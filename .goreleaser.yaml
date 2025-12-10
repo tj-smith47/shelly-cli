@@ -1,0 +1,84 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+    - go test -race ./...
+
+builds:
+  - id: shelly
+    main: ./cmd/shelly
+    binary: shelly
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/tj-smith47/shelly-cli/internal/version.Version={{.Version}}
+      - -X github.com/tj-smith47/shelly-cli/internal/version.Commit={{.Commit}}
+      - -X github.com/tj-smith47/shelly-cli/internal/version.Date={{.Date}}
+      - -X github.com/tj-smith47/shelly-cli/internal/version.BuiltBy=goreleaser
+    flags:
+      - -trimpath
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - completions/*
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "^style:"
+
+release:
+  github:
+    owner: tj-smith47
+    name: shelly-cli
+  prerelease: auto
+  name_template: "{{.ProjectName}} v{{.Version}}"
+  footer: |
+    ## Installation
+
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install tj-smith47/tap/shelly
+    ```
+
+    ### Go Install
+    ```bash
+    go install github.com/tj-smith47/shelly-cli/cmd/shelly@v{{.Version}}
+    ```
+
+    ### Download Binary
+    Download the appropriate binary for your platform from the assets below.
+
+    ## What's Changed
+    See the [CHANGELOG](https://github.com/tj-smith47/shelly-cli/blob/master/CHANGELOG.md) for details.
+
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}_{{ .Version }}_source"

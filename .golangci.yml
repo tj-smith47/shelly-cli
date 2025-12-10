@@ -1,0 +1,110 @@
+version: "2"
+
+run:
+  timeout: 5m
+  concurrency: 4
+  allow-parallel-runners: true
+
+linters:
+  enable:
+    # Core linters
+    - errcheck
+    - govet
+    - unused
+    - ineffassign
+    - staticcheck
+
+    # Style & complexity
+    - goconst
+    - gocritic
+    - revive
+    - gocyclo
+
+    # Bug prevention
+    - bodyclose
+    - errorlint
+    - nilerr
+    - wastedassign
+
+    # Security
+    - gosec
+
+    # Testing
+    - paralleltest
+    - thelper
+    - tparallel
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - opinionated
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+
+    revive:
+      severity: warning
+      rules:
+        - name: var-naming
+          severity: warning
+        - name: package-comments
+          severity: warning
+        - name: exported
+          severity: warning
+
+    gosec:
+      severity: medium
+      confidence: medium
+
+    thelper:
+      benchmark:
+        first: true
+        name: true
+        begin: true
+      fuzz:
+        first: true
+        name: true
+        begin: true
+      tb:
+        first: true
+        name: true
+        begin: true
+
+    gocyclo:
+      min-complexity: 15
+
+    paralleltest:
+      ignore-missing: false
+      ignore-missing-subtests: false
+
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+    - gci
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/tj-smith47/shelly-cli
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/tj-smith47/shelly-cli)
