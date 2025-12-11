@@ -45,8 +45,8 @@ Use --dry-run to preview actions without executing them.`,
   # Short form
   shelly sc activate party-mode`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], timeout, concurrent, dryRun)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], timeout, concurrent, dryRun)
 		},
 	}
 
@@ -65,7 +65,7 @@ type Result struct {
 	Error  error
 }
 
-func run(name string, timeout time.Duration, concurrent int, dryRun bool) error {
+func run(ctx context.Context, name string, timeout time.Duration, concurrent int, dryRun bool) error {
 	scene, exists := config.GetScene(name)
 	if !exists {
 		return fmt.Errorf("scene %q not found", name)
@@ -98,7 +98,7 @@ func run(name string, timeout time.Duration, concurrent int, dryRun bool) error 
 	var results []Result
 
 	// Create parent context with overall timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Duration(len(scene.Actions)))
+	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(scene.Actions)))
 	defer cancel()
 
 	g, ctx := errgroup.WithContext(ctx)

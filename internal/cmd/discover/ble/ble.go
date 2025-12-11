@@ -49,8 +49,8 @@ Examples:
 
   # Include BTHome sensor data
   shelly discover ble --bthome`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(timeout, includeBTHome, filterPrefix)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return run(cmd.Context(), timeout, includeBTHome, filterPrefix)
 		},
 	}
 
@@ -61,7 +61,7 @@ Examples:
 	return cmd
 }
 
-func run(timeout time.Duration, includeBTHome bool, filterPrefix string) error {
+func run(ctx context.Context, timeout time.Duration, includeBTHome bool, filterPrefix string) error {
 	if timeout == 0 {
 		timeout = DefaultTimeout
 	}
@@ -92,7 +92,7 @@ func run(timeout time.Duration, includeBTHome bool, filterPrefix string) error {
 		bleDiscoverer.FilterPrefix = filterPrefix
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	devices, err := bleDiscoverer.DiscoverWithContext(ctx)

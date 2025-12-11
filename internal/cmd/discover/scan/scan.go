@@ -42,12 +42,12 @@ Examples:
   # Auto-register discovered devices
   shelly discover scan --register`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			subnet := ""
 			if len(args) > 0 {
 				subnet = args[0]
 			}
-			return run(subnet, timeout, register, skipExisting)
+			return run(cmd.Context(), subnet, timeout, register, skipExisting)
 		},
 	}
 
@@ -58,7 +58,7 @@ Examples:
 	return cmd
 }
 
-func run(subnet string, timeout time.Duration, register, skipExisting bool) error {
+func run(ctx context.Context, subnet string, timeout time.Duration, register, skipExisting bool) error {
 	if subnet == "" {
 		var err error
 		subnet, err = detectSubnet()
@@ -84,7 +84,7 @@ func run(subnet string, timeout time.Duration, register, skipExisting bool) erro
 	spin := iostreams.NewSpinner(fmt.Sprintf("Probing %d addresses...", len(addresses)))
 	spin.Start()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	devices := discovery.ProbeAddresses(ctx, addresses)
