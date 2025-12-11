@@ -22,8 +22,9 @@ var allFlag bool
 // NewCommand creates the firmware check command.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "check [device]",
-		Short: "Check for firmware updates",
+		Use:     "check [device]",
+		Aliases: []string{"ck"},
+		Short:   "Check for firmware updates",
 		Long: `Check if firmware updates are available for a device.
 
 Use --all to check all registered devices.`,

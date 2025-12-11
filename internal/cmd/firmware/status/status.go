@@ -15,8 +15,9 @@ import (
 // NewCommand creates the firmware status command.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <device>",
-		Short: "Show firmware status",
+		Use:     "status <device>",
+		Aliases: []string{"st"},
+		Short:   "Show firmware status",
 		Long: `Show the current firmware status for a device.
 
 Displays update status, available versions, and rollback availability.`,

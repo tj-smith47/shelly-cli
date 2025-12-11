@@ -30,8 +30,9 @@ var (
 // NewCommand creates the firmware update command.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update [device]",
-		Short: "Update device firmware",
+		Use:     "update [device]",
+		Aliases: []string{"up"},
+		Short:   "Update device firmware",
 		Long: `Update device firmware to the latest version.
 
 By default, updates to the latest stable version. Use --beta for beta firmware

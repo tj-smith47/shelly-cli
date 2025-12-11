@@ -32,10 +32,10 @@ Create a production-ready, open-source Cobra CLI that:
 ## Current Status
 
 **Last Updated:** 2025-12-11
-**Phase:** Phase 7 - Script Commands (next)
-**Completed:** Phases 0.1-0.6, 1-6 (full)
+**Phase:** Phase 9 - Cloud Commands (next)
+**Completed:** Phases 0.1-0.6, 1-8 (full)
 **Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phases 7-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
+**Pending:** Phases 9-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
 **Test Coverage:** ~25% average - TARGET: >90% (deferred to Phase 25)
 
 **Architecture Audit (2025-12-11):**
@@ -669,21 +669,26 @@ shelly-cli/
 
 ---
 
-## Phase 7: Script Commands (Gen2+)
+## Phase 7: Script Commands (Gen2+) ✅
 
-### 7.1 Script Management
-- [ ] `shelly script list <device>` - List scripts
-- [ ] `shelly script get <device> <id>` - Get script code
-- [ ] `shelly script create <device> <name>` - Create script
-  - Flags: --code (inline), --file (from file), --enable
-- [ ] `shelly script update <device> <id>` - Update script code
-  - Flags: --code, --file, --name
-- [ ] `shelly script delete <device> <id>` - Delete script
-- [ ] `shelly script start <device> <id>` - Start script
-- [ ] `shelly script stop <device> <id>` - Stop script
-- [ ] `shelly script eval <device> <code>` - Evaluate code snippet
-- [ ] `shelly script upload <device> <file>` - Upload script from file
-- [ ] `shelly script download <device> <id> <file>` - Download script to file
+### 7.1 Script Management ✅
+- [x] `shelly script list <device>` - List scripts (alias: ls)
+- [x] `shelly script get <device> <id>` - Get script code (alias: code)
+  - Flags: --status (show status instead of code)
+- [x] `shelly script create <device>` - Create script (alias: new)
+  - Flags: --code (inline), --file (from file), --enable, --name
+- [x] `shelly script update <device> <id>` - Update script code (alias: up)
+  - Flags: --code, --file, --name, --append, --enable
+- [x] `shelly script delete <device> <id>` - Delete script (aliases: del, rm)
+  - Flags: --yes (skip confirmation)
+- [x] `shelly script start <device> <id>` - Start script (alias: run)
+- [x] `shelly script stop <device> <id>` - Stop script
+- [x] `shelly script eval <device> <id> <code>` - Evaluate code snippet (alias: exec)
+- [x] `shelly script upload <device> <id> <file>` - Upload script from file (alias: put)
+  - Flags: --append
+- [x] `shelly script download <device> <id> <file>` - Download script to file (alias: save)
+
+**Session Note (2025-12-11):** Created `internal/cmd/script/` with list/, get/, create/, update/, del/, start/, stop/, eval/, upload/, download/ subcommands. Added `internal/shelly/script.go` service layer using shelly-go gen2/components/script. Parent command alias: `sc`.
 
 ### 7.2 Script Library
 - [ ] `shelly script-lib list` - List available script templates
@@ -693,18 +698,22 @@ shelly-cli/
 
 ---
 
-## Phase 8: Schedule Commands
+## Phase 8: Schedule Commands ✅
 
-### 8.1 Schedule Management
-- [ ] `shelly schedule list <device>` - List schedules
-- [ ] `shelly schedule create <device>` - Create schedule
-  - Flags: --timespec, --calls, --enable
-  - Interactive mode for complex schedules
-- [ ] `shelly schedule update <device> <id>` - Update schedule
-- [ ] `shelly schedule delete <device> <id>` - Delete schedule
-- [ ] `shelly schedule delete-all <device>` - Delete all schedules
-- [ ] `shelly schedule enable <device> <id>` - Enable schedule
-- [ ] `shelly schedule disable <device> <id>` - Disable schedule
+### 8.1 Schedule Management ✅
+- [x] `shelly schedule list <device>` - List schedules (alias: ls)
+- [x] `shelly schedule create <device>` - Create schedule (alias: new)
+  - Flags: --timespec (required), --calls (required), --enable
+- [x] `shelly schedule update <device> <id>` - Update schedule (alias: up)
+  - Flags: --timespec, --calls, --enable, --disable
+- [x] `shelly schedule delete <device> <id>` - Delete schedule (aliases: del, rm)
+  - Flags: --yes
+- [x] `shelly schedule delete-all <device>` - Delete all schedules (alias: clear)
+  - Flags: --yes
+- [x] `shelly schedule enable <device> <id>` - Enable schedule
+- [x] `shelly schedule disable <device> <id>` - Disable schedule
+
+**Session Note (2025-12-11):** Created `internal/cmd/schedule/` with list/, create/, update/, del/, deleteall/, enable/, disable/ subcommands. Added `internal/shelly/schedule.go` service layer using shelly-go gen2/components/schedule. Supports cron-like timespec with @sunrise/@sunset. Parent command alias: `sched`.
 
 ### 8.2 Schedule Helpers
 - [ ] `shelly schedule sunrise <device>` - Create sunrise-based schedule

@@ -17,8 +17,9 @@ var yesFlag bool
 // NewCommand creates the firmware rollback command.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rollback <device>",
-		Short: "Rollback to previous firmware",
+		Use:     "rollback <device>",
+		Aliases: []string{"rb"},
+		Short:   "Rollback to previous firmware",
 		Long: `Rollback device firmware to the previous version.
 
 This is only available when the device supports rollback (typically after

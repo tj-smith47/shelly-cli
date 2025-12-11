@@ -24,8 +24,9 @@ var (
 // NewCommand creates the firmware download command.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "download <device>",
-		Short: "Download firmware file",
+		Use:     "download <device>",
+		Aliases: []string{"dl"},
+		Short:   "Download firmware file",
 		Long: `Download firmware file for a device.
 
 Downloads the latest available firmware for the device.

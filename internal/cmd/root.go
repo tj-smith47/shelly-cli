@@ -29,6 +29,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
@@ -109,6 +111,8 @@ func init() {
 	rootCmd.AddCommand(mqtt.NewCommand())
 	rootCmd.AddCommand(webhook.NewCommand())
 	rootCmd.AddCommand(firmware.NewCommand())
+	rootCmd.AddCommand(script.NewCommand())
+	rootCmd.AddCommand(schedule.NewCommand())
 	rootCmd.AddCommand(versionCmd())
 }
 
