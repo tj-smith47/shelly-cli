@@ -1,0 +1,81 @@
+// Package status provides the firmware status subcommand.
+package status
+
+import (
+	"context"
+
+	"github.com/spf13/cobra"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
+)
+
+// NewCommand creates the firmware status command.
+func NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "status <device>",
+		Short: "Show firmware status",
+		Long: `Show the current firmware status for a device.
+
+Displays update status, available versions, and rollback availability.`,
+		Example: `  # Show firmware status
+  shelly firmware status living-room`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0])
+		},
+	}
+
+	return cmd
+}
+
+func run(ctx context.Context, device string) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	defer cancel()
+
+	ios := iostreams.System()
+	svc := shelly.NewService()
+
+	return cmdutil.RunDeviceStatus(ctx, ios, svc, device,
+		"Getting firmware status...",
+		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.FirmwareStatus, error) {
+			return svc.GetFirmwareStatus(ctx, device)
+		},
+		displayStatus)
+}
+
+func displayStatus(ios *iostreams.IOStreams, status *shelly.FirmwareStatus) {
+	ios.Println(theme.Bold().Render("Firmware Status"))
+	ios.Println("")
+
+	// Status
+	statusStr := status.Status
+	if statusStr == "" {
+		statusStr = "idle"
+	}
+	ios.Printf("  Status:      %s\n", statusStr)
+
+	// Update available
+	if status.HasUpdate {
+		ios.Printf("  Update:      %s\n", theme.StatusOK().Render("available"))
+		if status.NewVersion != "" {
+			ios.Printf("  New Version: %s\n", status.NewVersion)
+		}
+	} else {
+		ios.Printf("  Update:      %s\n", theme.Dim().Render("up to date"))
+	}
+
+	// Progress (if updating)
+	if status.Progress > 0 {
+		ios.Printf("  Progress:    %d%%\n", status.Progress)
+	}
+
+	// Rollback
+	if status.CanRollback {
+		ios.Printf("  Rollback:    %s\n", theme.StatusOK().Render("available"))
+	} else {
+		ios.Printf("  Rollback:    %s\n", theme.Dim().Render("not available"))
+	}
+}

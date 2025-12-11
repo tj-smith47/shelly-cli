@@ -22,6 +22,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
@@ -107,6 +108,7 @@ func init() {
 	rootCmd.AddCommand(auth.NewCommand())
 	rootCmd.AddCommand(mqtt.NewCommand())
 	rootCmd.AddCommand(webhook.NewCommand())
+	rootCmd.AddCommand(firmware.NewCommand())
 	rootCmd.AddCommand(versionCmd())
 }
 

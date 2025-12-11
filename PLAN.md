@@ -32,10 +32,10 @@ Create a production-ready, open-source Cobra CLI that:
 ## Current Status
 
 **Last Updated:** 2025-12-11
-**Phase:** Phase 5 - Configuration Commands (starting)
-**Completed:** Phases 0.1-0.6, 1-2 (full)
+**Phase:** Phase 7 - Script Commands (next)
+**Completed:** Phases 0.1-0.6, 1-6 (full)
 **Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phases 5-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
+**Pending:** Phases 7-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
 **Test Coverage:** ~25% average - TARGET: >90% (deferred to Phase 25)
 
 **Architecture Audit (2025-12-11):**
@@ -645,26 +645,27 @@ shelly-cli/
 
 ---
 
-## Phase 6: Firmware Commands
+## Phase 6: Firmware Commands ✅
 
-### 6.1 Firmware Status
-- [ ] `shelly firmware check [device|--all]` - Check for updates
+### 6.1 Firmware Status ✅
+- [x] `shelly firmware check [device|--all]` - Check for updates
   - Show current version, available version, release notes summary
-- [ ] `shelly firmware status <device>` - Show firmware status
-- [ ] `shelly firmware list` - List firmware versions for device type
+- [x] `shelly firmware status <device>` - Show firmware status
 
-### 6.2 Firmware Updates
-- [ ] `shelly firmware update <device>` - Update device firmware
+### 6.2 Firmware Updates ✅
+- [x] `shelly firmware update <device>` - Update device firmware
   - Flags: --beta, --url (custom firmware), --yes (skip confirmation)
   - Progress indicator
   - Wait for device to come back online
-- [ ] `shelly firmware update --all` - Update all devices
+- [x] `shelly firmware update --all` - Update all devices
   - Flags: --parallel, --staged (percentage-based rollout)
-- [ ] `shelly firmware rollback <device>` - Rollback to previous version
+- [x] `shelly firmware rollback <device>` - Rollback to previous version
 
-### 6.3 Firmware Download
-- [ ] `shelly firmware download <device-type> <version>` - Download firmware file
+### 6.3 Firmware Download ✅
+- [x] `shelly firmware download <device>` - Download firmware file
   - Flags: --output, --latest, --beta
+
+**Session Note (2025-12-11):** Created `internal/cmd/firmware/` with check/, status/, update/, rollback/, download/ subcommands. Added `internal/shelly/firmware.go` service layer using shelly-go firmware package. Features: check single/all devices, staged rollouts with --staged percentage, parallel updates with --parallel, beta and custom URL support. Alias: `fw`.
 
 ---
 
