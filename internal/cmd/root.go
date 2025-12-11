@@ -106,8 +106,8 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
 	} else {
-		home, err := os.UserHomeDir()
-		if err != nil {
+		var home string
+		if home, err = os.UserHomeDir(); err != nil {
 			return fmt.Errorf("failed to get home directory: %w", err)
 		}
 		viper.AddConfigPath(home + "/.config/shelly")

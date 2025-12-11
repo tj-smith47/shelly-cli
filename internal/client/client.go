@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-go/gen2"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 	"github.com/tj-smith47/shelly-go/rpc"
 	"github.com/tj-smith47/shelly-go/transport"
+
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // Client represents a connection to a Shelly device.

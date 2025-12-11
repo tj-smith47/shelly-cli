@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // DefaultTimeout is the default timeout for device operations.
