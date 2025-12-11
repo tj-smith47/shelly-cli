@@ -2,9 +2,12 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -35,11 +38,29 @@ This tool provides a comprehensive interface for discovering, monitoring,
 and controlling Shelly devices on your local network.`,
 }
 
-// Execute runs the root command.
+// Execute runs the root command with signal-aware context.
+// The context is cancelled on SIGINT (Ctrl+C) or SIGTERM, enabling graceful
+// shutdown of in-flight HTTP requests and other operations.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
+	os.Exit(execute())
+}
+
+// execute runs the root command and returns an exit code.
+// Separating this allows proper cleanup via defer before exit.
+func execute() int {
+	// Create a cancellable context that responds to signals
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
+		// Check if we were cancelled by signal
+		if ctx.Err() != nil {
+			// Exit quietly for signal-based cancellation
+			return 130 // 128 + SIGINT (2)
+		}
+		return 1
 	}
+	return 0
 }
 
 func init() {

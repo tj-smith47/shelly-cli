@@ -26,7 +26,7 @@ func NewCommand() *cobra.Command {
 		Long:    `Show the current status of a switch component on the specified device.`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args[0], switchID)
+			return run(cmd.Context(), cmd, args[0], switchID)
 		},
 	}
 
@@ -35,8 +35,8 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(cmd *cobra.Command, device string, switchID int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, cmd *cobra.Command, device string, switchID int) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

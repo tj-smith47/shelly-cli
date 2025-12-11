@@ -27,8 +27,8 @@ func NewCommand() *cobra.Command {
 You can set brightness and on/off state.
 Values not specified will be left unchanged.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], lightID, brightness, on)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], lightID, brightness, on)
 		},
 	}
 
@@ -39,8 +39,8 @@ Values not specified will be left unchanged.`,
 	return cmd
 }
 
-func run(device string, lightID, brightness int, on bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, lightID, brightness int, on bool) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

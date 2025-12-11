@@ -20,8 +20,8 @@ func NewCommand() *cobra.Command {
 		Short: "Turn light on",
 		Long:  `Turn on a light component on the specified device.`,
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], lightID)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], lightID)
 		},
 	}
 
@@ -30,8 +30,8 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(device string, lightID int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, lightID int) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

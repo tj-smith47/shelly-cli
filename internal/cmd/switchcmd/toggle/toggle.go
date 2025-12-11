@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the switch toggle command.
@@ -21,7 +21,7 @@ func NewCommand() *cobra.Command {
 		Long:  `Toggle the state of a switch component on the specified device.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(args[0], switchID)
+			return run(cmd.Context(), args[0], switchID)
 		},
 	}
 
@@ -30,8 +30,8 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(device string, switchID int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, switchID int) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

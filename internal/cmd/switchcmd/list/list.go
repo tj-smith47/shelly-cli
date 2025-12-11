@@ -8,10 +8,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the switch list command.
@@ -22,15 +22,15 @@ func NewCommand() *cobra.Command {
 		Long:  `List all switch components on the specified device with their current status.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args[0])
+			return run(cmd.Context(), cmd, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(cmd *cobra.Command, device string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*shelly.DefaultTimeout/10) // 15s
+func run(ctx context.Context, cmd *cobra.Command, device string) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*shelly.DefaultTimeout/10) // 15s
 	defer cancel()
 
 	svc := shelly.NewService()
