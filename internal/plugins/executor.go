@@ -2,6 +2,7 @@
 package plugins
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -22,7 +23,13 @@ func NewExecutor() *Executor {
 
 // Execute runs a plugin with the given arguments.
 func (e *Executor) Execute(plugin *Plugin, args []string) error {
-	cmd := exec.Command(plugin.Path, args...)
+	return e.ExecuteContext(context.Background(), plugin, args)
+}
+
+// ExecuteContext runs a plugin with context for cancellation support.
+func (e *Executor) ExecuteContext(ctx context.Context, plugin *Plugin, args []string) error {
+	//nolint:gosec // G204: Plugin path is validated by loader, not arbitrary user input
+	cmd := exec.CommandContext(ctx, plugin.Path, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -36,7 +43,13 @@ func (e *Executor) Execute(plugin *Plugin, args []string) error {
 
 // ExecuteCapture runs a plugin and captures its output.
 func (e *Executor) ExecuteCapture(plugin *Plugin, args []string) ([]byte, error) {
-	cmd := exec.Command(plugin.Path, args...)
+	return e.ExecuteCaptureContext(context.Background(), plugin, args)
+}
+
+// ExecuteCaptureContext runs a plugin with context and captures its output.
+func (e *Executor) ExecuteCaptureContext(ctx context.Context, plugin *Plugin, args []string) ([]byte, error) {
+	//nolint:gosec // G204: Plugin path is validated by loader, not arbitrary user input
+	cmd := exec.CommandContext(ctx, plugin.Path, args...)
 	cmd.Env = e.buildEnvironment()
 
 	return cmd.Output()
@@ -74,10 +87,8 @@ func (e *Executor) buildEnvironment() []string {
 	}
 
 	// SHELLY_API_MODE: API mode (local, cloud, auto)
-	env = append(env, "SHELLY_API_MODE="+cfg.APIMode)
-
 	// SHELLY_THEME: Current theme
-	env = append(env, "SHELLY_THEME="+cfg.Theme)
+	env = append(env, "SHELLY_API_MODE="+cfg.APIMode, "SHELLY_THEME="+cfg.Theme)
 
 	// SHELLY_DEVICES_JSON: JSON of registered devices
 	if devicesJSON, err := json.Marshal(cfg.Devices); err == nil {

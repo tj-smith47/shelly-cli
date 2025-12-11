@@ -36,6 +36,9 @@ type Config struct {
 	// Groups
 	Groups map[string]Group `mapstructure:"groups"`
 
+	// Scenes
+	Scenes map[string]Scene `mapstructure:"scenes"`
+
 	// Plugin settings
 	Plugins PluginsConfig `mapstructure:"plugins"`
 }
@@ -87,6 +90,20 @@ type Group struct {
 	Devices []string `mapstructure:"devices"`
 }
 
+// Scene represents a saved device state configuration.
+type Scene struct {
+	Name        string        `mapstructure:"name" json:"name" yaml:"name"`
+	Description string        `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
+	Actions     []SceneAction `mapstructure:"actions" json:"actions" yaml:"actions"`
+}
+
+// SceneAction represents a single action within a scene.
+type SceneAction struct {
+	Device string         `mapstructure:"device" json:"device" yaml:"device"`
+	Method string         `mapstructure:"method" json:"method" yaml:"method"`
+	Params map[string]any `mapstructure:"params,omitempty" json:"params,omitempty" yaml:"params,omitempty"`
+}
+
 // PluginsConfig holds plugin system settings.
 type PluginsConfig struct {
 	Enabled bool     `mapstructure:"enabled"`
@@ -113,6 +130,7 @@ func Get() *Config {
 			Devices: make(map[string]Device),
 			Aliases: make(map[string]Alias),
 			Groups:  make(map[string]Group),
+			Scenes:  make(map[string]Scene),
 		}
 	}
 	return cfg
@@ -138,6 +156,9 @@ func Load() (*Config, error) {
 		}
 		if c.Groups == nil {
 			c.Groups = make(map[string]Group)
+		}
+		if c.Scenes == nil {
+			c.Scenes = make(map[string]Scene)
 		}
 
 		cfgMu.Lock()
@@ -182,6 +203,7 @@ func Save() error {
 	viper.Set("devices", c.Devices)
 	viper.Set("aliases", c.Aliases)
 	viper.Set("groups", c.Groups)
+	viper.Set("scenes", c.Scenes)
 	viper.Set("plugins", c.Plugins)
 
 	// Get config file path
@@ -196,7 +218,7 @@ func Save() error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(configFile)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -208,8 +230,8 @@ func Save() error {
 	return nil
 }
 
-// ConfigDir returns the configuration directory path.
-func ConfigDir() (string, error) {
+// Dir returns the configuration directory path.
+func Dir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
@@ -219,7 +241,7 @@ func ConfigDir() (string, error) {
 
 // PluginsDir returns the plugins directory path.
 func PluginsDir() (string, error) {
-	configDir, err := ConfigDir()
+	configDir, err := Dir()
 	if err != nil {
 		return "", err
 	}

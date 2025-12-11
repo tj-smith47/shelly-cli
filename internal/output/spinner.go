@@ -27,8 +27,9 @@ func NewSpinner(message string, opts ...SpinnerOption) *Spinner {
 		s: spinner.New(charSet, 100*time.Millisecond, spinner.WithWriter(os.Stderr)),
 	}
 
-	// Apply theme color
-	s.s.Color("cyan") // Default color, will be overridden by theme if possible
+	// Apply theme color.
+	//nolint:errcheck // Spinner color is best-effort
+	s.s.Color("cyan")
 
 	// Set message
 	s.s.Suffix = " " + message

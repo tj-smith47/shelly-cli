@@ -20,8 +20,8 @@ jobs:
       - name: Bump version and push tag
         uses: anothrNick/github-tag-action@1.71.0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
           DEFAULT_BUMP: patch
+          GITHUB_TOKEN: ${{ github.token }}
           RELEASE_BRANCHES: master
           TAG_CONTEXT: branch
+          WITH_V: true

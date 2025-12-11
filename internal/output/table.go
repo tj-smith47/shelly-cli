@@ -150,6 +150,7 @@ func (t *Table) Print() {
 
 // PrintTo prints the table to the specified writer.
 func (t *Table) PrintTo(w io.Writer) {
+	//nolint:errcheck // Best-effort output to terminal
 	fmt.Fprint(w, t.Render())
 }
 
@@ -231,5 +232,6 @@ func PrintStatus(status, message string) {
 		style = lipgloss.NewStyle().Foreground(theme.Fg())
 	}
 
+	//nolint:errcheck // Best-effort output to terminal
 	fmt.Fprintf(os.Stdout, "%s %s\n", style.Render("●"), message)
 }

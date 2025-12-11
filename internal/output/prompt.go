@@ -33,7 +33,7 @@ func ConfirmDanger(message string) (bool, error) {
 }
 
 // Input prompts the user for text input.
-func Input(message string, defaultValue string) (string, error) {
+func Input(message, defaultValue string) (string, error) {
 	var result string
 	prompt := &survey.Input{
 		Message: message,
@@ -92,7 +92,7 @@ func SelectIndex(message string, options []string, defaultIndex int) (int, error
 }
 
 // MultiSelect prompts the user to select multiple options from a list.
-func MultiSelect(message string, options []string, defaults []string) ([]string, error) {
+func MultiSelect(message string, options, defaults []string) ([]string, error) {
 	var result []string
 	prompt := &survey.MultiSelect{
 		Message: message,
@@ -104,7 +104,7 @@ func MultiSelect(message string, options []string, defaults []string) ([]string,
 }
 
 // Editor opens the user's editor for multi-line input.
-func Editor(message string, defaultValue string) (string, error) {
+func Editor(message, defaultValue string) (string, error) {
 	var result string
 	prompt := &survey.Editor{
 		Message:       message,
@@ -116,7 +116,7 @@ func Editor(message string, defaultValue string) (string, error) {
 	return result, err
 }
 
-// AskQuestions asks multiple questions at once.
+// Question represents a prompt question for multiple question surveys.
 type Question struct {
 	Name     string
 	Prompt   survey.Prompt
@@ -127,7 +127,7 @@ type Question struct {
 func Ask(questions []Question) (map[string]any, error) {
 	answers := make(map[string]any)
 
-	var qs []*survey.Question
+	qs := make([]*survey.Question, 0, len(questions))
 	for _, q := range questions {
 		sq := &survey.Question{
 			Name:   q.Name,

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"text/template"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -15,11 +16,13 @@ import (
 // Format represents an output format.
 type Format string
 
+// Output format constants.
 const (
-	FormatJSON  Format = "json"
-	FormatYAML  Format = "yaml"
-	FormatTable Format = "table"
-	FormatText  Format = "text"
+	FormatJSON     Format = "json"
+	FormatYAML     Format = "yaml"
+	FormatTable    Format = "table"
+	FormatText     Format = "text"
+	FormatTemplate Format = "template"
 )
 
 // Formatter defines the interface for output formatters.
@@ -39,9 +42,16 @@ func GetFormat() Format {
 		return FormatTable
 	case "text", "plain":
 		return FormatText
+	case "template", "go-template":
+		return FormatTemplate
 	default:
 		return FormatTable
 	}
+}
+
+// GetTemplate returns the current template string from config.
+func GetTemplate() string {
+	return viper.GetString("template")
 }
 
 // Print outputs data in the configured format.
@@ -86,6 +96,8 @@ func NewFormatter(format Format) Formatter {
 		return NewTableFormatter()
 	case FormatText:
 		return NewTextFormatter()
+	case FormatTemplate:
+		return NewTemplateFormatter(GetTemplate())
 	default:
 		return NewTableFormatter()
 	}
@@ -119,10 +131,14 @@ func NewYAMLFormatter() *YAMLFormatter {
 }
 
 // Format outputs data as YAML.
-func (f *YAMLFormatter) Format(w io.Writer, data any) error {
+func (f *YAMLFormatter) Format(w io.Writer, data any) (err error) {
 	encoder := yaml.NewEncoder(w)
 	encoder.SetIndent(2)
-	defer encoder.Close()
+	defer func() {
+		if cerr := encoder.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 	return encoder.Encode(data)
 }
 
@@ -184,6 +200,8 @@ func ParseFormat(s string) (Format, error) {
 		return FormatTable, nil
 	case "text", "plain":
 		return FormatText, nil
+	case "template", "go-template":
+		return FormatTemplate, nil
 	default:
 		return "", fmt.Errorf("unknown format: %s", s)
 	}
@@ -191,5 +209,50 @@ func ParseFormat(s string) (Format, error) {
 
 // ValidFormats returns a list of valid format strings.
 func ValidFormats() []string {
-	return []string{"json", "yaml", "table", "text"}
+	return []string{"json", "yaml", "table", "text", "template"}
+}
+
+// TemplateFormatter formats output using Go text/template.
+type TemplateFormatter struct {
+	Template string
+}
+
+// NewTemplateFormatter creates a new template formatter with the given template string.
+func NewTemplateFormatter(tmpl string) *TemplateFormatter {
+	return &TemplateFormatter{Template: tmpl}
+}
+
+// Format outputs data using the Go template.
+func (f *TemplateFormatter) Format(w io.Writer, data any) error {
+	if f.Template == "" {
+		return fmt.Errorf("template string is required when using template output format (use --template flag)")
+	}
+
+	tmpl, err := template.New("output").Parse(f.Template)
+	if err != nil {
+		return fmt.Errorf("invalid template: %w", err)
+	}
+
+	if err := tmpl.Execute(w, data); err != nil {
+		return fmt.Errorf("template execution failed: %w", err)
+	}
+
+	// Add newline if template doesn't end with one
+	if !strings.HasSuffix(f.Template, "\n") {
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Template outputs data using the specified template to the given writer.
+func Template(w io.Writer, tmpl string, data any) error {
+	return NewTemplateFormatter(tmpl).Format(w, data)
+}
+
+// PrintTemplate outputs data using the specified template to stdout.
+func PrintTemplate(tmpl string, data any) error {
+	return Template(os.Stdout, tmpl, data)
 }

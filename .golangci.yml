@@ -25,6 +25,32 @@ linters:
     - errorlint
     - nilerr
     - wastedassign
+    - asciicheck
+    - bidichk
+    - copyloopvar
+    - durationcheck
+    - fatcontext
+    - forcetypeassert
+    - nilnil
+    - noctx
+    - reassign
+    - recvcheck
+
+    # Code quality
+    - errname
+    - exhaustive
+    - gocheckcompilerdirectives
+    - godot
+    - intrange
+    - misspell
+    - nestif
+    - nolintlint
+    - prealloc
+    - predeclared
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - whitespace
 
     # Security
     - gosec
@@ -92,6 +118,16 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
+
+    nestif:
+      min-complexity: 4
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+    exhaustive:
+      default-signifies-exhaustive: true
 
 formatters:
   enable:

@@ -17,8 +17,8 @@ func resetConfig() {
 	viper.Reset()
 }
 
+//nolint:paralleltest // Test modifies global config state via resetConfig
 func TestGet_ReturnsDefaults(t *testing.T) {
-	t.Parallel()
 	resetConfig()
 
 	c := Get()
@@ -37,8 +37,8 @@ func TestGet_ReturnsDefaults(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global config state via resetConfig
 func TestLoad_InitializesMaps(t *testing.T) {
-	t.Parallel()
 	resetConfig()
 
 	c, err := Load()
@@ -60,12 +60,15 @@ func TestLoad_InitializesMaps(t *testing.T) {
 func TestConfigDir(t *testing.T) {
 	t.Parallel()
 
-	dir, err := ConfigDir()
+	dir, err := Dir()
 	if err != nil {
-		t.Fatalf("ConfigDir() error: %v", err)
+		t.Fatalf("Dir() error: %v", err)
 	}
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir() error: %v", err)
+	}
 	expected := filepath.Join(home, ".config", "shelly")
 	if dir != expected {
 		t.Errorf("expected %q, got %q", expected, dir)
@@ -80,7 +83,10 @@ func TestPluginsDir(t *testing.T) {
 		t.Fatalf("PluginsDir() error: %v", err)
 	}
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir() error: %v", err)
+	}
 	expected := filepath.Join(home, ".config", "shelly", "plugins")
 	if dir != expected {
 		t.Errorf("expected %q, got %q", expected, dir)

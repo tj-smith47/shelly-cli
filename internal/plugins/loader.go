@@ -2,10 +2,12 @@
 package plugins
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
@@ -49,9 +51,7 @@ func getSearchPaths() []string {
 
 	// Add PATH directories
 	if pathEnv := os.Getenv("PATH"); pathEnv != "" {
-		for _, p := range strings.Split(pathEnv, string(os.PathListSeparator)) {
-			paths = append(paths, p)
-		}
+		paths = append(paths, strings.Split(pathEnv, string(os.PathListSeparator))...)
 	}
 
 	return paths
@@ -127,7 +127,7 @@ func (l *Loader) Find(name string) (*Plugin, error) {
 		}
 	}
 
-	return nil, nil
+	return nil, nil //nolint:nilnil // Plugin not found is valid, not an error
 }
 
 func (l *Loader) findByName(name string) *Plugin {
@@ -176,7 +176,10 @@ func isExecutable(path string) bool {
 
 // getPluginVersion attempts to get the version of a plugin by running it with --version.
 func getPluginVersion(path string) string {
-	cmd := exec.Command(path, "--version")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, path, "--version")
 	output, err := cmd.Output()
 	if err != nil {
 		return ""

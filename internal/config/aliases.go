@@ -149,7 +149,8 @@ type aliasFile struct {
 // ImportAliases imports aliases from a YAML file.
 // Returns the number of imported aliases, skipped aliases, and any error.
 // If merge is true, existing aliases are not overwritten.
-func (c *Config) ImportAliases(filename string, merge bool) (imported int, skipped int, err error) {
+func (c *Config) ImportAliases(filename string, merge bool) (imported, skipped int, err error) {
+	//nolint:gosec // G304: filename is user-provided intentionally (import command)
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to read file: %w", err)
@@ -222,7 +223,7 @@ func (c *Config) ExportAliases(filename string) error {
 		return nil
 	}
 
-	if err := os.WriteFile(filename, data, 0o644); err != nil {
+	if err := os.WriteFile(filename, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

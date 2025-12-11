@@ -1,0 +1,58 @@
+// Package open provides the cover open subcommand.
+package open
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/spf13/cobra"
+
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+)
+
+// NewCommand creates the cover open command.
+func NewCommand() *cobra.Command {
+	var coverID int
+	var duration int
+
+	cmd := &cobra.Command{
+		Use:   "open <device>",
+		Short: "Open cover",
+		Long:  `Open a cover/roller component on the specified device.`,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return run(args[0], coverID, duration)
+		},
+	}
+
+	cmd.Flags().IntVarP(&coverID, "id", "i", 0, "Cover ID (default 0)")
+	cmd.Flags().IntVarP(&duration, "duration", "d", 0, "Duration in seconds (0 = full open)")
+
+	return cmd
+}
+
+func run(device string, coverID, duration int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+	defer cancel()
+
+	svc := shelly.NewService()
+
+	spin := iostreams.NewSpinner("Opening cover...")
+	spin.Start()
+
+	var dur *int
+	if duration > 0 {
+		dur = &duration
+	}
+
+	err := svc.CoverOpen(ctx, device, coverID, dur)
+	spin.Stop()
+
+	if err != nil {
+		return fmt.Errorf("failed to open cover: %w", err)
+	}
+
+	iostreams.Success("Cover %d opening", coverID)
+	return nil
+}

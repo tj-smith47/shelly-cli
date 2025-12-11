@@ -43,46 +43,46 @@ func TestExpandAlias(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name   string
-		alias  Alias
-		args   []string
-		want   string
+		name  string
+		alias Alias
+		args  []string
+		want  string
 	}{
 		{
-			name:   "no placeholders",
-			alias:  Alias{Command: "switch status"},
-			args:   []string{},
-			want:   "switch status",
+			name:  "no placeholders",
+			alias: Alias{Command: "switch status"},
+			args:  []string{},
+			want:  "switch status",
 		},
 		{
-			name:   "single placeholder",
-			alias:  Alias{Command: "switch toggle $1"},
-			args:   []string{"living-room"},
-			want:   "switch toggle living-room",
+			name:  "single placeholder",
+			alias: Alias{Command: "switch toggle $1"},
+			args:  []string{"living-room"},
+			want:  "switch toggle living-room",
 		},
 		{
-			name:   "multiple placeholders",
-			alias:  Alias{Command: "switch $1 $2"},
-			args:   []string{"on", "kitchen"},
-			want:   "switch on kitchen",
+			name:  "multiple placeholders",
+			alias: Alias{Command: "switch $1 $2"},
+			args:  []string{"on", "kitchen"},
+			want:  "switch on kitchen",
 		},
 		{
-			name:   "all args placeholder",
-			alias:  Alias{Command: "batch $@"},
-			args:   []string{"device1", "device2", "device3"},
-			want:   "batch device1 device2 device3",
+			name:  "all args placeholder",
+			alias: Alias{Command: "batch $@"},
+			args:  []string{"device1", "device2", "device3"},
+			want:  "batch device1 device2 device3",
 		},
 		{
-			name:   "mixed placeholders",
-			alias:  Alias{Command: "script $1 run $@"},
-			args:   []string{"mydevice", "arg1", "arg2"},
-			want:   "script mydevice run mydevice arg1 arg2",
+			name:  "mixed placeholders",
+			alias: Alias{Command: "script $1 run $@"},
+			args:  []string{"mydevice", "arg1", "arg2"},
+			want:  "script mydevice run mydevice arg1 arg2",
 		},
 		{
-			name:   "unused placeholder",
-			alias:  Alias{Command: "switch $1 $2 $3"},
-			args:   []string{"on"},
-			want:   "switch on $2 $3",
+			name:  "unused placeholder",
+			alias: Alias{Command: "switch $1 $2 $3"},
+			args:  []string{"on"},
+			want:  "switch on $2 $3",
 		},
 	}
 
@@ -97,6 +97,7 @@ func TestExpandAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global config state
 func TestConfig_AliasOperations(t *testing.T) {
 	// Reset config state
 	cfgMu.Lock()
@@ -142,6 +143,7 @@ func TestConfig_AliasOperations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global config state
 func TestConfig_ImportExportAliases(t *testing.T) {
 	// Reset config state
 	cfgMu.Lock()
@@ -151,16 +153,24 @@ func TestConfig_ImportExportAliases(t *testing.T) {
 
 	c := Get()
 
-	// Add some aliases
-	c.AddAlias("ss", "switch status", false)
-	c.AddAlias("st", "switch toggle $1", false)
+	// Add some aliases.
+	if err := c.AddAlias("ss", "switch status", false); err != nil {
+		t.Fatalf("AddAlias(ss) error: %v", err)
+	}
+	if err := c.AddAlias("st", "switch toggle $1", false); err != nil {
+		t.Fatalf("AddAlias(st) error: %v", err)
+	}
 
-	// Create temp dir
+	// Create temp dir.
 	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
 	// Export
 	exportPath := filepath.Join(tmpDir, "aliases.yaml")

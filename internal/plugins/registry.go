@@ -23,7 +23,7 @@ func NewRegistry() (*Registry, error) {
 	}
 
 	// Ensure plugins directory exists
-	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
+	if err := os.MkdirAll(pluginsDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create plugins directory: %w", err)
 	}
 
@@ -51,12 +51,14 @@ func (r *Registry) Install(sourcePath string) error {
 	destPath := filepath.Join(r.pluginsDir, filename)
 
 	// Copy the file
+	//nolint:gosec // G304: sourcePath is user-provided intentionally (install command)
 	data, err := os.ReadFile(sourcePath)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin: %w", err)
 	}
 
-	if err := os.WriteFile(destPath, data, 0o755); err != nil {
+	//nolint:gosec // G306: Plugins need executable permission
+	if err := os.WriteFile(destPath, data, 0o700); err != nil {
 		return fmt.Errorf("failed to install plugin: %w", err)
 	}
 
@@ -90,15 +92,15 @@ func (r *Registry) Remove(name string) error {
 
 // List returns all installed plugins (in user plugins directory).
 func (r *Registry) List() ([]Plugin, error) {
-	var plugins []Plugin
-
 	entries, err := os.ReadDir(r.pluginsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return plugins, nil
+			return nil, nil // Empty list is valid when directory doesn't exist.
 		}
 		return nil, fmt.Errorf("failed to read plugins directory: %w", err)
 	}
+
+	plugins := make([]Plugin, 0, len(entries))
 
 	for _, entry := range entries {
 		if entry.IsDir() {

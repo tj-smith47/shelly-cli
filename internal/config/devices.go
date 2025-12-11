@@ -222,11 +222,8 @@ func AddDeviceToGroup(groupName, deviceName string) error {
 		return fmt.Errorf("group %q not found", groupName)
 	}
 
-	// Check if device exists (or is a valid address)
-	if _, ok := c.Devices[deviceName]; !ok {
-		// Allow adding unregistered devices (by address)
-		// This provides flexibility for ad-hoc grouping
-	}
+	// Note: We allow adding unregistered devices (by address) to groups.
+	// This provides flexibility for ad-hoc grouping.
 
 	// Check if already in group
 	for _, d := range group.Devices {

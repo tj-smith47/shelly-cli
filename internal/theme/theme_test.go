@@ -32,9 +32,8 @@ func TestListThemes(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global theme state
 func TestSetTheme(t *testing.T) {
-	// Not parallel - modifies global state
-
 	// Valid theme
 	if !SetTheme("nord") {
 		t.Error("SetTheme('nord') returned false")
@@ -49,9 +48,8 @@ func TestSetTheme(t *testing.T) {
 	SetTheme("dracula")
 }
 
+//nolint:paralleltest // Test modifies global theme state
 func TestCurrent(t *testing.T) {
-	// Not parallel - uses global state
-
 	SetTheme("dracula")
 	tint := Current()
 
@@ -134,9 +132,9 @@ func TestFormatEnergy(t *testing.T) {
 		contains string
 		unit     string
 	}{
-		{500.0, "500", "Wh"},     // 500 Wh (< 1000)
-		{1000.0, "1", "kWh"},     // 1 kWh
-		{2500.0, "2.5", "kWh"},   // 2.5 kWh
+		{500.0, "500", "Wh"},   // 500 Wh (< 1000)
+		{1000.0, "1", "kWh"},   // 1 kWh
+		{2500.0, "2.5", "kWh"}, // 2.5 kWh
 	}
 
 	for _, tt := range tests {
@@ -163,9 +161,8 @@ func TestTextStyles(t *testing.T) {
 	_ = Code()
 }
 
+//nolint:paralleltest // Test modifies global theme state
 func TestNextPrevTheme(t *testing.T) {
-	// Not parallel - modifies global state
-
 	SetTheme("dracula")
 	initial := Current().ID()
 

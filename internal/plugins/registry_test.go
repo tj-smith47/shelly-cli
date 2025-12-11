@@ -40,34 +40,43 @@ func TestRegistry_PluginsDir(t *testing.T) {
 func TestRegistry_Install(t *testing.T) {
 	t.Parallel()
 
-	// Create temp dirs for source and registry
+	// Create temp dirs for source and registry.
 	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
 	pluginsDir := filepath.Join(tmpDir, "plugins")
 	sourceDir := filepath.Join(tmpDir, "source")
-	os.MkdirAll(pluginsDir, 0o755)
-	os.MkdirAll(sourceDir, 0o755)
+	if err := os.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
+	}
+	if err := os.MkdirAll(sourceDir, 0o750); err != nil {
+		t.Fatalf("failed to create source dir: %v", err)
+	}
 
 	registry := &Registry{pluginsDir: pluginsDir}
 
-	// Create source plugin
+	// Create source plugin.
 	sourcePath := filepath.Join(sourceDir, "shelly-testplugin")
+	//nolint:gosec // Test file needs to be executable
 	err = os.WriteFile(sourcePath, []byte("#!/bin/bash\necho test"), 0o755)
 	if err != nil {
 		t.Fatalf("failed to create source plugin: %v", err)
 	}
 
-	// Install
+	// Install.
 	err = registry.Install(sourcePath)
 	if err != nil {
 		t.Fatalf("Install() error: %v", err)
 	}
 
-	// Verify installed
+	// Verify installed.
 	installedPath := filepath.Join(pluginsDir, "shelly-testplugin")
 	if _, err := os.Stat(installedPath); os.IsNotExist(err) {
 		t.Error("plugin not installed to expected location")
@@ -81,13 +90,20 @@ func TestRegistry_Install_InvalidName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
 	registry := &Registry{pluginsDir: tmpDir}
 
-	// Create source with wrong prefix
+	// Create source with wrong prefix.
 	sourcePath := filepath.Join(tmpDir, "wrong-prefix")
-	os.WriteFile(sourcePath, []byte("test"), 0o755)
+	//nolint:gosec // Test file needs to be executable
+	if err := os.WriteFile(sourcePath, []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create source file: %v", err)
+	}
 
 	err = registry.Install(sourcePath)
 	if err == nil {
@@ -95,6 +111,7 @@ func TestRegistry_Install_InvalidName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test skipped - uses NewLoader with system paths
 func TestRegistry_Remove(t *testing.T) {
 	// Skip: Remove() uses NewLoader() which searches in default system paths,
 	// making unit testing difficult without environment manipulation.
@@ -109,7 +126,11 @@ func TestRegistry_Remove_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
 	registry := &Registry{pluginsDir: tmpDir}
 
@@ -126,11 +147,15 @@ func TestRegistry_List(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
 	registry := &Registry{pluginsDir: tmpDir}
 
-	// Empty list
+	// Empty list.
 	plugins, err := registry.List()
 	if err != nil {
 		t.Fatalf("List() error: %v", err)
@@ -139,10 +164,19 @@ func TestRegistry_List(t *testing.T) {
 		t.Errorf("expected 0 plugins, got %d", len(plugins))
 	}
 
-	// Add some plugins
-	os.WriteFile(filepath.Join(tmpDir, "shelly-plugin1"), []byte("test"), 0o755)
-	os.WriteFile(filepath.Join(tmpDir, "shelly-plugin2"), []byte("test"), 0o755)
-	os.WriteFile(filepath.Join(tmpDir, "not-a-plugin"), []byte("test"), 0o755) // Should be ignored
+	// Add some plugins.
+	//nolint:gosec // Test files need to be executable
+	if err := os.WriteFile(filepath.Join(tmpDir, "shelly-plugin1"), []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create plugin1: %v", err)
+	}
+	//nolint:gosec // Test files need to be executable
+	if err := os.WriteFile(filepath.Join(tmpDir, "shelly-plugin2"), []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create plugin2: %v", err)
+	}
+	//nolint:gosec // Test file needs to be executable
+	if err := os.WriteFile(filepath.Join(tmpDir, "not-a-plugin"), []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create not-a-plugin: %v", err)
+	}
 
 	plugins, err = registry.List()
 	if err != nil {
@@ -160,12 +194,19 @@ func TestRegistry_IsInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
 	registry := &Registry{pluginsDir: tmpDir}
 
-	// Create installed plugin
-	os.WriteFile(filepath.Join(tmpDir, "shelly-installed"), []byte("test"), 0o755)
+	// Create installed plugin.
+	//nolint:gosec // Test file needs to be executable
+	if err := os.WriteFile(filepath.Join(tmpDir, "shelly-installed"), []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create installed plugin: %v", err)
+	}
 
 	if !registry.IsInstalled("installed") {
 		t.Error("IsInstalled() returned false for installed plugin")

@@ -1,0 +1,99 @@
+// Package discover provides device discovery commands.
+package discover
+
+import (
+	"testing"
+	"time"
+)
+
+func TestNewCommand(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand()
+
+	if cmd == nil {
+		t.Fatal("NewCommand() returned nil")
+	}
+
+	if cmd.Use != "discover" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "discover")
+	}
+
+	if cmd.Short == "" {
+		t.Error("Short description is empty")
+	}
+
+	if cmd.Long == "" {
+		t.Error("Long description is empty")
+	}
+
+	// Verify subcommands are registered
+	subcommands := cmd.Commands()
+	expectedSubcmds := map[string]bool{
+		"mdns":          false,
+		"ble":           false,
+		"coiot":         false,
+		"scan [subnet]": false,
+	}
+
+	for _, sub := range subcommands {
+		if _, ok := expectedSubcmds[sub.Use]; ok {
+			expectedSubcmds[sub.Use] = true
+		}
+	}
+
+	for name, found := range expectedSubcmds {
+		if !found {
+			t.Errorf("Expected subcommand %q not found", name)
+		}
+	}
+}
+
+func TestNewCommand_Flags(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand()
+
+	// Test timeout flag exists
+	timeout := cmd.Flags().Lookup("timeout")
+	switch {
+	case timeout == nil:
+		t.Error("timeout flag not found")
+	case timeout.Shorthand != "t":
+		t.Errorf("timeout shorthand = %q, want %q", timeout.Shorthand, "t")
+	case timeout.DefValue != "10s":
+		t.Errorf("timeout default = %q, want %q", timeout.DefValue, "10s")
+	}
+
+	// Test register flag exists
+	register := cmd.Flags().Lookup("register")
+	if register == nil {
+		t.Error("register flag not found")
+	} else if register.DefValue != "false" {
+		t.Errorf("register default = %q, want %q", register.DefValue, "false")
+	}
+
+	// Test skip-existing flag exists
+	skipExisting := cmd.Flags().Lookup("skip-existing")
+	if skipExisting == nil {
+		t.Error("skip-existing flag not found")
+	} else if skipExisting.DefValue != "true" {
+		t.Errorf("skip-existing default = %q, want %q", skipExisting.DefValue, "true")
+	}
+}
+
+func TestDefaultTimeout(t *testing.T) {
+	t.Parallel()
+	expected := 10 * time.Second
+	if DefaultTimeout != expected {
+		t.Errorf("DefaultTimeout = %v, want %v", DefaultTimeout, expected)
+	}
+}
+
+func TestNewCommand_SubcommandCount(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand()
+
+	// Should have exactly 4 subcommands
+	if len(cmd.Commands()) != 4 {
+		t.Errorf("subcommand count = %d, want 4", len(cmd.Commands()))
+	}
+}

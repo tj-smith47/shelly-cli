@@ -21,12 +21,16 @@ func TestNewLoader(t *testing.T) {
 func TestLoader_Discover_Empty(t *testing.T) {
 	t.Parallel()
 
-	// Create temp dir with no plugins
+	// Create temp dir with no plugins.
 	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
 	loader := &Loader{paths: []string{tmpDir}}
 	plugins, err := loader.Discover()
@@ -42,15 +46,20 @@ func TestLoader_Discover_Empty(t *testing.T) {
 func TestLoader_Discover_FindsPlugins(t *testing.T) {
 	t.Parallel()
 
-	// Create temp dir with a fake plugin
+	// Create temp dir with a fake plugin.
 	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
-	// Create fake plugin executable
+	// Create fake plugin executable.
 	pluginPath := filepath.Join(tmpDir, "shelly-test-plugin")
+	//nolint:gosec // Test file needs to be executable
 	err = os.WriteFile(pluginPath, []byte("#!/bin/bash\necho test"), 0o755)
 	if err != nil {
 		t.Fatalf("failed to create fake plugin: %v", err)
@@ -77,15 +86,20 @@ func TestLoader_Discover_FindsPlugins(t *testing.T) {
 func TestLoader_Find(t *testing.T) {
 	t.Parallel()
 
-	// Create temp dir with a fake plugin
+	// Create temp dir with a fake plugin.
 	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
-	// Create fake plugin executable
+	// Create fake plugin executable.
 	pluginPath := filepath.Join(tmpDir, "shelly-myplugin")
+	//nolint:gosec // Test file needs to be executable
 	err = os.WriteFile(pluginPath, []byte("#!/bin/bash\necho test"), 0o755)
 	if err != nil {
 		t.Fatalf("failed to create fake plugin: %v", err)
@@ -93,7 +107,7 @@ func TestLoader_Find(t *testing.T) {
 
 	loader := &Loader{paths: []string{tmpDir}}
 
-	// Find by name without prefix
+	// Find by name without prefix.
 	plugin, err := loader.Find("myplugin")
 	if err != nil {
 		t.Fatalf("Find() error: %v", err)
@@ -105,7 +119,7 @@ func TestLoader_Find(t *testing.T) {
 		t.Errorf("expected name 'myplugin', got %q", plugin.Name)
 	}
 
-	// Find by name with prefix
+	// Find by name with prefix.
 	plugin, err = loader.Find("shelly-myplugin")
 	if err != nil {
 		t.Fatalf("Find() error: %v", err)
@@ -114,7 +128,7 @@ func TestLoader_Find(t *testing.T) {
 		t.Fatal("Find() returned nil for existing plugin (with prefix)")
 	}
 
-	// Find nonexistent
+	// Find nonexistent.
 	plugin, err = loader.Find("nonexistent")
 	if err != nil {
 		t.Fatalf("Find() error: %v", err)
@@ -127,22 +141,28 @@ func TestLoader_Find(t *testing.T) {
 func TestIsExecutable(t *testing.T) {
 	t.Parallel()
 
-	// Create temp dir
+	// Create temp dir.
 	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
 
-	// Create executable file
+	// Create executable file.
 	execPath := filepath.Join(tmpDir, "executable")
+	//nolint:gosec // Test file needs to be executable
 	err = os.WriteFile(execPath, []byte("test"), 0o755)
 	if err != nil {
 		t.Fatalf("failed to create executable: %v", err)
 	}
 
-	// Create non-executable file
+	// Create non-executable file.
 	noExecPath := filepath.Join(tmpDir, "not-executable")
+	//nolint:gosec // G306: Test file intentionally needs specific permissions (0o644)
 	err = os.WriteFile(noExecPath, []byte("test"), 0o644)
 	if err != nil {
 		t.Fatalf("failed to create non-executable: %v", err)

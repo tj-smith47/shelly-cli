@@ -2,15 +2,9 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/tj-smith47/shelly-cli/internal/cli"
+	"github.com/tj-smith47/shelly-cli/internal/cmd"
 )
 
 func main() {
-	if err := cli.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	cmd.Execute()
 }
