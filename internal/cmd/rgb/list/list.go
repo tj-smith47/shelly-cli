@@ -22,15 +22,15 @@ func NewCommand() *cobra.Command {
 		Long:  `List all RGB light components on the specified device with their current status.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args[0])
+			return run(cmd.Context(), cmd, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(cmd *cobra.Command, device string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*shelly.DefaultTimeout/10)
+func run(ctx context.Context, cmd *cobra.Command, device string) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*shelly.DefaultTimeout/10)
 	defer cancel()
 
 	svc := shelly.NewService()
