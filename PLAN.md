@@ -32,11 +32,11 @@ Create a production-ready, open-source Cobra CLI that:
 ## Current Status
 
 **Last Updated:** 2025-12-11
-**Phase:** Phase 0 - Architecture Refactoring (0.1-0.6 COMPLETE, 0.7 in progress)
-**Completed:** Phases 1-2 (full), Phase 0.1-0.6
+**Phase:** Phase 5 - Configuration Commands (starting)
+**Completed:** Phases 0.1-0.6, 1-2 (full)
 **Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phase 0.7, Phases 5-11, 14, 17-26
-**Test Coverage:** ~25% average - TARGET: >90%
+**Pending:** Phases 5-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
+**Test Coverage:** ~25% average - TARGET: >90% (deferred to Phase 25)
 
 **Architecture Audit (2025-12-11):**
 Comprehensive audit against industry standards (gh, kubectl, docker, jira-cli, gh-dash, k9s) revealed:
@@ -244,11 +244,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, lightID int) er
 ### 0.7 Test Coverage Foundation
 Establish testing patterns for new packages:
 
-- [ ] Add comprehensive tests for `internal/iostreams/` (target: 90%+) - **currently 78.3%**
+- [ ] Add comprehensive tests for `internal/iostreams/` (target: 90%+) - **currently 79.1%** - DEFERRED to Phase 25
   - Note: Gap is primarily interactive prompt functions that require terminal input
 - [x] Add comprehensive tests for `internal/cmdutil/` (target: 90%+) - **93.6% achieved**
 - [x] Add table-driven tests for runner patterns (RunStatus, RunList, PrintResult)
 - [x] Update existing command tests to use new patterns (all tests pass with refactored code)
+
+**Note:** Remaining test coverage work deferred to Phase 25 (Testing). Proceeding with functionality.
 
 ---
 
@@ -585,48 +587,61 @@ shelly-cli/
 
 ## Phase 5: Configuration Commands
 
-### 5.1 Device Configuration
-- [ ] `shelly config get <device>` - Get device config (all components)
-- [ ] `shelly config get <device> <component>` - Get component config
-- [ ] `shelly config set <device> <component> <key>=<value>...` - Set config
-- [ ] `shelly config diff <device> <file>` - Compare config with file
-- [ ] `shelly config export <device> <file>` - Export config to file
-- [ ] `shelly config import <device> <file>` - Import config from file
+### 5.1 Device Configuration ✅
+- [x] `shelly config get <device>` - Get device config (all components)
+- [x] `shelly config get <device> <component>` - Get component config
+- [x] `shelly config set <device> <component> <key>=<value>...` - Set config
+- [x] `shelly config diff <device> <file>` - Compare config with file
+- [x] `shelly config export <device> <file>` - Export config to file
+- [x] `shelly config import <device> <file>` - Import config from file
   - Flags: --dry-run, --merge, --overwrite
-- [ ] `shelly config reset <device> [component]` - Reset to defaults
+- [x] `shelly config reset <device> [component]` - Reset to defaults
 
-### 5.2 Network Configuration
-- [ ] `shelly wifi status <device>` - Show WiFi status
-- [ ] `shelly wifi scan <device>` - Scan for networks
-- [ ] `shelly wifi set <device>` - Configure WiFi
+**Session Note (2025-12-11):** Created `internal/cmd/config/` with get/, set/, diff/, export/, import/, reset/ subcommands and `internal/shelly/config.go` service layer. Uses iostreams.DebugErr for verbose error logging. Approved nolint for: MD5 (Shelly digest auth), G304 (user-provided file paths), G306 (0o644 for config exports).
+
+### 5.2 Network Configuration ✅
+- [x] `shelly wifi status <device>` - Show WiFi status
+- [x] `shelly wifi scan <device>` - Scan for networks
+- [x] `shelly wifi set <device>` - Configure WiFi
   - Flags: --ssid, --password, --static-ip, --gateway, --dns
-- [ ] `shelly wifi ap <device>` - Configure AP mode
-- [ ] `shelly ethernet status <device>` - Show ethernet status (Pro devices)
-- [ ] `shelly ethernet set <device>` - Configure ethernet
+- [x] `shelly wifi ap <device>` - Configure AP mode (--clients to list connected clients)
+- [x] `shelly ethernet status <device>` - Show ethernet status (Pro devices)
+- [x] `shelly ethernet set <device>` - Configure ethernet
 
-### 5.3 Cloud Configuration
-- [ ] `shelly cloud status <device>` - Show cloud status
-- [ ] `shelly cloud enable <device>` - Enable cloud connection
-- [ ] `shelly cloud disable <device>` - Disable cloud connection
+**Session Note (2025-12-11):** Created `internal/cmd/wifi/` and `internal/cmd/ethernet/` using cmdutil helpers (RunDeviceStatus, RunList, RunWithSpinner). Added ethernet and WiFi AP service methods to `internal/shelly/config.go`.
 
-### 5.4 Auth Configuration
-- [ ] `shelly auth status <device>` - Show auth status
-- [ ] `shelly auth set <device>` - Set auth credentials
+### 5.3 Cloud Configuration ✅
+- [x] `shelly cloud status <device>` - Show cloud status
+- [x] `shelly cloud enable <device>` - Enable cloud connection
+- [x] `shelly cloud disable <device>` - Disable cloud connection
+
+**Session Note (2025-12-11):** Created `internal/cmd/cloud/` with status/, enable/, disable/ subcommands.
+
+### 5.4 Auth Configuration ✅
+- [x] `shelly auth status <device>` - Show auth status
+- [x] `shelly auth set <device>` - Set auth credentials
   - Flags: --user, --password
-- [ ] `shelly auth disable <device>` - Disable auth
+- [x] `shelly auth disable <device>` - Disable auth
 
-### 5.5 MQTT Configuration
-- [ ] `shelly mqtt status <device>` - Show MQTT status
-- [ ] `shelly mqtt set <device>` - Configure MQTT
+**Session Note (2025-12-11):** Created `internal/cmd/auth/` with status/, set/, disable/ subcommands. Added GetAuthStatus and DisableAuth to service layer.
+
+### 5.5 MQTT Configuration ✅
+- [x] `shelly mqtt status <device>` - Show MQTT status
+- [x] `shelly mqtt set <device>` - Configure MQTT
   - Flags: --server, --user, --password, --topic-prefix
-- [ ] `shelly mqtt disable <device>` - Disable MQTT
+- [x] `shelly mqtt disable <device>` - Disable MQTT
 
-### 5.6 Webhook Configuration
-- [ ] `shelly webhook list <device>` - List webhooks
-- [ ] `shelly webhook create <device>` - Create webhook
-  - Flags: --event, --url, --active
-- [ ] `shelly webhook delete <device> <id>` - Delete webhook
-- [ ] `shelly webhook update <device> <id>` - Update webhook
+**Session Note (2025-12-11):** Created `internal/cmd/mqtt/` with status/, set/, disable/ subcommands.
+
+### 5.6 Webhook Configuration ✅
+- [x] `shelly webhook list <device>` - List webhooks
+- [x] `shelly webhook create <device>` - Create webhook
+  - Flags: --event, --url, --name, --disable, --cid
+- [x] `shelly webhook delete <device> <id>` - Delete webhook
+- [x] `shelly webhook update <device> <id>` - Update webhook
+  - Flags: --event, --url, --name, --enable, --disable
+
+**Session Note (2025-12-11):** Created `internal/cmd/webhook/` with list/, create/, del/, update/ subcommands. Added webhook service methods to `internal/shelly/config.go`.
 
 ---
 

@@ -1,0 +1,125 @@
+// Package ap provides the wifi ap subcommand.
+package ap
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/spf13/cobra"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+)
+
+var (
+	ssidFlag     string
+	passwordFlag string
+	enableFlag   bool
+	disableFlag  bool
+	clientsFlag  bool
+)
+
+// NewCommand creates the wifi ap command.
+func NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "ap <device>",
+		Short: "Configure WiFi access point",
+		Long: `Configure the WiFi access point (AP) mode for a device.
+
+When enabled, the device creates its own WiFi network that other devices
+can connect to. Use --clients to list connected clients.`,
+		Example: `  # Enable access point with custom SSID
+  shelly wifi ap living-room --enable --ssid "ShellyAP" --password "secret"
+
+  # Disable access point
+  shelly wifi ap living-room --disable
+
+  # List connected clients
+  shelly wifi ap living-room --clients`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0])
+		},
+	}
+
+	cmd.Flags().StringVar(&ssidFlag, "ssid", "", "Access point SSID")
+	cmd.Flags().StringVar(&passwordFlag, "password", "", "Access point password")
+	cmd.Flags().BoolVar(&enableFlag, "enable", false, "Enable access point")
+	cmd.Flags().BoolVar(&disableFlag, "disable", false, "Disable access point")
+	cmd.Flags().BoolVar(&clientsFlag, "clients", false, "List connected clients")
+
+	return cmd
+}
+
+func run(ctx context.Context, device string) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	defer cancel()
+
+	ios := iostreams.System()
+	svc := shelly.NewService()
+
+	// If --clients flag, list connected clients
+	if clientsFlag {
+		return listClients(ctx, ios, svc, device)
+	}
+
+	// Determine enable state
+	var enable *bool
+	if enableFlag {
+		t := true
+		enable = &t
+	} else if disableFlag {
+		f := false
+		enable = &f
+	}
+
+	// Validate flags - need either enable/disable or configuration
+	if enable == nil && ssidFlag == "" && passwordFlag == "" {
+		return fmt.Errorf("specify --enable, --disable, or configuration options (--ssid, --password)")
+	}
+
+	return cmdutil.RunWithSpinner(ctx, ios, "Configuring access point...", func(ctx context.Context) error {
+		if err := svc.SetWiFiAPConfig(ctx, device, ssidFlag, passwordFlag, enable); err != nil {
+			return fmt.Errorf("failed to configure access point: %w", err)
+		}
+
+		if disableFlag {
+			ios.Success("Access point disabled on %s", device)
+		} else {
+			ios.Success("Access point configured on %s", device)
+			if ssidFlag != "" {
+				ios.Printf("  SSID: %s\n", ssidFlag)
+			}
+		}
+		return nil
+	})
+}
+
+func listClients(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string) error {
+	return cmdutil.RunList(ctx, ios, svc, device,
+		"Getting connected clients...",
+		"No clients connected to access point",
+		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WiFiAPClient, error) {
+			return svc.ListWiFiAPClients(ctx, device)
+		},
+		displayClients)
+}
+
+func displayClients(ios *iostreams.IOStreams, clients []shelly.WiFiAPClient) {
+	ios.Title("Connected Clients")
+	ios.Println()
+
+	table := output.NewTable("MAC Address", "IP Address")
+	for _, c := range clients {
+		ip := c.IP
+		if ip == "" {
+			ip = "<no IP>"
+		}
+		table.AddRow(c.MAC, ip)
+	}
+	table.Print()
+
+	ios.Printf("\n%d client(s) connected\n", len(clients))
+}

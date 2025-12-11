@@ -14,16 +14,23 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
+	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/version"
@@ -93,6 +100,13 @@ func init() {
 	rootCmd.AddCommand(light.NewCommand())
 	rootCmd.AddCommand(rgb.NewCommand())
 	rootCmd.AddCommand(input.NewCommand())
+	rootCmd.AddCommand(configcmd.NewCommand())
+	rootCmd.AddCommand(wifi.NewCommand())
+	rootCmd.AddCommand(ethernet.NewCommand())
+	rootCmd.AddCommand(cloud.NewCommand())
+	rootCmd.AddCommand(auth.NewCommand())
+	rootCmd.AddCommand(mqtt.NewCommand())
+	rootCmd.AddCommand(webhook.NewCommand())
 	rootCmd.AddCommand(versionCmd())
 }
 

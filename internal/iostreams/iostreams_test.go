@@ -325,3 +325,64 @@ func TestIOStreams_StopProgress_NilIndicator(t *testing.T) {
 	ios.StopProgressWithError("Failed")
 	ios.UpdateProgress("Update")
 }
+
+// Tests for color environment variables - these test the internal
+// isColorDisabled and isColorForced functions indirectly via System().
+// Note: These tests can't run in parallel because they modify environment variables.
+
+func TestSystem_ColorDisabled_NO_COLOR(t *testing.T) {
+	// Set NO_COLOR env var
+	t.Setenv("NO_COLOR", "1")
+
+	ios := iostreams.System()
+
+	// Color should be disabled when NO_COLOR is set
+	if ios.ColorEnabled() {
+		t.Error("Color should be disabled when NO_COLOR is set")
+	}
+}
+
+func TestSystem_ColorDisabled_SHELLY_NO_COLOR(t *testing.T) {
+	t.Setenv("SHELLY_NO_COLOR", "1")
+
+	ios := iostreams.System()
+
+	if ios.ColorEnabled() {
+		t.Error("Color should be disabled when SHELLY_NO_COLOR is set")
+	}
+}
+
+func TestSystem_ColorDisabled_TERM_dumb(t *testing.T) {
+	t.Setenv("TERM", "dumb")
+
+	ios := iostreams.System()
+
+	if ios.ColorEnabled() {
+		t.Error("Color should be disabled when TERM=dumb")
+	}
+}
+
+func TestSystem_ColorForced_FORCE_COLOR(t *testing.T) {
+	// First disable via NO_COLOR
+	t.Setenv("NO_COLOR", "1")
+	// Then force via FORCE_COLOR
+	t.Setenv("FORCE_COLOR", "1")
+
+	ios := iostreams.System()
+
+	// FORCE_COLOR should override NO_COLOR
+	if !ios.ColorEnabled() {
+		t.Error("Color should be enabled when FORCE_COLOR is set")
+	}
+}
+
+func TestSystem_ColorForced_SHELLY_FORCE_COLOR(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	t.Setenv("SHELLY_FORCE_COLOR", "1")
+
+	ios := iostreams.System()
+
+	if !ios.ColorEnabled() {
+		t.Error("Color should be enabled when SHELLY_FORCE_COLOR is set")
+	}
+}

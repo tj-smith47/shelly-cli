@@ -1,0 +1,41 @@
+// Package webhook provides webhook configuration commands.
+package webhook
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/create"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/del"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/list"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/update"
+)
+
+// NewCommand creates the webhook command and its subcommands.
+func NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "webhook",
+		Short: "Manage device webhooks",
+		Long: `Manage webhooks for devices.
+
+Webhooks allow the device to send HTTP requests when events occur,
+enabling integration with external services and automation systems.`,
+		Example: `  # List all webhooks
+  shelly webhook list living-room
+
+  # Create a webhook
+  shelly webhook create living-room --event "switch.on" --url "http://example.com/hook"
+
+  # Delete a webhook
+  shelly webhook delete living-room 1
+
+  # Update a webhook
+  shelly webhook update living-room 1 --disable`,
+	}
+
+	cmd.AddCommand(list.NewCommand())
+	cmd.AddCommand(create.NewCommand())
+	cmd.AddCommand(del.NewCommand())
+	cmd.AddCommand(update.NewCommand())
+
+	return cmd
+}

@@ -260,6 +260,22 @@ func (c *Client) GetConfig(ctx context.Context) (map[string]any, error) {
 	return config, nil
 }
 
+// SetConfig updates device configuration.
+func (c *Client) SetConfig(ctx context.Context, config map[string]any) error {
+	_, err := c.rpcClient.Call(ctx, "Shelly.SetConfig", map[string]any{
+		"config": config,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set device config: %w", err)
+	}
+	return nil
+}
+
+// RPCClient returns the underlying RPC client.
+func (c *Client) RPCClient() *rpc.Client {
+	return c.rpcClient
+}
+
 // unmarshalResponse converts an RPC response to a typed struct.
 func unmarshalResponse(data, v any) error {
 	jsonBytes, err := json.Marshal(data)
