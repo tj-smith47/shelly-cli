@@ -33,8 +33,8 @@ Event types:
   double_push - Double button press
   long_push   - Long button press`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], inputID, event)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], inputID, event)
 		},
 	}
 
@@ -44,8 +44,8 @@ Event types:
 	return cmd
 }
 
-func run(device string, inputID int, event string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, inputID int, event string) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

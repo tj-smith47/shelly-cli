@@ -22,8 +22,8 @@ func NewCommand() *cobra.Command {
 		Short:   "Show input status",
 		Long:    `Display the status of an input component on a Shelly device.`,
 		Args:    cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], inputID)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], inputID)
 		},
 	}
 
@@ -32,8 +32,8 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(device string, inputID int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, inputID int) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()
