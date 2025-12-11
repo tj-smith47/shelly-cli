@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the scene activate command.
@@ -91,41 +92,49 @@ func run(name string, timeout time.Duration, concurrent int, dryRun bool) error 
 	iostreams.Info("Activating scene %q (%d actions)...", theme.Bold().Render(name), len(scene.Actions))
 
 	svc := shelly.NewService()
-	results := make(chan Result, len(scene.Actions))
 
-	// Semaphore for concurrency control
-	sem := make(chan struct{}, concurrent)
+	// Use mutex to protect results collection
+	var mu sync.Mutex
+	var results []Result
 
-	var wg sync.WaitGroup
+	// Create parent context with overall timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Duration(len(scene.Actions)))
+	defer cancel()
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrent)
+
 	for i, action := range scene.Actions {
-		wg.Add(1)
-		go func(idx int, act config.SceneAction) {
-			defer wg.Done()
-			sem <- struct{}{}        // Acquire
-			defer func() { <-sem }() // Release
+		idx := i
+		act := action // Capture for closure
+		g.Go(func() error {
+			// Per-action timeout
+			actionCtx, actionCancel := context.WithTimeout(ctx, timeout)
+			defer actionCancel()
 
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
+			_, err := svc.RawRPC(actionCtx, act.Device, act.Method, act.Params)
 
-			_, err := svc.RawRPC(ctx, act.Device, act.Method, act.Params)
-			results <- Result{
+			mu.Lock()
+			results = append(results, Result{
 				Index:  idx,
 				Device: act.Device,
 				Method: act.Method,
 				Error:  err,
-			}
-		}(i, action)
+			})
+			mu.Unlock()
+
+			return nil // Don't fail the whole batch on individual errors
+		})
 	}
 
-	// Close results channel when all goroutines complete
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
+	// Wait for all operations to complete
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("scene activation failed: %w", err)
+	}
 
-	// Collect results
+	// Report results
 	var succeeded, failed int
-	for result := range results {
+	for _, result := range results {
 		if result.Error != nil {
 			iostreams.Warning("%s %s: %v",
 				theme.Bold().Render(result.Device),

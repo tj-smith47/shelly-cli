@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -90,44 +91,49 @@ type Result struct {
 
 func run(targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
 	svc := shelly.NewService()
-	results := make(chan Result, len(targets))
 
-	// Semaphore for concurrency control
-	sem := make(chan struct{}, concurrent)
+	// Use mutex to protect results slice since errgroup doesn't provide channel pattern
+	var mu sync.Mutex
+	collected := make([]Result, 0, len(targets))
 
-	var wg sync.WaitGroup
+	// Create parent context with overall timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Duration(len(targets)))
+	defer cancel()
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrent)
+
 	for _, target := range targets {
-		wg.Add(1)
-		go func(device string) {
-			defer wg.Done()
-			sem <- struct{}{}        // Acquire
-			defer func() { <-sem }() // Release
+		device := target // Capture for closure
+		g.Go(func() error {
+			// Per-device timeout
+			deviceCtx, deviceCancel := context.WithTimeout(ctx, timeout)
+			defer deviceCancel()
 
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-
-			resp, err := svc.RawRPC(ctx, device, method, params)
+			resp, err := svc.RawRPC(deviceCtx, device, method, params)
 			result := Result{Device: device}
 			if err != nil {
 				result.Error = err.Error()
 			} else {
 				result.Response = resp
 			}
-			results <- result
-		}(target)
+
+			mu.Lock()
+			collected = append(collected, result)
+			mu.Unlock()
+
+			return nil // Don't fail the whole batch on individual errors
+		})
 	}
 
-	// Close results channel when all goroutines complete
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
+	// Wait for all operations to complete
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("batch operation failed: %w", err)
+	}
 
-	// Collect results
-	collected := make([]Result, 0, len(targets))
+	// Count failures
 	var failed int
-	for result := range results {
-		collected = append(collected, result)
+	for _, result := range collected {
 		if result.Error != "" {
 			failed++
 		}
