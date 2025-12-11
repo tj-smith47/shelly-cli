@@ -3,10 +3,10 @@ package toggle
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -25,7 +25,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&rgbID, "id", "i", 0, "RGB ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &rgbID, "RGB")
 
 	return cmd
 }
@@ -34,23 +34,20 @@ func run(ctx context.Context, device string, rgbID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Toggling RGB...")
-	spin.Start()
+	return cmdutil.RunWithSpinner(ctx, ios, "Toggling RGB...", func(ctx context.Context) error {
+		status, err := svc.RGBToggle(ctx, device, rgbID)
+		if err != nil {
+			return err
+		}
 
-	status, err := svc.RGBToggle(ctx, device, rgbID)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to toggle RGB: %w", err)
-	}
-
-	state := "off"
-	if status.Output {
-		state = "on"
-	}
-
-	iostreams.Success("RGB %d toggled %s", rgbID, state)
-	return nil
+		state := "off"
+		if status.Output {
+			state = "on"
+		}
+		ios.Success("RGB %d toggled %s", rgbID, state)
+		return nil
+	})
 }

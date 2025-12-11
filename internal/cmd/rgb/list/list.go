@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -22,50 +22,30 @@ func NewCommand() *cobra.Command {
 		Long:  `List all RGB light components on the specified device with their current status.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), cmd, args[0])
+			return run(cmd.Context(), args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, cmd *cobra.Command, device string) error {
+func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, 15*shelly.DefaultTimeout/10)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Fetching RGB components...")
-	spin.Start()
-
-	rgbs, err := svc.RGBList(ctx, device)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to list RGB components: %w", err)
-	}
-
-	if len(rgbs) == 0 {
-		iostreams.NoResults("RGB components")
-		return nil
-	}
-
-	return outputList(cmd, rgbs)
+	return cmdutil.RunList(ctx, ios, svc, device,
+		"Fetching RGB components...",
+		"RGB components",
+		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.RGBInfo, error) {
+			return svc.RGBList(ctx, device)
+		},
+		displayList)
 }
 
-func outputList(cmd *cobra.Command, rgbs []shelly.RGBInfo) error {
-	switch viper.GetString("output") {
-	case string(output.FormatJSON):
-		return output.JSON(cmd.OutOrStdout(), rgbs)
-	case string(output.FormatYAML):
-		return output.YAML(cmd.OutOrStdout(), rgbs)
-	default:
-		printTable(rgbs)
-		return nil
-	}
-}
-
-func printTable(rgbs []shelly.RGBInfo) {
+func displayList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
 	t := output.NewTable("ID", "Name", "State", "Color", "Brightness", "Power")
 	for _, rgb := range rgbs {
 		name := rgb.Name

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -105,10 +106,16 @@ func (l *Loader) Discover() ([]Plugin, error) {
 		}
 	}
 
-	// Try to get versions for each plugin
+	// Try to get versions for each plugin concurrently
+	var wg sync.WaitGroup
 	for i := range plugins {
-		plugins[i].Version = getPluginVersion(plugins[i].Path)
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			plugins[idx].Version = getPluginVersion(plugins[idx].Path)
+		}(i)
 	}
+	wg.Wait()
 
 	return plugins, nil
 }

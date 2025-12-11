@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -35,7 +36,7 @@ Values not specified will be left unchanged.`,
 		},
 	}
 
-	cmd.Flags().IntVarP(&rgbID, "id", "i", 0, "RGB ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &rgbID, "RGB")
 	cmd.Flags().IntVarP(&red, "red", "r", -1, "Red value (0-255)")
 	cmd.Flags().IntVarP(&green, "green", "g", -1, "Green value (0-255)")
 	cmd.Flags().IntVarP(&blue, "blue", "b", -1, "Blue value (0-255)")

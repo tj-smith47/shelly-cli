@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -38,33 +39,28 @@ func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Getting device status...")
-	spin.Start()
+	return cmdutil.RunDeviceStatus(ctx, ios, svc, device,
+		"Getting device status...",
+		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.DeviceStatus, error) {
+			return svc.DeviceStatus(ctx, device)
+		},
+		displayStatus)
+}
 
-	status, err := svc.DeviceStatus(ctx, device)
-	spin.Stop()
+func displayStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) {
+	ios.Info("Device: %s", theme.Bold().Render(status.Info.ID))
+	ios.Info("Model: %s (Gen%d)", status.Info.Model, status.Info.Generation)
+	ios.Info("Firmware: %s", status.Info.Firmware)
+	ios.Println()
 
-	if err != nil {
-		return fmt.Errorf("failed to get device status: %w", err)
-	}
-
-	// Print device info
-	iostreams.Info("Device: %s", theme.Bold().Render(status.Info.ID))
-	iostreams.Info("Model: %s (Gen%d)", status.Info.Model, status.Info.Generation)
-	iostreams.Info("Firmware: %s", status.Info.Firmware)
-	iostreams.Info("")
-
-	// Print status table
 	table := output.NewTable("Component", "Value")
-
 	for key, value := range status.Status {
 		table.AddRow(key, formatValue(value))
 	}
-
 	table.Print()
-	return nil
 }
 
 func formatValue(v any) string {

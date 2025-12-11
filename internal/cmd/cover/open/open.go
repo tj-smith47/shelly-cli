@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -26,7 +27,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&coverID, "id", "i", 0, "Cover ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &coverID, "Cover")
 	cmd.Flags().IntVarP(&duration, "duration", "d", 0, "Duration in seconds (0 = full open)")
 
 	return cmd

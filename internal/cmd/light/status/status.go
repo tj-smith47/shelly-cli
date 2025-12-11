@@ -3,14 +3,12 @@ package status
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -25,66 +23,50 @@ func NewCommand() *cobra.Command {
 		Long:  `Show the current status of a light component on the specified device.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), cmd, args[0], lightID)
+			return run(cmd.Context(), args[0], lightID)
 		},
 	}
 
-	cmd.Flags().IntVarP(&lightID, "id", "i", 0, "Light ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &lightID, "Light")
 
 	return cmd
 }
 
-func run(ctx context.Context, cmd *cobra.Command, device string, lightID int) error {
+func run(ctx context.Context, device string, lightID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Fetching light status...")
-	spin.Start()
-
-	status, err := svc.LightStatus(ctx, device, lightID)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to get light status: %w", err)
-	}
-
-	return outputStatus(cmd, status)
+	return cmdutil.RunStatus(ctx, ios, svc, device, lightID,
+		"Fetching light status...",
+		func(ctx context.Context, svc *shelly.Service, device string, id int) (*model.LightStatus, error) {
+			return svc.LightStatus(ctx, device, id)
+		},
+		displayStatus)
 }
 
-func outputStatus(cmd *cobra.Command, status *model.LightStatus) error {
-	switch viper.GetString("output") {
-	case string(output.FormatJSON):
-		return output.JSON(cmd.OutOrStdout(), status)
-	case string(output.FormatYAML):
-		return output.YAML(cmd.OutOrStdout(), status)
-	default:
-		displayStatus(status)
-		return nil
-	}
-}
-
-func displayStatus(status *model.LightStatus) {
-	iostreams.Title("Light %d Status", status.ID)
-	fmt.Println()
+func displayStatus(ios *iostreams.IOStreams, status *model.LightStatus) {
+	ios.Title("Light %d Status", status.ID)
+	ios.Println()
 
 	state := theme.StatusError().Render("OFF")
 	if status.Output {
 		state = theme.StatusOK().Render("ON")
 	}
-	fmt.Printf("  State:      %s\n", state)
+	ios.Printf("  State:      %s\n", state)
 
 	if status.Brightness != nil {
-		fmt.Printf("  Brightness: %d%%\n", *status.Brightness)
+		ios.Printf("  Brightness: %d%%\n", *status.Brightness)
 	}
 	if status.Power != nil {
-		fmt.Printf("  Power:      %.1f W\n", *status.Power)
+		ios.Printf("  Power:      %.1f W\n", *status.Power)
 	}
 	if status.Voltage != nil {
-		fmt.Printf("  Voltage:    %.1f V\n", *status.Voltage)
+		ios.Printf("  Voltage:    %.1f V\n", *status.Voltage)
 	}
 	if status.Current != nil {
-		fmt.Printf("  Current:    %.3f A\n", *status.Current)
+		ios.Printf("  Current:    %.3f A\n", *status.Current)
 	}
 }

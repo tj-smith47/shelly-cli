@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -25,7 +26,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&switchID, "id", "i", 0, "Switch ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &switchID, "Switch")
 
 	return cmd
 }
@@ -34,18 +35,13 @@ func run(ctx context.Context, device string, switchID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Turning switch on...")
-	spin.Start()
-
-	err := svc.SwitchOn(ctx, device, switchID)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to turn switch on: %w", err)
-	}
-
-	iostreams.Success("Switch %d turned on", switchID)
-	return nil
+	return cmdutil.RunSimple(ctx, ios, svc, device, switchID,
+		"Turning switch on...",
+		fmt.Sprintf("Switch %d turned on", switchID),
+		func(ctx context.Context, svc *shelly.Service, device string, id int) error {
+			return svc.SwitchOn(ctx, device, id)
+		})
 }

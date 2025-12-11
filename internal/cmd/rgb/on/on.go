@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -25,7 +26,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&rgbID, "id", "i", 0, "RGB ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &rgbID, "RGB")
 
 	return cmd
 }
@@ -34,18 +35,13 @@ func run(ctx context.Context, device string, rgbID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Turning RGB on...")
-	spin.Start()
-
-	err := svc.RGBOn(ctx, device, rgbID)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to turn RGB on: %w", err)
-	}
-
-	iostreams.Success("RGB %d turned on", rgbID)
-	return nil
+	return cmdutil.RunSimple(ctx, ios, svc, device, rgbID,
+		"Turning RGB on...",
+		fmt.Sprintf("RGB %d turned on", rgbID),
+		func(ctx context.Context, svc *shelly.Service, device string, id int) error {
+			return svc.RGBOn(ctx, device, id)
+		})
 }

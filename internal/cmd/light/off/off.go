@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -25,7 +26,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&lightID, "id", "i", 0, "Light ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &lightID, "Light")
 
 	return cmd
 }
@@ -34,18 +35,13 @@ func run(ctx context.Context, device string, lightID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Turning light off...")
-	spin.Start()
-
-	err := svc.LightOff(ctx, device, lightID)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to turn light off: %w", err)
-	}
-
-	iostreams.Success("Light %d turned off", lightID)
-	return nil
+	return cmdutil.RunSimple(ctx, ios, svc, device, lightID,
+		"Turning light off...",
+		fmt.Sprintf("Light %d turned off", lightID),
+		func(ctx context.Context, svc *shelly.Service, device string, id int) error {
+			return svc.LightOff(ctx, device, id)
+		})
 }

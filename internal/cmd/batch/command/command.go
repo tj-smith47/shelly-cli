@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -90,11 +89,19 @@ type Result struct {
 }
 
 func run(ctx context.Context, targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	// Use mutex to protect results slice since errgroup doesn't provide channel pattern
-	var mu sync.Mutex
-	collected := make([]Result, 0, len(targets))
+	// Create MultiWriter for progress tracking
+	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
+
+	// Add all lines upfront
+	for _, target := range targets {
+		mw.AddLine(target, "pending")
+	}
+
+	// Results are collected by index to maintain order
+	results := make([]Result, len(targets))
 
 	// Create parent context with overall timeout
 	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(targets)))
@@ -103,9 +110,12 @@ func run(ctx context.Context, targets []string, method string, params map[string
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(concurrent)
 
-	for _, target := range targets {
+	for i, target := range targets {
+		idx := i
 		device := target // Capture for closure
 		g.Go(func() error {
+			mw.UpdateLine(device, iostreams.StatusRunning, method)
+
 			// Per-device timeout
 			deviceCtx, deviceCancel := context.WithTimeout(ctx, timeout)
 			defer deviceCancel()
@@ -114,14 +124,13 @@ func run(ctx context.Context, targets []string, method string, params map[string
 			result := Result{Device: device}
 			if err != nil {
 				result.Error = err.Error()
+				mw.UpdateLine(device, iostreams.StatusError, err.Error())
 			} else {
 				result.Response = resp
+				mw.UpdateLine(device, iostreams.StatusSuccess, "done")
 			}
 
-			mu.Lock()
-			collected = append(collected, result)
-			mu.Unlock()
-
+			results[idx] = result
 			return nil // Don't fail the whole batch on individual errors
 		})
 	}
@@ -131,32 +140,31 @@ func run(ctx context.Context, targets []string, method string, params map[string
 		return fmt.Errorf("batch operation failed: %w", err)
 	}
 
-	// Count failures
-	var failed int
-	for _, result := range collected {
-		if result.Error != "" {
-			failed++
-		}
+	mw.Finalize()
+
+	// For TTY, add a blank line before JSON/YAML output for clarity
+	if ios.IsStdoutTTY() {
+		ios.Printf("\n")
 	}
 
 	// Output results
 	switch outputFormat {
 	case "yaml":
-		if err := output.PrintYAML(collected); err != nil {
+		if err := output.PrintYAML(results); err != nil {
 			return err
 		}
 	default:
-		if err := output.PrintJSON(collected); err != nil {
+		if err := output.PrintJSON(results); err != nil {
 			return err
 		}
 	}
 
 	// Print summary
-	succeeded := len(collected) - failed
+	success, failed, _ := mw.Summary()
 	if failed > 0 {
 		iostreams.Warning("%d/%d devices failed", failed, len(targets))
 		return fmt.Errorf("%d/%d devices failed", failed, len(targets))
 	}
-	iostreams.Info("Command sent to %d device(s)", succeeded)
+	iostreams.Info("Command sent to %d device(s)", success)
 	return nil
 }

@@ -81,14 +81,32 @@ func run(ctx context.Context, subnet string, timeout time.Duration, register, sk
 
 	iostreams.Info("Scanning %d addresses in %s...", len(addresses), ipNet)
 
-	spin := iostreams.NewSpinner(fmt.Sprintf("Probing %d addresses...", len(addresses)))
-	spin.Start()
+	ios := iostreams.System()
+
+	// Create MultiWriter for progress tracking
+	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
+
+	// Add progress line
+	mw.AddLine("scan", fmt.Sprintf("0/%d addresses probed", len(addresses)))
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	devices := discovery.ProbeAddresses(ctx, addresses)
-	spin.Stop()
+	// Use progress callback to update MultiWriter
+	devices := discovery.ProbeAddressesWithProgress(ctx, addresses, func(p discovery.ProbeProgress) bool {
+		status := iostreams.StatusRunning
+		msg := fmt.Sprintf("%d/%d addresses probed", p.Done, p.Total)
+		if p.Found && p.Device != nil {
+			msg = fmt.Sprintf("%d/%d - found %s (%s)", p.Done, p.Total, p.Device.Name, p.Device.Model)
+		}
+		mw.UpdateLine("scan", status, msg)
+		return ctx.Err() == nil // Continue unless context canceled
+	})
+
+	// Mark scan complete
+	mw.UpdateLine("scan", iostreams.StatusSuccess, fmt.Sprintf("%d/%d addresses probed, %d devices found",
+		len(addresses), len(addresses), len(devices)))
+	mw.Finalize()
 
 	if len(devices) == 0 {
 		iostreams.NoResults("devices", "Ensure devices are powered on and accessible on the network")

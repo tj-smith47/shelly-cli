@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -22,50 +22,30 @@ func NewCommand() *cobra.Command {
 		Long:  `List all cover/roller components on the specified device with their current status.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), cmd, args[0])
+			return run(cmd.Context(), args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, cmd *cobra.Command, device string) error {
+func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, 15*shelly.DefaultTimeout/10)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Fetching cover components...")
-	spin.Start()
-
-	covers, err := svc.CoverList(ctx, device)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to list cover components: %w", err)
-	}
-
-	if len(covers) == 0 {
-		iostreams.NoResults("cover components")
-		return nil
-	}
-
-	return outputList(cmd, covers)
+	return cmdutil.RunList(ctx, ios, svc, device,
+		"Fetching cover components...",
+		"cover components",
+		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.CoverInfo, error) {
+			return svc.CoverList(ctx, device)
+		},
+		displayList)
 }
 
-func outputList(cmd *cobra.Command, covers []shelly.CoverInfo) error {
-	switch viper.GetString("output") {
-	case string(output.FormatJSON):
-		return output.JSON(cmd.OutOrStdout(), covers)
-	case string(output.FormatYAML):
-		return output.YAML(cmd.OutOrStdout(), covers)
-	default:
-		printTable(covers)
-		return nil
-	}
-}
-
-func printTable(covers []shelly.CoverInfo) {
+func displayList(ios *iostreams.IOStreams, covers []shelly.CoverInfo) {
 	t := output.NewTable("ID", "Name", "State", "Position", "Power")
 	for _, cover := range covers {
 		name := cover.Name

@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -28,7 +29,7 @@ The cover will move to both extremes during calibration.`,
 		},
 	}
 
-	cmd.Flags().IntVarP(&coverID, "id", "i", 0, "Cover ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &coverID, "Cover")
 
 	return cmd
 }

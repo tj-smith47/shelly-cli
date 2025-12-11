@@ -3,11 +3,12 @@ package status
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -27,7 +28,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&inputID, "id", "i", 0, "Input ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &inputID, "Input")
 
 	return cmd
 }
@@ -36,27 +37,28 @@ func run(ctx context.Context, device string, inputID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Getting input status...")
-	spin.Start()
+	return cmdutil.RunStatus(ctx, ios, svc, device, inputID,
+		"Getting input status...",
+		func(ctx context.Context, svc *shelly.Service, device string, id int) (*model.InputStatus, error) {
+			return svc.InputStatus(ctx, device, id)
+		},
+		displayStatus)
+}
 
-	status, err := svc.InputStatus(ctx, device, inputID)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to get input status: %w", err)
-	}
+func displayStatus(ios *iostreams.IOStreams, status *model.InputStatus) {
+	ios.Title("Input %d Status", status.ID)
+	ios.Println()
 
 	state := theme.StatusError().Render("inactive")
 	if status.State {
 		state = theme.StatusOK().Render("active")
 	}
+	ios.Printf("  State: %s\n", state)
 
-	iostreams.Info("Input %d: %s", inputID, state)
 	if status.Type != "" {
-		iostreams.Info("Type: %s", status.Type)
+		ios.Printf("  Type:  %s\n", status.Type)
 	}
-
-	return nil
 }

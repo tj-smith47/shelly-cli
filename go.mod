@@ -7,9 +7,11 @@ require (
 	github.com/briandowns/spinner v1.23.2
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/lrstanley/bubbletint v1.0.0
+	github.com/mattn/go-isatty v0.0.20
+	github.com/muesli/termenv v0.16.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
-	github.com/tj-smith47/shelly-go v0.1.3
+	github.com/tj-smith47/shelly-go v0.1.4
 	golang.org/x/sync v0.17.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -31,10 +33,8 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
-	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect

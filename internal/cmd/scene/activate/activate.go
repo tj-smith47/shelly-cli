@@ -4,7 +4,6 @@ package activate
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -57,14 +56,6 @@ Use --dry-run to preview actions without executing them.`,
 	return cmd
 }
 
-// Result holds the result of a scene action execution.
-type Result struct {
-	Index  int
-	Device string
-	Method string
-	Error  error
-}
-
 func run(ctx context.Context, name string, timeout time.Duration, concurrent int, dryRun bool) error {
 	scene, exists := config.GetScene(name)
 	if !exists {
@@ -89,13 +80,19 @@ func run(ctx context.Context, name string, timeout time.Duration, concurrent int
 		return nil
 	}
 
+	ios := iostreams.System()
 	iostreams.Info("Activating scene %q (%d actions)...", theme.Bold().Render(name), len(scene.Actions))
 
 	svc := shelly.NewService()
 
-	// Use mutex to protect results collection
-	var mu sync.Mutex
-	var results []Result
+	// Create MultiWriter for progress tracking
+	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
+
+	// Add all actions upfront (use device:method as identifier for clarity)
+	for _, action := range scene.Actions {
+		lineID := fmt.Sprintf("%s:%s", action.Device, action.Method)
+		mw.AddLine(lineID, "pending")
+	}
 
 	// Create parent context with overall timeout
 	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(scene.Actions)))
@@ -104,24 +101,22 @@ func run(ctx context.Context, name string, timeout time.Duration, concurrent int
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(concurrent)
 
-	for i, action := range scene.Actions {
-		idx := i
+	for _, action := range scene.Actions {
 		act := action // Capture for closure
+		lineID := fmt.Sprintf("%s:%s", act.Device, act.Method)
 		g.Go(func() error {
+			mw.UpdateLine(lineID, iostreams.StatusRunning, formatParams(act.Params))
+
 			// Per-action timeout
 			actionCtx, actionCancel := context.WithTimeout(ctx, timeout)
 			defer actionCancel()
 
 			_, err := svc.RawRPC(actionCtx, act.Device, act.Method, act.Params)
-
-			mu.Lock()
-			results = append(results, Result{
-				Index:  idx,
-				Device: act.Device,
-				Method: act.Method,
-				Error:  err,
-			})
-			mu.Unlock()
+			if err != nil {
+				mw.UpdateLine(lineID, iostreams.StatusError, err.Error())
+			} else {
+				mw.UpdateLine(lineID, iostreams.StatusSuccess, "done")
+			}
 
 			return nil // Don't fail the whole batch on individual errors
 		})
@@ -132,29 +127,14 @@ func run(ctx context.Context, name string, timeout time.Duration, concurrent int
 		return fmt.Errorf("scene activation failed: %w", err)
 	}
 
-	// Report results
-	var succeeded, failed int
-	for _, result := range results {
-		if result.Error != nil {
-			iostreams.Warning("%s %s: %v",
-				theme.Bold().Render(result.Device),
-				result.Method,
-				result.Error,
-			)
-			failed++
-		} else {
-			iostreams.Success("%s %s",
-				theme.Bold().Render(result.Device),
-				theme.Dim().Render(result.Method),
-			)
-			succeeded++
-		}
-	}
+	mw.Finalize()
+
+	// Get summary from MultiWriter
+	succeeded, failed, _ := mw.Summary()
 
 	// Print summary
 	if failed > 0 {
-		iostreams.Warning("Scene %q: %d/%d actions failed",
-			name, failed, len(scene.Actions))
+		iostreams.Warning("Scene %q: %d/%d actions failed", name, failed, len(scene.Actions))
 		return fmt.Errorf("%d/%d actions failed", failed, len(scene.Actions))
 	}
 

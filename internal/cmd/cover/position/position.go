@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -41,7 +42,7 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
 		},
 	}
 
-	cmd.Flags().IntVarP(&coverID, "id", "i", 0, "Cover ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &coverID, "Cover")
 
 	return cmd
 }

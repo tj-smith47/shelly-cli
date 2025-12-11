@@ -3,11 +3,13 @@ package cmdutil
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
+	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -188,5 +190,122 @@ func PrintBatchSummary(ios *iostreams.IOStreams, results []BatchResult) {
 		ios.Error("All %d operations failed", len(results))
 	default:
 		ios.Printf("%d succeeded, %d failed\n", success, failed)
+	}
+}
+
+// StatusFetcher is a function that fetches component status.
+type StatusFetcher[T any] func(ctx context.Context, svc *shelly.Service, device string, id int) (T, error)
+
+// StatusDisplay is a function that displays status in human-readable format.
+type StatusDisplay[T any] func(ios *iostreams.IOStreams, status T)
+
+// RunStatus executes a status fetch with spinner and handles output formatting.
+// It uses RunWithSpinnerResult for the fetch operation and supports JSON/YAML/default output.
+func RunStatus[T any](
+	ctx context.Context,
+	ios *iostreams.IOStreams,
+	svc *shelly.Service,
+	device string,
+	componentID int,
+	spinnerMsg string,
+	fetcher StatusFetcher[T],
+	display StatusDisplay[T],
+) error {
+	status, err := RunWithSpinnerResult(ctx, ios, spinnerMsg, func(ctx context.Context) (T, error) {
+		return fetcher(ctx, svc, device, componentID)
+	})
+	if err != nil {
+		return err
+	}
+
+	return PrintResult(ios, status, display)
+}
+
+// PrintResult outputs result data in the configured format (JSON, YAML, or human-readable).
+func PrintResult[T any](ios *iostreams.IOStreams, data T, display StatusDisplay[T]) error {
+	switch viper.GetString("output") {
+	case "json":
+		enc := json.NewEncoder(ios.Out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(data)
+	case "yaml":
+		enc := yaml.NewEncoder(ios.Out)
+		return enc.Encode(data)
+	default:
+		display(ios, data)
+		return nil
+	}
+}
+
+// DeviceStatusFetcher is a function that fetches device-level status (no component ID).
+type DeviceStatusFetcher[T any] func(ctx context.Context, svc *shelly.Service, device string) (T, error)
+
+// RunDeviceStatus executes a device status fetch with spinner and handles output formatting.
+// Similar to RunStatus but doesn't take a component ID.
+func RunDeviceStatus[T any](
+	ctx context.Context,
+	ios *iostreams.IOStreams,
+	svc *shelly.Service,
+	device string,
+	spinnerMsg string,
+	fetcher DeviceStatusFetcher[T],
+	display StatusDisplay[T],
+) error {
+	status, err := RunWithSpinnerResult(ctx, ios, spinnerMsg, func(ctx context.Context) (T, error) {
+		return fetcher(ctx, svc, device)
+	})
+	if err != nil {
+		return err
+	}
+
+	return PrintResult(ios, status, display)
+}
+
+// ListFetcher is a function that fetches a list of items from a device.
+type ListFetcher[T any] func(ctx context.Context, svc *shelly.Service, device string) ([]T, error)
+
+// ListDisplay is a function that displays a list in human-readable format.
+type ListDisplay[T any] func(ios *iostreams.IOStreams, items []T)
+
+// RunList executes a list fetch with spinner and handles output formatting.
+// Returns early with a message if the list is empty.
+func RunList[T any](
+	ctx context.Context,
+	ios *iostreams.IOStreams,
+	svc *shelly.Service,
+	device string,
+	spinnerMsg string,
+	emptyMsg string,
+	fetcher ListFetcher[T],
+	display ListDisplay[T],
+) error {
+	items, err := RunWithSpinnerResult(ctx, ios, spinnerMsg, func(ctx context.Context) ([]T, error) {
+		return fetcher(ctx, svc, device)
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(items) == 0 {
+		ios.NoResults(emptyMsg)
+		return nil
+	}
+
+	return PrintListResult(ios, items, display)
+}
+
+// PrintListResult outputs list data in the configured format (JSON, YAML, or human-readable).
+func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T]) error {
+	switch viper.GetString("output") {
+	case "json":
+		enc := json.NewEncoder(ios.Out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(items)
+	case "yaml":
+		enc := yaml.NewEncoder(ios.Out)
+		return enc.Encode(items)
+	default:
+		display(ios, items)
+		return nil
 	}
 }

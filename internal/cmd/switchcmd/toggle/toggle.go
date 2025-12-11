@@ -3,10 +3,10 @@ package toggle
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -25,7 +25,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVarP(&switchID, "id", "i", 0, "Switch ID (default 0)")
+	cmdutil.AddComponentIDFlag(cmd, &switchID, "Switch")
 
 	return cmd
 }
@@ -34,22 +34,20 @@ func run(ctx context.Context, device string, switchID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Toggling switch...")
-	spin.Start()
+	return cmdutil.RunWithSpinner(ctx, ios, "Toggling switch...", func(ctx context.Context) error {
+		status, err := svc.SwitchToggle(ctx, device, switchID)
+		if err != nil {
+			return err
+		}
 
-	status, err := svc.SwitchToggle(ctx, device, switchID)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to toggle switch: %w", err)
-	}
-
-	state := "off"
-	if status.Output {
-		state = "on"
-	}
-	iostreams.Success("Switch %d toggled to %s", switchID, state)
-	return nil
+		state := "off"
+		if status.Output {
+			state = "on"
+		}
+		ios.Success("Switch %d toggled to %s", switchID, state)
+		return nil
+	})
 }

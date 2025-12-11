@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -32,23 +33,19 @@ func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
+	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	spin := iostreams.NewSpinner("Getting inputs...")
-	spin.Start()
+	return cmdutil.RunList(ctx, ios, svc, device,
+		"Getting inputs...",
+		"inputs",
+		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.InputInfo, error) {
+			return svc.InputList(ctx, device)
+		},
+		displayList)
+}
 
-	inputs, err := svc.InputList(ctx, device)
-	spin.Stop()
-
-	if err != nil {
-		return fmt.Errorf("failed to list inputs: %w", err)
-	}
-
-	if len(inputs) == 0 {
-		iostreams.Info("No inputs found on this device")
-		return nil
-	}
-
+func displayList(ios *iostreams.IOStreams, inputs []shelly.InputInfo) {
 	table := output.NewTable("ID", "Name", "Type", "State")
 
 	for _, input := range inputs {
@@ -71,7 +68,5 @@ func run(ctx context.Context, device string) error {
 	}
 
 	table.Print()
-	iostreams.Count("input", len(inputs))
-
-	return nil
+	ios.Count("input", len(inputs))
 }
