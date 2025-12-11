@@ -21,8 +21,8 @@ func NewCommand() *cobra.Command {
 		Short: "Open cover",
 		Long:  `Open a cover/roller component on the specified device.`,
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], coverID, duration)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], coverID, duration)
 		},
 	}
 
@@ -32,8 +32,8 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(device string, coverID, duration int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, coverID, duration int) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

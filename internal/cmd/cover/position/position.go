@@ -29,7 +29,7 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
   # Set cover 1 to fully open
   shelly cover position my-cover 100 --id 1`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			position, err := strconv.Atoi(args[1])
 			if err != nil {
 				return fmt.Errorf("invalid position: %w", err)
@@ -37,7 +37,7 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
 			if position < 0 || position > 100 {
 				return fmt.Errorf("position must be between 0 and 100, got %d", position)
 			}
-			return run(args[0], coverID, position)
+			return run(cmd.Context(), args[0], coverID, position)
 		},
 	}
 
@@ -46,8 +46,8 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
 	return cmd
 }
 
-func run(device string, coverID, position int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, coverID, position int) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

@@ -23,8 +23,8 @@ func NewCommand() *cobra.Command {
 Calibration determines the open and close times for the cover.
 The cover will move to both extremes during calibration.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], coverID)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], coverID)
 		},
 	}
 
@@ -33,8 +33,8 @@ The cover will move to both extremes during calibration.`,
 	return cmd
 }
 
-func run(device string, coverID int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+func run(ctx context.Context, device string, coverID int) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()
