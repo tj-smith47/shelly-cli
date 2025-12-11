@@ -46,8 +46,8 @@ This command requires both --yes and --confirm flags for safety.`,
   # This will fail (safety measure)
   shelly device factory-reset living-room --yes`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], yes, confirm)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], yes, confirm)
 		},
 	}
 
@@ -57,7 +57,7 @@ This command requires both --yes and --confirm flags for safety.`,
 	return cmd
 }
 
-func run(device string, yes, confirm bool) error {
+func run(ctx context.Context, device string, yes, confirm bool) error {
 	// Require both flags for safety
 	if !yes || !confirm {
 		iostreams.Error("Factory reset requires both --yes and --confirm flags for safety")
@@ -80,7 +80,7 @@ func run(device string, yes, confirm bool) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()

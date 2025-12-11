@@ -30,8 +30,8 @@ func NewCommand() *cobra.Command {
   # Reboot with delay
   shelly device reboot living-room --delay 5000`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], delay, yes)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), args[0], delay, yes)
 		},
 	}
 
@@ -41,7 +41,7 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(device string, delay int, yes bool) error {
+func run(ctx context.Context, device string, delay int, yes bool) error {
 	if !yes {
 		confirmed, err := iostreams.Confirm(fmt.Sprintf("Reboot device %q?", device), false)
 		if err != nil {
@@ -53,7 +53,7 @@ func run(device string, delay int, yes bool) error {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
 	svc := shelly.NewService()
