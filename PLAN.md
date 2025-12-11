@@ -4,6 +4,12 @@
 
 > **IMPORTANT:** All future session work derives from this PLAN.md file. No additional session files should be created. Check off completed work and add concise context notes only when necessary to save investigation time.
 
+> **WORKFLOW REQUIREMENTS:**
+> 1. **Lint after every file change:** Run `golangci-lint run <file>` immediately after creating or modifying any `.go` file. Address all issues before proceeding.
+> 2. **Tests for every file:** Every new or modified `.go` file must have corresponding test coverage. Write tests immediately after implementation, not as a separate phase.
+> 3. **Commit frequently:** Commit after completing each major section, large subsection, or BEFORE running any terminal commands that write to multiple files (e.g., `sed`, `gci`, bulk operations). Never leave work uncommitted.
+> 4. **No nolint without approval:** Do not add `//nolint` directives without explicit user approval.
+
 ## Project Overview
 
 **Repository:** `github.com/tj-smith47/shelly-cli`
