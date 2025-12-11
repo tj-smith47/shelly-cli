@@ -97,7 +97,7 @@ func outputTable(groups map[string]config.Group) error {
 	}
 
 	table.Print()
-	output.Count("group", len(groups))
+	iostreams.Count("group", len(groups))
 
 	return nil
 }

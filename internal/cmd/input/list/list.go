@@ -71,7 +71,7 @@ func run(device string) error {
 	}
 
 	table.Print()
-	output.Count("input", len(inputs))
+	iostreams.Count("input", len(inputs))
 
 	return nil
 }

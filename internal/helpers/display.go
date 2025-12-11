@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -54,7 +55,7 @@ func FormatState(state string) string {
 // DisplayDiscoveredDevices prints a table of discovered devices with themed formatting.
 func DisplayDiscoveredDevices(devices []discovery.DiscoveredDevice) {
 	if len(devices) == 0 {
-		output.NoResults("devices")
+		iostreams.NoResults("devices")
 		return
 	}
 
@@ -80,7 +81,7 @@ func DisplayDiscoveredDevices(devices []discovery.DiscoveredDevice) {
 	}
 
 	table.Print()
-	output.Count("device", len(devices))
+	iostreams.Count("device", len(devices))
 }
 
 // DisplayDeviceSummary prints a summary line for a single device with themed formatting.
@@ -94,7 +95,7 @@ func DisplayDeviceSummary(d discovery.DiscoveredDevice) {
 	address := theme.Highlight().Render(d.Address.String())
 	model := theme.Dim().Render(d.Model)
 
-	output.Plain("  %s @ %s - %s Gen%d%s", id, address, model, d.Generation, auth)
+	iostreams.Plain("  %s @ %s - %s Gen%d%s", id, address, model, d.Generation, auth)
 }
 
 // ResolveBatchTargets resolves batch operation targets from flags and arguments.

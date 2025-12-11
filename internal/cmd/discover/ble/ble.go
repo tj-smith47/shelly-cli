@@ -187,5 +187,5 @@ func displayBLEDevices(devices []discovery.BLEDiscoveredDevice) {
 	}
 
 	table.Print()
-	output.Count("BLE device", len(devices))
+	iostreams.Count("BLE device", len(devices))
 }

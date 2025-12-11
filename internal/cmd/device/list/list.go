@@ -81,7 +81,7 @@ func run(generation int, deviceType string) error {
 	}
 
 	table.Print()
-	output.Count("device", len(filtered))
+	iostreams.Count("device", len(filtered))
 
 	return nil
 }
