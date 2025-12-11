@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -465,4 +467,399 @@ func TestPrintBatchSummary(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStatus is a sample status type for testing generic status functions.
+type TestStatus struct {
+	ID    int    `json:"id" yaml:"id"`
+	Name  string `json:"name" yaml:"name"`
+	Value int    `json:"value" yaml:"value"`
+}
+
+func TestRunStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success with default output", func(t *testing.T) {
+		t.Parallel()
+		ios, out, _ := testIOStreams()
+		svc := shelly.NewService()
+
+		fetcher := func(_ context.Context, _ *shelly.Service, device string, id int) (*TestStatus, error) {
+			return &TestStatus{ID: id, Name: device, Value: 42}, nil
+		}
+
+		display := func(ios *iostreams.IOStreams, status *TestStatus) {
+			ios.Printf("Status: %s (id=%d, value=%d)\n", status.Name, status.ID, status.Value)
+		}
+
+		err := cmdutil.RunStatus(context.Background(), ios, svc, "test-device", 1, "Fetching...", fetcher, display)
+
+		if err != nil {
+			t.Errorf("RunStatus() error = %v, want nil", err)
+		}
+
+		output := out.String()
+		if output == "" {
+			t.Error("expected output from display function")
+		}
+		if !contains(output, "test-device") {
+			t.Errorf("output should contain device name, got: %s", output)
+		}
+	})
+
+	t.Run("fetcher error", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+		svc := shelly.NewService()
+		expectedErr := errors.New("fetch failed")
+
+		fetcher := func(_ context.Context, _ *shelly.Service, _ string, _ int) (*TestStatus, error) {
+			return nil, expectedErr
+		}
+
+		display := func(_ *iostreams.IOStreams, _ *TestStatus) {}
+
+		err := cmdutil.RunStatus(context.Background(), ios, svc, "device", 0, "Fetching...", fetcher, display)
+
+		if !errors.Is(err, expectedErr) {
+			t.Errorf("RunStatus() error = %v, want %v", err, expectedErr)
+		}
+	})
+
+	t.Run("passes correct parameters to fetcher", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+		svc := shelly.NewService()
+
+		var receivedDevice string
+		var receivedID int
+
+		fetcher := func(_ context.Context, _ *shelly.Service, device string, id int) (*TestStatus, error) {
+			receivedDevice = device
+			receivedID = id
+			return &TestStatus{}, nil
+		}
+
+		display := func(_ *iostreams.IOStreams, _ *TestStatus) {}
+
+		err := cmdutil.RunStatus(context.Background(), ios, svc, "my-device", 5, "Fetching...", fetcher, display)
+
+		if err != nil {
+			t.Errorf("RunStatus() error = %v, want nil", err)
+		}
+		if receivedDevice != "my-device" {
+			t.Errorf("fetcher received device = %q, want %q", receivedDevice, "my-device")
+		}
+		if receivedID != 5 {
+			t.Errorf("fetcher received id = %d, want 5", receivedID)
+		}
+	})
+}
+
+//nolint:paralleltest,tparallel // Tests share viper state for output format
+func TestPrintResult(t *testing.T) {
+	t.Run("default output calls display", func(t *testing.T) {
+		t.Parallel()
+		ios, out, _ := testIOStreams()
+		data := &TestStatus{ID: 1, Name: "test", Value: 100}
+		displayCalled := false
+
+		display := func(ios *iostreams.IOStreams, status *TestStatus) {
+			displayCalled = true
+			ios.Printf("Name: %s\n", status.Name)
+		}
+
+		err := cmdutil.PrintResult(ios, data, display)
+
+		if err != nil {
+			t.Errorf("PrintResult() error = %v, want nil", err)
+		}
+		if !displayCalled {
+			t.Error("display function should be called for default output")
+		}
+		if !contains(out.String(), "Name: test") {
+			t.Errorf("output = %q, want to contain 'Name: test'", out.String())
+		}
+	})
+
+	// Note: JSON and YAML output tests cannot be parallelized due to shared viper state
+	t.Run("json output", func(t *testing.T) {
+		ios, out, _ := testIOStreams()
+		data := &TestStatus{ID: 1, Name: "test", Value: 100}
+		displayCalled := false
+
+		display := func(_ *iostreams.IOStreams, _ *TestStatus) {
+			displayCalled = true
+		}
+
+		// Set output format to json using viper
+		viper.Set("output", "json")
+		defer viper.Set("output", "")
+
+		err := cmdutil.PrintResult(ios, data, display)
+
+		if err != nil {
+			t.Errorf("PrintResult() error = %v, want nil", err)
+		}
+		if displayCalled {
+			t.Error("display function should not be called for json output")
+		}
+		output := out.String()
+		if !contains(output, `"name": "test"`) {
+			t.Errorf("json output = %q, want to contain '\"name\": \"test\"'", output)
+		}
+	})
+
+	t.Run("yaml output", func(t *testing.T) {
+		ios, out, _ := testIOStreams()
+		data := &TestStatus{ID: 1, Name: "test", Value: 100}
+		displayCalled := false
+
+		display := func(_ *iostreams.IOStreams, _ *TestStatus) {
+			displayCalled = true
+		}
+
+		// Set output format to yaml using viper
+		viper.Set("output", "yaml")
+		defer viper.Set("output", "")
+
+		err := cmdutil.PrintResult(ios, data, display)
+
+		if err != nil {
+			t.Errorf("PrintResult() error = %v, want nil", err)
+		}
+		if displayCalled {
+			t.Error("display function should not be called for yaml output")
+		}
+		output := out.String()
+		if !contains(output, "name: test") {
+			t.Errorf("yaml output = %q, want to contain 'name: test'", output)
+		}
+	})
+}
+
+func TestRunDeviceStatus(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+		ios, out, _ := testIOStreams()
+		svc := shelly.NewService()
+
+		fetcher := func(_ context.Context, _ *shelly.Service, device string) (*TestStatus, error) {
+			return &TestStatus{ID: 0, Name: device, Value: 99}, nil
+		}
+
+		display := func(ios *iostreams.IOStreams, status *TestStatus) {
+			ios.Printf("Device: %s, Value: %d\n", status.Name, status.Value)
+		}
+
+		err := cmdutil.RunDeviceStatus(context.Background(), ios, svc, "my-device", "Fetching device...", fetcher, display)
+
+		if err != nil {
+			t.Errorf("RunDeviceStatus() error = %v, want nil", err)
+		}
+		if !contains(out.String(), "my-device") {
+			t.Errorf("output should contain device name")
+		}
+	})
+
+	t.Run("fetcher error", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+		svc := shelly.NewService()
+		expectedErr := errors.New("device not found")
+
+		fetcher := func(_ context.Context, _ *shelly.Service, _ string) (*TestStatus, error) {
+			return nil, expectedErr
+		}
+
+		display := func(_ *iostreams.IOStreams, _ *TestStatus) {}
+
+		err := cmdutil.RunDeviceStatus(context.Background(), ios, svc, "device", "Fetching...", fetcher, display)
+
+		if !errors.Is(err, expectedErr) {
+			t.Errorf("RunDeviceStatus() error = %v, want %v", err, expectedErr)
+		}
+	})
+}
+
+// TestItem is a sample item type for testing generic list functions.
+type TestItem struct {
+	ID   int    `json:"id" yaml:"id"`
+	Name string `json:"name" yaml:"name"`
+}
+
+func TestRunList(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success with items", func(t *testing.T) {
+		t.Parallel()
+		ios, out, _ := testIOStreams()
+		svc := shelly.NewService()
+
+		fetcher := func(_ context.Context, _ *shelly.Service, _ string) ([]TestItem, error) {
+			return []TestItem{{ID: 1, Name: "item1"}, {ID: 2, Name: "item2"}}, nil
+		}
+
+		display := func(ios *iostreams.IOStreams, items []TestItem) {
+			for _, item := range items {
+				ios.Printf("- %s (id=%d)\n", item.Name, item.ID)
+			}
+		}
+
+		err := cmdutil.RunList(context.Background(), ios, svc, "device", "Fetching...", "items", fetcher, display)
+
+		if err != nil {
+			t.Errorf("RunList() error = %v, want nil", err)
+		}
+		output := out.String()
+		if !contains(output, "item1") || !contains(output, "item2") {
+			t.Errorf("output should contain items, got: %s", output)
+		}
+	})
+
+	t.Run("empty list shows message", func(t *testing.T) {
+		t.Parallel()
+		ios, out, _ := testIOStreams()
+		svc := shelly.NewService()
+
+		fetcher := func(_ context.Context, _ *shelly.Service, _ string) ([]TestItem, error) {
+			return []TestItem{}, nil
+		}
+
+		displayCalled := false
+		display := func(_ *iostreams.IOStreams, _ []TestItem) {
+			displayCalled = true
+		}
+
+		err := cmdutil.RunList(context.Background(), ios, svc, "device", "Fetching...", "items", fetcher, display)
+
+		if err != nil {
+			t.Errorf("RunList() error = %v, want nil", err)
+		}
+		if displayCalled {
+			t.Error("display should not be called for empty list")
+		}
+		if !contains(out.String(), "items") {
+			t.Errorf("output should contain empty message 'items', got: %s", out.String())
+		}
+	})
+
+	t.Run("fetcher error", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+		svc := shelly.NewService()
+		expectedErr := errors.New("list fetch failed")
+
+		fetcher := func(_ context.Context, _ *shelly.Service, _ string) ([]TestItem, error) {
+			return nil, expectedErr
+		}
+
+		display := func(_ *iostreams.IOStreams, _ []TestItem) {}
+
+		err := cmdutil.RunList(context.Background(), ios, svc, "device", "Fetching...", "items", fetcher, display)
+
+		if !errors.Is(err, expectedErr) {
+			t.Errorf("RunList() error = %v, want %v", err, expectedErr)
+		}
+	})
+}
+
+//nolint:paralleltest,tparallel // Tests share viper state for output format
+func TestPrintListResult(t *testing.T) {
+	t.Run("default output calls display", func(t *testing.T) {
+		t.Parallel()
+		ios, out, _ := testIOStreams()
+		items := []TestItem{{ID: 1, Name: "a"}, {ID: 2, Name: "b"}}
+		displayCalled := false
+
+		display := func(ios *iostreams.IOStreams, items []TestItem) {
+			displayCalled = true
+			for _, item := range items {
+				ios.Printf("%s\n", item.Name)
+			}
+		}
+
+		err := cmdutil.PrintListResult(ios, items, display)
+
+		if err != nil {
+			t.Errorf("PrintListResult() error = %v, want nil", err)
+		}
+		if !displayCalled {
+			t.Error("display function should be called")
+		}
+		output := out.String()
+		if !contains(output, "a") || !contains(output, "b") {
+			t.Errorf("output = %q, want to contain 'a' and 'b'", output)
+		}
+	})
+
+	// Note: JSON and YAML output tests cannot be parallelized due to shared viper state
+	t.Run("json output", func(t *testing.T) {
+		ios, out, _ := testIOStreams()
+		items := []TestItem{{ID: 1, Name: "first"}, {ID: 2, Name: "second"}}
+		displayCalled := false
+
+		display := func(_ *iostreams.IOStreams, _ []TestItem) {
+			displayCalled = true
+		}
+
+		viper.Set("output", "json")
+		defer viper.Set("output", "")
+
+		err := cmdutil.PrintListResult(ios, items, display)
+
+		if err != nil {
+			t.Errorf("PrintListResult() error = %v, want nil", err)
+		}
+		if displayCalled {
+			t.Error("display function should not be called for json output")
+		}
+		output := out.String()
+		if !contains(output, `"name": "first"`) || !contains(output, `"name": "second"`) {
+			t.Errorf("json output = %q, want to contain both items", output)
+		}
+	})
+
+	t.Run("yaml output", func(t *testing.T) {
+		ios, out, _ := testIOStreams()
+		items := []TestItem{{ID: 1, Name: "first"}, {ID: 2, Name: "second"}}
+		displayCalled := false
+
+		display := func(_ *iostreams.IOStreams, _ []TestItem) {
+			displayCalled = true
+		}
+
+		viper.Set("output", "yaml")
+		defer viper.Set("output", "")
+
+		err := cmdutil.PrintListResult(ios, items, display)
+
+		if err != nil {
+			t.Errorf("PrintListResult() error = %v, want nil", err)
+		}
+		if displayCalled {
+			t.Error("display function should not be called for yaml output")
+		}
+		output := out.String()
+		if !contains(output, "name: first") || !contains(output, "name: second") {
+			t.Errorf("yaml output = %q, want to contain both items", output)
+		}
+	})
+}
+
+// contains is a helper function for string containment checks.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || substr == "" ||
+		(s != "" && substr != "" && findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

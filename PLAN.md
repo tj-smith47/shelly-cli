@@ -32,10 +32,10 @@ Create a production-ready, open-source Cobra CLI that:
 ## Current Status
 
 **Last Updated:** 2025-12-11
-**Phase:** Phase 0 - Architecture Refactoring COMPLETE
-**Completed:** Phases 0-2 (full)
+**Phase:** Phase 0 - Architecture Refactoring (0.1-0.6 COMPLETE, 0.7 in progress)
+**Completed:** Phases 1-2 (full), Phase 0.1-0.6
 **Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phases 5-11, 14, 17-26
+**Pending:** Phase 0.7, Phases 5-11, 14, 17-26
 **Test Coverage:** ~25% average - TARGET: >90%
 
 **Architecture Audit (2025-12-11):**
@@ -244,9 +244,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, lightID int) er
 ### 0.7 Test Coverage Foundation
 Establish testing patterns for new packages:
 
-- [x] Add comprehensive tests for `internal/iostreams/` (target: 90%+) - **92.3% achieved**
-- [x] Add comprehensive tests for `internal/cmdutil/` (target: 90%+) - **92.3% achieved**
-- [x] Add table-driven tests for runner patterns
+- [ ] Add comprehensive tests for `internal/iostreams/` (target: 90%+) - **currently 78.3%**
+  - Note: Gap is primarily interactive prompt functions that require terminal input
+- [x] Add comprehensive tests for `internal/cmdutil/` (target: 90%+) - **93.6% achieved**
+- [x] Add table-driven tests for runner patterns (RunStatus, RunList, PrintResult)
 - [x] Update existing command tests to use new patterns (all tests pass with refactored code)
 
 ---
