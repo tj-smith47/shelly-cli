@@ -3,6 +3,7 @@ package iostreams_test
 import (
 	"bytes"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -20,90 +21,175 @@ func setupDebugViper(t *testing.T) {
 	viper.Reset()
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+// captureStderr captures stderr during test execution.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	os.Stderr = w
+
+	fn()
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close pipe writer: %v", err)
+	}
+	os.Stderr = oldStderr
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("failed to read from pipe: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Logf("warning: failed to close pipe reader: %v", err)
+	}
+
+	return buf.String()
+}
+
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestDebug_VerboseMode(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", true)
 
-	// Debug prints to os.Stderr, so we can't easily capture it
-	// without redirecting os.Stderr. The function doesn't panic,
-	// which is the main thing we want to verify.
-	iostreams.Debug("test message %s", "arg")
+	output := captureStderr(t, func() {
+		iostreams.Debug("test message %d", 42)
+	})
+
+	if output != "debug: test message 42\n" {
+		t.Errorf("Debug() output = %q, want %q", output, "debug: test message 42\n")
+	}
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestDebug_QuietMode(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", false)
 
-	// Should not panic when verbose is disabled
-	iostreams.Debug("test message %s", "arg")
+	output := captureStderr(t, func() {
+		iostreams.Debug("test message %s", "arg")
+	})
+
+	if output != "" {
+		t.Errorf("Debug() should not output when verbose is false, got %q", output)
+	}
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestDebugErr_VerboseMode(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", true)
 
-	testErr := errors.New("test error")
-	// Should not panic
-	iostreams.DebugErr("operation", testErr)
+	output := captureStderr(t, func() {
+		iostreams.DebugErr("operation", errors.New("test error"))
+	})
+
+	if output != "debug: operation: test error\n" {
+		t.Errorf("DebugErr() output = %q, want %q", output, "debug: operation: test error\n")
+	}
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestDebugErr_NilError(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", true)
 
-	// Should not panic with nil error
-	iostreams.DebugErr("operation", nil)
+	output := captureStderr(t, func() {
+		iostreams.DebugErr("operation", nil)
+	})
+
+	if output != "" {
+		t.Errorf("DebugErr() should not output for nil error, got %q", output)
+	}
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestDebugErr_QuietMode(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", false)
 
-	testErr := errors.New("test error")
-	// Should not panic when verbose is disabled
-	iostreams.DebugErr("operation", testErr)
+	output := captureStderr(t, func() {
+		iostreams.DebugErr("operation", errors.New("test error"))
+	})
+
+	if output != "" {
+		t.Errorf("DebugErr() should not output when verbose is false, got %q", output)
+	}
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestCloseWithDebug_Success(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", true)
 
 	closer := &mockCloser{err: nil}
-	// Should not panic
-	iostreams.CloseWithDebug("closing resource", closer)
+
+	output := captureStderr(t, func() {
+		iostreams.CloseWithDebug("test close", closer)
+	})
 
 	if !closer.closed {
-		t.Error("CloseWithDebug should call Close()")
+		t.Error("Close() was not called")
+	}
+	if output != "" {
+		t.Errorf("CloseWithDebug() should not output on success, got %q", output)
 	}
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestCloseWithDebug_Error(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", true)
 
-	closer := &mockCloser{err: errors.New("close error")}
-	// Should not panic even with error
-	iostreams.CloseWithDebug("closing resource", closer)
+	closer := &mockCloser{err: errors.New("close failed")}
+
+	output := captureStderr(t, func() {
+		iostreams.CloseWithDebug("test close", closer)
+	})
 
 	if !closer.closed {
-		t.Error("CloseWithDebug should call Close()")
+		t.Error("Close() was not called")
+	}
+	if output != "debug: test close: close failed\n" {
+		t.Errorf("CloseWithDebug() output = %q, want %q", output, "debug: test close: close failed\n")
 	}
 }
 
-//nolint:paralleltest // Tests modify global state (viper)
+//nolint:paralleltest // Tests modify global state (viper, stderr)
 func TestCloseWithDebug_NilCloser(t *testing.T) {
 	setupDebugViper(t)
 	viper.Set("verbose", true)
 
-	// Should not panic with nil closer
-	iostreams.CloseWithDebug("closing resource", nil)
+	output := captureStderr(t, func() {
+		iostreams.CloseWithDebug("test close", nil)
+	})
+
+	if output != "" {
+		t.Errorf("CloseWithDebug() should not output for nil closer, got %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state (viper, stderr)
+func TestCloseWithDebug_ErrorVerboseDisabled(t *testing.T) {
+	setupDebugViper(t)
+	viper.Set("verbose", false)
+
+	closer := &mockCloser{err: errors.New("close failed")}
+
+	output := captureStderr(t, func() {
+		iostreams.CloseWithDebug("test close", closer)
+	})
+
+	if !closer.closed {
+		t.Error("Close() was not called")
+	}
+	if output != "" {
+		t.Errorf("CloseWithDebug() should not output when verbose is false, got %q", output)
+	}
 }
 
 // mockCloser is a test helper that implements io.Closer.
