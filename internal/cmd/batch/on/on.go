@@ -48,12 +48,12 @@ or by using --all to target all registered devices.`,
 
   # Control concurrency and timeout
   shelly batch on --all --concurrent 10 --timeout 30s`,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := helpers.ResolveBatchTargets(groupName, all, args)
 			if err != nil {
 				return err
 			}
-			return run(targets, switchID, timeout, concurrent)
+			return run(cmd.Context(), targets, switchID, timeout, concurrent)
 		},
 	}
 
@@ -66,7 +66,7 @@ or by using --all to target all registered devices.`,
 	return cmd
 }
 
-func run(targets []string, switchID int, timeout time.Duration, concurrent int) error {
+func run(ctx context.Context, targets []string, switchID int, timeout time.Duration, concurrent int) error {
 	if len(targets) == 0 {
 		return fmt.Errorf("no target devices specified")
 	}
@@ -74,7 +74,7 @@ func run(targets []string, switchID int, timeout time.Duration, concurrent int) 
 	ios := iostreams.System()
 	svc := shelly.NewService()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Duration(len(targets)))
+	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(targets)))
 	defer cancel()
 
 	return cmdutil.RunBatch(ctx, ios, svc, targets, concurrent, func(ctx context.Context, svc *shelly.Service, device string) error {

@@ -47,7 +47,7 @@ Params should be a JSON object (e.g., '{"id":0,"on":true}').`,
   # Using alias
   shelly batch rpc "Switch.Toggle" '{"id":0}' --group bedroom`,
 		Args: cobra.MinimumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			method := args[0]
 
 			// Parse params if provided
@@ -64,7 +64,7 @@ Params should be a JSON object (e.g., '{"id":0,"on":true}').`,
 			if err != nil {
 				return err
 			}
-			return run(targets, method, params, timeout, concurrent, outputFormat)
+			return run(cmd.Context(), targets, method, params, timeout, concurrent, outputFormat)
 		},
 	}
 
@@ -89,7 +89,7 @@ type Result struct {
 	Error    string `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
-func run(targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
+func run(ctx context.Context, targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
 	svc := shelly.NewService()
 
 	// Use mutex to protect results slice since errgroup doesn't provide channel pattern
@@ -97,7 +97,7 @@ func run(targets []string, method string, params map[string]any, timeout time.Du
 	collected := make([]Result, 0, len(targets))
 
 	// Create parent context with overall timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Duration(len(targets)))
+	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(targets)))
 	defer cancel()
 
 	g, ctx := errgroup.WithContext(ctx)
