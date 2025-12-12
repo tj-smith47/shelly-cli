@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-go/backup"
+
+	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
 // MigrationOptions configures migration between devices.
@@ -243,13 +244,13 @@ func (s *Service) ValidateMigration(ctx context.Context, sourceIdentifier, targe
 // MigrateFromBackup migrates configuration from a backup file to a device.
 func (s *Service) MigrateFromBackup(ctx context.Context, backupData []byte, targetIdentifier string, opts *RestoreOptions) (*RestoreResult, error) {
 	// Parse backup
-	backup, err := ValidateBackup(backupData)
+	bkup, err := ValidateBackup(backupData)
 	if err != nil {
 		return nil, fmt.Errorf("invalid backup: %w", err)
 	}
 
 	// Restore to target device
-	return s.RestoreBackup(ctx, targetIdentifier, backup, *opts)
+	return s.RestoreBackup(ctx, targetIdentifier, bkup, *opts)
 }
 
 // DiffBackups compares two backups and returns differences.

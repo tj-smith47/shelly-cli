@@ -120,18 +120,6 @@ func run(ctx context.Context, device, filePath string) error {
 	return nil
 }
 
-const (
-	statusEnabled  = "enabled"
-	statusDisabled = "disabled"
-)
-
-func enabledStatus(enabled bool) string {
-	if enabled {
-		return statusEnabled
-	}
-	return statusDisabled
-}
-
 func printRestorePreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
 	printBackupSource(ios, backup)
 	ios.Printf("Will restore:\n")

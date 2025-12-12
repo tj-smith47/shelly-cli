@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/tj-smith47/shelly-cli/internal/testutil"
 	"github.com/tj-smith47/shelly-go/backup"
+
+	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
 func TestMigrationOptions_ToMigrationOptions(t *testing.T) {

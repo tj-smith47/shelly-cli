@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-go/backup"
+
+	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
 // DeviceBackup wraps the shelly-go backup.Backup for backward compatibility.
@@ -189,37 +190,45 @@ func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBa
 			Warnings:        restoreResult.Warnings,
 		}
 
-		// Count restored items from warnings/errors
+		// Count restored items from backup
 		if restoreResult.Success {
-			result.ConfigRestored = true
-			// Estimate counts from backup
-			if deviceBackup.Scripts != nil {
-				result.ScriptsRestored = len(deviceBackup.Scripts)
-			}
-			if deviceBackup.Schedules != nil {
-				// Parse schedules count
-				var schedData struct {
-					Jobs []json.RawMessage `json:"jobs"`
-				}
-				if err := json.Unmarshal(deviceBackup.Schedules, &schedData); err == nil {
-					result.SchedulesRestored = len(schedData.Jobs)
-				}
-			}
-			if deviceBackup.Webhooks != nil {
-				// Parse webhooks count
-				var whData struct {
-					Hooks []json.RawMessage `json:"hooks"`
-				}
-				if err := json.Unmarshal(deviceBackup.Webhooks, &whData); err == nil {
-					result.WebhooksRestored = len(whData.Hooks)
-				}
-			}
+			updateRestoreResultCounts(result, deviceBackup.Backup)
 		}
 
 		return nil
 	})
 
 	return result, err
+}
+
+// updateRestoreResultCounts updates the RestoreResult with counts from the backup.
+func updateRestoreResultCounts(result *RestoreResult, deviceBackup *backup.Backup) {
+	result.ConfigRestored = true
+
+	// Count scripts
+	if deviceBackup.Scripts != nil {
+		result.ScriptsRestored = len(deviceBackup.Scripts)
+	}
+
+	// Parse and count schedules
+	if deviceBackup.Schedules != nil {
+		var schedData struct {
+			Jobs []json.RawMessage `json:"jobs"`
+		}
+		if err := json.Unmarshal(deviceBackup.Schedules, &schedData); err == nil {
+			result.SchedulesRestored = len(schedData.Jobs)
+		}
+	}
+
+	// Parse and count webhooks
+	if deviceBackup.Webhooks != nil {
+		var whData struct {
+			Hooks []json.RawMessage `json:"hooks"`
+		}
+		if err := json.Unmarshal(deviceBackup.Webhooks, &whData); err == nil {
+			result.WebhooksRestored = len(whData.Hooks)
+		}
+	}
 }
 
 // ValidateBackup validates a backup file structure.
