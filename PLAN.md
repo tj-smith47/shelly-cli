@@ -9,6 +9,8 @@
 > 2. **Tests for every file:** Every new or modified `.go` file must have corresponding test coverage. Write tests immediately after implementation, not as a separate phase.
 > 3. **Commit frequently:** Commit after completing each major section, large subsection, or BEFORE running any terminal commands that write to multiple files (e.g., `sed`, `gci`, bulk operations). Never leave work uncommitted.
 > 4. **No nolint without approval:** Do not add `//nolint` directives without explicit user approval.
+> 5. **No gci/gofmt without approval:** Do not run `gci`, `gofmt`, or other bulk formatting tools without explicit user approval.
+> 6. **Use verbose logging for errors:** Never use `_ = err` or similar lazy error suppression. Use `iostreams.DebugErr()` or other logging helpers to properly handle errors that don't need to propagate.
 
 ## Project Overview
 
@@ -773,13 +775,13 @@ shelly-cli/
 > **Note:** Energy monitoring uses shelly-go `gen2/components/em.go`, `em1.go`, `pm.go`, `pm1.go` components.
 
 ### 11.1 Real-time Monitoring
-- [ ] `shelly monitor <device>` - Real-time status monitoring
+- [x] `shelly monitor <device>` - Real-time status monitoring
   - Auto-refresh with configurable interval
   - Color-coded status changes
-- [ ] `shelly monitor power <device>` - Monitor power consumption
-- [ ] `shelly monitor events <device>` - Monitor device events
+- [x] `shelly monitor power <device>` - Monitor power consumption
+- [x] `shelly monitor events <device>` - Monitor device events
   - WebSocket subscription via shelly-go events package
-- [ ] `shelly monitor all` - Monitor all registered devices
+- [x] `shelly monitor all` - Monitor all registered devices
 
 ### 11.2 Energy Monitoring (EM/EM1 Components)
 - [ ] `shelly energy list <device>` - List energy meters (EM components)
