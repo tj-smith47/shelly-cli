@@ -64,7 +64,7 @@ func run(ctx context.Context, device, filePath string) error {
 	ios.Title("Configuration Differences")
 	ios.Println()
 	ios.Printf("Device: %s\n", device)
-	ios.Printf("Backup: %s (%s, %s)\n", filePath, backup.Device.ID, backup.Device.Model)
+	ios.Printf("Backup: %s (%s, %s)\n", filePath, backup.Device().ID, backup.Device().Model)
 	ios.Println()
 
 	if !d.HasDifferences() {

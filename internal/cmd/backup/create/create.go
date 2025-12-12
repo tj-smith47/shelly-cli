@@ -122,8 +122,8 @@ func run(ctx context.Context, device, filePath string) error {
 
 func printBackupSummary(ios *iostreams.IOStreams, backup *shelly.DeviceBackup) {
 	ios.Println()
-	ios.Printf("  Device:    %s (%s)\n", backup.Device.ID, backup.Device.Model)
-	ios.Printf("  Firmware:  %s\n", backup.Device.FWVersion)
+	ios.Printf("  Device:    %s (%s)\n", backup.Device().ID, backup.Device().Model)
+	ios.Printf("  Firmware:  %s\n", backup.Device().FWVersion)
 	ios.Printf("  Config:    %d keys\n", len(backup.Config))
 	if len(backup.Scripts) > 0 {
 		ios.Printf("  Scripts:   %d\n", len(backup.Scripts))
@@ -134,7 +134,7 @@ func printBackupSummary(ios *iostreams.IOStreams, backup *shelly.DeviceBackup) {
 	if len(backup.Webhooks) > 0 {
 		ios.Printf("  Webhooks:  %d\n", len(backup.Webhooks))
 	}
-	if backup.Encrypted {
+	if backup.Encrypted() {
 		ios.Printf("  Encrypted: yes\n")
 	}
 }

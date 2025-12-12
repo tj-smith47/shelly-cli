@@ -143,9 +143,9 @@ func checkTargetCompatibility(ctx context.Context, svc *shelly.Service, ios *ios
 		return fmt.Errorf("failed to get target device info: %w", err)
 	}
 
-	if !forceFlag && backup.Device.Model != targetInfo.Model {
+	if !forceFlag && backup.Device().Model != targetInfo.Model {
 		ios.Warning("Source and target are different device types:")
-		ios.Printf("  Source: %s\n", backup.Device.Model)
+		ios.Printf("  Source: %s\n", backup.Device().Model)
 		ios.Printf("  Target: %s\n", targetInfo.Model)
 		ios.Info("Use --force to migrate anyway")
 		return fmt.Errorf("device type mismatch")

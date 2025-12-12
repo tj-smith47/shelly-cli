@@ -177,11 +177,11 @@ func parseBackupFile(filePath string) (backupFileInfo, error) {
 		return info, err
 	}
 
-	info.DeviceID = backup.Device.ID
-	info.DeviceModel = backup.Device.Model
-	info.FWVersion = backup.Device.FWVersion
+	info.DeviceID = backup.Device().ID
+	info.DeviceModel = backup.Device().Model
+	info.FWVersion = backup.Device().FWVersion
 	info.CreatedAt = backup.CreatedAt.Format("2006-01-02 15:04:05")
-	info.Encrypted = backup.Encrypted
+	info.Encrypted = backup.Encrypted()
 	info.Size = stat.Size()
 
 	return info, nil

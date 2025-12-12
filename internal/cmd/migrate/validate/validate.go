@@ -50,15 +50,15 @@ func run(filePath string) error {
 	ios.Success("Backup file is valid")
 	ios.Println()
 	ios.Printf("  Version:   %s\n", backup.Version)
-	ios.Printf("  Device:    %s (%s)\n", backup.Device.ID, backup.Device.Model)
-	ios.Printf("  Firmware:  %s\n", backup.Device.FWVersion)
+	ios.Printf("  Device:    %s (%s)\n", backup.Device().ID, backup.Device().Model)
+	ios.Printf("  Firmware:  %s\n", backup.Device().FWVersion)
 	ios.Printf("  Created:   %s\n", backup.CreatedAt.Format("2006-01-02 15:04:05"))
 	ios.Printf("  Config:    %d keys\n", len(backup.Config))
 	ios.Printf("  Scripts:   %d\n", len(backup.Scripts))
 	ios.Printf("  Schedules: %d\n", len(backup.Schedules))
 	ios.Printf("  Webhooks:  %d\n", len(backup.Webhooks))
 
-	if backup.Encrypted {
+	if backup.Encrypted() {
 		ios.Printf("  Encrypted: yes\n")
 	}
 

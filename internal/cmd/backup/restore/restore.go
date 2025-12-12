@@ -82,7 +82,7 @@ func run(ctx context.Context, device, filePath string) error {
 	}
 
 	// Check encryption
-	if backup.Encrypted && decryptFlag == "" {
+	if backup.Encrypted() && decryptFlag == "" {
 		return fmt.Errorf("backup is encrypted, use --decrypt to provide password")
 	}
 
@@ -142,9 +142,10 @@ func printRestorePreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, 
 }
 
 func printBackupSource(ios *iostreams.IOStreams, backup *shelly.DeviceBackup) {
+	device := backup.Device()
 	ios.Printf("Backup source:\n")
-	ios.Printf("  Device:    %s (%s)\n", backup.Device.ID, backup.Device.Model)
-	ios.Printf("  Firmware:  %s\n", backup.Device.FWVersion)
+	ios.Printf("  Device:    %s (%s)\n", device.ID, device.Model)
+	ios.Printf("  Firmware:  %s\n", device.FWVersion)
 	ios.Printf("  Created:   %s\n", backup.CreatedAt.Format("2006-01-02 15:04:05"))
 	ios.Println()
 }
@@ -160,35 +161,32 @@ func printConfigPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, o
 }
 
 func printScriptsPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	if !opts.SkipScripts && len(backup.Scripts) > 0 {
-		ios.Printf("  Scripts:   %d\n", len(backup.Scripts))
-		for _, s := range backup.Scripts {
-			ios.Printf("    - %s (%s)\n", s.Name, enabledStatus(s.Enable))
+	if len(backup.Scripts) > 0 {
+		if opts.SkipScripts {
+			ios.Printf("  Scripts:   %d (skipped)\n", len(backup.Scripts))
+		} else {
+			ios.Printf("  Scripts:   %d\n", len(backup.Scripts))
 		}
-	} else if opts.SkipScripts && len(backup.Scripts) > 0 {
-		ios.Printf("  Scripts:   %d (skipped)\n", len(backup.Scripts))
 	}
 }
 
 func printSchedulesPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	if !opts.SkipSchedules && len(backup.Schedules) > 0 {
-		ios.Printf("  Schedules: %d\n", len(backup.Schedules))
-		for _, s := range backup.Schedules {
-			ios.Printf("    - %s (%s)\n", s.Timespec, enabledStatus(s.Enable))
+	if len(backup.Schedules) > 0 {
+		if opts.SkipSchedules {
+			ios.Printf("  Schedules: %d (skipped)\n", len(backup.Schedules))
+		} else {
+			ios.Printf("  Schedules: %d\n", len(backup.Schedules))
 		}
-	} else if opts.SkipSchedules && len(backup.Schedules) > 0 {
-		ios.Printf("  Schedules: %d (skipped)\n", len(backup.Schedules))
 	}
 }
 
 func printWebhooksPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	if !opts.SkipWebhooks && len(backup.Webhooks) > 0 {
-		ios.Printf("  Webhooks:  %d\n", len(backup.Webhooks))
-		for _, w := range backup.Webhooks {
-			ios.Printf("    - %s: %s (%s)\n", w.Event, w.Name, enabledStatus(w.Enable))
+	if len(backup.Webhooks) > 0 {
+		if opts.SkipWebhooks {
+			ios.Printf("  Webhooks:  %d (skipped)\n", len(backup.Webhooks))
+		} else {
+			ios.Printf("  Webhooks:  %d\n", len(backup.Webhooks))
 		}
-	} else if opts.SkipWebhooks && len(backup.Webhooks) > 0 {
-		ios.Printf("  Webhooks:  %d (skipped)\n", len(backup.Webhooks))
 	}
 }
 
