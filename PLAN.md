@@ -34,11 +34,11 @@ Create a production-ready, open-source Cobra CLI that:
 ## Current Status
 
 **Last Updated:** 2025-12-12
-**Phase:** Phase 10 - Backup & Restore Commands (next)
-**Completed:** Phases 0.1-0.6, 1-9 (full)
+**Phase:** Phase 11 - Monitoring Commands (next)
+**Completed:** Phases 0.1-0.6, 1-10 (full), 11.1 (real-time monitoring)
 **Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phases 10-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
-**Test Coverage:** ~25% average - TARGET: >90% (deferred to Phase 25)
+**Pending:** Phases 11.2-11.5, 14, 17-26, Phase 0.7 (deferred to Phase 25)
+**Test Coverage:** ~30% average - TARGET: >90% (deferred to Phase 25)
 
 **Architecture Audit (2025-12-11):**
 Comprehensive audit against industry standards (gh, kubectl, docker, jira-cli, gh-dash, k9s) revealed:
@@ -751,22 +751,31 @@ shelly-cli/
 
 ---
 
-## Phase 10: Backup & Restore Commands
+## Phase 10: Backup & Restore Commands ✅
 
-### 10.1 Backup Operations
-- [ ] `shelly backup create <device> [file]` - Create device backup
+> **Implementation Notes (2025-12-12):**
+> - Rewrote `internal/shelly/backup.go` to properly use shelly-go's backup.Manager
+> - Replaced weak bcrypt-only "encryption" with proper AES-256-GCM via shelly-go
+> - Added missing KVS (Key-Value Storage) backup support
+> - Created `internal/shelly/migrate.go` using shelly-go's backup.Migrator
+> - Updated all commands to use wrapper API (Device() and Encrypted() methods)
+> - Comprehensive test suites for both backup and migrate service layers
+> - All golangci-lint checks passing
+
+### 10.1 Backup Operations ✅
+- [x] `shelly backup create <device> [file]` - Create device backup
   - Includes: config, scripts, schedules, webhooks, KVS
-  - Flags: --encrypt (password-protected)
-- [ ] `shelly backup restore <device> <file>` - Restore from backup
+  - Flags: --encrypt (password-protected via AES-256-GCM)
+- [x] `shelly backup restore <device> <file>` - Restore from backup
   - Flags: --dry-run, --skip-network, --decrypt
-- [ ] `shelly backup list` - List saved backups
-- [ ] `shelly backup export --all <directory>` - Backup all devices
+- [x] `shelly backup list` - List saved backups
+- [x] `shelly backup export --all <directory>` - Backup all devices
 
-### 10.2 Migration
-- [ ] `shelly migrate <source> <target>` - Migrate config between devices
+### 10.2 Migration ✅
+- [x] `shelly migrate <source> <target>` - Migrate config between devices
   - Flags: --dry-run, --force (different device types)
-- [ ] `shelly migrate validate <backup>` - Validate backup file
-- [ ] `shelly migrate diff <device> <backup>` - Show differences
+- [x] `shelly migrate validate <backup>` - Validate backup file
+- [x] `shelly migrate diff <device> <backup>` - Show differences
 
 ---
 
