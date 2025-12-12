@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
 	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
@@ -26,6 +27,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
@@ -113,6 +115,8 @@ func init() {
 	rootCmd.AddCommand(firmware.NewCommand())
 	rootCmd.AddCommand(script.NewCommand())
 	rootCmd.AddCommand(schedule.NewCommand())
+	rootCmd.AddCommand(backup.NewCommand())
+	rootCmd.AddCommand(migrate.NewCommand())
 	rootCmd.AddCommand(versionCmd())
 }
 
