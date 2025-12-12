@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const DefaultTheme = "dracula"
+
 var (
 	initOnce sync.Once
 )
@@ -20,7 +22,7 @@ func init() {
 		// Initialize default registry
 		tint.NewDefaultRegistry()
 		// Set default theme
-		SetTheme("dracula")
+		SetTheme(DefaultTheme)
 	})
 }
 
@@ -38,7 +40,7 @@ func SetTheme(name string) bool {
 func SetThemeFromConfig() {
 	name := viper.GetString("theme")
 	if name == "" {
-		name = "dracula"
+		name = DefaultTheme
 	}
 	SetTheme(name)
 }

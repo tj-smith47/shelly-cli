@@ -6,16 +6,21 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+const (
+	typeAuto = "auto"
+	typeEM   = "em"
+	typeEM1  = "em1"
+)
+
 // NewCmd creates the energy status command.
 func NewCmd(f *cmdutil.Factory) *cobra.Command {
 	var (
-		componentID int
+		componentID   int
 		componentType string
 	)
 
@@ -41,7 +46,7 @@ per-phase data and totals.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", "auto", "Component type (auto, em, em1)")
+	cmd.Flags().StringVar(&componentType, "type", typeAuto, "Component type (auto, em, em1)")
 
 	return cmd
 }
@@ -51,35 +56,37 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	svc := f.ShellyService()
 
 	// Auto-detect type if not specified
-	if componentType == "auto" {
-		emIDs, _ := svc.ListEMComponents(ctx, device)
-		em1IDs, _ := svc.ListEM1Components(ctx, device)
+	if componentType == typeAuto {
+		emIDs, err := svc.ListEMComponents(ctx, device)
+		ios.DebugErr("list EM components", err)
+		em1IDs, err := svc.ListEM1Components(ctx, device)
+		ios.DebugErr("list EM1 components", err)
 
 		for _, emID := range emIDs {
 			if emID == id {
-				componentType = "em"
+				componentType = typeEM
 				break
 			}
 		}
-		if componentType == "auto" {
+		if componentType == typeAuto {
 			for _, em1ID := range em1IDs {
 				if em1ID == id {
-					componentType = "em1"
+					componentType = typeEM1
 					break
 				}
 			}
 		}
-		if componentType == "auto" && len(emIDs) > 0 {
-			componentType = "em"
-		} else if componentType == "auto" && len(em1IDs) > 0 {
-			componentType = "em1"
+		if componentType == typeAuto && len(emIDs) > 0 {
+			componentType = typeEM
+		} else if componentType == typeAuto && len(em1IDs) > 0 {
+			componentType = typeEM1
 		}
 	}
 
 	switch componentType {
-	case "em":
+	case typeEM:
 		return showEMStatus(ctx, ios, svc, device, id)
-	case "em1":
+	case typeEM1:
 		return showEM1Status(ctx, ios, svc, device, id)
 	default:
 		return fmt.Errorf("no energy monitoring components found")
@@ -97,55 +104,55 @@ func showEMStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Ser
 	}
 
 	// Human-readable format
-	fmt.Fprintf(ios.Out, "Energy Monitor (EM) #%d\n\n", status.ID)
+	ios.Printf("Energy Monitor (EM) #%d\n\n", status.ID)
 
-	fmt.Fprintf(ios.Out, "Phase A:\n")
-	fmt.Fprintf(ios.Out, "  Voltage:        %.2f V\n", status.AVoltage)
-	fmt.Fprintf(ios.Out, "  Current:        %.2f A\n", status.ACurrent)
-	fmt.Fprintf(ios.Out, "  Active Power:   %.2f W\n", status.AActivePower)
-	fmt.Fprintf(ios.Out, "  Apparent Power: %.2f VA\n", status.AApparentPower)
+	ios.Printf("Phase A:\n")
+	ios.Printf("  Voltage:        %.2f V\n", status.AVoltage)
+	ios.Printf("  Current:        %.2f A\n", status.ACurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.AActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.AApparentPower)
 	if status.APowerFactor != nil {
-		fmt.Fprintf(ios.Out, "  Power Factor:   %.3f\n", *status.APowerFactor)
+		ios.Printf("  Power Factor:   %.3f\n", *status.APowerFactor)
 	}
 	if status.AFreq != nil {
-		fmt.Fprintf(ios.Out, "  Frequency:      %.2f Hz\n", *status.AFreq)
+		ios.Printf("  Frequency:      %.2f Hz\n", *status.AFreq)
 	}
 
-	fmt.Fprintf(ios.Out, "\nPhase B:\n")
-	fmt.Fprintf(ios.Out, "  Voltage:        %.2f V\n", status.BVoltage)
-	fmt.Fprintf(ios.Out, "  Current:        %.2f A\n", status.BCurrent)
-	fmt.Fprintf(ios.Out, "  Active Power:   %.2f W\n", status.BActivePower)
-	fmt.Fprintf(ios.Out, "  Apparent Power: %.2f VA\n", status.BApparentPower)
+	ios.Printf("\nPhase B:\n")
+	ios.Printf("  Voltage:        %.2f V\n", status.BVoltage)
+	ios.Printf("  Current:        %.2f A\n", status.BCurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.BActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.BApparentPower)
 	if status.BPowerFactor != nil {
-		fmt.Fprintf(ios.Out, "  Power Factor:   %.3f\n", *status.BPowerFactor)
+		ios.Printf("  Power Factor:   %.3f\n", *status.BPowerFactor)
 	}
 	if status.BFreq != nil {
-		fmt.Fprintf(ios.Out, "  Frequency:      %.2f Hz\n", *status.BFreq)
+		ios.Printf("  Frequency:      %.2f Hz\n", *status.BFreq)
 	}
 
-	fmt.Fprintf(ios.Out, "\nPhase C:\n")
-	fmt.Fprintf(ios.Out, "  Voltage:        %.2f V\n", status.CVoltage)
-	fmt.Fprintf(ios.Out, "  Current:        %.2f A\n", status.CCurrent)
-	fmt.Fprintf(ios.Out, "  Active Power:   %.2f W\n", status.CActivePower)
-	fmt.Fprintf(ios.Out, "  Apparent Power: %.2f VA\n", status.CApparentPower)
+	ios.Printf("\nPhase C:\n")
+	ios.Printf("  Voltage:        %.2f V\n", status.CVoltage)
+	ios.Printf("  Current:        %.2f A\n", status.CCurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.CActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.CApparentPower)
 	if status.CPowerFactor != nil {
-		fmt.Fprintf(ios.Out, "  Power Factor:   %.3f\n", *status.CPowerFactor)
+		ios.Printf("  Power Factor:   %.3f\n", *status.CPowerFactor)
 	}
 	if status.CFreq != nil {
-		fmt.Fprintf(ios.Out, "  Frequency:      %.2f Hz\n", *status.CFreq)
+		ios.Printf("  Frequency:      %.2f Hz\n", *status.CFreq)
 	}
 
-	fmt.Fprintf(ios.Out, "\nTotals:\n")
-	fmt.Fprintf(ios.Out, "  Current:        %.2f A\n", status.TotalCurrent)
-	fmt.Fprintf(ios.Out, "  Active Power:   %.2f W\n", status.TotalActivePower)
-	fmt.Fprintf(ios.Out, "  Apparent Power: %.2f VA\n", status.TotalAprtPower)
+	ios.Printf("\nTotals:\n")
+	ios.Printf("  Current:        %.2f A\n", status.TotalCurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.TotalActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.TotalAprtPower)
 
 	if status.NCurrent != nil {
-		fmt.Fprintf(ios.Out, "\nNeutral Current: %.2f A\n", *status.NCurrent)
+		ios.Printf("\nNeutral Current: %.2f A\n", *status.NCurrent)
 	}
 
 	if len(status.Errors) > 0 {
-		fmt.Fprintf(ios.Out, "\nErrors: %v\n", status.Errors)
+		ios.Printf("\nErrors: %v\n", status.Errors)
 	}
 
 	return nil
@@ -162,20 +169,20 @@ func showEM1Status(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 	}
 
 	// Human-readable format
-	fmt.Fprintf(ios.Out, "Energy Monitor (EM1) #%d\n\n", status.ID)
-	fmt.Fprintf(ios.Out, "Voltage:        %.2f V\n", status.Voltage)
-	fmt.Fprintf(ios.Out, "Current:        %.2f A\n", status.Current)
-	fmt.Fprintf(ios.Out, "Active Power:   %.2f W\n", status.ActPower)
-	fmt.Fprintf(ios.Out, "Apparent Power: %.2f VA\n", status.AprtPower)
+	ios.Printf("Energy Monitor (EM1) #%d\n\n", status.ID)
+	ios.Printf("Voltage:        %.2f V\n", status.Voltage)
+	ios.Printf("Current:        %.2f A\n", status.Current)
+	ios.Printf("Active Power:   %.2f W\n", status.ActPower)
+	ios.Printf("Apparent Power: %.2f VA\n", status.AprtPower)
 	if status.PF != nil {
-		fmt.Fprintf(ios.Out, "Power Factor:   %.3f\n", *status.PF)
+		ios.Printf("Power Factor:   %.3f\n", *status.PF)
 	}
 	if status.Freq != nil {
-		fmt.Fprintf(ios.Out, "Frequency:      %.2f Hz\n", *status.Freq)
+		ios.Printf("Frequency:      %.2f Hz\n", *status.Freq)
 	}
 
 	if len(status.Errors) > 0 {
-		fmt.Fprintf(ios.Out, "\nErrors: %v\n", status.Errors)
+		ios.Printf("\nErrors: %v\n", status.Errors)
 	}
 
 	return nil
