@@ -740,11 +740,12 @@ shelly-cli/
 - [x] `shelly cloud control <id> <action>` - Control via cloud
   - Actions: on, off, toggle, open, close, stop, position=N, brightness=N, light-on, light-off, light-toggle
   - Flags: --channel
-- [ ] `shelly cloud events` - Subscribe to real-time events (deferred - requires WebSocket)
-  - Output events as they arrive
-  - Flags: --filter, --format
+- [x] `shelly cloud events` - Subscribe to real-time events (aliases: watch, subscribe)
+  - WebSocket connection to Shelly Cloud
+  - Output events as they arrive (text or JSON)
+  - Flags: --device (filter), --event (filter), --format (text/json), --raw
 
-**Session Note (2025-12-12):** Created `internal/shelly/cloud.go` service layer wrapping shelly-go cloud package. Added login/, logout/, authstatus/, token/, devices/, device/, control/ subcommands under existing cloud command. Existing device cloud commands (status, enable, disable) preserved.
+**Session Note (2025-12-12):** Created `internal/shelly/cloud.go` service layer wrapping shelly-go cloud package. Added login/, logout/, authstatus/, token/, devices/, device/, control/, events/ subcommands under existing cloud command. Events command uses gorilla/websocket for real-time cloud event streaming. Existing device cloud commands (status, enable, disable) preserved.
 
 ---
 

@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/devices"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/disable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/enable"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/events"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/login"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/logout"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/status"
@@ -35,7 +36,8 @@ Cloud API commands (requires login):
   token       Show/manage access token
   devices     List cloud-registered devices
   device      Show cloud device details
-  control     Control devices via cloud`,
+  control     Control devices via cloud
+  events      Subscribe to real-time cloud events`,
 		Example: `  # Device cloud configuration
   shelly cloud status living-room
   shelly cloud enable living-room
@@ -67,6 +69,7 @@ Cloud API commands (requires login):
 	cmd.AddCommand(devices.NewCommand())
 	cmd.AddCommand(device.NewCommand())
 	cmd.AddCommand(control.NewCommand())
+	cmd.AddCommand(events.NewCommand())
 
 	return cmd
 }
