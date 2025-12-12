@@ -31,11 +31,11 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-11
-**Phase:** Phase 9 - Cloud Commands (next)
-**Completed:** Phases 0.1-0.6, 1-8 (full)
+**Last Updated:** 2025-12-12
+**Phase:** Phase 10 - Backup & Restore Commands (next)
+**Completed:** Phases 0.1-0.6, 1-9 (full)
 **Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phases 9-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
+**Pending:** Phases 10-11, 14, 17-26, Phase 0.7 (deferred to Phase 25)
 **Test Coverage:** ~25% average - TARGET: >90% (deferred to Phase 25)
 
 **Architecture Audit (2025-12-11):**
@@ -723,23 +723,28 @@ shelly-cli/
 
 ---
 
-## Phase 9: Cloud Commands
+## Phase 9: Cloud Commands ✅
 
-### 9.1 Cloud Authentication
-- [ ] `shelly cloud login` - Authenticate with Shelly Cloud
-  - OAuth flow with browser redirect
-  - Save token securely
-- [ ] `shelly cloud logout` - Clear cloud credentials
-- [ ] `shelly cloud status` - Show cloud auth status
-- [ ] `shelly cloud token` - Show/refresh token (for debugging)
+### 9.1 Cloud Authentication ✅
+- [x] `shelly cloud login` - Authenticate with Shelly Cloud
+  - Email/password authentication (interactive or via flags)
+  - Saves token and server URL to config
+- [x] `shelly cloud logout` - Clear cloud credentials
+- [x] `shelly cloud auth-status` - Show cloud auth status (alias: whoami)
+- [x] `shelly cloud token` - Show/manage access token
 
-### 9.2 Cloud Device Management
-- [ ] `shelly cloud devices` - List cloud-registered devices
-- [ ] `shelly cloud device <id>` - Show cloud device details
-- [ ] `shelly cloud control <id> <action>` - Control via cloud
-- [ ] `shelly cloud events` - Subscribe to real-time events
+### 9.2 Cloud Device Management ✅
+- [x] `shelly cloud devices` - List cloud-registered devices (aliases: ls, list)
+- [x] `shelly cloud device <id>` - Show cloud device details (alias: get)
+  - Flags: --status (show full status JSON)
+- [x] `shelly cloud control <id> <action>` - Control via cloud
+  - Actions: on, off, toggle, open, close, stop, position=N, brightness=N, light-on, light-off, light-toggle
+  - Flags: --channel
+- [ ] `shelly cloud events` - Subscribe to real-time events (deferred - requires WebSocket)
   - Output events as they arrive
   - Flags: --filter, --format
+
+**Session Note (2025-12-12):** Created `internal/shelly/cloud.go` service layer wrapping shelly-go cloud package. Added login/, logout/, authstatus/, token/, devices/, device/, control/ subcommands under existing cloud command. Existing device cloud commands (status, enable, disable) preserved.
 
 ---
 
