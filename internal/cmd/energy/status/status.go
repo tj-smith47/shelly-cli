@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -16,6 +17,38 @@ const (
 	typeEM   = "em"
 	typeEM1  = "em1"
 )
+
+// detectEnergyComponentType auto-detects the energy component type.
+func detectEnergyComponentType(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int) string {
+	emIDs, err := svc.ListEMComponents(ctx, device)
+	ios.DebugErr("list EM components", err)
+	em1IDs, err := svc.ListEM1Components(ctx, device)
+	ios.DebugErr("list EM1 components", err)
+
+	// Check if ID matches EM component
+	for _, emID := range emIDs {
+		if emID == id {
+			return typeEM
+		}
+	}
+
+	// Check if ID matches EM1 component
+	for _, em1ID := range em1IDs {
+		if em1ID == id {
+			return typeEM1
+		}
+	}
+
+	// Default to first available type
+	if len(emIDs) > 0 {
+		return typeEM
+	}
+	if len(em1IDs) > 0 {
+		return typeEM1
+	}
+
+	return typeAuto
+}
 
 // NewCmd creates the energy status command.
 func NewCmd(f *cmdutil.Factory) *cobra.Command {
@@ -57,30 +90,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 
 	// Auto-detect type if not specified
 	if componentType == typeAuto {
-		emIDs, err := svc.ListEMComponents(ctx, device)
-		ios.DebugErr("list EM components", err)
-		em1IDs, err := svc.ListEM1Components(ctx, device)
-		ios.DebugErr("list EM1 components", err)
-
-		for _, emID := range emIDs {
-			if emID == id {
-				componentType = typeEM
-				break
-			}
-		}
-		if componentType == typeAuto {
-			for _, em1ID := range em1IDs {
-				if em1ID == id {
-					componentType = typeEM1
-					break
-				}
-			}
-		}
-		if componentType == typeAuto && len(emIDs) > 0 {
-			componentType = typeEM
-		} else if componentType == typeAuto && len(em1IDs) > 0 {
-			componentType = typeEM1
-		}
+		componentType = detectEnergyComponentType(ctx, ios, svc, device, id)
 	}
 
 	switch componentType {
