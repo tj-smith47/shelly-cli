@@ -6,13 +6,12 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the migrate validate command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate <backup-file>",
 		Short: "Validate a backup file",
@@ -24,15 +23,15 @@ all required fields.`,
   shelly migrate validate backup.json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0])
+			return run(f, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(filePath string) error {
-	ios := iostreams.System()
+func run(f *cmdutil.Factory, filePath string) error {
+	ios := f.IOStreams()
 
 	// Read backup file
 	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is user-provided CLI argument

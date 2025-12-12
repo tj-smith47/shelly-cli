@@ -4,6 +4,8 @@ package discover
 import (
 	"time"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/discovery"
 
@@ -19,7 +21,7 @@ import (
 const DefaultTimeout = 10 * time.Second
 
 // NewCommand creates the discover command group.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		timeout      time.Duration
 		register     bool
@@ -60,10 +62,10 @@ Examples:
 	cmd.Flags().BoolVar(&skipExisting, "skip-existing", true, "Skip devices already registered")
 
 	// Add subcommands
-	cmd.AddCommand(mdns.NewCommand())
-	cmd.AddCommand(ble.NewCommand())
-	cmd.AddCommand(coiot.NewCommand())
-	cmd.AddCommand(scan.NewCommand())
+	cmd.AddCommand(mdns.NewCommand(f))
+	cmd.AddCommand(ble.NewCommand(f))
+	cmd.AddCommand(coiot.NewCommand(f))
+	cmd.AddCommand(scan.NewCommand(f))
 
 	return cmd
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -21,7 +20,7 @@ var (
 )
 
 // NewCommand creates the mqtt set command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <device>",
 		Short: "Configure MQTT",
@@ -39,7 +38,7 @@ integration with home automation systems.`,
   shelly mqtt set living-room --enable`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -52,7 +51,7 @@ integration with home automation systems.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	// Validate - need at least one option
 	if serverFlag == "" && userFlag == "" && passwordFlag == "" && topicPrefixFlag == "" && !enableFlag {
 		return fmt.Errorf("specify at least one configuration option (--server, --user, --password, --topic-prefix) or --enable")
@@ -61,8 +60,8 @@ func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Determine enable state
 	var enable *bool

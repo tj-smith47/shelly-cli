@@ -1,13 +1,14 @@
 package importcmd
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "import <file>" {
 		t.Errorf("Use = %q, want \"import <file>\"", cmd.Use)
@@ -26,7 +27,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_Args(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test requires exactly 1 argument
 	if err := cmd.Args(cmd, []string{}); err == nil {
@@ -43,7 +44,7 @@ func TestNewCommand_Args(t *testing.T) {
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	nameFlag := cmd.Flags().Lookup("name")
 	if nameFlag == nil {

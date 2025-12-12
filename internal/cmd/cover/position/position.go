@@ -14,7 +14,7 @@ import (
 )
 
 // NewCommand creates the cover position command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var coverID int
 
 	cmd := &cobra.Command{
@@ -38,7 +38,7 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
 			if position < 0 || position > 100 {
 				return fmt.Errorf("position must be between 0 and 100, got %d", position)
 			}
-			return run(cmd.Context(), args[0], coverID, position)
+			return run(cmd.Context(), f, args[0], coverID, position)
 		},
 	}
 
@@ -47,11 +47,11 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, coverID, position int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, coverID, position int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner(fmt.Sprintf("Setting cover to %d%%...", position))
 	spin.Start()

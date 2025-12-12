@@ -3,6 +3,7 @@ package monitor
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor/all"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor/events"
@@ -11,7 +12,7 @@ import (
 )
 
 // NewCommand creates the monitor command group.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "monitor",
 		Aliases: []string{"mon"},
@@ -22,10 +23,10 @@ Monitor device status, power consumption, and events in real-time
 with automatic refresh and color-coded status changes.`,
 	}
 
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(power.NewCommand())
-	cmd.AddCommand(events.NewCommand())
-	cmd.AddCommand(all.NewCommand())
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(power.NewCommand(f))
+	cmd.AddCommand(events.NewCommand(f))
+	cmd.AddCommand(all.NewCommand(f))
 
 	return cmd
 }

@@ -3,6 +3,7 @@ package input
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input/status"
@@ -10,7 +11,7 @@ import (
 )
 
 // NewCommand creates the input command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "input",
 		Aliases: []string{"in"},
@@ -18,9 +19,9 @@ func NewCommand() *cobra.Command {
 		Long:    `Manage input components on Shelly devices.`,
 	}
 
-	cmd.AddCommand(list.NewCommand())
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(trigger.NewCommand())
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(trigger.NewCommand(f))
 
 	return cmd
 }

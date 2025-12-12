@@ -8,12 +8,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the mqtt disable command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "disable <device>",
 		Short: "Disable MQTT",
@@ -24,19 +23,19 @@ This disconnects the device from the MQTT broker and disables MQTT functionality
   shelly mqtt disable living-room`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	enable := false
 	return cmdutil.RunWithSpinner(ctx, ios, "Disabling MQTT...", func(ctx context.Context) error {

@@ -3,13 +3,14 @@ package ethernet
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet/status"
 )
 
 // NewCommand creates the ethernet command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "ethernet",
 		Aliases: []string{"eth"},
@@ -29,8 +30,8 @@ It provides wired network connectivity as an alternative to WiFi.`,
     --gateway "192.168.1.1" --netmask "255.255.255.0"`,
 	}
 
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(set.NewCommand())
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(set.NewCommand(f))
 
 	return cmd
 }

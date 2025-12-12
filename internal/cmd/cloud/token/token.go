@@ -5,15 +5,15 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the cloud token command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "token",
 		Short: "Show or manage cloud token",
@@ -27,15 +27,15 @@ Be careful not to share or expose your token.`,
   # Copy token to clipboard (Linux)
   shelly cloud token | xclip -selection clipboard`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run()
+			return run(f)
 		},
 	}
 
 	return cmd
 }
 
-func run() error {
-	ios := iostreams.System()
+func run(f *cmdutil.Factory) error {
+	ios := f.IOStreams()
 
 	cfg := config.Get()
 

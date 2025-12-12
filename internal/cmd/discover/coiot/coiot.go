@@ -5,17 +5,18 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // DefaultTimeout is the default discovery timeout.
 const DefaultTimeout = 10 * time.Second
 
 // NewCommand creates the discover coiot command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var timeout time.Duration
 	var register bool
 	var skipExisting bool

@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the cloud auth-status command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "auth-status",
 		Aliases: []string{"whoami"},
@@ -28,15 +28,15 @@ Displays whether you're logged in, your email, and token validity.`,
   # Also available as whoami
   shelly cloud whoami`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run()
+			return run(f)
 		},
 	}
 
 	return cmd
 }
 
-func run() error {
-	ios := iostreams.System()
+func run(f *cmdutil.Factory) error {
+	ios := f.IOStreams()
 
 	cfg := config.Get()
 

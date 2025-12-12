@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 )
 
 // NewCommand creates the backup create command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create <device> [file]",
 		Short: "Create a device backup",
@@ -56,7 +56,7 @@ sensitive data is not encrypted in the file).`,
 			if len(args) > 1 {
 				filePath = args[1]
 			}
-			return run(cmd.Context(), device, filePath)
+			return run(cmd.Context(), f, device, filePath)
 		},
 	}
 
@@ -69,11 +69,11 @@ sensitive data is not encrypted in the file).`,
 	return cmd
 }
 
-func run(ctx context.Context, device, filePath string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*3)
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	opts := shelly.BackupOptions{
 		SkipScripts:   skipScriptsFlag,
@@ -85,7 +85,7 @@ func run(ctx context.Context, device, filePath string) error {
 	spin := iostreams.NewSpinner("Creating backup...")
 	spin.Start()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 	backup, err := svc.CreateBackup(ctx, device, opts)
 	spin.Stop()
 

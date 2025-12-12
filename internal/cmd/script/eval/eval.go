@@ -16,7 +16,7 @@ import (
 )
 
 // NewCommand creates the script eval command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "eval <device> <id> <code>",
 		Aliases: []string{"exec"},
@@ -40,19 +40,19 @@ multiple words that will be joined together.`,
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
 			code := strings.Join(args[2:], " ")
-			return run(cmd.Context(), args[0], id, code)
+			return run(cmd.Context(), f, args[0], id, code)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int, code string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int, code string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Evaluating code...", func(ctx context.Context) error {
 		result, err := svc.EvalScript(ctx, device, id, code)

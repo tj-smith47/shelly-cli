@@ -8,17 +8,18 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var formatFlag string
 
 // NewCommand creates the backup list command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list [directory]",
 		Aliases: []string{"ls"},
@@ -41,7 +42,7 @@ You can specify a different directory as an argument.`,
 			if len(args) > 0 {
 				dir = args[0]
 			}
-			return run(dir)
+			return run(f, dir)
 		},
 	}
 
@@ -61,8 +62,8 @@ type backupFileInfo struct {
 	Size        int64  `json:"size"`
 }
 
-func run(dir string) error {
-	ios := iostreams.System()
+func run(f *cmdutil.Factory, dir string) error {
+	ios := f.IOStreams()
 
 	dir, err := resolveBackupDir(dir)
 	if err != nil {

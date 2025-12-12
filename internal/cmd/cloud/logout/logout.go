@@ -3,13 +3,13 @@ package logout
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the cloud logout command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Clear cloud credentials",
@@ -20,15 +20,15 @@ You will need to login again to use cloud commands.`,
 		Example: `  # Logout from Shelly Cloud
   shelly cloud logout`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run()
+			return run(f)
 		},
 	}
 
 	return cmd
 }
 
-func run() error {
-	ios := iostreams.System()
+func run(f *cmdutil.Factory) error {
+	ios := f.IOStreams()
 
 	cfg := config.Get()
 

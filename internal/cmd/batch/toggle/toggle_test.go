@@ -1,13 +1,14 @@
 package toggle
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "toggle [device...]" {
 		t.Errorf("Use = %q, want \"toggle [device...]\"", cmd.Use)
@@ -26,7 +27,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	flags := []struct {
 		name      string

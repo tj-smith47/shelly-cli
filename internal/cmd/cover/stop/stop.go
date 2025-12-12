@@ -13,7 +13,7 @@ import (
 )
 
 // NewCommand creates the cover stop command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var coverID int
 
 	cmd := &cobra.Command{
@@ -22,7 +22,7 @@ func NewCommand() *cobra.Command {
 		Long:  `Stop a cover/roller component on the specified device.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], coverID)
+			return run(cmd.Context(), f, args[0], coverID)
 		},
 	}
 
@@ -31,11 +31,11 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, device string, coverID int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, coverID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Stopping cover...")
 	spin.Start()

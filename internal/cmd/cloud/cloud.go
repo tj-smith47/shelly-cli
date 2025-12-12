@@ -3,6 +3,7 @@ package cloud
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/authstatus"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/control"
@@ -18,7 +19,7 @@ import (
 )
 
 // NewCommand creates the cloud command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Manage cloud connection and Shelly Cloud API",
@@ -55,21 +56,21 @@ Cloud API commands (requires login):
 	}
 
 	// Device cloud configuration commands
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(enable.NewCommand())
-	cmd.AddCommand(disable.NewCommand())
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(enable.NewCommand(f))
+	cmd.AddCommand(disable.NewCommand(f))
 
 	// Cloud API authentication commands
-	cmd.AddCommand(login.NewCommand())
-	cmd.AddCommand(logout.NewCommand())
-	cmd.AddCommand(authstatus.NewCommand())
-	cmd.AddCommand(token.NewCommand())
+	cmd.AddCommand(login.NewCommand(f))
+	cmd.AddCommand(logout.NewCommand(f))
+	cmd.AddCommand(authstatus.NewCommand(f))
+	cmd.AddCommand(token.NewCommand(f))
 
 	// Cloud API device management commands
-	cmd.AddCommand(devices.NewCommand())
-	cmd.AddCommand(device.NewCommand())
-	cmd.AddCommand(control.NewCommand())
-	cmd.AddCommand(events.NewCommand())
+	cmd.AddCommand(devices.NewCommand(f))
+	cmd.AddCommand(device.NewCommand(f))
+	cmd.AddCommand(control.NewCommand(f))
+	cmd.AddCommand(events.NewCommand(f))
 
 	return cmd
 }

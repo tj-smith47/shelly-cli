@@ -15,26 +15,26 @@ import (
 )
 
 // NewCommand creates the input list command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list <device>",
 		Short: "List input components",
 		Long:  `List all input components on a Shelly device with their current state.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunList(ctx, ios, svc, device,
 		"Getting inputs...",

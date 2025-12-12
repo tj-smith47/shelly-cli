@@ -8,17 +8,18 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // DefaultTimeout is the default scan timeout.
 const DefaultTimeout = 2 * time.Minute
 
 // NewCommand creates the discover scan command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var register bool
 	var skipExisting bool
 	var timeout time.Duration
@@ -47,7 +48,7 @@ Examples:
 			if len(args) > 0 {
 				subnet = args[0]
 			}
-			return run(cmd.Context(), subnet, timeout, register, skipExisting)
+			return run(cmd.Context(), f, subnet, timeout, register, skipExisting)
 		},
 	}
 
@@ -58,7 +59,7 @@ Examples:
 	return cmd
 }
 
-func run(ctx context.Context, subnet string, timeout time.Duration, register, skipExisting bool) error {
+func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Duration, register, skipExisting bool) error {
 	if subnet == "" {
 		var err error
 		subnet, err = detectSubnet()
@@ -81,7 +82,7 @@ func run(ctx context.Context, subnet string, timeout time.Duration, register, sk
 
 	iostreams.Info("Scanning %d addresses in %s...", len(addresses), ipNet)
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())

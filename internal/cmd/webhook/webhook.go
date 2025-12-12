@@ -3,6 +3,7 @@ package webhook
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/del"
@@ -11,7 +12,7 @@ import (
 )
 
 // NewCommand creates the webhook command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "webhook",
 		Short: "Manage device webhooks",
@@ -32,10 +33,10 @@ enabling integration with external services and automation systems.`,
   shelly webhook update living-room 1 --disable`,
 	}
 
-	cmd.AddCommand(list.NewCommand())
-	cmd.AddCommand(create.NewCommand())
-	cmd.AddCommand(del.NewCommand())
-	cmd.AddCommand(update.NewCommand())
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(create.NewCommand(f))
+	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(update.NewCommand(f))
 
 	return cmd
 }

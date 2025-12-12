@@ -8,14 +8,15 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // NewCommand creates the config get command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get <device> [component]",
 		Short: "Get device configuration",
@@ -48,18 +49,18 @@ only that component's configuration.`,
 			if len(args) > 1 {
 				component = args[1]
 			}
-			return run(cmd.Context(), device, component)
+			return run(cmd.Context(), f, device, component)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device, component string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, component string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Getting configuration...")
 	spin.Start()

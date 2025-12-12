@@ -11,7 +11,6 @@ import (
 	"github.com/tj-smith47/shelly-go/firmware"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -22,7 +21,7 @@ var (
 )
 
 // NewCommand creates the firmware download command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "download <device>",
 		Aliases: []string{"dl"},
@@ -41,7 +40,7 @@ The firmware URL is determined by querying the device.`,
   shelly firmware download living-room --beta`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -52,9 +51,9 @@ The firmware URL is determined by querying the device.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
-	ios := iostreams.System()
-	svc := shelly.NewService()
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Determine stage
 	stage := "stable"

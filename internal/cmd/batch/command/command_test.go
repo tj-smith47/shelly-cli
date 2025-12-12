@@ -1,13 +1,14 @@
 package command
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "command <method> [params-json] [device...]" {
 		t.Errorf("Use = %q, want \"command <method> [params-json] [device...]\"", cmd.Use)
@@ -35,7 +36,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_Args(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test requires minimum 1 argument
 	if err := cmd.Args(cmd, []string{}); err == nil {
@@ -52,7 +53,7 @@ func TestNewCommand_Args(t *testing.T) {
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	flags := []struct {
 		name      string

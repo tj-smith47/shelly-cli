@@ -18,7 +18,7 @@ import (
 var statusFlag bool
 
 // NewCommand creates the cloud device command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "device <id>",
 		Aliases: []string{"get"},
@@ -33,7 +33,7 @@ Displays device information including status, settings, and online state.`,
   shelly cloud device abc123 --status`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -42,11 +42,11 @@ Displays device information including status, settings, and online state.`,
 	return cmd
 }
 
-func run(ctx context.Context, deviceID string) error {
+func run(ctx context.Context, f *cmdutil.Factory, deviceID string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2)
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()

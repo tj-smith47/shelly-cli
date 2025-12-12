@@ -3,6 +3,7 @@ package mqtt
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt/disable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt/set"
@@ -10,7 +11,7 @@ import (
 )
 
 // NewCommand creates the mqtt command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mqtt",
 		Short: "Manage device MQTT configuration",
@@ -28,9 +29,9 @@ like Home Assistant, OpenHAB, or custom MQTT brokers.`,
   shelly mqtt disable living-room`,
 	}
 
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(set.NewCommand())
-	cmd.AddCommand(disable.NewCommand())
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(set.NewCommand(f))
+	cmd.AddCommand(disable.NewCommand(f))
 
 	return cmd
 }

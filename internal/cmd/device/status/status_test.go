@@ -1,13 +1,14 @@
 package status
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "status <device>" {
 		t.Errorf("Use = %q, want 'status <device>'", cmd.Use)
@@ -29,7 +30,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_RequiresArg(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Should require exactly 1 argument
 	err := cmd.Args(cmd, []string{})

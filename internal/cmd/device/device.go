@@ -3,6 +3,7 @@ package device
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/factoryreset"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/info"
@@ -13,7 +14,7 @@ import (
 )
 
 // NewCommand creates the device command group.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "device",
 		Aliases: []string{"dev"},
@@ -24,12 +25,12 @@ Device commands allow you to add, remove, list, and manage registered devices.
 Registered devices can be referenced by name in other commands.`,
 	}
 
-	cmd.AddCommand(list.NewCommand())
-	cmd.AddCommand(info.NewCommand())
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(ping.NewCommand())
-	cmd.AddCommand(reboot.NewCommand())
-	cmd.AddCommand(factoryreset.NewCommand())
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(info.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(ping.NewCommand(f))
+	cmd.AddCommand(reboot.NewCommand(f))
+	cmd.AddCommand(factoryreset.NewCommand(f))
 
 	return cmd
 }

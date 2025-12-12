@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -22,7 +22,7 @@ var (
 )
 
 // NewCommand creates the backup restore command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restore <device> <file>",
 		Short: "Restore a device from backup",
@@ -49,7 +49,7 @@ Network configuration (WiFi, Ethernet) is skipped by default with
   shelly backup restore living-room backup.json --skip-scripts`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], args[1])
+			return run(cmd.Context(), f, args[0], args[1])
 		},
 	}
 
@@ -63,11 +63,11 @@ Network configuration (WiFi, Ethernet) is skipped by default with
 	return cmd
 }
 
-func run(ctx context.Context, device, filePath string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*5)
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Read backup file
 	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is user-provided CLI argument
@@ -105,7 +105,7 @@ func run(ctx context.Context, device, filePath string) error {
 	spin := iostreams.NewSpinner("Restoring backup...")
 	spin.Start()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 	result, err := svc.RestoreBackup(ctx, device, backup, opts)
 	spin.Stop()
 

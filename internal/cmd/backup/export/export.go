@@ -11,12 +11,12 @@ import (
 	"sync"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 )
 
 // NewCommand creates the backup export command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export <directory>",
 		Short: "Export backups for all registered devices",
@@ -44,7 +44,7 @@ Use --format to choose JSON or YAML output.`,
   shelly backup export ./backups --parallel 5`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -55,11 +55,11 @@ Use --format to choose JSON or YAML output.`,
 	return cmd
 }
 
-func run(ctx context.Context, dir string) error {
+func run(ctx context.Context, f *cmdutil.Factory, dir string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*10)
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Get registered devices
 	cfg := config.Get()
@@ -77,7 +77,7 @@ func run(ctx context.Context, dir string) error {
 	ios.Info("Exporting backups for %d devices...", len(cfg.Devices))
 	ios.Println()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 	opts := shelly.BackupOptions{}
 
 	var (

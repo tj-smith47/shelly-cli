@@ -10,10 +10,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 )
 
 // NewCommand creates the config import command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import <device> <file>",
 		Short: "Import configuration from a file",
@@ -41,7 +41,7 @@ to replace the entire configuration.`,
   shelly config import living-room config.json --overwrite`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], args[1])
+			return run(cmd.Context(), f, args[0], args[1])
 		},
 	}
 
@@ -52,7 +52,7 @@ to replace the entire configuration.`,
 	return cmd
 }
 
-func run(ctx context.Context, device, filePath string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
@@ -71,7 +71,7 @@ func run(ctx context.Context, device, filePath string) error {
 		}
 	}
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	if dryRunFlag {
 		// Get current config and show diff

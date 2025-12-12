@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -16,7 +16,7 @@ var (
 )
 
 // NewCommand creates the config reset command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset <device> [component]",
 		Short: "Reset configuration to defaults",
@@ -39,7 +39,7 @@ Note: This does not perform a full factory reset. For that, use:
 			if len(args) > 1 {
 				component = args[1]
 			}
-			return run(cmd.Context(), device, component)
+			return run(f, cmd.Context(), device, component)
 		},
 	}
 
@@ -48,10 +48,10 @@ Note: This does not perform a full factory reset. For that, use:
 	return cmd
 }
 
-func run(ctx context.Context, device, component string) error {
+func run(f *cmdutil.Factory, ctx context.Context, device, component string) error {
 	if component == "" {
 		// Show available components
-		return showComponents(ctx, device)
+		return showComponents(f, ctx, device)
 	}
 
 	// Confirm reset
@@ -72,7 +72,7 @@ func run(ctx context.Context, device, component string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Resetting configuration...")
 	spin.Start()
@@ -92,11 +92,11 @@ func run(ctx context.Context, device, component string) error {
 }
 
 // showComponents lists available components that can be reset.
-func showComponents(ctx context.Context, device string) error {
+func showComponents(f *cmdutil.Factory, ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Getting device components...")
 	spin.Start()

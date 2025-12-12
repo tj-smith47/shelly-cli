@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -21,7 +20,7 @@ var (
 )
 
 // NewCommand creates the schedule update command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update <device> <id>",
 		Aliases: []string{"up"},
@@ -45,7 +44,7 @@ You can update the timespec, calls, or enabled status.`,
 			if err != nil {
 				return fmt.Errorf("invalid schedule ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], id)
+			return run(cmd.Context(), f, args[0], id)
 		},
 	}
 
@@ -59,12 +58,12 @@ You can update the timespec, calls, or enabled status.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Parse calls if provided
 	var calls []shelly.ScheduleCall

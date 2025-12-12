@@ -10,13 +10,13 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the config diff command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diff <device> <file>",
 		Short: "Compare device configuration with a file",
@@ -30,14 +30,14 @@ Shows differences between the device's current configuration and the file.`,
   shelly config diff office-switch original-config.json`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], args[1])
+			return run(cmd.Context(), f, args[0], args[1])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device, filePath string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
@@ -52,7 +52,7 @@ func run(ctx context.Context, device, filePath string) error {
 		return fmt.Errorf("failed to parse file as JSON: %w", err)
 	}
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Getting device configuration...")
 	spin.Start()

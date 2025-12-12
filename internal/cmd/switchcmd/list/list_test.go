@@ -2,15 +2,16 @@
 package list
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd == nil {
-		t.Fatal("NewCommand() returned nil")
+		t.Fatal("NewCommand(cmdutil.NewFactory()) returned nil")
 	}
 
 	if cmd.Use != "list <device>" {
@@ -28,7 +29,7 @@ func TestNewCommand(t *testing.T) {
 
 func TestNewCommand_Args(t *testing.T) {
 	t.Parallel()
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Args == nil {
 		t.Error("Args validator not set")

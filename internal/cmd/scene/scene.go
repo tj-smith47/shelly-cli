@@ -3,6 +3,7 @@ package scene
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/activate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/create"
@@ -14,7 +15,7 @@ import (
 )
 
 // NewCommand creates the scene command group.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "scene",
 		Aliases: []string{"sc"},
@@ -45,13 +46,13 @@ Each scene contains one or more actions that are executed when the scene is acti
   shelly scene delete movie-night`,
 	}
 
-	cmd.AddCommand(list.NewCommand())
-	cmd.AddCommand(create.NewCommand())
-	cmd.AddCommand(deletecmd.NewCommand())
-	cmd.AddCommand(activate.NewCommand())
-	cmd.AddCommand(show.NewCommand())
-	cmd.AddCommand(export.NewCommand())
-	cmd.AddCommand(importcmd.NewCommand())
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(create.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
+	cmd.AddCommand(activate.NewCommand(f))
+	cmd.AddCommand(show.NewCommand(f))
+	cmd.AddCommand(export.NewCommand(f))
+	cmd.AddCommand(importcmd.NewCommand(f))
 
 	return cmd
 }

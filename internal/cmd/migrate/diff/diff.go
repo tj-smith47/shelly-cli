@@ -7,13 +7,13 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the migrate diff command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diff <device> <backup-file>",
 		Short: "Show differences between device and backup",
@@ -24,18 +24,18 @@ This helps you understand what would change if you restored the backup.`,
   shelly migrate diff living-room backup.json`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], args[1])
+			return run(cmd.Context(), f, args[0], args[1])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device, filePath string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2)
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Read backup file
 	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is user-provided CLI argument
@@ -52,7 +52,7 @@ func run(ctx context.Context, device, filePath string) error {
 	spin := iostreams.NewSpinner("Comparing configurations...")
 	spin.Start()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 	d, err := svc.CompareBackup(ctx, device, backup)
 	spin.Stop()
 

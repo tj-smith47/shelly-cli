@@ -9,12 +9,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the schedule enable command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "enable <device> <id>",
 		Short: "Enable a schedule",
@@ -27,19 +26,19 @@ func NewCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid schedule ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], id)
+			return run(cmd.Context(), f, args[0], id)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Enabling schedule...", func(ctx context.Context) error {
 		if err := svc.EnableSchedule(ctx, device, id); err != nil {

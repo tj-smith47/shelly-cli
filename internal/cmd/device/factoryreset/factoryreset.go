@@ -6,13 +6,13 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the device factory-reset command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		yes     bool
 		confirm bool
@@ -47,7 +47,7 @@ This command requires both --yes and --confirm flags for safety.`,
   shelly device factory-reset living-room --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], yes, confirm)
+			return run(cmd.Context(), f, args[0], yes, confirm)
 		},
 	}
 
@@ -57,7 +57,7 @@ This command requires both --yes and --confirm flags for safety.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, yes, confirm bool) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, yes, confirm bool) error {
 	// Require both flags for safety
 	if !yes || !confirm {
 		iostreams.Error("Factory reset requires both --yes and --confirm flags for safety")
@@ -83,7 +83,7 @@ func run(ctx context.Context, device string, yes, confirm bool) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Factory resetting device...")
 	spin.Start()

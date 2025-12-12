@@ -8,12 +8,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the light off command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var lightID int
 
 	cmd := &cobra.Command{
@@ -22,7 +21,7 @@ func NewCommand() *cobra.Command {
 		Long:  `Turn off a light component on the specified device.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], lightID)
+			return run(cmd.Context(), f, args[0], lightID)
 		},
 	}
 
@@ -31,12 +30,12 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, device string, lightID int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, lightID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunSimple(ctx, ios, svc, device, lightID,
 		"Turning light off...",

@@ -3,6 +3,7 @@ package batch
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch/command"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch/off"
@@ -11,7 +12,7 @@ import (
 )
 
 // NewCommand creates the batch command group.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "batch",
 		Aliases: []string{"b"},
@@ -37,10 +38,10 @@ Failed operations are reported but don't stop the batch.`,
   shelly batch command --group office "Switch.Set" '{"id":0,"on":true}'`,
 	}
 
-	cmd.AddCommand(on.NewCommand())
-	cmd.AddCommand(off.NewCommand())
-	cmd.AddCommand(toggle.NewCommand())
-	cmd.AddCommand(command.NewCommand())
+	cmd.AddCommand(on.NewCommand(f))
+	cmd.AddCommand(off.NewCommand(f))
+	cmd.AddCommand(toggle.NewCommand(f))
+	cmd.AddCommand(command.NewCommand(f))
 
 	return cmd
 }

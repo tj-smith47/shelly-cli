@@ -9,12 +9,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the script start command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "start <device> <id>",
 		Aliases: []string{"run"},
@@ -30,19 +29,19 @@ The script must be enabled before it can be started.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], id)
+			return run(cmd.Context(), f, args[0], id)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Starting script...", func(ctx context.Context) error {
 		if err := svc.StartScript(ctx, device, id); err != nil {

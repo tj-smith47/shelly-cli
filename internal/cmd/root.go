@@ -38,6 +38,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/version"
@@ -96,31 +97,34 @@ func init() {
 	must(viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet")))
 	must(viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color")))
 
+	// Create factory for dependency injection
+	f := cmdutil.NewFactory()
+
 	// Add commands
-	rootCmd.AddCommand(discover.NewCommand())
-	rootCmd.AddCommand(device.NewCommand())
-	rootCmd.AddCommand(group.NewCommand())
-	rootCmd.AddCommand(batch.NewCommand())
-	rootCmd.AddCommand(scene.NewCommand())
-	rootCmd.AddCommand(switchcmd.NewCommand())
-	rootCmd.AddCommand(cover.NewCommand())
-	rootCmd.AddCommand(light.NewCommand())
-	rootCmd.AddCommand(rgb.NewCommand())
-	rootCmd.AddCommand(input.NewCommand())
-	rootCmd.AddCommand(configcmd.NewCommand())
-	rootCmd.AddCommand(wifi.NewCommand())
-	rootCmd.AddCommand(ethernet.NewCommand())
-	rootCmd.AddCommand(energy.NewCommand())
-	rootCmd.AddCommand(cloud.NewCommand())
-	rootCmd.AddCommand(auth.NewCommand())
-	rootCmd.AddCommand(mqtt.NewCommand())
-	rootCmd.AddCommand(webhook.NewCommand())
-	rootCmd.AddCommand(firmware.NewCommand())
-	rootCmd.AddCommand(script.NewCommand())
-	rootCmd.AddCommand(schedule.NewCommand())
-	rootCmd.AddCommand(backup.NewCommand())
-	rootCmd.AddCommand(migrate.NewCommand())
-	rootCmd.AddCommand(monitor.NewCommand())
+	rootCmd.AddCommand(discover.NewCommand(f))
+	rootCmd.AddCommand(device.NewCommand(f))
+	rootCmd.AddCommand(group.NewCommand(f))
+	rootCmd.AddCommand(batch.NewCommand(f))
+	rootCmd.AddCommand(scene.NewCommand(f))
+	rootCmd.AddCommand(switchcmd.NewCommand(f))
+	rootCmd.AddCommand(cover.NewCommand(f))
+	rootCmd.AddCommand(light.NewCommand(f))
+	rootCmd.AddCommand(rgb.NewCommand(f))
+	rootCmd.AddCommand(input.NewCommand(f))
+	rootCmd.AddCommand(configcmd.NewCommand(f))
+	rootCmd.AddCommand(wifi.NewCommand(f))
+	rootCmd.AddCommand(ethernet.NewCommand(f))
+	rootCmd.AddCommand(energy.NewCommand(f))
+	rootCmd.AddCommand(cloud.NewCommand(f))
+	rootCmd.AddCommand(auth.NewCommand(f))
+	rootCmd.AddCommand(mqtt.NewCommand(f))
+	rootCmd.AddCommand(webhook.NewCommand(f))
+	rootCmd.AddCommand(firmware.NewCommand(f))
+	rootCmd.AddCommand(script.NewCommand(f))
+	rootCmd.AddCommand(schedule.NewCommand(f))
+	rootCmd.AddCommand(backup.NewCommand(f))
+	rootCmd.AddCommand(migrate.NewCommand(f))
+	rootCmd.AddCommand(monitor.NewCommand(f))
 	rootCmd.AddCommand(versionCmd())
 }
 

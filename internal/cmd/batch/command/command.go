@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the batch command command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		groupName    string
 		all          bool
@@ -63,7 +63,7 @@ Params should be a JSON object (e.g., '{"id":0,"on":true}').`,
 			if err != nil {
 				return err
 			}
-			return run(cmd.Context(), targets, method, params, timeout, concurrent, outputFormat)
+			return run(cmd.Context(), f, targets, method, params, timeout, concurrent, outputFormat)
 		},
 	}
 
@@ -88,9 +88,9 @@ type Result struct {
 	Error    string `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
-func run(ctx context.Context, targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
-	ios := iostreams.System()
-	svc := shelly.NewService()
+func run(ctx context.Context, f *cmdutil.Factory, targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())

@@ -1,13 +1,14 @@
 package scene
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "scene" {
 		t.Errorf("Use = %q, want scene", cmd.Use)
@@ -29,7 +30,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_Subcommands(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	expected := []string{"list", "create", "delete", "activate", "show", "export", "import"}
 	subCmds := cmd.Commands()

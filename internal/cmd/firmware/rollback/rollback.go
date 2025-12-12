@@ -8,14 +8,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
 
 // NewCommand creates the firmware rollback command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rollback <device>",
 		Aliases: []string{"rb"},
@@ -31,7 +30,7 @@ a recent firmware update or when in safe mode).`,
   shelly firmware rollback living-room --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -40,9 +39,9 @@ a recent firmware update or when in safe mode).`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
-	ios := iostreams.System()
-	svc := shelly.NewService()
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Check rollback availability
 	ios.StartProgress("Checking rollback availability...")

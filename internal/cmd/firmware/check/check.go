@@ -20,7 +20,7 @@ import (
 var allFlag bool
 
 // NewCommand creates the firmware check command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "check [device]",
 		Aliases: []string{"ck"},
@@ -36,12 +36,12 @@ Use --all to check all registered devices.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if allFlag {
-				return runAll(cmd.Context())
+				return runAll(f, cmd.Context())
 			}
 			if len(args) == 0 {
 				return fmt.Errorf("device name required (or use --all)")
 			}
-			return run(cmd.Context(), args[0])
+			return run(f, cmd.Context(), args[0])
 		},
 	}
 
@@ -50,12 +50,12 @@ Use --all to check all registered devices.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(f *cmdutil.Factory, ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunDeviceStatus(ctx, ios, svc, device,
 		"Checking for updates...",
@@ -95,8 +95,8 @@ func displayFirmwareInfo(ios *iostreams.IOStreams, info *shelly.FirmwareInfo) {
 	}
 }
 
-func runAll(ctx context.Context) error {
-	ios := iostreams.System()
+func runAll(f *cmdutil.Factory, ctx context.Context) error {
+	ios := f.IOStreams()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -109,7 +109,7 @@ func runAll(ctx context.Context) error {
 		return nil
 	}
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	type result struct {
 		name string

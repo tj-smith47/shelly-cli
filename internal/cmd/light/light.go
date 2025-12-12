@@ -3,6 +3,7 @@ package light
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light/off"
@@ -13,7 +14,7 @@ import (
 )
 
 // NewCommand creates the light command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "light",
 		Aliases: []string{"lt"},
@@ -21,12 +22,12 @@ func NewCommand() *cobra.Command {
 		Long:    `Control dimmable light components on Shelly devices.`,
 	}
 
-	cmd.AddCommand(on.NewCommand())
-	cmd.AddCommand(off.NewCommand())
-	cmd.AddCommand(toggle.NewCommand())
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(lightset.NewCommand())
-	cmd.AddCommand(list.NewCommand())
+	cmd.AddCommand(on.NewCommand(f))
+	cmd.AddCommand(off.NewCommand(f))
+	cmd.AddCommand(toggle.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(lightset.NewCommand(f))
+	cmd.AddCommand(list.NewCommand(f))
 
 	return cmd
 }

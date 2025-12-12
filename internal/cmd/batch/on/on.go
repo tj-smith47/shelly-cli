@@ -10,12 +10,11 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the batch on command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		groupName  string
 		all        bool
@@ -53,7 +52,7 @@ or by using --all to target all registered devices.`,
 			if err != nil {
 				return err
 			}
-			return run(cmd.Context(), targets, switchID, timeout, concurrent)
+			return run(cmd.Context(), f, targets, switchID, timeout, concurrent)
 		},
 	}
 
@@ -66,13 +65,13 @@ or by using --all to target all registered devices.`,
 	return cmd
 }
 
-func run(ctx context.Context, targets []string, switchID int, timeout time.Duration, concurrent int) error {
+func run(ctx context.Context, f *cmdutil.Factory, targets []string, switchID int, timeout time.Duration, concurrent int) error {
 	if len(targets) == 0 {
 		return fmt.Errorf("no target devices specified")
 	}
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(targets)))
 	defer cancel()

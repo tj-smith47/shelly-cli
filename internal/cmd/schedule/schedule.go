@@ -3,6 +3,7 @@ package schedule
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/del"
@@ -14,7 +15,7 @@ import (
 )
 
 // NewCommand creates the schedule command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "schedule",
 		Aliases: []string{"sched"},
@@ -45,13 +46,13 @@ Note: Maximum 20 schedules per device.`,
   shelly schedule delete living-room 1`,
 	}
 
-	cmd.AddCommand(list.NewCommand())
-	cmd.AddCommand(create.NewCommand())
-	cmd.AddCommand(update.NewCommand())
-	cmd.AddCommand(del.NewCommand())
-	cmd.AddCommand(deleteall.NewCommand())
-	cmd.AddCommand(enable.NewCommand())
-	cmd.AddCommand(disable.NewCommand())
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(create.NewCommand(f))
+	cmd.AddCommand(update.NewCommand(f))
+	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(deleteall.NewCommand(f))
+	cmd.AddCommand(enable.NewCommand(f))
+	cmd.AddCommand(disable.NewCommand(f))
 
 	return cmd
 }

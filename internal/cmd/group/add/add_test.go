@@ -1,13 +1,14 @@
 package add
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "add <group> <device>..." {
 		t.Errorf("Use = %q, want \"add <group> <device>...\"", cmd.Use)
@@ -26,7 +27,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_Args(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test requires minimum 2 arguments
 	if err := cmd.Args(cmd, []string{}); err == nil {

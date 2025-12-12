@@ -14,7 +14,7 @@ import (
 )
 
 // NewCommand creates the input status command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var inputID int
 
 	cmd := &cobra.Command{
@@ -24,7 +24,7 @@ func NewCommand() *cobra.Command {
 		Long:    `Display the status of an input component on a Shelly device.`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], inputID)
+			return run(cmd.Context(), f, args[0], inputID)
 		},
 	}
 
@@ -33,12 +33,12 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, device string, inputID int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, inputID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunStatus(ctx, ios, svc, device, inputID,
 		"Getting input status...",

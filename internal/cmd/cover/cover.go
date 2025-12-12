@@ -3,6 +3,7 @@ package cover
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover/calibrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover/closecmd"
@@ -14,7 +15,7 @@ import (
 )
 
 // NewCommand creates the cover command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cover",
 		Aliases: []string{"cv"},
@@ -22,13 +23,13 @@ func NewCommand() *cobra.Command {
 		Long:    `Control cover and roller shutter components on Shelly devices.`,
 	}
 
-	cmd.AddCommand(open.NewCommand())
-	cmd.AddCommand(closecmd.NewCommand())
-	cmd.AddCommand(stop.NewCommand())
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(position.NewCommand())
-	cmd.AddCommand(calibrate.NewCommand())
-	cmd.AddCommand(list.NewCommand())
+	cmd.AddCommand(open.NewCommand(f))
+	cmd.AddCommand(closecmd.NewCommand(f))
+	cmd.AddCommand(stop.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(position.NewCommand(f))
+	cmd.AddCommand(calibrate.NewCommand(f))
+	cmd.AddCommand(list.NewCommand(f))
 
 	return cmd
 }

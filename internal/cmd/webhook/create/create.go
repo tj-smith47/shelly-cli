@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -21,7 +20,7 @@ var (
 )
 
 // NewCommand creates the webhook create command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create <device>",
 		Short: "Create a webhook",
@@ -39,7 +38,7 @@ Common events include "switch.on", "switch.off", "input.toggle", etc.`,
   shelly webhook create living-room --event "input.toggle" --url "http://example.com" --disable`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -52,7 +51,7 @@ Common events include "switch.on", "switch.off", "input.toggle", etc.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	// Validate required flags
 	if eventFlag == "" {
 		return fmt.Errorf("--event is required")
@@ -64,8 +63,8 @@ func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Creating webhook...", func(ctx context.Context) error {
 		params := shelly.CreateWebhookParams{

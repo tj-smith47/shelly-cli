@@ -17,7 +17,7 @@ import (
 var statusFlag bool
 
 // NewCommand creates the script get command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get <device> <id>",
 		Aliases: []string{"code"},
@@ -37,7 +37,7 @@ detailed status including memory usage and errors.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], id)
+			return run(cmd.Context(), f, args[0], id)
 		},
 	}
 
@@ -46,12 +46,12 @@ detailed status including memory usage and errors.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	if statusFlag {
 		return cmdutil.RunWithSpinner(ctx, ios, "Getting script status...", func(ctx context.Context) error {

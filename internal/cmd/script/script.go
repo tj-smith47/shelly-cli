@@ -3,6 +3,7 @@ package script
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/del"
@@ -17,7 +18,7 @@ import (
 )
 
 // NewCommand creates the script command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "script",
 		Aliases: []string{"sc"},
@@ -45,16 +46,16 @@ Note: Scripts are only available on Gen2+ devices.`,
   shelly script eval living-room 1 "print('Hello!')"`,
 	}
 
-	cmd.AddCommand(list.NewCommand())
-	cmd.AddCommand(get.NewCommand())
-	cmd.AddCommand(create.NewCommand())
-	cmd.AddCommand(update.NewCommand())
-	cmd.AddCommand(del.NewCommand())
-	cmd.AddCommand(start.NewCommand())
-	cmd.AddCommand(stop.NewCommand())
-	cmd.AddCommand(eval.NewCommand())
-	cmd.AddCommand(upload.NewCommand())
-	cmd.AddCommand(download.NewCommand())
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(get.NewCommand(f))
+	cmd.AddCommand(create.NewCommand(f))
+	cmd.AddCommand(update.NewCommand(f))
+	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(start.NewCommand(f))
+	cmd.AddCommand(stop.NewCommand(f))
+	cmd.AddCommand(eval.NewCommand(f))
+	cmd.AddCommand(upload.NewCommand(f))
+	cmd.AddCommand(download.NewCommand(f))
 
 	return cmd
 }

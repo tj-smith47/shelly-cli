@@ -3,6 +3,7 @@ package config
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/diff"
 	configexport "github.com/tj-smith47/shelly-cli/internal/cmd/config/export"
@@ -13,7 +14,7 @@ import (
 )
 
 // NewCommand creates the config command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "config",
 		Aliases: []string{"cfg"},
@@ -44,12 +45,12 @@ component settings, system parameters, and feature configurations.`,
   shelly config reset living-room switch:0`,
 	}
 
-	cmd.AddCommand(get.NewCommand())
-	cmd.AddCommand(set.NewCommand())
-	cmd.AddCommand(diff.NewCommand())
-	cmd.AddCommand(configexport.NewCommand())
-	cmd.AddCommand(configimport.NewCommand())
-	cmd.AddCommand(reset.NewCommand())
+	cmd.AddCommand(get.NewCommand(f))
+	cmd.AddCommand(set.NewCommand(f))
+	cmd.AddCommand(diff.NewCommand(f))
+	cmd.AddCommand(configexport.NewCommand(f))
+	cmd.AddCommand(configimport.NewCommand(f))
+	cmd.AddCommand(reset.NewCommand(f))
 
 	return cmd
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -22,7 +21,7 @@ var (
 )
 
 // NewCommand creates the webhook update command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update <device> <webhook-id>",
 		Short: "Update a webhook",
@@ -44,7 +43,7 @@ change the webhook's active state.`,
 			if err != nil {
 				return fmt.Errorf("invalid webhook ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], webhookID)
+			return run(cmd.Context(), f, args[0], webhookID)
 		},
 	}
 
@@ -57,7 +56,7 @@ change the webhook's active state.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, webhookID int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, webhookID int) error {
 	// Validate - need at least one option
 	if eventFlag == "" && len(urlFlag) == 0 && nameFlag == "" && !enableFlag && !disableFlag {
 		return fmt.Errorf("specify at least one option to update (--event, --url, --name, --enable, --disable)")
@@ -66,8 +65,8 @@ func run(ctx context.Context, device string, webhookID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Build update params
 	params := shelly.UpdateWebhookParams{

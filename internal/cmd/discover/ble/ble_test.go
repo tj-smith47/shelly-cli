@@ -2,6 +2,7 @@
 package ble
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"errors"
 	"testing"
 	"time"
@@ -11,10 +12,10 @@ import (
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd == nil {
-		t.Fatal("NewCommand() returned nil")
+		t.Fatal("NewCommand(cmdutil.NewFactory()) returned nil")
 	}
 
 	if cmd.Use != "ble" {
@@ -32,7 +33,7 @@ func TestNewCommand(t *testing.T) {
 
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test timeout flag exists
 	timeout := cmd.Flags().Lookup("timeout")

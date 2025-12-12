@@ -22,7 +22,7 @@ var (
 )
 
 // NewCommand creates the wifi ap command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ap <device>",
 		Short: "Configure WiFi access point",
@@ -40,7 +40,7 @@ can connect to. Use --clients to list connected clients.`,
   shelly wifi ap living-room --clients`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -53,12 +53,12 @@ can connect to. Use --clients to list connected clients.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// If --clients flag, list connected clients
 	if clientsFlag {

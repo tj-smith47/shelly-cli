@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the config set command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <device> <component> <key>=<value>...",
 		Short: "Set device configuration",
@@ -33,18 +33,18 @@ Specify key=value pairs to update. Only the specified keys will be modified.`,
 			device := args[0]
 			component := args[1]
 			keyValues := args[2:]
-			return run(cmd.Context(), device, component, keyValues)
+			return run(cmd.Context(), f, device, component, keyValues)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device, component string, keyValues []string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyValues []string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	// Parse key=value pairs
 	config := make(map[string]any)

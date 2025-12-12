@@ -11,12 +11,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the script download command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "download <device> <id> <file>",
 		Aliases: []string{"save"},
@@ -33,19 +32,19 @@ func NewCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], id, args[2])
+			return run(cmd.Context(), f, args[0], id, args[2])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int, file string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int, file string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Downloading script...", func(ctx context.Context) error {
 		code, err := svc.GetScriptCode(ctx, device, id)

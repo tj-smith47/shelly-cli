@@ -1,13 +1,14 @@
 package list
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "list" {
 		t.Errorf("Use = %q, want list", cmd.Use)
@@ -29,7 +30,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	outputFlag := cmd.Flags().Lookup("output")
 	if outputFlag == nil {

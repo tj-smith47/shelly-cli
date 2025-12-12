@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-go/discovery"
 
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -20,7 +21,7 @@ import (
 const DefaultTimeout = 15 * time.Second
 
 // NewCommand creates the BLE discovery command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		timeout       time.Duration
 		includeBTHome bool
@@ -50,7 +51,7 @@ Examples:
   # Include BTHome sensor data
   shelly discover ble --bthome`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), timeout, includeBTHome, filterPrefix)
+			return run(cmd.Context(), f, timeout, includeBTHome, filterPrefix)
 		},
 	}
 
@@ -61,7 +62,7 @@ Examples:
 	return cmd
 }
 
-func run(ctx context.Context, timeout time.Duration, includeBTHome bool, filterPrefix string) error {
+func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, includeBTHome bool, filterPrefix string) error {
 	if timeout == 0 {
 		timeout = DefaultTimeout
 	}

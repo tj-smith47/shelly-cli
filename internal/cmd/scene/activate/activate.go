@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the scene activate command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		timeout    time.Duration
 		concurrent int
@@ -45,7 +45,7 @@ Use --dry-run to preview actions without executing them.`,
   shelly sc activate party-mode`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], timeout, concurrent, dryRun)
+			return run(cmd.Context(), f, args[0], timeout, concurrent, dryRun)
 		},
 	}
 
@@ -56,7 +56,7 @@ Use --dry-run to preview actions without executing them.`,
 	return cmd
 }
 
-func run(ctx context.Context, name string, timeout time.Duration, concurrent int, dryRun bool) error {
+func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Duration, concurrent int, dryRun bool) error {
 	scene, exists := config.GetScene(name)
 	if !exists {
 		return fmt.Errorf("scene %q not found", name)
@@ -80,10 +80,10 @@ func run(ctx context.Context, name string, timeout time.Duration, concurrent int
 		return nil
 	}
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 	iostreams.Info("Activating scene %q (%d actions)...", theme.Bold().Render(name), len(scene.Actions))
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())

@@ -3,6 +3,7 @@ package wifi
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi/ap"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi/scan"
@@ -11,7 +12,7 @@ import (
 )
 
 // NewCommand creates the wifi command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wifi",
 		Short: "Manage device WiFi configuration",
@@ -32,10 +33,10 @@ station mode (connecting to a network) and access point mode.`,
   shelly wifi ap living-room --enable --ssid "ShellyAP"`,
 	}
 
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(scan.NewCommand())
-	cmd.AddCommand(set.NewCommand())
-	cmd.AddCommand(ap.NewCommand())
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(scan.NewCommand(f))
+	cmd.AddCommand(set.NewCommand(f))
+	cmd.AddCommand(ap.NewCommand(f))
 
 	return cmd
 }

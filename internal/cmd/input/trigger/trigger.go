@@ -20,7 +20,7 @@ const (
 )
 
 // NewCommand creates the input trigger command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var inputID int
 	var event string
 
@@ -35,7 +35,7 @@ Event types:
   long_push   - Long button press`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], inputID, event)
+			return run(cmd.Context(), f, args[0], inputID, event)
 		},
 	}
 
@@ -45,11 +45,11 @@ Event types:
 	return cmd
 }
 
-func run(ctx context.Context, device string, inputID int, event string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, inputID int, event string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Triggering input event...")
 	spin.Start()

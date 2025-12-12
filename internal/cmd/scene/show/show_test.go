@@ -1,13 +1,14 @@
 package show
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "show <name>" {
 		t.Errorf("Use = %q, want \"show <name>\"", cmd.Use)
@@ -30,7 +31,7 @@ func TestNewCommand(t *testing.T) {
 func TestNewCommand_Args(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if err := cmd.Args(cmd, []string{}); err == nil {
 		t.Error("expected error with no args")
@@ -46,7 +47,7 @@ func TestNewCommand_Args(t *testing.T) {
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	outputFlag := cmd.Flags().Lookup("output")
 	if outputFlag == nil {

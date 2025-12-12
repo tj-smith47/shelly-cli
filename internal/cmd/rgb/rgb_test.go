@@ -2,15 +2,16 @@
 package rgb
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 )
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd == nil {
-		t.Fatal("NewCommand() returned nil")
+		t.Fatal("NewCommand(cmdutil.NewFactory()) returned nil")
 	}
 
 	if cmd.Use != "rgb" {
@@ -28,7 +29,7 @@ func TestNewCommand(t *testing.T) {
 
 func TestNewCommand_Subcommands(t *testing.T) {
 	t.Parallel()
-	cmd := NewCommand()
+	cmd := NewCommand(cmdutil.NewFactory())
 
 	subcommands := cmd.Commands()
 	if len(subcommands) != 6 {

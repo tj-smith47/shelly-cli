@@ -13,7 +13,7 @@ import (
 )
 
 // NewCommand creates the light set command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		lightID    int
 		brightness int
@@ -29,7 +29,7 @@ You can set brightness and on/off state.
 Values not specified will be left unchanged.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], lightID, brightness, on)
+			return run(cmd.Context(), f, args[0], lightID, brightness, on)
 		},
 	}
 
@@ -40,11 +40,11 @@ Values not specified will be left unchanged.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, lightID, brightness int, on bool) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, lightID, brightness int, on bool) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Setting light parameters...")
 	spin.Start()

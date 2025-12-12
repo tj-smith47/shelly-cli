@@ -28,7 +28,7 @@ var (
 )
 
 // NewCommand creates the firmware update command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [device]",
 		Aliases: []string{"up"},
@@ -57,12 +57,12 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if allFlag {
-				return runAll(cmd.Context())
+				return runAll(f, cmd.Context())
 			}
 			if len(args) == 0 {
 				return fmt.Errorf("device name required (or use --all)")
 			}
-			return run(cmd.Context(), args[0])
+			return run(f, cmd.Context(), args[0])
 		},
 	}
 
@@ -76,9 +76,9 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
-	ios := iostreams.System()
-	svc := shelly.NewService()
+func run(f *cmdutil.Factory, ctx context.Context, device string) error {
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Check for updates first
 	ios.StartProgress("Checking for updates...")
@@ -160,8 +160,8 @@ type updateResult struct {
 	err     error
 }
 
-func runAll(ctx context.Context) error {
-	ios := iostreams.System()
+func runAll(f *cmdutil.Factory, ctx context.Context) error {
+	ios := f.IOStreams()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -174,7 +174,7 @@ func runAll(ctx context.Context) error {
 		return nil
 	}
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	// Check all devices for updates
 	toUpdate := checkDevicesForUpdates(ctx, ios, svc, devices)

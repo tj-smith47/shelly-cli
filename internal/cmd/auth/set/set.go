@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -19,7 +18,7 @@ var (
 )
 
 // NewCommand creates the auth set command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <device>",
 		Short: "Set authentication credentials",
@@ -34,7 +33,7 @@ to "admin" if not specified.`,
   shelly auth set living-room --user myuser --password secret`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -45,7 +44,7 @@ to "admin" if not specified.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	if passwordFlag == "" {
 		return fmt.Errorf("--password is required")
 	}
@@ -53,8 +52,8 @@ func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Setting authentication...", func(ctx context.Context) error {
 		if err := svc.SetAuth(ctx, device, userFlag, realmFlag, passwordFlag); err != nil {

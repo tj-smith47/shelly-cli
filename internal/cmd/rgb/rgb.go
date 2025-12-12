@@ -3,6 +3,7 @@ package rgb
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb/off"
@@ -13,19 +14,19 @@ import (
 )
 
 // NewCommand creates the rgb command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rgb",
 		Short: "Control RGB light components",
 		Long:  `Control RGB and RGBW light components on Shelly devices.`,
 	}
 
-	cmd.AddCommand(on.NewCommand())
-	cmd.AddCommand(off.NewCommand())
-	cmd.AddCommand(toggle.NewCommand())
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(rgbset.NewCommand())
-	cmd.AddCommand(list.NewCommand())
+	cmd.AddCommand(on.NewCommand(f))
+	cmd.AddCommand(off.NewCommand(f))
+	cmd.AddCommand(toggle.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(rgbset.NewCommand(f))
+	cmd.AddCommand(list.NewCommand(f))
 
 	return cmd
 }

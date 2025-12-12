@@ -3,6 +3,7 @@ package firmware
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/check"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/download"
@@ -12,7 +13,7 @@ import (
 )
 
 // NewCommand creates the firmware command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "firmware",
 		Aliases: []string{"fw"},
@@ -42,11 +43,11 @@ Check for updates, update to the latest version, or rollback to a previous versi
   shelly firmware download ShellyPlus1PM 1.0.0 --output firmware.zip`,
 	}
 
-	cmd.AddCommand(check.NewCommand())
-	cmd.AddCommand(status.NewCommand())
-	cmd.AddCommand(update.NewCommand())
-	cmd.AddCommand(rollback.NewCommand())
-	cmd.AddCommand(download.NewCommand())
+	cmd.AddCommand(check.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(update.NewCommand(f))
+	cmd.AddCommand(rollback.NewCommand(f))
+	cmd.AddCommand(download.NewCommand(f))
 
 	return cmd
 }

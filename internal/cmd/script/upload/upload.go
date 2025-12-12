@@ -10,14 +10,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var appendFlag bool
 
 // NewCommand creates the script upload command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "upload <device> <id> <file>",
 		Aliases: []string{"put"},
@@ -36,7 +35,7 @@ By default, replaces the existing code. Use --append to add to existing code.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], id, args[2])
+			return run(cmd.Context(), f, args[0], id, args[2])
 		},
 	}
 
@@ -45,12 +44,12 @@ By default, replaces the existing code. Use --append to add to existing code.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int, file string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int, file string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Read file
 	//nolint:gosec // G304: User-provided file path is intentional for this command

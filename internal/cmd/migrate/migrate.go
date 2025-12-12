@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/diff"
@@ -20,7 +22,7 @@ var (
 )
 
 // NewCommand creates the migrate command and its subcommands.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate <source> <target>",
 		Short: "Migrate configuration between devices",
@@ -45,8 +47,8 @@ The --dry-run flag shows what would be changed without applying.`,
 	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would be changed without applying")
 	cmd.Flags().BoolVar(&forceFlag, "force", false, "Force migration between different device types")
 
-	cmd.AddCommand(validate.NewCommand())
-	cmd.AddCommand(diff.NewCommand())
+	cmd.AddCommand(validate.NewCommand(f))
+	cmd.AddCommand(diff.NewCommand(f))
 
 	return cmd
 }

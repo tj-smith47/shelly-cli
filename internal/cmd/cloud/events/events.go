@@ -14,10 +14,11 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
-
-	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 var (
@@ -28,7 +29,7 @@ var (
 )
 
 // NewCommand creates the cloud events command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "events",
 		Aliases: []string{"watch", "subscribe"},
@@ -57,7 +58,7 @@ Event types:
   # Output in JSON format
   shelly cloud events --format json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context())
+			return run(f, cmd.Context())
 		},
 	}
 
@@ -87,8 +88,8 @@ func (e *cloudEvent) getDeviceID() string {
 	return e.Device
 }
 
-func run(ctx context.Context) error {
-	ios := iostreams.System()
+func run(f *cmdutil.Factory, ctx context.Context) error {
+	ios := f.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()

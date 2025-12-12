@@ -18,7 +18,7 @@ import (
 var channelFlag int
 
 // NewCommand creates the cloud control command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "control <device-id> <action>",
 		Short: "Control a device via cloud",
@@ -49,7 +49,7 @@ This command requires authentication with 'shelly cloud login'.`,
   shelly cloud control abc123 brightness=75`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], args[1])
+			return run(cmd.Context(), f, args[0], args[1])
 		},
 	}
 
@@ -58,11 +58,11 @@ This command requires authentication with 'shelly cloud login'.`,
 	return cmd
 }
 
-func run(ctx context.Context, deviceID, action string) error {
+func run(ctx context.Context, f *cmdutil.Factory, deviceID, action string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2)
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()

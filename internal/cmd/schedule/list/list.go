@@ -16,7 +16,7 @@ import (
 )
 
 // NewCommand creates the schedule list command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list <device>",
 		Aliases: []string{"ls"},
@@ -28,19 +28,19 @@ Shows schedule ID, enabled status, timespec, and the calls to execute.`,
   shelly schedule list living-room`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunDeviceStatus(ctx, ios, svc, device,
 		"Getting schedules...",

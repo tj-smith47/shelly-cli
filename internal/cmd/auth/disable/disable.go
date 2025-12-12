@@ -8,14 +8,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
 
 // NewCommand creates the auth disable command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "disable <device>",
 		Short: "Disable authentication",
@@ -30,7 +29,7 @@ Use with caution in production environments.`,
   shelly auth disable living-room --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -39,8 +38,8 @@ Use with caution in production environments.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
-	ios := iostreams.System()
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+	ios := f.IOStreams()
 
 	// Confirm before disabling
 	if !yesFlag {
@@ -60,7 +59,7 @@ func run(ctx context.Context, device string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Disabling authentication...", func(ctx context.Context) error {
 		if err := svc.DisableAuth(ctx, device); err != nil {

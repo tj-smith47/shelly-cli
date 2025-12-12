@@ -3,6 +3,7 @@ package group
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/add"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/create"
@@ -13,7 +14,7 @@ import (
 )
 
 // NewCommand creates the group command group.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "group",
 		Aliases: []string{"grp"},
@@ -41,12 +42,12 @@ Devices can belong to multiple groups.`,
   shelly group delete living-room`,
 	}
 
-	cmd.AddCommand(list.NewCommand())
-	cmd.AddCommand(create.NewCommand())
-	cmd.AddCommand(deletecmd.NewCommand())
-	cmd.AddCommand(add.NewCommand())
-	cmd.AddCommand(remove.NewCommand())
-	cmd.AddCommand(members.NewCommand())
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(create.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
+	cmd.AddCommand(add.NewCommand(f))
+	cmd.AddCommand(remove.NewCommand(f))
+	cmd.AddCommand(members.NewCommand(f))
 
 	return cmd
 }

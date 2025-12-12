@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -23,7 +22,7 @@ var (
 )
 
 // NewCommand creates the script update command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update <device> <id>",
 		Aliases: []string{"up"},
@@ -49,7 +48,7 @@ Use --append to add code to the existing script instead of replacing it.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], id)
+			return run(cmd.Context(), f, args[0], id)
 		},
 	}
 
@@ -62,12 +61,12 @@ Use --append to add code to the existing script instead of replacing it.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, id int) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Get code from file if specified
 	code := codeFlag

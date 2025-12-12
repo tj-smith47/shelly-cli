@@ -15,7 +15,7 @@ import (
 )
 
 // NewCommand creates the wifi scan command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan <device>",
 		Short: "Scan for available WiFi networks",
@@ -32,20 +32,20 @@ Note: Scanning may take several seconds to complete.`,
   shelly wifi scan living-room -o json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	// Use longer timeout for scanning
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	return cmdutil.RunList(ctx, ios, svc, device,
 		"Scanning for WiFi networks...",

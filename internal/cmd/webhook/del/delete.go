@@ -9,14 +9,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
 
 // NewCommand creates the webhook delete command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete <device> <webhook-id>",
 		Short: "Delete a webhook",
@@ -34,7 +33,7 @@ Use 'shelly webhook list' to see webhook IDs.`,
 			if err != nil {
 				return fmt.Errorf("invalid webhook ID: %s", args[1])
 			}
-			return run(cmd.Context(), args[0], webhookID)
+			return run(cmd.Context(), f, args[0], webhookID)
 		},
 	}
 
@@ -43,8 +42,8 @@ Use 'shelly webhook list' to see webhook IDs.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string, webhookID int) error {
-	ios := iostreams.System()
+func run(ctx context.Context, f *cmdutil.Factory, device string, webhookID int) error {
+	ios := f.IOStreams()
 
 	// Confirm deletion
 	if !yesFlag {
@@ -64,7 +63,7 @@ func run(ctx context.Context, device string, webhookID int) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Deleting webhook...", func(ctx context.Context) error {
 		if err := svc.DeleteWebhook(ctx, device, webhookID); err != nil {

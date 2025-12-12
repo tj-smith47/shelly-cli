@@ -8,16 +8,17 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 var filterFlag string
 
 // NewCommand creates the monitor events command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "events <device>",
 		Short: "Monitor device events in real-time",
@@ -35,7 +36,7 @@ Press Ctrl+C to stop monitoring.`,
   shelly monitor events living-room -o json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -44,9 +45,9 @@ Press Ctrl+C to stop monitoring.`,
 	return cmd
 }
 
-func run(ctx context.Context, device string) error {
-	ios := iostreams.System()
-	svc := shelly.NewService()
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	jsonOutput := viper.GetString("output") == "json"
 

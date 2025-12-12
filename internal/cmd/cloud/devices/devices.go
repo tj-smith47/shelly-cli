@@ -17,7 +17,7 @@ import (
 )
 
 // NewCommand creates the cloud devices command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "devices",
 		Aliases: []string{"ls", "list"},
@@ -31,18 +31,18 @@ Shows device ID, name, model, firmware version, and online status.`,
   # Output as JSON
   shelly cloud devices -o json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context())
+			return run(f, cmd.Context())
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context) error {
+func run(f *cmdutil.Factory, ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2) // Longer timeout for cloud
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()

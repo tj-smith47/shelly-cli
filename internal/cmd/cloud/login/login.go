@@ -20,7 +20,7 @@ var (
 )
 
 // NewCommand creates the cloud login command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Authenticate with Shelly Cloud",
@@ -42,7 +42,7 @@ You can provide credentials via:
   # Login with environment variables
   SHELLY_CLOUD_EMAIL=user@example.com SHELLY_CLOUD_PASSWORD=mypassword shelly cloud login`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context())
+			return run(f, cmd.Context())
 		},
 	}
 
@@ -52,11 +52,11 @@ You can provide credentials via:
 	return cmd
 }
 
-func run(ctx context.Context) error {
+func run(f *cmdutil.Factory, ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	ios := iostreams.System()
+	ios := f.IOStreams()
 
 	// Get email
 	email := emailFlag

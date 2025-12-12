@@ -6,13 +6,13 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the device reboot command.
-func NewCommand() *cobra.Command {
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var delay int
 	var yes bool
 
@@ -31,7 +31,7 @@ func NewCommand() *cobra.Command {
   shelly device reboot living-room --delay 5000`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], delay, yes)
+			return run(cmd.Context(), f, args[0], delay, yes)
 		},
 	}
 
@@ -41,7 +41,7 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, device string, delay int, yes bool) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, delay int, yes bool) error {
 	if !yes {
 		confirmed, err := iostreams.Confirm(fmt.Sprintf("Reboot device %q?", device), false)
 		if err != nil {
@@ -56,7 +56,7 @@ func run(ctx context.Context, device string, delay int, yes bool) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
 	defer cancel()
 
-	svc := shelly.NewService()
+	svc := f.ShellyService()
 
 	spin := iostreams.NewSpinner("Rebooting device...")
 	spin.Start()
