@@ -27,9 +27,9 @@ type Factory struct {
 	shellyService *shelly.Service
 }
 
-// New creates a Factory with production dependencies.
+// NewFactory creates a Factory with production dependencies.
 // Dependencies are lazily initialized on first access.
-func New() *Factory {
+func NewFactory() *Factory {
 	f := &Factory{}
 
 	f.IOStreams = func() *iostreams.IOStreams {
@@ -63,7 +63,7 @@ func New() *Factory {
 // NewWithIOStreams creates a Factory with a custom IOStreams instance.
 // Useful for testing or when you need to override standard I/O.
 func NewWithIOStreams(ios *iostreams.IOStreams) *Factory {
-	f := New()
+	f := NewFactory()
 	f.ioStreams = ios
 	f.IOStreams = func() *iostreams.IOStreams {
 		return ios

@@ -12,8 +12,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
-// NewCmd creates the energy list command.
-func NewCmd(f *cmdutil.Factory) *cobra.Command {
+// NewCommand creates the energy list command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list <device>",
 		Short: "List energy monitoring components",

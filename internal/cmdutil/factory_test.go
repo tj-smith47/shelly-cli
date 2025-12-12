@@ -13,7 +13,7 @@ import (
 func TestNew(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 	if f == nil {
 		t.Fatal("New() returned nil")
 	}
@@ -33,7 +33,7 @@ func TestNew(t *testing.T) {
 func TestFactory_IOStreams_LazyInit(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 
 	// First call should initialize
 	ios1 := f.IOStreams()
@@ -51,7 +51,7 @@ func TestFactory_IOStreams_LazyInit(t *testing.T) {
 func TestFactory_ShellyService_LazyInit(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 
 	// First call should initialize
 	svc1 := f.ShellyService()
@@ -89,7 +89,7 @@ func TestNewWithIOStreams(t *testing.T) {
 func TestFactory_SetIOStreams(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 
 	// Create custom IOStreams
 	in := &bytes.Buffer{}
@@ -113,7 +113,7 @@ func TestFactory_SetIOStreams(t *testing.T) {
 func TestFactory_SetConfig(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 
 	// Create custom config
 	cfg := &config.Config{}
@@ -137,7 +137,7 @@ func TestFactory_SetConfig(t *testing.T) {
 func TestFactory_SetShellyService(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 
 	// Create custom service
 	svc := shelly.NewService()
@@ -165,7 +165,7 @@ func TestFactory_Chaining(t *testing.T) {
 	cfg := &config.Config{}
 	svc := shelly.NewService()
 
-	f := cmdutil.New().
+	f := cmdutil.NewFactory().
 		SetIOStreams(ios).
 		SetConfig(cfg).
 		SetShellyService(svc)
@@ -188,7 +188,7 @@ func TestFactory_Chaining(t *testing.T) {
 func TestFactory_MustConfig(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 	cfg := &config.Config{}
 	f.SetConfig(cfg)
 
@@ -226,7 +226,7 @@ func TestFactory_SetIOStreams_OverridesOriginal(t *testing.T) {
 func TestFactory_SetConfig_OverridesOriginal(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 
 	// Set first config
 	cfg1 := &config.Config{}
@@ -249,7 +249,7 @@ func TestFactory_SetConfig_OverridesOriginal(t *testing.T) {
 func TestFactory_SetShellyService_OverridesOriginal(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.New()
+	f := cmdutil.NewFactory()
 
 	// Set first service
 	svc1 := shelly.NewService()

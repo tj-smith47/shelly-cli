@@ -10,8 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
-// NewCmd creates the energy reset command.
-func NewCmd(f *cmdutil.Factory) *cobra.Command {
+// NewCommand creates the energy reset command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		componentID  int
 		counterTypes []string

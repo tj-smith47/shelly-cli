@@ -50,8 +50,8 @@ func detectEnergyComponentType(ctx context.Context, ios *iostreams.IOStreams, sv
 	return typeAuto
 }
 
-// NewCmd creates the energy status command.
-func NewCmd(f *cmdutil.Factory) *cobra.Command {
+// NewCommand creates the energy status command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
 		componentID   int
 		componentType string

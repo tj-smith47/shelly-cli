@@ -22,6 +22,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
@@ -109,6 +110,7 @@ func init() {
 	rootCmd.AddCommand(configcmd.NewCommand())
 	rootCmd.AddCommand(wifi.NewCommand())
 	rootCmd.AddCommand(ethernet.NewCommand())
+	rootCmd.AddCommand(energy.NewCommand())
 	rootCmd.AddCommand(cloud.NewCommand())
 	rootCmd.AddCommand(auth.NewCommand())
 	rootCmd.AddCommand(mqtt.NewCommand())

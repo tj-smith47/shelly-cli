@@ -8,8 +8,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
-// NewCmd creates the energy command.
-func NewCmd(f *cmdutil.Factory) *cobra.Command {
+// NewCommand creates the energy command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "energy",
 		Short: "Energy monitoring operations (EM/EM1 components)",
@@ -31,9 +31,9 @@ For power meters with energy totals (PM/PM1 components), use 'shelly power'.`,
 		Aliases: []string{"em"},
 	}
 
-	cmd.AddCommand(list.NewCmd(f))
-	cmd.AddCommand(status.NewCmd(f))
-	cmd.AddCommand(reset.NewCmd(f))
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(reset.NewCommand(f))
 
 	return cmd
 }
