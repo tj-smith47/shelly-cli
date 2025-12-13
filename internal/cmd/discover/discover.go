@@ -2,6 +2,7 @@
 package discover
 
 import (
+	"context"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -13,11 +14,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/scan"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
-
-// DefaultTimeout is the default discovery timeout for the parent command.
-const DefaultTimeout = 10 * time.Second
 
 // NewCommand creates the discover command group.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
@@ -50,13 +48,13 @@ Examples:
 
   # Scan a subnet
   shelly discover scan 192.168.1.0/24`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return runDiscover(timeout, register, skipExisting)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runDiscover(cmd.Context(), f, timeout, register, skipExisting)
 		},
 	}
 
 	// Add flags for the parent discover command
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", DefaultTimeout, "Discovery timeout")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "t", shelly.DefaultTimeout, "Discovery timeout")
 	cmd.Flags().BoolVar(&register, "register", false, "Auto-register discovered devices")
 	cmd.Flags().BoolVar(&skipExisting, "skip-existing", true, "Skip devices already registered")
 
@@ -70,11 +68,11 @@ Examples:
 }
 
 // runDiscover runs mDNS discovery as the default discovery method.
-func runDiscover(timeout time.Duration, register, skipExisting bool) error {
-	ios := iostreams.System()
+func runDiscover(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool) error {
+	ios := f.IOStreams()
 
 	if timeout == 0 {
-		timeout = DefaultTimeout
+		timeout = shelly.DefaultTimeout
 	}
 
 	ios.StartProgress("Discovering devices via mDNS...")
@@ -86,6 +84,8 @@ func runDiscover(timeout time.Duration, register, skipExisting bool) error {
 		}
 	}()
 
+	// Use context for cancellation support
+	_ = ctx // TODO: Pass context to discoverer when shelly-go supports it
 	devices, err := mdnsDiscoverer.Discover(timeout)
 	ios.StopProgress()
 

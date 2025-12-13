@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -85,8 +86,8 @@ func TestNewCommand_Flags(t *testing.T) {
 func TestDefaultTimeout(t *testing.T) {
 	t.Parallel()
 	expected := 10 * time.Second
-	if DefaultTimeout != expected {
-		t.Errorf("DefaultTimeout = %v, want %v", DefaultTimeout, expected)
+	if shelly.DefaultTimeout != expected {
+		t.Errorf("shelly.DefaultTimeout = %v, want %v", shelly.DefaultTimeout, expected)
 	}
 }
 

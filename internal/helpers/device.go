@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
@@ -153,16 +152,6 @@ func RegisterDiscoveredDevices(devices []discovery.DiscoveredDevice, skipExistin
 	}
 
 	return added, nil
-}
-
-// DefaultTimeout returns the default timeout for device operations.
-func DefaultTimeout() time.Duration {
-	return 10 * time.Second
-}
-
-// DefaultDiscoveryTimeout returns the default timeout for discovery operations.
-func DefaultDiscoveryTimeout() time.Duration {
-	return 10 * time.Second
 }
 
 // UnmarshalJSON converts an RPC response (interface{}) to a typed struct.

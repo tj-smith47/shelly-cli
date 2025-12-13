@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -48,7 +49,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		shorthand string
 		defValue  string
 	}{
-		{name: "type", shorthand: "", defValue: typeAuto},
+		{name: "type", shorthand: "", defValue: shelly.ComponentTypeAuto},
 		{name: "format", shorthand: "f", defValue: formatCSV},
 		{name: "output", shorthand: "o", defValue: ""},
 		{name: "period", shorthand: "p", defValue: ""},
@@ -100,133 +101,5 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
-func TestCalculateTimeRange(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		period    string
-		from      string
-		to        string
-		wantError bool
-	}{
-		{
-			name:      "hour period",
-			period:    "hour",
-			wantError: false,
-		},
-		{
-			name:      "day period",
-			period:    "day",
-			wantError: false,
-		},
-		{
-			name:      "week period",
-			period:    "week",
-			wantError: false,
-		},
-		{
-			name:      "month period",
-			period:    "month",
-			wantError: false,
-		},
-		{
-			name:      "default period (day)",
-			period:    "",
-			wantError: false,
-		},
-		{
-			name:      "invalid period",
-			period:    "invalid",
-			wantError: true,
-		},
-		{
-			name:      "explicit from date",
-			from:      "2025-01-01",
-			wantError: false,
-		},
-		{
-			name:      "explicit from and to",
-			from:      "2025-01-01",
-			to:        "2025-01-07",
-			wantError: false,
-		},
-		{
-			name:      "invalid from date",
-			from:      "invalid",
-			wantError: true,
-		},
-		{
-			name:      "invalid to date",
-			to:        "invalid",
-			wantError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			_, _, err := calculateTimeRange(tt.period, tt.from, tt.to)
-			if tt.wantError {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
-func TestParseTime(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		input     string
-		wantError bool
-	}{
-		{
-			name:      "RFC3339 format",
-			input:     "2025-01-01T12:00:00Z",
-			wantError: false,
-		},
-		{
-			name:      "date only",
-			input:     "2025-01-01",
-			wantError: false,
-		},
-		{
-			name:      "datetime format",
-			input:     "2025-01-01 12:00:00",
-			wantError: false,
-		},
-		{
-			name:      "invalid format",
-			input:     "not-a-date",
-			wantError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result, err := parseTime(tt.input)
-			if tt.wantError {
-				if err == nil {
-					t.Error("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-			if result.IsZero() {
-				t.Error("expected non-zero time")
-			}
-		})
-	}
-}
+// Note: Tests for CalculateTimeRange and ParseTime are now in internal/shelly/energy_test.go
+// since these functions were extracted to the service layer for DRY compliance.

@@ -4,7 +4,6 @@ package helpers
 import (
 	"net"
 	"testing"
-	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
 
@@ -81,23 +80,8 @@ func TestDiscoveredDeviceToConfig_EmptyName(t *testing.T) {
 	}
 }
 
-func TestDefaultTimeout(t *testing.T) {
-	t.Parallel()
-	expected := 10 * time.Second
-	got := DefaultTimeout()
-	if got != expected {
-		t.Errorf("DefaultTimeout() = %v, want %v", got, expected)
-	}
-}
-
-func TestDefaultDiscoveryTimeout(t *testing.T) {
-	t.Parallel()
-	expected := 10 * time.Second
-	got := DefaultDiscoveryTimeout()
-	if got != expected {
-		t.Errorf("DefaultDiscoveryTimeout() = %v, want %v", got, expected)
-	}
-}
+// Note: DefaultTimeout is now defined in internal/shelly/shelly.go.
+// Tests for the constant value are in the shelly package.
 
 func TestUnmarshalJSON_ValidData(t *testing.T) {
 	t.Parallel()

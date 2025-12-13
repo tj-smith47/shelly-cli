@@ -23,10 +23,6 @@ const (
 	formatCSV  = "csv"
 	formatJSON = "json"
 	formatYAML = "yaml"
-
-	typeAuto = "auto"
-	typeEM   = "em"
-	typeEM1  = "em1"
 )
 
 // NewCommand creates the energy export command.
@@ -74,7 +70,7 @@ measurements for the specified time range.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", typeAuto, "Component type (auto, em, em1)")
+	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
 	cmd.Flags().StringVarP(&format, "format", "f", formatCSV, "Output format (csv, json, yaml)")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file (default: stdout)")
 	cmd.Flags().StringVarP(&period, "period", "p", "", "Time period (hour, day, week, month)")
@@ -94,14 +90,14 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	}
 
 	// Calculate time range
-	startTS, endTS, err := calculateTimeRange(period, from, to)
+	startTS, endTS, err := shelly.CalculateTimeRange(period, from, to)
 	if err != nil {
 		return fmt.Errorf("invalid time range: %w", err)
 	}
 
 	// Auto-detect type if not specified
-	if componentType == typeAuto {
-		componentType, err = detectEnergyDataComponentType(ctx, ios, svc, device, id)
+	if componentType == shelly.ComponentTypeAuto {
+		componentType, err = svc.DetectEnergyComponentType(ctx, ios, device, id)
 		if err != nil {
 			return err
 		}
@@ -109,102 +105,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 
 	// Export based on type and format
 	switch componentType {
-	case typeEM:
+	case shelly.ComponentTypeEM:
 		return exportEMData(ctx, ios, svc, device, id, startTS, endTS, format, outputFile)
-	case typeEM1:
+	case shelly.ComponentTypeEM1:
 		return exportEM1Data(ctx, ios, svc, device, id, startTS, endTS, format, outputFile)
 	default:
 		return fmt.Errorf("no energy data components found")
 	}
-}
-
-func detectEnergyDataComponentType(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int) (string, error) {
-	// Try EMData first
-	emRecords, err := svc.GetEMDataRecords(ctx, device, id, nil)
-	if err == nil && emRecords != nil && len(emRecords.Records) > 0 {
-		return typeEM, nil
-	}
-	ios.DebugErr("get EMData records", err)
-
-	// Try EM1Data
-	em1Records, err := svc.GetEM1DataRecords(ctx, device, id, nil)
-	if err == nil && em1Records != nil && len(em1Records.Records) > 0 {
-		return typeEM1, nil
-	}
-	ios.DebugErr("get EM1Data records", err)
-
-	return "", fmt.Errorf("no energy data components found")
-}
-
-func calculateTimeRange(period, from, to string) (startTS, endTS *int64, err error) {
-	// If explicit from/to provided, use those
-	if from != "" || to != "" {
-		startTS, endTS, err = parseExplicitTimeRange(from, to)
-		return startTS, endTS, err
-	}
-
-	// Calculate based on period
-	now := time.Now()
-	var start time.Time
-
-	switch period {
-	case "hour":
-		start = now.Add(-1 * time.Hour)
-	case "day", "":
-		start = now.Add(-24 * time.Hour)
-	case "week":
-		start = now.Add(-7 * 24 * time.Hour)
-	case "month":
-		start = now.Add(-30 * 24 * time.Hour)
-	default:
-		return nil, nil, fmt.Errorf("invalid period: %s (use: hour, day, week, month)", period)
-	}
-
-	startUnix := start.Unix()
-	endUnix := now.Unix()
-	return &startUnix, &endUnix, nil
-}
-
-func parseExplicitTimeRange(from, to string) (startTS, endTS *int64, err error) {
-	if from != "" {
-		t, err := parseTime(from)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid --from time: %w", err)
-		}
-		ts := t.Unix()
-		startTS = &ts
-	}
-	if to != "" {
-		t, err := parseTime(to)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid --to time: %w", err)
-		}
-		ts := t.Unix()
-		endTS = &ts
-	}
-	return startTS, endTS, nil
-}
-
-func parseTime(s string) (time.Time, error) {
-	// Try RFC3339 first
-	t, err := time.Parse(time.RFC3339, s)
-	if err == nil {
-		return t, nil
-	}
-
-	// Try date-only format (YYYY-MM-DD)
-	t, err = time.Parse("2006-01-02", s)
-	if err == nil {
-		return t, nil
-	}
-
-	// Try datetime format (YYYY-MM-DD HH:MM:SS)
-	t, err = time.Parse("2006-01-02 15:04:05", s)
-	if err == nil {
-		return t, nil
-	}
-
-	return time.Time{}, fmt.Errorf("unable to parse time (use RFC3339, YYYY-MM-DD, or 'YYYY-MM-DD HH:MM:SS')")
 }
 
 func exportEMData(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int, startTS, endTS *int64, format, outputFile string) error {

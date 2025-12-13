@@ -12,44 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-const (
-	typeAuto = "auto"
-	typePM   = "pm"
-	typePM1  = "pm1"
-)
-
-// detectPowerComponentType auto-detects the power meter component type.
-func detectPowerComponentType(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int) string {
-	pmIDs, err := svc.ListPMComponents(ctx, device)
-	ios.DebugErr("list PM components", err)
-	pm1IDs, err := svc.ListPM1Components(ctx, device)
-	ios.DebugErr("list PM1 components", err)
-
-	// Check if ID matches PM component
-	for _, pmID := range pmIDs {
-		if pmID == id {
-			return typePM
-		}
-	}
-
-	// Check if ID matches PM1 component
-	for _, pm1ID := range pm1IDs {
-		if pm1ID == id {
-			return typePM1
-		}
-	}
-
-	// Default to first available type
-	if len(pmIDs) > 0 {
-		return typePM
-	}
-	if len(pm1IDs) > 0 {
-		return typePM1
-	}
-
-	return typeAuto
-}
-
 // NewCommand creates the power status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
@@ -78,7 +40,7 @@ frequency, and accumulated energy.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", typeAuto, "Component type (auto, pm, pm1)")
+	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, pm, pm1)")
 
 	return cmd
 }
@@ -88,12 +50,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	svc := f.ShellyService()
 
 	// Auto-detect type if not specified
-	if componentType == typeAuto {
-		componentType = detectPowerComponentType(ctx, ios, svc, device, id)
+	if componentType == shelly.ComponentTypeAuto {
+		componentType = svc.DetectPowerComponentType(ctx, ios, device, id)
 	}
 
 	switch componentType {
-	case typePM, typePM1:
+	case shelly.ComponentTypePM, shelly.ComponentTypePM1:
 		// Both PM and PM1 return PMStatus
 		return showPMStatus(ctx, ios, svc, device, id, componentType)
 	default:
@@ -105,7 +67,7 @@ func showPMStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Ser
 	var status *shelly.PMStatus
 	var err error
 
-	if componentType == typePM {
+	if componentType == shelly.ComponentTypePM {
 		status, err = svc.GetPMStatus(ctx, device, id)
 	} else {
 		status, err = svc.GetPM1Status(ctx, device, id)
@@ -121,7 +83,7 @@ func showPMStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Ser
 
 	// Human-readable format
 	typeLabel := "Power Meter (PM)"
-	if componentType == typePM1 {
+	if componentType == shelly.ComponentTypePM1 {
 		typeLabel = "Power Meter (PM1)"
 	}
 	ios.Printf("%s #%d\n\n", typeLabel, status.ID)
