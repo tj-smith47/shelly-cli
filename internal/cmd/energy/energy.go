@@ -1,7 +1,11 @@
+// Package energy provides commands for managing professional energy monitoring components (EM/EM1).
 package energy
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/export"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/history"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/reset"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/status"
@@ -33,6 +37,8 @@ For power meters with energy totals (PM/PM1 components), use 'shelly power'.`,
 
 	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(history.NewCommand(f))
+	cmd.AddCommand(export.NewCommand(f))
 	cmd.AddCommand(reset.NewCommand(f))
 
 	return cmd
