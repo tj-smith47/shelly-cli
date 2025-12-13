@@ -3,12 +3,12 @@ package wifi
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi/ap"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi/scan"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi/status"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the wifi command and its subcommands.

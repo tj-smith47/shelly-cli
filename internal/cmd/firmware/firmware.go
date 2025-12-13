@@ -3,13 +3,13 @@ package firmware
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/check"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/download"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/rollback"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/update"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the firmware command and its subcommands.

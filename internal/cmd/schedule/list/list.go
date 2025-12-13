@@ -68,7 +68,9 @@ func displaySchedules(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) 
 
 		table.AddRow(fmt.Sprintf("%d", s.ID), enabled, s.Timespec, callsSummary)
 	}
-	table.PrintTo(ios.Out)
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }
 
 func formatCallsSummary(calls []shelly.ScheduleCall) string {

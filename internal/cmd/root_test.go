@@ -140,10 +140,12 @@ func TestShouldDisableColor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up env vars using t.Setenv (auto-restores after test)
 			// First unset, then use t.Setenv to track
-			//nolint:errcheck // Best-effort cleanup in tests
-			os.Unsetenv("NO_COLOR")
-			//nolint:errcheck // Best-effort cleanup in tests
-			os.Unsetenv("SHELLY_NO_COLOR")
+			if err := os.Unsetenv("NO_COLOR"); err != nil {
+				t.Logf("warning: failed to unset NO_COLOR: %v", err)
+			}
+			if err := os.Unsetenv("SHELLY_NO_COLOR"); err != nil {
+				t.Logf("warning: failed to unset SHELLY_NO_COLOR: %v", err)
+			}
 			viper.Set("no-color", false)
 
 			// Set test conditions

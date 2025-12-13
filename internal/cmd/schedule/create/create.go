@@ -56,10 +56,12 @@ The calls parameter is a JSON array of RPC calls to execute.`,
 	cmd.Flags().StringVar(&callsFlag, "calls", "", "JSON array of RPC calls to execute (required)")
 	cmd.Flags().BoolVar(&enableFlag, "enable", true, "Enable schedule after creation")
 
-	//nolint:errcheck // cobra's MarkFlagRequired only returns errors for non-existent flags
-	cmd.MarkFlagRequired("timespec")
-	//nolint:errcheck // cobra's MarkFlagRequired only returns errors for non-existent flags
-	cmd.MarkFlagRequired("calls")
+	if err := cmd.MarkFlagRequired("timespec"); err != nil {
+		panic(fmt.Sprintf("failed to mark timespec flag required: %v", err))
+	}
+	if err := cmd.MarkFlagRequired("calls"); err != nil {
+		panic(fmt.Sprintf("failed to mark calls flag required: %v", err))
+	}
 
 	return cmd
 }

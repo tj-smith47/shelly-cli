@@ -3,7 +3,6 @@ package scene
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/activate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/create"
@@ -12,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/importcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene/show"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the scene command group.

@@ -3,7 +3,6 @@ package cover
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover/calibrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover/closecmd"
@@ -12,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover/position"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover/stop"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the cover command.

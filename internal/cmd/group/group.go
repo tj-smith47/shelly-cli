@@ -3,7 +3,6 @@ package group
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/add"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/create"
@@ -11,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/members"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group/remove"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the group command group.

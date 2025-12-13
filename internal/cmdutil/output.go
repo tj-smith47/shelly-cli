@@ -32,8 +32,8 @@ func FormatOutput(ios *iostreams.IOStreams, data any) error {
 }
 
 // FormatTable creates and prints a table using IOStreams.
-func FormatTable(ios *iostreams.IOStreams, headers []string, rows [][]string) {
-	output.PrintTableTo(ios.Out, headers, rows)
+func FormatTable(ios *iostreams.IOStreams, headers []string, rows [][]string) error {
+	return output.PrintTableTo(ios.Out, headers, rows)
 }
 
 // PrintFormatted outputs data using the specified format.

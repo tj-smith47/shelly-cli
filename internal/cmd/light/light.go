@@ -3,7 +3,6 @@ package light
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light/off"
@@ -11,6 +10,7 @@ import (
 	lightset "github.com/tj-smith47/shelly-cli/internal/cmd/light/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light/toggle"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the light command.

@@ -37,6 +37,7 @@ func TempFile(t *testing.T, dir, name, content string) string {
 
 // CaptureOutput captures stdout/stderr during test execution.
 type CaptureOutput struct {
+	t         *testing.T
 	oldStdout *os.File
 	oldStderr *os.File
 	outR      *os.File
@@ -78,32 +79,28 @@ func NewCaptureOutput(t *testing.T) *CaptureOutput {
 func (c *CaptureOutput) Stop() (stdout, stderr string) {
 	if err := c.outW.Close(); err != nil {
 		// Log but don't fail - we still want to restore stdout/stderr.
-		//nolint:errcheck // Best-effort warning output
-		os.Stderr.WriteString("warning: failed to close stdout writer: " + err.Error() + "\n")
+		c.t.Logf("warning: failed to close stdout writer: %v", err)
 	}
 	if err := c.errW.Close(); err != nil {
-		//nolint:errcheck // Best-effort warning output
-		os.Stderr.WriteString("warning: failed to close stderr writer: " + err.Error() + "\n")
+		c.t.Logf("warning: failed to close stderr writer: %v", err)
 	}
 
 	var outBuf, errBuf bytes.Buffer
 	if _, err := io.Copy(&outBuf, c.outR); err != nil {
-		//nolint:errcheck // Best-effort warning output
-		os.Stderr.WriteString("warning: failed to read stdout: " + err.Error() + "\n")
+		c.t.Logf("warning: failed to read stdout: %v", err)
 	}
 	if _, err := io.Copy(&errBuf, c.errR); err != nil {
-		//nolint:errcheck // Best-effort warning output
-		os.Stderr.WriteString("warning: failed to read stderr: " + err.Error() + "\n")
+		c.t.Logf("warning: failed to read stderr: %v", err)
 	}
 
 	os.Stdout = c.oldStdout
 	os.Stderr = c.oldStderr
 
 	if err := c.outR.Close(); err != nil {
-		os.Stderr.WriteString("warning: failed to close stdout reader: " + err.Error() + "\n") //nolint:errcheck // Best-effort warning
+		c.t.Logf("warning: failed to close stdout reader: %v", err)
 	}
 	if err := c.errR.Close(); err != nil {
-		os.Stderr.WriteString("warning: failed to close stderr reader: " + err.Error() + "\n") //nolint:errcheck // Best-effort warning
+		c.t.Logf("warning: failed to close stderr reader: %v", err)
 	}
 
 	return outBuf.String(), errBuf.String()

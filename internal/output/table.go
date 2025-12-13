@@ -4,7 +4,6 @@ package output
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -149,9 +148,9 @@ func (t *Table) Print() {
 }
 
 // PrintTo prints the table to the specified writer.
-func (t *Table) PrintTo(w io.Writer) {
-	//nolint:errcheck // Best-effort output to terminal
-	fmt.Fprint(w, t.Render())
+func (t *Table) PrintTo(w io.Writer) error {
+	_, err := fmt.Fprint(w, t.Render())
+	return err
 }
 
 // String returns the rendered table as a string.
@@ -167,10 +166,10 @@ func PrintTable(headers []string, rows [][]string) {
 }
 
 // PrintTableTo is a convenience function to create and print a table to a writer.
-func PrintTableTo(w io.Writer, headers []string, rows [][]string) {
+func PrintTableTo(w io.Writer, headers []string, rows [][]string) error {
 	t := NewTable(headers...)
 	t.AddRows(rows)
-	t.PrintTo(w)
+	return t.PrintTo(w)
 }
 
 // KeyValueTable creates a table from key-value pairs.
@@ -213,25 +212,4 @@ func (t *Table) Empty() bool {
 // RowCount returns the number of rows in the table.
 func (t *Table) RowCount() int {
 	return len(t.rows)
-}
-
-// PrintStatus prints a status line with appropriate coloring.
-func PrintStatus(status, message string) {
-	var style lipgloss.Style
-
-	switch strings.ToLower(status) {
-	case "ok", "success", "online":
-		style = lipgloss.NewStyle().Foreground(theme.Green())
-	case "warn", "warning":
-		style = lipgloss.NewStyle().Foreground(theme.Yellow())
-	case "error", "fail", "offline":
-		style = lipgloss.NewStyle().Foreground(theme.Red())
-	case "info":
-		style = lipgloss.NewStyle().Foreground(theme.Blue())
-	default:
-		style = lipgloss.NewStyle().Foreground(theme.Fg())
-	}
-
-	//nolint:errcheck // Best-effort output to terminal
-	fmt.Fprintf(os.Stdout, "%s %s\n", style.Render("●"), message)
 }

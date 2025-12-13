@@ -34,11 +34,12 @@ Create a production-ready, open-source Cobra CLI that:
 ## Current Status
 
 **Last Updated:** 2025-12-13
-**Phase:** Phase 11.3 - Power Monitoring Commands (PM/PM1)
-**Completed:** Phases 0.1-0.6, 1-10 (full), 11.1 (real-time monitoring), 11.2 (energy monitoring)
+**Phase:** Phase 11.4 - Aggregated Energy Dashboard
+**Completed:** Phases 0.1-0.6, 1-10 (full), 11.1-11.3 (monitoring, energy, power)
 **Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phases 11.3-11.5, 14, 17-26, Phase 0.7 (deferred to Phase 25)
-**Test Coverage:** ~30% average - TARGET: >90% (deferred to Phase 25)
+**Pending:** Phases 11.4-11.5, 14, 17-26, Phase 0.7 (deferred to Phase 25)
+**Test Coverage:** ~19% average - TARGET: >90% (deferred to Phase 25)
+**shelly-go version:** v0.1.6
 
 **Architecture Audit (2025-12-11):**
 Comprehensive audit against industry standards (gh, kubectl, docker, jira-cli, gh-dash, k9s) revealed:
@@ -61,7 +62,83 @@ Comprehensive audit against industry standards (gh, kubectl, docker, jira-cli, g
   - Updated shelly-go to v0.1.5 for EMData/EM1Data component support
   - Fixed CSV URL methods to avoid unnecessary device connections
   - All commands support auto-detection of EM vs EM1 component types
+- Phase 11.3 (power commands) completed: list, status (PM/PM1 components)
+  - Updated shelly-go to v0.1.6
+  - Fixed CSV export type assertions (was broken - using wrong types)
+  - Removed all `//nolint:errcheck` directives - replaced with proper `ios.DebugErr()` or `t.Logf()` logging
 - Service layer enhanced with 8 new monitoring methods in `internal/shelly/monitoring.go`
+
+---
+
+## Lessons Learned (Critical for Future Sessions)
+
+> **READ THIS BEFORE STARTING ANY NEW PHASE.** These lessons prevent wasted context and rework.
+
+### 1. Verify shelly-go API Before Planning
+**Problem:** Plan items for `power history` and `power calibrate` were impossible - the Shelly API doesn't provide these for PM components.
+
+**Solution:** Before adding ANY feature to the plan:
+1. Check shelly-go components: `ls /db/appdata/shelly-go/gen2/components/`
+2. Read the actual component file to see available methods
+3. Check Shelly API docs if unclear: https://shelly-api-docs.shelly.cloud/gen2/
+
+### 2. Use Concrete Types, Never interface{}
+**Problem:** export.go used `interface{}` parameters and wrong type assertions, causing the CSV export to be completely broken despite being marked complete.
+
+**Solution:** Always use concrete types from shelly-go:
+```go
+// WRONG - vague and error-prone
+func exportEMDataCSV(data interface{}) error
+
+// CORRECT - compiler catches type mismatches
+func exportEMDataCSV(data *components.EMDataGetDataResult) error
+```
+
+### 3. Never Suppress Errors with nolint:errcheck
+**Problem:** 10+ `//nolint:errcheck` directives hid errors that should have been logged.
+
+**Solution:** Always handle errors properly:
+```go
+// WRONG - errors silently ignored
+//nolint:errcheck
+table.PrintTo(ios.Out)
+
+// CORRECT - errors surfaced in verbose mode
+if err := table.PrintTo(ios.Out); err != nil {
+    ios.DebugErr("print table", err)
+}
+
+// CORRECT for tests - use t.Logf
+if err := os.Unsetenv("VAR"); err != nil {
+    t.Logf("warning: %v", err)
+}
+```
+
+### 4. Check Existing Patterns Before Implementing
+**Problem:** Time wasted reimplementing patterns that already exist in cmdutil.
+
+**Solution:** Before writing command code, check:
+- `internal/cmdutil/runner.go` - RunWithSpinner, RunStatus, RunList, etc.
+- `internal/cmdutil/output.go` - FormatOutput, FormatTable, PrintListResult
+- `internal/iostreams/` - DebugErr, Success, Info, Printf
+- Existing similar commands for patterns (e.g., check energy/ before implementing power/)
+
+### 5. Verify Completion Before Marking Complete
+**Problem:** Phase 11.2 was marked complete but CSV export was broken.
+
+**Solution:** Before marking ANY task complete:
+1. Build and run linter: `go build ./... && golangci-lint run ./...`
+2. Run tests: `go test ./...`
+3. Manually test the feature if it's user-facing
+4. Check that all code paths work (not just the happy path)
+
+### 6. Don't Run Bulk Formatting Without Approval
+**Problem:** Running `gci` across 70+ files wasted an entire context window fixing import ordering that wasn't broken.
+
+**Solution:** PLAN.md rule #5 exists for a reason:
+> "No gci/gofmt without approval: Do not run `gci`, `gofmt`, or other bulk formatting tools without explicit user approval."
+
+Only run formatters on files YOU changed, not the entire codebase.
 
 ---
 
@@ -821,12 +898,13 @@ shelly-cli/
   - Fully implemented in `internal/cmd/energy/reset/reset.go`
   - Supports both EM and EM1 components with confirmation prompt
 
-### 11.3 Power Monitoring (PM/PM1 Components)
-- [ ] `shelly power list <device>` - List power meters (PM components)
-- [ ] `shelly power status <device> [id]` - Current power status
-  - Shows: power (W), energy (Wh), voltage, current
-- [ ] `shelly power history <device> [id]` - Power history
-- [ ] `shelly power calibrate <device> [id]` - Calibrate power meter
+### 11.3 Power Monitoring (PM/PM1 Components) ✅
+- [x] `shelly power list <device>` - List power meters (PM components)
+- [x] `shelly power status <device> [id]` - Current power status
+  - Shows: power (W), energy (Wh), voltage, current, frequency
+  - Includes accumulated energy counters and return energy
+
+**Note:** PM/PM1 components do not have historical data storage (unlike EM/EM1 which have EMData/EM1Data). PM also has no calibration method - calibration is only available for Cover and Thermostat components. The plan items for `power history` and `power calibrate` were incorrect assumptions.
 
 ### 11.4 Aggregated Energy Dashboard
 - [ ] `shelly energy dashboard` - Summary of all energy meters

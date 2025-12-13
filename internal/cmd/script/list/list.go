@@ -71,5 +71,7 @@ func displayScripts(ios *iostreams.IOStreams, scripts []shelly.ScriptInfo) {
 		}
 		table.AddRow(fmt.Sprintf("%d", s.ID), name, enabled, running)
 	}
-	table.PrintTo(ios.Out)
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }

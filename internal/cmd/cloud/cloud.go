@@ -3,7 +3,6 @@ package cloud
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/authstatus"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/control"
@@ -16,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/logout"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud/token"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the cloud command and its subcommands.

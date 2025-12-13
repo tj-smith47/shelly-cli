@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var formatFlag string
@@ -206,7 +206,9 @@ func printBackupsTable(ios *iostreams.IOStreams, backups []backupFileInfo) {
 	}
 
 	headers := []string{"FILENAME", "DEVICE", "MODEL", "CREATED", "ENCRYPTED", "SIZE"}
-	output.PrintTableTo(ios.Out, headers, data)
+	if err := output.PrintTableTo(ios.Out, headers, data); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }
 
 func formatSize(bytes int64) string {

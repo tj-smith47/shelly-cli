@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the group delete command.

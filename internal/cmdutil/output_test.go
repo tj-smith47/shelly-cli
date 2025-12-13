@@ -93,7 +93,9 @@ func TestFormatTable(t *testing.T) {
 		{"key2", "value2"},
 	}
 
-	cmdutil.FormatTable(ios, headers, rows)
+	if err := cmdutil.FormatTable(ios, headers, rows); err != nil {
+		t.Fatalf("FormatTable failed: %v", err)
+	}
 
 	got := out.String()
 	if got == "" {

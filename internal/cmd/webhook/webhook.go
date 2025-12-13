@@ -3,12 +3,12 @@ package webhook
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/del"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/update"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the webhook command and its subcommands.

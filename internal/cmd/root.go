@@ -31,6 +31,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
@@ -115,6 +116,7 @@ func init() {
 	rootCmd.AddCommand(wifi.NewCommand(f))
 	rootCmd.AddCommand(ethernet.NewCommand(f))
 	rootCmd.AddCommand(energy.NewCommand(f))
+	rootCmd.AddCommand(power.NewCommand(f))
 	rootCmd.AddCommand(cloud.NewCommand(f))
 	rootCmd.AddCommand(auth.NewCommand(f))
 	rootCmd.AddCommand(mqtt.NewCommand(f))

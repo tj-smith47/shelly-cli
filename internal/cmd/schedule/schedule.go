@@ -3,7 +3,6 @@ package schedule
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/del"
@@ -12,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/enable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/update"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the schedule command.

@@ -3,7 +3,6 @@ package script
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/del"
@@ -15,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/stop"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/update"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/upload"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the script command.

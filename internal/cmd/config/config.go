@@ -3,7 +3,6 @@ package config
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/diff"
 	configexport "github.com/tj-smith47/shelly-cli/internal/cmd/config/export"
@@ -11,6 +10,7 @@ import (
 	configimport "github.com/tj-smith47/shelly-cli/internal/cmd/config/import"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/reset"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/set"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the config command and its subcommands.

@@ -3,12 +3,12 @@ package monitor
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor/all"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor/events"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor/power"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor/status"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the monitor command group.

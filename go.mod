@@ -12,7 +12,7 @@ require (
 	github.com/muesli/termenv v0.16.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
-	github.com/tj-smith47/shelly-go v0.1.5
+	github.com/tj-smith47/shelly-go v0.1.6
 	golang.org/x/sync v0.19.0
 	gopkg.in/yaml.v3 v3.0.1
 )

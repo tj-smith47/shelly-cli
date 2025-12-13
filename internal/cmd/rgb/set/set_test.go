@@ -2,9 +2,9 @@
 package set
 
 import (
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 

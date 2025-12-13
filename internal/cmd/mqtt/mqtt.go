@@ -3,11 +3,11 @@ package mqtt
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt/disable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt/status"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the mqtt command and its subcommands.

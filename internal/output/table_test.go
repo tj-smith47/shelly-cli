@@ -42,7 +42,9 @@ func TestTable_PrintTo(t *testing.T) {
 	table.AddRow("Bedroom", "OFF")
 
 	var buf bytes.Buffer
-	table.PrintTo(&buf)
+	if err := table.PrintTo(&buf); err != nil {
+		t.Fatalf("PrintTo failed: %v", err)
+	}
 
 	output := buf.String()
 
@@ -69,7 +71,9 @@ func TestTable_EmptyTable(t *testing.T) {
 	table := NewTable("A", "B")
 
 	var buf bytes.Buffer
-	table.PrintTo(&buf)
+	if err := table.PrintTo(&buf); err != nil {
+		t.Fatalf("PrintTo failed: %v", err)
+	}
 
 	output := buf.String()
 	// Should still have headers
@@ -88,7 +92,9 @@ func TestTable_SetStyle(t *testing.T) {
 	table.AddRow("Test")
 
 	var buf bytes.Buffer
-	table.PrintTo(&buf)
+	if err := table.PrintTo(&buf); err != nil {
+		t.Fatalf("PrintTo failed: %v", err)
+	}
 
 	// Should produce output without errors
 	if buf.Len() == 0 {
@@ -170,7 +176,9 @@ func TestPrintTableTo(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	PrintTableTo(&buf, []string{"A", "B"}, [][]string{{"1", "2"}})
+	if err := PrintTableTo(&buf, []string{"A", "B"}, [][]string{{"1", "2"}}); err != nil {
+		t.Fatalf("PrintTableTo failed: %v", err)
+	}
 
 	if buf.Len() == 0 {
 		t.Error("PrintTableTo() produced no output")

@@ -3,12 +3,12 @@ package batch
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch/command"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch/off"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch/on"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch/toggle"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the batch command group.

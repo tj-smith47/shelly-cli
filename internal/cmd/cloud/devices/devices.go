@@ -101,5 +101,7 @@ func displayDevices(ios *iostreams.IOStreams, devices []shelly.CloudDevice) {
 	}
 
 	ios.Printf("Found %d device(s):\n\n", len(devices))
-	table.PrintTo(ios.Out)
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }

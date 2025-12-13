@@ -1,4 +1,4 @@
-// Package list provides the energy list command.
+// Package list provides the power list command.
 package list
 
 import (
@@ -12,15 +12,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
-// NewCommand creates the energy list command.
+// NewCommand creates the power list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list <device>",
-		Short: "List energy monitoring components",
-		Long: `List all energy monitoring components (EM/EM1) on a device.
+		Short: "List power meter components",
+		Long: `List all power meter components (PM/PM1) on a device.
 
-Shows component IDs and types for all energy monitors found on the device.
-EM components are 3-phase monitors, EM1 components are single-phase.`,
+Shows component IDs and types for all power meters found on the device.`,
 		Aliases: []string{"ls"},
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -40,36 +39,36 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	// List EM components
-	emIDs, err := svc.ListEMComponents(ctx, device)
+	// List PM components
+	pmIDs, err := svc.ListPMComponents(ctx, device)
 	if err != nil {
-		return fmt.Errorf("failed to list EM components: %w", err)
+		return fmt.Errorf("failed to list PM components: %w", err)
 	}
 
-	// List EM1 components
-	em1IDs, err := svc.ListEM1Components(ctx, device)
+	// List PM1 components
+	pm1IDs, err := svc.ListPM1Components(ctx, device)
 	if err != nil {
-		return fmt.Errorf("failed to list EM1 components: %w", err)
+		return fmt.Errorf("failed to list PM1 components: %w", err)
 	}
 
 	// Combine results
-	components := make([]componentInfo, 0, len(emIDs)+len(em1IDs))
-	for _, id := range emIDs {
+	components := make([]componentInfo, 0, len(pmIDs)+len(pm1IDs))
+	for _, id := range pmIDs {
 		components = append(components, componentInfo{
 			ID:   id,
-			Type: "EM (3-phase)",
+			Type: "PM",
 		})
 	}
-	for _, id := range em1IDs {
+	for _, id := range pm1IDs {
 		components = append(components, componentInfo{
 			ID:   id,
-			Type: "EM1 (single-phase)",
+			Type: "PM1",
 		})
 	}
 
 	if len(components) == 0 {
-		_, err := fmt.Fprintf(ios.Out, "No energy monitoring components found\n")
-		iostreams.DebugErr("writing output", err)
+		_, err := fmt.Fprintf(ios.Out, "No power meter components found\n")
+		ios.DebugErr("writing output", err)
 		return nil
 	}
 

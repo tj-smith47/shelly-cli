@@ -3,12 +3,12 @@ package backup
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup/restore"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the backup command and its subcommands.

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 

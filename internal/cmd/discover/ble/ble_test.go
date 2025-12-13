@@ -2,12 +2,13 @@
 package ble
 
 import (
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 func TestNewCommand(t *testing.T) {

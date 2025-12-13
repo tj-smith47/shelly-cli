@@ -138,8 +138,9 @@ func runAll(f *cmdutil.Factory, ctx context.Context) error {
 		})
 	}
 
-	//nolint:errcheck // Individual errors are captured per-device, not propagated
-	g.Wait()
+	if err := g.Wait(); err != nil {
+		ios.DebugErr("errgroup wait", err)
+	}
 	ios.StopProgress()
 
 	// Build table
@@ -166,7 +167,9 @@ func runAll(f *cmdutil.Factory, ctx context.Context) error {
 		table.AddRow(r.name, current, available, status)
 	}
 
-	table.PrintTo(ios.Out)
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 
 	ios.Println("")
 	if updatesAvailable > 0 {

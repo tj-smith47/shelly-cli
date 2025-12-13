@@ -225,8 +225,9 @@ func checkDevicesForUpdates(
 		})
 	}
 
-	//nolint:errcheck // Individual errors are captured per-device, not propagated
-	g.Wait()
+	if err := g.Wait(); err != nil {
+		ios.DebugErr("errgroup wait", err)
+	}
 	ios.StopProgress()
 
 	// Filter devices with updates and apply staged percentage
@@ -256,7 +257,9 @@ func displayAndConfirmUpdates(ios *iostreams.IOStreams, toUpdate []deviceStatus)
 	for _, s := range toUpdate {
 		table.AddRow(s.name, s.info.Current, s.info.Available)
 	}
-	table.PrintTo(ios.Out)
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 	ios.Println("")
 
 	if !yesFlag {
@@ -309,8 +312,9 @@ func performUpdates(
 		})
 	}
 
-	//nolint:errcheck // Individual errors are captured per-device, not propagated
-	ug.Wait()
+	if err := ug.Wait(); err != nil {
+		ios.DebugErr("errgroup wait", err)
+	}
 	ios.StopProgress()
 
 	// Show results

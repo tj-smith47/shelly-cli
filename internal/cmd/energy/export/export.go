@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -216,9 +219,9 @@ func exportEMData(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Ser
 	case formatCSV:
 		return exportEMDataCSV(ios, data, outputFile)
 	case formatJSON:
-		return exportJSON(ios, data, outputFile)
+		return exportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
 	case formatYAML:
-		return exportYAML(ios, data, outputFile)
+		return exportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
 	default:
 		return fmt.Errorf("unsupported format: %s", format)
 	}
@@ -236,21 +239,17 @@ func exportEM1Data(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 	case formatCSV:
 		return exportEM1DataCSV(ios, data, outputFile)
 	case formatJSON:
-		return exportJSON(ios, data, outputFile)
+		return exportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
 	case formatYAML:
-		return exportYAML(ios, data, outputFile)
+		return exportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
 	default:
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 }
 
-func exportEMDataCSV(ios *iostreams.IOStreams, data interface{}, outputFile string) error {
-	// Type assert to EMDataGetDataResult
-	result, ok := data.(*shelly.Service)
-	if !ok {
-		// If direct conversion fails, we need the actual data structure
-		// For now, output a helpful error
-		return fmt.Errorf("CSV export requires EMDataGetDataResult type")
+func exportEMDataCSV(ios *iostreams.IOStreams, data *components.EMDataGetDataResult, outputFile string) error {
+	if data == nil || len(data.Data) == 0 {
+		return fmt.Errorf("no data to export")
 	}
 
 	writer, closer, err := getWriter(ios, outputFile)
@@ -262,73 +261,152 @@ func exportEMDataCSV(ios *iostreams.IOStreams, data interface{}, outputFile stri
 	csvWriter := csv.NewWriter(writer)
 	defer csvWriter.Flush()
 
-	// Write CSV headers
+	// Write CSV headers for 3-phase energy meter
 	headers := []string{
 		"timestamp",
-		"a_voltage", "a_current", "a_power_active", "a_power_apparent", "a_power_factor", "a_frequency",
-		"b_voltage", "b_current", "b_power_active", "b_power_apparent", "b_power_factor", "b_frequency",
-		"c_voltage", "c_current", "c_power_active", "c_power_apparent", "c_power_factor", "c_frequency",
-		"total_current", "total_power_active", "total_power_apparent",
-		"neutral_current",
+		"a_voltage", "a_current", "a_act_power", "a_aprt_power", "a_pf", "a_freq",
+		"b_voltage", "b_current", "b_act_power", "b_aprt_power", "b_pf", "b_freq",
+		"c_voltage", "c_current", "c_act_power", "c_aprt_power", "c_pf", "c_freq",
+		"total_current", "total_act_power", "total_aprt_power",
+		"total_act_energy", "total_act_ret_energy",
+		"n_current",
 	}
 	if err := csvWriter.Write(headers); err != nil {
 		return fmt.Errorf("failed to write CSV headers: %w", err)
 	}
 
-	// TODO: Write actual data rows
-	// This requires proper access to the EMDataGetDataResult structure
+	// Write data rows
+	for _, block := range data.Data {
+		ts := block.TS
+		period := int64(block.Period)
 
-	ios.DebugErr("CSV export implementation incomplete", fmt.Errorf("type assertion failed for %T", result))
-	return fmt.Errorf("CSV export not fully implemented - use JSON or YAML format")
+		for i, v := range block.Values {
+			// Calculate timestamp for this measurement
+			measurementTS := ts + int64(i)*period
+			timeStr := time.Unix(measurementTS, 0).UTC().Format(time.RFC3339)
+
+			row := []string{
+				timeStr,
+				formatFloat(v.AVoltage),
+				formatFloat(v.ACurrent),
+				formatFloat(v.AActivePower),
+				formatFloat(v.AApparentPower),
+				formatFloatPtr(v.APowerFactor),
+				formatFloatPtr(v.AFreq),
+				formatFloat(v.BVoltage),
+				formatFloat(v.BCurrent),
+				formatFloat(v.BActivePower),
+				formatFloat(v.BApparentPower),
+				formatFloatPtr(v.BPowerFactor),
+				formatFloatPtr(v.BFreq),
+				formatFloat(v.CVoltage),
+				formatFloat(v.CCurrent),
+				formatFloat(v.CActivePower),
+				formatFloat(v.CApparentPower),
+				formatFloatPtr(v.CPowerFactor),
+				formatFloatPtr(v.CFreq),
+				formatFloat(v.TotalCurrent),
+				formatFloat(v.TotalActivePower),
+				formatFloat(v.TotalAprtPower),
+				formatFloatPtr(v.TotalActEnergy),
+				formatFloatPtr(v.TotalActRetEnergy),
+				formatFloatPtr(v.NCurrent),
+			}
+
+			if err := csvWriter.Write(row); err != nil {
+				return fmt.Errorf("failed to write CSV row: %w", err)
+			}
+		}
+	}
+
+	if outputFile != "" {
+		ios.Success("Exported to %s (CSV)", outputFile)
+	}
+	return nil
 }
 
-func exportEM1DataCSV(ios *iostreams.IOStreams, data interface{}, outputFile string) error {
-	// Similar to EMDataCSV - placeholder for now
-	return fmt.Errorf("CSV export not fully implemented - use JSON or YAML format")
-}
+func exportEM1DataCSV(ios *iostreams.IOStreams, data *components.EM1DataGetDataResult, outputFile string) error {
+	if data == nil || len(data.Data) == 0 {
+		return fmt.Errorf("no data to export")
+	}
 
-func exportJSON(ios *iostreams.IOStreams, data interface{}, outputFile string) error {
 	writer, closer, err := getWriter(ios, outputFile)
 	if err != nil {
 		return err
 	}
 	defer closer()
 
-	formatter := output.NewFormatter(output.FormatJSON)
-	if err := formatter.Format(writer, data); err != nil {
-		return fmt.Errorf("failed to encode JSON: %w", err)
+	csvWriter := csv.NewWriter(writer)
+	defer csvWriter.Flush()
+
+	// Write CSV headers for single-phase energy meter
+	headers := []string{
+		"timestamp",
+		"voltage", "current", "act_power", "aprt_power", "pf", "freq",
+		"act_energy", "act_ret_energy",
+	}
+	if err := csvWriter.Write(headers); err != nil {
+		return fmt.Errorf("failed to write CSV headers: %w", err)
+	}
+
+	// Write data rows
+	for _, block := range data.Data {
+		ts := block.TS
+		period := int64(block.Period)
+
+		for i, v := range block.Values {
+			// Calculate timestamp for this measurement
+			measurementTS := ts + int64(i)*period
+			timeStr := time.Unix(measurementTS, 0).UTC().Format(time.RFC3339)
+
+			row := []string{
+				timeStr,
+				formatFloat(v.Voltage),
+				formatFloat(v.Current),
+				formatFloat(v.ActivePower),
+				formatFloat(v.ApparentPower),
+				formatFloatPtr(v.PowerFactor),
+				formatFloatPtr(v.Freq),
+				formatFloatPtr(v.ActEnergy),
+				formatFloatPtr(v.ActRetEnergy),
+			}
+
+			if err := csvWriter.Write(row); err != nil {
+				return fmt.Errorf("failed to write CSV row: %w", err)
+			}
+		}
 	}
 
 	if outputFile != "" {
-		ios.Success("Exported to %s (JSON)", outputFile)
+		ios.Success("Exported to %s (CSV)", outputFile)
 	}
 	return nil
 }
 
-func exportYAML(ios *iostreams.IOStreams, data interface{}, outputFile string) error {
+func exportToFile(ios *iostreams.IOStreams, data any, outputFile string, format output.Format, formatName string) error {
 	writer, closer, err := getWriter(ios, outputFile)
 	if err != nil {
 		return err
 	}
 	defer closer()
 
-	formatter := output.NewFormatter(output.FormatYAML)
+	formatter := output.NewFormatter(format)
 	if err := formatter.Format(writer, data); err != nil {
-		return fmt.Errorf("failed to encode YAML: %w", err)
+		return fmt.Errorf("failed to encode %s: %w", formatName, err)
 	}
 
 	if outputFile != "" {
-		ios.Success("Exported to %s (YAML)", outputFile)
+		ios.Success("Exported to %s (%s)", outputFile, formatName)
 	}
 	return nil
 }
 
-func getWriter(ios *iostreams.IOStreams, outputFile string) (writer interface{ Write([]byte) (int, error) }, closer func(), err error) {
+func getWriter(ios *iostreams.IOStreams, outputFile string) (io.Writer, func(), error) {
 	if outputFile == "" {
 		return ios.Out, func() {}, nil
 	}
 
-	//nolint:gosec // User-provided file path is expected for CLI export functionality
+	//nolint:gosec // G304: User-provided file path is expected for CLI export functionality
 	file, err := os.Create(outputFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create output file: %w", err)
@@ -339,4 +417,15 @@ func getWriter(ios *iostreams.IOStreams, outputFile string) (writer interface{ W
 			ios.DebugErr("close output file", err)
 		}
 	}, nil
+}
+
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+func formatFloatPtr(f *float64) string {
+	if f == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*f, 'f', -1, 64)
 }

@@ -4,8 +4,6 @@ package discover
 import (
 	"time"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/discovery"
 
@@ -13,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/coiot"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/mdns"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/scan"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
