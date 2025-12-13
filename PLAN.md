@@ -33,10 +33,10 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-12
-**Phase:** Phase 11.2 - Energy Monitoring Commands (in progress)
-**Completed:** Phases 0.1-0.6, 1-10 (full), 11.1 (real-time monitoring)
-**Partial:** Phases 3-4 (commands done, completions TBD), 11.2 (list done, status/reset WIP), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
+**Last Updated:** 2025-12-13
+**Phase:** Phase 11.3 - Power Monitoring Commands (PM/PM1)
+**Completed:** Phases 0.1-0.6, 1-10 (full), 11.1 (real-time monitoring), 11.2 (energy monitoring)
+**Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
 **Pending:** Phases 11.3-11.5, 14, 17-26, Phase 0.7 (deferred to Phase 25)
 **Test Coverage:** ~30% average - TARGET: >90% (deferred to Phase 25)
 
@@ -55,10 +55,13 @@ Comprehensive audit against industry standards (gh, kubectl, docker, jira-cli, g
 - All control commands (switch, cover, light, rgb, input, device, group, batch, scene) implemented with tests
 - Phase 0.1-0.3 completed (IOStreams 92.3%, cmdutil 92.3%, package consolidation)
 - Batch operations use `errgroup.SetLimit()` for concurrency
-- All tests pass (48 test packages), golangci-lint passes with 0 issues
-- Phase 11.1 (monitor commands) already implemented: status, power, events, all subcommands
-- Phase 11.2 (energy commands) started: list command complete, status/reset commands WIP
-- Service layer for energy/power monitoring already exists in `internal/shelly/monitoring.go`
+- All tests pass, golangci-lint passes with 0 issues
+- Phase 11.1 (monitor commands) completed: status, power, events, all subcommands
+- Phase 11.2 (energy commands) completed: list, status, history, export, reset with comprehensive tests
+  - Updated shelly-go to v0.1.5 for EMData/EM1Data component support
+  - Fixed CSV URL methods to avoid unnecessary device connections
+  - All commands support auto-detection of EM vs EM1 component types
+- Service layer enhanced with 8 new monitoring methods in `internal/shelly/monitoring.go`
 
 ---
 
@@ -795,23 +798,28 @@ shelly-cli/
   - WebSocket subscription via shelly-go events package
 - [x] `shelly monitor all` - Monitor all registered devices
 
-### 11.2 Energy Monitoring (EM/EM1 Components)
+### 11.2 Energy Monitoring (EM/EM1 Components) ✅
 - [x] `shelly energy list <device>` - List energy meters (EM components)
   - Fully implemented and linted in `internal/cmd/energy/list/`
   - Lists both EM (3-phase) and EM1 (single-phase) components
   - Uses existing service methods from `internal/shelly/monitoring.go`
-- [ ] `shelly energy status <device> [id]` - Current power/energy status
+- [x] `shelly energy status <device> [id]` - Current power/energy status
   - Shows: voltage, current, power, energy, power factor, frequency
-  - **WIP:** Drafted in `internal/cmd/energy/status/status.go` but needs lint fixes (errcheck, goconst)
-- [ ] `shelly energy history <device> [id]` - Energy history
-  - Flags: `--period` (minute, hour, day, week, month)
-  - Flags: `--from`, `--to` (date range)
-  - Flags: `--format` (json, csv, table)
-  - **Note:** EM/EM1 components may not have historical data API - verify with shelly-go
-- [ ] `shelly energy export <device> <file>` - Export energy data
-  - Flags: `--period`, `--from`, `--to`, `--format`
-- [ ] `shelly energy reset <device> [id]` - Reset energy counters
-  - Service method exists: `svc.ResetEMCounters()` (EM only, not EM1!)
+  - Fully implemented in `internal/cmd/energy/status/status.go` with auto-detection
+  - Supports both EM (3-phase) and EM1 (single-phase) components
+- [x] `shelly energy history <device> [id]` - Energy history (aliases: hist, events)
+  - Flags: `--period` (hour, day, week, month), `--from`, `--to` (date range), `--limit`
+  - Auto-detects EM vs EM1 component type
+  - Calculates total kWh consumption from historical data
+  - Comprehensive tests for time parsing and energy calculations
+  - **Implementation:** Uses EMData/EM1Data components from shelly-go v0.1.5
+- [x] `shelly energy export <device> [id]` - Export energy data (aliases: exp, dump)
+  - Flags: `--format` (csv, json, yaml), `--output`, `--period`, `--from`, `--to`
+  - Supports structured export (JSON/YAML) and CSV via HTTP endpoints
+  - **Implementation:** Service methods with CSV URL generation (optimized to avoid unnecessary connections)
+- [x] `shelly energy reset <device> [id]` - Reset energy counters
+  - Fully implemented in `internal/cmd/energy/reset/reset.go`
+  - Supports both EM and EM1 components with confirmation prompt
 
 ### 11.3 Power Monitoring (PM/PM1 Components)
 - [ ] `shelly power list <device>` - List power meters (PM components)

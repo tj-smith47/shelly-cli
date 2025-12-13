@@ -1,3 +1,6 @@
+# Agents
+.claude/
+
 # Binaries
 /shelly
 *.exe
@@ -47,3 +50,4 @@ dist/
 # Temporary files
 tmp/
 temp/
+
