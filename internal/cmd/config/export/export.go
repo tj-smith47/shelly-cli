@@ -8,10 +8,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"gopkg.in/yaml.v3"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var formatFlag string
@@ -49,12 +49,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Getting configuration...")
-	spin.Start()
+	ios.StartProgress("Getting configuration...")
 
 	config, err := svc.GetConfig(ctx, device)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to get configuration: %w", err)
@@ -79,7 +79,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		if err := os.WriteFile(filePath, data, 0o644); err != nil { //nolint:gosec // G306: 0o644 is acceptable for config exports
 			return fmt.Errorf("failed to write file: %w", err)
 		}
-		iostreams.Success("Configuration exported to %s", filePath)
+		ios.Success("Configuration exported to %s", filePath)
 	}
 
 	return nil

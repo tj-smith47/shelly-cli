@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
-
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the config get command.
@@ -61,12 +61,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Getting configuration...")
-	spin.Start()
+	ios.StartProgress("Getting configuration...")
 
 	config, err := svc.GetConfig(ctx, device)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to get configuration: %w", err)
@@ -96,20 +96,21 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 
 // printConfigTable prints configuration as a formatted table.
 func printConfigTable(config any) error {
+	ios := iostreams.System()
 	configMap, ok := config.(map[string]any)
 	if !ok {
 		return output.PrintJSON(config)
 	}
 
 	for component, cfg := range configMap {
-		iostreams.Title("%s", component)
+		ios.Title("%s", component)
 
 		cfgMap, ok := cfg.(map[string]any)
 		if !ok {
 			// If it's not a map, just print it as JSON
 			data, err := json.MarshalIndent(cfg, "", "  ")
 			if err != nil {
-				iostreams.DebugErr("marshaling config component", err)
+				ios.DebugErr("marshaling config component", err)
 			} else {
 				fmt.Println(string(data))
 			}
@@ -119,7 +120,7 @@ func printConfigTable(config any) error {
 
 		table := output.NewTable("Setting", "Value")
 		for key, value := range cfgMap {
-			table.AddRow(key, formatValue(value))
+			table.AddRow(key, formatValue(value, ios))
 		}
 		table.Print()
 		fmt.Println()
@@ -129,7 +130,7 @@ func printConfigTable(config any) error {
 }
 
 // formatValue formats a configuration value for display.
-func formatValue(v any) string {
+func formatValue(v any, ios *iostreams.IOStreams) string {
 	switch val := v.(type) {
 	case nil:
 		return "<not set>"
@@ -152,7 +153,7 @@ func formatValue(v any) string {
 	case map[string]any, []any:
 		data, err := json.Marshal(val)
 		if err != nil {
-			iostreams.DebugErr("marshaling config value", err)
+			ios.DebugErr("marshaling config value", err)
 			return fmt.Sprintf("%v", val)
 		}
 		return string(data)

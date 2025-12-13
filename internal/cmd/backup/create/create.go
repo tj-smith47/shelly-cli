@@ -9,10 +9,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -74,6 +75,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	defer cancel()
 
 	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	opts := shelly.BackupOptions{
 		SkipScripts:   skipScriptsFlag,
@@ -82,12 +84,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		Password:      encryptFlag,
 	}
 
-	spin := iostreams.NewSpinner("Creating backup...")
-	spin.Start()
+	ios.StartProgress("Creating backup...")
 
-	svc := f.ShellyService()
 	backup, err := svc.CreateBackup(ctx, device, opts)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)

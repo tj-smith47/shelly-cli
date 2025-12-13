@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -39,17 +38,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, coverID int) er
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Starting calibration...")
-	spin.Start()
+	ios.StartProgress("Starting calibration...")
 
 	err := svc.CoverCalibrate(ctx, device, coverID)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to start calibration: %w", err)
 	}
 
-	iostreams.Success("Cover %d calibration started", coverID)
+	ios.Success("Cover %d calibration started", coverID)
 	return nil
 }

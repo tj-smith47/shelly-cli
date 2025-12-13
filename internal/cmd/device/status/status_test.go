@@ -1,8 +1,9 @@
 package status
 
 import (
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"testing"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 func TestNewCommand(t *testing.T) {

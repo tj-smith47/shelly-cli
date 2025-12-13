@@ -52,29 +52,30 @@ Examples:
 }
 
 func run(timeout time.Duration, register, skipExisting bool) error {
+	ios := iostreams.System()
+
 	if timeout == 0 {
 		timeout = DefaultTimeout
 	}
 
-	spin := iostreams.NewSpinner("Discovering devices via CoIoT...")
-	spin.Start()
+	ios.StartProgress("Discovering devices via CoIoT...")
 
 	coiotDiscoverer := discovery.NewCoIoTDiscoverer()
 	defer func() {
 		if err := coiotDiscoverer.Stop(); err != nil {
-			iostreams.DebugErr("stopping CoIoT discoverer", err)
+			ios.DebugErr("stopping CoIoT discoverer", err)
 		}
 	}()
 
 	devices, err := coiotDiscoverer.Discover(timeout)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return err
 	}
 
 	if len(devices) == 0 {
-		iostreams.NoResults("devices", "CoIoT works best with Gen1 devices. Try 'shelly discover mdns' for Gen2+")
+		ios.NoResults("devices", "CoIoT works best with Gen1 devices. Try 'shelly discover mdns' for Gen2+")
 		return nil
 	}
 
@@ -83,9 +84,9 @@ func run(timeout time.Duration, register, skipExisting bool) error {
 	if register {
 		added, err := helpers.RegisterDiscoveredDevices(devices, skipExisting)
 		if err != nil {
-			iostreams.Warning("Registration error: %v", err)
+			ios.Warning("Registration error: %v", err)
 		}
-		iostreams.Added("device", added)
+		ios.Added("device", added)
 	}
 
 	return nil

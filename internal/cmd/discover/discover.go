@@ -72,29 +72,30 @@ Examples:
 
 // runDiscover runs mDNS discovery as the default discovery method.
 func runDiscover(timeout time.Duration, register, skipExisting bool) error {
+	ios := iostreams.System()
+
 	if timeout == 0 {
 		timeout = DefaultTimeout
 	}
 
-	spin := iostreams.NewSpinner("Discovering devices via mDNS...")
-	spin.Start()
+	ios.StartProgress("Discovering devices via mDNS...")
 
 	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
 	defer func() {
 		if err := mdnsDiscoverer.Stop(); err != nil {
-			iostreams.DebugErr("stopping mDNS discoverer", err)
+			ios.DebugErr("stopping mDNS discoverer", err)
 		}
 	}()
 
 	devices, err := mdnsDiscoverer.Discover(timeout)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return err
 	}
 
 	if len(devices) == 0 {
-		iostreams.NoResults("devices", "Ensure devices are powered on and on the same network")
+		ios.NoResults("devices", "Ensure devices are powered on and on the same network")
 		return nil
 	}
 
@@ -103,9 +104,9 @@ func runDiscover(timeout time.Duration, register, skipExisting bool) error {
 	if register {
 		added, err := helpers.RegisterDiscoveredDevices(devices, skipExisting)
 		if err != nil {
-			iostreams.Warning("Registration error: %v", err)
+			ios.Warning("Registration error: %v", err)
 		}
-		iostreams.Added("device", added)
+		ios.Added("device", added)
 	}
 
 	return nil

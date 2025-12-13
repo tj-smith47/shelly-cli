@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// DefaultTheme is the default color theme for the CLI.
 const DefaultTheme = "dracula"
 
 var (

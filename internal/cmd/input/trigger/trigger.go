@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -50,17 +49,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, inputID int, ev
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Triggering input event...")
-	spin.Start()
+	ios.StartProgress("Triggering input event...")
 
 	err := svc.InputTrigger(ctx, device, inputID, event)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to trigger input event: %w", err)
 	}
 
-	iostreams.Success("Input %d triggered with event %q", inputID, event)
+	ios.Success("Input %d triggered with event %q", inputID, event)
 	return nil
 }

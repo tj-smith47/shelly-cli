@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -102,12 +103,11 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		return nil
 	}
 
-	spin := iostreams.NewSpinner("Restoring backup...")
-	spin.Start()
+	ios.StartProgress("Restoring backup...")
 
 	svc := f.ShellyService()
 	result, err := svc.RestoreBackup(ctx, device, backup, opts)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to restore backup: %w", err)

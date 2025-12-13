@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -49,6 +49,8 @@ Note: This does not perform a full factory reset. For that, use:
 }
 
 func run(f *cmdutil.Factory, ctx context.Context, device, component string) error {
+	ios := f.IOStreams()
+
 	if component == "" {
 		// Show available components
 		return showComponents(f, ctx, device)
@@ -56,7 +58,7 @@ func run(f *cmdutil.Factory, ctx context.Context, device, component string) erro
 
 	// Confirm reset
 	if !yesFlag {
-		confirmed, err := iostreams.Confirm(
+		confirmed, err := ios.Confirm(
 			fmt.Sprintf("Reset %s configuration on %s to defaults?", component, device),
 			false,
 		)
@@ -64,7 +66,7 @@ func run(f *cmdutil.Factory, ctx context.Context, device, component string) erro
 			return err
 		}
 		if !confirmed {
-			iostreams.Warning("Reset cancelled")
+			ios.Warning("Reset cancelled")
 			return nil
 		}
 	}
@@ -74,20 +76,19 @@ func run(f *cmdutil.Factory, ctx context.Context, device, component string) erro
 
 	svc := f.ShellyService()
 
-	spin := iostreams.NewSpinner("Resetting configuration...")
-	spin.Start()
+	ios.StartProgress("Resetting configuration...")
 
 	// Reset by setting config to empty/defaults
 	// Note: The actual reset behavior depends on the component type
 	// For now, we use a raw RPC call if available, or set to empty config
 	err := resetComponent(ctx, svc, device, component)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to reset configuration: %w", err)
 	}
 
-	iostreams.Success("Configuration reset for %s on %s", component, device)
+	ios.Success("Configuration reset for %s on %s", component, device)
 	return nil
 }
 
@@ -97,18 +98,18 @@ func showComponents(f *cmdutil.Factory, ctx context.Context, device string) erro
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Getting device components...")
-	spin.Start()
+	ios.StartProgress("Getting device components...")
 
 	config, err := svc.GetConfig(ctx, device)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to get device configuration: %w", err)
 	}
 
-	iostreams.Title("Available components")
+	ios.Title("Available components")
 	fmt.Println("Specify a component to reset its configuration:")
 	fmt.Println()
 

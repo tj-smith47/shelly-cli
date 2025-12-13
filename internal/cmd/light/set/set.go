@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -45,9 +44,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, lightID, bright
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Setting light parameters...")
-	spin.Start()
+	ios.StartProgress("Setting light parameters...")
 
 	var brightnessPtr *int
 	if brightness >= 0 && brightness <= 100 {
@@ -60,12 +59,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, lightID, bright
 	}
 
 	err := svc.LightSet(ctx, device, lightID, brightnessPtr, onPtr)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to set light parameters: %w", err)
 	}
 
-	iostreams.Success("Light %d parameters set", lightID)
+	ios.Success("Light %d parameters set", lightID)
 	return nil
 }

@@ -67,12 +67,12 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 		timeout = DefaultTimeout
 	}
 
-	spin := iostreams.NewSpinner("Discovering devices via BLE...")
-	spin.Start()
+	ios := f.IOStreams()
+	ios.StartProgress("Discovering devices via BLE...")
 
 	bleDiscoverer, err := discovery.NewBLEDiscoverer()
 	if err != nil {
-		spin.Stop()
+		ios.StopProgress()
 		if isBLENotSupportedError(err) {
 			iostreams.Error("BLE discovery is not available on this system")
 			iostreams.Hint("Ensure you have a Bluetooth adapter and it is enabled")
@@ -97,7 +97,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	defer cancel()
 
 	devices, err := bleDiscoverer.DiscoverWithContext(ctx)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("BLE discovery failed: %w", err)

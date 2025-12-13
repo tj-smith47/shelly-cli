@@ -10,8 +10,8 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -53,12 +53,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Getting device configuration...")
-	spin.Start()
+	ios.StartProgress("Getting device configuration...")
 
 	deviceConfig, err := svc.GetConfig(ctx, device)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to get device configuration: %w", err)
@@ -68,11 +68,11 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	diffs := compareConfigs("", deviceConfig, fileConfig)
 
 	if len(diffs) == 0 {
-		iostreams.Success("Configurations are identical")
+		ios.Success("Configurations are identical")
 		return nil
 	}
 
-	iostreams.Title("Configuration differences")
+	ios.Title("Configuration differences")
 	fmt.Printf("Comparing device %s with file %s\n\n", device, filePath)
 
 	for _, d := range diffs {
@@ -152,7 +152,6 @@ func formatValue(v any) string {
 	case map[string]any, []any:
 		data, err := json.Marshal(val)
 		if err != nil {
-			iostreams.DebugErr("marshaling config value", err)
 			return fmt.Sprintf("%v", val)
 		}
 		return string(data)

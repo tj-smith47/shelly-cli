@@ -3,6 +3,7 @@
 package cmdutil
 
 import (
+	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -21,10 +22,14 @@ type Factory struct {
 	// ShellyService provides the business logic service for device operations.
 	ShellyService func() *shelly.Service
 
+	// Browser provides the ability to open URLs in the default web browser.
+	Browser func() browser.Browser
+
 	// Cached instances - set after first call to avoid re-initialization.
 	ioStreams     *iostreams.IOStreams
 	cfg           *config.Config
 	shellyService *shelly.Service
+	browserInst   browser.Browser
 }
 
 // NewFactory creates a Factory with production dependencies.
@@ -55,6 +60,13 @@ func NewFactory() *Factory {
 			f.shellyService = shelly.NewService()
 		}
 		return f.shellyService
+	}
+
+	f.Browser = func() browser.Browser {
+		if f.browserInst == nil {
+			f.browserInst = browser.New()
+		}
+		return f.browserInst
 	}
 
 	return f
@@ -109,6 +121,20 @@ func (f *Factory) SetShellyService(svc *shelly.Service) *Factory {
 			return f.shellyService
 		}
 		return origService()
+	}
+	return f
+}
+
+// SetBrowser sets a custom browser instance on an existing factory.
+// This modifies the factory in-place and returns it for chaining.
+func (f *Factory) SetBrowser(b browser.Browser) *Factory {
+	f.browserInst = b
+	origBrowser := f.Browser
+	f.Browser = func() browser.Browser {
+		if f.browserInst != nil {
+			return f.browserInst
+		}
+		return origBrowser()
 	}
 	return f
 }

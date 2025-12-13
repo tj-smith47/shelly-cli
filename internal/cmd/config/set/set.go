@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -45,6 +45,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyV
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
 	// Parse key=value pairs
 	config := make(map[string]any)
@@ -58,17 +59,16 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyV
 		config[key] = value
 	}
 
-	spin := iostreams.NewSpinner("Setting configuration...")
-	spin.Start()
+	ios.StartProgress("Setting configuration...")
 
 	err := svc.SetComponentConfig(ctx, device, component, config)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to set configuration: %w", err)
 	}
 
-	iostreams.Success("Configuration updated for %s on %s", component, device)
+	ios.Success("Configuration updated for %s on %s", component, device)
 	return nil
 }
 

@@ -76,14 +76,13 @@ func run(ctx context.Context, source, target string) error {
 	}
 
 	// Perform migration
-	spin := iostreams.NewSpinner("Migrating configuration...")
-	spin.Start()
+	ios.StartProgress("Migrating configuration...")
 
 	opts := shelly.RestoreOptions{
 		SkipNetwork: true, // Always skip network to prevent disconnection
 	}
 	result, err := svc.RestoreBackup(ctx, target, backup, opts)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("migration failed: %w", err)
@@ -129,10 +128,10 @@ func loadFromFile(source string) (*shelly.DeviceBackup, string, error) {
 }
 
 func loadFromDevice(ctx context.Context, svc *shelly.Service, source string) (*shelly.DeviceBackup, string, error) {
-	spin := iostreams.NewSpinner("Reading source device...")
-	spin.Start()
+	ios := iostreams.System()
+	ios.StartProgress("Reading source device...")
 	backup, err := svc.CreateBackup(ctx, source, shelly.BackupOptions{})
-	spin.Stop()
+	ios.StopProgress()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read source device: %w", err)
 	}

@@ -10,10 +10,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"gopkg.in/yaml.v3"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var (
@@ -72,35 +72,34 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
 	if dryRunFlag {
 		// Get current config and show diff
-		spin := iostreams.NewSpinner("Getting current configuration...")
-		spin.Start()
+		ios.StartProgress("Getting current configuration...")
 
 		currentConfig, err := svc.GetConfig(ctx, device)
-		spin.Stop()
+		ios.StopProgress()
 
 		if err != nil {
 			return fmt.Errorf("failed to get current configuration: %w", err)
 		}
 
-		iostreams.Title("Dry run - changes that would be applied")
+		ios.Title("Dry run - changes that would be applied")
 		showDiff(currentConfig, config)
 		return nil
 	}
 
-	spin := iostreams.NewSpinner("Importing configuration...")
-	spin.Start()
+	ios.StartProgress("Importing configuration...")
 
 	err = svc.SetConfig(ctx, device, config)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to import configuration: %w", err)
 	}
 
-	iostreams.Success("Configuration imported to %s", device)
+	ios.Success("Configuration imported to %s", device)
 	return nil
 }
 
@@ -130,7 +129,6 @@ func formatValue(v any) string {
 	case map[string]any, []any:
 		data, err := json.Marshal(val)
 		if err != nil {
-			iostreams.DebugErr("marshaling config value", err)
 			return fmt.Sprintf("%v", val)
 		}
 		s := string(data)
@@ -147,12 +145,7 @@ func formatValue(v any) string {
 func deepEqual(a, b any) bool {
 	aJSON, aErr := json.Marshal(a)
 	bJSON, bErr := json.Marshal(b)
-	if aErr != nil {
-		iostreams.DebugErr("marshaling value for comparison", aErr)
-		return false
-	}
-	if bErr != nil {
-		iostreams.DebugErr("marshaling value for comparison", bErr)
+	if aErr != nil || bErr != nil {
 		return false
 	}
 	return bytes.Equal(aJSON, bJSON)

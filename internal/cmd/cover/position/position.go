@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -52,17 +51,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, coverID, positi
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner(fmt.Sprintf("Setting cover to %d%%...", position))
-	spin.Start()
+	ios.StartProgress(fmt.Sprintf("Setting cover to %d%%...", position))
 
 	err := svc.CoverPosition(ctx, device, coverID, position)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to set cover position: %w", err)
 	}
 
-	iostreams.Success("Cover %d set to %d%%", coverID, position)
+	ios.Success("Cover %d set to %d%%", coverID, position)
 	return nil
 }

@@ -3,11 +3,11 @@ package auth
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/disable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/status"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the auth command and its subcommands.

@@ -2,6 +2,7 @@ package cmdutil_test
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -27,6 +28,9 @@ func TestNew(t *testing.T) {
 	}
 	if f.ShellyService == nil {
 		t.Error("ShellyService function is nil")
+	}
+	if f.Browser == nil {
+		t.Error("Browser function is nil")
 	}
 }
 
@@ -264,4 +268,53 @@ func TestFactory_SetShellyService_OverridesOriginal(t *testing.T) {
 	if gotSvc != svc2 {
 		t.Error("SetShellyService should override previous service")
 	}
+}
+
+func TestFactory_Browser_LazyInit(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// First call should initialize
+	browser1 := f.Browser()
+	if browser1 == nil {
+		t.Fatal("Browser() returned nil")
+	}
+
+	// Second call should return same instance
+	browser2 := f.Browser()
+	if browser1 != browser2 {
+		t.Error("Browser() should return cached instance")
+	}
+}
+
+func TestFactory_SetBrowser(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Create mock browser
+	mockBrowser := &mockBrowser{}
+
+	// Set custom browser
+	result := f.SetBrowser(mockBrowser)
+	if result != f {
+		t.Error("SetBrowser should return factory for chaining")
+	}
+
+	// Should return the custom browser
+	gotBrowser := f.Browser()
+	if gotBrowser != mockBrowser {
+		t.Error("SetBrowser should set the browser")
+	}
+}
+
+// mockBrowser is a mock implementation of browser.Browser for testing.
+type mockBrowser struct {
+	browsedURLs []string
+}
+
+func (m *mockBrowser) Browse(ctx context.Context, url string) error {
+	m.browsedURLs = append(m.browsedURLs, url)
+	return nil
 }

@@ -3,11 +3,11 @@ package list
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 

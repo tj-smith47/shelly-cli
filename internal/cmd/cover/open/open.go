@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -38,9 +37,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, coverID, durati
 	defer cancel()
 
 	svc := f.ShellyService()
+	ios := f.IOStreams()
 
-	spin := iostreams.NewSpinner("Opening cover...")
-	spin.Start()
+	ios.StartProgress("Opening cover...")
 
 	var dur *int
 	if duration > 0 {
@@ -48,12 +47,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, coverID, durati
 	}
 
 	err := svc.CoverOpen(ctx, device, coverID, dur)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to open cover: %w", err)
 	}
 
-	iostreams.Success("Cover %d opening", coverID)
+	ios.Success("Cover %d opening", coverID)
 	return nil
 }

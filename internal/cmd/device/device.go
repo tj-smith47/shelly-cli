@@ -3,7 +3,6 @@ package device
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/factoryreset"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/info"
@@ -11,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/ping"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/reboot"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/status"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
 // NewCommand creates the device command group.
