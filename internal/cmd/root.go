@@ -57,6 +57,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/interactive"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/shellcmd"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
@@ -329,6 +331,8 @@ func init() {
 	addCommandWithGroup(rootCmd, dash.NewCommand(f), groupMonitoring)
 
 	// Utility commands - CLI utilities
+	addCommandWithGroup(rootCmd, interactive.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, shellcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, initcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, exportcmd.NewCommand(f), groupUtility)
