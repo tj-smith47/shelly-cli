@@ -1537,44 +1537,49 @@ shelly-cli/
 
 ---
 
-## Phase 24: Sensor Commands
+## Phase 24: Sensor Commands ✅
 
 > **Note:** Covers environmental sensors available in shelly-go `gen2/components/`.
 
-### 24.1 Temperature Sensor
-- [ ] `shelly sensor temperature list <device>` - List temperature sensors
-- [ ] `shelly sensor temperature status <device> [id]` - Current temperature
-- [ ] `shelly sensor temperature history <device> [id]` - Temperature history
-  - Flags: `--period`, `--format`
+### 24.1 Temperature Sensor ✅
+- [x] `shelly sensor temperature list <device>` - List temperature sensors
+- [x] `shelly sensor temperature status <device> [id]` - Current temperature
+- [ ] ~~`shelly sensor temperature history <device> [id]` - Temperature history~~ **SKIPPED** - No historical data API exists for sensors (unlike EMData for energy meters)
 
-### 24.2 Humidity Sensor
-- [ ] `shelly sensor humidity list <device>` - List humidity sensors
-- [ ] `shelly sensor humidity status <device> [id]` - Current humidity
+### 24.2 Humidity Sensor ✅
+- [x] `shelly sensor humidity list <device>` - List humidity sensors
+- [x] `shelly sensor humidity status <device> [id]` - Current humidity
 
-### 24.3 Flood Sensor
-- [ ] `shelly sensor flood list <device>` - List flood sensors
-- [ ] `shelly sensor flood status <device> [id]` - Flood detection status
-- [ ] `shelly sensor flood test <device> [id]` - Test flood alarm
+### 24.3 Flood Sensor ✅
+- [x] `shelly sensor flood list <device>` - List flood sensors
+- [x] `shelly sensor flood status <device> [id]` - Flood detection status
+- [x] `shelly sensor flood test <device> [id]` - Test flood alarm (provides guidance, no API method)
 
-### 24.4 Smoke Sensor
-- [ ] `shelly sensor smoke list <device>` - List smoke sensors
-- [ ] `shelly sensor smoke status <device> [id]` - Smoke detection status
-- [ ] `shelly sensor smoke test <device> [id]` - Test smoke alarm
-- [ ] `shelly sensor smoke mute <device> [id]` - Mute alarm
+### 24.4 Smoke Sensor ✅
+- [x] `shelly sensor smoke list <device>` - List smoke sensors
+- [x] `shelly sensor smoke status <device> [id]` - Smoke detection status
+- [x] `shelly sensor smoke test <device> [id]` - Test smoke alarm (provides guidance, no API method)
+- [x] `shelly sensor smoke mute <device> [id]` - Mute alarm
 
-### 24.5 Illuminance Sensor
-- [ ] `shelly sensor illuminance list <device>` - List illuminance sensors
-- [ ] `shelly sensor illuminance status <device> [id]` - Current light level
+### 24.5 Illuminance Sensor ✅
+- [x] `shelly sensor illuminance list <device>` - List illuminance sensors
+- [x] `shelly sensor illuminance status <device> [id]` - Current light level (with human-readable descriptions)
 
-### 24.6 Voltmeter
-- [ ] `shelly sensor voltmeter list <device>` - List voltmeters
-- [ ] `shelly sensor voltmeter status <device> [id]` - Current voltage reading
+### 24.6 Voltmeter ✅
+- [x] `shelly sensor voltmeter list <device>` - List voltmeters
+- [x] `shelly sensor voltmeter status <device> [id]` - Current voltage reading
 
-### 24.7 Combined Sensor Status
-- [ ] `shelly sensor status <device>` - All sensor readings in one view
-- [ ] `shelly sensor monitor <device>` - Real-time sensor monitoring
-  - Updates via WebSocket
-  - TUI display with graphs
+### 24.7 Combined Sensor Status ✅
+- [x] `shelly sensor status <device>` - All sensor readings in one view
+- [ ] ~~`shelly sensor monitor <device>` - Real-time sensor monitoring~~ **DEFERRED** - WebSocket TUI monitoring requires Phase 29 TUI improvements
+
+**Code Audit Notes (Phase 24):**
+- Factory pattern with `*cmdutil.Factory`
+- IOStreams via `f.IOStreams()` methods
+- JSON marshal/unmarshal pattern for API responses
+- Component key prefix parsing from `Shelly.GetStatus` response
+- Helper functions for display to reduce cyclomatic complexity
+- Test commands provide guidance when no API method exists
 
 ---
 

@@ -59,6 +59,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/shellcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/statuscmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
@@ -338,6 +339,7 @@ func init() {
 	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)
 	addCommandWithGroup(rootCmd, energy.NewCommand(f), groupMonitoring)
 	addCommandWithGroup(rootCmd, power.NewCommand(f), groupMonitoring)
+	addCommandWithGroup(rootCmd, sensor.NewCommand(f), groupMonitoring)
 	addCommandWithGroup(rootCmd, metrics.NewCommand(f), groupMonitoring)
 	addCommandWithGroup(rootCmd, dash.NewCommand(f), groupMonitoring)
 
