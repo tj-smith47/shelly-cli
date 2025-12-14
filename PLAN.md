@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 20.3 - Debug Commands | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 21 - BTHome/Zigbee/LoRa Commands | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -1362,12 +1362,34 @@ shelly-cli/
 - **Recommended refactor:** Extract shared `ComponentController` helper to `internal/control/` package
 - Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
 
-### 20.3 Debug Commands
-- [ ] `shelly debug log <device>` - Get device debug log (Gen1)
-- [ ] `shelly debug rpc <device> <method> [params]` - Raw RPC call
-- [ ] `shelly debug coiot <device>` - Show CoIoT status
-- [ ] `shelly debug websocket <device>` - WebSocket debug connection
-- [ ] `shelly debug methods <device>` - List available RPC methods
+### 20.3 Debug Commands ✅ Complete
+- [x] `shelly debug log <device>` - Get device debug log (Gen1)
+  - Aliases: logs, debug-log
+  - Shows workaround instructions for Gen1 devices (curl http://<ip>/debug/log)
+  - Gen2+ redirected to debug rpc commands
+- [x] `shelly debug rpc <device> <method> [params]` - Raw RPC call
+  - Aliases: call, invoke
+  - Flags: --raw (unformatted output)
+  - Accepts JSON params as third argument
+- [x] `shelly debug coiot <device>` - Show CoIoT status
+  - Aliases: coap
+  - Flags: --json
+  - Extracts coiot/device/sys sections from Sys.GetConfig
+- [x] `shelly debug websocket <device>` - WebSocket debug connection
+  - Aliases: ws, events
+  - Shows Ws.GetConfig and Ws.GetStatus (Gen2+)
+  - Falls back to Sys.GetConfig for ws section
+- [x] `shelly debug methods <device>` - List available RPC methods
+  - Aliases: list-methods, lm
+  - Flags: --filter (filter by name), --json
+  - Groups methods by namespace
+
+**Code Audit Notes (Phase 20.3):**
+- JSON printing pattern (`json.MarshalIndent` + print) appears in rpc.go, methods.go, coiot.go, websocket.go
+- websocket.go extracts `printJSONResult` helper; similar pattern could be shared across debug commands
+- Sys.GetConfig section extraction appears in both coiot.go and websocket.go (fallback)
+- **Recommended refactor:** Extract shared `debugutil` package with `PrintJSON()` and `ExtractConfigSection()` helpers
+- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
 
 ---
 

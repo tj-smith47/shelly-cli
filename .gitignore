@@ -41,8 +41,8 @@ Thumbs.db
 # Local config (user-specific, not for repo)
 .shelly.y*l
 
-# Debug
-debug
+# Debug output (root level only, not internal/cmd/debug/)
+/debug
 *.log
 
 # GoReleaser

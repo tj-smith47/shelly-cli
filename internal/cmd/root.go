@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
@@ -26,6 +27,7 @@ import (
 	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/dash"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/debug"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
@@ -36,6 +38,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	initcmd "github.com/tj-smith47/shelly-cli/internal/cmd/init"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/interactive"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
@@ -45,21 +48,19 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/on"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rebootcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/resetcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/shellcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/statuscmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/togglecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/interactive"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/shellcmd"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/togglecmd"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
@@ -333,6 +334,7 @@ func init() {
 	// Utility commands - CLI utilities
 	addCommandWithGroup(rootCmd, interactive.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, shellcmd.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, debug.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, initcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, exportcmd.NewCommand(f), groupUtility)
