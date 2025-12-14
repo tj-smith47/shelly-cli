@@ -23,8 +23,9 @@ var (
 // NewCommand creates the migrate command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "migrate <source> <target>",
-		Short: "Migrate configuration between devices",
+		Use:     "migrate <source> <target>",
+		Aliases: []string{"mig"},
+		Short:   "Migrate configuration between devices",
 		Long: `Migrate configuration from a source device or backup file to a target device.
 
 Source can be a device name/address or a backup file path.

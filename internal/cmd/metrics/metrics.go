@@ -24,6 +24,14 @@ Supports multiple output formats for integration with monitoring systems:
 
 All formats export: power, voltage, current, energy, temperature, and device status.`,
 		Aliases: []string{"metric", "export-metrics"},
+		Example: `  # Start Prometheus exporter
+  shelly metrics prometheus --devices kitchen,bedroom
+
+  # Export metrics as JSON
+  shelly metric json kitchen
+
+  # Export in InfluxDB line protocol
+  shelly metrics influxdb kitchen`,
 	}
 
 	cmd.AddCommand(prometheus.NewCommand(f))

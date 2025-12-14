@@ -17,9 +17,15 @@ import (
 // NewCommand creates the input list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "list <device>",
-		Short:             "List input components",
-		Long:              `List all input components on a Shelly device with their current state.`,
+		Use:     "list <device>",
+		Aliases: []string{"ls"},
+		Short:   "List input components",
+		Long:    `List all input components on a Shelly device with their current state.`,
+		Example: `  # List all inputs on a device
+  shelly input list living-room
+
+  # Output as JSON for scripting
+  shelly input list living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -14,8 +14,9 @@ import (
 // NewCommand creates the wifi status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <device>",
-		Short: "Show WiFi status",
+		Use:     "status <device>",
+		Aliases: []string{"st"},
+		Short:   "Show WiFi status",
 		Long: `Show the current WiFi status for a device.
 
 Displays connection status, IP address, SSID, signal strength (RSSI),

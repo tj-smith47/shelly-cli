@@ -28,8 +28,9 @@ var (
 // NewCommand creates the backup export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "export <directory>",
-		Short: "Export backups for all registered devices",
+		Use:     "export <directory>",
+		Aliases: []string{"save", "dump"},
+		Short:   "Export backups for all registered devices",
 		Long: `Export backup files for all registered devices to a directory.
 
 Creates one backup file per device, named by device ID.

@@ -17,9 +17,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var duration int
 
 	cmd := &cobra.Command{
-		Use:               "close <device>",
-		Short:             "Close cover",
-		Long:              `Close a cover/roller component on the specified device.`,
+		Use:     "close <device>",
+		Aliases: []string{"down", "lower"},
+		Short:   "Close cover",
+		Long:    `Close a cover/roller component on the specified device.`,
+		Example: `  # Close cover fully
+  shelly cover close bedroom
+
+  # Close cover for 5 seconds
+  shelly cover down bedroom --duration 5`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

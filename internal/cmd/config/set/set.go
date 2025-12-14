@@ -15,8 +15,9 @@ import (
 // NewCommand creates the config set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <device> <component> <key>=<value>...",
-		Short: "Set device configuration",
+		Use:     "set <device> <component> <key>=<value>...",
+		Aliases: []string{"write", "update"},
+		Short:   "Set device configuration",
 		Long: `Set configuration values for a device component.
 
 Specify key=value pairs to update. Only the specified keys will be modified.`,

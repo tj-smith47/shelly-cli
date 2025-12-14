@@ -14,8 +14,9 @@ import (
 // NewCommand creates the ethernet status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <device>",
-		Short: "Show Ethernet status",
+		Use:     "status <device>",
+		Aliases: []string{"st"},
+		Short:   "Show Ethernet status",
 		Long: `Show the current Ethernet status for a device.
 
 Displays connection status and IP address. Only available on Pro devices

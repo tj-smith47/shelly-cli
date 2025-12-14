@@ -26,8 +26,9 @@ var (
 // NewCommand creates the config import command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "import <device> <file>",
-		Short: "Import configuration from a file",
+		Use:     "import <device> <file>",
+		Aliases: []string{"restore", "load"},
+		Short:   "Import configuration from a file",
 		Long: `Import device configuration from a JSON or YAML file.
 
 By default, only specified keys are updated (merge mode). Use --overwrite

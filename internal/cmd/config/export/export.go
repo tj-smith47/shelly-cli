@@ -19,8 +19,9 @@ var formatFlag string
 // NewCommand creates the config export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "export <device> <file>",
-		Short: "Export device configuration to a file",
+		Use:     "export <device> <file>",
+		Aliases: []string{"backup", "save"},
+		Short:   "Export device configuration to a file",
 		Long: `Export the complete device configuration to a file.
 
 The configuration is saved in JSON format by default. Use --format=yaml

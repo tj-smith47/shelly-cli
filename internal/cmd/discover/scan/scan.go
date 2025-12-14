@@ -25,23 +25,25 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var timeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:   "scan [subnet]",
-		Short: "Scan subnet for devices",
+		Use:     "scan [subnet]",
+		Aliases: []string{"search", "probe"},
+		Short:   "Scan subnet for devices",
 		Long: `Scan a network subnet for Shelly devices by probing HTTP endpoints.
 
 If no subnet is provided, attempts to detect the local network.
 This method is slower than mDNS or CoIoT but works when multicast
-is blocked or devices are on different VLANs.
-
-Examples:
-  # Scan default network
+is blocked or devices are on different VLANs.`,
+		Example: `  # Scan default network
   shelly discover scan
 
   # Scan specific subnet
   shelly discover scan 192.168.1.0/24
 
   # Auto-register discovered devices
-  shelly discover scan --register`,
+  shelly discover scan --register
+
+  # Scan with custom timeout
+  shelly discover scan --timeout 5m`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			subnet := ""

@@ -386,6 +386,7 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 	}
 
 	viper.SetEnvPrefix("SHELLY")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -400,10 +401,11 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Initialize theme
-	themeName := viper.GetString("theme")
-	if themeName != "" {
-		theme.SetTheme(themeName)
+	// Initialize theme from config (supports name, colors, and file)
+	tc := config.Get().GetThemeConfig()
+	if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.File); err != nil {
+		// Log theme error but don't fail - use default theme
+		fmt.Fprintf(os.Stderr, "warning: %v, using default theme\n", err)
 	}
 
 	// Handle color settings

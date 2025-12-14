@@ -5,12 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/httputil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -63,7 +61,7 @@ Note: Gen2+ devices use webhooks instead. See 'shelly webhook' commands.`,
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
-	settings, err := fetchSettings(ctx, ios, opts.Device)
+	settings, err := httputil.FetchEndpoint(ctx, ios, opts.Device, "/settings")
 	if err != nil {
 		return err
 	}
@@ -80,61 +78,6 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	return displayActions(ios, actionsData, opts.Device)
-}
-
-func fetchSettings(ctx context.Context, ios *iostreams.IOStreams, device string) (map[string]any, error) {
-	devCfg, err := config.ResolveDevice(device)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve device: %w", err)
-	}
-
-	address := devCfg.Address
-	if address == "" {
-		return nil, fmt.Errorf("device %s has no address configured", device)
-	}
-
-	// Ensure http:// prefix
-	if len(address) < 7 || address[:7] != "http://" {
-		address = "http://" + address
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address+"/settings", http.NoBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	if devCfg.Auth != nil && devCfg.Auth.Username != "" {
-		req.SetBasicAuth(devCfg.Auth.Username, devCfg.Auth.Password)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			ios.Debug("failed to close response body: %v", closeErr)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("device returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var settings map[string]any
-	if err := json.Unmarshal(body, &settings); err != nil {
-		return nil, fmt.Errorf("failed to parse settings: %w", err)
-	}
-
-	return settings, nil
 }
 
 func collectActions(settings map[string]any) map[string]any {

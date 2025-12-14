@@ -10,12 +10,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
+
+// tfExtensions defines valid Terraform file extensions.
+var tfExtensions = []string{".tf"}
 
 // Options holds command options.
 type Options struct {
@@ -30,8 +31,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "terraform <devices...> [file]",
-		Short: "Export devices as Terraform configuration",
+		Use:     "terraform <devices...> [file]",
+		Aliases: []string{"tf"},
+		Short:   "Export devices as Terraform configuration",
 		Long: `Export devices as Terraform local values configuration.
 
 Creates a Terraform locals block with device information that can be
@@ -47,13 +49,7 @@ used as data source for infrastructure as code workflows.`,
 		Args:              cobra.MinimumNArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDevicesWithGroups(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check if last arg is a file
-			if len(args) > 1 && strings.HasSuffix(args[len(args)-1], ".tf") {
-				opts.File = args[len(args)-1]
-				opts.Devices = args[:len(args)-1]
-			} else {
-				opts.Devices = args
-			}
+			opts.Devices, opts.File = cmdutil.SplitDevicesAndFile(args, tfExtensions)
 			return run(cmd.Context(), opts)
 		},
 	}
@@ -112,43 +108,26 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("no devices specified")
 	}
 
-	// Collect device data
-	var tfDevices []Device
-
+	// Collect device data using shared helper
+	var deviceData []cmdutil.DeviceData
 	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching device data...", func(ctx context.Context) error {
-		for _, device := range devices {
-			var tfDev Device
-			tfDev.Name = normalizeResourceName(device)
-
-			// Get device config for address
-			deviceCfg, exists := config.GetDevice(device)
-			if exists {
-				tfDev.Address = deviceCfg.Address
-				tfDev.Model = deviceCfg.Model
-				tfDev.Generation = deviceCfg.Generation
-			}
-
-			err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
-				info := conn.Info()
-				tfDev.Model = info.Model
-				tfDev.Generation = info.Generation
-				tfDev.App = info.App
-				return nil
-			})
-
-			if err != nil {
-				// Use config data if device offline (already populated above)
-				if !exists {
-					continue
-				}
-			}
-
-			tfDevices = append(tfDevices, tfDev)
-		}
+		deviceData = cmdutil.CollectDeviceData(ctx, svc, devices)
 		return nil
 	})
 	if err != nil {
 		return err
+	}
+
+	// Convert to terraform Device format with normalized names
+	tfDevices := make([]Device, 0, len(deviceData))
+	for _, d := range deviceData {
+		tfDevices = append(tfDevices, Device{
+			Name:       normalizeResourceName(d.Name),
+			Address:    d.Address,
+			Model:      d.Model,
+			Generation: d.Generation,
+			App:        d.App,
+		})
 	}
 
 	// Generate Terraform config

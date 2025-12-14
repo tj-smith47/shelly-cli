@@ -28,8 +28,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "yaml <device> [file]",
-		Short: "Export device configuration as YAML",
+		Use:     "yaml <device> [file]",
+		Aliases: []string{"yml", "y"},
+		Short:   "Export device configuration as YAML",
 		Long: `Export a device's configuration and status as YAML.
 
 If no file is specified, outputs to stdout.
@@ -43,7 +44,7 @@ Use --full to include device status in addition to configuration.`,
   # Export with full status
   shelly export yaml living-room --full`,
 		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: completeDevice(),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenFile(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			if len(args) > 1 {
@@ -123,7 +124,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Output
 	if opts.File == "" {
-		ios.Printf("%s", string(data))
+		ios.Printf("%s\n", string(data))
 		return nil
 	}
 
@@ -133,22 +134,4 @@ func run(ctx context.Context, opts *Options) error {
 
 	ios.Success("Device %q exported to %s", opts.Device, opts.File)
 	return nil
-}
-
-// completeDevice provides completion for device argument.
-func completeDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			devices := config.ListDevices()
-			completions := make([]string, 0, len(devices))
-			for name := range devices {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		if len(args) == 1 {
-			return nil, cobra.ShellCompDirectiveDefault
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

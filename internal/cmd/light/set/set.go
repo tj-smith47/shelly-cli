@@ -20,12 +20,18 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "set <device>",
-		Short: "Set light parameters",
+		Use:     "set <device>",
+		Aliases: []string{"brightness", "br"},
+		Short:   "Set light parameters",
 		Long: `Set parameters of a light component on the specified device.
 
 You can set brightness and on/off state.
 Values not specified will be left unchanged.`,
+		Example: `  # Set brightness to 50%
+  shelly light set kitchen --brightness 50
+
+  # Turn on and set brightness
+  shelly light br kitchen -b 75 --on`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

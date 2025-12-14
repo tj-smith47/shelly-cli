@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -50,13 +51,17 @@ func newStatusCommand(f *cmdutil.Factory) *cobra.Command {
 func runRollerStatus(ctx context.Context, opts *StatusOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
-	roller := gen1Client.Roller(opts.ID)
+	roller, err := gen1Client.Roller(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	status, err := roller.GetStatus(ctx)
 	if err != nil {
 		return err

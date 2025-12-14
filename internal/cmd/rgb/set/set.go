@@ -23,12 +23,18 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "set <device>",
-		Short: "Set RGB parameters",
+		Use:     "set <device>",
+		Aliases: []string{"color", "c"},
+		Short:   "Set RGB parameters",
 		Long: `Set parameters of an RGB light component on the specified device.
 
 You can set color values (red, green, blue), brightness, and on/off state.
 Values not specified will be left unchanged.`,
+		Example: `  # Set RGB color to red
+  shelly rgb set living-room --red 255 --green 0 --blue 0
+
+  # Set RGB with brightness
+  shelly rgb color living-room -r 0 -g 255 -b 128 --brightness 75`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

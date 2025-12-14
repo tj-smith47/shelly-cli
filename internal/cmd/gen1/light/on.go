@@ -2,15 +2,12 @@ package light
 
 import (
 	"context"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // OnOptions holds on command options.
@@ -26,8 +23,9 @@ func newOnCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &OnOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "on <device>",
-		Short: "Turn light on",
+		Use:     "on <device>",
+		Aliases: []string{"enable", "1"},
+		Short:   "Turn light on",
 		Long: `Turn on a Gen1 light/dimmer.
 
 Optionally specify brightness (0-100) and/or duration for auto-off.`,
@@ -57,15 +55,18 @@ Optionally specify brightness (0-100) and/or duration for auto-off.`,
 func runOn(ctx context.Context, opts *OnOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
-	ios.StartProgress("Turning light on...")
+	light, err := gen1Client.Light(opts.ID)
+	if err != nil {
+		return err
+	}
 
-	light := gen1Client.Light(opts.ID)
+	ios.StartProgress("Turning light on...")
 
 	switch {
 	case opts.Brightness > 0:
@@ -92,36 +93,4 @@ func runOn(ctx context.Context, opts *OnOptions) error {
 	}
 
 	return nil
-}
-
-// connectGen1 resolves device config and connects to a Gen1 device.
-func connectGen1(ctx context.Context, ios *iostreams.IOStreams, deviceName string) (*client.Gen1Client, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	devCfg, err := config.ResolveDevice(deviceName)
-	if err != nil {
-		return nil, err
-	}
-
-	device := model.Device{
-		Name:    devCfg.Name,
-		Address: devCfg.Address,
-	}
-	if devCfg.Auth != nil {
-		device.Auth = &model.Auth{
-			Username: devCfg.Auth.Username,
-			Password: devCfg.Auth.Password,
-		}
-	}
-
-	ios.StartProgress("Connecting to device...")
-	gen1Client, err := client.ConnectGen1(ctx, device)
-	ios.StopProgress()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return gen1Client, nil
 }

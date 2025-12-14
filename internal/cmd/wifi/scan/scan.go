@@ -17,8 +17,9 @@ import (
 // NewCommand creates the wifi scan command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "scan <device>",
-		Short: "Scan for available WiFi networks",
+		Use:     "scan <device>",
+		Aliases: []string{"search", "find"},
+		Short:   "Scan for available WiFi networks",
 		Long: `Scan for available WiFi networks using a device.
 
 The device will scan for nearby WiFi networks and report their SSID,

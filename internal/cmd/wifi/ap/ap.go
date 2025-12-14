@@ -24,8 +24,9 @@ var (
 // NewCommand creates the wifi ap command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "ap <device>",
-		Short: "Configure WiFi access point",
+		Use:     "ap <device>",
+		Aliases: []string{"accesspoint", "hotspot"},
+		Short:   "Configure WiFi access point",
 		Long: `Configure the WiFi access point (AP) mode for a device.
 
 When enabled, the device creates its own WiFi network that other devices

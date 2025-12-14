@@ -15,8 +15,9 @@ import (
 // NewCommand creates the matter command group.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "matter",
-		Short: "Manage Matter connectivity",
+		Use:     "matter",
+		Aliases: []string{"mtr"},
+		Short:   "Manage Matter connectivity",
 		Long: `Manage Matter connectivity on Gen4+ Shelly devices.
 
 Matter is a unified smart home connectivity standard that allows

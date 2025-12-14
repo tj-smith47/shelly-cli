@@ -20,8 +20,9 @@ var channelFlag int
 // NewCommand creates the cloud control command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "control <device-id> <action>",
-		Short: "Control a device via cloud",
+		Use:     "control <device-id> <action>",
+		Aliases: []string{"ctrl", "cmd"},
+		Short:   "Control a device via cloud",
 		Long: `Control a Shelly device through the Shelly Cloud API.
 
 Supported actions:

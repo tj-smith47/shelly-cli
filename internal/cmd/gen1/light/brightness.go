@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -62,15 +63,19 @@ Optionally specify a transition time for smooth dimming.`,
 func runBrightness(ctx context.Context, opts *BrightnessOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
+	light, err := gen1Client.Light(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	ios.StartProgress("Setting brightness...")
 
-	light := gen1Client.Light(opts.ID)
 	if opts.Transition > 0 {
 		err = light.SetBrightnessWithTransition(ctx, opts.Brightness, opts.Transition)
 	} else {

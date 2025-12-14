@@ -14,8 +14,9 @@ import (
 // NewCommand creates the migrate validate command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "validate <backup-file>",
-		Short: "Validate a backup file",
+		Use:     "validate <backup-file>",
+		Aliases: []string{"check", "verify"},
+		Short:   "Validate a backup file",
 		Long: `Validate a backup file for structural integrity.
 
 Checks that the backup file is properly formatted and contains

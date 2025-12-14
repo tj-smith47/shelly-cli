@@ -22,8 +22,9 @@ var (
 // NewCommand creates the mqtt set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <device>",
-		Short: "Configure MQTT",
+		Use:     "set <device>",
+		Aliases: []string{"configure", "config"},
+		Short:   "Configure MQTT",
 		Long: `Configure MQTT settings for a device.
 
 Set the MQTT broker address, credentials, and topic prefix for

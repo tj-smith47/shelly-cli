@@ -26,6 +26,17 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 Displays real-time measurements including voltage, current, power,
 frequency, and accumulated energy.`,
+		Example: `  # Show power meter status
+  shelly power status living-room
+
+  # Show specific component by ID
+  shelly power status living-room 0
+
+  # Specify component type explicitly
+  shelly power status living-room --type pm1
+
+  # Output as JSON for scripting
+  shelly power status living-room -o json`,
 		Aliases: []string{"st"},
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -16,8 +16,9 @@ import (
 // NewCommand creates the migrate diff command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "diff <device> <backup-file>",
-		Short: "Show differences between device and backup",
+		Use:     "diff <device> <backup-file>",
+		Aliases: []string{"compare", "cmp"},
+		Short:   "Show differences between device and backup",
 		Long: `Show the differences between a device's current state and a backup file.
 
 This helps you understand what would change if you restored the backup.`,

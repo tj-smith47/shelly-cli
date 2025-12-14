@@ -15,9 +15,10 @@ import (
 // NewCommand creates the script stop command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "stop <device> <id>",
-		Short: "Stop a running script",
-		Long:  `Stop a running script on a Gen2+ Shelly device.`,
+		Use:     "stop <device> <id>",
+		Aliases: []string{"halt", "kill"},
+		Short:   "Stop a running script",
+		Long:    `Stop a running script on a Gen2+ Shelly device.`,
 		Example: `  # Stop a script
   shelly script stop living-room 1`,
 		Args:              cobra.ExactArgs(2),

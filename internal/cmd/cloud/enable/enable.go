@@ -14,8 +14,9 @@ import (
 // NewCommand creates the cloud enable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "enable <device>",
-		Short: "Enable cloud connection",
+		Use:     "enable <device>",
+		Aliases: []string{"on", "connect"},
+		Short:   "Enable cloud connection",
 		Long: `Enable the Shelly Cloud connection for a device.
 
 Once enabled, the device will connect to Shelly Cloud for remote access

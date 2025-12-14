@@ -385,6 +385,7 @@ func controlDevice(ctx context.Context, state *replState, device, action string)
 			return err
 		}
 
+		var failures []string
 		for _, comp := range comps {
 			var opErr error
 			switch comp.Type {
@@ -402,10 +403,15 @@ func controlDevice(ctx context.Context, state *replState, device, action string)
 			}
 
 			if opErr != nil {
+				failures = append(failures, fmt.Sprintf("%s:%d", comp.Type, comp.ID))
 				state.ios.DebugErr(fmt.Sprintf("%s %s:%d failed", action, comp.Type, comp.ID), opErr)
 			} else {
 				state.ios.Success("%s:%d %s", comp.Type, comp.ID, action)
 			}
+		}
+
+		if len(failures) > 0 {
+			state.ios.Warning("Failed on: %s", strings.Join(failures, ", "))
 		}
 		return nil
 	})

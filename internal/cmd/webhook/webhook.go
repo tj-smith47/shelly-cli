@@ -14,8 +14,9 @@ import (
 // NewCommand creates the webhook command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "webhook",
-		Short: "Manage device webhooks",
+		Use:     "webhook",
+		Aliases: []string{"wh", "hook"},
+		Short:   "Manage device webhooks",
 		Long: `Manage webhooks for devices.
 
 Webhooks allow the device to send HTTP requests when events occur,

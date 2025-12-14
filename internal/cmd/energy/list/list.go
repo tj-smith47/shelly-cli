@@ -21,6 +21,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 Shows component IDs and types for all energy monitors found on the device.
 EM components are 3-phase monitors, EM1 components are single-phase.`,
+		Example: `  # List energy monitoring components on a device
+  shelly energy list shelly-3em-pro
+
+  # Output as JSON for scripting
+  shelly energy list shelly-3em-pro -o json`,
 		Aliases:           []string{"ls"},
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),

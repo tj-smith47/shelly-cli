@@ -29,8 +29,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f, Pretty: true}
 
 	cmd := &cobra.Command{
-		Use:   "json <device> [file]",
-		Short: "Export device configuration as JSON",
+		Use:     "json <device> [file]",
+		Aliases: []string{"j"},
+		Short:   "Export device configuration as JSON",
 		Long: `Export a device's configuration and status as JSON.
 
 If no file is specified, outputs to stdout.
@@ -47,7 +48,7 @@ Use --full to include device status in addition to configuration.`,
   # Export compact (no pretty printing)
   shelly export json living-room --no-pretty`,
 		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: completeDevice(),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenFile(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			if len(args) > 1 {
@@ -143,22 +144,4 @@ func run(ctx context.Context, opts *Options) error {
 
 	ios.Success("Device %q exported to %s", opts.Device, opts.File)
 	return nil
-}
-
-// completeDevice provides completion for device argument.
-func completeDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			devices := config.ListDevices()
-			completions := make([]string, 0, len(devices))
-			for name := range devices {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		if len(args) == 1 {
-			return nil, cobra.ShellCompDirectiveDefault
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

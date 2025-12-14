@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/sensorutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -93,7 +94,7 @@ func runList(ctx context.Context, opts *ListOptions) error {
 		return fmt.Errorf("failed to parse status: %w", err)
 	}
 
-	sensors := collectIlluminanceSensors(fullStatus)
+	sensors := collectIlluminanceSensors(fullStatus, ios)
 
 	if opts.JSON {
 		output, err := json.MarshalIndent(sensors, "", "  ")
@@ -241,15 +242,6 @@ type Status struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
-func collectIlluminanceSensors(status map[string]json.RawMessage) []Status {
-	var sensors []Status
-	for key, raw := range status {
-		if strings.HasPrefix(key, "illuminance:") {
-			var s Status
-			if err := json.Unmarshal(raw, &s); err == nil {
-				sensors = append(sensors, s)
-			}
-		}
-	}
-	return sensors
+func collectIlluminanceSensors(status map[string]json.RawMessage, ios *iostreams.IOStreams) []Status {
+	return sensorutil.CollectByPrefix[Status](status, "illuminance:", ios)
 }

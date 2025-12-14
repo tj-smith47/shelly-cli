@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -27,8 +28,9 @@ func newSetCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &SetOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "set <device> <red> <green> <blue>",
-		Short: "Set RGB color",
+		Use:     "set <device> <red> <green> <blue>",
+		Aliases: []string{"rgb", "c"},
+		Short:   "Set RGB color",
 		Long: `Set the RGB color values of a Gen1 RGBW light.
 
 RGB values range from 0-255. Optionally include white channel and gain.`,
@@ -77,15 +79,18 @@ RGB values range from 0-255. Optionally include white channel and gain.`,
 func runSet(ctx context.Context, opts *SetOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
-	ios.StartProgress("Setting color...")
+	color, err := gen1Client.Color(opts.ID)
+	if err != nil {
+		return err
+	}
 
-	color := gen1Client.Color(opts.ID)
+	ios.StartProgress("Setting color...")
 
 	switch {
 	case opts.Gain > 0:

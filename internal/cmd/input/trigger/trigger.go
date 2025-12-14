@@ -24,14 +24,23 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var event string
 
 	cmd := &cobra.Command{
-		Use:   "trigger <device>",
-		Short: "Trigger input event",
+		Use:     "trigger <device>",
+		Aliases: []string{"fire", "simulate"},
+		Short:   "Trigger input event",
 		Long: `Trigger an input event on a Shelly device.
 
 Event types:
   single_push - Single button press
   double_push - Double button press
   long_push   - Long button press`,
+		Example: `  # Trigger single push event
+  shelly input trigger living-room
+
+  # Trigger double push event
+  shelly input trigger living-room --event double_push
+
+  # Trigger long push on specific input
+  shelly input trigger living-room --id 1 --event long_push`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

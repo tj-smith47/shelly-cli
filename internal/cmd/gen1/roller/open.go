@@ -2,15 +2,12 @@ package roller
 
 import (
 	"context"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // OpenOptions holds open command options.
@@ -25,8 +22,9 @@ func newOpenCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &OpenOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "open <device>",
-		Short: "Open roller/cover",
+		Use:     "open <device>",
+		Aliases: []string{"up", "raise"},
+		Short:   "Open roller/cover",
 		Long: `Start opening a Gen1 roller/cover.
 
 Optionally specify a duration to open for a specific time.`,
@@ -55,15 +53,19 @@ Optionally specify a duration to open for a specific time.`,
 func runOpen(ctx context.Context, opts *OpenOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
+	roller, err := gen1Client.Roller(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	ios.StartProgress("Opening roller...")
 
-	roller := gen1Client.Roller(opts.ID)
 	if opts.Duration > 0 {
 		err = roller.OpenForDuration(ctx, opts.Duration)
 	} else {
@@ -83,36 +85,4 @@ func runOpen(ctx context.Context, opts *OpenOptions) error {
 	}
 
 	return nil
-}
-
-// connectGen1 resolves device config and connects to a Gen1 device.
-func connectGen1(ctx context.Context, ios *iostreams.IOStreams, deviceName string) (*client.Gen1Client, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	devCfg, err := config.ResolveDevice(deviceName)
-	if err != nil {
-		return nil, err
-	}
-
-	device := model.Device{
-		Name:    devCfg.Name,
-		Address: devCfg.Address,
-	}
-	if devCfg.Auth != nil {
-		device.Auth = &model.Auth{
-			Username: devCfg.Auth.Username,
-			Password: devCfg.Auth.Password,
-		}
-	}
-
-	ios.StartProgress("Connecting to device...")
-	gen1Client, err := client.ConnectGen1(ctx, device)
-	ios.StopProgress()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return gen1Client, nil
 }

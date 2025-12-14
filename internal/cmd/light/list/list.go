@@ -17,9 +17,15 @@ import (
 // NewCommand creates the light list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "list <device>",
-		Short:             "List light components",
-		Long:              `List all light components on the specified device with their current status.`,
+		Use:     "list <device>",
+		Aliases: []string{"ls", "l"},
+		Short:   "List light components",
+		Long:    `List all light components on the specified device with their current status.`,
+		Example: `  # List all lights on a device
+  shelly light list kitchen
+
+  # List lights with JSON output
+  shelly lt ls kitchen -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -38,7 +38,7 @@ func newDisableCommand(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.Flags().IntVar(&opts.ScheduleID, "id", 0, "Schedule ID to disable (required)")
 	if err := cmd.MarkFlagRequired("id"); err != nil {
-		cmd.Printf("Warning: failed to mark flag required: %v\n", err)
+		panic(fmt.Sprintf("failed to mark flag required: %v", err))
 	}
 
 	return cmd

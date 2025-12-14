@@ -26,28 +26,27 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "discover",
-		Short: "Discover Shelly devices on the network",
+		Use:     "discover",
+		Aliases: []string{"disc", "find"},
+		Short:   "Discover Shelly devices on the network",
 		Long: `Discover Shelly devices using various protocols.
 
 Available discovery methods:
   mdns   - mDNS/Zeroconf discovery (Gen2+ devices)
   ble    - Bluetooth Low Energy discovery (provisioning mode)
   coiot  - CoIoT/CoAP discovery (Gen1 devices)
-  scan   - HTTP subnet scanning (all devices)
-
-Examples:
-  # Discover all devices using mDNS (default)
+  scan   - HTTP subnet scanning (all devices)`,
+		Example: `  # Discover all devices using mDNS (default)
   shelly discover
 
   # Discover using mDNS only
-  shelly discover mdns
+  shelly disc mdns
 
   # Discover BLE devices in provisioning mode
   shelly discover ble
 
   # Scan a subnet
-  shelly discover scan 192.168.1.0/24`,
+  shelly find scan 192.168.1.0/24`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runDiscover(cmd.Context(), f, timeout, register, skipExisting)
 		},

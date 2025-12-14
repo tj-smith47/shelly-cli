@@ -24,8 +24,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "import <file>",
-		Short: "Import a scene from file",
+		Use:     "import <file>",
+		Aliases: []string{"load", "restore"},
+		Short:   "Import a scene from file",
 		Long: `Import a scene definition from a file.
 
 Format is auto-detected from file extension (.json, .yaml, .yml).

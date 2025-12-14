@@ -16,9 +16,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var switchID int
 
 	cmd := &cobra.Command{
-		Use:               "on <device>",
-		Short:             "Turn switch on",
-		Long:              `Turn on a switch component on the specified device.`,
+		Use:     "on <device>",
+		Aliases: []string{"enable", "1"},
+		Short:   "Turn switch on",
+		Long:    `Turn on a switch component on the specified device.`,
+		Example: `  # Turn on switch on kitchen device
+  shelly switch on kitchen
+
+  # Turn on specific switch ID
+  shelly switch on kitchen --id 1`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

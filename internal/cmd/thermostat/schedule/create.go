@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -19,6 +20,7 @@ type CreateOptions struct {
 	ThermostatID int
 	Timespec     string
 	TargetC      float64
+	TargetCSet   bool // Tracks if --target was explicitly provided
 	Mode         string
 	Enable       bool
 	Disable      bool
@@ -68,6 +70,7 @@ Examples:
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
+			opts.TargetCSet = cmd.Flags().Changed("target")
 			return runCreate(cmd.Context(), opts)
 		},
 	}
@@ -81,8 +84,7 @@ Examples:
 	cmd.Flags().BoolVar(&opts.Enabled, "enabled", true, "Whether the schedule itself is enabled")
 
 	if err := cmd.MarkFlagRequired("time"); err != nil {
-		// Flag marking should not fail, but handle gracefully
-		cmd.Printf("Warning: failed to mark flag required: %v\n", err)
+		panic(fmt.Sprintf("failed to mark flag required: %v", err))
 	}
 	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
 
@@ -123,15 +125,12 @@ func runCreate(ctx context.Context, opts *CreateOptions) error {
 }
 
 func validateCreateOptions(opts *CreateOptions) error {
-	if opts.TargetC == 0 && opts.Mode == "" && !opts.Enable && !opts.Disable {
+	if !opts.TargetCSet && opts.Mode == "" && !opts.Enable && !opts.Disable {
 		return fmt.Errorf("at least one of --target, --mode, --enable, or --disable must be specified")
 	}
 
-	if opts.Mode != "" {
-		validModes := map[string]bool{"heat": true, "cool": true, "auto": true}
-		if !validModes[opts.Mode] {
-			return fmt.Errorf("invalid mode %q, must be one of: heat, cool, auto", opts.Mode)
-		}
+	if err := validate.ValidateMode(opts.Mode, true); err != nil {
+		return err
 	}
 
 	return nil
@@ -157,7 +156,7 @@ func buildScheduleParams(opts *CreateOptions) map[string]any {
 
 func buildThermostatConfig(opts *CreateOptions) map[string]any {
 	config := make(map[string]any)
-	if opts.TargetC > 0 {
+	if opts.TargetCSet {
 		config["target_C"] = opts.TargetC
 	}
 	if opts.Mode != "" {
@@ -193,7 +192,7 @@ func displayCreateSuccess(ios *iostreams.IOStreams, opts *CreateOptions, schedul
 	ios.Success("Created schedule %d", scheduleID)
 	ios.Printf("  Timespec: %s\n", opts.Timespec)
 
-	if opts.TargetC > 0 {
+	if opts.TargetCSet {
 		ios.Printf("  Target: %.1f°C\n", opts.TargetC)
 	}
 	if opts.Mode != "" {

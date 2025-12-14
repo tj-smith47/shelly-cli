@@ -18,9 +18,17 @@ import (
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "cover",
-		Aliases: []string{"cv"},
+		Aliases: []string{"cv", "blind"},
 		Short:   "Control cover/roller components",
 		Long:    `Control cover and roller shutter components on Shelly devices.`,
+		Example: `  # Open a cover
+  shelly cover open bedroom
+
+  # Close a cover
+  shelly cv close living-room
+
+  # Set cover to 50% position
+  shelly cover position bedroom --pos 50`,
 	}
 
 	cmd.AddCommand(open.NewCommand(f))

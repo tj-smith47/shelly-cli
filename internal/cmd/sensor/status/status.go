@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/sensorutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -310,17 +311,13 @@ func displayFlood(ios *iostreams.IOStreams, floods []FloodReading) bool {
 		return false
 	}
 	ios.Println("  " + theme.Highlight().Render("Flood Detection:"))
-	for _, f := range floods {
-		status := theme.StatusOK().Render("Clear")
-		if f.Alarm {
-			status = theme.StatusError().Render("WATER DETECTED!")
-		}
-		muteStr := ""
-		if f.Mute {
-			muteStr = " " + theme.Dim().Render("(muted)")
-		}
-		ios.Printf("    Sensor %d: %s%s\n", f.ID, status, muteStr)
+	// Convert to AlarmReading for shared display
+	alarms := make([]sensorutil.AlarmReading, len(floods))
+	for i, f := range floods {
+		alarms[i] = sensorutil.AlarmReading{ID: f.ID, Alarm: f.Alarm, Mute: f.Mute}
 	}
+	sensorutil.DisplayAlarmSensors(ios, alarms, "Flood", "WATER DETECTED!",
+		theme.StatusOK().Render, theme.StatusError().Render, theme.Dim().Render)
 	ios.Println()
 	return true
 }
@@ -330,17 +327,13 @@ func displaySmoke(ios *iostreams.IOStreams, smokes []SmokeReading) bool {
 		return false
 	}
 	ios.Println("  " + theme.Highlight().Render("Smoke Detection:"))
-	for _, s := range smokes {
-		status := theme.StatusOK().Render("Clear")
-		if s.Alarm {
-			status = theme.StatusError().Render("SMOKE DETECTED!")
-		}
-		muteStr := ""
-		if s.Mute {
-			muteStr = " " + theme.Dim().Render("(muted)")
-		}
-		ios.Printf("    Sensor %d: %s%s\n", s.ID, status, muteStr)
+	// Convert to AlarmReading for shared display
+	alarms := make([]sensorutil.AlarmReading, len(smokes))
+	for i, s := range smokes {
+		alarms[i] = sensorutil.AlarmReading{ID: s.ID, Alarm: s.Alarm, Mute: s.Mute}
 	}
+	sensorutil.DisplayAlarmSensors(ios, alarms, "Smoke", "SMOKE DETECTED!",
+		theme.StatusOK().Render, theme.StatusError().Render, theme.Dim().Render)
 	ios.Println()
 	return true
 }

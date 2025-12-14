@@ -20,6 +20,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Aliases: []string{"lt"},
 		Short:   "Control light components",
 		Long:    `Control dimmable light components on Shelly devices.`,
+		Example: `  # Turn on a light
+  shelly light on kitchen
+
+  # Set brightness to 50%
+  shelly light set kitchen --brightness 50
+
+  # Check light status
+  shelly lt status bedroom`,
 	}
 
 	cmd.AddCommand(on.NewCommand(f))

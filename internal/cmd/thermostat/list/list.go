@@ -67,6 +67,7 @@ func run(ctx context.Context, opts *Options) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to device: %w", err)
 	}
+	defer iostreams.CloseWithDebug("closing connection", conn)
 
 	// Get full device status to find thermostats
 	result, err := conn.Call(ctx, "Shelly.GetStatus", nil)

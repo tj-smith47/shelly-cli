@@ -13,8 +13,14 @@ import (
 )
 
 // ThemeImport represents an imported theme configuration.
+// Supports both the old format (id only) and new format (name + colors).
 type ThemeImport struct {
-	ID          string `yaml:"id" json:"id"`
+	// New format fields
+	Name   string            `yaml:"name" json:"name,omitempty"`
+	Colors map[string]string `yaml:"colors" json:"colors,omitempty"`
+
+	// Old format fields (backwards compatible)
+	ID          string `yaml:"id" json:"id,omitempty"`
 	DisplayName string `yaml:"display_name,omitempty" json:"display_name,omitempty"`
 }
 
@@ -60,25 +66,43 @@ func run(f *cmdutil.Factory, file string, apply bool) error {
 		return fmt.Errorf("failed to parse theme file: %w", err)
 	}
 
-	if imported.ID == "" {
-		return fmt.Errorf("invalid theme file: missing 'id' field")
+	// Determine theme name (new format: name, old format: id)
+	themeName := imported.Name
+	if themeName == "" {
+		themeName = imported.ID
 	}
 
-	// Check if this is a built-in theme
-	if _, ok := theme.GetTheme(imported.ID); !ok {
-		ios.Warning("Theme '%s' is not a built-in theme", imported.ID)
-		ios.Info("Custom themes are not yet supported. Please use a built-in theme ID.")
-		ios.Printf("\nRun 'shelly theme list' to see available themes.\n")
-		return fmt.Errorf("theme '%s' not found in built-in themes", imported.ID)
+	// Validate: need either a theme name or custom colors
+	if themeName == "" && len(imported.Colors) == 0 {
+		return fmt.Errorf("invalid theme file: missing 'name' or 'colors' field")
+	}
+
+	// Check if base theme exists (if specified)
+	if themeName != "" {
+		if _, ok := theme.GetTheme(themeName); !ok {
+			ios.Warning("Theme '%s' is not a built-in theme", themeName)
+			ios.Info("Run 'shelly theme list' to see available themes.")
+			return fmt.Errorf("theme '%s' not found in built-in themes", themeName)
+		}
 	}
 
 	if apply {
-		if !theme.SetTheme(imported.ID) {
-			return fmt.Errorf("failed to apply theme: %s", imported.ID)
+		if err := theme.ApplyConfig(themeName, imported.Colors, ""); err != nil {
+			return fmt.Errorf("failed to apply theme: %w", err)
 		}
-		ios.Success("Theme '%s' imported and applied", imported.ID)
+		if len(imported.Colors) > 0 {
+			ios.Success("Theme '%s' with %d color overrides imported and applied", themeName, len(imported.Colors))
+		} else {
+			ios.Success("Theme '%s' imported and applied", themeName)
+		}
 	} else {
-		ios.Success("Theme file validated: '%s' is a valid built-in theme", imported.ID)
+		ios.Success("Theme file validated successfully")
+		if themeName != "" {
+			ios.Info("Base theme: %s", themeName)
+		}
+		if len(imported.Colors) > 0 {
+			ios.Info("Color overrides: %d", len(imported.Colors))
+		}
 		ios.Info("Use --apply to apply the theme")
 	}
 

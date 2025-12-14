@@ -5,8 +5,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/current"
-	exportcmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme/export_cmd"
-	importcmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme/import_cmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/exportcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/importcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/next"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/prev"

@@ -15,8 +15,9 @@ import (
 // NewCommand creates the export command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "export",
-		Short: "Export device data in various formats",
+		Use:     "export",
+		Aliases: []string{"exp"},
+		Short:   "Export device data in various formats",
 		Long: `Export device configuration and status data in various formats.
 
 Supports exporting to JSON, YAML, CSV, Ansible inventory, and Terraform

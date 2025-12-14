@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/bthome/bthomeutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -87,24 +88,11 @@ func run(ctx context.Context, opts *Options) error {
 			return fmt.Errorf("failed to parse status: %w", err)
 		}
 
-		// Find BTHomeDevice components (keys like "bthomedevice:200")
-		for key, value := range status {
-			if len(key) <= 12 || key[:12] != "bthomedevice" {
-				continue
-			}
+		// Collect BTHome device statuses using helper
+		deviceStatuses := bthomeutil.CollectDevices(status, ios)
 
-			var devStatus struct {
-				ID         int     `json:"id"`
-				RSSI       *int    `json:"rssi"`
-				Battery    *int    `json:"battery"`
-				LastUpdate float64 `json:"last_updated_ts"`
-			}
-			if err := json.Unmarshal(value, &devStatus); err != nil {
-				ios.Debug("failed to parse device status for %s: %v", key, err)
-				continue
-			}
-
-			// Get config for name and address
+		// Enrich each device with config data (name, address)
+		for _, devStatus := range deviceStatuses {
 			configResult, cfgErr := conn.Call(ctx, "BTHomeDevice.GetConfig", map[string]any{"id": devStatus.ID})
 			var name, addr string
 			if cfgErr == nil {

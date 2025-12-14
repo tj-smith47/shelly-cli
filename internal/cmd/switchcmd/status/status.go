@@ -18,10 +18,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var switchID int
 
 	cmd := &cobra.Command{
-		Use:               "status <device>",
-		Aliases:           []string{"st"},
-		Short:             "Show switch status",
-		Long:              `Show the current status of a switch component on the specified device.`,
+		Use:     "status <device>",
+		Aliases: []string{"st", "s"},
+		Short:   "Show switch status",
+		Long:    `Show the current status of a switch component on the specified device.`,
+		Example: `  # Show switch status
+  shelly switch status kitchen
+
+  # Show status with JSON output
+  shelly switch st kitchen -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

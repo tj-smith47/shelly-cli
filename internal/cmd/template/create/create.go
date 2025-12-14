@@ -52,7 +52,7 @@ Use --include-wifi to include them.`,
   # Overwrite existing template
   shelly template create my-config living-room --force`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: completeNameThenDevice(),
+		ValidArgsFunction: cmdutil.CompleteNameThenDevice(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Name = args[0]
 			opts.Device = args[1]
@@ -119,24 +119,4 @@ func run(ctx context.Context, opts *Options) error {
 
 	ios.Success("Template %q created from %s (%s)", opts.Name, opts.Device, deviceTpl.Model)
 	return nil
-}
-
-// completeNameThenDevice provides completion for name and device arguments.
-func completeNameThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: template name (no completion)
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		if len(args) == 1 {
-			// Second argument: device names
-			devices := config.ListDevices()
-			completions := make([]string, 0, len(devices))
-			for name := range devices {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

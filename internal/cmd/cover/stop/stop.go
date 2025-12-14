@@ -16,9 +16,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var coverID int
 
 	cmd := &cobra.Command{
-		Use:               "stop <device>",
-		Short:             "Stop cover",
-		Long:              `Stop a cover/roller component on the specified device.`,
+		Use:     "stop <device>",
+		Aliases: []string{"halt", "pause"},
+		Short:   "Stop cover",
+		Long:    `Stop a cover/roller component on the specified device.`,
+		Example: `  # Stop cover movement
+  shelly cover stop bedroom
+
+  # Stop specific cover ID
+  shelly cover halt bedroom --id 1`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -113,10 +113,13 @@ func parseTemplate(filename string, data []byte) (config.Template, error) {
 		}
 	default:
 		// Try YAML first, then JSON
-		if err := yaml.Unmarshal(data, &tpl); err != nil {
-			if jsonErr := json.Unmarshal(data, &tpl); jsonErr != nil {
-				return tpl, fmt.Errorf("failed to parse file (tried YAML and JSON)")
-			}
+		yamlErr := yaml.Unmarshal(data, &tpl)
+		if yamlErr == nil {
+			break
+		}
+		jsonErr := json.Unmarshal(data, &tpl)
+		if jsonErr != nil {
+			return tpl, fmt.Errorf("failed to parse file (YAML error: %v, JSON error: %v)", yamlErr, jsonErr)
 		}
 	}
 

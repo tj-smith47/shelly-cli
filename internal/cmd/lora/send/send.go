@@ -75,6 +75,9 @@ func run(ctx context.Context, opts *Options) error {
 		// Parse hex string
 		hexStr := strings.ReplaceAll(opts.Data, " ", "")
 		hexStr = strings.ReplaceAll(hexStr, ":", "")
+		if len(hexStr)%2 != 0 {
+			return fmt.Errorf("invalid hex string: odd number of characters")
+		}
 		data = make([]byte, len(hexStr)/2)
 		for i := 0; i < len(hexStr); i += 2 {
 			var b byte

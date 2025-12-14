@@ -16,8 +16,9 @@ var yesFlag bool
 // NewCommand creates the auth disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "disable <device>",
-		Short: "Disable authentication",
+		Use:     "disable <device>",
+		Aliases: []string{"off", "remove"},
+		Short:   "Disable authentication",
 		Long: `Disable authentication for a device.
 
 This removes the password requirement for accessing the device locally.

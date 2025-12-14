@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -27,8 +24,9 @@ func newCheckCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &CheckOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "check <device>",
-		Short: "Check for firmware updates",
+		Use:     "check <device>",
+		Aliases: []string{"ck"},
+		Short:   "Check for firmware updates",
 		Long: `Check if a firmware update is available for a Gen1 device.
 
 This queries the device's OTA endpoint to see if a newer
@@ -54,7 +52,7 @@ firmware version is available.`,
 func runCheck(ctx context.Context, opts *CheckOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
@@ -91,36 +89,4 @@ func runCheck(ctx context.Context, opts *CheckOptions) error {
 	}
 
 	return nil
-}
-
-// connectGen1 resolves device config and connects to a Gen1 device.
-func connectGen1(ctx context.Context, ios *iostreams.IOStreams, deviceName string) (*client.Gen1Client, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	devCfg, err := config.ResolveDevice(deviceName)
-	if err != nil {
-		return nil, err
-	}
-
-	device := model.Device{
-		Name:    devCfg.Name,
-		Address: devCfg.Address,
-	}
-	if devCfg.Auth != nil {
-		device.Auth = &model.Auth{
-			Username: devCfg.Auth.Username,
-			Password: devCfg.Auth.Password,
-		}
-	}
-
-	ios.StartProgress("Connecting to device...")
-	gen1Client, err := client.ConnectGen1(ctx, device)
-	ios.StopProgress()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return gen1Client, nil
 }

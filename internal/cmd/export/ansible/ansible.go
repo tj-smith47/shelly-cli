@@ -10,11 +10,12 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
+
+// yamlExtensions defines valid YAML file extensions.
+var yamlExtensions = []string{".yaml", ".yml"}
 
 // Options holds command options.
 type Options struct {
@@ -29,8 +30,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "ansible <devices...> [file]",
-		Short: "Export devices as Ansible inventory",
+		Use:     "ansible <devices...> [file]",
+		Aliases: []string{"ans"},
+		Short:   "Export devices as Ansible inventory",
 		Long: `Export devices as an Ansible inventory YAML file.
 
 Creates an Ansible-compatible inventory with device groups based on
@@ -49,13 +51,7 @@ model type. Use @all to export all registered devices.`,
 		Args:              cobra.MinimumNArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDevicesWithGroups(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check if last arg is a file
-			if len(args) > 1 && (strings.HasSuffix(args[len(args)-1], ".yaml") || strings.HasSuffix(args[len(args)-1], ".yml")) {
-				opts.File = args[len(args)-1]
-				opts.Devices = args[:len(args)-1]
-			} else {
-				opts.Devices = args
-			}
+			opts.Devices, opts.File = cmdutil.SplitDevicesAndFile(args, yamlExtensions)
 			return run(cmd.Context(), opts)
 		},
 	}
@@ -97,48 +93,30 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("no devices specified")
 	}
 
-	// Collect device data grouped by model
-	hostsByModel := make(map[string]map[string]Host)
-
+	// Collect device data using shared helper
+	var deviceData []cmdutil.DeviceData
 	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching device data...", func(ctx context.Context) error {
-		for _, device := range devices {
-			var host Host
-			var model string
-
-			// Get device config for address
-			deviceCfg, exists := config.GetDevice(device)
-			if exists {
-				host.AnsibleHost = deviceCfg.Address
-				host.ShellyModel = deviceCfg.Model
-				host.ShellyGen = deviceCfg.Generation
-				model = deviceCfg.Model
-			}
-
-			err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
-				info := conn.Info()
-				host.ShellyModel = info.Model
-				host.ShellyGen = info.Generation
-				host.ShellyApp = info.App
-				model = info.Model
-				return nil
-			})
-
-			if err != nil {
-				// Use config data if device offline (already populated above)
-				if !exists {
-					continue
-				}
-			}
-
-			if hostsByModel[model] == nil {
-				hostsByModel[model] = make(map[string]Host)
-			}
-			hostsByModel[model][device] = host
-		}
+		deviceData = cmdutil.CollectDeviceData(ctx, svc, devices)
 		return nil
 	})
 	if err != nil {
 		return err
+	}
+
+	// Group by model
+	hostsByModel := make(map[string]map[string]Host)
+	for _, d := range deviceData {
+		host := Host{
+			AnsibleHost: d.Address,
+			ShellyModel: d.Model,
+			ShellyGen:   d.Generation,
+			ShellyApp:   d.App,
+		}
+		model := d.Model
+		if hostsByModel[model] == nil {
+			hostsByModel[model] = make(map[string]Host)
+		}
+		hostsByModel[model][d.Name] = host
 	}
 
 	// Build inventory structure

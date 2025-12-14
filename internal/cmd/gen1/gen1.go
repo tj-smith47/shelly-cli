@@ -19,8 +19,9 @@ import (
 // NewCommand creates the gen1 command group.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "gen1",
-		Short: "Manage Gen1 Shelly devices",
+		Use:     "gen1",
+		Aliases: []string{"g1", "legacy"},
+		Short:   "Manage Gen1 Shelly devices",
 		Long: `Manage Gen1 Shelly devices using their HTTP REST API.
 
 Gen1 devices (released before 2021) include:

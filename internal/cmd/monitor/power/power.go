@@ -22,8 +22,9 @@ var (
 // NewCommand creates the monitor power command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "power <device>",
-		Short: "Monitor power consumption in real-time",
+		Use:     "power <device>",
+		Aliases: []string{"pwr", "watt"},
+		Short:   "Monitor power consumption in real-time",
 		Long: `Monitor a device's power consumption in real-time.
 
 Shows power (W), voltage (V), current (A), and energy (Wh) for all
@@ -33,7 +34,10 @@ Press Ctrl+C to stop monitoring.`,
   shelly monitor power living-room
 
   # Monitor with 1-second interval
-  shelly monitor power living-room --interval 1s`,
+  shelly monitor power living-room --interval 1s
+
+  # Monitor for a specific number of updates
+  shelly monitor power living-room --count 10`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

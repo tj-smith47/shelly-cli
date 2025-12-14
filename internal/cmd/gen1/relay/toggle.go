@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -20,9 +21,10 @@ func newToggleCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &ToggleOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "toggle <device>",
-		Short: "Toggle relay state",
-		Long:  `Toggle a Gen1 relay switch between on and off states.`,
+		Use:     "toggle <device>",
+		Aliases: []string{"flip", "t"},
+		Short:   "Toggle relay state",
+		Long:    `Toggle a Gen1 relay switch between on and off states.`,
 		Example: `  # Toggle relay
   shelly gen1 relay toggle living-room
 
@@ -44,15 +46,19 @@ func newToggleCommand(f *cmdutil.Factory) *cobra.Command {
 func runToggle(ctx context.Context, opts *ToggleOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
+	relay, err := gen1Client.Relay(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	ios.StartProgress("Toggling relay...")
 
-	relay := gen1Client.Relay(opts.ID)
 	err = relay.Toggle(ctx)
 
 	ios.StopProgress()

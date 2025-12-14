@@ -29,8 +29,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "ble",
-		Short: "Discover devices using Bluetooth Low Energy",
+		Use:     "ble",
+		Aliases: []string{"bluetooth", "bt"},
+		Short:   "Discover devices using Bluetooth Low Energy",
 		Long: `Discover Shelly devices using Bluetooth Low Energy (BLE).
 
 This method finds Shelly devices that are in provisioning mode or
@@ -39,17 +40,18 @@ BLU devices broadcasting BTHome sensor data.
 Requirements:
   - Bluetooth adapter on the host machine
   - Bluetooth must be enabled
-  - May require elevated privileges on some systems
-
-Examples:
-  # Basic BLE discovery
+  - May require elevated privileges on some systems`,
+		Example: `  # Basic BLE discovery
   shelly discover ble
 
   # With longer timeout
   shelly discover ble --timeout 30s
 
   # Include BTHome sensor data
-  shelly discover ble --bthome`,
+  shelly discover ble --bthome
+
+  # Filter by device name prefix
+  shelly discover ble --filter "Shelly"`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), f, timeout, includeBTHome, filterPrefix)
 		},

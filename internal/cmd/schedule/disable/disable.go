@@ -15,9 +15,10 @@ import (
 // NewCommand creates the schedule disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "disable <device> <id>",
-		Short: "Disable a schedule",
-		Long:  `Disable a schedule on a Gen2+ Shelly device.`,
+		Use:     "disable <device> <id>",
+		Aliases: []string{"off", "deactivate"},
+		Short:   "Disable a schedule",
+		Long:    `Disable a schedule on a Gen2+ Shelly device.`,
 		Example: `  # Disable a schedule
   shelly schedule disable living-room 1`,
 		Args:              cobra.ExactArgs(2),

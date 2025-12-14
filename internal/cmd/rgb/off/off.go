@@ -16,9 +16,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var rgbID int
 
 	cmd := &cobra.Command{
-		Use:               "off <device>",
-		Short:             "Turn RGB off",
-		Long:              `Turn off an RGB light component on the specified device.`,
+		Use:     "off <device>",
+		Aliases: []string{"disable", "0"},
+		Short:   "Turn RGB off",
+		Long:    `Turn off an RGB light component on the specified device.`,
+		Example: `  # Turn off RGB light
+  shelly rgb off bedroom
+
+  # Turn off specific RGB ID
+  shelly rgb off bedroom --id 1`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

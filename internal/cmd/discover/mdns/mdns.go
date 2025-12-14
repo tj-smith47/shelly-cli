@@ -23,15 +23,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "mdns",
-		Short: "Discover devices using mDNS/Zeroconf",
+		Use:     "mdns",
+		Aliases: []string{"zeroconf", "bonjour"},
+		Short:   "Discover devices using mDNS/Zeroconf",
 		Long: `Discover Shelly devices using mDNS/Zeroconf.
 
 This method works best for Gen2+ devices that advertise the
-_shelly._tcp.local service.
-
-Examples:
-  # Basic mDNS discovery
+_shelly._tcp.local service.`,
+		Example: `  # Basic mDNS discovery
   shelly discover mdns
 
   # With longer timeout

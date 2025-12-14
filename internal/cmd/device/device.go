@@ -23,6 +23,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 Device commands allow you to add, remove, list, and manage registered devices.
 Registered devices can be referenced by name in other commands.`,
+		Example: `  # List all registered devices
+  shelly device list
+
+  # Get device info
+  shelly dev info kitchen
+
+  # Reboot a device
+  shelly device reboot living-room`,
 	}
 
 	cmd.AddCommand(list.NewCommand(f))

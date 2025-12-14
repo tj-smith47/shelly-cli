@@ -15,8 +15,9 @@ import (
 // NewCommand creates the cloud status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <device>",
-		Short: "Show cloud connection status",
+		Use:     "status <device>",
+		Aliases: []string{"st"},
+		Short:   "Show cloud connection status",
 		Long: `Show the Shelly Cloud connection status for a device.
 
 Displays whether the device is currently connected to Shelly Cloud.`,

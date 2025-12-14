@@ -16,9 +16,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var lightID int
 
 	cmd := &cobra.Command{
-		Use:               "off <device>",
-		Short:             "Turn light off",
-		Long:              `Turn off a light component on the specified device.`,
+		Use:     "off <device>",
+		Aliases: []string{"disable", "0"},
+		Short:   "Turn light off",
+		Long:    `Turn off a light component on the specified device.`,
+		Example: `  # Turn off light
+  shelly light off living-room
+
+  # Turn off specific light ID
+  shelly light off living-room --id 1`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

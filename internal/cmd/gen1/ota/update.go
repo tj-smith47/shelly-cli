@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -22,8 +23,9 @@ func newUpdateCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &UpdateOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "update <device>",
-		Short: "Update device firmware",
+		Use:     "update <device>",
+		Aliases: []string{"upgrade", "up"},
+		Short:   "Update device firmware",
 		Long: `Update the firmware on a Gen1 Shelly device.
 
 By default, updates to the latest available firmware from Shelly.
@@ -55,7 +57,7 @@ The device will reboot after the update is applied.`,
 func runUpdate(ctx context.Context, opts *UpdateOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}

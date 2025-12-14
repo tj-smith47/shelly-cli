@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/sensorutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -93,7 +94,7 @@ func runList(ctx context.Context, opts *ListOptions) error {
 		return fmt.Errorf("failed to parse status: %w", err)
 	}
 
-	sensors := collectVoltmeterSensors(fullStatus)
+	sensors := collectVoltmeterSensors(fullStatus, ios)
 
 	if opts.JSON {
 		output, err := json.MarshalIndent(sensors, "", "  ")
@@ -114,7 +115,7 @@ func runList(ctx context.Context, opts *ListOptions) error {
 	for _, s := range sensors {
 		ios.Printf("  Sensor %d:\n", s.ID)
 		if s.Voltage != nil {
-			ios.Printf("    Voltage: %.2f V\n", *s.Voltage)
+			ios.Printf("    Voltage: %.3f V\n", *s.Voltage)
 		}
 	}
 
@@ -216,15 +217,6 @@ type Status struct {
 	Errors  []string `json:"errors,omitempty"`
 }
 
-func collectVoltmeterSensors(status map[string]json.RawMessage) []Status {
-	var sensors []Status
-	for key, raw := range status {
-		if strings.HasPrefix(key, "voltmeter:") {
-			var s Status
-			if err := json.Unmarshal(raw, &s); err == nil {
-				sensors = append(sensors, s)
-			}
-		}
-	}
-	return sensors
+func collectVoltmeterSensors(status map[string]json.RawMessage, ios *iostreams.IOStreams) []Status {
+	return sensorutil.CollectByPrefix[Status](status, "voltmeter:", ios)
 }

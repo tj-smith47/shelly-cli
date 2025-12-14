@@ -30,6 +30,14 @@ PM/PM1 components provide real-time measurements including:
 
 For professional energy monitors (EM/EM1 components), use 'shelly energy'.`,
 		Aliases: []string{"pm"},
+		Example: `  # List power meter components
+  shelly power list kitchen
+
+  # Get current power status
+  shelly pm status living-room
+
+  # Check power consumption with JSON output
+  shelly power status kitchen -o json`,
 	}
 
 	cmd.AddCommand(list.NewCommand(f))

@@ -8,19 +8,21 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // Options holds command options.
 type Options struct {
-	Factory *cmdutil.Factory
-	Device  string
-	ID      int
-	Target  float64
-	Mode    string
-	Enable  bool
-	Disable bool
+	Factory   *cmdutil.Factory
+	Device    string
+	ID        int
+	Target    float64
+	TargetSet bool // Tracks if --target was explicitly provided
+	Mode      string
+	Enable    bool
+	Disable   bool
 }
 
 // NewCommand creates the thermostat set command.
@@ -52,6 +54,7 @@ Allows setting:
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
+			opts.TargetSet = cmd.Flags().Changed("target")
 			return run(cmd.Context(), opts)
 		},
 	}
@@ -72,14 +75,13 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	// Validate that at least one option is set
-	if opts.Target == 0 && opts.Mode == "" && !opts.Enable && !opts.Disable {
+	if !opts.TargetSet && opts.Mode == "" && !opts.Enable && !opts.Disable {
 		return fmt.Errorf("at least one of --target, --mode, --enable, or --disable must be specified")
 	}
 
 	// Validate mode
-	validModes := map[string]bool{"heat": true, "cool": true, "auto": true, "": true}
-	if !validModes[opts.Mode] {
-		return fmt.Errorf("invalid mode %q, must be one of: heat, cool, auto", opts.Mode)
+	if err := validate.ValidateMode(opts.Mode, true); err != nil {
+		return err
 	}
 
 	conn, err := svc.Connect(ctx, opts.Device)
@@ -94,7 +96,7 @@ func run(ctx context.Context, opts *Options) error {
 	config := &components.ThermostatConfig{}
 	changes := []string{}
 
-	if opts.Target > 0 {
+	if opts.TargetSet {
 		config.TargetC = &opts.Target
 		changes = append(changes, fmt.Sprintf("target temperature: %.1f°C", opts.Target))
 	}

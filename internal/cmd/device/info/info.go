@@ -17,8 +17,9 @@ import (
 // NewCommand creates the device info command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "info <device>",
-		Short: "Show device information",
+		Use:     "info <device>",
+		Aliases: []string{"details", "show"},
+		Short:   "Show device information",
 		Long: `Show detailed information about a device.
 
 The device can be specified by its registered name or IP address.`,

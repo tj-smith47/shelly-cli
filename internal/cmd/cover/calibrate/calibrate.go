@@ -16,12 +16,18 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var coverID int
 
 	cmd := &cobra.Command{
-		Use:   "calibrate <device>",
-		Short: "Calibrate cover",
+		Use:     "calibrate <device>",
+		Aliases: []string{"cal"},
+		Short:   "Calibrate cover",
 		Long: `Start calibration for a cover/roller component.
 
 Calibration determines the open and close times for the cover.
 The cover will move to both extremes during calibration.`,
+		Example: `  # Calibrate a cover
+  shelly cover calibrate bedroom
+
+  # Calibrate specific cover ID
+  shelly cover cal bedroom --id 1`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

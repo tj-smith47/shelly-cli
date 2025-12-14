@@ -14,8 +14,9 @@ import (
 // NewCommand creates the group add command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "add <group> <device>...",
-		Short: "Add devices to a group",
+		Use:     "add <group> <device>...",
+		Aliases: []string{"append", "include"},
+		Short:   "Add devices to a group",
 		Long: `Add one or more devices to a group.
 
 Devices can be specified by their registered name or IP address.

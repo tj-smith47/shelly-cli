@@ -57,6 +57,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
+	ios.StartProgress("Enabling Matter...")
 	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Matter.SetConfig", map[string]any{
 			"config": map[string]any{
@@ -69,6 +70,8 @@ func run(ctx context.Context, opts *Options) error {
 
 		return nil
 	})
+	ios.StopProgress()
+
 	if err != nil {
 		return err
 	}

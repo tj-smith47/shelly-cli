@@ -23,6 +23,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Switches are the basic on/off relays found in most Shelly devices.
 Use these commands to control individual switches or list all
 switches on a device.`,
+		Example: `  # Turn on a switch
+  shelly switch on kitchen
+
+  # Turn off a switch
+  shelly sw off living-room
+
+  # Check switch status
+  shelly switch status bedroom`,
 	}
 
 	cmd.AddCommand(on.NewCommand(f))

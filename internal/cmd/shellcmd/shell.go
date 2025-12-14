@@ -30,8 +30,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "shell <device>",
-		Short: "Interactive shell for a specific device",
+		Use:     "shell <device>",
+		Aliases: []string{"sh", "console"},
+		Short:   "Interactive shell for a specific device",
 		Long: `Open an interactive shell for a specific Shelly device.
 
 This provides direct access to execute RPC commands on the device.

@@ -18,9 +18,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var coverID int
 
 	cmd := &cobra.Command{
-		Use:               "status <device>",
-		Short:             "Show cover status",
-		Long:              `Show the current status of a cover component on the specified device.`,
+		Use:     "status <device>",
+		Aliases: []string{"st", "s"},
+		Short:   "Show cover status",
+		Long:    `Show the current status of a cover component on the specified device.`,
+		Example: `  # Show cover status
+  shelly cover status bedroom
+
+  # Show status with JSON output
+  shelly cv st bedroom -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -55,15 +56,19 @@ Gain range: 0 (off) to 100 (full brightness).`,
 func runGain(ctx context.Context, opts *GainOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
+	color, err := gen1Client.Color(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	ios.StartProgress("Setting gain...")
 
-	color := gen1Client.Color(opts.ID)
 	err = color.SetGain(ctx, opts.Gain)
 
 	ios.StopProgress()

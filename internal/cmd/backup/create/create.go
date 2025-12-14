@@ -27,8 +27,9 @@ var (
 // NewCommand creates the backup create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create <device> [file]",
-		Short: "Create a device backup",
+		Use:     "create <device> [file]",
+		Aliases: []string{"new", "make"},
+		Short:   "Create a device backup",
 		Long: `Create a complete backup of a Shelly device.
 
 The backup includes configuration, scripts, schedules, and webhooks.

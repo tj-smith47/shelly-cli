@@ -22,8 +22,9 @@ var (
 // NewCommand creates the webhook create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create <device>",
-		Short: "Create a webhook",
+		Use:     "create <device>",
+		Aliases: []string{"add", "new"},
+		Short:   "Create a webhook",
 		Long: `Create a new webhook for a device.
 
 Webhooks are triggered by events and send HTTP requests to the specified URLs.

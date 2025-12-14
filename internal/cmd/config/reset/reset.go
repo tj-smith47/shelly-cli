@@ -18,8 +18,9 @@ var (
 // NewCommand creates the config reset command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "reset <device> [component]",
-		Short: "Reset configuration to defaults",
+		Use:     "reset <device> [component]",
+		Aliases: []string{"factory", "clear"},
+		Short:   "Reset configuration to defaults",
 		Long: `Reset device or component configuration to factory defaults.
 
 Without a component argument, shows available components that can be reset.

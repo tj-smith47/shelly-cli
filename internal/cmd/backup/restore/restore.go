@@ -25,8 +25,9 @@ var (
 // NewCommand creates the backup restore command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "restore <device> <file>",
-		Short: "Restore a device from backup",
+		Use:     "restore <device> <file>",
+		Aliases: []string{"apply", "load"},
+		Short:   "Restore a device from backup",
 		Long: `Restore a Shelly device from a backup file.
 
 By default, all data from the backup is restored. Use --skip-* flags

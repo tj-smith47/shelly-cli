@@ -13,8 +13,9 @@ import (
 // NewCommand creates the mqtt command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "mqtt",
-		Short: "Manage device MQTT configuration",
+		Use:     "mqtt",
+		Aliases: []string{"mq"},
+		Short:   "Manage device MQTT configuration",
 		Long: `Manage MQTT configuration for devices.
 
 Enable and configure MQTT for integration with home automation systems

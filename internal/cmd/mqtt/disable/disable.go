@@ -14,8 +14,9 @@ import (
 // NewCommand creates the mqtt disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "disable <device>",
-		Short: "Disable MQTT",
+		Use:     "disable <device>",
+		Aliases: []string{"off", "stop"},
+		Short:   "Disable MQTT",
 		Long: `Disable MQTT on a device.
 
 This disconnects the device from the MQTT broker and disables MQTT functionality.`,

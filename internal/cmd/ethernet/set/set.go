@@ -23,8 +23,9 @@ var (
 // NewCommand creates the ethernet set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <device>",
-		Short: "Configure Ethernet connection",
+		Use:     "set <device>",
+		Aliases: []string{"configure", "config"},
+		Short:   "Configure Ethernet connection",
 		Long: `Configure the Ethernet connection for a device.
 
 By default, Ethernet uses DHCP for automatic IP configuration. Use static IP

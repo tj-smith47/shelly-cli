@@ -35,6 +35,14 @@ These components provide real-time measurements including:
 
 For power meters with energy totals (PM/PM1 components), use 'shelly power'.`,
 		Aliases: []string{"em"},
+		Example: `  # List energy monitor components
+  shelly energy list kitchen
+
+  # Get current energy status
+  shelly em status pro3em
+
+  # View energy history
+  shelly energy history kitchen --period day`,
 	}
 
 	cmd.AddCommand(list.NewCommand(f))

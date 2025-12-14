@@ -15,8 +15,9 @@ import (
 // NewCommand creates the mqtt status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <device>",
-		Short: "Show MQTT status",
+		Use:     "status <device>",
+		Aliases: []string{"st"},
+		Short:   "Show MQTT status",
 		Long: `Show the MQTT connection status for a device.
 
 Displays whether MQTT is enabled and if the device is connected to the broker.`,

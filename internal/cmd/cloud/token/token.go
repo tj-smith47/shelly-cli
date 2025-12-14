@@ -15,8 +15,9 @@ import (
 // NewCommand creates the cloud token command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "token",
-		Short: "Show or manage cloud token",
+		Use:     "token",
+		Aliases: []string{"tok", "key"},
+		Short:   "Show or manage cloud token",
 		Long: `Show the current Shelly Cloud access token.
 
 This command displays the access token for debugging purposes.

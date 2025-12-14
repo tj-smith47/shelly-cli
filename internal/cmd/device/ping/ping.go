@@ -16,8 +16,9 @@ import (
 // NewCommand creates the device ping command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "ping <device>",
-		Short: "Check device connectivity",
+		Use:     "ping <device>",
+		Aliases: []string{"check", "test"},
+		Short:   "Check device connectivity",
 		Long: `Check if a device is reachable and responding.
 
 The ping command attempts to connect to the device and retrieve its info.

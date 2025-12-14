@@ -18,8 +18,9 @@ import (
 // NewCommand creates the webhook list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list <device>",
-		Short: "List webhooks",
+		Use:     "list <device>",
+		Aliases: []string{"ls"},
+		Short:   "List webhooks",
 		Long: `List all configured webhooks for a device.
 
 Displays webhook ID, event type, URLs, and enabled status.`,

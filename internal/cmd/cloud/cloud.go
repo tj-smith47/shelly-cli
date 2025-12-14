@@ -21,8 +21,9 @@ import (
 // NewCommand creates the cloud command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "cloud",
-		Short: "Manage cloud connection and Shelly Cloud API",
+		Use:     "cloud",
+		Aliases: []string{"cl"},
+		Short:   "Manage cloud connection and Shelly Cloud API",
 		Long: `Manage device cloud connection and interact with the Shelly Cloud API.
 
 Device cloud commands:

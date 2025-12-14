@@ -17,8 +17,9 @@ var yesFlag bool
 // NewCommand creates the webhook delete command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete <device> <webhook-id>",
-		Short: "Delete a webhook",
+		Use:     "delete <device> <webhook-id>",
+		Aliases: []string{"rm", "remove"},
+		Short:   "Delete a webhook",
 		Long: `Delete a webhook by ID.
 
 Use 'shelly webhook list' to see webhook IDs.`,

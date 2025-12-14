@@ -65,6 +65,17 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Displays real-time measurements including voltage, current, power,
 power factor, and frequency. For 3-phase EM components, shows
 per-phase data and totals.`,
+		Example: `  # Show energy monitor status
+  shelly energy status shelly-3em-pro
+
+  # Show specific component by ID
+  shelly energy status shelly-em 0
+
+  # Specify component type explicitly
+  shelly energy status shelly-em --type em1
+
+  # Output as JSON for scripting
+  shelly energy status shelly-3em-pro -o json`,
 		Aliases: []string{"st"},
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {

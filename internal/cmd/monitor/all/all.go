@@ -21,8 +21,9 @@ var intervalFlag time.Duration
 // NewCommand creates the monitor all command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "all",
-		Short: "Monitor all registered devices",
+		Use:     "all",
+		Aliases: []string{"overview", "summary"},
+		Short:   "Monitor all registered devices",
 		Long: `Monitor all devices in the registry.
 
 Shows a summary of power consumption and status for all registered devices.

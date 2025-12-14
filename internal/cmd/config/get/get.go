@@ -18,8 +18,9 @@ import (
 // NewCommand creates the config get command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get <device> [component]",
-		Short: "Get device configuration",
+		Use:     "get <device> [component]",
+		Aliases: []string{"show", "read"},
+		Short:   "Get device configuration",
 		Long: `Get configuration for a device or specific component.
 
 Without a component argument, returns the full device configuration.

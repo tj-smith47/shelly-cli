@@ -18,10 +18,18 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var inputID int
 
 	cmd := &cobra.Command{
-		Use:               "status <device>",
-		Aliases:           []string{"st"},
-		Short:             "Show input status",
-		Long:              `Display the status of an input component on a Shelly device.`,
+		Use:     "status <device>",
+		Aliases: []string{"st"},
+		Short:   "Show input status",
+		Long:    `Display the status of an input component on a Shelly device.`,
+		Example: `  # Show input status
+  shelly input status living-room
+
+  # Show specific input by ID
+  shelly input status living-room --id 1
+
+  # Output as JSON for scripting
+  shelly input status living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

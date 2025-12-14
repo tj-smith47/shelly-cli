@@ -14,8 +14,9 @@ import (
 // NewCommand creates the cloud disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "disable <device>",
-		Short: "Disable cloud connection",
+		Use:     "disable <device>",
+		Aliases: []string{"off", "disconnect"},
+		Short:   "Disable cloud connection",
 		Long: `Disable the Shelly Cloud connection for a device.
 
 Once disabled, the device will only be accessible via local network.`,

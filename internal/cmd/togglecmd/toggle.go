@@ -31,7 +31,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Toggle a device by automatically detecting its type.
 
 Works with switches, lights, covers, and RGB devices. For covers,
-this stops them if moving, otherwise toggles open/close state.
+this toggles between open and close based on current state.
 
 Use --all to toggle all controllable components on the device.`,
 		Example: `  # Toggle a switch or light
@@ -101,8 +101,21 @@ func run(ctx context.Context, opts *Options) error {
 				case model.ComponentRGB:
 					_, opErr = conn.RGB(comp.ID).Toggle(ctx)
 				case model.ComponentCover:
-					// For covers, stop if moving, otherwise toggle
-					opErr = conn.Cover(comp.ID).Stop(ctx)
+					// For covers, toggle based on current state
+					status, statusErr := conn.Cover(comp.ID).GetStatus(ctx)
+					if statusErr != nil {
+						opErr = statusErr
+					} else {
+						switch status.State {
+						case "open", "opening":
+							opErr = conn.Cover(comp.ID).Close(ctx, nil)
+						case "closed", "closing":
+							opErr = conn.Cover(comp.ID).Open(ctx, nil)
+						default:
+							// If stopped mid-way or unknown, open
+							opErr = conn.Cover(comp.ID).Open(ctx, nil)
+						}
+					}
 				default:
 					ios.Debug("skipping unsupported component type %s:%d", comp.Type, comp.ID)
 					continue

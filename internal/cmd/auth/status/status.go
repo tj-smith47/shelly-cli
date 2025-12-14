@@ -15,8 +15,9 @@ import (
 // NewCommand creates the auth status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <device>",
-		Short: "Show authentication status",
+		Use:     "status <device>",
+		Aliases: []string{"st"},
+		Short:   "Show authentication status",
 		Long: `Show the authentication status for a device.
 
 Displays whether authentication is enabled for the device.`,

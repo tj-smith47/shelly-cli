@@ -21,6 +21,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 Monitor device status, power consumption, and events in real-time
 with automatic refresh and color-coded status changes.`,
+		Example: `  # Monitor device status
+  shelly monitor status kitchen
+
+  # Monitor power consumption
+  shelly mon power living-room
+
+  # Monitor events from a device
+  shelly monitor events kitchen`,
 	}
 
 	cmd.AddCommand(status.NewCommand(f))

@@ -24,8 +24,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "toggle [device...]",
-		Short: "Toggle devices",
+		Use:     "toggle [device...]",
+		Aliases: []string{"flip"},
+		Short:   "Toggle devices",
 		Long: `Toggle multiple devices simultaneously.
 
 By default, toggles switch component 0 on each device.

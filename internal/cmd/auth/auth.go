@@ -13,8 +13,9 @@ import (
 // NewCommand creates the auth command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "auth",
-		Short: "Manage device authentication",
+		Use:     "auth",
+		Aliases: []string{"authentication"},
+		Short:   "Manage device authentication",
 		Long: `Manage device authentication settings.
 
 Enable, configure, or disable authentication for local device access.

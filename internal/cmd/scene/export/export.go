@@ -20,8 +20,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var outputFormat string
 
 	cmd := &cobra.Command{
-		Use:   "export <name> [file]",
-		Short: "Export a scene to file",
+		Use:     "export <name> [file]",
+		Aliases: []string{"save", "backup"},
+		Short:   "Export a scene to file",
 		Long: `Export a scene definition to a file.
 
 If no file is specified, outputs to stdout.

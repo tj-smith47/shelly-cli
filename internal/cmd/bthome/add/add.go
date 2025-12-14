@@ -3,7 +3,6 @@ package add
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -105,13 +104,13 @@ func addDeviceDirectly(ctx context.Context, svc *shelly.Service, opts *Options, 
 			return fmt.Errorf("failed to add device: %w", err)
 		}
 
-		jsonBytes, err := json.Marshal(resultAny)
+		parsed, err := cmdutil.UnmarshalRPCResult[struct {
+			Key string `json:"key"`
+		}](resultAny)
 		if err != nil {
-			return fmt.Errorf("failed to marshal result: %w", err)
-		}
-		if err := json.Unmarshal(jsonBytes, &result); err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
+		result = parsed
 
 		return nil
 	})

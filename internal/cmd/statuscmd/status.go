@@ -4,6 +4,7 @@ package statuscmd
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -226,8 +227,15 @@ func showAllDevicesStatus(ctx context.Context, ios *iostreams.IOStreams, svc *sh
 
 	var statuses []deviceStatus
 
+	// Sort device names for consistent ordering
+	names := make([]string, 0, len(devices))
+	for name := range devices {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
 	err := cmdutil.RunWithSpinner(ctx, ios, "Checking devices...", func(ctx context.Context) error {
-		for name := range devices {
+		for _, name := range names {
 			ds := deviceStatus{Name: name}
 
 			err := svc.WithConnection(ctx, name, func(conn *client.Client) error {

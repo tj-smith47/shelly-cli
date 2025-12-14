@@ -20,8 +20,9 @@ var filterFlag string
 // NewCommand creates the monitor events command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "events <device>",
-		Short: "Monitor device events in real-time",
+		Use:     "events <device>",
+		Aliases: []string{"ev", "subscribe"},
+		Short:   "Monitor device events in real-time",
 		Long: `Monitor device events via WebSocket subscription.
 
 Events include state changes, notifications, and status updates.

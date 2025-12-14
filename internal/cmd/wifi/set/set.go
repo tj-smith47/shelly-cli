@@ -25,8 +25,9 @@ var (
 // NewCommand creates the wifi set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <device>",
-		Short: "Configure WiFi connection",
+		Use:     "set <device>",
+		Aliases: []string{"configure", "config"},
+		Short:   "Configure WiFi connection",
 		Long: `Configure the WiFi station (client) connection for a device.
 
 Set the SSID and password to connect to a WiFi network. Optionally configure

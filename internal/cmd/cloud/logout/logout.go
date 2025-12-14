@@ -11,8 +11,9 @@ import (
 // NewCommand creates the cloud logout command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "logout",
-		Short: "Clear cloud credentials",
+		Use:     "logout",
+		Aliases: []string{"signout"},
+		Short:   "Clear cloud credentials",
 		Long: `Clear the stored Shelly Cloud credentials.
 
 This removes your access token and email from the local configuration.

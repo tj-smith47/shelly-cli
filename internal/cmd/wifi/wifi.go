@@ -14,8 +14,9 @@ import (
 // NewCommand creates the wifi command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "wifi",
-		Short: "Manage device WiFi configuration",
+		Use:     "wifi",
+		Aliases: []string{"wf", "wireless"},
+		Short:   "Manage device WiFi configuration",
 		Long: `Manage device WiFi configuration settings.
 
 Get WiFi status, scan for networks, and configure WiFi settings including

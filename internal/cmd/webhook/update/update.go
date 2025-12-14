@@ -23,8 +23,9 @@ var (
 // NewCommand creates the webhook update command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update <device> <webhook-id>",
-		Short: "Update a webhook",
+		Use:     "update <device> <webhook-id>",
+		Aliases: []string{"edit", "modify"},
+		Short:   "Update a webhook",
 		Long: `Update an existing webhook.
 
 Only specified fields will be updated. Use --enable or --disable to

@@ -14,23 +14,21 @@ import (
 
 // ThemeExport represents an exported theme configuration.
 type ThemeExport struct {
-	ID          string     `yaml:"id" json:"id"`
-	DisplayName string     `yaml:"display_name,omitempty" json:"display_name,omitempty"`
-	Colors      ThemeColor `yaml:"colors" json:"colors"`
+	Name           string            `yaml:"name" json:"name"`
+	ColorOverrides map[string]string `yaml:"color_overrides,omitempty" json:"color_overrides,omitempty"`
+	RenderedColors RenderedColors    `yaml:"rendered_colors" json:"rendered_colors"`
 }
 
-// ThemeColor represents the color values of a theme.
-type ThemeColor struct {
+// RenderedColors represents the actual color values being used (base + overrides).
+type RenderedColors struct {
 	Foreground  string `yaml:"foreground" json:"foreground"`
 	Background  string `yaml:"background" json:"background"`
-	Black       string `yaml:"black" json:"black"`
-	Red         string `yaml:"red" json:"red"`
 	Green       string `yaml:"green" json:"green"`
+	Red         string `yaml:"red" json:"red"`
 	Yellow      string `yaml:"yellow" json:"yellow"`
 	Blue        string `yaml:"blue" json:"blue"`
-	Purple      string `yaml:"purple" json:"purple"`
 	Cyan        string `yaml:"cyan" json:"cyan"`
-	White       string `yaml:"white" json:"white"`
+	Purple      string `yaml:"purple" json:"purple"`
 	BrightBlack string `yaml:"bright_black" json:"bright_black"`
 }
 
@@ -41,6 +39,10 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Aliases: []string{"exp", "save"},
 		Short:   "Export current theme",
 		Long: `Export the current theme configuration to a file.
+
+Exports the base theme name, any custom color overrides, and the effective
+colors (what you actually see). The exported file can be imported back with
+'shelly theme import'.
 
 If no file is specified, outputs to stdout.`,
 		Example: `  # Export to file
@@ -71,21 +73,53 @@ func run(f *cmdutil.Factory, file string) error {
 
 	// Build export data
 	export := ThemeExport{
-		ID:          current.ID,
-		DisplayName: current.DisplayName,
-		Colors: ThemeColor{
-			Foreground:  colorToHex(current.Fg),
-			Background:  colorToHex(current.Bg),
-			Black:       colorToHex(current.Black),
-			Red:         colorToHex(current.Red),
-			Green:       colorToHex(current.Green),
-			Yellow:      colorToHex(current.Yellow),
-			Blue:        colorToHex(current.Blue),
-			Purple:      colorToHex(current.Purple),
-			Cyan:        colorToHex(current.Cyan),
-			White:       colorToHex(current.White),
-			BrightBlack: colorToHex(current.BrightBlack),
+		Name: current.ID,
+		RenderedColors: RenderedColors{
+			Foreground:  colorToHex(theme.Fg()),
+			Background:  colorToHex(theme.Bg()),
+			Green:       colorToHex(theme.Green()),
+			Red:         colorToHex(theme.Red()),
+			Yellow:      colorToHex(theme.Yellow()),
+			Blue:        colorToHex(theme.Blue()),
+			Cyan:        colorToHex(theme.Cyan()),
+			Purple:      colorToHex(theme.Purple()),
+			BrightBlack: colorToHex(theme.BrightBlack()),
 		},
+	}
+
+	// Include custom color overrides if any are set
+	if custom := theme.GetCustomColors(); custom != nil {
+		colors := make(map[string]string)
+		if custom.Foreground != "" {
+			colors["foreground"] = custom.Foreground
+		}
+		if custom.Background != "" {
+			colors["background"] = custom.Background
+		}
+		if custom.Green != "" {
+			colors["green"] = custom.Green
+		}
+		if custom.Red != "" {
+			colors["red"] = custom.Red
+		}
+		if custom.Yellow != "" {
+			colors["yellow"] = custom.Yellow
+		}
+		if custom.Blue != "" {
+			colors["blue"] = custom.Blue
+		}
+		if custom.Cyan != "" {
+			colors["cyan"] = custom.Cyan
+		}
+		if custom.Purple != "" {
+			colors["purple"] = custom.Purple
+		}
+		if custom.BrightBlack != "" {
+			colors["bright_black"] = custom.BrightBlack
+		}
+		if len(colors) > 0 {
+			export.ColorOverrides = colors
+		}
 	}
 
 	// Marshal to YAML
@@ -107,7 +141,7 @@ func run(f *cmdutil.Factory, file string) error {
 	return nil
 }
 
-// colorToHex converts a tint.Color to a hex string.
+// colorToHex converts a color.Color to a hex string.
 func colorToHex(c interface{ RGBA() (r, g, b, a uint32) }) string {
 	if c == nil {
 		return ""

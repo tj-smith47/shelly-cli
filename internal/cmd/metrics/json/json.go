@@ -51,8 +51,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "json",
-		Short: "Output metrics as JSON",
+		Use:     "json",
+		Aliases: []string{"j"},
+		Short:   "Output metrics as JSON",
 		Long: `Output device metrics in JSON format.
 
 Outputs power, voltage, current, and energy metrics from all registered

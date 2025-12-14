@@ -15,9 +15,10 @@ import (
 // NewCommand creates the schedule enable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "enable <device> <id>",
-		Short: "Enable a schedule",
-		Long:  `Enable a schedule on a Gen2+ Shelly device.`,
+		Use:     "enable <device> <id>",
+		Aliases: []string{"on", "activate"},
+		Short:   "Enable a schedule",
+		Long:    `Enable a schedule on a Gen2+ Shelly device.`,
 		Example: `  # Enable a schedule
   shelly schedule enable living-room 1`,
 		Args:              cobra.ExactArgs(2),

@@ -24,8 +24,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "off [device...]",
-		Short: "Turn off devices",
+		Use:     "off [device...]",
+		Aliases: []string{"disable"},
+		Short:   "Turn off devices",
 		Long: `Turn off multiple devices simultaneously.
 
 By default, turns off switch component 0 on each device.

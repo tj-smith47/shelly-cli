@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -20,9 +21,10 @@ func newOffCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &OffOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "off <device>",
-		Short: "Turn light off",
-		Long:  `Turn off a Gen1 light/dimmer.`,
+		Use:     "off <device>",
+		Aliases: []string{"disable", "0"},
+		Short:   "Turn light off",
+		Long:    `Turn off a Gen1 light/dimmer.`,
 		Example: `  # Turn light off
   shelly gen1 light off living-room`,
 		Args:              cobra.ExactArgs(1),
@@ -41,15 +43,19 @@ func newOffCommand(f *cmdutil.Factory) *cobra.Command {
 func runOff(ctx context.Context, opts *OffOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
+	light, err := gen1Client.Light(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	ios.StartProgress("Turning light off...")
 
-	light := gen1Client.Light(opts.ID)
 	err = light.TurnOff(ctx)
 
 	ios.StopProgress()

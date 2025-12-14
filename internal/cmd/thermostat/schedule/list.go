@@ -118,11 +118,15 @@ func runList(ctx context.Context, opts *ListOptions) error {
 	return nil
 }
 
+// filterThermostatSchedules filters schedule jobs to only those targeting thermostats.
+// If showAll is true, returns all schedules without filtering.
+// If thermostatID > 0, only returns schedules targeting that specific thermostat.
 func filterThermostatSchedules(jobs []components.ScheduleJob, thermostatID int, showAll bool) []ThermostatSchedule {
 	var schedules []ThermostatSchedule
 
 	for _, job := range jobs {
 		if showAll {
+			// Include all schedules without parsing their calls
 			schedules = append(schedules, ThermostatSchedule{
 				ID:       job.ID,
 				Enabled:  job.Enable,
@@ -131,6 +135,7 @@ func filterThermostatSchedules(jobs []components.ScheduleJob, thermostatID int, 
 			continue
 		}
 
+		// Only include if the job calls a Thermostat.* method
 		if sched, ok := extractThermostatSchedule(job, thermostatID); ok {
 			schedules = append(schedules, sched)
 		}
@@ -139,8 +144,12 @@ func filterThermostatSchedules(jobs []components.ScheduleJob, thermostatID int, 
 	return schedules
 }
 
+// extractThermostatSchedule checks if a schedule job targets a thermostat.
+// Returns the extracted schedule and true if the job contains a Thermostat.* call.
+// If filterID > 0, only matches schedules targeting that thermostat ID.
 func extractThermostatSchedule(job components.ScheduleJob, filterID int) (ThermostatSchedule, bool) {
 	for _, call := range job.Calls {
+		// Only interested in Thermostat.* method calls (e.g., SetConfig, SetTarget)
 		if !strings.HasPrefix(call.Method, "Thermostat.") {
 			continue
 		}
@@ -151,6 +160,7 @@ func extractThermostatSchedule(job components.ScheduleJob, filterID int) (Thermo
 			Timespec: job.Timespec,
 		}
 
+		// Extract thermostat-specific parameters from the call
 		params, ok := call.Params.(map[string]any)
 		if !ok {
 			return sched, true
@@ -168,22 +178,26 @@ func extractThermostatSchedule(job components.ScheduleJob, filterID int) (Thermo
 	return ThermostatSchedule{}, false
 }
 
+// extractThermostatParams extracts thermostat-related parameters from a schedule call.
+// Handles both SetConfig (nested config object) and SetTarget (direct params) formats.
 func extractThermostatParams(sched *ThermostatSchedule, params map[string]any) {
+	// Get the thermostat component ID
 	if id, ok := params["id"].(float64); ok {
 		sched.ThermostatID = int(id)
 	}
 
-	// Check for SetConfig params
+	// SetConfig format: params.config.{target_C, thermostat_mode, enable}
 	if config, ok := params["config"].(map[string]any); ok {
 		extractConfigParams(sched, config)
 	}
 
-	// Direct params for SetTarget
+	// SetTarget format: params.target_C directly
 	if targetC, ok := params["target_C"].(float64); ok {
 		sched.TargetC = &targetC
 	}
 }
 
+// extractConfigParams extracts target temperature, mode, and enable state from config object.
 func extractConfigParams(sched *ThermostatSchedule, config map[string]any) {
 	if targetC, ok := config["target_C"].(float64); ok {
 		sched.TargetC = &targetC

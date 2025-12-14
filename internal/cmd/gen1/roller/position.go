@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -64,15 +65,19 @@ Use 'shelly gen1 roller calibrate' to calibrate first.`,
 func runPosition(ctx context.Context, opts *PositionOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
+	roller, err := gen1Client.Roller(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	ios.StartProgress("Moving roller to position...")
 
-	roller := gen1Client.Roller(opts.ID)
 	err = roller.GoToPosition(ctx, opts.Position)
 
 	ios.StopProgress()

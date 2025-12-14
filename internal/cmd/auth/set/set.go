@@ -20,8 +20,9 @@ var (
 // NewCommand creates the auth set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <device>",
-		Short: "Set authentication credentials",
+		Use:     "set <device>",
+		Aliases: []string{"password", "pw"},
+		Short:   "Set authentication credentials",
 		Long: `Set authentication credentials for a device.
 
 This enables authentication if not already enabled. The username defaults

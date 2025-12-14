@@ -17,9 +17,15 @@ import (
 // NewCommand creates the switch list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "list <device>",
-		Short:             "List switch components",
-		Long:              `List all switch components on the specified device with their current status.`,
+		Use:     "list <device>",
+		Aliases: []string{"ls", "l"},
+		Short:   "List switch components",
+		Long:    `List all switch components on the specified device with their current status.`,
+		Example: `  # List all switches on a device
+  shelly switch list kitchen
+
+  # List switches with JSON output
+  shelly switch ls kitchen -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

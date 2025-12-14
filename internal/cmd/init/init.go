@@ -118,7 +118,7 @@ func runCheck(_ context.Context, f *cmdutil.Factory) error {
 		}
 
 		// Show config summary
-		ios.Info("  Theme: %s", cfg.Theme)
+		ios.Info("  Theme: %s", cfg.GetThemeConfig().Name)
 		ios.Info("  Output: %s", cfg.Output)
 		ios.Info("  API Mode: %s", cfg.APIMode)
 	} else {
@@ -698,9 +698,10 @@ func validateConfig(cfg *config.Config) error {
 	}
 
 	// Validate theme exists
-	if cfg.Theme != "" {
-		if _, exists := theme.GetTheme(cfg.Theme); !exists {
-			errs = append(errs, fmt.Sprintf("unknown theme: %s", cfg.Theme))
+	tc := cfg.GetThemeConfig()
+	if tc.Name != "" {
+		if _, exists := theme.GetTheme(tc.Name); !exists {
+			errs = append(errs, fmt.Sprintf("unknown theme: %s", tc.Name))
 		}
 	}
 

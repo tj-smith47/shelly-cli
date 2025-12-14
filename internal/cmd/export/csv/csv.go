@@ -6,13 +6,10 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -30,8 +27,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "csv <devices...> [file]",
-		Short: "Export device list as CSV",
+		Use:     "csv <devices...> [file]",
+		Aliases: []string{"spreadsheet"},
+		Short:   "Export device list as CSV",
 		Long: `Export multiple devices as a CSV file.
 
 The CSV includes device name, address, model, generation, and online status.
@@ -53,13 +51,7 @@ Otherwise outputs to stdout.`,
 		Args:              cobra.MinimumNArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDevicesWithGroups(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check if last arg is a file
-			if len(args) > 1 && strings.HasSuffix(args[len(args)-1], ".csv") {
-				opts.File = args[len(args)-1]
-				opts.Devices = args[:len(args)-1]
-			} else {
-				opts.Devices = args
-			}
+			opts.Devices, opts.File = cmdutil.SplitDevicesAndFile(args, []string{".csv"})
 			return run(cmd.Context(), opts)
 		},
 	}
@@ -67,16 +59,6 @@ Otherwise outputs to stdout.`,
 	cmd.Flags().BoolVar(&opts.NoHead, "no-header", false, "Omit CSV header row")
 
 	return cmd
-}
-
-// DeviceRow represents a single CSV row.
-type DeviceRow struct {
-	Name       string
-	Address    string
-	Model      string
-	Generation int
-	App        string
-	Online     bool
 }
 
 func run(ctx context.Context, opts *Options) error {
@@ -92,37 +74,10 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("no devices specified")
 	}
 
-	// Collect device data
-	var rows []DeviceRow
+	// Collect device data using shared helper
+	var rows []cmdutil.DeviceData
 	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching device data...", func(ctx context.Context) error {
-		for _, device := range devices {
-			row := DeviceRow{Name: device}
-
-			// Get device config for address
-			deviceCfg, exists := config.GetDevice(device)
-			if exists {
-				row.Address = deviceCfg.Address
-				row.Model = deviceCfg.Model
-				row.Generation = deviceCfg.Generation
-			}
-
-			err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
-				info := conn.Info()
-				row.Address = deviceCfg.Address // Use config address
-				row.Model = info.Model
-				row.Generation = info.Generation
-				row.App = info.App
-				row.Online = true
-				return nil
-			})
-
-			if err != nil {
-				// Device offline - use config data (already populated above)
-				row.Online = false
-			}
-
-			rows = append(rows, row)
-		}
+		rows = cmdutil.CollectDeviceData(ctx, svc, devices)
 		return nil
 	})
 	if err != nil {

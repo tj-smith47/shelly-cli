@@ -22,8 +22,9 @@ var (
 // NewCommand creates the cloud login command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "login",
-		Short: "Authenticate with Shelly Cloud",
+		Use:     "login",
+		Aliases: []string{"auth", "signin"},
+		Short:   "Authenticate with Shelly Cloud",
 		Long: `Authenticate with the Shelly Cloud API.
 
 This command authenticates you with the Shelly Cloud service using your

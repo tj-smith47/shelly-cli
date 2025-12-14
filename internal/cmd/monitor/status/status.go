@@ -22,8 +22,9 @@ var (
 // NewCommand creates the monitor status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status <device>",
-		Short: "Monitor device status in real-time",
+		Use:     "status <device>",
+		Aliases: []string{"st", "watch"},
+		Short:   "Monitor device status in real-time",
 		Long: `Monitor a device's status in real-time with automatic refresh.
 
 Status includes switches, covers, lights, energy meters, and other components.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -60,11 +61,8 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	// Validate mode if provided
-	if opts.Mode != "" {
-		validModes := map[string]bool{"heat": true, "cool": true, "auto": true}
-		if !validModes[opts.Mode] {
-			return fmt.Errorf("invalid mode %q, must be one of: heat, cool, auto", opts.Mode)
-		}
+	if err := validate.ValidateMode(opts.Mode, true); err != nil {
+		return err
 	}
 
 	conn, err := svc.Connect(ctx, opts.Device)
@@ -76,11 +74,11 @@ func run(ctx context.Context, opts *Options) error {
 	thermostat := conn.Thermostat(opts.ID)
 
 	ios.StartProgress("Enabling thermostat...")
+	defer ios.StopProgress()
 
 	// Enable the thermostat
 	err = thermostat.Enable(ctx, true)
 	if err != nil {
-		ios.StopProgress()
 		return fmt.Errorf("failed to enable thermostat: %w", err)
 	}
 
@@ -88,12 +86,9 @@ func run(ctx context.Context, opts *Options) error {
 	if opts.Mode != "" {
 		err = thermostat.SetMode(ctx, opts.Mode)
 		if err != nil {
-			ios.StopProgress()
 			return fmt.Errorf("failed to set thermostat mode: %w", err)
 		}
 	}
-
-	ios.StopProgress()
 
 	if opts.Mode != "" {
 		ios.Success("Thermostat %d enabled in %s mode", opts.ID, opts.Mode)

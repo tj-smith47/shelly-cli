@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -20,8 +21,9 @@ func newCalibrateCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &CalibrateOptions{Factory: f}
 
 	cmd := &cobra.Command{
-		Use:   "calibrate <device>",
-		Short: "Calibrate roller positioning",
+		Use:     "calibrate <device>",
+		Aliases: []string{"cal"},
+		Short:   "Calibrate roller positioning",
 		Long: `Start the calibration procedure for a Gen1 roller/cover.
 
 Calibration measures the time required to fully open and close the roller.
@@ -51,16 +53,20 @@ Warning: Make sure the roller has no obstructions before calibrating.`,
 func runCalibrate(ctx context.Context, opts *CalibrateOptions) error {
 	ios := opts.Factory.IOStreams()
 
-	gen1Client, err := connectGen1(ctx, ios, opts.Device)
+	gen1Client, err := connutil.ConnectGen1(ctx, ios, opts.Device)
 	if err != nil {
 		return err
 	}
 	defer iostreams.CloseWithDebug("closing gen1 client", gen1Client)
 
+	roller, err := gen1Client.Roller(opts.ID)
+	if err != nil {
+		return err
+	}
+
 	ios.Info("Starting roller calibration...")
 	ios.Info("The roller will move to fully closed, then fully open.")
 
-	roller := gen1Client.Roller(opts.ID)
 	err = roller.Calibrate(ctx)
 	if err != nil {
 		return err

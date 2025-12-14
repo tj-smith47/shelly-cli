@@ -17,6 +17,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Aliases: []string{"in"},
 		Short:   "Manage input components",
 		Long:    `Manage input components on Shelly devices.`,
+		Example: `  # List input components on a device
+  shelly input list kitchen
+
+  # Check input status
+  shelly in status kitchen
+
+  # Trigger an input action
+  shelly input trigger kitchen --id 0`,
 	}
 
 	cmd.AddCommand(list.NewCommand(f))

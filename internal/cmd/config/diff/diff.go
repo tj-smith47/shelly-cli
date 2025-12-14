@@ -18,8 +18,9 @@ import (
 // NewCommand creates the config diff command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "diff <device> <file>",
-		Short: "Compare device configuration with a file",
+		Use:     "diff <device> <file>",
+		Aliases: []string{"compare", "cmp"},
+		Short:   "Compare device configuration with a file",
 		Long: `Compare the current device configuration with a saved configuration file.
 
 Shows differences between the device's current configuration and the file.`,

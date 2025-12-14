@@ -18,9 +18,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var lightID int
 
 	cmd := &cobra.Command{
-		Use:               "status <device>",
-		Short:             "Show light status",
-		Long:              `Show the current status of a light component on the specified device.`,
+		Use:     "status <device>",
+		Aliases: []string{"st", "s"},
+		Short:   "Show light status",
+		Long:    `Show the current status of a light component on the specified device.`,
+		Example: `  # Show light status
+  shelly light status kitchen
+
+  # Show status with JSON output
+  shelly lt st kitchen -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

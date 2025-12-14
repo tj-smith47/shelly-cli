@@ -5,12 +5,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -107,6 +110,11 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("no devices specified in config file")
 	}
 
+	// Validate all device names before starting
+	if err := validateDeviceNames(&cfg); err != nil {
+		return err
+	}
+
 	ios.Info("Found %d devices to provision", len(cfg.Devices))
 
 	if opts.DryRun {
@@ -130,6 +138,10 @@ func run(ctx context.Context, opts *Options) error {
 }
 
 func provisionDevices(ctx context.Context, ios *iostreams.IOStreams, opts *Options, cfg *Config) error {
+	// Add timeout for entire bulk operation
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
 	svc := opts.Factory.ShellyService()
 
 	type result struct {
@@ -195,6 +207,33 @@ func provisionDevice(ctx context.Context, svc *shelly.Service, cfg *Config, devi
 	enable := true
 	if err := svc.SetWiFiConfig(ctx, device.Name, wifi.SSID, wifi.Password, &enable); err != nil {
 		return fmt.Errorf("failed to set WiFi: %w", err)
+	}
+
+	return nil
+}
+
+// validateDeviceNames validates all device names in the config before starting.
+// For devices without an explicit address, the name must be a registered device.
+func validateDeviceNames(cfg *Config) error {
+	var errors []string
+
+	for _, d := range cfg.Devices {
+		// Validate device name format
+		if err := config.ValidateDeviceName(d.Name); err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", d.Name, err))
+			continue
+		}
+
+		// If no address specified, device must be registered
+		if d.Address == "" {
+			if _, ok := config.GetDevice(d.Name); !ok {
+				errors = append(errors, fmt.Sprintf("%s: not a registered device and no address specified", d.Name))
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("invalid device configuration:\n  %s", strings.Join(errors, "\n  "))
 	}
 
 	return nil

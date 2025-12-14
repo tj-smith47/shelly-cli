@@ -20,6 +20,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `List all power meter components (PM/PM1) on a device.
 
 Shows component IDs and types for all power meters found on the device.`,
+		Example: `  # List power meter components on a device
+  shelly power list living-room
+
+  # Output as JSON for scripting
+  shelly power list living-room -o json`,
 		Aliases:           []string{"ls"},
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
