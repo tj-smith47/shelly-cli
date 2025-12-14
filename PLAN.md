@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 14 - TUI Dashboard | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 18 - KVS Commands | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -101,7 +101,8 @@ Create a production-ready, open-source Cobra CLI that:
 | 14 | TUI Dashboard | ✅ Complete |
 | 15 | Theme System | ✅ Complete |
 | 16 | Shell Completions | ✅ Complete |
-| 17-25 | Advanced Features | ⏳ Pending |
+| 17 | Update Command | ✅ Complete |
+| 18-25 | Advanced Features | ⏳ Pending |
 | 26-27 | Documentation & Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
 | 29 | Innovative Commands (82 new) | ⏳ Pending |
@@ -1187,7 +1188,7 @@ shelly-cli/
 
 ## Phase 17: Update Command
 
-### 17.0 Init Command
+### 17.0 Init Command ✅
 
 > **INIT:** Before implementing, analyze and discuss:
 > 1. What should `shelly init` do exactly? (First-run setup? Config generation? Device discovery?)
@@ -1196,33 +1197,36 @@ shelly-cli/
 > 4. What should be configured? (Default device, output format, theme, shell completions, cloud auth?)
 > 5. Should it detect existing config and offer to migrate/update?
 
-- [ ] `shelly init` - First-run setup wizard (aliases: `setup`, `configure`)
+- [x] `shelly init` - First-run setup wizard (aliases: `setup`, `configure`)
   - Interactive guided setup for new users
   - Flags: `--non-interactive`, `--force` (overwrite existing config)
-  - Steps TBD after analysis discussion
+  - Creates config directory and example config file
+  - Installs shell completions for detected shell
+  - Offers to run device discovery
 
-### 17.1 Update System
-- [ ] Create `internal/cli/update/update.go`:
+### 17.1 Update System ✅
+- [x] Create `internal/cmd/update/update.go`:
   - Check for new releases via GitHub API
-  - Download and verify checksums
-  - Replace binary in-place
-- [ ] `shelly update` - Update CLI to latest version (aliases: `upgrade`, `self-update`)
+  - Download and verify checksums (SHA256)
+  - Replace binary in-place with backup/restore
+- [x] `shelly update` - Update CLI to latest version (aliases: `upgrade`, `self-update`)
   - Flags: `--check` (just check, don't update)
   - Flags: `--version <tag>` (specific version)
   - Flags: `--channel stable|beta` (release channel)
   - Flags: `--rollback` (revert to previous version)
   - Flags: `--yes` (skip confirmation)
-- [ ] `shelly version` - Show current version
-  - Include available update info
-  - Flags: `--short` (version only), `--json` (machine-readable)
+  - Flags: `--include-pre` (include prereleases)
+- [x] `shelly version` - Show current version
+  - Include available update info (from cache)
+  - Flags: `--short` (version only), `--json` (machine-readable), `--check` (check for updates)
 
-### 17.2 Version Checking
-- [ ] Check for updates on startup (configurable)
+### 17.2 Version Checking ✅
+- [x] Check for updates on startup (configurable)
   - Rate limit to once per 24 hours
-  - Cache check result
-- [ ] Display update notification if available
-- [ ] Respect `SHELLY_NO_UPDATE_CHECK` environment variable
-- [ ] Respect `--quiet` global flag to suppress notifications
+  - Cache check result in ~/.config/shelly/cache/latest-version
+- [x] Display update notification if available
+- [x] Respect `SHELLY_NO_UPDATE_CHECK` environment variable
+- [x] Respect `--quiet` global flag to suppress notifications
 
 ---
 
@@ -1504,7 +1508,7 @@ shelly-cli/
   - shelly-prometheus - Prometheus metrics
 
 ### 27.4 Config Examples
-- [ ] Create `examples/config/`:
+- [ ] Currently in `cfg/` with a full example and schema - needs update once here:
   - minimal.yaml - Minimal configuration
   - full.yaml - Full configuration with all options
   - multi-site.yaml - Multiple location setup
@@ -1728,7 +1732,7 @@ shelly-cli/
   - `shelly alert create|list|test|snooze <name>`
   - `--condition "power > 1000W" --notify email:admin@...`
 - [ ] `shelly notify setup` - Notification channel setup
-  - `shelly notify setup email|slack|telegram|pushover`
+  - `shelly notify setup email|slack|telegram|pushover|gotify`
 - [ ] `shelly subscribe` - Event subscriptions
   - `shelly subscribe <device> --event <type>`
 

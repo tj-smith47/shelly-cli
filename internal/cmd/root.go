@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
@@ -32,6 +33,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/extension"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
+	initcmd "github.com/tj-smith47/shelly-cli/internal/cmd/init"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
@@ -45,10 +47,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
+	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
+	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
@@ -99,7 +104,68 @@ func execute() int {
 		}
 		return 1
 	}
+
+	// Show update notification if available (from cache)
+	showCachedUpdateNotification()
+
 	return 0
+}
+
+// showCachedUpdateNotification displays a cached update notification if available.
+// This is non-blocking and only reads from the cache file.
+func showCachedUpdateNotification() {
+	// Skip if update check is disabled
+	if os.Getenv("SHELLY_NO_UPDATE_CHECK") != "" {
+		return
+	}
+
+	// Skip for certain commands (they handle their own update info)
+	if len(os.Args) > 1 {
+		cmd := os.Args[1]
+		if cmd == "version" || cmd == "update" || cmd == "completion" || cmd == "help" {
+			return
+		}
+	}
+
+	// Get cache path
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	cachePath := home + "/.config/shelly/cache/latest-version"
+
+	// Check if cache exists and is recent (within 24 hours)
+	info, err := os.Stat(cachePath)
+	if err != nil {
+		return
+	}
+
+	// Cache expired - skip notification, will be refreshed next version check
+	if info.ModTime().Add(24 * time.Hour).Before(time.Now()) {
+		return
+	}
+
+	data, err := os.ReadFile(cachePath) //nolint:gosec // G304: cachePath is from known config directory
+	if err != nil {
+		return
+	}
+
+	cachedVersion := strings.TrimSpace(string(data))
+	if cachedVersion == "" {
+		return
+	}
+
+	currentVersion := strings.TrimPrefix(version.Version, "v")
+	latestVersion := strings.TrimPrefix(cachedVersion, "v")
+
+	if currentVersion == "dev" || currentVersion == "" {
+		return
+	}
+
+	// Simple semver comparison - if latest is different and "newer"
+	if latestVersion > currentVersion {
+		iostreams.Warning("\nUpdate available: %s -> %s (run 'shelly update' to install)\n", version.Version, cachedVersion)
+	}
 }
 
 // expandAlias checks if the first argument is an alias and expands it.
@@ -238,12 +304,14 @@ func init() {
 	addCommandWithGroup(rootCmd, dash.NewCommand(f), groupMonitoring)
 
 	// Utility commands - CLI utilities
+	addCommandWithGroup(rootCmd, initcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, alias.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, extension.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, themecmd.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, updatecmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, completioncmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, versionCmd(), groupUtility)
+	addCommandWithGroup(rootCmd, versioncmd.NewCommand(f), groupUtility)
 }
 
 // addCommandWithGroup adds a command to the root and assigns it to a group.
@@ -327,21 +395,5 @@ func shouldDisableColor() bool {
 func must(err error) {
 	if err != nil {
 		panic(err)
-	}
-}
-
-func versionCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "version",
-		Short: "Print version information",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("shelly version %s\n", version.Version)
-			if version.Commit != "" {
-				fmt.Printf("  commit: %s\n", version.Commit)
-			}
-			if version.Date != "" {
-				fmt.Printf("  built: %s\n", version.Date)
-			}
-		},
 	}
 }

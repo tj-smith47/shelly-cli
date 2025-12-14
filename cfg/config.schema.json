@@ -1,0 +1,443 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/tj-smith47/shelly-cli/cfg/config.schema.json",
+  "title": "Shelly CLI Configuration",
+  "description": "Configuration schema for the Shelly CLI tool",
+  "type": "object",
+  "properties": {
+    "output": {
+      "type": "string",
+      "description": "Default output format for commands",
+      "enum": ["table", "json", "yaml", "text", "template"],
+      "default": "table"
+    },
+    "color": {
+      "type": "boolean",
+      "description": "Enable colored output",
+      "default": true
+    },
+    "theme": {
+      "type": "string",
+      "description": "Color theme for CLI output (280+ themes available)",
+      "default": "dracula",
+      "examples": ["dracula", "nord", "tokyo-night", "gruvbox", "catppuccin", "one-dark", "solarized-dark"]
+    },
+    "api_mode": {
+      "type": "string",
+      "description": "API mode for device communication",
+      "enum": ["local", "cloud", "auto"],
+      "default": "local"
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose output",
+      "default": false
+    },
+    "quiet": {
+      "type": "boolean",
+      "description": "Suppress non-essential output",
+      "default": false
+    },
+    "discovery": {
+      "type": "object",
+      "description": "Device discovery settings",
+      "properties": {
+        "timeout": {
+          "type": "string",
+          "description": "Discovery timeout (e.g., '10s', '1m')",
+          "pattern": "^[0-9]+(s|m|h)$",
+          "default": "10s"
+        },
+        "mdns": {
+          "type": "boolean",
+          "description": "Enable mDNS discovery",
+          "default": true
+        },
+        "ble": {
+          "type": "boolean",
+          "description": "Enable Bluetooth LE discovery",
+          "default": false
+        },
+        "coiot": {
+          "type": "boolean",
+          "description": "Enable CoIoT discovery",
+          "default": false
+        },
+        "network": {
+          "type": "string",
+          "description": "Default subnet for network scanning (CIDR notation)",
+          "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$",
+          "examples": ["192.168.1.0/24", "10.0.0.0/24"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "cloud": {
+      "type": "object",
+      "description": "Shelly Cloud API settings",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Shelly Cloud integration",
+          "default": false
+        },
+        "email": {
+          "type": "string",
+          "description": "Shelly Cloud account email",
+          "format": "email"
+        },
+        "access_token": {
+          "type": "string",
+          "description": "Shelly Cloud access token (do not edit manually)"
+        },
+        "refresh_token": {
+          "type": "string",
+          "description": "Shelly Cloud refresh token (do not edit manually)"
+        },
+        "server_url": {
+          "type": "string",
+          "description": "Shelly Cloud server URL",
+          "format": "uri",
+          "default": "https://shelly-api.shelly.cloud"
+        }
+      },
+      "additionalProperties": false
+    },
+    "devices": {
+      "type": "object",
+      "description": "Registered devices",
+      "additionalProperties": {
+        "$ref": "#/$defs/device"
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "description": "Command aliases",
+      "additionalProperties": {
+        "$ref": "#/$defs/alias"
+      }
+    },
+    "groups": {
+      "type": "object",
+      "description": "Device groups",
+      "additionalProperties": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "scenes": {
+      "type": "object",
+      "description": "Saved scenes",
+      "additionalProperties": {
+        "$ref": "#/$defs/scene"
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "description": "Plugin system settings",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable plugin system",
+          "default": false
+        },
+        "path": {
+          "type": "array",
+          "description": "Additional plugin search paths",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tui": {
+      "type": "object",
+      "description": "TUI dashboard settings",
+      "properties": {
+        "refresh_interval": {
+          "type": "integer",
+          "description": "Refresh interval in seconds",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 5
+        },
+        "keybindings": {
+          "$ref": "#/$defs/keybindings"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "device": {
+      "type": "object",
+      "description": "A registered Shelly device",
+      "required": ["address"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Device friendly name"
+        },
+        "address": {
+          "type": "string",
+          "description": "Device IP address or hostname",
+          "examples": ["192.168.1.50", "shelly-plus-1pm.local"]
+        },
+        "generation": {
+          "type": "integer",
+          "description": "Device generation (1, 2, or 3)",
+          "enum": [1, 2, 3]
+        },
+        "type": {
+          "type": "string",
+          "description": "Device type",
+          "examples": ["switch", "plug", "light", "dimmer", "cover", "sensor"]
+        },
+        "model": {
+          "type": "string",
+          "description": "Device model identifier",
+          "examples": ["SHSW-PM", "SHPLG-S", "SHSW-1", "SHDM-2", "SHBDUO-1"]
+        },
+        "auth": {
+          "type": "object",
+          "description": "Device authentication credentials",
+          "properties": {
+            "username": {
+              "type": "string",
+              "description": "Authentication username",
+              "default": "admin"
+            },
+            "password": {
+              "type": "string",
+              "description": "Authentication password"
+            }
+          },
+          "required": ["password"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "alias": {
+      "type": "object",
+      "description": "A command alias",
+      "required": ["command"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Alias name"
+        },
+        "command": {
+          "type": "string",
+          "description": "Command to execute (use $1, $2, etc. for arguments)",
+          "examples": ["switch on kitchen", "device list --output json", "batch toggle $@"]
+        },
+        "shell": {
+          "type": "boolean",
+          "description": "Execute command via shell (enables pipes, redirects)",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "group": {
+      "type": "object",
+      "description": "A device group",
+      "required": ["devices"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Group name"
+        },
+        "devices": {
+          "type": "array",
+          "description": "List of device names or addresses in this group",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "scene": {
+      "type": "object",
+      "description": "A saved scene configuration",
+      "required": ["actions"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Scene name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Scene description"
+        },
+        "actions": {
+          "type": "array",
+          "description": "Actions to execute when scene is activated",
+          "items": {
+            "$ref": "#/$defs/sceneAction"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "sceneAction": {
+      "type": "object",
+      "description": "A single action within a scene",
+      "required": ["device", "method"],
+      "properties": {
+        "device": {
+          "type": "string",
+          "description": "Device name or address"
+        },
+        "method": {
+          "type": "string",
+          "description": "RPC method to call",
+          "examples": ["Switch.Set", "Light.Set", "Cover.Open", "Cover.Close"]
+        },
+        "params": {
+          "type": "object",
+          "description": "Parameters for the RPC method",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "keybindings": {
+      "type": "object",
+      "description": "TUI keyboard bindings",
+      "properties": {
+        "up": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["up", "k"]
+        },
+        "down": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["down", "j"]
+        },
+        "left": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["left", "h"]
+        },
+        "right": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["right", "l"]
+        },
+        "page_up": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["pgup", "ctrl+u"]
+        },
+        "page_down": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["pgdown", "ctrl+d"]
+        },
+        "home": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["home", "g"]
+        },
+        "end": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["end", "G"]
+        },
+        "enter": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["enter"]
+        },
+        "escape": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["esc"]
+        },
+        "refresh": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["r", "ctrl+r"]
+        },
+        "filter": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["/"]
+        },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [":"]
+        },
+        "help": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["?"]
+        },
+        "quit": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["q", "ctrl+c"]
+        },
+        "toggle": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["space", "t"]
+        },
+        "turn_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["1", "o"]
+        },
+        "turn_off": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["0", "x"]
+        },
+        "reboot": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["R"]
+        },
+        "tab": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["tab"]
+        },
+        "shift_tab": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["shift+tab"]
+        },
+        "view1": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["1"]
+        },
+        "view2": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["2"]
+        },
+        "view3": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["3"]
+        },
+        "view4": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["4"]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

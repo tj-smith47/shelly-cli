@@ -64,7 +64,7 @@ func run(f *cmdutil.Factory, rootCmd *cobra.Command, shell string) error {
 	// Auto-detect shell if not specified
 	if shell == "" {
 		var err error
-		shell, err = detectShell()
+		shell, err = DetectShell()
 		if err != nil {
 			return fmt.Errorf("could not detect shell: %w\nSpecify shell with --shell flag", err)
 		}
@@ -101,20 +101,20 @@ func run(f *cmdutil.Factory, rootCmd *cobra.Command, shell string) error {
 	// Install based on shell
 	switch shell {
 	case ShellBash:
-		return installBash(ios, buf.Bytes())
+		return Bash(ios, buf.Bytes())
 	case ShellZsh:
-		return installZsh(ios, buf.Bytes())
+		return Zsh(ios, buf.Bytes())
 	case ShellFish:
-		return installFish(ios, buf.Bytes())
+		return Fish(ios, buf.Bytes())
 	case ShellPowerShell:
-		return installPowerShell(ios, buf.Bytes())
+		return PowerShell(ios, buf.Bytes())
 	}
 
 	return nil
 }
 
-// detectShell attempts to detect the user's shell.
-func detectShell() (string, error) {
+// DetectShell attempts to detect the user's shell.
+func DetectShell() (string, error) {
 	// Check SHELL environment variable
 	shell := os.Getenv("SHELL")
 	if shell != "" {
@@ -181,8 +181,8 @@ func getProcessName(pid int) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// installBash installs bash completions.
-func installBash(ios *iostreams.IOStreams, script []byte) error {
+// Bash installs bash completions.
+func Bash(ios *iostreams.IOStreams, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -244,8 +244,8 @@ func writeBashCompletion(home string, script []byte) (completionDir, completionF
 	return userDir, completionFile, nil
 }
 
-// installZsh installs zsh completions.
-func installZsh(ios *iostreams.IOStreams, script []byte) error {
+// Zsh installs zsh completions.
+func Zsh(ios *iostreams.IOStreams, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -321,8 +321,8 @@ func printZshInstructions(ios *iostreams.IOStreams, rcFile, completionDir string
 	ios.Println("  autoload -Uz compinit && compinit")
 }
 
-// installFish installs fish completions.
-func installFish(ios *iostreams.IOStreams, script []byte) error {
+// Fish installs fish completions.
+func Fish(ios *iostreams.IOStreams, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -349,8 +349,8 @@ func installFish(ios *iostreams.IOStreams, script []byte) error {
 	return nil
 }
 
-// installPowerShell installs PowerShell completions.
-func installPowerShell(ios *iostreams.IOStreams, script []byte) error {
+// PowerShell installs PowerShell completions.
+func PowerShell(ios *iostreams.IOStreams, script []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err

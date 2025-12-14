@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,17 +26,36 @@ const (
 	GitHubAPIBaseURL = "https://api.github.com"
 	// DefaultTimeout for API requests.
 	DefaultTimeout = 30 * time.Second
+	// DefaultOwner is the repository owner for shelly-cli.
+	DefaultOwner = "tj-smith47"
+	// DefaultRepo is the repository name.
+	DefaultRepo = "shelly-cli"
 )
+
+// ErrNoReleases is returned when no releases are found.
+var ErrNoReleases = errors.New("no releases found")
 
 // Release represents a GitHub release.
 type Release struct {
-	TagName string  `json:"tag_name"`
-	Name    string  `json:"name"`
-	Assets  []Asset `json:"assets"`
+	TagName     string    `json:"tag_name"`
+	Name        string    `json:"name"`
+	Body        string    `json:"body"`
+	Draft       bool      `json:"draft"`
+	Prerelease  bool      `json:"prerelease"`
+	CreatedAt   time.Time `json:"created_at"`
+	PublishedAt time.Time `json:"published_at"`
+	HTMLURL     string    `json:"html_url"`
+	Assets      []Asset   `json:"assets"`
+}
+
+// Version returns the release version without the 'v' prefix.
+func (r *Release) Version() string {
+	return strings.TrimPrefix(r.TagName, "v")
 }
 
 // Asset represents a release asset (downloadable file).
 type Asset struct {
+	ID                 int64  `json:"id"`
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 	Size               int64  `json:"size"`
@@ -81,7 +101,7 @@ func (c *Client) GetLatestRelease(ctx context.Context, owner, repo string) (*Rel
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("repository %s/%s not found or has no releases", owner, repo)
+		return nil, ErrNoReleases
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -94,6 +114,90 @@ func (c *Client) GetLatestRelease(ctx context.Context, owner, repo string) (*Rel
 	}
 
 	return &release, nil
+}
+
+// GetReleaseByTag fetches a specific release by tag name.
+func (c *Client) GetReleaseByTag(ctx context.Context, owner, repo, tag string) (*Release, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/releases/tags/%s", GitHubAPIBaseURL, owner, repo, tag)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "shelly-cli")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch release: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			c.ios.DebugErr("closing response body", cerr)
+		}
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("release %s not found", tag)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to parse release: %w", err)
+	}
+
+	return &release, nil
+}
+
+// ListReleases fetches all releases, optionally including prereleases.
+func (c *Client) ListReleases(ctx context.Context, owner, repo string, includePrereleases bool) ([]Release, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/releases", GitHubAPIBaseURL, owner, repo)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "shelly-cli")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch releases: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			c.ios.DebugErr("closing response body", cerr)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var releases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, fmt.Errorf("failed to parse releases: %w", err)
+	}
+
+	// Filter out drafts and optionally prereleases
+	filtered := make([]Release, 0, len(releases))
+	for _, r := range releases {
+		if r.Draft {
+			continue
+		}
+		if r.Prerelease && !includePrereleases {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+
+	return filtered, nil
 }
 
 // FindBinaryAsset finds the appropriate binary asset for the current platform.
@@ -400,4 +504,156 @@ func ParseRepoString(s string) (owner, repo string, err error) {
 	}
 
 	return owner, repo, nil
+}
+
+// FindAssetForPlatform finds the appropriate asset for the current OS/arch.
+func (r *Release) FindAssetForPlatform() *Asset {
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+
+	// Normalize arch names
+	archNames := []string{goarch}
+	switch goarch {
+	case "amd64":
+		archNames = append(archNames, "x86_64", "64bit")
+	case "386":
+		archNames = append(archNames, "i386", "32bit")
+	case "arm64":
+		archNames = append(archNames, "aarch64")
+	}
+
+	// OS-specific extensions
+	extensions := []string{".tar.gz", ".zip"}
+	if goos == "windows" {
+		extensions = []string{".zip", ".exe"}
+	}
+
+	for i := range r.Assets {
+		asset := &r.Assets[i]
+		name := strings.ToLower(asset.Name)
+
+		// Skip checksums
+		if strings.HasSuffix(name, ".sha256") || strings.HasSuffix(name, ".sha512") ||
+			strings.Contains(name, "checksum") {
+			continue
+		}
+
+		// Check OS
+		if !strings.Contains(name, goos) {
+			continue
+		}
+
+		// Check arch
+		archMatch := false
+		for _, a := range archNames {
+			if strings.Contains(name, strings.ToLower(a)) {
+				archMatch = true
+				break
+			}
+		}
+		if !archMatch {
+			continue
+		}
+
+		// Check extension
+		for _, ext := range extensions {
+			if strings.HasSuffix(name, ext) {
+				return asset
+			}
+		}
+	}
+
+	return nil
+}
+
+// FindChecksumAsset finds the checksum file for an asset.
+func (r *Release) FindChecksumAsset(assetName string) *Asset {
+	checksumNames := []string{
+		assetName + ".sha256",
+		assetName + ".sha256sum",
+		"checksums.txt",
+		"sha256sums.txt",
+		"SHA256SUMS",
+	}
+
+	for i := range r.Assets {
+		asset := &r.Assets[i]
+		for _, name := range checksumNames {
+			if strings.EqualFold(asset.Name, name) {
+				return asset
+			}
+		}
+	}
+
+	return nil
+}
+
+// CompareVersions compares two semantic versions.
+// Returns -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2.
+func CompareVersions(v1, v2 string) int {
+	v1 = strings.TrimPrefix(v1, "v")
+	v2 = strings.TrimPrefix(v2, "v")
+
+	// Split into parts
+	parts1 := parseVersion(v1)
+	parts2 := parseVersion(v2)
+
+	// Compare each part
+	maxLen := len(parts1)
+	if len(parts2) > maxLen {
+		maxLen = len(parts2)
+	}
+
+	for i := range maxLen {
+		var p1, p2 int
+		if i < len(parts1) {
+			p1 = parts1[i]
+		}
+		if i < len(parts2) {
+			p2 = parts2[i]
+		}
+
+		if p1 < p2 {
+			return -1
+		}
+		if p1 > p2 {
+			return 1
+		}
+	}
+
+	return 0
+}
+
+// parseVersion parses a version string into numeric parts.
+func parseVersion(v string) []int {
+	// Remove prerelease suffix (e.g., -beta.1)
+	if idx := strings.IndexAny(v, "-+"); idx != -1 {
+		v = v[:idx]
+	}
+
+	parts := strings.Split(v, ".")
+	result := make([]int, 0, len(parts))
+
+	for _, p := range parts {
+		var num int
+		_, err := fmt.Sscanf(p, "%d", &num)
+		if err != nil {
+			num = 0
+		}
+		result = append(result, num)
+	}
+
+	return result
+}
+
+// IsNewerVersion returns true if available is newer than current.
+func IsNewerVersion(current, available string) bool {
+	return CompareVersions(available, current) > 0
+}
+
+// SortReleasesByVersion sorts releases by version in descending order.
+func SortReleasesByVersion(releases []Release) {
+	sort.Slice(releases, func(i, j int) bool {
+		return CompareVersions(releases[i].TagName, releases[j].TagName) > 0
+	})
 }
