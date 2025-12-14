@@ -28,6 +28,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
@@ -127,6 +128,7 @@ func init() {
 	rootCmd.AddCommand(backup.NewCommand(f))
 	rootCmd.AddCommand(migrate.NewCommand(f))
 	rootCmd.AddCommand(monitor.NewCommand(f))
+	rootCmd.AddCommand(metrics.NewCommand(f))
 	rootCmd.AddCommand(versionCmd())
 }
 

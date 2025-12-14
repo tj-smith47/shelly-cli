@@ -4,6 +4,8 @@ package energy
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/compare"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/dashboard"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/history"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy/list"
@@ -40,6 +42,8 @@ For power meters with energy totals (PM/PM1 components), use 'shelly power'.`,
 	cmd.AddCommand(history.NewCommand(f))
 	cmd.AddCommand(export.NewCommand(f))
 	cmd.AddCommand(reset.NewCommand(f))
+	cmd.AddCommand(dashboard.NewCommand(f))
+	cmd.AddCommand(compare.NewCommand(f))
 
 	return cmd
 }

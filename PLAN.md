@@ -1,16 +1,60 @@
 # Shelly CLI - Comprehensive Implementation Plan
 
-> **CRITICAL:** NEVER mark any task as "optional", "nice to have", "not necessary", or "future improvement". All tasks are REQUIRED. Do not defer work without explicit user approval. If context limits are reached, split the work into multiple sessions - do not skip tasks.
+> ⛔ **STOP. READ [RULES.md](RULES.md) FIRST.** All mandatory workflow rules are there.
 
-> **IMPORTANT:** All future session work derives from this PLAN.md file. No additional session files should be created. Check off completed work and add concise context notes only when necessary to save investigation time.
+---
 
-> **WORKFLOW REQUIREMENTS:**
-> 1. **Lint after every file change:** Run `golangci-lint run <file>` immediately after creating or modifying any `.go` file. Address all issues before proceeding.
-> 2. **Tests for every file:** Every new or modified `.go` file must have corresponding test coverage. Write tests immediately after implementation, not as a separate phase.
-> 3. **Commit frequently:** Commit after completing each major section, large subsection, or BEFORE running any terminal commands that write to multiple files (e.g., `sed`, `gci`, bulk operations). Never leave work uncommitted.
-> 4. **No nolint without approval:** Do not add `//nolint` directives without explicit user approval.
-> 5. **No gci/gofmt without approval:** Do not run `gci`, `gofmt`, or other bulk formatting tools without explicit user approval.
-> 6. **Use verbose logging for errors:** Never use `_ = err` or similar lazy error suppression. Use `iostreams.DebugErr()` or other logging helpers to properly handle errors that don't need to propagate.
+## Session Quick Start
+
+**For LLM sessions:** This section contains everything needed to start working immediately.
+
+### What This Project Is
+A production-ready Cobra CLI for Shelly smart home devices, targeting adoption by ALLTERCO Robotics as the official Shelly CLI. Built on the `shelly-go` library (at `/db/appdata/shelly-go`).
+
+### Before You Code
+1. **Read [RULES.md](RULES.md)** - Mandatory workflow rules (factory pattern, IOStreams, error handling)
+2. **Check Current Phase** (see status table below) - Pick up where we left off
+3. **Verify shelly-go API** - Check `gen2/components/` before assuming features exist
+4. **Run existing tests** - `go test ./...` to ensure you don't break anything
+
+### Key Patterns (Enforced)
+```go
+// ✅ CORRECT: Use factory pattern
+func NewCmdSwitch(f *cmdutil.Factory) *cobra.Command
+
+// ✅ CORRECT: Get IOStreams from factory
+ios := f.IOStreams()
+
+// ✅ CORRECT: Context from command
+ctx := cmd.Context()
+
+// ✅ CORRECT: Themed output
+fmt.Fprintf(ios.Out, "%s: %s\n", ios.ColorScheme().Cyan("Power"), value)
+
+// ❌ WRONG: Direct instantiation, fmt.Println, context.Background()
+```
+
+### Commands to Run
+```bash
+go build ./...                    # Must pass
+golangci-lint run ./...           # Must pass
+go test ./...                     # Must pass
+./shelly <command> --help         # Verify help text
+./shelly <command> -o json        # Verify JSON output works
+```
+
+### Where to Find Things
+- **Commands**: `internal/cmd/<command>/` (subdirectory per subcommand)
+- **Service layer**: `internal/shelly/` (business logic, device communication)
+- **Output/theming**: `internal/iostreams/` (IOStreams, colors, spinners)
+- **Utilities**: `internal/cmdutil/` (RunWithSpinner, PrintResult, flags)
+- **shelly-go components**: `/db/appdata/shelly-go/gen2/components/`
+
+---
+
+> ⚠️ **CRITICAL:** NEVER mark any task as "optional", "nice to have", or "future improvement". All tasks are REQUIRED. Do not defer work without explicit user approval.
+
+> **Session context:** See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md) for historical implementation details.
 
 ## Project Overview
 
@@ -33,112 +77,124 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-13
-**Phase:** Phase 11.4 - Aggregated Energy Dashboard
-**Completed:** Phases 0.1-0.6, 1-10 (full), 11.1-11.3 (monitoring, energy, power)
-**Partial:** Phases 3-4 (commands done, completions TBD), 12 (core done), 13 (core done), 15 (core done), 16 (basic done, dynamic TBD)
-**Pending:** Phases 11.4-11.5, 14, 17-26, Phase 0.7 (deferred to Phase 25)
-**Test Coverage:** ~19% average - TARGET: >90% (deferred to Phase 25)
-**shelly-go version:** v0.1.6
+**Last Updated:** 2025-12-13 | **Current Phase:** 12 - Alias System | **shelly-go:** v0.1.6
 
-**Architecture Audit (2025-12-11):**
-Comprehensive audit against industry standards (gh, kubectl, docker, jira-cli, gh-dash, k9s) revealed:
-- **Critical:** 38+ duplicate command patterns need DRY refactoring
-- **Critical:** Duplicate packages (`internal/output/` vs `internal/ui/`) need consolidation
-- **Critical:** Context propagation missing (41+ files use `context.Background()`)
-- **Critical:** Missing shelly-go features (firmware, cloud, energy, scripts, schedules, etc.)
-- **High:** Batch operations should use `errgroup` instead of manual WaitGroup
-- **High:** Test coverage at ~20% (target: 90%)
-- See `docs/architecture.md` for detailed patterns from reference projects
+### Phase Progress
 
-**Session Notes:**
-- CLI restructured from `internal/cli/` to `internal/cmd/` with subdirectory-per-command pattern
-- All control commands (switch, cover, light, rgb, input, device, group, batch, scene) implemented with tests
-- Phase 0.1-0.3 completed (IOStreams 92.3%, cmdutil 92.3%, package consolidation)
-- Batch operations use `errgroup.SetLimit()` for concurrency
-- All tests pass, golangci-lint passes with 0 issues
-- Phase 11.1 (monitor commands) completed: status, power, events, all subcommands
-- Phase 11.2 (energy commands) completed: list, status, history, export, reset with comprehensive tests
-  - Updated shelly-go to v0.1.5 for EMData/EM1Data component support
-  - Fixed CSV URL methods to avoid unnecessary device connections
-  - All commands support auto-detection of EM vs EM1 component types
-- Phase 11.3 (power commands) completed: list, status (PM/PM1 components)
-  - Updated shelly-go to v0.1.6
-  - Fixed CSV export type assertions (was broken - using wrong types)
-  - Removed all `//nolint:errcheck` directives - replaced with proper `ios.DebugErr()` or `t.Logf()` logging
-- Service layer enhanced with 8 new monitoring methods in `internal/shelly/monitoring.go`
+| Phase | Name | Status |
+|-------|------|--------|
+| 0.1-0.6 | Architecture Refactoring | ✅ Complete |
+| 0.7 | Test Coverage Foundation | ⏳ Deferred to Phase 29 |
+| 1-2 | Project Foundation & Infrastructure | ✅ Complete |
+| 3-4 | Device Management & Control | 🟡 Commands done, completions TBD |
+| 5 | Configuration Commands | ✅ Complete |
+| 6 | Firmware Commands | ✅ Complete |
+| 7 | Script Commands | ✅ Complete |
+| 8 | Schedule Commands | ✅ Complete |
+| 9 | Cloud Commands | ✅ Complete |
+| 10 | Backup & Restore | ✅ Complete |
+| 11.1-11.3 | Monitoring (status, energy, power) | ✅ Complete |
+| 11.4 | Energy Dashboard | ✅ Complete |
+| 11.5 | Metrics Export | ✅ Complete |
+| 12 | Alias System | 🟡 Core done |
+| 13 | Plugin System | 🟡 Core done |
+| 14 | TUI Dashboard | ⏳ Pending |
+| 15 | Theme System | 🟡 Core done |
+| 16 | Shell Completions | 🟡 Basic done, dynamic TBD |
+| 17-25 | Advanced Features | ⏳ Pending |
+| 26-27 | Documentation & Examples | ⏳ Pending |
+| 28 | Testing (90%+ coverage) | ⏳ Pending |
+| 29 | Innovative Commands (82 new) | ⏳ Pending |
+| 30 | Polish & Release (FINAL) | ⏳ Pending |
+
+**Test Coverage:** ~19% (target: 90%+ in Phase 28)
+
+> **Note:** Session-specific implementation notes moved to [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md)
 
 ---
 
-## Lessons Learned (Critical for Future Sessions)
+## Lessons Learned
 
-> **READ THIS BEFORE STARTING ANY NEW PHASE.** These lessons prevent wasted context and rework.
+> See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md) for full details.
 
-### 1. Verify shelly-go API Before Planning
-**Problem:** Plan items for `power history` and `power calibrate` were impossible - the Shelly API doesn't provide these for PM components.
+**Key lessons:**
+1. **Verify shelly-go API** - Check component files before planning features
+2. **Use concrete types** - Never `interface{}` for API data
+3. **Never suppress errors** - Use `ios.DebugErr()` instead of `//nolint:errcheck`
+4. **Check existing patterns** - Search cmdutil before reimplementing
+5. **Verify before marking complete** - Build, lint, test, manual verify
+6. **No bulk formatting** - Only format files YOU changed
 
-**Solution:** Before adding ANY feature to the plan:
-1. Check shelly-go components: `ls /db/appdata/shelly-go/gen2/components/`
-2. Read the actual component file to see available methods
-3. Check Shelly API docs if unclear: https://shelly-api-docs.shelly.cloud/gen2/
+---
 
-### 2. Use Concrete Types, Never interface{}
-**Problem:** export.go used `interface{}` parameters and wrong type assertions, causing the CSV export to be completely broken despite being marked complete.
+## Global Flags & Output Control
 
-**Solution:** Always use concrete types from shelly-go:
-```go
-// WRONG - vague and error-prone
-func exportEMDataCSV(data interface{}) error
+> ⚠️ **IMPORTANT:** All commands MUST support these global flags. Theming must be consistent across all output.
 
-// CORRECT - compiler catches type mismatches
-func exportEMDataCSV(data *components.EMDataGetDataResult) error
+### Global Flags (Available on ALL Commands)
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--output` | `-o` | string | `text` | Output format: `text`, `json`, `yaml`, `table`, `csv` |
+| `--no-color` | | bool | auto | Disable colored output (also respects `NO_COLOR` env var) |
+| `--plain` | | bool | false | Plain output: no colors, no spinners, no progress bars |
+| `--quiet` | `-q` | bool | false | Suppress non-essential output (only errors and direct results) |
+| `--verbose` | `-v` | bool | false | Verbose output with extra details |
+| `--debug` | | bool | false | Debug mode with request/response logging |
+| `--timeout` | | duration | 30s | Request timeout for device operations |
+| `--config` | | string | auto | Config file path (default: `~/.config/shelly/config.yaml`) |
+| `--device` | `-d` | string | | Default device for commands that require one |
+
+### Output Format Examples
+
+```bash
+# JSON output (pipeable)
+shelly device list -o json | jq '.[] | select(.online)'
+
+# CSV for spreadsheets
+shelly energy history kitchen -o csv > energy.csv
+
+# YAML for config management
+shelly config export kitchen -o yaml > kitchen.yaml
+
+# Plain for scripting (no ANSI codes)
+shelly switch status kitchen --plain
+
+# Quiet for cron jobs
+shelly batch on all-lights -q
 ```
 
-### 3. Never Suppress Errors with nolint:errcheck
-**Problem:** 10+ `//nolint:errcheck` directives hid errors that should have been logged.
+### Theming Requirements
 
-**Solution:** Always handle errors properly:
-```go
-// WRONG - errors silently ignored
-//nolint:errcheck
-table.PrintTo(ios.Out)
+All output MUST use themed colors via IOStreams:
+- **Keys/labels**: Use `ios.ColorScheme().Cyan()` for property names
+- **Values**: Use theme-appropriate colors (green=success, red=error, yellow=warning)
+- **Tables**: Headers themed, alternating row colors optional
+- **Status indicators**: Use consistent symbols (✓, ✗, ●, ○, ◐)
 
-// CORRECT - errors surfaced in verbose mode
-if err := table.PrintTo(ios.Out); err != nil {
-    ios.DebugErr("print table", err)
-}
+**Anti-pattern:** Never use `fmt.Println()` or hardcoded ANSI codes in commands.
 
-// CORRECT for tests - use t.Logf
-if err := os.Unsetenv("VAR"); err != nil {
-    t.Logf("warning: %v", err)
-}
-```
+### Pipeable Commands
 
-### 4. Check Existing Patterns Before Implementing
-**Problem:** Time wasted reimplementing patterns that already exist in cmdutil.
+These commands MUST produce clean, parseable output when piped:
 
-**Solution:** Before writing command code, check:
-- `internal/cmdutil/runner.go` - RunWithSpinner, RunStatus, RunList, etc.
-- `internal/cmdutil/output.go` - FormatOutput, FormatTable, PrintListResult
-- `internal/iostreams/` - DebugErr, Success, Info, Printf
-- Existing similar commands for patterns (e.g., check energy/ before implementing power/)
+| Command | Pipeable Output | Example Use |
+|---------|-----------------|-------------|
+| `device list` | Device names/IPs | `shelly device list -o json \| jq -r '.[].name'` |
+| `device info` | Device JSON | `shelly device info kitchen -o json \| jq '.firmware'` |
+| `switch status` | State (on/off/json) | `shelly switch status kitchen --plain` returns `on` or `off` |
+| `energy status` | Power/energy values | `shelly energy status -o json \| jq '.power'` |
+| `energy history` | CSV/JSON data | `shelly energy history kitchen -o csv >> log.csv` |
+| `discover scan` | Discovered IPs | `shelly discover scan -o json \| jq -r '.[].ip'` |
+| `config export` | Config JSON/YAML | `shelly config export kitchen -o yaml > backup.yaml` |
+| `backup create` | Backup file path | `shelly backup create kitchen -o plain` returns filename |
+| `script get` | Script source code | `shelly script get kitchen 1 > script.js` |
 
-### 5. Verify Completion Before Marking Complete
-**Problem:** Phase 11.2 was marked complete but CSV export was broken.
-
-**Solution:** Before marking ANY task complete:
-1. Build and run linter: `go build ./... && golangci-lint run ./...`
-2. Run tests: `go test ./...`
-3. Manually test the feature if it's user-facing
-4. Check that all code paths work (not just the happy path)
-
-### 6. Don't Run Bulk Formatting Without Approval
-**Problem:** Running `gci` across 70+ files wasted an entire context window fixing import ordering that wasn't broken.
-
-**Solution:** PLAN.md rule #5 exists for a reason:
-> "No gci/gofmt without approval: Do not run `gci`, `gofmt`, or other bulk formatting tools without explicit user approval."
-
-Only run formatters on files YOU changed, not the entire codebase.
+**Requirements for pipeable commands:**
+1. When stdout is not a TTY, automatically disable colors and spinners
+2. Support `--plain` to force machine-readable output even in TTY
+3. JSON output must be valid, parseable JSON (no extra text)
+4. Exit codes must reflect success (0) or failure (non-zero)
 
 ---
 
@@ -682,7 +738,7 @@ shelly-cli/
   - Flags: --dry-run, --merge, --overwrite
 - [x] `shelly config reset <device> [component]` - Reset to defaults
 
-**Session Note (2025-12-11):** Created `internal/cmd/config/` with get/, set/, diff/, export/, import/, reset/ subcommands and `internal/shelly/config.go` service layer. Uses iostreams.DebugErr for verbose error logging. Approved nolint for: MD5 (Shelly digest auth), G304 (user-provided file paths), G306 (0o644 for config exports).
+*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-5-configuration-commands)*
 
 ### 5.2 Network Configuration ✅
 - [x] `shelly wifi status <device>` - Show WiFi status
@@ -693,14 +749,12 @@ shelly-cli/
 - [x] `shelly ethernet status <device>` - Show ethernet status (Pro devices)
 - [x] `shelly ethernet set <device>` - Configure ethernet
 
-**Session Note (2025-12-11):** Created `internal/cmd/wifi/` and `internal/cmd/ethernet/` using cmdutil helpers (RunDeviceStatus, RunList, RunWithSpinner). Added ethernet and WiFi AP service methods to `internal/shelly/config.go`.
 
 ### 5.3 Cloud Configuration ✅
 - [x] `shelly cloud status <device>` - Show cloud status
 - [x] `shelly cloud enable <device>` - Enable cloud connection
 - [x] `shelly cloud disable <device>` - Disable cloud connection
 
-**Session Note (2025-12-11):** Created `internal/cmd/cloud/` with status/, enable/, disable/ subcommands.
 
 ### 5.4 Auth Configuration ✅
 - [x] `shelly auth status <device>` - Show auth status
@@ -708,7 +762,6 @@ shelly-cli/
   - Flags: --user, --password
 - [x] `shelly auth disable <device>` - Disable auth
 
-**Session Note (2025-12-11):** Created `internal/cmd/auth/` with status/, set/, disable/ subcommands. Added GetAuthStatus and DisableAuth to service layer.
 
 ### 5.5 MQTT Configuration ✅
 - [x] `shelly mqtt status <device>` - Show MQTT status
@@ -716,7 +769,6 @@ shelly-cli/
   - Flags: --server, --user, --password, --topic-prefix
 - [x] `shelly mqtt disable <device>` - Disable MQTT
 
-**Session Note (2025-12-11):** Created `internal/cmd/mqtt/` with status/, set/, disable/ subcommands.
 
 ### 5.6 Webhook Configuration ✅
 - [x] `shelly webhook list <device>` - List webhooks
@@ -726,7 +778,6 @@ shelly-cli/
 - [x] `shelly webhook update <device> <id>` - Update webhook
   - Flags: --event, --url, --name, --enable, --disable
 
-**Session Note (2025-12-11):** Created `internal/cmd/webhook/` with list/, create/, del/, update/ subcommands. Added webhook service methods to `internal/shelly/config.go`.
 
 ---
 
@@ -750,7 +801,7 @@ shelly-cli/
 - [x] `shelly firmware download <device>` - Download firmware file
   - Flags: --output, --latest, --beta
 
-**Session Note (2025-12-11):** Created `internal/cmd/firmware/` with check/, status/, update/, rollback/, download/ subcommands. Added `internal/shelly/firmware.go` service layer using shelly-go firmware package. Features: check single/all devices, staged rollouts with --staged percentage, parallel updates with --parallel, beta and custom URL support. Alias: `fw`.
+*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-6-firmware-commands)*
 
 ---
 
@@ -773,7 +824,7 @@ shelly-cli/
   - Flags: --append
 - [x] `shelly script download <device> <id> <file>` - Download script to file (alias: save)
 
-**Session Note (2025-12-11):** Created `internal/cmd/script/` with list/, get/, create/, update/, del/, start/, stop/, eval/, upload/, download/ subcommands. Added `internal/shelly/script.go` service layer using shelly-go gen2/components/script. Parent command alias: `sc`.
+*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-7-script-commands-gen2)*
 
 ### 7.2 Script Library
 - [ ] `shelly script-lib list` - List available script templates
@@ -798,7 +849,7 @@ shelly-cli/
 - [x] `shelly schedule enable <device> <id>` - Enable schedule
 - [x] `shelly schedule disable <device> <id>` - Disable schedule
 
-**Session Note (2025-12-11):** Created `internal/cmd/schedule/` with list/, create/, update/, del/, deleteall/, enable/, disable/ subcommands. Added `internal/shelly/schedule.go` service layer using shelly-go gen2/components/schedule. Supports cron-like timespec with @sunrise/@sunset. Parent command alias: `sched`.
+*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-8-schedule-commands)*
 
 ### 8.2 Schedule Helpers
 - [ ] `shelly schedule sunrise <device>` - Create sunrise-based schedule
@@ -830,20 +881,13 @@ shelly-cli/
   - Output events as they arrive (text or JSON)
   - Flags: --device (filter), --event (filter), --format (text/json), --raw
 
-**Session Note (2025-12-12):** Created `internal/shelly/cloud.go` service layer wrapping shelly-go cloud package. Added login/, logout/, authstatus/, token/, devices/, device/, control/, events/ subcommands under existing cloud command. Events command uses gorilla/websocket for real-time cloud event streaming. Existing device cloud commands (status, enable, disable) preserved.
+*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-9-cloud-commands)*
 
 ---
 
 ## Phase 10: Backup & Restore Commands ✅
 
-> **Implementation Notes (2025-12-12):**
-> - Rewrote `internal/shelly/backup.go` to properly use shelly-go's backup.Manager
-> - Replaced weak bcrypt-only "encryption" with proper AES-256-GCM via shelly-go
-> - Added missing KVS (Key-Value Storage) backup support
-> - Created `internal/shelly/migrate.go` using shelly-go's backup.Migrator
-> - Updated all commands to use wrapper API (Device() and Encrypted() methods)
-> - Comprehensive test suites for both backup and migrate service layers
-> - All golangci-lint checks passing
+*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-10-backup--restore)*
 
 ### 10.1 Backup Operations ✅
 - [x] `shelly backup create <device> [file]` - Create device backup
@@ -906,22 +950,33 @@ shelly-cli/
 
 **Note:** PM/PM1 components do not have historical data storage (unlike EM/EM1 which have EMData/EM1Data). PM also has no calibration method - calibration is only available for Cover and Thermostat components. The plan items for `power history` and `power calibrate` were incorrect assumptions.
 
-### 11.4 Aggregated Energy Dashboard
-- [ ] `shelly energy dashboard` - Summary of all energy meters
+### 11.4 Aggregated Energy Dashboard ✅
+- [x] `shelly energy dashboard` - Summary of all energy meters (aliases: dash, summary)
   - Total power consumption
   - Per-device breakdown
-  - Cost estimation (if rate configured)
-- [ ] `shelly energy compare` - Compare energy usage
-  - Flags: `--devices`, `--period`
+  - Cost estimation via `--cost` and `--currency` flags
+  - Concurrent device queries with errgroup
+  - Supports EM, EM1, PM, PM1 components
+- [x] `shelly energy compare` - Compare energy usage (aliases: cmp, diff)
+  - Flags: `--devices`, `--period`, `--from`, `--to`
+  - Historical energy comparison using EMData/EM1Data
+  - Visual bar chart of energy distribution
+  - Per-device percentage breakdown
 
-### 11.5 Metrics Export
-- [ ] `shelly metrics prometheus` - Start Prometheus exporter
-  - Flags: `--port`, `--devices`, `--interval`
-  - Exports: power, energy, voltage, current, temperature
-- [ ] `shelly metrics json` - Output metrics as JSON
+### 11.5 Metrics Export ✅
+- [x] `shelly metrics prometheus` - Start Prometheus exporter (aliases: prom)
+  - Flags: `--port` (default 9090), `--devices`, `--interval` (default 15s)
+  - HTTP server at /metrics with Prometheus format
+  - Exports: shelly_power_watts, shelly_voltage_volts, shelly_current_amps, shelly_energy_wh, shelly_device_online
+  - Collects from PM, PM1, EM, EM1 components concurrently
+- [x] `shelly metrics json` - Output metrics as JSON
+  - Flags: `--devices`, `--continuous`, `--interval`, `--output`
+  - Structured JSON with timestamp, devices, components
   - For integration with other monitoring tools
-- [ ] `shelly metrics influxdb` - InfluxDB line protocol output
-  - Flags: `--host`, `--database`, `--retention`
+- [x] `shelly metrics influxdb` - InfluxDB line protocol output (aliases: influx, line)
+  - Flags: `--devices`, `--continuous`, `--interval`, `--output`, `--measurement`, `--tags`
+  - InfluxDB line protocol format for time-series databases
+  - Supports custom measurement names and additional tags
 
 ---
 
@@ -1113,19 +1168,22 @@ shelly-cli/
 
 ---
 
-## Phase 17: Self-Update Command
+## Phase 17: Update Command
 
 ### 17.1 Update System
-- [ ] Create `internal/cli/upgrade/upgrade.go`:
+- [ ] Create `internal/cli/update/update.go`:
   - Check for new releases via GitHub API
   - Download and verify checksums
   - Replace binary in-place
-- [ ] `shelly upgrade` - Upgrade to latest version
-  - Flags: --check (just check, don't upgrade)
-  - Flags: --version (specific version)
-  - Flags: --pre-release (include pre-releases)
+- [ ] `shelly update` - Update CLI to latest version (aliases: `upgrade`, `self-update`)
+  - Flags: `--check` (just check, don't update)
+  - Flags: `--version <tag>` (specific version)
+  - Flags: `--channel stable|beta` (release channel)
+  - Flags: `--rollback` (revert to previous version)
+  - Flags: `--yes` (skip confirmation)
 - [ ] `shelly version` - Show current version
   - Include available update info
+  - Flags: `--short` (version only), `--json` (machine-readable)
 
 ### 17.2 Version Checking
 - [ ] Check for updates on startup (configurable)
@@ -1133,6 +1191,7 @@ shelly-cli/
   - Cache check result
 - [ ] Display update notification if available
 - [ ] Respect `SHELLY_NO_UPDATE_CHECK` environment variable
+- [ ] Respect `--quiet` global flag to suppress notifications
 
 ---
 
@@ -1245,73 +1304,73 @@ shelly-cli/
 
 ---
 
-## Phase 22A: Gen1 Device Support
+## Phase 23: Gen1 Device Support
 
 > **Note:** Gen1 devices use a different API than Gen2+. The shelly-go library provides full Gen1 support via the `gen1/` package.
 
-### 22A.1 Gen1 Client Integration
+### 23.1 Gen1 Client Integration
 - [ ] Create `internal/client/gen1.go`:
   - Wrapper for shelly-go `gen1/` package
   - Auto-detection of device generation
   - Unified interface where possible
 
-### 22A.2 Gen1 Discovery
+### 23.2 Gen1 Discovery
 - [ ] Enhance `shelly discover coiot` for Gen1-specific info
 - [ ] Add `--gen1-only` flag to discovery commands
 
-### 22A.3 Gen1 Control Commands
+### 23.3 Gen1 Control Commands
 - [ ] Extend existing commands to support Gen1 devices:
   - `shelly switch on/off/toggle/status` - Use Gen1 relay API
   - `shelly cover open/close/stop/position` - Use Gen1 roller API
   - `shelly light on/off/set/status` - Use Gen1 light API (Bulbs, Duo)
   - `shelly rgb set/status` - Use Gen1 color API (RGBW, Bulb)
 
-### 22A.4 Gen1-Specific Commands
+### 23.4 Gen1-Specific Commands
 - [ ] `shelly gen1 settings <device>` - Get/set Gen1 settings
 - [ ] `shelly gen1 actions <device>` - Manage Gen1 actions (URLs)
 - [ ] `shelly gen1 status <device>` - Full Gen1 status dump
 - [ ] `shelly gen1 ota <device>` - Gen1 OTA firmware update
 
-### 22A.5 CoIoT Real-time Updates
+### 23.5 CoIoT Real-time Updates
 - [ ] `shelly gen1 coiot <device>` - Subscribe to CoIoT updates
 - [ ] Integrate CoIoT into TUI monitoring view
 
 ---
 
-## Phase 22B: Sensor Commands
+## Phase 24: Sensor Commands
 
 > **Note:** Covers environmental sensors available in shelly-go `gen2/components/`.
 
-### 22B.1 Temperature Sensor
+### 24.1 Temperature Sensor
 - [ ] `shelly sensor temperature list <device>` - List temperature sensors
 - [ ] `shelly sensor temperature status <device> [id]` - Current temperature
 - [ ] `shelly sensor temperature history <device> [id]` - Temperature history
   - Flags: `--period`, `--format`
 
-### 22B.2 Humidity Sensor
+### 24.2 Humidity Sensor
 - [ ] `shelly sensor humidity list <device>` - List humidity sensors
 - [ ] `shelly sensor humidity status <device> [id]` - Current humidity
 
-### 22B.3 Flood Sensor
+### 24.3 Flood Sensor
 - [ ] `shelly sensor flood list <device>` - List flood sensors
 - [ ] `shelly sensor flood status <device> [id]` - Flood detection status
 - [ ] `shelly sensor flood test <device> [id]` - Test flood alarm
 
-### 22B.4 Smoke Sensor
+### 24.4 Smoke Sensor
 - [ ] `shelly sensor smoke list <device>` - List smoke sensors
 - [ ] `shelly sensor smoke status <device> [id]` - Smoke detection status
 - [ ] `shelly sensor smoke test <device> [id]` - Test smoke alarm
 - [ ] `shelly sensor smoke mute <device> [id]` - Mute alarm
 
-### 22B.5 Illuminance Sensor
+### 24.5 Illuminance Sensor
 - [ ] `shelly sensor illuminance list <device>` - List illuminance sensors
 - [ ] `shelly sensor illuminance status <device> [id]` - Current light level
 
-### 22B.6 Voltmeter
+### 24.6 Voltmeter
 - [ ] `shelly sensor voltmeter list <device>` - List voltmeters
 - [ ] `shelly sensor voltmeter status <device> [id]` - Current voltage reading
 
-### 22B.7 Combined Sensor Status
+### 24.7 Combined Sensor Status
 - [ ] `shelly sensor status <device>` - All sensor readings in one view
 - [ ] `shelly sensor monitor <device>` - Real-time sensor monitoring
   - Updates via WebSocket
@@ -1319,11 +1378,11 @@ shelly-cli/
 
 ---
 
-## Phase 22C: Thermostat Commands
+## Phase 25: Thermostat Commands
 
 > **Note:** Thermostat support via shelly-go `gen2/components/thermostat.go`.
 
-### 22C.1 Thermostat Control
+### 25.1 Thermostat Control
 - [ ] `shelly thermostat list <device>` - List thermostats
 - [ ] `shelly thermostat status <device> [id]` - Thermostat status
 - [ ] `shelly thermostat set <device> [id]` - Set thermostat
@@ -1331,54 +1390,54 @@ shelly-cli/
 - [ ] `shelly thermostat enable <device> [id]` - Enable thermostat
 - [ ] `shelly thermostat disable <device> [id]` - Disable thermostat
 
-### 22C.2 Thermostat Schedules
+### 25.2 Thermostat Schedules
 - [ ] `shelly thermostat schedule list <device> [id]` - List schedules
 - [ ] `shelly thermostat schedule set <device> [id]` - Set schedule
   - Interactive mode for schedule configuration
 
 ---
 
-## Phase 23: Documentation
+## Phase 26: Documentation
 
-### 23.1 README.md
+### 26.1 README.md
 - [ ] Project overview and features
 - [ ] Installation instructions (all methods)
 - [ ] Quick start guide
 - [ ] Configuration overview
 - [ ] Link to full documentation
 
-### 23.2 Command Documentation
+### 26.2 Command Documentation
 - [ ] Generate `docs/commands/` from Cobra command help
 - [ ] Include examples for each command
 - [ ] Document all flags and options
 - [ ] Add common use cases
 
-### 23.3 Configuration Reference
+### 26.3 Configuration Reference
 - [ ] Create `docs/configuration.md`:
   - Config file format and location
   - All configuration options
   - Environment variables
   - Example configurations
 
-### 23.4 Plugin Development Guide
+### 26.4 Plugin Development Guide
 - [ ] Create `docs/plugins.md`:
   - Plugin architecture overview
   - SDK documentation
   - Example plugin walkthrough
   - Publishing plugins
 
-### 23.5 Theming Guide
+### 26.5 Theming Guide
 - [ ] Create `docs/themes.md`:
   - Built-in themes
   - Custom theme creation
   - Theme file format
   - TUI component styling
 
-### 23.6 Man Pages
+### 26.6 Man Pages
 - [ ] Generate man pages via Cobra
 - [ ] Include in release artifacts
 
-### 23.7 Documentation Site
+### 26.7 Documentation Site
 - [ ] Create docs site using mkdocs-material or docusaurus
 - [ ] Deploy to GitHub Pages
 - [ ] Include:
@@ -1392,28 +1451,28 @@ shelly-cli/
 
 ---
 
-## Phase 24: Examples
+## Phase 27: Examples
 
-### 24.1 Alias Examples
+### 27.1 Alias Examples
 - [ ] Create `examples/aliases/`:
   - power-users.yaml - Power user aliases
   - shortcuts.yaml - Common shortcuts
   - automation.yaml - Automation-focused aliases
 
-### 24.2 Script Examples
+### 27.2 Script Examples
 - [ ] Create `examples/scripts/`:
   - morning-routine.sh - Morning automation
   - away-mode.sh - Away mode setup
   - energy-report.sh - Energy reporting
   - bulk-update.sh - Bulk firmware update
 
-### 24.3 Plugin Examples
+### 27.3 Plugin Examples
 - [ ] Create `examples/plugins/`:
   - shelly-notify - Desktop notifications
   - shelly-homekit - HomeKit bridge info
   - shelly-prometheus - Prometheus metrics
 
-### 24.4 Config Examples
+### 27.4 Config Examples
 - [ ] Create `examples/config/`:
   - minimal.yaml - Minimal configuration
   - full.yaml - Full configuration with all options
@@ -1421,13 +1480,13 @@ shelly-cli/
 
 ---
 
-## Phase 25: Testing
+## Phase 28: Testing
 
 > **READ WHEN IMPLEMENTING:** See [docs/testing.md](docs/testing.md) for full testing strategy, coverage targets, and code examples.
 
 **Target:** 90%+ overall coverage
 
-### 25.1 Tasks
+### 28.1 Tasks
 - [ ] Implement unit tests per package (see docs/testing.md for targets)
 - [ ] Create `internal/testutil/` with MockClient, MockServer, TestIOStreams, TestFactory
 - [ ] Add integration tests with mock device server
@@ -1437,33 +1496,282 @@ shelly-cli/
 
 ---
 
-## Phase 26: Polish & Release
+## Phase 29: Innovative Commands
 
-### 26.1 Code Quality
+> These commands differentiate the CLI and showcase its power. They're the "wow factor" that makes this tool stand out.
+
+### 29.1 User Experience Excellence
+
+- [ ] `shelly feedback` - Integrated issue reporting to GitHub
+  - Interactive mode or `--type bug|feature|device`
+  - Auto-populates system info, CLI version, device context
+  - Flags: `--attach-log`, `--screenshot`
+- [ ] `shelly doctor` - Comprehensive diagnostic health check (inspired by `brew doctor`)
+  - Checks: CLI version, config validity, network reachability, device health, firmware status, cloud auth
+  - Flags: `--network`, `--devices`, `--full`
+- [ ] `shelly context` - Context management (kubectl-style)
+  - `shelly context list|use|create|export|import`
+  - Switch between device groups/locations seamlessly
+- [ ] `shelly history` - Command history with replay
+  - `shelly history [--device]`, `shelly history replay <id>`, `shelly history export`
+- [ ] `shelly diff` - Visual diff between device configurations
+  - `shelly diff <device1> <device2>` or `shelly diff <device> <backup.json>`
+
+### 29.2 Power User Features
+
+- [ ] `shelly watch` - Real-time monitoring dashboard (BubbleTea TUI)
+  - `shelly watch [devices...]`, `--power`, `--events`, `--interval`
+  - Live updates via WebSocket
+- [ ] `shelly simulate` - Dry run mode for commands
+  - `shelly simulate <any-command>` - shows what would execute without changes
+- [ ] `shelly record` - Macro recording and replay
+  - `shelly record start|stop|list|play|export <name>`
+- [ ] `shelly benchmark` - Device performance testing
+  - Measures ping, API latency, toggle response times
+  - `shelly benchmark <device> [--iterations N]`
+- [ ] `shelly profile usage` - Analyze device usage patterns
+  - Peak hours, average on-time, energy consumption, toggle frequency
+
+### 29.3 Developer & Integration
+
+- [ ] `shelly api` - Direct RPC access for developers
+  - `shelly api <device> <method> [params]`
+  - Flags: `--list-methods`, `--interactive` (REPL)
+- [ ] `shelly webhook server` - Built-in local webhook receiver for testing
+  - Auto-configures devices to send webhooks to this server
+  - `shelly webhook server [--port 8080] [--log]`
+- [ ] `shelly export terraform` - Infrastructure as Code export
+  - `shelly export terraform|ansible|homeassistant --all`
+- [ ] `shelly mqtt bridge` - Act as MQTT bridge for devices
+  - `shelly mqtt bridge --broker mqtt://localhost:1883 [--ha-discovery]`
+- [ ] `shelly test` - Integration testing for devices
+  - `shelly test <device> [--stress] [--network] [--power]`
+
+### 29.4 Smart Automation
+
+- [ ] `shelly trigger` - Event-based automation rules
+  - `shelly trigger create <name> --event <type> --action <command>`
+  - Events: sunset, sunrise, device events, thresholds
+- [ ] `shelly chain` - Command chaining with conditions
+  - `shelly chain "cmd1" --then "cmd2" --on-error "notify"`
+- [ ] `shelly schedule smart` - Intelligent scheduling
+  - `--trigger sunset|sunrise [--offset +30m] [--condition "not weekend"]`
+
+### 29.5 Fleet Management (Enterprise)
+
+- [ ] `shelly fleet` - Fleet management for large deployments
+  - `shelly fleet list|health|firmware|update|export|sync`
+  - Staged rollouts: `shelly fleet update --staged 10%`
+- [ ] `shelly audit` - Security audit for devices
+  - Checks: default credentials, outdated firmware, network exposure
+  - `shelly audit [--check-auth] [--check-firmware] [--check-network]`
+- [ ] `shelly report` - Generate professional reports
+  - `shelly report energy|devices|audit|usage --format pdf|html|json`
+
+### 29.6 Quality of Life
+
+- [ ] `shelly tips` - Contextual tips based on usage
+  - `shelly tips [--command X] [--new]`
+- [ ] `shelly undo` - Undo last action where possible
+- [ ] `shelly favorite` - Quick access to frequent commands
+  - `shelly favorite add|list|run|delete <name>`
+  - Shortcut: `shelly @morning`
+- [ ] `shelly notify` - Desktop notifications on events
+  - `shelly notify on <event> [--threshold]`
+
+### 29.7 Interactive Features
+
+- [ ] `shelly wizard` - Guided setup wizards
+  - `shelly wizard [discover|scene|automation]`
+- [ ] `shelly learn` - Built-in interactive tutorial
+  - `shelly learn [basics|automation|scripting]`
+
+### 29.8 Convenience Shortcuts
+
+- [ ] `shelly @<alias>` - Quick alias invocation prefix
+- [ ] `shelly last` - Repeat last command
+  - `shelly last [--device other-device]`
+- [ ] `shelly clipboard` - Copy output to clipboard
+  - `shelly <command> --clipboard`
+- [ ] `shelly open` - Open device in browser
+  - `shelly open <device> [--cloud] [--docs <component>]`
+- [ ] `shelly qr` - Generate QR codes
+  - `shelly qr <device> [--wifi] [--export file.png]`
+
+### 29.9 Analysis & Insights
+
+- [ ] `shelly stats` - Usage statistics
+  - `shelly stats [devices|commands|energy] [--period]`
+- [ ] `shelly trends` - Usage trend visualization
+  - `shelly trends power|usage <device> [--export chart.svg]`
+- [ ] `shelly compare` - Compare devices or time periods
+  - `shelly compare <device1> <device2>` or `--this-week --last-week`
+- [ ] `shelly forecast` - Usage/cost forecasting
+  - `shelly forecast energy|cost --period month [--rate 0.15]`
+- [ ] `shelly anomaly` - Anomaly detection
+  - `shelly anomaly detect [--device X] [--alert]`
+
+### 29.10 Networking & Connectivity
+
+- [ ] `shelly ping` - Enhanced ping with latency stats
+  - `shelly ping <device> [--all] [--continuous] [--graph]`
+- [ ] `shelly trace` - Connection trace
+  - `shelly trace <device> [--protocol]`
+- [ ] `shelly network` - Network diagnostics
+  - `shelly network scan|topology|bandwidth|latency-map`
+- [ ] `shelly proxy` - Local proxy mode for remote access
+  - `shelly proxy start [--port 8080]`
+
+### 29.11 Security & Auth (Enhanced)
+
+- [ ] `shelly auth rotate` - Rotate device credentials
+- [ ] `shelly auth test` - Test auth connectivity
+- [ ] `shelly auth export|import` - Encrypted credential export/import
+- [ ] `shelly cert` - Certificate management
+  - `shelly cert show|install|renew <device>`
+- [ ] `shelly vault` - Secure credential storage
+  - `shelly vault init|add|list|export`
+- [ ] `shelly firewall` - Device firewall rules
+  - `shelly firewall show|allow|deny <device> [subnet]`
+
+### 29.12 Scripting & Automation
+
+- [ ] `shelly cron` - Cron-style scheduling
+  - `shelly cron "0 7 * * *" "scene activate morning"`
+- [ ] `shelly wait` - Wait for condition
+  - `shelly wait <device> --state on|--online [--timeout 30s]`
+- [ ] `shelly if` - Conditional execution
+  - `shelly if "<condition>" then "<command>"`
+- [ ] `shelly loop` - Loop execution
+  - `shelly loop N "command" [--delay 1s] [--until "time"]`
+- [ ] `shelly pipeline` - Command pipelines
+  - `shelly pipeline create|run|list <name>`
+
+### 29.13 Data & Export
+
+- [ ] `shelly dump` - Full data dump
+  - `shelly dump <device> [--all] [--format json] [--schema]`
+- [ ] `shelly import` - Bulk import
+  - `shelly import devices.yaml|scenes.yaml|config.json`
+- [ ] `shelly sync` - Cloud synchronization
+  - `shelly sync cloud [--push|--pull]`
+- [ ] `shelly archive` - Archive management
+  - `shelly archive create|list|restore|--rotate N`
+
+### 29.14 Debugging & Development
+
+- [ ] `shelly debug trace` - Trace all API calls
+- [ ] `shelly debug memory|crash-log|performance` - Device diagnostics
+- [ ] `shelly mock` - Mock device mode for testing without hardware
+  - `shelly mock create|list|scenario <name>`
+- [ ] `shelly replay` - Replay recorded API calls
+  - `shelly replay record|stop|play <file>`
+- [ ] `shelly profile perf` - Performance profiling
+  - `shelly profile perf <device>|network|cli`
+
+### 29.15 Integration Commands
+
+- [ ] `shelly homeassistant` - Home Assistant integration
+  - `shelly homeassistant status|discover|export|mqtt-config`
+- [ ] `shelly node-red` - Node-RED integration
+  - `shelly node-red flows export|palette`
+- [ ] `shelly openhab` - OpenHAB integration
+  - `shelly openhab things|items`
+- [ ] `shelly alexa` - Alexa integration info
+  - `shelly alexa status|devices`
+- [ ] `shelly google-home` - Google Home integration info
+  - `shelly google-home status|devices`
+
+### 29.16 Maintenance & Lifecycle
+
+- [ ] `shelly maintenance` - Maintenance mode
+  - `shelly maintenance enable|disable|schedule <device>`
+- [ ] `shelly lifecycle` - Device lifecycle info
+  - `shelly lifecycle <device> [--warranty|--age|--usage]`
+- [ ] `shelly inventory` - Inventory management
+  - `shelly inventory list|add|export|value`
+
+### 29.17 Notifications & Alerts
+
+- [ ] `shelly alert` - Alert management
+  - `shelly alert create|list|test|snooze <name>`
+  - `--condition "power > 1000W" --notify email:admin@...`
+- [ ] `shelly notify setup` - Notification channel setup
+  - `shelly notify setup email|slack|telegram|pushover`
+- [ ] `shelly subscribe` - Event subscriptions
+  - `shelly subscribe <device> --event <type>`
+
+### 29.18 Documentation & Help
+
+- [ ] `shelly man` - Manual pages
+  - `shelly man <command> [--all] [--pdf]`
+- [ ] `shelly examples` - Command examples
+  - `shelly examples <command> [--scenario X] [--level advanced]`
+- [ ] `shelly explain` - Explain what a command does
+  - `shelly explain "switch on kitchen --timer 300"`
+- [ ] `shelly cheatsheet` - Quick reference
+  - `shelly cheatsheet [--pdf] [--poster]`
+
+### 29.19 Meta & CLI Management
+
+> **Note:** `shelly update` is defined in Phase 17. These are additional config/meta commands.
+
+- [ ] `shelly config edit` - Open config in $EDITOR
+- [ ] `shelly config validate|doctor|migrate` - Config management
+- [ ] `shelly cache` - Cache management
+  - `shelly cache clear|stats|warm [--discovery]`
+- [ ] `shelly log` - CLI logging
+  - `shelly log show|tail|level|export`
+- [ ] `shelly telemetry` - Anonymous telemetry control
+  - `shelly telemetry status|on|off|show`
+
+### 29.20 Fun & Easter Eggs
+
+- [ ] `shelly party` - Party mode (cycle colors on RGB devices)
+  - `shelly party [--mode rainbow|disco] [--duration 5m]`
+- [ ] `shelly sleep` - Gradual lights off
+  - `shelly sleep [--duration 30m] [--except bedroom]`
+- [ ] `shelly wake` - Gradual lights on
+  - `shelly wake [--simulate sunrise] [--duration 15m]`
+- [ ] `shelly demo` - Demo mode without real devices
+  - `shelly demo [--scenario home] [--speed fast]`
+
+---
+
+## Phase 30: Polish & Release (FINAL)
+
+> ⛔ **This is the FINAL phase.** Do not release until all prior phases are complete.
+
+### 30.1 Code Quality
 - [ ] Run golangci-lint with all enabled linters
 - [ ] Fix all linter warnings
 - [ ] Ensure consistent error messages
 - [ ] Review public API surface
 - [ ] Verify all commands have --help text
 - [ ] Check for proper context propagation
+- [ ] Verify all output respects `--no-color` and `--plain` flags
+- [ ] Ensure all pipeable commands produce valid JSON/YAML
 
-### 26.2 Performance
+### 30.2 Performance
 - [ ] Profile startup time
 - [ ] Optimize config loading
 - [ ] Cache discovery results
 - [ ] Lazy-load TUI components
 
-### 26.3 Accessibility
+### 30.3 Accessibility
 - [ ] Ensure TUI works with screen readers (where possible)
-- [ ] Support --no-color for all output
+- [ ] Support `--no-color` for all output
 - [ ] Provide text-only alternatives to TUI elements
+- [ ] Verify exit codes are correct for scripting
 
-### 26.4 Release Preparation
+### 30.4 Release Preparation
 - [ ] Write CHANGELOG.md with all features
 - [ ] Create GitHub release notes template
 - [ ] Verify goreleaser builds all platforms
-- [ ] Test installation instructions
-- [ ] Create v0.1.0 tag
+- [ ] Test installation instructions on all platforms
+- [ ] Create professional ASCII banner/logo
+- [ ] Final documentation review
+- [ ] Create v1.0.0 tag
 
 ---
 
@@ -1471,14 +1779,15 @@ shelly-cli/
 
 > **Full details:** See [docs/shelly-go-coverage.md](docs/shelly-go-coverage.md)
 
-**Summary:** 9 feature areas complete, ~25 remaining across Phases 5-22C.
+**Summary:** 9 feature areas complete, ~25 remaining across Phases 5-25, plus 82 innovative commands in Phase 29.
 
 | Priority | Features | Status |
 |----------|----------|--------|
 | **Critical** | Firmware, Cloud API | Phases 6, 9 |
 | **High** | Energy, Scripts, Schedules, KVS, MQTT, Webhooks, WiFi | Phases 5, 7, 8, 11, 18 |
-| **Medium** | BTHome, Zigbee, Gen1, Sensors, Thermostat | Phases 21, 22A-C |
+| **Medium** | BTHome, Zigbee, Gen1, Sensors, Thermostat | Phases 21, 23-25 |
 | **Low** | Matter, LoRa, Z-Wave, ModBus, Virtual | Phases 21, 22 |
+| **Innovative** | 82 new commands for QoL, fleet, automation, integrations | Phase 29 |
 
 ---
 
@@ -1504,3 +1813,7 @@ shelly-cli/
 - [ ] Full documentation (godoc, user docs, examples)
 - [ ] Automated releases via GitHub Actions
 - [ ] Clean golangci-lint with strict settings
+- [ ] Phase 29 innovative commands: `feedback`, `doctor`, `watch`, `api`, `audit`, `fleet`
+- [ ] Home Assistant, Node-RED, OpenHAB integration commands
+- [ ] Demo mode working without real devices (for showcasing)
+- [ ] Professional branding (logo, ASCII banner)
