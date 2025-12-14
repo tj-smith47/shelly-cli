@@ -25,7 +25,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Shows script ID, name, enabled status, and running status.`,
 		Example: `  # List all scripts
   shelly script list living-room`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

@@ -23,7 +23,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 The script must be enabled before it can be started.`,
 		Example: `  # Start a script
   shelly script start living-room 1`,
-		Args: cobra.ExactArgs(2),
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

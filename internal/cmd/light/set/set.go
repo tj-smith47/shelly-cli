@@ -26,7 +26,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 You can set brightness and on/off state.
 Values not specified will be left unchanged.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], lightID, brightness, on)
 		},

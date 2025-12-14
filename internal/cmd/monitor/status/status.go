@@ -36,7 +36,8 @@ Press Ctrl+C to stop monitoring.`,
 
   # Monitor for a specific number of updates
   shelly monitor status living-room --count 10`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

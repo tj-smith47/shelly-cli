@@ -4,7 +4,7 @@
 
 ```go
 require (
-    github.com/tj-smith47/shelly-go v0.1.0  // Shelly device library
+    github.com/tj-smith47/shelly-go v0.1.6  // Shelly device library
     github.com/spf13/cobra v1.8.x           // CLI framework
     github.com/spf13/viper v1.18.x          // Configuration
     github.com/charmbracelet/bubbletea      // TUI framework

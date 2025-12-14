@@ -30,7 +30,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
   # Reboot with delay
   shelly device reboot living-room --delay 5000`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], delay, yes)
 		},

@@ -43,7 +43,8 @@ Use --dry-run to preview actions without executing them.`,
 
   # Short form
   shelly sc activate party-mode`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteSceneNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], timeout, concurrent, dryRun)
 		},

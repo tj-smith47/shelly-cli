@@ -26,7 +26,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
   # Download to a specific directory
   shelly script download living-room 1 scripts/auto-light.js`,
-		Args: cobra.ExactArgs(3),
+		Args:              cobra.ExactArgs(3),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

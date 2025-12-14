@@ -22,7 +22,8 @@ Once enabled, the device will connect to Shelly Cloud for remote access
 and monitoring.`,
 		Example: `  # Enable cloud connection
   shelly cloud enable living-room`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

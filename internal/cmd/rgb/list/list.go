@@ -17,10 +17,11 @@ import (
 // NewCommand creates the rgb list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list <device>",
-		Short: "List RGB components",
-		Long:  `List all RGB light components on the specified device with their current status.`,
-		Args:  cobra.ExactArgs(1),
+		Use:               "list <device>",
+		Short:             "List RGB components",
+		Long:              `List all RGB light components on the specified device with their current status.`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

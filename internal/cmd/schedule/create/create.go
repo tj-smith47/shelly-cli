@@ -46,7 +46,8 @@ The calls parameter is a JSON array of RPC calls to execute.`,
   # Run script at sunrise + 30 minutes
   shelly schedule create living-room --timespec "@sunrise+30" \
     --calls '[{"method":"Script.Start","params":{"id":1}}]'`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

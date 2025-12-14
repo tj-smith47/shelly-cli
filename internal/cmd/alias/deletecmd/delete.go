@@ -22,7 +22,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
   # Using short form
   shelly alias rm lights`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteAliasNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(f, args[0])
 		},

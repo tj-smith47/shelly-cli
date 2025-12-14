@@ -38,7 +38,8 @@ can connect to. Use --clients to list connected clients.`,
 
   # List connected clients
   shelly wifi ap living-room --clients`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

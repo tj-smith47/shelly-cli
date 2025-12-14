@@ -46,7 +46,8 @@ This command requires both --yes and --confirm flags for safety.`,
 
   # This will fail (safety measure)
   shelly device factory-reset living-room --yes`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], yes, confirm)
 		},

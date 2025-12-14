@@ -1,5 +1,7 @@
 # Agents
 .claude/
+RULES.md
+docs/IMPLEMENTATION-NOTES.md
 
 # Binaries
 /shelly
@@ -37,8 +39,7 @@ go.work.sum
 Thumbs.db
 
 # Local config (user-specific, not for repo)
-.shelly.yaml
-.shelly.yml
+.shelly.y*l
 
 # Debug
 debug
@@ -50,4 +51,3 @@ dist/
 # Temporary files
 tmp/
 temp/
-

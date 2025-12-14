@@ -38,7 +38,8 @@ You can update the timespec, calls, or enabled status.`,
   # Enable/disable
   shelly schedule update living-room 1 --enable
   shelly schedule update living-room 1 --disable`,
-		Args: cobra.ExactArgs(2),
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScheduleID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

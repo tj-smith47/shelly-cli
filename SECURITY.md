@@ -18,7 +18,7 @@ We take security seriously. If you discover a security vulnerability, please fol
 
 ### Do
 
-1. **Email**: Send details to security@example.com (replace with actual contact)
+1. **Email**: Send details to admin@jarvispro.io
 2. **Include**:
    - Description of the vulnerability
    - Steps to reproduce

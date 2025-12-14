@@ -40,7 +40,8 @@ static IP settings instead of using DHCP.`,
 
   # Disable WiFi station mode
   shelly wifi set living-room --disable`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

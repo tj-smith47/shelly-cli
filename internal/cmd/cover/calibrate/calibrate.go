@@ -22,7 +22,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 Calibration determines the open and close times for the cover.
 The cover will move to both extremes during calibration.`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], coverID)
 		},

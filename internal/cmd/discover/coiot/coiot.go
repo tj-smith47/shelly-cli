@@ -81,6 +81,15 @@ func run(timeout time.Duration, register, skipExisting bool) error {
 
 	helpers.DisplayDiscoveredDevices(devices)
 
+	// Save discovered addresses to completion cache
+	addresses := make([]string, 0, len(devices))
+	for _, d := range devices {
+		addresses = append(addresses, d.Address.String())
+	}
+	if err := cmdutil.SaveDiscoveryCache(addresses); err != nil {
+		ios.DebugErr("saving discovery cache", err)
+	}
+
 	if register {
 		added, err := helpers.RegisterDiscoveredDevices(devices, skipExisting)
 		if err != nil {

@@ -20,7 +20,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long:  `Stop a running script on a Gen2+ Shelly device.`,
 		Example: `  # Stop a script
   shelly script stop living-room 1`,
-		Args: cobra.ExactArgs(2),
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

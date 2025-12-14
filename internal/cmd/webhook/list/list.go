@@ -28,7 +28,8 @@ Displays webhook ID, event type, URLs, and enabled status.`,
 
   # Output as JSON
   shelly webhook list living-room -o json`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

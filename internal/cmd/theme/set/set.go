@@ -30,7 +30,8 @@ the theme is only applied for the current session.`,
 
   # Set and save to config
   shelly theme set nord --save`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteThemeNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(f, args[0], save)
 		},

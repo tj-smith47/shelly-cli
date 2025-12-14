@@ -27,7 +27,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
   # Output as JSON
   shelly group members living-room -o json`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteGroupNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(f, cmd, args[0])
 		},

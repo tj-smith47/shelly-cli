@@ -21,7 +21,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 This disconnects the device from the MQTT broker and disables MQTT functionality.`,
 		Example: `  # Disable MQTT
   shelly mqtt disable living-room`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

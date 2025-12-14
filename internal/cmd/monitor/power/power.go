@@ -34,7 +34,8 @@ Press Ctrl+C to stop monitoring.`,
 
   # Monitor with 1-second interval
   shelly monitor power living-room --interval 1s`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

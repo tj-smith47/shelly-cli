@@ -41,7 +41,8 @@ Only available on Shelly Pro devices with an Ethernet port.`,
 
   # Disable Ethernet
   shelly ethernet set living-room-pro --disable`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

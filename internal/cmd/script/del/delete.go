@@ -28,7 +28,8 @@ This permanently removes the script and its code from the device.`,
 
   # Delete without confirmation
   shelly script delete living-room 1 --yes`,
-		Args: cobra.ExactArgs(2),
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

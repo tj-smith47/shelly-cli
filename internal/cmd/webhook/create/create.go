@@ -36,7 +36,8 @@ Common events include "switch.on", "switch.off", "input.toggle", etc.`,
 
   # Create disabled webhook
   shelly webhook create living-room --event "input.toggle" --url "http://example.com" --disable`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

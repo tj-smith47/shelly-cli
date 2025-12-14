@@ -33,7 +33,8 @@ This only removes the group definition, not the devices themselves.`,
 
   # Short form
   shelly grp del office`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteGroupNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(args[0], yes)
 		},

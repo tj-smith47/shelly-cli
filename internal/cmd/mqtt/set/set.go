@@ -36,7 +36,8 @@ integration with home automation systems.`,
 
   # Enable MQTT with existing configuration
   shelly mqtt set living-room --enable`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

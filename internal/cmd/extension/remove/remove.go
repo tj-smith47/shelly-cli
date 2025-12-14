@@ -20,7 +20,8 @@ Only extensions installed in the user plugins directory can be removed.
 Extensions found in PATH cannot be removed with this command.`,
 		Example: `  # Remove an extension
   shelly extension remove myext`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteExtensionNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(f, args[0])
 		},

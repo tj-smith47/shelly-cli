@@ -21,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
+	completioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/completion"
 	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/dash"
@@ -59,6 +60,10 @@ var rootCmd = &cobra.Command{
 
 This tool provides a comprehensive interface for discovering, monitoring,
 and controlling Shelly devices on your local network.`,
+	// Disable Cobra's auto-generated completion to use our own with install subcommand
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+	},
 }
 
 // Execute runs the root command with signal-aware context.
@@ -158,6 +163,15 @@ func executeShellAlias(args []string) int {
 	return 0
 }
 
+// Command group IDs for organized help output.
+const (
+	groupControl    = "control"
+	groupManagement = "management"
+	groupConfig     = "config"
+	groupMonitoring = "monitoring"
+	groupUtility    = "utility"
+)
+
 func init() {
 	// Set pre-run hook
 	rootCmd.PersistentPreRunE = initializeConfig
@@ -177,41 +191,65 @@ func init() {
 	must(viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet")))
 	must(viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color")))
 
+	// Define command groups for organized help output
+	rootCmd.AddGroup(
+		&cobra.Group{ID: groupControl, Title: "Device Control:"},
+		&cobra.Group{ID: groupManagement, Title: "Device Management:"},
+		&cobra.Group{ID: groupConfig, Title: "Configuration:"},
+		&cobra.Group{ID: groupMonitoring, Title: "Monitoring:"},
+		&cobra.Group{ID: groupUtility, Title: "Utility:"},
+	)
+
 	// Create factory for dependency injection
 	f := cmdutil.NewFactory()
 
-	// Add commands
-	rootCmd.AddCommand(dash.NewCommand(f))
-	rootCmd.AddCommand(discover.NewCommand(f))
-	rootCmd.AddCommand(device.NewCommand(f))
-	rootCmd.AddCommand(group.NewCommand(f))
-	rootCmd.AddCommand(batch.NewCommand(f))
-	rootCmd.AddCommand(scene.NewCommand(f))
-	rootCmd.AddCommand(switchcmd.NewCommand(f))
-	rootCmd.AddCommand(cover.NewCommand(f))
-	rootCmd.AddCommand(light.NewCommand(f))
-	rootCmd.AddCommand(rgb.NewCommand(f))
-	rootCmd.AddCommand(input.NewCommand(f))
-	rootCmd.AddCommand(configcmd.NewCommand(f))
-	rootCmd.AddCommand(wifi.NewCommand(f))
-	rootCmd.AddCommand(ethernet.NewCommand(f))
-	rootCmd.AddCommand(energy.NewCommand(f))
-	rootCmd.AddCommand(power.NewCommand(f))
-	rootCmd.AddCommand(cloud.NewCommand(f))
-	rootCmd.AddCommand(auth.NewCommand(f))
-	rootCmd.AddCommand(mqtt.NewCommand(f))
-	rootCmd.AddCommand(webhook.NewCommand(f))
-	rootCmd.AddCommand(firmware.NewCommand(f))
-	rootCmd.AddCommand(script.NewCommand(f))
-	rootCmd.AddCommand(schedule.NewCommand(f))
-	rootCmd.AddCommand(backup.NewCommand(f))
-	rootCmd.AddCommand(migrate.NewCommand(f))
-	rootCmd.AddCommand(monitor.NewCommand(f))
-	rootCmd.AddCommand(metrics.NewCommand(f))
-	rootCmd.AddCommand(alias.NewCommand(f))
-	rootCmd.AddCommand(extension.NewCommand(f))
-	rootCmd.AddCommand(themecmd.NewCommand(f))
-	rootCmd.AddCommand(versionCmd())
+	// Control commands - direct device control
+	addCommandWithGroup(rootCmd, switchcmd.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, cover.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, light.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, rgb.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, input.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, batch.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, scene.NewCommand(f), groupControl)
+
+	// Management commands - device and group management
+	addCommandWithGroup(rootCmd, device.NewCommand(f), groupManagement)
+	addCommandWithGroup(rootCmd, group.NewCommand(f), groupManagement)
+	addCommandWithGroup(rootCmd, discover.NewCommand(f), groupManagement)
+	addCommandWithGroup(rootCmd, script.NewCommand(f), groupManagement)
+	addCommandWithGroup(rootCmd, schedule.NewCommand(f), groupManagement)
+	addCommandWithGroup(rootCmd, backup.NewCommand(f), groupManagement)
+	addCommandWithGroup(rootCmd, migrate.NewCommand(f), groupManagement)
+
+	// Configuration commands - device and service configuration
+	addCommandWithGroup(rootCmd, configcmd.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, wifi.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, ethernet.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, cloud.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, auth.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, mqtt.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, webhook.NewCommand(f), groupConfig)
+
+	// Monitoring commands - status and metrics
+	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)
+	addCommandWithGroup(rootCmd, energy.NewCommand(f), groupMonitoring)
+	addCommandWithGroup(rootCmd, power.NewCommand(f), groupMonitoring)
+	addCommandWithGroup(rootCmd, metrics.NewCommand(f), groupMonitoring)
+	addCommandWithGroup(rootCmd, dash.NewCommand(f), groupMonitoring)
+
+	// Utility commands - CLI utilities
+	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, alias.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, extension.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, themecmd.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, completioncmd.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, versionCmd(), groupUtility)
+}
+
+// addCommandWithGroup adds a command to the root and assigns it to a group.
+func addCommandWithGroup(root, cmd *cobra.Command, groupID string) {
+	cmd.GroupID = groupID
+	root.AddCommand(cmd)
 }
 
 func initializeConfig(_ *cobra.Command, _ []string) error {

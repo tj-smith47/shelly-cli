@@ -20,8 +20,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `List all power meter components (PM/PM1) on a device.
 
 Shows component IDs and types for all power meters found on the device.`,
-		Aliases: []string{"ls"},
-		Args:    cobra.ExactArgs(1),
+		Aliases:           []string{"ls"},
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

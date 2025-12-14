@@ -17,10 +17,11 @@ import (
 // NewCommand creates the cover list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list <device>",
-		Short: "List cover components",
-		Long:  `List all cover/roller components on the specified device with their current status.`,
-		Args:  cobra.ExactArgs(1),
+		Use:               "list <device>",
+		Short:             "List cover components",
+		Long:              `List all cover/roller components on the specified device with their current status.`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

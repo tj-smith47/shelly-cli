@@ -30,7 +30,8 @@ Note: Scanning may take several seconds to complete.`,
 
   # Output as JSON
   shelly wifi scan living-room -o json`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

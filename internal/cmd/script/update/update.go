@@ -42,7 +42,8 @@ Use --append to add code to the existing script instead of replacing it.`,
 
   # Enable/disable script
   shelly script update living-room 1 --enable`,
-		Args: cobra.ExactArgs(2),
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

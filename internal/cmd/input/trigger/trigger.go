@@ -32,7 +32,8 @@ Event types:
   single_push - Single button press
   double_push - Double button press
   long_push   - Long button press`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], inputID, event)
 		},

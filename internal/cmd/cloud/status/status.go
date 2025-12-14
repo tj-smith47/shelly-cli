@@ -25,7 +25,8 @@ Displays whether the device is currently connected to Shelly Cloud.`,
 
   # Output as JSON
   shelly cloud status living-room -o json`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

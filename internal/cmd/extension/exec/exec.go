@@ -26,6 +26,7 @@ or when you want to explicitly invoke an extension.`,
   # Run with arguments
   shelly extension exec myext arg1 arg2`,
 		Args:               cobra.MinimumNArgs(1),
+		ValidArgsFunction:  cmdutil.CompleteExtensionNames(),
 		DisableFlagParsing: true, // Pass all args to the extension
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(f, args[0], args[1:])

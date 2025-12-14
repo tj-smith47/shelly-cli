@@ -25,7 +25,8 @@ and number of clients connected to the access point (if enabled).`,
 
   # Output as JSON
   shelly wifi status living-room -o json`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

@@ -21,7 +21,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Once disabled, the device will only be accessible via local network.`,
 		Example: `  # Disable cloud connection
   shelly cloud disable living-room`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

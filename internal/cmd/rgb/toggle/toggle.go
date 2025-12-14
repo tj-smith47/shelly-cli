@@ -15,10 +15,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var rgbID int
 
 	cmd := &cobra.Command{
-		Use:   "toggle <device>",
-		Short: "Toggle RGB on/off",
-		Long:  `Toggle an RGB light component on or off on the specified device.`,
-		Args:  cobra.ExactArgs(1),
+		Use:               "toggle <device>",
+		Short:             "Toggle RGB on/off",
+		Long:              `Toggle an RGB light component on or off on the specified device.`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], rgbID)
 		},

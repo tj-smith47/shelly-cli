@@ -25,7 +25,8 @@ Displays whether MQTT is enabled and if the device is connected to the broker.`,
 
   # Output as JSON
   shelly mqtt status living-room -o json`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

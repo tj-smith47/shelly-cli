@@ -17,10 +17,11 @@ import (
 // NewCommand creates the input list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list <device>",
-		Short: "List input components",
-		Long:  `List all input components on a Shelly device with their current state.`,
-		Args:  cobra.ExactArgs(1),
+		Use:               "list <device>",
+		Short:             "List input components",
+		Long:              `List all input components on a Shelly device with their current state.`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

@@ -100,7 +100,7 @@ Create a production-ready, open-source Cobra CLI that:
 | 13 | Plugin System | ✅ Complete |
 | 14 | TUI Dashboard | ✅ Complete |
 | 15 | Theme System | ✅ Complete |
-| 16 | Shell Completions | 🟡 Basic done, dynamic TBD |
+| 16 | Shell Completions | ✅ Complete |
 | 17-25 | Advanced Features | ⏳ Pending |
 | 26-27 | Documentation & Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
@@ -1165,16 +1165,17 @@ shelly-cli/
 - [x] Generated completion files in `completions/` directory
 
 ### 16.2 Dynamic Completions
-- [ ] Implement dynamic completions for:
-  - Device names (from registry)
-  - Device addresses (from discovery cache)
-  - Group names
-  - Script names (per device)
-  - Schedule IDs (per device)
-  - Alias names
-  - Theme names
-  - Extension names
-- [ ] Cache completion data for performance
+- [x] Implement dynamic completions for:
+  - Device names (from registry) - CompleteDevices()
+  - Device addresses (from discovery cache) - CompleteDiscoveredDevices()
+  - Group names - CompleteGroups()
+  - Script names (per device) - CompleteDeviceThenScriptID()
+  - Schedule IDs (per device) - CompleteDeviceThenScheduleID()
+  - Alias names - CompleteAliases()
+  - Theme names - CompleteThemes()
+  - Extension names - CompleteExtensions()
+  - Scene names - CompleteScenes()
+- [x] Cache completion data for performance (in-memory with TTL + filesystem cache for discovery)
 - [x] Support completion descriptions
 
 ### 16.3 Completion Installation
@@ -1185,6 +1186,20 @@ shelly-cli/
 ---
 
 ## Phase 17: Update Command
+
+### 17.0 Init Command
+
+> **INIT:** Before implementing, analyze and discuss:
+> 1. What should `shelly init` do exactly? (First-run setup? Config generation? Device discovery?)
+> 2. What's the optimal UX for the init flow? (Interactive wizard? Guided prompts? Non-interactive flags?)
+> 3. How do other CLIs handle this? (gh auth login, docker init, npm init, git init)
+> 4. What should be configured? (Default device, output format, theme, shell completions, cloud auth?)
+> 5. Should it detect existing config and offer to migrate/update?
+
+- [ ] `shelly init` - First-run setup wizard (aliases: `setup`, `configure`)
+  - Interactive guided setup for new users
+  - Flags: `--non-interactive`, `--force` (overwrite existing config)
+  - Steps TBD after analysis discussion
 
 ### 17.1 Update System
 - [ ] Create `internal/cli/update/update.go`:

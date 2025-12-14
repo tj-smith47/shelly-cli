@@ -16,10 +16,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var lightID int
 
 	cmd := &cobra.Command{
-		Use:   "on <device>",
-		Short: "Turn light on",
-		Long:  `Turn on a light component on the specified device.`,
-		Args:  cobra.ExactArgs(1),
+		Use:               "on <device>",
+		Short:             "Turn light on",
+		Long:              `Turn on a light component on the specified device.`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], lightID)
 		},

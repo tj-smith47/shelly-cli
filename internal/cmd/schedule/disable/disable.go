@@ -20,7 +20,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long:  `Disable a schedule on a Gen2+ Shelly device.`,
 		Example: `  # Disable a schedule
   shelly schedule disable living-room 1`,
-		Args: cobra.ExactArgs(2),
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScheduleID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

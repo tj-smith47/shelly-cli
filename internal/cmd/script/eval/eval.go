@@ -33,7 +33,8 @@ multiple words that will be joined together.`,
 
   # Call a function defined in the script
   shelly script eval living-room 1 "myFunction()"`,
-		Args: cobra.MinimumNArgs(3),
+		Args:              cobra.MinimumNArgs(3),
+		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

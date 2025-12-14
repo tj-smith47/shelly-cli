@@ -31,7 +31,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
   # Short form
   shelly sc del old-scene`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteSceneNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(args[0], yes)
 		},

@@ -25,7 +25,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
   # Delete without confirmation
   shelly schedule delete-all living-room --yes`,
-		Args: cobra.ExactArgs(1),
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},
