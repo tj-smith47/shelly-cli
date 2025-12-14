@@ -22,6 +22,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/bthome"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
 	completioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/completion"
 	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
@@ -41,6 +42,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/interactive"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/lora"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor"
@@ -65,6 +67,7 @@ import (
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/zigbee"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -323,6 +326,9 @@ func init() {
 	addCommandWithGroup(rootCmd, template.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, provision.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, action.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, bthome.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, zigbee.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, lora.NewCommand(f), groupConfig)
 
 	// Monitoring commands - status and metrics
 	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)

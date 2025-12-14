@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 21 - BTHome/Zigbee/LoRa Commands | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 22 - Matter Commands | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -102,7 +102,9 @@ Create a production-ready, open-source Cobra CLI that:
 | 15 | Theme System | ✅ Complete |
 | 16 | Shell Completions | ✅ Complete |
 | 17 | Update Command | ✅ Complete |
-| 18-25 | Advanced Features | ⏳ Pending |
+| 18-20 | Advanced Features (Monitor, Debug) | ✅ Complete |
+| 21 | BTHome/Zigbee/LoRa Commands | ✅ Complete |
+| 22-25 | Advanced Features | ⏳ Pending |
 | 26-27 | Documentation & Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
 | 29 | Innovative Commands (82 new) | ⏳ Pending |
@@ -1396,23 +1398,61 @@ shelly-cli/
 ## Phase 21: BTHome/Zigbee/LoRa Commands
 
 ### 21.1 BTHome Commands
-- [ ] `shelly bthome list <device>` - List BTHome devices
-- [ ] `shelly bthome add <device>` - Start BTHome discovery
-- [ ] `shelly bthome remove <device> <id>` - Remove BTHome device
-- [ ] `shelly bthome status <device> [id]` - BTHome device status
+- [x] `shelly bthome list <device>` - List BTHome devices
+  - Aliases: ls, devices
+  - Flags: --json
+  - Parses Shelly.GetStatus for bthomedevice:* components
+- [x] `shelly bthome add <device>` - Start BTHome discovery
+  - Aliases: discover, scan
+  - Flags: --duration (scan time), --addr (add specific device), --name
+  - Uses BTHome.StartDeviceDiscovery or BTHome.AddDevice
+- [x] `shelly bthome remove <device> <id>` - Remove BTHome device
+  - Aliases: rm, delete, del
+  - Flags: --yes (skip confirmation)
+  - Uses BTHome.DeleteDevice
+- [x] `shelly bthome status <device> [id]` - BTHome device status
+  - Aliases: st, info
+  - Flags: --json
+  - Shows BTHome.GetStatus (component) or BTHomeDevice.GetStatus (specific device)
 
 ### 21.2 Zigbee Commands (Gen4 gateways)
-- [ ] `shelly zigbee status <device>` - Zigbee network status
-- [ ] `shelly zigbee discover <device>` - Discover Zigbee devices
-- [ ] `shelly zigbee pair <device>` - Start pairing mode
-- [ ] `shelly zigbee remove <device> <id>` - Remove Zigbee device
-- [ ] `shelly zigbee list <device>` - List paired Zigbee devices
+- [x] `shelly zigbee status <device>` - Zigbee network status
+  - Aliases: st, info
+  - Flags: --json
+  - Shows Zigbee.GetConfig and Zigbee.GetStatus
+- [x] `shelly zigbee pair <device>` - Start pairing mode
+  - Aliases: join, connect
+  - Flags: --timeout (pairing timeout)
+  - Enables Zigbee and starts Zigbee.StartNetworkSteering
+- [x] `shelly zigbee remove <device>` - Leave Zigbee network
+  - Aliases: leave, disconnect, rm
+  - Flags: --yes (skip confirmation)
+  - Disables Zigbee which causes device to leave network
+- [x] `shelly zigbee list` - List Zigbee-capable devices
+  - Aliases: ls, devices
+  - Flags: --json
+  - Scans config devices for Zigbee support via Zigbee.GetConfig
 
 ### 21.3 LoRa Commands
-- [ ] `shelly lora status <device>` - LoRa add-on status
-- [ ] `shelly lora config <device>` - Configure LoRa settings
-- [ ] `shelly lora send <device> <data>` - Send LoRa message
-- [ ] `shelly lora receive <device>` - Monitor incoming messages
+- [x] `shelly lora status <device>` - LoRa add-on status
+  - Aliases: st, info
+  - Flags: --id (component ID), --json
+  - Shows LoRa.GetConfig and LoRa.GetStatus (RSSI, SNR)
+- [x] `shelly lora config <device>` - Configure LoRa settings
+  - Aliases: set, configure
+  - Flags: --id, --freq (Hz), --bw (bandwidth), --dr (data rate), --power (dBm)
+  - Uses LoRa.SetConfig
+- [x] `shelly lora send <device> <data>` - Send LoRa message
+  - Aliases: tx, transmit
+  - Flags: --id, --hex (data is hex)
+  - Base64 encodes data for LoRa.SendBytes API
+
+**Code Audit Notes (Phase 21):**
+- JSON marshal/unmarshal pattern for conn.Call() results is repeated across all files
+- Complexity warnings (gocyclo) in list.go and status.go due to conditional rendering logic
+- Similar struct patterns for config/status responses could be consolidated
+- **Recommended refactor:** Extract shared `rpcutil.UnmarshalResult()` helper
+- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
 
 ---
 
