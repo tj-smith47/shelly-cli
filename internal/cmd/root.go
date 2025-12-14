@@ -27,6 +27,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/extension"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
@@ -205,6 +206,7 @@ func init() {
 	rootCmd.AddCommand(monitor.NewCommand(f))
 	rootCmd.AddCommand(metrics.NewCommand(f))
 	rootCmd.AddCommand(alias.NewCommand(f))
+	rootCmd.AddCommand(extension.NewCommand(f))
 	rootCmd.AddCommand(versionCmd())
 }
 

@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 13 - Plugin System | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 14 - TUI Dashboard | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -97,7 +97,7 @@ Create a production-ready, open-source Cobra CLI that:
 | 11.4 | Energy Dashboard | ✅ Complete |
 | 11.5 | Metrics Export | ✅ Complete |
 | 12 | Alias System | ✅ Complete |
-| 13 | Plugin System | 🟡 Core done |
+| 13 | Plugin System | ✅ Complete |
 | 14 | TUI Dashboard | ⏳ Pending |
 | 15 | Theme System | 🟡 Core done |
 | 16 | Shell Completions | 🟡 Basic done, dynamic TBD |
@@ -1009,9 +1009,9 @@ shelly-cli/
 
 ---
 
-## Phase 13: Plugin/Extension System (gh-style)
+## Phase 13: Plugin/Extension System (gh-style) ✅
 
-### 13.1 Plugin Infrastructure (PATH-based, gh-style)
+### 13.1 Plugin Infrastructure (PATH-based, gh-style) ✅
 - [x] Create `internal/plugins/loader.go`:
   - Discover plugins in PATH and ~/.config/shelly/plugins/
   - Plugin naming convention: `shelly-*` executables
@@ -1032,25 +1032,30 @@ shelly-cli/
   - Version tracking and update checking
   - Plugin manifest support (optional .shelly-plugin.yaml)
 
-### 13.2 Plugin Commands
-- [x] `shelly extension list` - List installed extensions
-- [x] `shelly extension install <name|url>` - Install extension
-  - Support GitHub repos: `gh:user/shelly-pluginname`
-  - Support local files
-- [x] `shelly extension remove <name>` - Remove extension
-- [ ] `shelly extension upgrade [name]` - Upgrade extension(s)
-- [x] `shelly extension create <name>` - Scaffold new extension
-- [x] `shelly extension exec <name> [args]` - Execute extension explicitly
-- [ ] `shelly extension browse` - Browse available extensions
+### 13.2 Plugin Commands ✅
+- [x] `shelly extension list` - List installed extensions (aliases: ls, l)
+  - Supports --all flag to show all discovered extensions
+  - JSON/YAML output support
+- [x] `shelly extension install <source>` - Install extension (alias: add)
+  - Support local files, URLs, and GitHub repos (gh:user/repo)
+  - GitHub integration via `internal/github/` package (downloads latest release binary)
+  - Platform detection for correct binary (linux/darwin, amd64/arm64)
+  - Archive extraction (tar.gz, zip)
+  - Force reinstall with --force
+- [x] `shelly extension remove <name>` - Remove extension (aliases: rm, uninstall, delete)
+- [x] `shelly extension upgrade [name]` - Upgrade extension(s) (alias: update)
+  - Supports --all flag
+  - GitHub release version checking and automatic download
+  - Uses shared `internal/github/` package for release handling
+- [x] `shelly extension create <name>` - Scaffold new extension (aliases: new, init, scaffold)
+  - Supports --lang (bash, go, python)
+  - Creates full project structure with README, main file
+- [x] `shelly extension exec <name> [args]` - Execute extension explicitly (alias: run)
 
-### 13.3 Plugin SDK
-- [ ] Create `pkg/api/` public package:
-  - Config access functions
-  - Device registry access
-  - Output formatting utilities
-  - Common types and interfaces
-- [ ] Document plugin development in `docs/plugins.md`
-- [ ] Create example plugins in `examples/plugins/`
+### 13.3 Plugin SDK (Deferred)
+- [ ] Create `pkg/api/` public package (future)
+- [ ] Document plugin development in `docs/plugins.md` (future)
+- [ ] Create example plugins in `examples/plugins/` (future)
 
 ---
 
