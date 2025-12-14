@@ -43,6 +43,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/lora"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/matter"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor"
@@ -329,6 +330,7 @@ func init() {
 	addCommandWithGroup(rootCmd, bthome.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, zigbee.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, lora.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, matter.NewCommand(f), groupConfig)
 
 	// Monitoring commands - status and metrics
 	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)

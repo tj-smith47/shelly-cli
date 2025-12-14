@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 22 - Matter Commands | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 23 - Gen1 Device Support | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -104,7 +104,8 @@ Create a production-ready, open-source Cobra CLI that:
 | 17 | Update Command | ✅ Complete |
 | 18-20 | Advanced Features (Monitor, Debug) | ✅ Complete |
 | 21 | BTHome/Zigbee/LoRa Commands | ✅ Complete |
-| 22-25 | Advanced Features | ⏳ Pending |
+| 22 | Matter Commands | ✅ Complete |
+| 23-25 | Gen1/Sensor/Thermostat Commands | ⏳ Pending |
 | 26-27 | Documentation & Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
 | 29 | Innovative Commands (82 new) | ⏳ Pending |
@@ -1459,11 +1460,30 @@ shelly-cli/
 ## Phase 22: Matter Commands
 
 ### 22.1 Matter Management
-- [ ] `shelly matter status <device>` - Matter status
-- [ ] `shelly matter enable <device>` - Enable Matter
-- [ ] `shelly matter disable <device>` - Disable Matter
-- [ ] `shelly matter reset <device>` - Reset Matter config
-- [ ] `shelly matter code <device>` - Show pairing code
+- [x] `shelly matter status <device>` - Matter status
+  - Aliases: st, info
+  - Flags: --json
+  - Shows Matter.GetConfig (enabled) and Matter.GetStatus (commissionable, fabrics count)
+- [x] `shelly matter enable <device>` - Enable Matter
+  - Aliases: on, activate
+  - Uses Matter.SetConfig with enable=true
+- [x] `shelly matter disable <device>` - Disable Matter
+  - Aliases: off, deactivate
+  - Uses Matter.SetConfig with enable=false
+- [x] `shelly matter reset <device>` - Reset Matter config
+  - Aliases: factory-reset, unpair
+  - Flags: --yes (skip confirmation)
+  - Uses Matter.FactoryReset
+- [x] `shelly matter code <device>` - Show pairing code
+  - Aliases: pairing, qr
+  - Flags: --json
+  - Tries Matter.GetCommissioningCode, falls back to web UI hint
+
+**Code Audit Notes (Phase 22):**
+- Follows same marshal/unmarshal pattern as Phase 21 commands
+- Complexity in code.go due to fallback logic for commissioning info
+- Matter API is simpler (enable/disable/reset) compared to Zigbee/BTHome
+- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
 
 ---
 
