@@ -42,13 +42,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/on"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/rebootcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/resetcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/statuscmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/togglecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
@@ -234,6 +242,7 @@ func executeShellAlias(args []string) int {
 
 // Command group IDs for organized help output.
 const (
+	groupShortcuts  = "shortcuts"
 	groupControl    = "control"
 	groupManagement = "management"
 	groupConfig     = "config"
@@ -262,6 +271,7 @@ func init() {
 
 	// Define command groups for organized help output
 	rootCmd.AddGroup(
+		&cobra.Group{ID: groupShortcuts, Title: "Quick Commands:"},
 		&cobra.Group{ID: groupControl, Title: "Device Control:"},
 		&cobra.Group{ID: groupManagement, Title: "Device Management:"},
 		&cobra.Group{ID: groupConfig, Title: "Configuration:"},
@@ -271,6 +281,14 @@ func init() {
 
 	// Create factory for dependency injection
 	f := cmdutil.NewFactory()
+
+	// Quick commands - shortcuts for common operations
+	addCommandWithGroup(rootCmd, on.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, off.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, togglecmd.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, statuscmd.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, rebootcmd.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, resetcmd.NewCommand(f), groupShortcuts)
 
 	// Control commands - direct device control
 	addCommandWithGroup(rootCmd, switchcmd.NewCommand(f), groupControl)
@@ -300,6 +318,8 @@ func init() {
 	addCommandWithGroup(rootCmd, webhook.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, kvs.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, template.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, provision.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, action.NewCommand(f), groupConfig)
 
 	// Monitoring commands - status and metrics
 	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)

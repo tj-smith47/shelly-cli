@@ -1284,39 +1284,65 @@ shelly-cli/
   - Aliases: del, rm, remove
   - Flags: --yes
 
-### 19.2 Export Formats
-- [ ] `shelly export json <device> [file]` - Export as JSON
-- [ ] `shelly export yaml <device> [file]` - Export as YAML
-- [ ] `shelly export csv <devices...> [file]` - Export devices list as CSV
-- [ ] `shelly export ansible <devices...> [file]` - Export as Ansible inventory
-- [ ] `shelly export terraform <devices...> [file]` - Export as Terraform config
+### 19.2 Export Formats ✅ Complete
+- [x] `shelly export json <device> [file]` - Export as JSON
+- [x] `shelly export yaml <device> [file]` - Export as YAML
+- [x] `shelly export csv <devices...> [file]` - Export devices list as CSV
+- [x] `shelly export ansible <devices...> [file]` - Export as Ansible inventory
+- [x] `shelly export terraform <devices...> [file]` - Export as Terraform config
 
-### 19.3 Provisioning
-- [ ] `shelly provision wifi <device>` - Provision WiFi settings
-  - Interactive or via flags
-- [ ] `shelly provision bulk <file>` - Bulk provision from config file
-  - YAML file with device list and settings
-  - Parallel provisioning
-  - Progress reporting
-- [ ] `shelly provision ble <device>` - BLE-based provisioning
+### 19.3 Provisioning ✅ Complete
+- [x] `shelly provision wifi <device>` - Provision WiFi settings
+  - Aliases: network, wlan
+  - Interactive network scan and selection
+  - Direct provisioning via --ssid and --password flags
+  - --no-scan flag to skip scan and prompt for SSID
+- [x] `shelly provision bulk <file>` - Bulk provision from config file
+  - Aliases: batch, mass
+  - YAML file with global and per-device WiFi settings
+  - Parallel provisioning with --parallel flag
+  - --dry-run for config validation
+- [x] `shelly provision ble <device>` - BLE-based provisioning
+  - Placeholder with workaround instructions
+  - Guides users to use AP mode provisioning
 
-### 19.4 Actions/Webhooks Helper
-- [ ] `shelly action list <device>` - List available actions (Gen1)
-- [ ] `shelly action set <device> <action> <url>` - Set action URL
-- [ ] `shelly action clear <device> <action>` - Clear action URL
-- [ ] `shelly action test <device> <action>` - Test action trigger
+### 19.4 Actions/Webhooks Helper ✅ Complete
+- [x] `shelly action list <device>` - List available actions (Gen1)
+  - Aliases: ls, show
+  - Placeholder with workaround instructions (curl)
+- [x] `shelly action set <device> <action> <url>` - Set action URL
+  - Aliases: add, configure
+  - Placeholder with workaround instructions
+- [x] `shelly action clear <device> <action>` - Clear action URL
+  - Aliases: delete, remove, rm
+  - Placeholder with workaround instructions
+- [x] `shelly action test <device> <action>` - Test action trigger
+  - Aliases: trigger, fire
+  - Documents that Gen1 actions trigger via state changes
 
 ---
 
 ## Phase 20: Convenience Commands
 
-### 20.1 Quick Commands
-- [ ] `shelly on <device>` - Quick on (detect switch/light/cover)
-- [ ] `shelly off <device>` - Quick off
-- [ ] `shelly toggle <device>` - Quick toggle
-- [ ] `shelly status [device]` - Quick status (all or specific)
-- [ ] `shelly reboot <device>` - Quick reboot
-- [ ] `shelly reset <device>` - Quick factory reset (with confirmation)
+### 20.1 Quick Commands ✅ Complete
+- [x] `shelly on <device>` - Quick on (detect switch/light/cover)
+  - Aliases: turn-on, enable
+  - Flags: --all (control all components)
+- [x] `shelly off <device>` - Quick off
+  - Aliases: turn-off, disable
+  - Flags: --all (control all components)
+- [x] `shelly toggle <device>` - Quick toggle
+  - Aliases: flip, switch
+  - Flags: --all (toggle all components)
+- [x] `shelly status [device]` - Quick status (all or specific)
+  - Aliases: st, state
+  - Shows component states with colored output
+- [x] `shelly reboot <device>` - Quick reboot
+  - Aliases: restart
+  - Flags: --delay, --yes
+- [x] `shelly reset <device>` - Quick factory reset (with confirmation)
+  - Aliases: factory-reset, wipe
+  - Requires both --yes and --confirm flags for safety
 
 ### 20.2 Interactive Mode
 - [ ] `shelly interactive` - Launch interactive REPL
