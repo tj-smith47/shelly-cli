@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
@@ -47,7 +48,7 @@ Format is auto-detected from file extension, or can be specified with --format.`
   # Export to stdout as YAML
   shelly template export my-config`,
 		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: cmdutil.CompleteTemplateThenFile(),
+		ValidArgsFunction: completion.TemplateThenFile(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			if len(args) > 1 {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -33,7 +34,7 @@ Gain range: 0 (off) to 100 (full brightness).`,
 		Example: `  # Set gain to 75%
   shelly gen1 color gain living-room 75`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			gain, err := strconv.Atoi(args[1])

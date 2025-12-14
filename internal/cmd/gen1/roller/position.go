@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -42,7 +43,7 @@ Use 'shelly gen1 roller calibrate' to calibrate first.`,
   # Fully close
   shelly gen1 roller position living-room 0`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			pos, err := strconv.Atoi(args[1])

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -48,7 +49,7 @@ Use --full to include device status in addition to configuration.`,
   # Export compact (no pretty printing)
   shelly export json living-room --no-pretty`,
 		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: cmdutil.CompleteDeviceThenFile(),
+		ValidArgsFunction: completion.DeviceThenFile(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			if len(args) > 1 {

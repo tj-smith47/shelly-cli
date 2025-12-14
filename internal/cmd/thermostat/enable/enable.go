@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -43,7 +44,7 @@ Optionally set the operating mode when enabling:
   # Enable specific thermostat in auto mode
   shelly thermostat enable gateway --id 1 --mode auto`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)

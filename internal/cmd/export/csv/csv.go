@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -49,7 +50,7 @@ Otherwise outputs to stdout.`,
   # Without header row
   shelly export csv @all --no-header`,
 		Args:              cobra.MinimumNArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDevicesWithGroups(),
+		ValidArgsFunction: completion.DevicesWithGroups(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Devices, opts.File = cmdutil.SplitDevicesAndFile(args, []string{".csv"})
 			return run(cmd.Context(), opts)
@@ -69,7 +70,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	// Expand @all to all registered devices
-	devices := cmdutil.ExpandDeviceArgs(opts.Devices)
+	devices := completion.ExpandDeviceArgs(opts.Devices)
 	if len(devices) == 0 {
 		return fmt.Errorf("no devices specified")
 	}

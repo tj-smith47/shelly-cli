@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -44,7 +45,7 @@ Note: Only devices of the same model/generation are fully compatible.`,
   # Apply without confirmation
   shelly template apply my-config bedroom --yes`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteTemplateThenDevice(),
+		ValidArgsFunction: completion.TemplateThenDevice(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			opts.Device = args[1]

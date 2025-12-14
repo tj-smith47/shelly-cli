@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -44,7 +44,7 @@ Displays the current Zigbee state including:
   # Output as JSON
   shelly zigbee status living-room --json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -89,79 +89,39 @@ func run(ctx context.Context, opts *Options) error {
 func fetchZigbeeStatus(ctx context.Context, svc *shelly.Service, device string, ios *iostreams.IOStreams) (ZigbeeStatus, error) {
 	var status ZigbeeStatus
 
-	err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
-		enabled, err := getZigbeeConfig(ctx, conn, ios)
-		if err != nil {
-			return err
-		}
-		status.Enabled = enabled
-
-		netStatus := getZigbeeNetworkStatus(ctx, conn, ios)
-		status.NetworkState = netStatus.NetworkState
-		status.EUI64 = netStatus.EUI64
-		status.PANID = netStatus.PANID
-		status.Channel = netStatus.Channel
-		status.CoordinatorEUI64 = netStatus.CoordinatorEUI64
-
-		return nil
-	})
-
-	return status, err
-}
-
-func getZigbeeConfig(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) (bool, error) {
-	cfgResult, err := conn.Call(ctx, "Zigbee.GetConfig", nil)
+	// Get config
+	cfg, err := svc.ZigbeeGetConfig(ctx, device)
 	if err != nil {
-		ios.Debug("Zigbee.GetConfig failed: %v", err)
-		return false, fmt.Errorf("zigbee not available on this device: %w", err)
+		return status, fmt.Errorf("zigbee not available on this device: %w", err)
+	}
+	if enable, ok := cfg["enable"].(bool); ok {
+		status.Enabled = enable
 	}
 
-	var cfg struct {
-		Enable bool `json:"enable"`
-	}
-	cfgBytes, err := json.Marshal(cfgResult)
-	if err != nil {
-		return false, fmt.Errorf("failed to marshal config: %w", err)
-	}
-	if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
-		return false, fmt.Errorf("failed to parse config: %w", err)
-	}
-
-	return cfg.Enable, nil
-}
-
-func getZigbeeNetworkStatus(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) ZigbeeStatus {
-	var status ZigbeeStatus
-
-	statusResult, err := conn.Call(ctx, "Zigbee.GetStatus", nil)
+	// Get status
+	st, err := svc.ZigbeeGetStatus(ctx, device)
 	if err != nil {
 		ios.Debug("Zigbee.GetStatus failed: %v", err)
-		return status
+		return status, nil // Config succeeded, return partial info
 	}
 
-	var st struct {
-		NetworkState     string `json:"network_state"`
-		EUI64            string `json:"eui64"`
-		PANID            uint16 `json:"pan_id"`
-		Channel          int    `json:"channel"`
-		CoordinatorEUI64 string `json:"coordinator_eui64"`
+	if networkState, ok := st["network_state"].(string); ok {
+		status.NetworkState = networkState
 	}
-	statusBytes, err := json.Marshal(statusResult)
-	if err != nil {
-		ios.Debug("failed to marshal status: %v", err)
-		return status
+	if eui64, ok := st["eui64"].(string); ok {
+		status.EUI64 = eui64
 	}
-	if json.Unmarshal(statusBytes, &st) != nil {
-		return status
+	if panID, ok := st["pan_id"].(float64); ok {
+		status.PANID = uint16(panID)
+	}
+	if channel, ok := st["channel"].(float64); ok {
+		status.Channel = int(channel)
+	}
+	if coordinatorEUI64, ok := st["coordinator_eui64"].(string); ok {
+		status.CoordinatorEUI64 = coordinatorEUI64
 	}
 
-	return ZigbeeStatus{
-		NetworkState:     st.NetworkState,
-		EUI64:            st.EUI64,
-		PANID:            st.PANID,
-		Channel:          st.Channel,
-		CoordinatorEUI64: st.CoordinatorEUI64,
-	}
+	return status, nil
 }
 
 func outputStatusJSON(ios *iostreams.IOStreams, status ZigbeeStatus) error {

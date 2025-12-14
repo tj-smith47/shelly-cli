@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -142,7 +143,7 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 	for _, d := range devices {
 		deviceAddrs = append(deviceAddrs, d.Address.String())
 	}
-	if err := cmdutil.SaveDiscoveryCache(deviceAddrs); err != nil {
+	if err := completion.SaveDiscoveryCache(deviceAddrs); err != nil {
 		ios.DebugErr("saving discovery cache", err)
 	}
 

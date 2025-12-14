@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -91,11 +92,11 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	}
 }
 
-func fetchAllSnapshots(ctx context.Context, svc *shelly.Service, devices map[string]config.Device, snapshots map[string]*deviceSnapshot, mu *sync.Mutex) {
+func fetchAllSnapshots(ctx context.Context, svc *shelly.Service, devices map[string]model.Device, snapshots map[string]*deviceSnapshot, mu *sync.Mutex) {
 	var wg sync.WaitGroup
 	for name, dev := range devices {
 		wg.Add(1)
-		go func(n string, d config.Device) {
+		go func(n string, d model.Device) {
 			defer wg.Done()
 
 			snapshot := &deviceSnapshot{
@@ -182,9 +183,9 @@ func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceS
 
 		// Display device line
 		statusIcon := theme.StatusOK().Render("●")
-		model := "Unknown"
+		deviceModel := "Unknown"
 		if snap.Info != nil {
-			model = snap.Info.Model
+			deviceModel = snap.Info.Model
 		}
 
 		powerStr := formatPowerColored(devicePower)
@@ -193,7 +194,7 @@ func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceS
 			energyStr = fmt.Sprintf("  %.2f Wh", deviceEnergy)
 		}
 		ios.Printf("%s %s (%s): %s%s\n",
-			statusIcon, name, model, powerStr, energyStr)
+			statusIcon, name, deviceModel, powerStr, energyStr)
 	}
 
 	// Display summary

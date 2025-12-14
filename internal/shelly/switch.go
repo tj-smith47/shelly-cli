@@ -4,6 +4,8 @@ package shelly
 import (
 	"context"
 
+	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
+
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -17,23 +19,70 @@ type SwitchInfo struct {
 }
 
 // SwitchOn turns on a switch component.
+// For Gen1 devices, this controls the relay.
 func (s *Service) SwitchOn(ctx context.Context, identifier string, switchID int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.Switch(switchID).On(ctx)
-	})
+	return s.withGenAwareAction(ctx, identifier,
+		func(conn *client.Gen1Client) error {
+			relay, err := conn.Relay(switchID)
+			if err != nil {
+				return err
+			}
+			return relay.TurnOn(ctx)
+		},
+		func(conn *client.Client) error {
+			return conn.Switch(switchID).On(ctx)
+		},
+	)
 }
 
 // SwitchOff turns off a switch component.
+// For Gen1 devices, this controls the relay.
 func (s *Service) SwitchOff(ctx context.Context, identifier string, switchID int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.Switch(switchID).Off(ctx)
-	})
+	return s.withGenAwareAction(ctx, identifier,
+		func(conn *client.Gen1Client) error {
+			relay, err := conn.Relay(switchID)
+			if err != nil {
+				return err
+			}
+			return relay.TurnOff(ctx)
+		},
+		func(conn *client.Client) error {
+			return conn.Switch(switchID).Off(ctx)
+		},
+	)
 }
 
 // SwitchToggle toggles a switch component and returns the new status.
+// For Gen1 devices, this controls the relay.
 func (s *Service) SwitchToggle(ctx context.Context, identifier string, switchID int) (*model.SwitchStatus, error) {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if isGen1 {
+		var result *model.SwitchStatus
+		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+			relay, err := conn.Relay(switchID)
+			if err != nil {
+				return err
+			}
+			if err := relay.Toggle(ctx); err != nil {
+				return err
+			}
+			// Get status after toggle
+			status, err := relay.GetStatus(ctx)
+			if err != nil {
+				return err
+			}
+			result = gen1RelayStatusToSwitch(switchID, status)
+			return nil
+		})
+		return result, err
+	}
+
 	var result *model.SwitchStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		status, err := conn.Switch(switchID).Toggle(ctx)
 		if err != nil {
 			return err
@@ -50,9 +99,32 @@ func (s *Service) SwitchToggle(ctx context.Context, identifier string, switchID 
 }
 
 // SwitchStatus gets the status of a switch component.
+// For Gen1 devices, this returns relay status.
 func (s *Service) SwitchStatus(ctx context.Context, identifier string, switchID int) (*model.SwitchStatus, error) {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if isGen1 {
+		var result *model.SwitchStatus
+		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+			relay, err := conn.Relay(switchID)
+			if err != nil {
+				return err
+			}
+			status, err := relay.GetStatus(ctx)
+			if err != nil {
+				return err
+			}
+			result = gen1RelayStatusToSwitch(switchID, status)
+			return nil
+		})
+		return result, err
+	}
+
 	var result *model.SwitchStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		status, err := conn.Switch(switchID).GetStatus(ctx)
 		if err != nil {
 			return err
@@ -64,6 +136,7 @@ func (s *Service) SwitchStatus(ctx context.Context, identifier string, switchID 
 }
 
 // SwitchList lists all switch components on a device with their status.
+// Note: Gen1 devices don't have a component enumeration API, so this only works for Gen2+.
 func (s *Service) SwitchList(ctx context.Context, identifier string) ([]SwitchInfo, error) {
 	var result []SwitchInfo
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
@@ -96,4 +169,14 @@ func (s *Service) SwitchList(ctx context.Context, identifier string) ([]SwitchIn
 		return nil
 	})
 	return result, err
+}
+
+// gen1RelayStatusToSwitch converts Gen1 relay status to model.SwitchStatus.
+func gen1RelayStatusToSwitch(id int, status *gen1comp.RelayStatus) *model.SwitchStatus {
+	return &model.SwitchStatus{
+		ID:        id,
+		Output:    status.IsOn,
+		Source:    status.Source,
+		Overpower: status.Overpower,
+	}
 }

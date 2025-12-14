@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -43,7 +44,7 @@ Use --append to add code to the existing script instead of replacing it.`,
   # Enable/disable script
   shelly script update living-room 1 --enable`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
+		ValidArgsFunction: completion.DeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

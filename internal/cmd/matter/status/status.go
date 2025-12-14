@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -42,7 +42,7 @@ Displays:
   # Output as JSON
   shelly matter status living-room --json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -70,54 +70,26 @@ func run(ctx context.Context, opts *Options) error {
 
 	var status MatterStatus
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		// Get Matter config
-		cfgResult, err := conn.Call(ctx, "Matter.GetConfig", nil)
-		if err != nil {
-			ios.Debug("Matter.GetConfig failed: %v", err)
-			return fmt.Errorf("matter not available on this device: %w", err)
-		}
-
-		var cfg struct {
-			Enable bool `json:"enable"`
-		}
-		cfgBytes, err := json.Marshal(cfgResult)
-		if err != nil {
-			return fmt.Errorf("failed to marshal config: %w", err)
-		}
-		if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
-			return fmt.Errorf("failed to parse config: %w", err)
-		}
-		status.Enabled = cfg.Enable
-
-		// Get Matter status
-		statusResult, err := conn.Call(ctx, "Matter.GetStatus", nil)
-		if err != nil {
-			ios.Debug("Matter.GetStatus failed: %v", err)
-			return nil // Config succeeded, show partial info
-		}
-
-		var st struct {
-			Commissionable bool `json:"commissionable"`
-			FabricsCount   int  `json:"fabrics_count"`
-		}
-		statusBytes, statusMarshalErr := json.Marshal(statusResult)
-		if statusMarshalErr != nil {
-			ios.Debug("failed to marshal status: %v", statusMarshalErr)
-			return nil
-		}
-		if err := json.Unmarshal(statusBytes, &st); err != nil {
-			ios.Debug("failed to parse status: %v", err)
-			return nil
-		}
-
-		status.Commissionable = st.Commissionable
-		status.FabricsCount = st.FabricsCount
-
-		return nil
-	})
+	// Get Matter config
+	cfg, err := svc.MatterGetConfig(ctx, opts.Device)
 	if err != nil {
-		return err
+		ios.Debug("Matter.GetConfig failed: %v", err)
+		return fmt.Errorf("matter not available on this device: %w", err)
+	}
+	status.Enabled = cfg.Enable
+
+	// Get Matter status
+	statusMap, err := svc.MatterGetStatus(ctx, opts.Device)
+	if err != nil {
+		ios.Debug("Matter.GetStatus failed: %v", err)
+		// Config succeeded, show partial info
+	} else {
+		if commissionable, ok := statusMap["commissionable"].(bool); ok {
+			status.Commissionable = commissionable
+		}
+		if fabricsCount, ok := statusMap["fabrics_count"].(float64); ok {
+			status.FabricsCount = int(fabricsCount)
+		}
 	}
 
 	if opts.JSON {

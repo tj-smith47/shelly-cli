@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -44,7 +44,7 @@ After reset, the device must be re-commissioned to any Matter fabrics.`,
   # Reset without confirmation
   shelly matter reset living-room --yes`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -79,15 +79,7 @@ func run(ctx context.Context, opts *Options) error {
 		}
 	}
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		_, err := conn.Call(ctx, "Matter.FactoryReset", nil)
-		if err != nil {
-			return fmt.Errorf("failed to reset Matter: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	if err := svc.MatterReset(ctx, opts.Device); err != nil {
 		return err
 	}
 

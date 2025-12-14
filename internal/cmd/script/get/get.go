@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -32,7 +33,7 @@ detailed status including memory usage and errors.`,
   # Get script status
   shelly script get living-room 1 --status`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
+		ValidArgsFunction: completion.DeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

@@ -189,8 +189,8 @@ check_pattern 'iostreams\.System()' "Use f.IOStreams() instead of iostreams.Syst
 
 # Rule 5: No shelly.NewService() direct instantiation
 info "Checking for shelly.NewService()..."
-# Exclude: factory.go (provides it), shelly.go (defines it), test files, completions.go (needs direct access)
-check_pattern 'shelly\.NewService()' "Use f.ShellyService() instead of shelly.NewService()" "all" "error" "_test.go\|factory.go\|shelly/shelly.go\|completions.go"
+# Exclude: factory.go (provides it), shelly.go (defines it), test files, completion/ (needs direct access)
+check_pattern 'shelly\.NewService()' "Use f.ShellyService() instead of shelly.NewService()" "all" "error" "_test.go\|factory.go\|shelly/shelly.go\|completion/"
 
 # Rule 6: No exec.Command("open"
 info "Checking for exec.Command browser calls..."

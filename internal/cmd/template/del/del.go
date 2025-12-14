@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
@@ -32,7 +33,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   # Delete without confirmation
   shelly template delete my-config --yes`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteTemplateNames(),
+		ValidArgsFunction: completion.TemplateNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			return run(opts)

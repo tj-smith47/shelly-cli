@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -236,7 +237,7 @@ func (m Model) fetchEnergy() tea.Cmd {
 }
 
 // fetchDeviceEnergy fetches energy data for a single device.
-func (m Model) fetchDeviceEnergy(ctx context.Context, device config.Device) DeviceEnergy {
+func (m Model) fetchDeviceEnergy(ctx context.Context, device model.Device) DeviceEnergy {
 	energy := DeviceEnergy{
 		Name:    device.Name,
 		Address: device.Address,

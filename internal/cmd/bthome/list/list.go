@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/bthome/bthomeutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -66,7 +66,7 @@ structured output suitable for scripting.`,
   # Short form
   shelly bthome ls living-room`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -117,7 +117,7 @@ func fetchDevices(ctx context.Context, svc *shelly.Service, device string, ios *
 			return err
 		}
 
-		deviceStatuses := bthomeutil.CollectDevices(status, ios)
+		deviceStatuses := shelly.CollectBTHomeDevices(status, ios)
 		devices = enrichDevices(ctx, conn, deviceStatuses)
 		return nil
 	})
@@ -144,7 +144,7 @@ func getDeviceStatus(ctx context.Context, conn *client.Client) (map[string]json.
 	return status, nil
 }
 
-func enrichDevices(ctx context.Context, conn *client.Client, deviceStatuses []bthomeutil.DeviceStatus) []BTHomeDeviceInfo {
+func enrichDevices(ctx context.Context, conn *client.Client, deviceStatuses []shelly.BTHomeDeviceStatus) []BTHomeDeviceInfo {
 	devices := make([]BTHomeDeviceInfo, 0, len(deviceStatuses))
 
 	for _, devStatus := range deviceStatuses {

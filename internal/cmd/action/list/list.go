@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // NewCommand creates the action list command.
@@ -29,7 +30,7 @@ to view and configure action URLs.`,
   # Workaround: use curl to get settings
   curl http://192.168.1.100/settings | jq '.actions'`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ios := f.IOStreams()
 			ios.Warning("Gen1 action URL management is not yet fully implemented.")

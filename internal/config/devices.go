@@ -4,10 +4,12 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // RegisterDevice adds a device to the registry.
-func RegisterDevice(name, address string, generation int, deviceType, model string, auth *Auth) error {
+func RegisterDevice(name, address string, generation int, deviceType, deviceModel string, auth *model.Auth) error {
 	if err := ValidateDeviceName(name); err != nil {
 		return err
 	}
@@ -15,12 +17,12 @@ func RegisterDevice(name, address string, generation int, deviceType, model stri
 	c := Get()
 
 	cfgMu.Lock()
-	c.Devices[name] = Device{
+	c.Devices[name] = model.Device{
 		Name:       name,
 		Address:    address,
 		Generation: generation,
 		Type:       deviceType,
-		Model:      model,
+		Model:      deviceModel,
 		Auth:       auth,
 	}
 	cfgMu.Unlock()
@@ -58,7 +60,7 @@ func UnregisterDevice(name string) error {
 }
 
 // GetDevice returns a device by name.
-func GetDevice(name string) (Device, bool) {
+func GetDevice(name string) (model.Device, bool) {
 	c := Get()
 	cfgMu.RLock()
 	defer cfgMu.RUnlock()
@@ -68,13 +70,13 @@ func GetDevice(name string) (Device, bool) {
 }
 
 // ListDevices returns all registered devices.
-func ListDevices() map[string]Device {
+func ListDevices() map[string]model.Device {
 	c := Get()
 	cfgMu.RLock()
 	defer cfgMu.RUnlock()
 
 	// Return a copy to avoid race conditions
-	result := make(map[string]Device, len(c.Devices))
+	result := make(map[string]model.Device, len(c.Devices))
 	for k, v := range c.Devices {
 		result[k] = v
 	}
@@ -136,14 +138,14 @@ func ValidateDeviceName(name string) error {
 
 // ResolveDevice resolves a device identifier to a Device.
 // The identifier can be a device name (from registry) or an address.
-func ResolveDevice(identifier string) (Device, error) {
+func ResolveDevice(identifier string) (model.Device, error) {
 	// First, check if it's a registered device name
 	if device, ok := GetDevice(identifier); ok {
 		return device, nil
 	}
 
 	// Otherwise, treat it as an address
-	return Device{
+	return model.Device{
 		Name:    identifier,
 		Address: identifier,
 	}, nil
@@ -284,13 +286,13 @@ func ValidateGroupName(name string) error {
 }
 
 // GetGroupDevices returns all devices in a group as Device structs.
-func GetGroupDevices(groupName string) ([]Device, error) {
+func GetGroupDevices(groupName string) ([]model.Device, error) {
 	group, ok := GetGroup(groupName)
 	if !ok {
 		return nil, fmt.Errorf("group %q not found", groupName)
 	}
 
-	devices := make([]Device, 0, len(group.Devices))
+	devices := make([]model.Device, 0, len(group.Devices))
 	for _, name := range group.Devices {
 		device, err := ResolveDevice(name)
 		if err != nil {

@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -40,7 +40,7 @@ Note: The device will still be accessible via WiFi/HTTP.`,
   # Leave without confirmation
   shelly zigbee remove living-room --yes`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -75,20 +75,8 @@ func run(ctx context.Context, opts *Options) error {
 		}
 	}
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		// Disable Zigbee (this also causes the device to leave the network)
-		_, err := conn.Call(ctx, "Zigbee.SetConfig", map[string]any{
-			"config": map[string]any{
-				"enable": false,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to disable Zigbee: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	// Disable Zigbee (this also causes the device to leave the network)
+	if err := svc.ZigbeeDisable(ctx, opts.Device); err != nil {
 		return err
 	}
 

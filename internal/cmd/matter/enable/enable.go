@@ -3,12 +3,11 @@ package enable
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -40,7 +39,7 @@ for commissioning the device.`,
   # Then get pairing code
   shelly matter code living-room`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -58,18 +57,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	ios.StartProgress("Enabling Matter...")
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		_, err := conn.Call(ctx, "Matter.SetConfig", map[string]any{
-			"config": map[string]any{
-				"enable": true,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to enable Matter: %w", err)
-		}
-
-		return nil
-	})
+	err := svc.MatterEnable(ctx, opts.Device)
 	ios.StopProgress()
 
 	if err != nil {

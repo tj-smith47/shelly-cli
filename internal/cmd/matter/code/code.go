@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -47,7 +47,7 @@ label or web UI at http://<device-ip>/matter for the QR code.`,
   # Output as JSON
   shelly matter code living-room --json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -75,9 +75,39 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	info, err := getCommissioningInfo(ctx, svc, opts.Device, ios)
+	// Check if device is commissionable
+	commissionable, err := svc.MatterIsCommissionable(ctx, opts.Device)
 	if err != nil {
 		return err
+	}
+
+	if !commissionable {
+		ios.Warning("Device is not commissionable.")
+		ios.Info("Enable Matter first: shelly matter enable %s", opts.Device)
+		if opts.JSON {
+			return outputJSON(ios, CommissioningInfo{Available: false})
+		}
+		return nil
+	}
+
+	// Get commissioning code
+	codeInfo, err := svc.MatterGetCommissioningCode(ctx, opts.Device)
+	if err != nil {
+		ios.Debug("failed to get commissioning code: %v", err)
+		// Code not available via API, show instructions
+		if opts.JSON {
+			return outputJSON(ios, CommissioningInfo{Available: false})
+		}
+		displayNotAvailable(ios, opts.Device)
+		return nil
+	}
+
+	info := CommissioningInfo{
+		ManualCode:    codeInfo.ManualCode,
+		QRCode:        codeInfo.QRCode,
+		Discriminator: codeInfo.Discriminator,
+		SetupPINCode:  codeInfo.SetupPINCode,
+		Available:     codeInfo.ManualCode != "",
 	}
 
 	if opts.JSON {
@@ -86,74 +116,6 @@ func run(ctx context.Context, opts *Options) error {
 
 	displayCommissioningInfo(ios, info, opts.Device)
 	return nil
-}
-
-func getCommissioningInfo(ctx context.Context, svc *shelly.Service, device string, ios *iostreams.IOStreams) (CommissioningInfo, error) {
-	var info CommissioningInfo
-
-	err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
-		commissionable, err := checkCommissionable(ctx, conn, ios)
-		if err != nil {
-			return err
-		}
-		if !commissionable {
-			ios.Warning("Device is not commissionable.")
-			ios.Info("Enable Matter first: shelly matter enable %s", device)
-			return nil
-		}
-
-		fetchedInfo, fetchErr := fetchCommissioningCode(ctx, conn, ios)
-		if fetchErr == nil {
-			info = fetchedInfo
-		}
-		return nil
-	})
-
-	return info, err
-}
-
-func checkCommissionable(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) (bool, error) {
-	statusResult, err := conn.Call(ctx, "Matter.GetStatus", nil)
-	if err != nil {
-		ios.Debug("Matter.GetStatus failed: %v", err)
-		return false, fmt.Errorf("matter not available on this device: %w", err)
-	}
-
-	var st struct {
-		Commissionable bool `json:"commissionable"`
-	}
-	statusBytes, err := json.Marshal(statusResult)
-	if err != nil {
-		return false, fmt.Errorf("failed to marshal status: %w", err)
-	}
-	if err := json.Unmarshal(statusBytes, &st); err != nil {
-		return false, fmt.Errorf("failed to parse status: %w", err)
-	}
-
-	return st.Commissionable, nil
-}
-
-func fetchCommissioningCode(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) (CommissioningInfo, error) {
-	var info CommissioningInfo
-
-	codeResult, err := conn.Call(ctx, "Matter.GetCommissioningCode", nil)
-	if err != nil {
-		ios.Debug("Matter.GetCommissioningCode not available: %v", err)
-		return info, err
-	}
-
-	codeBytes, err := json.Marshal(codeResult)
-	if err != nil {
-		ios.Debug("failed to marshal code: %v", err)
-		return info, err
-	}
-	if err := json.Unmarshal(codeBytes, &info); err != nil {
-		ios.Debug("failed to parse code: %v", err)
-		return info, err
-	}
-	info.Available = true
-
-	return info, nil
 }
 
 func outputJSON(ios *iostreams.IOStreams, info CommissioningInfo) error {

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -28,7 +29,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   # Output as JSON
   shelly group members living-room -o json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteGroupNames(),
+		ValidArgsFunction: completion.GroupNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(f, cmd, args[0])
 		},

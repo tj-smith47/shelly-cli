@@ -23,6 +23,12 @@ type DeviceResolver interface {
 	Resolve(identifier string) (model.Device, error)
 }
 
+// GenerationAwareResolver extends DeviceResolver with generation detection.
+type GenerationAwareResolver interface {
+	DeviceResolver
+	ResolveWithGeneration(ctx context.Context, identifier string) (model.Device, error)
+}
+
 // New creates a new Shelly service.
 func New(resolver DeviceResolver) *Service {
 	return &Service{resolver: resolver}
@@ -61,4 +67,62 @@ func (s *Service) RawRPC(ctx context.Context, identifier, method string, params 
 		return nil
 	})
 	return result, err
+}
+
+// ResolveWithGeneration resolves a device identifier with generation auto-detection.
+// If the resolver implements GenerationAwareResolver, it uses that; otherwise falls back to basic resolution.
+func (s *Service) ResolveWithGeneration(ctx context.Context, identifier string) (model.Device, error) {
+	if gar, ok := s.resolver.(GenerationAwareResolver); ok {
+		return gar.ResolveWithGeneration(ctx, identifier)
+	}
+	return s.resolver.Resolve(identifier)
+}
+
+// ConnectGen1 establishes a connection to a Gen1 device by identifier.
+func (s *Service) ConnectGen1(ctx context.Context, identifier string) (*client.Gen1Client, error) {
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.ConnectGen1(ctx, device)
+}
+
+// WithGen1Connection executes a function with a Gen1 device connection, handling cleanup.
+func (s *Service) WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error {
+	conn, err := s.ConnectGen1(ctx, identifier)
+	if err != nil {
+		return err
+	}
+	defer iostreams.CloseWithDebug("closing gen1 device connection", conn)
+
+	return fn(conn)
+}
+
+// IsGen1Device checks if a device is Gen1.
+func (s *Service) IsGen1Device(ctx context.Context, identifier string) (bool, model.Device, error) {
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+	if err != nil {
+		return false, model.Device{}, err
+	}
+	return device.Generation == 1, device, nil
+}
+
+// withGenAwareAction executes gen1Fn for Gen1 devices, gen2Fn for Gen2+ devices.
+// This centralizes the generation detection and routing logic.
+func (s *Service) withGenAwareAction(
+	ctx context.Context,
+	identifier string,
+	gen1Fn func(*client.Gen1Client) error,
+	gen2Fn func(*client.Client) error,
+) error {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return err
+	}
+
+	if isGen1 {
+		return s.WithGen1Connection(ctx, identifier, gen1Fn)
+	}
+	return s.WithConnection(ctx, identifier, gen2Fn)
 }

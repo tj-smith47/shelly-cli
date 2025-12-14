@@ -7,7 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/discovery"
 
-	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 func TestDeviceConnection_Close_NilDevice(t *testing.T) {
@@ -279,7 +279,7 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 	tests := []struct {
 		name string
 		d    discovery.DiscoveredDevice
-		want config.Device
+		want model.Device
 	}{
 		{
 			name: "gen1 device",
@@ -289,7 +289,7 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 				Generation: 1,
 				Model:      "SHSW-1",
 			},
-			want: config.Device{
+			want: model.Device{
 				Name:       "shelly1-AABBCC",
 				Address:    "10.0.0.1",
 				Generation: 1,
@@ -305,7 +305,7 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 				Generation: 2,
 				Model:      "SPSW-001P16EU",
 			},
-			want: config.Device{
+			want: model.Device{
 				Name:       "shellypro1pm-AABBCC",
 				Address:    "10.0.0.2",
 				Generation: 2,
@@ -321,7 +321,7 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 				Generation: 3,
 				Model:      "S3PM-001PCEU16",
 			},
-			want: config.Device{
+			want: model.Device{
 				Name:       "shelly3pm-AABBCC",
 				Address:    "10.0.0.3",
 				Generation: 3,

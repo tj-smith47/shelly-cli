@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/connutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -38,7 +39,7 @@ Warning: Make sure the roller has no obstructions before calibrating.`,
 		Example: `  # Start calibration
   shelly gen1 roller calibrate living-room`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return runCalibrate(cmd.Context(), opts)

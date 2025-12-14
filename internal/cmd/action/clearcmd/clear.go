@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // NewCommand creates the action clear command.
@@ -28,7 +29,7 @@ Workaround: Use curl to clear action URLs directly:
   # Workaround: use curl
   curl "http://192.168.1.100/settings?out_on_url="`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ios := f.IOStreams()
 			action := args[1]

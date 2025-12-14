@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-go/firmware"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -39,7 +40,7 @@ The firmware URL is determined by querying the device.`,
   # Download beta firmware
   shelly firmware download living-room --beta`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0])
 		},

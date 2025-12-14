@@ -11,7 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -24,7 +24,7 @@ type Deps struct {
 
 // Msg signals that device details were loaded.
 type Msg struct {
-	Device config.Device
+	Device model.Device
 	Status *shelly.MonitoringSnapshot
 	Config map[string]any
 	Err    error
@@ -37,7 +37,7 @@ type ClosedMsg struct{}
 type Model struct {
 	ctx      context.Context
 	svc      *shelly.Service
-	device   *config.Device
+	device   *model.Device
 	status   *shelly.MonitoringSnapshot
 	config   map[string]any
 	viewport viewport.Model
@@ -277,7 +277,7 @@ func (m Model) SetSize(width, height int) Model {
 }
 
 // Show shows the device detail overlay and starts loading data.
-func (m Model) Show(device config.Device) (Model, tea.Cmd) {
+func (m Model) Show(device model.Device) (Model, tea.Cmd) {
 	m.visible = true
 	m.loading = true
 	m.err = nil
@@ -301,7 +301,7 @@ func (m Model) Visible() bool {
 }
 
 // fetchDeviceDetails returns a command that loads device details.
-func (m Model) fetchDeviceDetails(device config.Device) tea.Cmd {
+func (m Model) fetchDeviceDetails(device model.Device) tea.Cmd {
 	return func() tea.Msg {
 		// Get monitoring snapshot
 		status, err := m.svc.GetMonitoringSnapshot(m.ctx, device.Address)

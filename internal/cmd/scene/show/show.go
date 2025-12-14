@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -34,7 +35,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   # Short form
   shelly sc show morning-routine`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteSceneNames(),
+		ValidArgsFunction: completion.SceneNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(args[0], outputFormat)
 		},

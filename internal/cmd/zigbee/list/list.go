@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -111,7 +112,7 @@ func scanZigbeeDevices(ctx context.Context, svc *shelly.Service, ios *iostreams.
 	return devices, nil
 }
 
-func checkZigbeeSupport(ctx context.Context, svc *shelly.Service, name string, dev config.Device, ios *iostreams.IOStreams) (ZigbeeDevice, bool) {
+func checkZigbeeSupport(ctx context.Context, svc *shelly.Service, name string, dev model.Device, ios *iostreams.IOStreams) (ZigbeeDevice, bool) {
 	result, err := svc.RawRPC(ctx, dev.Address, "Zigbee.GetConfig", nil)
 	if err != nil {
 		ios.Debug("device %s does not support Zigbee: %v", name, err)

@@ -1,5 +1,5 @@
-// Package sensorutil provides shared utilities for sensor commands.
-package sensorutil
+// Package shelly provides business logic for Shelly device operations.
+package shelly
 
 import (
 	"encoding/json"
@@ -8,12 +8,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
-// CollectByPrefix collects sensor data from a status map by component prefix.
+// CollectSensorsByPrefix collects sensor data from a status map by component prefix.
 // It iterates through all keys in the status map, finds those matching the prefix,
 // and unmarshals them into the target type T.
 //
 // Example prefixes: "temperature:", "humidity:", "flood:", "smoke:", "illuminance:", "voltmeter:".
-func CollectByPrefix[T any](status map[string]json.RawMessage, prefix string, ios *iostreams.IOStreams) []T {
+func CollectSensorsByPrefix[T any](status map[string]json.RawMessage, prefix string, ios *iostreams.IOStreams) []T {
 	var sensors []T
 	for key, raw := range status {
 		if strings.HasPrefix(key, prefix) {
@@ -30,14 +30,14 @@ func CollectByPrefix[T any](status map[string]json.RawMessage, prefix string, io
 	return sensors
 }
 
-// CollectByPrefixSilent is like CollectByPrefix but doesn't log unmarshal errors.
+// CollectSensorsByPrefixSilent is like CollectSensorsByPrefix but doesn't log unmarshal errors.
 // Use this when you don't have access to IOStreams or errors are expected.
-func CollectByPrefixSilent[T any](status map[string]json.RawMessage, prefix string) []T {
-	return CollectByPrefix[T](status, prefix, nil)
+func CollectSensorsByPrefixSilent[T any](status map[string]json.RawMessage, prefix string) []T {
+	return CollectSensorsByPrefix[T](status, prefix, nil)
 }
 
-// AlarmReading represents a sensor with alarm and mute state (flood, smoke).
-type AlarmReading struct {
+// AlarmSensorReading represents a sensor with alarm and mute state (flood, smoke).
+type AlarmSensorReading struct {
 	ID    int  `json:"id"`
 	Alarm bool `json:"alarm"`
 	Mute  bool `json:"mute"`
@@ -48,7 +48,7 @@ type StyleFunc func(...string) string
 
 // DisplayAlarmSensors displays alarm-type sensors (flood, smoke) with a consistent format.
 // Returns true if any sensors were displayed.
-func DisplayAlarmSensors(ios *iostreams.IOStreams, sensors []AlarmReading, sensorType, alarmMsg string, okStyle, errorStyle, dimStyle StyleFunc) bool {
+func DisplayAlarmSensors(ios *iostreams.IOStreams, sensors []AlarmSensorReading, sensorType, alarmMsg string, okStyle, errorStyle, dimStyle StyleFunc) bool {
 	if len(sensors) == 0 {
 		return false
 	}
@@ -61,7 +61,7 @@ func DisplayAlarmSensors(ios *iostreams.IOStreams, sensors []AlarmReading, senso
 		if s.Mute {
 			muteStr = " " + dimStyle("(muted)")
 		}
-		ios.Printf("    Sensor %d: %s%s\n", s.ID, status, muteStr)
+		ios.Printf("    %s Sensor %d: %s%s\n", sensorType, s.ID, status, muteStr)
 	}
 	return true
 }

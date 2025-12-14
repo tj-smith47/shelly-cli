@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/mdns"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/scan"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -106,7 +107,7 @@ func runDiscover(ctx context.Context, f *cmdutil.Factory, timeout time.Duration,
 	for _, d := range devices {
 		addresses = append(addresses, d.Address.String())
 	}
-	if err := cmdutil.SaveDiscoveryCache(addresses); err != nil {
+	if err := completion.SaveDiscoveryCache(addresses); err != nil {
 		ios.DebugErr("saving discovery cache", err)
 	}
 

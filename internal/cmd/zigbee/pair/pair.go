@@ -3,13 +3,12 @@ package pair
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -43,7 +42,7 @@ the device to join a network.`,
   # Start pairing with custom timeout
   shelly zigbee pair living-room --timeout 60`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -65,31 +64,18 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Println(theme.Bold().Render("Starting Zigbee Pairing..."))
 	ios.Println()
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		// Enable Zigbee if not already enabled
-		ios.Info("Enabling Zigbee...")
-		_, err := conn.Call(ctx, "Zigbee.SetConfig", map[string]any{
-			"config": map[string]any{
-				"enable": true,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to enable Zigbee: %w", err)
-		}
+	// Enable Zigbee if not already enabled
+	ios.Info("Enabling Zigbee...")
+	if err := svc.ZigbeeEnable(ctx, opts.Device); err != nil {
+		return err
+	}
 
-		// Wait a moment for Zigbee to initialize
-		time.Sleep(2 * time.Second)
+	// Wait a moment for Zigbee to initialize
+	time.Sleep(2 * time.Second)
 
-		// Start network steering
-		ios.Info("Starting network steering...")
-		_, err = conn.Call(ctx, "Zigbee.StartNetworkSteering", nil)
-		if err != nil {
-			return fmt.Errorf("failed to start network steering: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	// Start network steering
+	ios.Info("Starting network steering...")
+	if err := svc.ZigbeeStartNetworkSteering(ctx, opts.Device); err != nil {
 		return err
 	}
 

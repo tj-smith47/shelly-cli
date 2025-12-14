@@ -15,6 +15,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -43,7 +44,7 @@ func (d Deps) validate() error {
 
 // DeviceStatus represents a device with its live status.
 type DeviceStatus struct {
-	Device  config.Device
+	Device  model.Device
 	Online  bool
 	Power   float64
 	Voltage float64
@@ -214,7 +215,7 @@ func (m Model) fetchDevices() tea.Cmd {
 }
 
 // checkDeviceStatus checks the status of a single device.
-func (m Model) checkDeviceStatus(ctx context.Context, device config.Device) DeviceStatus {
+func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) DeviceStatus {
 	status := DeviceStatus{
 		Device: device,
 		Online: false,

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -40,7 +41,7 @@ what would change if the template were applied.`,
   # Output as JSON
   shelly template diff my-config bedroom -o json`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteTemplateThenDevice(),
+		ValidArgsFunction: completion.TemplateThenDevice(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			opts.Device = args[1]

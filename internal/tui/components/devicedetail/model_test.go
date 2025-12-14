@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -32,7 +32,7 @@ func TestShowAndHide(t *testing.T) {
 
 	m := New(deps)
 
-	device := config.Device{
+	device := model.Device{
 		Name:    "test-device",
 		Address: "192.168.1.100",
 	}
@@ -119,7 +119,7 @@ func TestMsgHandling(t *testing.T) {
 	m.loading = true
 
 	// Simulate receiving device details
-	device := config.Device{
+	device := model.Device{
 		Name:       "test-device",
 		Address:    "192.168.1.100",
 		Generation: 2,
@@ -166,7 +166,7 @@ func TestMsgWithError(t *testing.T) {
 	m.visible = true
 	m.loading = true
 
-	device := config.Device{
+	device := model.Device{
 		Name:    "test-device",
 		Address: "192.168.1.100",
 	}

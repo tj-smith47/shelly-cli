@@ -3,12 +3,11 @@ package config
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -52,7 +51,7 @@ Common frequencies:
   # Configure multiple settings
   shelly lora config living-room --freq 915000000 --power 20 --dr 7`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -97,20 +96,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		params := map[string]any{
-			"id":     opts.ID,
-			"config": config,
-		}
-
-		_, err := conn.Call(ctx, "LoRa.SetConfig", params)
-		if err != nil {
-			return fmt.Errorf("failed to set LoRa config: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	if err := svc.LoRaSetConfig(ctx, opts.Device, opts.ID, config); err != nil {
 		return err
 	}
 

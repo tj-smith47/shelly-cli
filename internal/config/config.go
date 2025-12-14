@@ -10,6 +10,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
+
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // ThemeConfig supports both string and block theme configuration formats.
@@ -37,7 +39,7 @@ type Config struct {
 	Cloud CloudConfig `mapstructure:"cloud"`
 
 	// Device registry
-	Devices map[string]Device `mapstructure:"devices"`
+	Devices map[string]model.Device `mapstructure:"devices"`
 
 	// Aliases
 	Aliases map[string]Alias `mapstructure:"aliases"`
@@ -119,22 +121,6 @@ type CloudConfig struct {
 	ServerURL    string `mapstructure:"server_url"`
 }
 
-// Device represents a registered device.
-type Device struct {
-	Name       string `mapstructure:"name"`
-	Address    string `mapstructure:"address"`
-	Generation int    `mapstructure:"generation"`
-	Type       string `mapstructure:"type"`
-	Model      string `mapstructure:"model"`
-	Auth       *Auth  `mapstructure:"auth,omitempty"`
-}
-
-// Auth holds device authentication credentials.
-type Auth struct {
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-}
-
 // Alias represents a command alias.
 type Alias struct {
 	Name    string `mapstructure:"name"`
@@ -197,7 +183,7 @@ func Get() *Config {
 			Color:     true,
 			Theme:     "dracula",
 			APIMode:   "local",
-			Devices:   make(map[string]Device),
+			Devices:   make(map[string]model.Device),
 			Aliases:   make(map[string]Alias),
 			Groups:    make(map[string]Group),
 			Scenes:    make(map[string]Scene),
@@ -257,7 +243,7 @@ func Load() (*Config, error) {
 
 		// Initialize maps if nil
 		if c.Devices == nil {
-			c.Devices = make(map[string]Device)
+			c.Devices = make(map[string]model.Device)
 		}
 		if c.Aliases == nil {
 			c.Aliases = make(map[string]Alias)

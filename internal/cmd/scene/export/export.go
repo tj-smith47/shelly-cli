@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
@@ -39,7 +40,7 @@ Format is auto-detected from file extension (.json, .yaml, .yml).`,
   # Export to stdout as JSON
   shelly scene export movie-night --output json`,
 		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: cmdutil.CompleteSceneNames(),
+		ValidArgsFunction: completion.SceneNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			name := args[0]
 			file := ""

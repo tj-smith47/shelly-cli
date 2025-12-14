@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -220,7 +221,7 @@ func (m Model) fetchStatuses() tea.Cmd {
 }
 
 // checkDeviceStatus fetches the real-time status of a single device.
-func (m Model) checkDeviceStatus(ctx context.Context, device config.Device) DeviceStatus {
+func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) DeviceStatus {
 	status := DeviceStatus{
 		Name:      device.Name,
 		Address:   device.Address,

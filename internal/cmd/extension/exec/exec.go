@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
@@ -26,7 +27,7 @@ or when you want to explicitly invoke an extension.`,
   # Run with arguments
   shelly extension exec myext arg1 arg2`,
 		Args:               cobra.MinimumNArgs(1),
-		ValidArgsFunction:  cmdutil.CompleteExtensionNames(),
+		ValidArgsFunction:  completion.ExtensionNames(),
 		DisableFlagParsing: true, // Pass all args to the extension
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(f, args[0], args[1:])

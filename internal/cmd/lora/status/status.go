@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -43,7 +43,7 @@ information from the last received packet.`,
   # Output as JSON
   shelly lora status living-room --json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -87,49 +87,39 @@ func run(ctx context.Context, opts *Options) error {
 
 	var full LoRaFullStatus
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		params := map[string]any{"id": opts.ID}
-
-		// Get config
-		cfgResult, err := conn.Call(ctx, "LoRa.GetConfig", params)
-		if err != nil {
-			ios.Debug("LoRa.GetConfig failed: %v", err)
-			return fmt.Errorf("LoRa not available on this device: %w", err)
-		}
-
-		var cfg LoRaConfig
-		cfgBytes, err := json.Marshal(cfgResult)
-		if err != nil {
-			return fmt.Errorf("failed to marshal config: %w", err)
-		}
-		if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
-			return fmt.Errorf("failed to parse config: %w", err)
-		}
-		full.Config = &cfg
-
-		// Get status
-		statusResult, err := conn.Call(ctx, "LoRa.GetStatus", params)
-		if err != nil {
-			ios.Debug("LoRa.GetStatus failed: %v", err)
-			return nil // Config succeeded, status failed - still show partial info
-		}
-
-		var st LoRaStatus
-		statusBytes, statusMarshalErr := json.Marshal(statusResult)
-		if statusMarshalErr != nil {
-			ios.Debug("failed to marshal status: %v", statusMarshalErr)
-			return nil
-		}
-		if err := json.Unmarshal(statusBytes, &st); err != nil {
-			ios.Debug("failed to parse status: %v", err)
-			return nil
-		}
-		full.Status = &st
-
-		return nil
-	})
+	// Get config
+	cfgMap, err := svc.LoRaGetConfig(ctx, opts.Device, opts.ID)
 	if err != nil {
-		return err
+		ios.Debug("LoRa.GetConfig failed: %v", err)
+		return fmt.Errorf("LoRa not available on this device: %w", err)
+	}
+
+	cfg := &LoRaConfig{}
+	if id, ok := cfgMap["id"].(float64); ok {
+		cfg.ID = int(id)
+	}
+	if freq, ok := cfgMap["freq"].(float64); ok {
+		cfg.Freq = int64(freq)
+	}
+	if bw, ok := cfgMap["bw"].(float64); ok {
+		cfg.BW = int(bw)
+	}
+	if dr, ok := cfgMap["dr"].(float64); ok {
+		cfg.DR = int(dr)
+	}
+	if txp, ok := cfgMap["txp"].(float64); ok {
+		cfg.TxP = int(txp)
+	}
+	full.Config = cfg
+
+	// Get status
+	statusMap, err := svc.LoRaGetStatus(ctx, opts.Device, opts.ID)
+	if err != nil {
+		ios.Debug("LoRa.GetStatus failed: %v", err)
+		// Config succeeded, status failed - still show partial info
+	}
+	if err == nil {
+		full.Status = parseLoRaStatus(statusMap)
 	}
 
 	if opts.JSON {
@@ -161,4 +151,18 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	return nil
+}
+
+func parseLoRaStatus(statusMap map[string]any) *LoRaStatus {
+	st := &LoRaStatus{}
+	if id, ok := statusMap["id"].(float64); ok {
+		st.ID = int(id)
+	}
+	if rssi, ok := statusMap["rssi"].(float64); ok {
+		st.RSSI = int(rssi)
+	}
+	if snr, ok := statusMap["snr"].(float64); ok {
+		st.SNR = snr
+	}
+	return st
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -194,7 +195,7 @@ func (m Model) subscribeToAllDevices() tea.Cmd {
 }
 
 // subscribeToDevice creates a WebSocket subscription for a single device.
-func (m Model) subscribeToDevice(device config.Device) {
+func (m Model) subscribeToDevice(device model.Device) {
 	m.state.mu.Lock()
 	// Cancel existing subscription if any
 	if cancel, exists := m.state.subscriptions[device.Address]; exists {

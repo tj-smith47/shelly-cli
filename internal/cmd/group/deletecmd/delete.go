@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -34,7 +35,7 @@ This only removes the group definition, not the devices themselves.`,
   # Short form
   shelly grp del office`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteGroupNames(),
+		ValidArgsFunction: completion.GroupNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return run(args[0], yes)
 		},

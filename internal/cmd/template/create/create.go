@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -52,7 +53,7 @@ Use --include-wifi to include them.`,
   # Overwrite existing template
   shelly template create my-config living-room --force`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteNameThenDevice(),
+		ValidArgsFunction: completion.NameThenDevice(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Name = args[0]
 			opts.Device = args[1]

@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -41,7 +41,7 @@ Use 'shelly bthome list' to see device IDs.`,
   # Remove without confirmation
   shelly bthome remove living-room 200 --yes`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			id, err := strconv.Atoi(args[1])
@@ -81,19 +81,7 @@ func run(ctx context.Context, opts *Options) error {
 		}
 	}
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		params := map[string]any{
-			"id": opts.ID,
-		}
-
-		_, err := conn.Call(ctx, "BTHome.DeleteDevice", params)
-		if err != nil {
-			return fmt.Errorf("failed to remove device: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	if err := svc.BTHomeRemoveDevice(ctx, opts.Device, opts.ID); err != nil {
 		return err
 	}
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -126,7 +127,7 @@ func run(ctx context.Context, opts *Options) error {
 	for _, d := range devices {
 		addresses = append(addresses, d.Address.String())
 	}
-	if err := cmdutil.SaveDiscoveryCache(addresses); err != nil {
+	if err := completion.SaveDiscoveryCache(addresses); err != nil {
 		ios.DebugErr("saving discovery cache", err)
 	}
 

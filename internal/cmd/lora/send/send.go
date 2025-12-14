@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -48,7 +48,7 @@ the LoRa.SendBytes API.`,
   # Specify component ID
   shelly lora send living-room "test" --id 100`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			opts.Data = args[1]
@@ -93,20 +93,7 @@ func run(ctx context.Context, opts *Options) error {
 	// Base64 encode for API
 	b64Data := base64.StdEncoding.EncodeToString(data)
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		params := map[string]any{
-			"id":   opts.ID,
-			"data": b64Data,
-		}
-
-		_, err := conn.Call(ctx, "LoRa.SendBytes", params)
-		if err != nil {
-			return fmt.Errorf("failed to send data: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	if err := svc.LoRaSendBytes(ctx, opts.Device, opts.ID, b64Data); err != nil {
 		return err
 	}
 

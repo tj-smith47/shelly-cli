@@ -1,6 +1,9 @@
-package cmdutil
-
-// Shell completion helper functions for dynamic tab completion.
+// Package completion provides shell completion helper functions for dynamic tab completion.
+//
+// These completion functions are used for shell tab completion which runs outside
+// of normal command execution. They don't have access to cmd.Context() or the
+// Factory pattern, so context.Background() and shelly.NewService() are used here.
+package completion
 
 import (
 	"context"
@@ -19,33 +22,35 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
-// completionCache holds cached completion data to avoid slow network queries.
-var completionCache = &struct {
-	sync.RWMutex
-	scripts   map[string][]scriptCompletion
-	schedules map[string][]scheduleCompletion
-	discovery []string
-	expiry    map[string]time.Time
-}{
-	scripts:   make(map[string][]scriptCompletion),
-	schedules: make(map[string][]scheduleCompletion),
+// cache holds cached completion data to avoid slow network queries.
+var cache = &completionCache{
+	scripts:   make(map[string][]scriptEntry),
+	schedules: make(map[string][]scheduleEntry),
 	expiry:    make(map[string]time.Time),
 }
 
-const completionCacheTTL = 5 * time.Minute
+const cacheTTL = 5 * time.Minute
 
-type scriptCompletion struct {
+type completionCache struct {
+	sync.RWMutex
+	scripts   map[string][]scriptEntry
+	schedules map[string][]scheduleEntry
+	discovery []string
+	expiry    map[string]time.Time
+}
+
+type scriptEntry struct {
 	ID   int
 	Name string
 }
 
-type scheduleCompletion struct {
+type scheduleEntry struct {
 	ID       int
 	Timespec string
 }
 
-// CompleteDeviceNames returns a completion function for device names from the registry.
-func CompleteDeviceNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// DeviceNames returns a completion function for device names from the registry.
+func DeviceNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		devices := config.ListDevices()
 
@@ -59,8 +64,8 @@ func CompleteDeviceNames() func(*cobra.Command, []string, string) ([]string, cob
 	}
 }
 
-// CompleteGroupNames returns a completion function for group names.
-func CompleteGroupNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// GroupNames returns a completion function for group names.
+func GroupNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		groups := config.ListGroups()
 
@@ -74,8 +79,8 @@ func CompleteGroupNames() func(*cobra.Command, []string, string) ([]string, cobr
 	}
 }
 
-// CompleteAliasNames returns a completion function for alias names.
-func CompleteAliasNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// AliasNames returns a completion function for alias names.
+func AliasNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		aliases := config.ListAliases()
 
@@ -89,8 +94,8 @@ func CompleteAliasNames() func(*cobra.Command, []string, string) ([]string, cobr
 	}
 }
 
-// CompleteThemeNames returns a completion function for theme names.
-func CompleteThemeNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// ThemeNames returns a completion function for theme names.
+func ThemeNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		themes := theme.ListThemes()
 
@@ -104,8 +109,8 @@ func CompleteThemeNames() func(*cobra.Command, []string, string) ([]string, cobr
 	}
 }
 
-// CompleteExtensionNames returns a completion function for extension names.
-func CompleteExtensionNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// ExtensionNames returns a completion function for extension names.
+func ExtensionNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		loader := plugins.NewLoader()
 		exts, err := loader.Discover()
@@ -123,8 +128,8 @@ func CompleteExtensionNames() func(*cobra.Command, []string, string) ([]string, 
 	}
 }
 
-// CompleteSceneNames returns a completion function for scene names.
-func CompleteSceneNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// SceneNames returns a completion function for scene names.
+func SceneNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		scenes := config.ListScenes()
 
@@ -138,8 +143,8 @@ func CompleteSceneNames() func(*cobra.Command, []string, string) ([]string, cobr
 	}
 }
 
-// CompleteOutputFormats returns a completion function for output format options.
-func CompleteOutputFormats() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// OutputFormats returns a completion function for output format options.
+func OutputFormats() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{
 			"table\tTabular format (default)",
@@ -150,9 +155,9 @@ func CompleteOutputFormats() func(*cobra.Command, []string, string) ([]string, c
 	}
 }
 
-// CompleteDevicesOrGroups returns a completion function for device or group names.
+// DevicesOrGroups returns a completion function for device or group names.
 // This is useful for commands that accept either.
-func CompleteDevicesOrGroups() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func DevicesOrGroups() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var completions []string
 
@@ -176,49 +181,49 @@ func CompleteDevicesOrGroups() func(*cobra.Command, []string, string) ([]string,
 	}
 }
 
-// NoFileCompletion returns a directive that disables file completion.
-func NoFileCompletion(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+// NoFile returns a directive that disables file completion.
+func NoFile(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 	return nil, cobra.ShellCompDirectiveNoFileComp
 }
 
-// CompleteDeviceThenScriptID returns a completion function that completes
+// DeviceThenScriptID returns a completion function that completes
 // device names for the first arg and script IDs for the second arg.
-func CompleteDeviceThenScriptID() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func DeviceThenScriptID() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		// First arg: complete device names
 		if len(args) == 0 {
-			return completeDeviceNamesFiltered(toComplete)
+			return deviceNamesFiltered(toComplete)
 		}
 
 		// Second arg: complete script IDs from the device
 		if len(args) == 1 {
-			return completeScriptIDs(args[0], toComplete)
+			return scriptIDs(args[0], toComplete)
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
-// CompleteDeviceThenScheduleID returns a completion function that completes
+// DeviceThenScheduleID returns a completion function that completes
 // device names for the first arg and schedule IDs for the second arg.
-func CompleteDeviceThenScheduleID() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func DeviceThenScheduleID() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		// First arg: complete device names
 		if len(args) == 0 {
-			return completeDeviceNamesFiltered(toComplete)
+			return deviceNamesFiltered(toComplete)
 		}
 
 		// Second arg: complete schedule IDs from the device
 		if len(args) == 1 {
-			return completeScheduleIDs(args[0], toComplete)
+			return scheduleIDs(args[0], toComplete)
 		}
 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
-// completeDeviceNamesFiltered returns device names that match the prefix.
-func completeDeviceNamesFiltered(toComplete string) ([]string, cobra.ShellCompDirective) {
+// deviceNamesFiltered returns device names that match the prefix.
+func deviceNamesFiltered(toComplete string) ([]string, cobra.ShellCompDirective) {
 	devices := config.ListDevices()
 	var completions []string
 	for name := range devices {
@@ -229,12 +234,12 @@ func completeDeviceNamesFiltered(toComplete string) ([]string, cobra.ShellCompDi
 	return completions, cobra.ShellCompDirectiveNoFileComp
 }
 
-// completeScriptIDs returns script IDs from the specified device.
-func completeScriptIDs(device, toComplete string) ([]string, cobra.ShellCompDirective) {
+// scriptIDs returns script IDs from the specified device.
+func scriptIDs(device, toComplete string) ([]string, cobra.ShellCompDirective) {
 	scripts := getCachedScripts(device)
 	if scripts == nil {
 		// Try to fetch scripts (with short timeout for completion)
-		scripts = fetchScriptsForCompletion(device)
+		scripts = fetchScripts(device)
 	}
 
 	var completions []string
@@ -251,12 +256,12 @@ func completeScriptIDs(device, toComplete string) ([]string, cobra.ShellCompDire
 	return completions, cobra.ShellCompDirectiveNoFileComp
 }
 
-// completeScheduleIDs returns schedule IDs from the specified device.
-func completeScheduleIDs(device, toComplete string) ([]string, cobra.ShellCompDirective) {
+// scheduleIDs returns schedule IDs from the specified device.
+func scheduleIDs(device, toComplete string) ([]string, cobra.ShellCompDirective) {
 	schedules := getCachedSchedules(device)
 	if schedules == nil {
 		// Try to fetch schedules (with short timeout for completion)
-		schedules = fetchSchedulesForCompletion(device)
+		schedules = fetchSchedules(device)
 	}
 
 	var completions []string
@@ -271,31 +276,33 @@ func completeScheduleIDs(device, toComplete string) ([]string, cobra.ShellCompDi
 }
 
 // getCachedScripts returns cached script completions for a device.
-func getCachedScripts(device string) []scriptCompletion {
-	completionCache.RLock()
-	defer completionCache.RUnlock()
+func getCachedScripts(device string) []scriptEntry {
+	cache.RLock()
+	defer cache.RUnlock()
 
 	key := "scripts:" + device
-	if exp, ok := completionCache.expiry[key]; ok && time.Now().Before(exp) {
-		return completionCache.scripts[device]
+	if exp, ok := cache.expiry[key]; ok && time.Now().Before(exp) {
+		return cache.scripts[device]
 	}
 	return nil
 }
 
 // getCachedSchedules returns cached schedule completions for a device.
-func getCachedSchedules(device string) []scheduleCompletion {
-	completionCache.RLock()
-	defer completionCache.RUnlock()
+func getCachedSchedules(device string) []scheduleEntry {
+	cache.RLock()
+	defer cache.RUnlock()
 
 	key := "schedules:" + device
-	if exp, ok := completionCache.expiry[key]; ok && time.Now().Before(exp) {
-		return completionCache.schedules[device]
+	if exp, ok := cache.expiry[key]; ok && time.Now().Before(exp) {
+		return cache.schedules[device]
 	}
 	return nil
 }
 
-// fetchScriptsForCompletion fetches scripts from a device with a short timeout.
-func fetchScriptsForCompletion(device string) []scriptCompletion {
+// fetchScripts fetches scripts from a device with a short timeout.
+// NOTE: Uses context.Background() and shelly.NewService() because completion
+// functions don't have access to cmd.Context() or Factory.
+func fetchScripts(device string) []scriptEntry {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -305,22 +312,24 @@ func fetchScriptsForCompletion(device string) []scriptCompletion {
 		return nil
 	}
 
-	result := make([]scriptCompletion, len(scripts))
+	result := make([]scriptEntry, len(scripts))
 	for i, s := range scripts {
-		result[i] = scriptCompletion{ID: s.ID, Name: s.Name}
+		result[i] = scriptEntry{ID: s.ID, Name: s.Name}
 	}
 
 	// Cache the result
-	completionCache.Lock()
-	completionCache.scripts[device] = result
-	completionCache.expiry["scripts:"+device] = time.Now().Add(completionCacheTTL)
-	completionCache.Unlock()
+	cache.Lock()
+	cache.scripts[device] = result
+	cache.expiry["scripts:"+device] = time.Now().Add(cacheTTL)
+	cache.Unlock()
 
 	return result
 }
 
-// fetchSchedulesForCompletion fetches schedules from a device with a short timeout.
-func fetchSchedulesForCompletion(device string) []scheduleCompletion {
+// fetchSchedules fetches schedules from a device with a short timeout.
+// NOTE: Uses context.Background() and shelly.NewService() because completion
+// functions don't have access to cmd.Context() or Factory.
+func fetchSchedules(device string) []scheduleEntry {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -330,23 +339,23 @@ func fetchSchedulesForCompletion(device string) []scheduleCompletion {
 		return nil
 	}
 
-	result := make([]scheduleCompletion, len(schedules))
+	result := make([]scheduleEntry, len(schedules))
 	for i, s := range schedules {
-		result[i] = scheduleCompletion{ID: s.ID, Timespec: s.Timespec}
+		result[i] = scheduleEntry{ID: s.ID, Timespec: s.Timespec}
 	}
 
 	// Cache the result
-	completionCache.Lock()
-	completionCache.schedules[device] = result
-	completionCache.expiry["schedules:"+device] = time.Now().Add(completionCacheTTL)
-	completionCache.Unlock()
+	cache.Lock()
+	cache.schedules[device] = result
+	cache.expiry["schedules:"+device] = time.Now().Add(cacheTTL)
+	cache.Unlock()
 
 	return result
 }
 
-// CompleteDiscoveredDevices returns a completion function for discovered device addresses.
+// DiscoveredDevices returns a completion function for discovered device addresses.
 // It reads from the discovery cache file if available.
-func CompleteDiscoveredDevices() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func DiscoveredDevices() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		addresses := getDiscoveryCache()
 
@@ -371,15 +380,15 @@ func CompleteDiscoveredDevices() func(*cobra.Command, []string, string) ([]strin
 
 // getDiscoveryCache reads cached discovery results from the cache directory.
 func getDiscoveryCache() []string {
-	completionCache.RLock()
-	if len(completionCache.discovery) > 0 {
-		if exp, ok := completionCache.expiry["discovery"]; ok && time.Now().Before(exp) {
-			result := completionCache.discovery
-			completionCache.RUnlock()
+	cache.RLock()
+	if len(cache.discovery) > 0 {
+		if exp, ok := cache.expiry["discovery"]; ok && time.Now().Before(exp) {
+			result := cache.discovery
+			cache.RUnlock()
 			return result
 		}
 	}
-	completionCache.RUnlock()
+	cache.RUnlock()
 
 	// Try to read from cache file
 	cacheDir, err := os.UserCacheDir()
@@ -404,17 +413,17 @@ func getDiscoveryCache() []string {
 	}
 
 	// Cache in memory
-	completionCache.Lock()
-	completionCache.discovery = result
-	completionCache.expiry["discovery"] = time.Now().Add(completionCacheTTL)
-	completionCache.Unlock()
+	cache.Lock()
+	cache.discovery = result
+	cache.expiry["discovery"] = time.Now().Add(cacheTTL)
+	cache.Unlock()
 
 	return result
 }
 
-// CompleteDevicesWithGroups returns a completion function that completes device names,
+// DevicesWithGroups returns a completion function that completes device names,
 // group names with @ prefix, and @all for all devices.
-func CompleteDevicesWithGroups() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func DevicesWithGroups() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		devices := config.ListDevices()
 		groups := config.ListGroups()
@@ -451,8 +460,8 @@ func ExpandDeviceArgs(devices []string) []string {
 	return result
 }
 
-// CompleteTemplateNames returns a completion function for template names.
-func CompleteTemplateNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+// TemplateNames returns a completion function for template names.
+func TemplateNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		templates := config.ListTemplates()
 		var completions []string
@@ -465,9 +474,9 @@ func CompleteTemplateNames() func(*cobra.Command, []string, string) ([]string, c
 	}
 }
 
-// CompleteTemplateThenDevice returns a completion function that completes
+// TemplateThenDevice returns a completion function that completes
 // template names for the first arg and device names for the second arg.
-func CompleteTemplateThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func TemplateThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			// First argument: template names
@@ -482,15 +491,15 @@ func CompleteTemplateThenDevice() func(*cobra.Command, []string, string) ([]stri
 		}
 		if len(args) == 1 {
 			// Second argument: device names
-			return completeDeviceNamesFiltered(toComplete)
+			return deviceNamesFiltered(toComplete)
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
-// CompleteTemplateThenFile returns a completion function that completes
+// TemplateThenFile returns a completion function that completes
 // template names for the first arg and file paths for the second arg.
-func CompleteTemplateThenFile() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func TemplateThenFile() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			// First argument: template names
@@ -511,13 +520,13 @@ func CompleteTemplateThenFile() func(*cobra.Command, []string, string) ([]string
 	}
 }
 
-// CompleteDeviceThenFile returns a completion function that completes
+// DeviceThenFile returns a completion function that completes
 // device names for the first arg and file paths for the second arg.
-func CompleteDeviceThenFile() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func DeviceThenFile() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			// First argument: device names
-			return completeDeviceNamesFiltered(toComplete)
+			return deviceNamesFiltered(toComplete)
 		}
 		if len(args) == 1 {
 			// Second argument: file path (use default file completion)
@@ -527,9 +536,9 @@ func CompleteDeviceThenFile() func(*cobra.Command, []string, string) ([]string, 
 	}
 }
 
-// CompleteNameThenDevice returns a completion function that skips completion
+// NameThenDevice returns a completion function that skips completion
 // for the first arg (user-provided name) and completes device names for the second arg.
-func CompleteNameThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func NameThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			// First argument: name (no completion)
@@ -537,7 +546,7 @@ func CompleteNameThenDevice() func(*cobra.Command, []string, string) ([]string, 
 		}
 		if len(args) == 1 {
 			// Second argument: device names
-			return completeDeviceNamesFiltered(toComplete)
+			return deviceNamesFiltered(toComplete)
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -560,10 +569,10 @@ func SaveDiscoveryCache(addresses []string) error {
 	data := strings.Join(addresses, "\n")
 
 	// Update memory cache
-	completionCache.Lock()
-	completionCache.discovery = addresses
-	completionCache.expiry["discovery"] = time.Now().Add(completionCacheTTL)
-	completionCache.Unlock()
+	cache.Lock()
+	cache.discovery = addresses
+	cache.expiry["discovery"] = time.Now().Add(cacheTTL)
+	cache.Unlock()
 
 	return os.WriteFile(cacheFile, []byte(data), 0o600)
 }

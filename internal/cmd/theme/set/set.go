@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -31,7 +32,7 @@ the theme is only applied for the current session.`,
   # Set and save to config
   shelly theme set nord --save`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteThemeNames(),
+		ValidArgsFunction: completion.ThemeNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(f, args[0], save)
 		},

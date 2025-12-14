@@ -3,14 +3,12 @@ package add
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -53,7 +51,7 @@ can be monitored with 'shelly monitor events'.`,
   # Add device with a name
   shelly bthome add living-room --addr 3c:2e:f5:71:d5:2a --name "Door Sensor"`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -71,49 +69,21 @@ func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(opts.Duration+10)*time.Second)
 	defer cancel()
 
-	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
 	// If address provided, add device directly
 	if opts.Addr != "" {
-		return addDeviceDirectly(ctx, svc, opts, ios)
+		return addDeviceDirectly(ctx, svc, opts)
 	}
 
 	// Otherwise start discovery scan
-	return startDiscovery(ctx, svc, opts, ios)
+	return startDiscovery(ctx, svc, opts)
 }
 
-func addDeviceDirectly(ctx context.Context, svc *shelly.Service, opts *Options, ios *iostreams.IOStreams) error {
-	var result struct {
-		Key string `json:"key"`
-	}
+func addDeviceDirectly(ctx context.Context, svc *shelly.Service, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		config := map[string]any{
-			"addr": opts.Addr,
-		}
-		if opts.Name != "" {
-			config["name"] = opts.Name
-		}
-		params := map[string]any{
-			"config": config,
-		}
-
-		resultAny, err := conn.Call(ctx, "BTHome.AddDevice", params)
-		if err != nil {
-			return fmt.Errorf("failed to add device: %w", err)
-		}
-
-		parsed, err := cmdutil.UnmarshalRPCResult[struct {
-			Key string `json:"key"`
-		}](resultAny)
-		if err != nil {
-			return fmt.Errorf("failed to parse response: %w", err)
-		}
-		result = parsed
-
-		return nil
-	})
+	result, err := svc.BTHomeAddDevice(ctx, opts.Device, opts.Addr, opts.Name)
 	if err != nil {
 		return err
 	}
@@ -127,20 +97,10 @@ func addDeviceDirectly(ctx context.Context, svc *shelly.Service, opts *Options, 
 	return nil
 }
 
-func startDiscovery(ctx context.Context, svc *shelly.Service, opts *Options, ios *iostreams.IOStreams) error {
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		params := map[string]any{
-			"duration": opts.Duration,
-		}
+func startDiscovery(ctx context.Context, svc *shelly.Service, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-		_, err := conn.Call(ctx, "BTHome.StartDeviceDiscovery", params)
-		if err != nil {
-			return fmt.Errorf("failed to start discovery: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
+	if err := svc.BTHomeStartDiscovery(ctx, opts.Device, opts.Duration); err != nil {
 		return err
 	}
 

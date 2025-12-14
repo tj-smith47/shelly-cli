@@ -9,9 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/sensorutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -67,7 +68,7 @@ func newListCommand(f *cmdutil.Factory) *cobra.Command {
   # Output as JSON
   shelly sensor smoke list kitchen --json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return runList(cmd.Context(), opts)
@@ -161,7 +162,7 @@ func newStatusCommand(f *cmdutil.Factory) *cobra.Command {
   # Output as JSON
   shelly sensor smoke status kitchen --json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return runStatus(cmd.Context(), opts)
@@ -251,7 +252,7 @@ This command provides instructions for manual testing.`,
 		Example: `  # Test smoke alarm
   shelly sensor smoke test kitchen`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return runTest(cmd.Context(), opts)
@@ -305,7 +306,7 @@ and potentially re-triggers.`,
   # Mute specific sensor
   shelly sensor smoke mute kitchen --id 1`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return runMute(cmd.Context(), opts)
@@ -346,5 +347,5 @@ type Status struct {
 }
 
 func collectSmokeSensors(status map[string]json.RawMessage, ios *iostreams.IOStreams) []Status {
-	return sensorutil.CollectByPrefix[Status](status, "smoke:", ios)
+	return shelly.CollectSensorsByPrefix[Status](status, "smoke:", ios)
 }

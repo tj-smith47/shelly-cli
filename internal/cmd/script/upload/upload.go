@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -30,7 +31,7 @@ By default, replaces the existing code. Use --append to add to existing code.`,
   # Append code from file
   shelly script upload living-room 1 additions.js --append`,
 		Args:              cobra.ExactArgs(3),
-		ValidArgsFunction: cmdutil.CompleteDeviceThenScriptID(),
+		ValidArgsFunction: completion.DeviceThenScriptID(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.Atoi(args[1])
 			if err != nil {

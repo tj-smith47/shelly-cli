@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // DeviceConnection represents an active connection to a Shelly device.
@@ -21,7 +22,7 @@ type DeviceConnection struct {
 	Device     *gen2.Device
 	Client     *rpc.Client
 	Transport  transport.Transport
-	Config     config.Device
+	Config     model.Device
 	Generation int
 }
 
@@ -60,7 +61,7 @@ func ConnectToDevice(ctx context.Context, identifier string) (*DeviceConnection,
 }
 
 // ConnectToDeviceConfig establishes a connection using a device config.
-func ConnectToDeviceConfig(ctx context.Context, device config.Device) (*DeviceConnection, error) {
+func ConnectToDeviceConfig(ctx context.Context, device model.Device) (*DeviceConnection, error) {
 	// Build URL from address
 	url := device.Address
 	if url != "" && url[0] != 'h' {
@@ -103,14 +104,14 @@ func ConnectToDeviceConfig(ctx context.Context, device config.Device) (*DeviceCo
 	}, nil
 }
 
-// DiscoveredDeviceToConfig converts a discovered device to a config.Device.
-func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) config.Device {
+// DiscoveredDeviceToConfig converts a discovered device to a model.Device.
+func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 	name := d.ID
 	if d.Name != "" {
 		name = d.Name
 	}
 
-	return config.Device{
+	return model.Device{
 		Name:       name,
 		Address:    d.Address.String(),
 		Generation: int(d.Generation),

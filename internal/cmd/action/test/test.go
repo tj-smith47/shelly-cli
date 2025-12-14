@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // NewCommand creates the action test command.
@@ -29,7 +30,7 @@ built-in test functionality via the web interface.`,
   # actually changing the device state:
   shelly switch on living-room  # triggers out_on_url`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ios := f.IOStreams()
 

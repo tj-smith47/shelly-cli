@@ -9,9 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/sensorutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -47,7 +48,7 @@ Only sensors present on the device will be shown.`,
   # Output as JSON
   shelly sensor status living-room --json`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			return run(cmd.Context(), opts)
@@ -312,11 +313,11 @@ func displayFlood(ios *iostreams.IOStreams, floods []FloodReading) bool {
 	}
 	ios.Println("  " + theme.Highlight().Render("Flood Detection:"))
 	// Convert to AlarmReading for shared display
-	alarms := make([]sensorutil.AlarmReading, len(floods))
+	alarms := make([]shelly.AlarmSensorReading, len(floods))
 	for i, f := range floods {
-		alarms[i] = sensorutil.AlarmReading{ID: f.ID, Alarm: f.Alarm, Mute: f.Mute}
+		alarms[i] = shelly.AlarmSensorReading{ID: f.ID, Alarm: f.Alarm, Mute: f.Mute}
 	}
-	sensorutil.DisplayAlarmSensors(ios, alarms, "Flood", "WATER DETECTED!",
+	shelly.DisplayAlarmSensors(ios, alarms, "Flood", "WATER DETECTED!",
 		theme.StatusOK().Render, theme.StatusError().Render, theme.Dim().Render)
 	ios.Println()
 	return true
@@ -328,11 +329,11 @@ func displaySmoke(ios *iostreams.IOStreams, smokes []SmokeReading) bool {
 	}
 	ios.Println("  " + theme.Highlight().Render("Smoke Detection:"))
 	// Convert to AlarmReading for shared display
-	alarms := make([]sensorutil.AlarmReading, len(smokes))
+	alarms := make([]shelly.AlarmSensorReading, len(smokes))
 	for i, s := range smokes {
-		alarms[i] = sensorutil.AlarmReading{ID: s.ID, Alarm: s.Alarm, Mute: s.Mute}
+		alarms[i] = shelly.AlarmSensorReading{ID: s.ID, Alarm: s.Alarm, Mute: s.Mute}
 	}
-	sensorutil.DisplayAlarmSensors(ios, alarms, "Smoke", "SMOKE DETECTED!",
+	shelly.DisplayAlarmSensors(ios, alarms, "Smoke", "SMOKE DETECTED!",
 		theme.StatusOK().Render, theme.StatusError().Render, theme.Dim().Render)
 	ios.Println()
 	return true
