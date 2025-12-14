@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 18 - KVS Commands | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 20.3 - Debug Commands | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -1344,14 +1344,16 @@ shelly-cli/
   - Aliases: factory-reset, wipe
   - Requires both --yes and --confirm flags for safety
 
-### 20.2 Interactive Mode
-- [ ] `shelly interactive` - Launch interactive REPL
-  - Command history
-  - Tab completion
-  - Persistent connection mode
-- [ ] `shelly shell <device>` - Interactive shell for device
-  - Execute RPC commands directly
-  - Script REPL for Gen2+ devices
+### 20.2 Interactive Mode ✅ Complete
+- [x] `shelly interactive` - Launch interactive REPL
+  - Aliases: repl, i
+  - Session state with active device
+  - Built-in commands: help, devices, connect, disconnect, status, on, off, toggle, rpc, methods, info
+  - Flags: --device, --no-prompt
+- [x] `shelly shell <device>` - Interactive shell for device
+  - Direct RPC method execution
+  - Built-in commands: help, info, status, config, methods, components
+  - Persistent connection to device
 
 ### 20.3 Debug Commands
 - [ ] `shelly debug log <device>` - Get device debug log (Gen1)
