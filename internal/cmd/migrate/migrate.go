@@ -39,7 +39,7 @@ The --dry-run flag shows what would be changed without applying.`,
   shelly migrate backup.json bedroom --force`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), args[0], args[1])
+			return run(cmd.Context(), f, args[0], args[1])
 		},
 	}
 
@@ -52,15 +52,15 @@ The --dry-run flag shows what would be changed without applying.`,
 	return cmd
 }
 
-func run(ctx context.Context, source, target string) error {
+func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*3)
 	defer cancel()
 
-	ios := iostreams.System()
-	svc := shelly.NewService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	// Load source backup (from file or device)
-	backup, sourceType, err := loadSource(ctx, svc, source)
+	backup, sourceType, err := loadSource(ctx, svc, ios, source)
 	if err != nil {
 		return err
 	}
@@ -99,11 +99,11 @@ const (
 	diffChanged = "changed"
 )
 
-func loadSource(ctx context.Context, svc *shelly.Service, source string) (*shelly.DeviceBackup, string, error) {
+func loadSource(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, source string) (*shelly.DeviceBackup, string, error) {
 	if fileExists(source) {
 		return loadFromFile(source)
 	}
-	return loadFromDevice(ctx, svc, source)
+	return loadFromDevice(ctx, svc, ios, source)
 }
 
 func fileExists(path string) bool {
@@ -126,8 +126,7 @@ func loadFromFile(source string) (*shelly.DeviceBackup, string, error) {
 	return backup, "file", nil
 }
 
-func loadFromDevice(ctx context.Context, svc *shelly.Service, source string) (*shelly.DeviceBackup, string, error) {
-	ios := iostreams.System()
+func loadFromDevice(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, source string) (*shelly.DeviceBackup, string, error) {
 	ios.StartProgress("Reading source device...")
 	backup, err := svc.CreateBackup(ctx, source, shelly.BackupOptions{})
 	ios.StopProgress()

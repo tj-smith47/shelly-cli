@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // DefaultTimeout is the default mDNS discovery timeout.
@@ -41,7 +40,7 @@ Examples:
   # Auto-register discovered devices
   shelly discover mdns --register`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(timeout, register, skipExisting)
+			return run(f, timeout, register, skipExisting)
 		},
 	}
 
@@ -52,8 +51,8 @@ Examples:
 	return cmd
 }
 
-func run(timeout time.Duration, register, skipExisting bool) error {
-	ios := iostreams.System()
+func run(f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool) error {
+	ios := f.IOStreams()
 
 	if timeout == 0 {
 		timeout = DefaultTimeout
