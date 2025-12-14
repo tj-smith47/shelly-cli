@@ -412,6 +412,105 @@ func getDiscoveryCache() []string {
 	return result
 }
 
+// CompleteDevicesWithGroups returns a completion function that completes device names,
+// group names with @ prefix, and @all for all devices.
+func CompleteDevicesWithGroups() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		devices := config.ListDevices()
+		groups := config.ListGroups()
+		completions := make([]string, 0, len(devices)+len(groups)+1)
+		completions = append(completions, "@all\tall registered devices")
+		for name := range groups {
+			completions = append(completions, "@"+name+"\tgroup")
+		}
+		for name := range devices {
+			completions = append(completions, name)
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// ExpandDeviceArgs expands @all to all registered devices and @groupname to group members.
+func ExpandDeviceArgs(devices []string) []string {
+	var result []string
+	for _, d := range devices {
+		switch {
+		case d == "@all":
+			for name := range config.ListDevices() {
+				result = append(result, name)
+			}
+		case strings.HasPrefix(d, "@"):
+			groupName := strings.TrimPrefix(d, "@")
+			if g, exists := config.GetGroup(groupName); exists {
+				result = append(result, g.Devices...)
+			}
+		default:
+			result = append(result, d)
+		}
+	}
+	return result
+}
+
+// CompleteTemplateNames returns a completion function for template names.
+func CompleteTemplateNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		templates := config.ListTemplates()
+		var completions []string
+		for name := range templates {
+			if strings.HasPrefix(name, toComplete) {
+				completions = append(completions, name)
+			}
+		}
+		return completions, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// CompleteTemplateThenDevice returns a completion function that completes
+// template names for the first arg and device names for the second arg.
+func CompleteTemplateThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// First argument: template names
+			templates := config.ListTemplates()
+			var completions []string
+			for name := range templates {
+				if strings.HasPrefix(name, toComplete) {
+					completions = append(completions, name)
+				}
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}
+		if len(args) == 1 {
+			// Second argument: device names
+			return completeDeviceNamesFiltered(toComplete)
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// CompleteTemplateThenFile returns a completion function that completes
+// template names for the first arg and file paths for the second arg.
+func CompleteTemplateThenFile() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// First argument: template names
+			templates := config.ListTemplates()
+			var completions []string
+			for name := range templates {
+				if strings.HasPrefix(name, toComplete) {
+					completions = append(completions, name)
+				}
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}
+		if len(args) == 1 {
+			// Second argument: file path (use default file completion)
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // SaveDiscoveryCache saves discovered addresses to the cache file.
 // This should be called by the discover command after a successful scan.
 func SaveDiscoveryCache(addresses []string) error {

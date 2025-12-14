@@ -44,7 +44,7 @@ Note: Only devices of the same model/generation are fully compatible.`,
   # Apply without confirmation
   shelly template apply my-config bedroom --yes`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: completeTemplateDevice(f),
+		ValidArgsFunction: cmdutil.CompleteTemplateThenDevice(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			opts.Device = args[1]
@@ -143,29 +143,4 @@ func runDryRun(ctx context.Context, opts *Options, tpl config.Template) error {
 	ios.Printf("\n%d change(s) would be applied\n", len(changes))
 
 	return nil
-}
-
-// completeTemplateDevice provides completion for template and device arguments.
-func completeTemplateDevice(f *cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: template names
-			templates := config.ListTemplates()
-			completions := make([]string, 0, len(templates))
-			for name := range templates {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		if len(args) == 1 {
-			// Second argument: device names
-			devices := config.ListDevices()
-			completions := make([]string, 0, len(devices))
-			for name := range devices {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

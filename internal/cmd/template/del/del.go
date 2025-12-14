@@ -32,7 +32,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   # Delete without confirmation
   shelly template delete my-config --yes`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completeTemplate(),
+		ValidArgsFunction: cmdutil.CompleteTemplateNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			return run(opts)
@@ -73,19 +73,4 @@ func run(opts *Options) error {
 
 	ios.Success("Template %q deleted", opts.Template)
 	return nil
-}
-
-// completeTemplate provides completion for template argument.
-func completeTemplate() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			templates := config.ListTemplates()
-			completions := make([]string, 0, len(templates))
-			for name := range templates {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

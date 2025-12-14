@@ -30,6 +30,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet"
+	exportcmd "github.com/tj-smith47/shelly-cli/internal/cmd/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/extension"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
@@ -310,6 +311,7 @@ func init() {
 	// Utility commands - CLI utilities
 	addCommandWithGroup(rootCmd, initcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, exportcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, alias.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, extension.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, themecmd.NewCommand(f), groupUtility)

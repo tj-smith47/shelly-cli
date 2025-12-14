@@ -47,7 +47,7 @@ Format is auto-detected from file extension, or can be specified with --format.`
   # Export to stdout as YAML
   shelly template export my-config`,
 		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: completeTemplate(),
+		ValidArgsFunction: cmdutil.CompleteTemplateThenFile(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Template = args[0]
 			if len(args) > 1 {
@@ -111,24 +111,4 @@ func run(opts *Options) error {
 
 	ios.Success("Template %q exported to %s", opts.Template, opts.File)
 	return nil
-}
-
-// completeTemplate provides completion for template argument.
-func completeTemplate() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: template names
-			templates := config.ListTemplates()
-			completions := make([]string, 0, len(templates))
-			for name := range templates {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		if len(args) == 1 {
-			// Second argument: file path
-			return nil, cobra.ShellCompDirectiveDefault
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }
