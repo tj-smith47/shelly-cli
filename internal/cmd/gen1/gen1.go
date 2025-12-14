@@ -5,6 +5,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/actions"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/coiot"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/color"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/light"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/ota"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/relay"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/roller"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/settings"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -48,6 +54,12 @@ For Gen2+ devices, use the standard commands directly.`,
 	cmd.AddCommand(status.NewCommand(f))
 	cmd.AddCommand(settings.NewCommand(f))
 	cmd.AddCommand(actions.NewCommand(f))
+	cmd.AddCommand(relay.NewCommand(f))
+	cmd.AddCommand(roller.NewCommand(f))
+	cmd.AddCommand(light.NewCommand(f))
+	cmd.AddCommand(color.NewCommand(f))
+	cmd.AddCommand(ota.NewCommand(f))
+	cmd.AddCommand(coiot.NewCommand(f))
 
 	return cmd
 }

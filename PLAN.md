@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 23 - Gen1 Device Support | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 24 - Sensor Commands | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -105,7 +105,8 @@ Create a production-ready, open-source Cobra CLI that:
 | 18-20 | Advanced Features (Monitor, Debug) | ✅ Complete |
 | 21 | BTHome/Zigbee/LoRa Commands | ✅ Complete |
 | 22 | Matter Commands | ✅ Complete |
-| 23-25 | Gen1/Sensor/Thermostat Commands | ⏳ Pending |
+| 23 | Gen1 Device Support | ✅ Complete |
+| 24-25 | Sensor/Thermostat Commands | ⏳ Pending |
 | 26-27 | Documentation & Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
 | 29 | Innovative Commands (82 new) | ⏳ Pending |
@@ -1487,26 +1488,25 @@ shelly-cli/
 
 ---
 
-## Phase 23: Gen1 Device Support ✅ Partial
+## Phase 23: Gen1 Device Support ✅
 
 > **Note:** Gen1 devices use a different API than Gen2+. Uses direct HTTP REST API calls (Gen1 doesn't use RPC).
 
-### 23.1 Gen1 Client Integration
-- [ ] Create `internal/client/gen1.go`:
+### 23.1 Gen1 Client Integration ✅
+- [x] Create `internal/client/gen1.go`:
   - Wrapper for shelly-go `gen1/` package
   - Auto-detection of device generation
   - Unified interface where possible
 
-### 23.2 Gen1 Discovery
-- [ ] Enhance `shelly discover coiot` for Gen1-specific info
-- [ ] Add `--gen1-only` flag to discovery commands
+### 23.2 Gen1 Discovery ✅
+- [x] Enhance `shelly discover coiot` for Gen1-specific info
+- [x] Add `--gen1-only` flag to discovery commands
 
-### 23.3 Gen1 Control Commands
-- [ ] Extend existing commands to support Gen1 devices:
-  - `shelly switch on/off/toggle/status` - Use Gen1 relay API
-  - `shelly cover open/close/stop/position` - Use Gen1 roller API
-  - `shelly light on/off/set/status` - Use Gen1 light API (Bulbs, Duo)
-  - `shelly rgb set/status` - Use Gen1 color API (RGBW, Bulb)
+### 23.3 Gen1 Control Commands ✅
+- [x] `shelly gen1 relay on/off/toggle/status` - Gen1 relay control
+- [x] `shelly gen1 roller open/close/stop/position/calibrate/status` - Gen1 roller shutter control
+- [x] `shelly gen1 light on/off/toggle/brightness/status` - Gen1 light control (Bulbs, Duo)
+- [x] `shelly gen1 color on/off/toggle/set/gain/status` - Gen1 RGBW control (RGBW2, Bulb)
 
 ### 23.4 Gen1-Specific Commands ✅
 - [x] `shelly gen1 status <device>` - Full Gen1 status dump
@@ -1521,11 +1521,16 @@ shelly-cli/
   - Aliases: urls, webhooks
   - Flags: --json
   - Parses action URLs from relays and inputs in settings
-- [ ] `shelly gen1 ota <device>` - Gen1 OTA firmware update
+- [x] `shelly gen1 ota check/update` - Gen1 OTA firmware management
+  - check: Check for firmware updates
+  - update: Apply firmware update with optional custom URL
 
-### 23.5 CoIoT Real-time Updates
-- [ ] `shelly gen1 coiot <device>` - Subscribe to CoIoT updates
-- [ ] Integrate CoIoT into TUI monitoring view
+### 23.5 CoIoT Real-time Updates ✅
+- [x] `shelly gen1 coiot` - Monitor Gen1 devices via CoIoT multicast
+  - Aliases: monitor, watch, listen
+  - Flags: --timeout, --follow
+  - Listens on 224.0.1.187:5683 for device broadcasts
+- [ ] Integrate CoIoT into TUI monitoring view (deferred to Phase 29)
 
 **Code Audit Notes (Phase 23):**
 - HTTP fetch pattern (`fetchSettings`, `fetchStatus`) duplicated across all gen1 commands
