@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Shelly API Documentation
+    url: https://shelly-api-docs.shelly.cloud/
+    about: Official Shelly API documentation for device capabilities
+  - name: Discussions
+    url: https://github.com/tj-smith47/shelly-cli/discussions
+    about: Ask questions and discuss features

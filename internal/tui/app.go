@@ -10,13 +10,23 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicedetail"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicelist"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/energy"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/events"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/help"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/monitor"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/search"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/tabs"
 )
+
+// DeviceActionMsg reports the result of a device action.
+type DeviceActionMsg struct {
+	Device string
+	Action string
+	Err    error
+}
 
 // ViewMode represents the current view in the TUI.
 type ViewMode int
@@ -67,16 +77,18 @@ type Model struct {
 	height int
 
 	// Components
-	deviceList devicelist.Model
-	monitor    monitor.Model
-	events     events.Model
-	energy     energy.Model
-	statusBar  statusbar.Model
-	tabs       tabs.Model
+	deviceList   devicelist.Model
+	monitor      monitor.Model
+	events       events.Model
+	energy       energy.Model
+	statusBar    statusbar.Model
+	tabs         tabs.Model
+	search       search.Model
+	help         help.Model
+	deviceDetail devicedetail.Model
 
 	// Settings
 	refreshInterval time.Duration
-	showHelp        bool
 }
 
 // Options configures the TUI.
@@ -104,6 +116,9 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	tabNames := []string{"Devices", "Monitor", "Events", "Energy"}
 	svc := f.ShellyService()
 	ios := f.IOStreams()
+
+	// Create search component with initial filter
+	searchModel := search.NewWithFilter(opts.Filter)
 
 	return Model{
 		ctx:             ctx,
@@ -138,6 +153,12 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		}),
 		statusBar: statusbar.New(),
 		tabs:      tabs.New(tabNames, int(opts.InitialView)),
+		search:    searchModel,
+		help:      help.New(),
+		deviceDetail: devicedetail.New(devicedetail.Deps{
+			Ctx: ctx,
+			Svc: svc,
+		}),
 	}
 }
 
@@ -160,8 +181,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
 
+	case DeviceActionMsg:
+		return m.handleDeviceAction(msg)
+
+	case search.FilterChangedMsg:
+		m.deviceList = m.deviceList.SetFilter(msg.Filter)
+		return m, nil
+
+	case search.ClosedMsg:
+		// Search was closed, nothing special to do
+		return m, nil
+
+	case devicedetail.Msg:
+		var cmd tea.Cmd
+		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
+		return m, cmd
+
+	case devicedetail.ClosedMsg:
+		// Device detail was closed, nothing special to do
+		return m, nil
+
 	case tea.KeyPressMsg:
-		if newModel, cmd, handled := m.handleKeyPress(msg); handled {
+		if newModel, cmd, handled := m.handleKeyPressMsg(msg); handled {
 			return newModel, cmd
 		}
 	}
@@ -181,6 +222,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// handleKeyPressMsg handles keyboard input, routing to overlays or main handlers.
+func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	// If device detail is visible, forward all keys to it
+	if m.deviceDetail.Visible() {
+		var cmd tea.Cmd
+		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
+		return m, cmd, true
+	}
+
+	// If help is visible, close on dismiss keys or forward for scrolling
+	if m.help.Visible() {
+		if key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Escape) || key.Matches(msg, m.keys.Quit) {
+			m.help = m.help.Hide()
+			return m, nil, true
+		}
+		var cmd tea.Cmd
+		m.help, cmd = m.help.Update(msg)
+		return m, cmd, true
+	}
+
+	// If search is active, forward all keys to it
+	if m.search.IsActive() {
+		var cmd tea.Cmd
+		m.search, cmd = m.search.Update(msg)
+		return m, cmd, true
+	}
+
+	return m.handleKeyPress(msg)
+}
+
 // handleWindowSize handles window resize events.
 func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
@@ -196,7 +267,51 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.events = m.events.SetSize(m.width, contentHeight)
 	m.energy = m.energy.SetSize(m.width, contentHeight)
 	m.statusBar = m.statusBar.SetWidth(m.width)
+	m.search = m.search.SetWidth(m.width)
 	return m, nil
+}
+
+// handleDeviceActionKey handles device action key presses (t/o/O/R).
+func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	var action string
+	switch {
+	case key.Matches(msg, m.keys.Toggle):
+		action = "toggle"
+	case key.Matches(msg, m.keys.TurnOn):
+		action = "on"
+	case key.Matches(msg, m.keys.TurnOff):
+		action = "off"
+	case key.Matches(msg, m.keys.Reboot):
+		action = "reboot"
+	default:
+		return m, nil, false
+	}
+
+	if cmd := m.executeDeviceAction(action); cmd != nil {
+		return m, cmd, true
+	}
+	return m, nil, false
+}
+
+// handleDeviceAction handles device action results and updates the status bar.
+func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
+	var statusCmd tea.Cmd
+	if msg.Err != nil {
+		statusCmd = statusbar.SetMessage(
+			msg.Device+": "+msg.Action+" failed - "+msg.Err.Error(),
+			statusbar.MessageError,
+		)
+	} else {
+		statusCmd = statusbar.SetMessage(
+			msg.Device+": "+msg.Action+" success",
+			statusbar.MessageSuccess,
+		)
+	}
+
+	// Also refresh the current view to show updated state
+	refreshCmd := m.refreshCurrentView()
+
+	return m, tea.Batch(statusCmd, refreshCmd)
 }
 
 // handleKeyPress handles global key presses and returns whether it was handled.
@@ -207,25 +322,45 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 		return m, tea.Quit, true
 
 	case key.Matches(msg, m.keys.Quit):
-		if !m.showHelp {
-			m.quitting = true
-			return m, tea.Quit, true
-		}
-		m.showHelp = false
-		return m, nil, true
+		m.quitting = true
+		return m, tea.Quit, true
 
 	case key.Matches(msg, m.keys.Help):
-		m.showHelp = !m.showHelp
+		m.help = m.help.SetSize(m.width, m.height)
+		m.help = m.help.SetContext(m.currentHelpContext())
+		m.help = m.help.Toggle()
 		return m, nil, true
 
 	case key.Matches(msg, m.keys.Escape):
-		if m.showHelp {
-			m.showHelp = false
-			return m, nil, true
-		}
+		// Escape does nothing when no overlay is open
+		return m, nil, false
 
 	case key.Matches(msg, m.keys.Refresh):
 		return m, m.refreshCurrentView(), true
+
+	case key.Matches(msg, m.keys.Enter):
+		// Show device detail in Devices or Monitor view
+		if m.currentView == ViewDevices || m.currentView == ViewMonitor {
+			if selected := m.deviceList.SelectedDevice(); selected != nil {
+				var cmd tea.Cmd
+				m.deviceDetail = m.deviceDetail.SetSize(m.width, m.height)
+				m.deviceDetail, cmd = m.deviceDetail.Show(selected.Device)
+				return m, cmd, true
+			}
+		}
+
+	case key.Matches(msg, m.keys.Filter):
+		// Only allow filter in Devices view
+		if m.currentView == ViewDevices {
+			var cmd tea.Cmd
+			m.search, cmd = m.search.Activate()
+			return m, cmd, true
+		}
+	}
+
+	// Handle device actions (extracted for complexity)
+	if newModel, cmd, handled := m.handleDeviceActionKey(msg); handled {
+		return newModel, cmd, true
 	}
 
 	// Handle view switching
@@ -274,6 +409,58 @@ func (m Model) updateActiveComponent(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// executeDeviceAction executes a device action on the selected device.
+func (m Model) executeDeviceAction(action string) tea.Cmd {
+	// Only allow device actions in Devices or Monitor view
+	if m.currentView != ViewDevices && m.currentView != ViewMonitor {
+		return nil
+	}
+
+	// Get selected device
+	selected := m.deviceList.SelectedDevice()
+	if selected == nil || !selected.Online {
+		return nil
+	}
+
+	device := selected.Device
+	svc := m.factory.ShellyService()
+
+	return func() tea.Msg {
+		var err error
+		switch action {
+		case "toggle":
+			_, err = svc.SwitchToggle(m.ctx, device.Address, 0)
+		case "on":
+			err = svc.SwitchOn(m.ctx, device.Address, 0)
+		case "off":
+			err = svc.SwitchOff(m.ctx, device.Address, 0)
+		case "reboot":
+			err = svc.DeviceReboot(m.ctx, device.Address, 0)
+		}
+		return DeviceActionMsg{
+			Device: device.Name,
+			Action: action,
+			Err:    err,
+		}
+	}
+}
+
+// currentHelpContext returns the help context for the current view.
+func (m Model) currentHelpContext() help.ViewContext {
+	switch m.currentView {
+	case ViewDevices:
+		return help.ContextDevices
+	case ViewMonitor:
+		return help.ContextMonitor
+	case ViewEvents:
+		return help.ContextEvents
+	case ViewEnergy:
+		return help.ContextEnergy
+	default:
+		return help.ContextDevices
+	}
+}
+
 // refreshCurrentView returns a command to refresh the current view's data.
 func (m Model) refreshCurrentView() tea.Cmd {
 	switch m.currentView {
@@ -305,6 +492,12 @@ func (m Model) View() tea.View {
 	// Header (tabs)
 	header := m.tabs.View()
 
+	// Search bar (if active)
+	var searchBar string
+	if m.search.IsActive() {
+		searchBar = m.search.View()
+	}
+
 	// Content based on current view
 	var content string
 	switch m.currentView {
@@ -318,46 +511,37 @@ func (m Model) View() tea.View {
 		content = m.energy.View()
 	}
 
-	// Help overlay
-	if m.showHelp {
-		content = m.renderHelp()
+	// Overlays (help or device detail)
+	if m.help.Visible() {
+		content = m.help.View()
+	} else if m.deviceDetail.Visible() {
+		content = m.deviceDetail.View()
 	}
 
 	// Footer (status bar)
 	footer := m.statusBar.View()
 
 	// Compose the layout
-	result := lipgloss.JoinVertical(lipgloss.Left,
-		header,
-		content,
-		footer,
-	)
+	var result string
+	if searchBar != "" {
+		result = lipgloss.JoinVertical(lipgloss.Left,
+			header,
+			searchBar,
+			content,
+			footer,
+		)
+	} else {
+		result = lipgloss.JoinVertical(lipgloss.Left,
+			header,
+			content,
+			footer,
+		)
+	}
 
 	v := tea.NewView(result)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
-}
-
-func (m Model) renderHelp() string {
-	help := m.styles.Title.Render("Keyboard Shortcuts") + "\n\n"
-
-	bindings := m.keys.FullHelp()
-	for _, group := range bindings {
-		for _, b := range group {
-			help += m.styles.HelpKey.Render(b.Help().Key) + " "
-			help += m.styles.HelpDesc.Render(b.Help().Desc) + "  "
-		}
-		help += "\n"
-	}
-
-	help += "\n" + m.styles.HelpDesc.Render("Press ? or Esc to close")
-
-	return m.styles.Border.
-		Width(m.width-2).
-		Height(m.height-5).
-		Align(lipgloss.Center, lipgloss.Center).
-		Render(help)
 }
 
 // Run starts the TUI application.

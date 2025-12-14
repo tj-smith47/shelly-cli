@@ -1,0 +1,104 @@
+name: Command Request
+description: Request a new CLI command
+labels: ["command-request", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Request a new command for the Shelly CLI.
+
+  - type: input
+    id: command-name
+    attributes:
+      label: Proposed command
+      placeholder: "shelly mycommand <args>"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Command category
+      options:
+        - Device control (switch, cover, light, etc.)
+        - Device management (add, remove, configure)
+        - Monitoring (status, events, power)
+        - Automation (scenes, schedules, triggers)
+        - Fleet management (batch, bulk operations)
+        - Integration (Home Assistant, MQTT, etc.)
+        - Utility (backup, export, import)
+        - Development (debug, API access)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Command description
+      description: What should this command do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: usage
+    attributes:
+      label: Example usage
+      description: Show how the command would be used
+      render: shell
+      placeholder: |
+        # Basic usage
+        shelly mycommand device1
+
+        # With options
+        shelly mycommand device1 --flag value
+
+        # Example output
+        Device: kitchen
+        Status: Online
+        ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: flags
+    attributes:
+      label: Proposed flags/options
+      description: List any flags or options the command should have
+      placeholder: |
+        --output, -o: Output format (json, yaml, table)
+        --timeout: Request timeout
+        --verbose: Verbose output
+    validations:
+      required: false
+
+  - type: dropdown
+    id: shelly-api
+    attributes:
+      label: Does this require Shelly API features?
+      options:
+        - "Yes - Gen2+ RPC API"
+        - "Yes - Gen1 REST API"
+        - "Yes - Cloud API"
+        - "No - CLI-only feature"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: related-commands
+    attributes:
+      label: Related commands
+      description: Are there similar commands this should work with?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I'm willing to help implement this command
+          required: false
+        - label: I'm willing to test a PR for this command
+          required: false

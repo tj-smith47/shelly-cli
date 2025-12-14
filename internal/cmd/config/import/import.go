@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -86,7 +87,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		}
 
 		ios.Title("Dry run - changes that would be applied")
-		showDiff(currentConfig, config)
+		showDiff(ios, currentConfig, config)
 		return nil
 	}
 
@@ -104,13 +105,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 }
 
 // showDiff displays the differences between current and incoming config.
-func showDiff(current, incoming map[string]any) {
+func showDiff(ios *iostreams.IOStreams, current, incoming map[string]any) {
 	for key, incomingVal := range incoming {
 		currentVal, exists := current[key]
 		if !exists {
-			fmt.Printf("  + %s: %v (new)\n", key, formatValue(incomingVal))
+			ios.Printf("  + %s: %v (new)\n", key, formatValue(incomingVal))
 		} else if !deepEqual(currentVal, incomingVal) {
-			fmt.Printf("  ~ %s: %v -> %v\n", key, formatValue(currentVal), formatValue(incomingVal))
+			ios.Printf("  ~ %s: %v -> %v\n", key, formatValue(currentVal), formatValue(incomingVal))
 		}
 	}
 }

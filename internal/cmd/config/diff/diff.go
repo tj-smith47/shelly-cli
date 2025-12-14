@@ -73,13 +73,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	ios.Title("Configuration differences")
-	fmt.Printf("Comparing device %s with file %s\n\n", device, filePath)
+	ios.Printf("Comparing device %s with file %s\n\n", device, filePath)
 
 	for _, d := range diffs {
-		fmt.Println(d)
+		ios.Printf("%s\n", d)
 	}
 
-	fmt.Printf("\n%d difference(s) found\n", len(diffs))
+	ios.Printf("\n%d difference(s) found\n", len(diffs))
 	return nil
 }
 

@@ -1,0 +1,30 @@
+# Shelly CLI Code Owners
+# These owners will be requested for review when someone opens a PR
+
+# Global owners - all files
+* @tj-smith47
+
+# Core architecture
+/internal/cmdutil/ @tj-smith47
+/internal/iostreams/ @tj-smith47
+
+# Service layer
+/internal/shelly/ @tj-smith47
+
+# TUI components
+/internal/tui/ @tj-smith47
+
+# Configuration
+/internal/config/ @tj-smith47
+
+# Documentation
+/docs/ @tj-smith47
+*.md @tj-smith47
+
+# CI/CD
+/.github/ @tj-smith47
+/.goreleaser.yaml @tj-smith47
+
+# Go module
+/go.mod @tj-smith47
+/go.sum @tj-smith47

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/table"
@@ -64,7 +65,9 @@ type Model struct {
 	svc             *shelly.Service
 	ios             *iostreams.IOStreams
 	table           table.Model
-	devices         []DeviceStatus
+	devices         []DeviceStatus // All devices
+	filtered        []DeviceStatus // Filtered devices for display
+	filter          string         // Current filter string
 	loading         bool
 	err             error
 	width           int
@@ -258,7 +261,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.devices = msg.Devices
-		m.table.SetRows(m.devicesToRows())
+		m = m.applyFilter()
 		return m, nil
 
 	case RefreshTickMsg:
@@ -278,10 +281,37 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// devicesToRows converts devices to table rows.
+// SetFilter sets the filter string and re-applies it to the device list.
+func (m Model) SetFilter(filter string) Model {
+	m.filter = filter
+	return m.applyFilter()
+}
+
+// applyFilter filters the device list based on the current filter string.
+func (m Model) applyFilter() Model {
+	if m.filter == "" {
+		m.filtered = m.devices
+	} else {
+		filterLower := strings.ToLower(m.filter)
+		m.filtered = make([]DeviceStatus, 0, len(m.devices))
+		for _, d := range m.devices {
+			// Match against name, address, type, or model
+			if strings.Contains(strings.ToLower(d.Device.Name), filterLower) ||
+				strings.Contains(strings.ToLower(d.Device.Address), filterLower) ||
+				strings.Contains(strings.ToLower(d.Device.Type), filterLower) ||
+				strings.Contains(strings.ToLower(d.Device.Model), filterLower) {
+				m.filtered = append(m.filtered, d)
+			}
+		}
+	}
+	m.table.SetRows(m.devicesToRows())
+	return m
+}
+
+// devicesToRows converts filtered devices to table rows.
 func (m Model) devicesToRows() []table.Row {
-	rows := make([]table.Row, 0, len(m.devices))
-	for _, d := range m.devices {
+	rows := make([]table.Row, 0, len(m.filtered))
+	for _, d := range m.filtered {
 		gen := "?"
 		if d.Device.Generation > 0 {
 			gen = fmt.Sprintf("%d", d.Device.Generation)
@@ -345,24 +375,42 @@ func (m Model) View() string {
 			Render("No devices registered.\nUse 'shelly device add' to add devices.")
 	}
 
+	if len(m.filtered) == 0 && m.filter != "" {
+		return m.styles.Table.
+			Width(m.width-2).
+			Height(m.height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("No devices match filter %q.\nPress / to clear or modify filter.", m.filter))
+	}
+
 	return m.styles.Table.Render(m.table.View())
 }
 
 // SelectedDevice returns the currently selected device, if any.
 func (m Model) SelectedDevice() *DeviceStatus {
-	if len(m.devices) == 0 {
+	if len(m.filtered) == 0 {
 		return nil
 	}
 
 	idx := m.table.Cursor()
-	if idx < 0 || idx >= len(m.devices) {
+	if idx < 0 || idx >= len(m.filtered) {
 		return nil
 	}
 
-	return &m.devices[idx]
+	return &m.filtered[idx]
 }
 
-// DeviceCount returns the number of devices.
+// DeviceCount returns the number of filtered devices.
 func (m Model) DeviceCount() int {
+	return len(m.filtered)
+}
+
+// TotalDeviceCount returns the total number of devices (before filtering).
+func (m Model) TotalDeviceCount() int {
 	return len(m.devices)
+}
+
+// Filter returns the current filter string.
+func (m Model) Filter() string {
+	return m.filter
 }

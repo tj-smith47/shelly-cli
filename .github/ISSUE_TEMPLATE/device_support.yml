@@ -1,0 +1,95 @@
+name: Device Support Request
+description: Request support for a new Shelly device
+labels: ["device-support", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Request support for a Shelly device that isn't currently working or supported.
+
+  - type: input
+    id: device-model
+    attributes:
+      label: Device model
+      placeholder: "e.g., Shelly Plus 2PM"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device-gen
+    attributes:
+      label: Device generation
+      options:
+        - Gen1 (Original Shelly devices)
+        - Gen2 (Plus series)
+        - Gen3
+        - Gen4
+        - BLU (Bluetooth)
+        - Wave (Z-Wave)
+        - Unknown
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware version
+      placeholder: "e.g., 1.0.8"
+    validations:
+      required: false
+
+  - type: textarea
+    id: components
+    attributes:
+      label: Device components
+      description: What components does this device have? (switches, covers, lights, inputs, sensors, etc.)
+      placeholder: |
+        - 2x Switch
+        - 2x PM (Power Meter)
+        - 1x Temperature sensor
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What's not working?
+      description: Describe what commands fail or what features are missing
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug
+    attributes:
+      label: Debug output
+      description: Run `shelly device info <device> --debug` and paste output
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: api-response
+    attributes:
+      label: API response (if available)
+      description: Raw API response from the device
+      render: json
+    validations:
+      required: false
+
+  - type: input
+    id: purchase-link
+    attributes:
+      label: Product page link
+      placeholder: "https://shelly.com/products/..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have the device available for testing
+          required: true
+        - label: I can provide API responses if needed
+          required: false

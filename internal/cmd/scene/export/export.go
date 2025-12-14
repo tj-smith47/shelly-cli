@@ -13,7 +13,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the scene export command.
@@ -45,7 +44,7 @@ Format is auto-detected from file extension (.json, .yaml, .yml).`,
 			if len(args) > 1 {
 				file = args[1]
 			}
-			return run(name, file, outputFormat)
+			return run(f, name, file, outputFormat)
 		},
 	}
 
@@ -61,7 +60,9 @@ type Scene struct {
 	Actions     []config.SceneAction `json:"actions" yaml:"actions"`
 }
 
-func run(name, file, format string) error {
+func run(f *cmdutil.Factory, name, file, format string) error {
+	ios := f.IOStreams()
+
 	scene, exists := config.GetScene(name)
 	if !exists {
 		return fmt.Errorf("scene %q not found", name)
@@ -100,7 +101,7 @@ func run(name, file, format string) error {
 
 	// Write to file or stdout
 	if file == "" {
-		fmt.Println(string(data))
+		ios.Printf("%s\n", data)
 		return nil
 	}
 
@@ -108,7 +109,7 @@ func run(name, file, format string) error {
 		return err
 	}
 
-	iostreams.Success("Exported scene %q to %s", name, file)
+	ios.Success("Exported scene %q to %s", name, file)
 	return nil
 }
 

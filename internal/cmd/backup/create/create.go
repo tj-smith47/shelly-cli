@@ -108,7 +108,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 
 	// Write to file or stdout
 	if filePath == "" || filePath == "-" {
-		fmt.Println(string(data))
+		ios.Printf("%s\n", data)
 	} else {
 		if err := os.WriteFile(filePath, data, 0o600); err != nil {
 			return fmt.Errorf("failed to write backup file: %w", err)

@@ -29,7 +29,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly group members living-room -o json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args[0])
+			return run(f, cmd, args[0])
 		},
 	}
 
@@ -38,21 +38,23 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func run(cmd *cobra.Command, groupName string) error {
+func run(f *cmdutil.Factory, cmd *cobra.Command, groupName string) error {
+	ios := f.IOStreams()
+
 	group, ok := config.GetGroup(groupName)
 	if !ok {
 		return fmt.Errorf("group %q not found", groupName)
 	}
 
 	if len(group.Devices) == 0 {
-		iostreams.NoResults("members in group %q", groupName)
+		ios.NoResults("members in group %q", groupName)
 		return nil
 	}
 
-	return outputMembers(cmd, groupName, group.Devices)
+	return outputMembers(ios, cmd, groupName, group.Devices)
 }
 
-func outputMembers(cmd *cobra.Command, groupName string, devices []string) error {
+func outputMembers(ios *iostreams.IOStreams, cmd *cobra.Command, groupName string, devices []string) error {
 	switch viper.GetString("output") {
 	case string(output.FormatJSON):
 		data := map[string]any{
@@ -69,14 +71,14 @@ func outputMembers(cmd *cobra.Command, groupName string, devices []string) error
 		}
 		return output.YAML(cmd.OutOrStdout(), data)
 	default:
-		printTable(groupName, devices)
+		printTable(ios, groupName, devices)
 		return nil
 	}
 }
 
-func printTable(groupName string, devices []string) {
-	iostreams.Title("Group: %s", groupName)
-	fmt.Println()
+func printTable(ios *iostreams.IOStreams, groupName string, devices []string) {
+	ios.Title("Group: %s", groupName)
+	ios.Printf("\n")
 
 	t := output.NewTable("#", "Device")
 	for i, device := range devices {
@@ -84,5 +86,5 @@ func printTable(groupName string, devices []string) {
 	}
 	t.Print()
 
-	iostreams.Count("member", len(devices))
+	ios.Count("member", len(devices))
 }

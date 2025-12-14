@@ -3,8 +3,11 @@
 package cmdutil
 
 import (
+	"context"
+
 	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -24,6 +27,10 @@ type Factory struct {
 
 	// Browser provides the ability to open URLs in the default web browser.
 	Browser func() browser.Browser
+
+	// DeviceConnector provides the ability to connect to a device by name or address.
+	// This enables dependency injection for testing device connections.
+	DeviceConnector func(ctx context.Context, identifier string) (*helpers.DeviceConnection, error)
 
 	// Cached instances - set after first call to avoid re-initialization.
 	ioStreams     *iostreams.IOStreams
@@ -68,6 +75,8 @@ func NewFactory() *Factory {
 		}
 		return f.browserInst
 	}
+
+	f.DeviceConnector = helpers.ConnectToDevice
 
 	return f
 }
@@ -136,6 +145,14 @@ func (f *Factory) SetBrowser(b browser.Browser) *Factory {
 		}
 		return origBrowser()
 	}
+	return f
+}
+
+// SetDeviceConnector sets a custom device connector on an existing factory.
+// This modifies the factory in-place and returns it for chaining.
+// Useful for testing device connection behavior without actual network calls.
+func (f *Factory) SetDeviceConnector(connector func(ctx context.Context, identifier string) (*helpers.DeviceConnection, error)) *Factory {
+	f.DeviceConnector = connector
 	return f
 }
 

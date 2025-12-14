@@ -1,0 +1,137 @@
+name: Bug Report
+description: Report a bug in the Shelly CLI
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the form below.
+
+  - type: dropdown
+    id: command
+    attributes:
+      label: Which command is affected?
+      options:
+        - discover
+        - device
+        - switch
+        - cover
+        - light
+        - rgb
+        - input
+        - config
+        - firmware
+        - script
+        - schedule
+        - cloud
+        - backup
+        - monitor
+        - energy
+        - power
+        - alias
+        - extension
+        - theme
+        - completion
+        - other
+    validations:
+      required: true
+
+  - type: input
+    id: device-model
+    attributes:
+      label: Device model (if applicable)
+      placeholder: "e.g., Shelly Plus 1PM, Shelly Pro 4PM"
+    validations:
+      required: false
+
+  - type: input
+    id: device-gen
+    attributes:
+      label: Device generation
+      placeholder: "e.g., Gen1, Gen2, Gen3"
+    validations:
+      required: false
+
+  - type: input
+    id: cli-version
+    attributes:
+      label: CLI version
+      description: Run `shelly version` to get this
+      placeholder: "v0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "e.g., macOS 14.0, Ubuntu 22.04, Windows 11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A clear description of what the bug is
+      placeholder: "When I run `shelly switch on kitchen`, I get an error..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Run `shelly device add kitchen 192.168.1.100`
+        2. Run `shelly switch on kitchen`
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug-output
+    attributes:
+      label: Debug output
+      description: Run the command with `--debug` flag and paste the output
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration (if relevant)
+      description: Paste relevant parts of your config (remove sensitive data)
+      render: yaml
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true
+        - label: I have tried the latest version
+          required: true
+        - label: I have included debug output
+          required: false

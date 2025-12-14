@@ -110,11 +110,11 @@ func showComponents(f *cmdutil.Factory, ctx context.Context, device string) erro
 	}
 
 	ios.Title("Available components")
-	fmt.Println("Specify a component to reset its configuration:")
-	fmt.Println()
+	ios.Printf("Specify a component to reset its configuration:\n")
+	ios.Printf("\n")
 
 	for key := range config {
-		fmt.Printf("  shelly config reset %s %s\n", device, key)
+		ios.Printf("  shelly config reset %s %s\n", device, key)
 	}
 
 	return nil

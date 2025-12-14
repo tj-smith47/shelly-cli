@@ -90,13 +90,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 	case "yaml":
 		return output.PrintYAML(result)
 	default:
-		return printConfigTable(result)
+		return printConfigTable(ios, result)
 	}
 }
 
 // printConfigTable prints configuration as a formatted table.
-func printConfigTable(config any) error {
-	ios := iostreams.System()
+func printConfigTable(ios *iostreams.IOStreams, config any) error {
 	configMap, ok := config.(map[string]any)
 	if !ok {
 		return output.PrintJSON(config)
@@ -112,9 +111,9 @@ func printConfigTable(config any) error {
 			if err != nil {
 				ios.DebugErr("marshaling config component", err)
 			} else {
-				fmt.Println(string(data))
+				ios.Printf("%s\n", data)
 			}
-			fmt.Println()
+			ios.Printf("\n")
 			continue
 		}
 
@@ -123,7 +122,7 @@ func printConfigTable(config any) error {
 			table.AddRow(key, formatValue(value, ios))
 		}
 		table.Print()
-		fmt.Println()
+		ios.Printf("\n")
 	}
 
 	return nil

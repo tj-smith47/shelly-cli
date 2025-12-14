@@ -74,7 +74,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 
 	// Write to file or stdout
 	if filePath == "-" {
-		fmt.Println(string(data))
+		ios.Printf("%s\n", data)
 	} else {
 		if err := os.WriteFile(filePath, data, 0o644); err != nil { //nolint:gosec // G306: 0o644 is acceptable for config exports
 			return fmt.Errorf("failed to write file: %w", err)
