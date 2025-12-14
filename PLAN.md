@@ -1620,9 +1620,24 @@ shelly-cli/
   - Aliases: cal
   - Flags: --id
 
-### 25.2 Thermostat Schedules
-- [ ] `shelly thermostat schedule list <device> [id]` - List schedules (deferred - requires schedule API)
-- [ ] `shelly thermostat schedule set <device> [id]` - Set schedule (deferred - requires schedule API)
+### 25.2 Thermostat Schedules ✅
+- [x] `shelly thermostat schedule list <device>` - List thermostat schedules
+  - Aliases: ls, l
+  - Flags: --thermostat-id, --all, --json
+  - Filters schedules by Thermostat.* method calls
+- [x] `shelly thermostat schedule create <device>` - Create thermostat schedule
+  - Aliases: add, new
+  - Flags: --thermostat-id, --time, --target, --mode, --enable, --disable, --enabled
+  - Timespec format: cron-like "ss mm hh DD WW" with @sunrise/@sunset support
+- [x] `shelly thermostat schedule delete <device>` - Delete schedule
+  - Aliases: del, rm, remove
+  - Flags: --id, --all
+- [x] `shelly thermostat schedule enable <device>` - Enable a schedule
+  - Aliases: on
+  - Flags: --id (required)
+- [x] `shelly thermostat schedule disable <device>` - Disable a schedule
+  - Aliases: off
+  - Flags: --id (required)
 
 ---
 

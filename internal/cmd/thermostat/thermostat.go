@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/enable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/override"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -61,6 +62,7 @@ Commands allow you to:
 	cmd.AddCommand(boost.NewCommand(f))
 	cmd.AddCommand(override.NewCommand(f))
 	cmd.AddCommand(calibrate.NewCommand(f))
+	cmd.AddCommand(schedule.NewCommand(f))
 
 	return cmd
 }
