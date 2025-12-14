@@ -8,15 +8,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
+
+// ThemeConfig supports both string and block theme configuration formats.
+// It allows users to specify just a theme name, or customize with color overrides.
+type ThemeConfig struct {
+	Name   string            `mapstructure:"name" json:"name,omitempty" yaml:"name,omitempty"`
+	Colors map[string]string `mapstructure:"colors" json:"colors,omitempty" yaml:"colors,omitempty"`
+	File   string            `mapstructure:"file" json:"file,omitempty" yaml:"file,omitempty"`
+}
 
 // Config holds all CLI configuration.
 type Config struct {
 	// Global settings
 	Output  string `mapstructure:"output"`
 	Color   bool   `mapstructure:"color"`
-	Theme   string `mapstructure:"theme"`
+	Theme   any    `mapstructure:"theme"` // Can be string or ThemeConfig
 	APIMode string `mapstructure:"api_mode"`
 	Verbose bool   `mapstructure:"verbose"`
 	Quiet   bool   `mapstructure:"quiet"`
@@ -53,6 +62,7 @@ type Config struct {
 type TUIConfig struct {
 	RefreshInterval int               `mapstructure:"refresh_interval"` // Refresh interval in seconds
 	Keybindings     KeybindingsConfig `mapstructure:"keybindings"`
+	Theme           *ThemeConfig      `mapstructure:"theme"` // Independent TUI theme (replaces main theme when set)
 }
 
 // KeybindingsConfig holds customizable keybindings for the TUI.
@@ -195,6 +205,43 @@ func Get() *Config {
 		}
 	}
 	return cfg
+}
+
+// GetThemeConfig normalizes the Theme field to ThemeConfig.
+// It handles both string format (e.g., "dracula") and block format.
+func (c *Config) GetThemeConfig() ThemeConfig {
+	if c == nil {
+		return ThemeConfig{Name: "dracula"}
+	}
+
+	switch v := c.Theme.(type) {
+	case string:
+		return ThemeConfig{Name: v}
+	case map[string]any:
+		var tc ThemeConfig
+		if err := mapstructure.Decode(v, &tc); err != nil {
+			return ThemeConfig{Name: "dracula"}
+		}
+		return tc
+	case ThemeConfig:
+		return v
+	case *ThemeConfig:
+		if v != nil {
+			return *v
+		}
+		return ThemeConfig{Name: "dracula"}
+	default:
+		return ThemeConfig{Name: "dracula"}
+	}
+}
+
+// GetTUIThemeConfig returns the TUI-specific theme config, or nil if not set.
+// When TUI theme is set, it completely replaces the main theme (independent).
+func (c *Config) GetTUIThemeConfig() *ThemeConfig {
+	if c == nil || c.TUI.Theme == nil {
+		return nil
+	}
+	return c.TUI.Theme
 }
 
 // Load reads configuration from file and environment.

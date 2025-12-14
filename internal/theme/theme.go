@@ -8,18 +8,47 @@
 package theme
 
 import (
+	"fmt"
 	"image/color"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // DefaultTheme is the default color theme for the CLI.
 const DefaultTheme = "dracula"
 
-var initOnce sync.Once
+// CustomColors holds user-defined color overrides.
+// Colors are specified as hex strings (e.g., "#50fa7b").
+type CustomColors struct {
+	Foreground  string `yaml:"foreground" json:"foreground,omitempty"`
+	Background  string `yaml:"background" json:"background,omitempty"`
+	Green       string `yaml:"green" json:"green,omitempty"`
+	Red         string `yaml:"red" json:"red,omitempty"`
+	Yellow      string `yaml:"yellow" json:"yellow,omitempty"`
+	Blue        string `yaml:"blue" json:"blue,omitempty"`
+	Cyan        string `yaml:"cyan" json:"cyan,omitempty"`
+	Purple      string `yaml:"purple" json:"purple,omitempty"`
+	BrightBlack string `yaml:"bright_black" json:"bright_black,omitempty"`
+}
+
+// File represents the structure of an external theme file.
+type File struct {
+	Name   string       `yaml:"name" json:"name,omitempty"`
+	Colors CustomColors `yaml:"colors" json:"colors,omitempty"`
+}
+
+var (
+	initOnce        sync.Once
+	customOverrides *CustomColors
+	customMu        sync.RWMutex
+)
 
 // init initializes the theme system with all available themes.
 func init() {
@@ -75,6 +104,161 @@ func PrevTheme() {
 }
 
 // =============================================================================
+// Custom Theme Configuration
+// =============================================================================
+
+// ApplyConfig applies a theme configuration with optional color overrides.
+// It supports setting a base theme by name, loading from file, or applying color overrides.
+func ApplyConfig(name string, colors map[string]string, filePath string) error {
+	// Load external file if specified
+	if filePath != "" {
+		if err := applyFromFile(filePath); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Set base theme if specified
+	if name != "" {
+		if !SetTheme(name) {
+			return fmt.Errorf("unknown theme: %s", name)
+		}
+	}
+
+	// Apply color overrides if specified
+	if len(colors) > 0 {
+		cc := parseColorsMap(colors)
+		SetCustomColors(cc)
+	}
+
+	return nil
+}
+
+// applyFromFile loads and applies theme configuration from a file.
+func applyFromFile(filePath string) error {
+	expanded := expandPath(filePath)
+	//nolint:gosec // G304: File path is user-configured, intentional
+	data, err := os.ReadFile(expanded)
+	if err != nil {
+		return fmt.Errorf("failed to read theme file: %w", err)
+	}
+	var fileTheme File
+	if err := yaml.Unmarshal(data, &fileTheme); err != nil {
+		return fmt.Errorf("invalid theme file: %w", err)
+	}
+	// Apply base theme from file if specified
+	if fileTheme.Name != "" {
+		if !SetTheme(fileTheme.Name) {
+			return fmt.Errorf("unknown theme in file: %s", fileTheme.Name)
+		}
+	}
+	// Apply colors from file
+	SetCustomColors(&fileTheme.Colors)
+	return nil
+}
+
+// SetCustomColors sets custom color overrides.
+func SetCustomColors(colors *CustomColors) {
+	customMu.Lock()
+	defer customMu.Unlock()
+	customOverrides = colors
+}
+
+// ClearCustomColors removes all custom color overrides.
+func ClearCustomColors() {
+	customMu.Lock()
+	defer customMu.Unlock()
+	customOverrides = nil
+}
+
+// GetCustomColors returns the current custom color overrides.
+func GetCustomColors() *CustomColors {
+	customMu.RLock()
+	defer customMu.RUnlock()
+	return customOverrides
+}
+
+// parseColorsMap converts a string map to CustomColors.
+func parseColorsMap(colors map[string]string) *CustomColors {
+	return &CustomColors{
+		Foreground:  colors["foreground"],
+		Background:  colors["background"],
+		Green:       colors["green"],
+		Red:         colors["red"],
+		Yellow:      colors["yellow"],
+		Blue:        colors["blue"],
+		Cyan:        colors["cyan"],
+		Purple:      colors["purple"],
+		BrightBlack: colors["bright_black"],
+	}
+}
+
+// expandPath expands ~ to home directory.
+func expandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, path[2:])
+	}
+	return path
+}
+
+// parseHexColor parses a hex color string (e.g., "#50fa7b") to color.Color.
+func parseHexColor(hex string) color.Color {
+	if hex == "" {
+		return nil
+	}
+	// Remove # prefix if present
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return nil
+	}
+
+	var r, g, b uint8
+	n, err := fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
+	if err != nil || n != 3 {
+		return nil
+	}
+	return &tint.Color{R: r, G: g, B: b, A: 255}
+}
+
+// getCustomColor returns the custom override for a color if set.
+func getCustomColor(colorName string) color.Color {
+	customMu.RLock()
+	defer customMu.RUnlock()
+
+	if customOverrides == nil {
+		return nil
+	}
+
+	var hex string
+	switch colorName {
+	case "foreground":
+		hex = customOverrides.Foreground
+	case "background":
+		hex = customOverrides.Background
+	case "green":
+		hex = customOverrides.Green
+	case "red":
+		hex = customOverrides.Red
+	case "yellow":
+		hex = customOverrides.Yellow
+	case "blue":
+		hex = customOverrides.Blue
+	case "cyan":
+		hex = customOverrides.Cyan
+	case "purple":
+		hex = customOverrides.Purple
+	case "bright_black":
+		hex = customOverrides.BrightBlack
+	}
+
+	return parseHexColor(hex)
+}
+
+// =============================================================================
 // Color Accessors - Return color.Color (compatible with lipgloss v2)
 // =============================================================================
 
@@ -100,7 +284,11 @@ var (
 )
 
 // Fg returns the current theme foreground color.
+// Custom overrides take precedence over the base theme.
 func Fg() color.Color {
+	if c := getCustomColor("foreground"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaFg
@@ -109,7 +297,11 @@ func Fg() color.Color {
 }
 
 // Bg returns the current theme background color.
+// Custom overrides take precedence over the base theme.
 func Bg() color.Color {
+	if c := getCustomColor("background"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaBg
@@ -118,7 +310,11 @@ func Bg() color.Color {
 }
 
 // Green returns the current theme green color.
+// Custom overrides take precedence over the base theme.
 func Green() color.Color {
+	if c := getCustomColor("green"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaGreen
@@ -127,7 +323,11 @@ func Green() color.Color {
 }
 
 // Red returns the current theme red color.
+// Custom overrides take precedence over the base theme.
 func Red() color.Color {
+	if c := getCustomColor("red"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaRed
@@ -136,7 +336,11 @@ func Red() color.Color {
 }
 
 // Yellow returns the current theme yellow color.
+// Custom overrides take precedence over the base theme.
 func Yellow() color.Color {
+	if c := getCustomColor("yellow"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaYellow
@@ -145,7 +349,11 @@ func Yellow() color.Color {
 }
 
 // Blue returns the current theme blue color.
+// Custom overrides take precedence over the base theme.
 func Blue() color.Color {
+	if c := getCustomColor("blue"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaBlue
@@ -154,7 +362,11 @@ func Blue() color.Color {
 }
 
 // Cyan returns the current theme cyan color.
+// Custom overrides take precedence over the base theme.
 func Cyan() color.Color {
+	if c := getCustomColor("cyan"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaCyan
@@ -163,7 +375,11 @@ func Cyan() color.Color {
 }
 
 // Purple returns the current theme purple color.
+// Custom overrides take precedence over the base theme.
 func Purple() color.Color {
+	if c := getCustomColor("purple"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaPurple
@@ -177,7 +393,11 @@ func Magenta() color.Color {
 }
 
 // BrightBlack returns the current theme bright black (gray) color.
+// Custom overrides take precedence over the base theme.
 func BrightBlack() color.Color {
+	if c := getCustomColor("bright_black"); c != nil {
+		return c
+	}
 	t := Current()
 	if t == nil {
 		return draculaBrightBlk

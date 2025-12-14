@@ -129,7 +129,7 @@ func validateCreateOptions(opts *CreateOptions) error {
 		return fmt.Errorf("at least one of --target, --mode, --enable, or --disable must be specified")
 	}
 
-	if err := validate.ValidateMode(opts.Mode, true); err != nil {
+	if err := validate.Mode(opts.Mode, true); err != nil {
 		return err
 	}
 

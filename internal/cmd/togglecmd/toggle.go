@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -65,63 +66,16 @@ func run(ctx context.Context, opts *Options) error {
 	var toggled int
 	err := cmdutil.RunWithSpinner(ctx, ios, "Toggling...", func(ctx context.Context) error {
 		return svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-			components, err := conn.ListComponents(ctx)
+			controllable, err := findControllable(ctx, conn, ios)
 			if err != nil {
-				return fmt.Errorf("failed to list components: %w", err)
+				return err
 			}
 
-			// Find controllable components
-			var controllable []model.Component
-			for _, comp := range components {
-				switch comp.Type {
-				case model.ComponentSwitch, model.ComponentLight, model.ComponentRGB, model.ComponentCover:
-					controllable = append(controllable, comp)
-				default:
-					ios.Debug("skipping non-controllable component %s:%d", comp.Type, comp.ID)
-				}
-			}
-
-			if len(controllable) == 0 {
-				return fmt.Errorf("no controllable components found on device")
-			}
-
-			// If not --all, just control the first one
-			toControl := controllable
-			if !opts.All && len(controllable) > 1 {
-				toControl = controllable[:1]
-			}
+			toControl := selectComponents(controllable, opts.All)
 
 			for _, comp := range toControl {
-				var opErr error
-				switch comp.Type {
-				case model.ComponentSwitch:
-					_, opErr = conn.Switch(comp.ID).Toggle(ctx)
-				case model.ComponentLight:
-					_, opErr = conn.Light(comp.ID).Toggle(ctx)
-				case model.ComponentRGB:
-					_, opErr = conn.RGB(comp.ID).Toggle(ctx)
-				case model.ComponentCover:
-					// For covers, toggle based on current state
-					status, statusErr := conn.Cover(comp.ID).GetStatus(ctx)
-					if statusErr != nil {
-						opErr = statusErr
-					} else {
-						switch status.State {
-						case "open", "opening":
-							opErr = conn.Cover(comp.ID).Close(ctx, nil)
-						case "closed", "closing":
-							opErr = conn.Cover(comp.ID).Open(ctx, nil)
-						default:
-							// If stopped mid-way or unknown, open
-							opErr = conn.Cover(comp.ID).Open(ctx, nil)
-						}
-					}
-				default:
-					ios.Debug("skipping unsupported component type %s:%d", comp.Type, comp.ID)
-					continue
-				}
-				if opErr != nil {
-					return fmt.Errorf("failed to toggle %s:%d: %w", comp.Type, comp.ID, opErr)
+				if err := toggleComponent(ctx, conn, comp, ios); err != nil {
+					return err
 				}
 				toggled++
 			}
@@ -133,10 +87,93 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if toggled == 1 {
-		ios.Success("Device %q toggled", opts.Device)
-	} else {
-		ios.Success("Toggled %d components on %q", toggled, opts.Device)
+	displayResult(ios, toggled, opts.Device)
+	return nil
+}
+
+func findControllable(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) ([]model.Component, error) {
+	components, err := conn.ListComponents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list components: %w", err)
+	}
+
+	var controllable []model.Component
+	for _, comp := range components {
+		if isControllable(comp.Type) {
+			controllable = append(controllable, comp)
+		} else {
+			ios.Debug("skipping non-controllable component %s:%d", comp.Type, comp.ID)
+		}
+	}
+
+	if len(controllable) == 0 {
+		return nil, fmt.Errorf("no controllable components found on device")
+	}
+
+	return controllable, nil
+}
+
+func isControllable(t model.ComponentType) bool {
+	switch t {
+	case model.ComponentSwitch, model.ComponentLight, model.ComponentRGB, model.ComponentCover:
+		return true
+	case model.ComponentInput:
+		return false
+	default:
+		return false
+	}
+}
+
+func selectComponents(controllable []model.Component, all bool) []model.Component {
+	if !all && len(controllable) > 1 {
+		return controllable[:1]
+	}
+	return controllable
+}
+
+func toggleComponent(ctx context.Context, conn *client.Client, comp model.Component, ios *iostreams.IOStreams) error {
+	var err error
+	switch comp.Type {
+	case model.ComponentSwitch:
+		_, err = conn.Switch(comp.ID).Toggle(ctx)
+	case model.ComponentLight:
+		_, err = conn.Light(comp.ID).Toggle(ctx)
+	case model.ComponentRGB:
+		_, err = conn.RGB(comp.ID).Toggle(ctx)
+	case model.ComponentCover:
+		err = toggleCover(ctx, conn.Cover(comp.ID))
+	default:
+		ios.Debug("skipping unsupported component type %s:%d", comp.Type, comp.ID)
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to toggle %s:%d: %w", comp.Type, comp.ID, err)
 	}
 	return nil
+}
+
+func toggleCover(ctx context.Context, cover *client.CoverComponent) error {
+	status, err := cover.GetStatus(ctx)
+	if err != nil {
+		return err
+	}
+
+	switch status.State {
+	case "open", "opening":
+		return cover.Close(ctx, nil)
+	case "closed", "closing":
+		return cover.Open(ctx, nil)
+	default:
+		// If stopped mid-way or unknown, open
+		return cover.Open(ctx, nil)
+	}
+}
+
+func displayResult(ios *iostreams.IOStreams, toggled int, device string) {
+	if toggled == 1 {
+		ios.Success("Device %q toggled", device)
+	} else {
+		ios.Success("Toggled %d components on %q", toggled, device)
+	}
 }

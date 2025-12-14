@@ -17,7 +17,33 @@ color: true
 
 # Color theme (280+ themes available, run 'shelly theme list' to see all)
 # Popular choices: dracula, nord, tokyo-night, gruvbox, catppuccin, one-dark
+#
+# Simple format - just the theme name:
 theme: dracula
+#
+# Block format - theme name with color overrides:
+# theme:
+#   name: dracula
+#   colors:
+#     green: "#50fa7b"
+#     red: "#ff5555"
+#
+# External file format - load from a theme file:
+# theme:
+#   file: ~/.config/shelly/themes/my-theme.yaml
+#
+# Full custom format - only custom colors (no base theme):
+# theme:
+#   colors:
+#     foreground: "#f8f8f2"
+#     background: "#282a36"
+#     green: "#50fa7b"
+#     red: "#ff5555"
+#     yellow: "#f1fa8c"
+#     blue: "#6272a4"
+#     cyan: "#8be9fd"
+#     purple: "#bd93f9"
+#     bright_black: "#6272a4"
 
 # API mode: local (direct device access), cloud (via Shelly Cloud), auto
 api_mode: local
@@ -211,6 +237,14 @@ plugins:
 tui:
   # Auto-refresh interval in seconds (1-300)
   refresh_interval: 5
+
+  # TUI-specific theme (independent - completely replaces main theme when set)
+  # Supports same formats as main theme: string, block with colors, or file
+  # theme: nord
+  # theme:
+  #   name: tokyo-night
+  #   colors:
+  #     green: "#9ece6a"
 
   # Custom keybindings (uncomment to override defaults)
   # keybindings:

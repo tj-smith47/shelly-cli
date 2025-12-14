@@ -17,10 +17,18 @@
       "default": true
     },
     "theme": {
-      "type": "string",
-      "description": "Color theme for CLI output (280+ themes available)",
-      "default": "dracula",
-      "examples": ["dracula", "nord", "tokyo-night", "gruvbox", "catppuccin", "one-dark", "solarized-dark"]
+      "description": "Color theme for CLI output. Can be a theme name (string) or a theme configuration object.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Theme name (280+ themes available)",
+          "examples": ["dracula", "nord", "tokyo-night", "gruvbox", "catppuccin", "one-dark", "solarized-dark"]
+        },
+        {
+          "$ref": "#/$defs/themeConfig"
+        }
+      ],
+      "default": "dracula"
     },
     "api_mode": {
       "type": "string",
@@ -163,6 +171,18 @@
         },
         "keybindings": {
           "$ref": "#/$defs/keybindings"
+        },
+        "theme": {
+          "description": "TUI-specific theme (independent, completely replaces main theme when set)",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Theme name for TUI"
+            },
+            {
+              "$ref": "#/$defs/themeConfig"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -435,6 +455,74 @@
           "type": "array",
           "items": { "type": "string" },
           "default": ["4"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "themeConfig": {
+      "type": "object",
+      "description": "Theme configuration with optional color overrides",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Base theme name (280+ themes available)",
+          "examples": ["dracula", "nord", "tokyo-night", "gruvbox", "catppuccin", "one-dark", "solarized-dark"]
+        },
+        "file": {
+          "type": "string",
+          "description": "Path to external theme file (YAML format)"
+        },
+        "colors": {
+          "type": "object",
+          "description": "Color overrides (hex format)",
+          "properties": {
+            "foreground": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Foreground color"
+            },
+            "background": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Background color"
+            },
+            "green": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Green color (success, online status)"
+            },
+            "red": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Red color (error, offline status)"
+            },
+            "yellow": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Yellow color (warning, updating status)"
+            },
+            "blue": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Blue color (info status)"
+            },
+            "cyan": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Cyan color (highlight)"
+            },
+            "purple": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Purple color (titles)"
+            },
+            "bright_black": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Bright black color (dim text)"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

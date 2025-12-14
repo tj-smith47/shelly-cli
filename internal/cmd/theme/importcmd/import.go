@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -87,24 +88,33 @@ func run(f *cmdutil.Factory, file string, apply bool) error {
 	}
 
 	if apply {
-		if err := theme.ApplyConfig(themeName, imported.Colors, ""); err != nil {
-			return fmt.Errorf("failed to apply theme: %w", err)
-		}
-		if len(imported.Colors) > 0 {
-			ios.Success("Theme '%s' with %d color overrides imported and applied", themeName, len(imported.Colors))
-		} else {
-			ios.Success("Theme '%s' imported and applied", themeName)
-		}
-	} else {
-		ios.Success("Theme file validated successfully")
-		if themeName != "" {
-			ios.Info("Base theme: %s", themeName)
-		}
-		if len(imported.Colors) > 0 {
-			ios.Info("Color overrides: %d", len(imported.Colors))
-		}
-		ios.Info("Use --apply to apply the theme")
+		return applyImportedTheme(ios, themeName, imported.Colors)
 	}
 
+	displayValidationResult(ios, themeName, imported.Colors)
 	return nil
+}
+
+func applyImportedTheme(ios *iostreams.IOStreams, themeName string, colors map[string]string) error {
+	if err := theme.ApplyConfig(themeName, colors, ""); err != nil {
+		return fmt.Errorf("failed to apply theme: %w", err)
+	}
+
+	if len(colors) > 0 {
+		ios.Success("Theme '%s' with %d color overrides imported and applied", themeName, len(colors))
+	} else {
+		ios.Success("Theme '%s' imported and applied", themeName)
+	}
+	return nil
+}
+
+func displayValidationResult(ios *iostreams.IOStreams, themeName string, colors map[string]string) {
+	ios.Success("Theme file validated successfully")
+	if themeName != "" {
+		ios.Info("Base theme: %s", themeName)
+	}
+	if len(colors) > 0 {
+		ios.Info("Color overrides: %d", len(colors))
+	}
+	ios.Info("Use --apply to apply the theme")
 }

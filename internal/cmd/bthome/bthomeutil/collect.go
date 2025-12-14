@@ -19,7 +19,7 @@ type DeviceStatus struct {
 // CollectDevices collects BTHomeDevice components from device status.
 // Returns a slice of DeviceStatus for all bthomedevice:* keys in the status map.
 func CollectDevices(status map[string]json.RawMessage, ios *iostreams.IOStreams) []DeviceStatus {
-	var devices []DeviceStatus
+	devices := make([]DeviceStatus, 0, len(status))
 
 	for key, raw := range status {
 		if !strings.HasPrefix(key, "bthomedevice:") {
@@ -51,7 +51,7 @@ type SensorStatus struct {
 // CollectSensors collects BTHomeSensor components from device status.
 // Returns a slice of SensorStatus for all bthomesensor:* keys in the status map.
 func CollectSensors(status map[string]json.RawMessage, ios *iostreams.IOStreams) []SensorStatus {
-	var sensors []SensorStatus
+	sensors := make([]SensorStatus, 0, len(status))
 
 	for key, raw := range status {
 		if !strings.HasPrefix(key, "bthomesensor:") {

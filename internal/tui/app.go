@@ -118,6 +118,15 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		cfg = nil
 	}
 
+	// Apply TUI-specific theme if configured (completely replaces main theme).
+	if cfg != nil {
+		if tc := cfg.GetTUIThemeConfig(); tc != nil {
+			if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.File); err != nil {
+				f.IOStreams().DebugErr("tui theme", err)
+			}
+		}
+	}
+
 	tabNames := []string{"Devices", "Monitor", "Events", "Energy"}
 	svc := f.ShellyService()
 	ios := f.IOStreams()

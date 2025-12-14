@@ -61,7 +61,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	// Validate mode if provided
-	if err := validate.ValidateMode(opts.Mode, true); err != nil {
+	if err := validate.Mode(opts.Mode, true); err != nil {
 		return err
 	}
 

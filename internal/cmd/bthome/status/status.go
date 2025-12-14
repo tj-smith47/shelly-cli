@@ -171,67 +171,114 @@ func showComponentStatus(ctx context.Context, svc *shelly.Service, opts *Options
 }
 
 func showDeviceStatus(ctx context.Context, svc *shelly.Service, opts *Options, ios *iostreams.IOStreams) error {
-	var status DeviceStatus
-
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		// Get device status
-		params := map[string]any{"id": opts.ID}
-		result, err := conn.Call(ctx, "BTHomeDevice.GetStatus", params)
-		if err != nil {
-			return fmt.Errorf("failed to get device status: %w", err)
-		}
-
-		jsonBytes, err := json.Marshal(result)
-		if err != nil {
-			return fmt.Errorf("failed to marshal result: %w", err)
-		}
-		if err := json.Unmarshal(jsonBytes, &status); err != nil {
-			return fmt.Errorf("failed to parse status: %w", err)
-		}
-
-		// Get device config for name and address
-		cfgResult, cfgErr := conn.Call(ctx, "BTHomeDevice.GetConfig", params)
-		if cfgErr == nil {
-			var cfg struct {
-				Name *string `json:"name"`
-				Addr string  `json:"addr"`
-			}
-			cfgBytes, cfgMarshalErr := json.Marshal(cfgResult)
-			if cfgMarshalErr == nil && json.Unmarshal(cfgBytes, &cfg) == nil {
-				status.Addr = cfg.Addr
-				if cfg.Name != nil {
-					status.Name = *cfg.Name
-				}
-			}
-		}
-
-		// Get known objects
-		objResult, objErr := conn.Call(ctx, "BTHomeDevice.GetKnownObjects", params)
-		if objErr == nil {
-			var objResp struct {
-				Objects []KnownObject `json:"objects"`
-			}
-			objBytes, objMarshalErr := json.Marshal(objResult)
-			if objMarshalErr == nil && json.Unmarshal(objBytes, &objResp) == nil {
-				status.KnownObjects = objResp.Objects
-			}
-		}
-
-		return nil
-	})
+	status, err := fetchDeviceStatus(ctx, svc, opts.Device, opts.ID)
 	if err != nil {
 		return err
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(status, "", "  ")
+		return outputDeviceJSON(ios, status)
+	}
+
+	displayDeviceStatus(ios, status)
+	return nil
+}
+
+func fetchDeviceStatus(ctx context.Context, svc *shelly.Service, device string, id int) (DeviceStatus, error) {
+	var status DeviceStatus
+	params := map[string]any{"id": id}
+
+	err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
+		var err error
+		status, err = getDeviceStatusRPC(ctx, conn, params)
 		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
+			return err
 		}
-		ios.Println(string(output))
+
+		name, addr := getDeviceConfigRPC(ctx, conn, params)
+		status.Name = name
+		status.Addr = addr
+
+		status.KnownObjects = getKnownObjectsRPC(ctx, conn, params)
+		return nil
+	})
+
+	return status, err
+}
+
+func getDeviceStatusRPC(ctx context.Context, conn *client.Client, params map[string]any) (DeviceStatus, error) {
+	var status DeviceStatus
+
+	result, err := conn.Call(ctx, "BTHomeDevice.GetStatus", params)
+	if err != nil {
+		return status, fmt.Errorf("failed to get device status: %w", err)
+	}
+
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return status, fmt.Errorf("failed to marshal result: %w", err)
+	}
+	if err := json.Unmarshal(jsonBytes, &status); err != nil {
+		return status, fmt.Errorf("failed to parse status: %w", err)
+	}
+
+	return status, nil
+}
+
+func getDeviceConfigRPC(ctx context.Context, conn *client.Client, params map[string]any) (name, addr string) {
+	cfgResult, err := conn.Call(ctx, "BTHomeDevice.GetConfig", params)
+	if err != nil {
+		return "", ""
+	}
+
+	var cfg struct {
+		Name *string `json:"name"`
+		Addr string  `json:"addr"`
+	}
+	cfgBytes, err := json.Marshal(cfgResult)
+	if err != nil {
+		return "", ""
+	}
+	if json.Unmarshal(cfgBytes, &cfg) != nil {
+		return "", ""
+	}
+
+	if cfg.Name != nil {
+		name = *cfg.Name
+	}
+	return name, cfg.Addr
+}
+
+func getKnownObjectsRPC(ctx context.Context, conn *client.Client, params map[string]any) []KnownObject {
+	objResult, err := conn.Call(ctx, "BTHomeDevice.GetKnownObjects", params)
+	if err != nil {
 		return nil
 	}
 
+	var objResp struct {
+		Objects []KnownObject `json:"objects"`
+	}
+	objBytes, err := json.Marshal(objResult)
+	if err != nil {
+		return nil
+	}
+	if json.Unmarshal(objBytes, &objResp) != nil {
+		return nil
+	}
+
+	return objResp.Objects
+}
+
+func outputDeviceJSON(ios *iostreams.IOStreams, status DeviceStatus) error {
+	output, err := json.MarshalIndent(status, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format JSON: %w", err)
+	}
+	ios.Println(string(output))
+	return nil
+}
+
+func displayDeviceStatus(ios *iostreams.IOStreams, status DeviceStatus) {
 	name := status.Name
 	if name == "" {
 		name = fmt.Sprintf("Device %d", status.ID)
@@ -240,6 +287,12 @@ func showDeviceStatus(ctx context.Context, svc *shelly.Service, opts *Options, i
 	ios.Println(theme.Bold().Render(fmt.Sprintf("BTHome Device: %s", name)))
 	ios.Println()
 
+	displayDeviceBasicInfo(ios, status)
+	displayKnownObjects(ios, status.KnownObjects)
+	displayErrors(ios, status.Errors)
+}
+
+func displayDeviceBasicInfo(ios *iostreams.IOStreams, status DeviceStatus) {
 	ios.Printf("  ID: %d\n", status.ID)
 	if status.Addr != "" {
 		ios.Printf("  Address: %s\n", status.Addr)
@@ -257,26 +310,32 @@ func showDeviceStatus(ctx context.Context, svc *shelly.Service, opts *Options, i
 		lastUpdate := time.Unix(int64(status.LastUpdateTS), 0)
 		ios.Printf("  Last Update: %s\n", lastUpdate.Format(time.RFC3339))
 	}
+}
 
-	if len(status.KnownObjects) > 0 {
-		ios.Println()
-		ios.Println("  " + theme.Highlight().Render("Known Objects:"))
-		for _, obj := range status.KnownObjects {
-			managed := ""
-			if obj.Component != nil {
-				managed = fmt.Sprintf(" (managed by %s)", *obj.Component)
-			}
-			ios.Printf("    Object ID: %d, Index: %d%s\n", obj.ObjID, obj.Idx, managed)
-		}
+func displayKnownObjects(ios *iostreams.IOStreams, objects []KnownObject) {
+	if len(objects) == 0 {
+		return
 	}
 
-	if len(status.Errors) > 0 {
-		ios.Println()
-		ios.Error("Errors:")
-		for _, e := range status.Errors {
-			ios.Printf("  - %s\n", e)
+	ios.Println()
+	ios.Println("  " + theme.Highlight().Render("Known Objects:"))
+	for _, obj := range objects {
+		managed := ""
+		if obj.Component != nil {
+			managed = fmt.Sprintf(" (managed by %s)", *obj.Component)
 		}
+		ios.Printf("    Object ID: %d, Index: %d%s\n", obj.ObjID, obj.Idx, managed)
+	}
+}
+
+func displayErrors(ios *iostreams.IOStreams, errors []string) {
+	if len(errors) == 0 {
+		return
 	}
 
-	return nil
+	ios.Println()
+	ios.Error("Errors:")
+	for _, e := range errors {
+		ios.Printf("  - %s\n", e)
+	}
 }

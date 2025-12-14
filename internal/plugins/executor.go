@@ -87,8 +87,8 @@ func (e *Executor) buildEnvironment() []string {
 	}
 
 	// SHELLY_API_MODE: API mode (local, cloud, auto)
-	// SHELLY_THEME: Current theme
-	env = append(env, "SHELLY_API_MODE="+cfg.APIMode, "SHELLY_THEME="+cfg.Theme)
+	// SHELLY_THEME: Current theme name
+	env = append(env, "SHELLY_API_MODE="+cfg.APIMode, "SHELLY_THEME="+cfg.GetThemeConfig().Name)
 
 	// SHELLY_DEVICES_JSON: JSON of registered devices
 	if devicesJSON, err := json.Marshal(cfg.Devices); err == nil {

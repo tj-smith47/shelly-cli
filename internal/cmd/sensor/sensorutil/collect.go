@@ -12,7 +12,7 @@ import (
 // It iterates through all keys in the status map, finds those matching the prefix,
 // and unmarshals them into the target type T.
 //
-// Example prefixes: "temperature:", "humidity:", "flood:", "smoke:", "illuminance:", "voltmeter:"
+// Example prefixes: "temperature:", "humidity:", "flood:", "smoke:", "illuminance:", "voltmeter:".
 func CollectByPrefix[T any](status map[string]json.RawMessage, prefix string, ios *iostreams.IOStreams) []T {
 	var sensors []T
 	for key, raw := range status {

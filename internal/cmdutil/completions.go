@@ -511,6 +511,38 @@ func CompleteTemplateThenFile() func(*cobra.Command, []string, string) ([]string
 	}
 }
 
+// CompleteDeviceThenFile returns a completion function that completes
+// device names for the first arg and file paths for the second arg.
+func CompleteDeviceThenFile() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// First argument: device names
+			return completeDeviceNamesFiltered(toComplete)
+		}
+		if len(args) == 1 {
+			// Second argument: file path (use default file completion)
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// CompleteNameThenDevice returns a completion function that skips completion
+// for the first arg (user-provided name) and completes device names for the second arg.
+func CompleteNameThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// First argument: name (no completion)
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if len(args) == 1 {
+			// Second argument: device names
+			return completeDeviceNamesFiltered(toComplete)
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // SaveDiscoveryCache saves discovered addresses to the cache file.
 // This should be called by the discover command after a successful scan.
 func SaveDiscoveryCache(addresses []string) error {

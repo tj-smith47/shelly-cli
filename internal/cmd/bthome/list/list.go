@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/bthome/bthomeutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -69,99 +70,137 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	var devices []BTHomeDeviceInfo
-
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		// Get all component status to find BTHome devices
-		result, err := conn.Call(ctx, "Shelly.GetStatus", nil)
-		if err != nil {
-			return fmt.Errorf("failed to get status: %w", err)
-		}
-
-		jsonBytes, err := json.Marshal(result)
-		if err != nil {
-			return fmt.Errorf("failed to marshal result: %w", err)
-		}
-
-		var status map[string]json.RawMessage
-		if err := json.Unmarshal(jsonBytes, &status); err != nil {
-			return fmt.Errorf("failed to parse status: %w", err)
-		}
-
-		// Collect BTHome device statuses using helper
-		deviceStatuses := bthomeutil.CollectDevices(status, ios)
-
-		// Enrich each device with config data (name, address)
-		for _, devStatus := range deviceStatuses {
-			configResult, cfgErr := conn.Call(ctx, "BTHomeDevice.GetConfig", map[string]any{"id": devStatus.ID})
-			var name, addr string
-			if cfgErr == nil {
-				var cfg struct {
-					Name *string `json:"name"`
-					Addr string  `json:"addr"`
-				}
-				cfgBytes, cfgMarshalErr := json.Marshal(configResult)
-				if cfgMarshalErr == nil && json.Unmarshal(cfgBytes, &cfg) == nil {
-					addr = cfg.Addr
-					if cfg.Name != nil {
-						name = *cfg.Name
-					}
-				}
-			}
-
-			devices = append(devices, BTHomeDeviceInfo{
-				ID:         devStatus.ID,
-				Name:       name,
-				Addr:       addr,
-				RSSI:       devStatus.RSSI,
-				Battery:    devStatus.Battery,
-				LastUpdate: devStatus.LastUpdate,
-			})
-		}
-
-		return nil
-	})
+	devices, err := fetchDevices(ctx, svc, opts.Device, ios)
 	if err != nil {
 		return err
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(devices, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(output))
-		return nil
+		return outputJSON(ios, devices)
 	}
 
+	displayDevices(ios, devices, opts.Device)
+	return nil
+}
+
+func fetchDevices(ctx context.Context, svc *shelly.Service, device string, ios *iostreams.IOStreams) ([]BTHomeDeviceInfo, error) {
+	var devices []BTHomeDeviceInfo
+
+	err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
+		status, err := getDeviceStatus(ctx, conn)
+		if err != nil {
+			return err
+		}
+
+		deviceStatuses := bthomeutil.CollectDevices(status, ios)
+		devices = enrichDevices(ctx, conn, deviceStatuses)
+		return nil
+	})
+
+	return devices, err
+}
+
+func getDeviceStatus(ctx context.Context, conn *client.Client) (map[string]json.RawMessage, error) {
+	result, err := conn.Call(ctx, "Shelly.GetStatus", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %w", err)
+	}
+
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	var status map[string]json.RawMessage
+	if err := json.Unmarshal(jsonBytes, &status); err != nil {
+		return nil, fmt.Errorf("failed to parse status: %w", err)
+	}
+
+	return status, nil
+}
+
+func enrichDevices(ctx context.Context, conn *client.Client, deviceStatuses []bthomeutil.DeviceStatus) []BTHomeDeviceInfo {
+	devices := make([]BTHomeDeviceInfo, 0, len(deviceStatuses))
+
+	for _, devStatus := range deviceStatuses {
+		name, addr := getDeviceConfig(ctx, conn, devStatus.ID)
+		devices = append(devices, BTHomeDeviceInfo{
+			ID:         devStatus.ID,
+			Name:       name,
+			Addr:       addr,
+			RSSI:       devStatus.RSSI,
+			Battery:    devStatus.Battery,
+			LastUpdate: devStatus.LastUpdate,
+		})
+	}
+
+	return devices
+}
+
+func getDeviceConfig(ctx context.Context, conn *client.Client, id int) (name, addr string) {
+	configResult, err := conn.Call(ctx, "BTHomeDevice.GetConfig", map[string]any{"id": id})
+	if err != nil {
+		return "", ""
+	}
+
+	var cfg struct {
+		Name *string `json:"name"`
+		Addr string  `json:"addr"`
+	}
+	cfgBytes, err := json.Marshal(configResult)
+	if err != nil {
+		return "", ""
+	}
+	if json.Unmarshal(cfgBytes, &cfg) != nil {
+		return "", ""
+	}
+
+	if cfg.Name != nil {
+		name = *cfg.Name
+	}
+	return name, cfg.Addr
+}
+
+func outputJSON(ios *iostreams.IOStreams, devices []BTHomeDeviceInfo) error {
+	output, err := json.MarshalIndent(devices, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format JSON: %w", err)
+	}
+	ios.Println(string(output))
+	return nil
+}
+
+func displayDevices(ios *iostreams.IOStreams, devices []BTHomeDeviceInfo, gatewayDevice string) {
 	if len(devices) == 0 {
 		ios.Info("No BTHome devices found.")
-		ios.Info("Use 'shelly bthome add %s' to discover new devices.", opts.Device)
-		return nil
+		ios.Info("Use 'shelly bthome add %s' to discover new devices.", gatewayDevice)
+		return
 	}
 
 	ios.Println(theme.Bold().Render(fmt.Sprintf("BTHome Devices (%d):", len(devices))))
 	ios.Println()
 
 	for _, dev := range devices {
-		name := dev.Name
-		if name == "" {
-			name = fmt.Sprintf("Device %d", dev.ID)
-		}
+		displayDevice(ios, dev)
+	}
+}
 
-		ios.Printf("  %s\n", theme.Highlight().Render(name))
-		ios.Printf("    ID: %d\n", dev.ID)
-		if dev.Addr != "" {
-			ios.Printf("    Address: %s\n", dev.Addr)
-		}
-		if dev.RSSI != nil {
-			ios.Printf("    RSSI: %d dBm\n", *dev.RSSI)
-		}
-		if dev.Battery != nil {
-			ios.Printf("    Battery: %d%%\n", *dev.Battery)
-		}
-		ios.Println()
+func displayDevice(ios *iostreams.IOStreams, dev BTHomeDeviceInfo) {
+	name := dev.Name
+	if name == "" {
+		name = fmt.Sprintf("Device %d", dev.ID)
 	}
 
-	return nil
+	ios.Printf("  %s\n", theme.Highlight().Render(name))
+	ios.Printf("    ID: %d\n", dev.ID)
+	if dev.Addr != "" {
+		ios.Printf("    Address: %s\n", dev.Addr)
+	}
+	if dev.RSSI != nil {
+		ios.Printf("    RSSI: %d dBm\n", *dev.RSSI)
+	}
+	if dev.Battery != nil {
+		ios.Printf("    Battery: %d%%\n", *dev.Battery)
+	}
+	ios.Println()
 }

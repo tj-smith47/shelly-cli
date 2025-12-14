@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -72,106 +73,151 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	var status ZigbeeStatus
-
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		// Get Zigbee config
-		cfgResult, err := conn.Call(ctx, "Zigbee.GetConfig", nil)
-		if err != nil {
-			ios.Debug("Zigbee.GetConfig failed: %v", err)
-			return fmt.Errorf("zigbee not available on this device: %w", err)
-		}
-
-		var cfg struct {
-			Enable bool `json:"enable"`
-		}
-		cfgBytes, err := json.Marshal(cfgResult)
-		if err != nil {
-			return fmt.Errorf("failed to marshal config: %w", err)
-		}
-		if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
-			return fmt.Errorf("failed to parse config: %w", err)
-		}
-		status.Enabled = cfg.Enable
-
-		// Get Zigbee status
-		statusResult, err := conn.Call(ctx, "Zigbee.GetStatus", nil)
-		if err != nil {
-			ios.Debug("Zigbee.GetStatus failed: %v", err)
-			return nil // Config succeeded, status failed - still show partial info
-		}
-
-		var st struct {
-			NetworkState     string `json:"network_state"`
-			EUI64            string `json:"eui64"`
-			PANID            uint16 `json:"pan_id"`
-			Channel          int    `json:"channel"`
-			CoordinatorEUI64 string `json:"coordinator_eui64"`
-		}
-		statusBytes, statusMarshalErr := json.Marshal(statusResult)
-		if statusMarshalErr != nil {
-			ios.Debug("failed to marshal status: %v", statusMarshalErr)
-			return nil
-		}
-		if err := json.Unmarshal(statusBytes, &st); err != nil {
-			ios.Debug("failed to parse status: %v", err)
-			return nil
-		}
-
-		status.NetworkState = st.NetworkState
-		status.EUI64 = st.EUI64
-		status.PANID = st.PANID
-		status.Channel = st.Channel
-		status.CoordinatorEUI64 = st.CoordinatorEUI64
-
-		return nil
-	})
+	status, err := fetchZigbeeStatus(ctx, svc, opts.Device, ios)
 	if err != nil {
 		return err
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(status, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(output))
-		return nil
+		return outputStatusJSON(ios, status)
 	}
 
+	displayZigbeeStatus(ios, status)
+	return nil
+}
+
+func fetchZigbeeStatus(ctx context.Context, svc *shelly.Service, device string, ios *iostreams.IOStreams) (ZigbeeStatus, error) {
+	var status ZigbeeStatus
+
+	err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
+		enabled, err := getZigbeeConfig(ctx, conn, ios)
+		if err != nil {
+			return err
+		}
+		status.Enabled = enabled
+
+		netStatus := getZigbeeNetworkStatus(ctx, conn, ios)
+		status.NetworkState = netStatus.NetworkState
+		status.EUI64 = netStatus.EUI64
+		status.PANID = netStatus.PANID
+		status.Channel = netStatus.Channel
+		status.CoordinatorEUI64 = netStatus.CoordinatorEUI64
+
+		return nil
+	})
+
+	return status, err
+}
+
+func getZigbeeConfig(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) (bool, error) {
+	cfgResult, err := conn.Call(ctx, "Zigbee.GetConfig", nil)
+	if err != nil {
+		ios.Debug("Zigbee.GetConfig failed: %v", err)
+		return false, fmt.Errorf("zigbee not available on this device: %w", err)
+	}
+
+	var cfg struct {
+		Enable bool `json:"enable"`
+	}
+	cfgBytes, err := json.Marshal(cfgResult)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
+		return false, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	return cfg.Enable, nil
+}
+
+func getZigbeeNetworkStatus(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) ZigbeeStatus {
+	var status ZigbeeStatus
+
+	statusResult, err := conn.Call(ctx, "Zigbee.GetStatus", nil)
+	if err != nil {
+		ios.Debug("Zigbee.GetStatus failed: %v", err)
+		return status
+	}
+
+	var st struct {
+		NetworkState     string `json:"network_state"`
+		EUI64            string `json:"eui64"`
+		PANID            uint16 `json:"pan_id"`
+		Channel          int    `json:"channel"`
+		CoordinatorEUI64 string `json:"coordinator_eui64"`
+	}
+	statusBytes, err := json.Marshal(statusResult)
+	if err != nil {
+		ios.Debug("failed to marshal status: %v", err)
+		return status
+	}
+	if json.Unmarshal(statusBytes, &st) != nil {
+		return status
+	}
+
+	return ZigbeeStatus{
+		NetworkState:     st.NetworkState,
+		EUI64:            st.EUI64,
+		PANID:            st.PANID,
+		Channel:          st.Channel,
+		CoordinatorEUI64: st.CoordinatorEUI64,
+	}
+}
+
+func outputStatusJSON(ios *iostreams.IOStreams, status ZigbeeStatus) error {
+	output, err := json.MarshalIndent(status, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format JSON: %w", err)
+	}
+	ios.Println(string(output))
+	return nil
+}
+
+func displayZigbeeStatus(ios *iostreams.IOStreams, status ZigbeeStatus) {
 	ios.Println(theme.Bold().Render("Zigbee Status:"))
 	ios.Println()
 
-	enabledStr := theme.Dim().Render("Disabled")
-	if status.Enabled {
-		enabledStr = theme.StatusOK().Render("Enabled")
-	}
-	ios.Printf("  Enabled: %s\n", enabledStr)
-
-	if status.NetworkState != "" {
-		stateStyle := theme.Dim()
-		switch status.NetworkState {
-		case "joined":
-			stateStyle = theme.StatusOK()
-		case "steering":
-			stateStyle = theme.StatusWarn()
-		}
-		ios.Printf("  Network State: %s\n", stateStyle.Render(status.NetworkState))
-	}
+	displayEnabledState(ios, status.Enabled)
+	displayNetworkState(ios, status.NetworkState)
 
 	if status.EUI64 != "" {
 		ios.Printf("  EUI64: %s\n", status.EUI64)
 	}
 
 	if status.NetworkState == "joined" {
-		ios.Println()
-		ios.Println("  " + theme.Highlight().Render("Network Info:"))
-		ios.Printf("    PAN ID: 0x%04X\n", status.PANID)
-		ios.Printf("    Channel: %d\n", status.Channel)
-		if status.CoordinatorEUI64 != "" {
-			ios.Printf("    Coordinator: %s\n", status.CoordinatorEUI64)
-		}
+		displayNetworkInfo(ios, status)
+	}
+}
+
+func displayEnabledState(ios *iostreams.IOStreams, enabled bool) {
+	enabledStr := theme.Dim().Render("Disabled")
+	if enabled {
+		enabledStr = theme.StatusOK().Render("Enabled")
+	}
+	ios.Printf("  Enabled: %s\n", enabledStr)
+}
+
+func displayNetworkState(ios *iostreams.IOStreams, state string) {
+	if state == "" {
+		return
 	}
 
-	return nil
+	stateStyle := theme.Dim()
+	switch state {
+	case "joined":
+		stateStyle = theme.StatusOK()
+	case "steering":
+		stateStyle = theme.StatusWarn()
+	}
+	ios.Printf("  Network State: %s\n", stateStyle.Render(state))
+}
+
+func displayNetworkInfo(ios *iostreams.IOStreams, status ZigbeeStatus) {
+	ios.Println()
+	ios.Println("  " + theme.Highlight().Render("Network Info:"))
+	ios.Printf("    PAN ID: 0x%04X\n", status.PANID)
+	ios.Printf("    Channel: %d\n", status.Channel)
+	if status.CoordinatorEUI64 != "" {
+		ios.Printf("    Coordinator: %s\n", status.CoordinatorEUI64)
+	}
 }

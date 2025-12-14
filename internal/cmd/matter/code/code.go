@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -74,103 +75,137 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	var info CommissioningInfo
-
-	// Get device address for the web UI hint
-	var deviceIP string
-	if devCfg, cfgErr := config.ResolveDevice(opts.Device); cfgErr == nil {
-		deviceIP = devCfg.Address
-	}
-
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-		// First check if Matter is enabled and commissionable
-		statusResult, err := conn.Call(ctx, "Matter.GetStatus", nil)
-		if err != nil {
-			ios.Debug("Matter.GetStatus failed: %v", err)
-			return fmt.Errorf("matter not available on this device: %w", err)
-		}
-
-		var st struct {
-			Commissionable bool `json:"commissionable"`
-		}
-		statusBytes, statusMarshalErr := json.Marshal(statusResult)
-		if statusMarshalErr != nil {
-			return fmt.Errorf("failed to marshal status: %w", statusMarshalErr)
-		}
-		if err := json.Unmarshal(statusBytes, &st); err != nil {
-			return fmt.Errorf("failed to parse status: %w", err)
-		}
-
-		if !st.Commissionable {
-			ios.Warning("Device is not commissionable.")
-			ios.Info("Enable Matter first: shelly matter enable %s", opts.Device)
-			return nil
-		}
-
-		// Try to get commissioning code via RPC
-		// Note: Not all devices expose this via API
-		codeResult, err := conn.Call(ctx, "Matter.GetCommissioningCode", nil)
-		if err != nil {
-			ios.Debug("Matter.GetCommissioningCode not available: %v", err)
-			// Commissioning code may not be available via API
-			return nil
-		}
-
-		codeBytes, codeMarshalErr := json.Marshal(codeResult)
-		if codeMarshalErr != nil {
-			ios.Debug("failed to marshal code: %v", codeMarshalErr)
-			return nil
-		}
-		if err := json.Unmarshal(codeBytes, &info); err != nil {
-			ios.Debug("failed to parse code: %v", err)
-			return nil
-		}
-		info.Available = true
-
-		return nil
-	})
+	info, err := getCommissioningInfo(ctx, svc, opts.Device, ios)
 	if err != nil {
 		return err
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(info, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(output))
-		return nil
+		return outputJSON(ios, info)
 	}
 
-	if info.Available && info.ManualCode != "" {
-		ios.Println(theme.Bold().Render("Matter Pairing Code:"))
-		ios.Println()
-		ios.Printf("  Manual Code: %s\n", theme.Highlight().Render(info.ManualCode))
-		if info.QRCode != "" {
-			ios.Printf("  QR Data: %s\n", info.QRCode)
-		}
-		if info.Discriminator > 0 {
-			ios.Printf("  Discriminator: %d\n", info.Discriminator)
-		}
-		if info.SetupPINCode > 0 {
-			ios.Printf("  Setup PIN: %d\n", info.SetupPINCode)
-		}
-		ios.Println()
-		ios.Info("Use this code in your Matter controller app.")
-	} else {
-		ios.Println(theme.Bold().Render("Matter Pairing Information:"))
-		ios.Println()
-		ios.Info("Pairing code not available via API.")
-		ios.Println()
-		ios.Info("To get the pairing code:")
-		ios.Info("  1. Check the device label for QR code")
-		if deviceIP != "" {
-			ios.Info("  2. Visit: http://%s/matter", deviceIP)
-		} else {
-			ios.Info("  2. Visit the device web UI at /matter")
-		}
-		ios.Info("  3. Use your Matter controller app to scan the QR code")
-	}
-
+	displayCommissioningInfo(ios, info, opts.Device)
 	return nil
+}
+
+func getCommissioningInfo(ctx context.Context, svc *shelly.Service, device string, ios *iostreams.IOStreams) (CommissioningInfo, error) {
+	var info CommissioningInfo
+
+	err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
+		commissionable, err := checkCommissionable(ctx, conn, ios)
+		if err != nil {
+			return err
+		}
+		if !commissionable {
+			ios.Warning("Device is not commissionable.")
+			ios.Info("Enable Matter first: shelly matter enable %s", device)
+			return nil
+		}
+
+		fetchedInfo, fetchErr := fetchCommissioningCode(ctx, conn, ios)
+		if fetchErr == nil {
+			info = fetchedInfo
+		}
+		return nil
+	})
+
+	return info, err
+}
+
+func checkCommissionable(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) (bool, error) {
+	statusResult, err := conn.Call(ctx, "Matter.GetStatus", nil)
+	if err != nil {
+		ios.Debug("Matter.GetStatus failed: %v", err)
+		return false, fmt.Errorf("matter not available on this device: %w", err)
+	}
+
+	var st struct {
+		Commissionable bool `json:"commissionable"`
+	}
+	statusBytes, err := json.Marshal(statusResult)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal status: %w", err)
+	}
+	if err := json.Unmarshal(statusBytes, &st); err != nil {
+		return false, fmt.Errorf("failed to parse status: %w", err)
+	}
+
+	return st.Commissionable, nil
+}
+
+func fetchCommissioningCode(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) (CommissioningInfo, error) {
+	var info CommissioningInfo
+
+	codeResult, err := conn.Call(ctx, "Matter.GetCommissioningCode", nil)
+	if err != nil {
+		ios.Debug("Matter.GetCommissioningCode not available: %v", err)
+		return info, err
+	}
+
+	codeBytes, err := json.Marshal(codeResult)
+	if err != nil {
+		ios.Debug("failed to marshal code: %v", err)
+		return info, err
+	}
+	if err := json.Unmarshal(codeBytes, &info); err != nil {
+		ios.Debug("failed to parse code: %v", err)
+		return info, err
+	}
+	info.Available = true
+
+	return info, nil
+}
+
+func outputJSON(ios *iostreams.IOStreams, info CommissioningInfo) error {
+	output, err := json.MarshalIndent(info, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format JSON: %w", err)
+	}
+	ios.Println(string(output))
+	return nil
+}
+
+func displayCommissioningInfo(ios *iostreams.IOStreams, info CommissioningInfo, device string) {
+	if info.Available && info.ManualCode != "" {
+		displayAvailableCode(ios, info)
+		return
+	}
+	displayNotAvailable(ios, device)
+}
+
+func displayAvailableCode(ios *iostreams.IOStreams, info CommissioningInfo) {
+	ios.Println(theme.Bold().Render("Matter Pairing Code:"))
+	ios.Println()
+	ios.Printf("  Manual Code: %s\n", theme.Highlight().Render(info.ManualCode))
+	if info.QRCode != "" {
+		ios.Printf("  QR Data: %s\n", info.QRCode)
+	}
+	if info.Discriminator > 0 {
+		ios.Printf("  Discriminator: %d\n", info.Discriminator)
+	}
+	if info.SetupPINCode > 0 {
+		ios.Printf("  Setup PIN: %d\n", info.SetupPINCode)
+	}
+	ios.Println()
+	ios.Info("Use this code in your Matter controller app.")
+}
+
+func displayNotAvailable(ios *iostreams.IOStreams, device string) {
+	deviceIP := ""
+	if devCfg, cfgErr := config.ResolveDevice(device); cfgErr == nil {
+		deviceIP = devCfg.Address
+	}
+
+	ios.Println(theme.Bold().Render("Matter Pairing Information:"))
+	ios.Println()
+	ios.Info("Pairing code not available via API.")
+	ios.Println()
+	ios.Info("To get the pairing code:")
+	ios.Info("  1. Check the device label for QR code")
+	if deviceIP != "" {
+		ios.Info("  2. Visit: http://%s/matter", deviceIP)
+	} else {
+		ios.Info("  2. Visit the device web UI at /matter")
+	}
+	ios.Info("  3. Use your Matter controller app to scan the QR code")
 }

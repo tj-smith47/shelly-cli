@@ -80,7 +80,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Validate mode
-	if err := validate.ValidateMode(opts.Mode, true); err != nil {
+	if err := validate.Mode(opts.Mode, true); err != nil {
 		return err
 	}
 

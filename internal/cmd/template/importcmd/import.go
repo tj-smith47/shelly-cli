@@ -3,6 +3,7 @@ package importcmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -119,7 +120,7 @@ func parseTemplate(filename string, data []byte) (config.Template, error) {
 		}
 		jsonErr := json.Unmarshal(data, &tpl)
 		if jsonErr != nil {
-			return tpl, fmt.Errorf("failed to parse file (YAML error: %v, JSON error: %v)", yamlErr, jsonErr)
+			return tpl, fmt.Errorf("failed to parse file: %w", errors.Join(yamlErr, jsonErr))
 		}
 	}
 

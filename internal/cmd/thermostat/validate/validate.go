@@ -10,9 +10,9 @@ var ValidModes = map[string]bool{
 	"auto": true,
 }
 
-// ValidateMode validates that a thermostat mode is one of: heat, cool, auto.
+// Mode validates that a thermostat mode is one of: heat, cool, auto.
 // If allowEmpty is true, an empty string is also valid (used when mode is optional).
-func ValidateMode(mode string, allowEmpty bool) error {
+func Mode(mode string, allowEmpty bool) error {
 	if mode == "" {
 		if allowEmpty {
 			return nil

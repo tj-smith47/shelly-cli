@@ -109,44 +109,67 @@ func (c *Gen1Client) Update(ctx context.Context, url string) error {
 	return c.device.Update(ctx, url)
 }
 
+// ErrInvalidComponentID is returned when a component ID is negative.
+var ErrInvalidComponentID = fmt.Errorf("invalid component ID: must be >= 0")
+
 // Relay returns a relay component accessor.
-func (c *Gen1Client) Relay(id int) *Gen1RelayComponent {
+// Returns an error if the ID is negative.
+func (c *Gen1Client) Relay(id int) (*Gen1RelayComponent, error) {
+	if id < 0 {
+		return nil, fmt.Errorf("%w: relay ID %d", ErrInvalidComponentID, id)
+	}
 	return &Gen1RelayComponent{
 		relay: c.device.Relay(id),
 		id:    id,
-	}
+	}, nil
 }
 
 // Roller returns a roller component accessor.
-func (c *Gen1Client) Roller(id int) *Gen1RollerComponent {
+// Returns an error if the ID is negative.
+func (c *Gen1Client) Roller(id int) (*Gen1RollerComponent, error) {
+	if id < 0 {
+		return nil, fmt.Errorf("%w: roller ID %d", ErrInvalidComponentID, id)
+	}
 	return &Gen1RollerComponent{
 		roller: c.device.Roller(id),
 		id:     id,
-	}
+	}, nil
 }
 
 // Light returns a light component accessor.
-func (c *Gen1Client) Light(id int) *Gen1LightComponent {
+// Returns an error if the ID is negative.
+func (c *Gen1Client) Light(id int) (*Gen1LightComponent, error) {
+	if id < 0 {
+		return nil, fmt.Errorf("%w: light ID %d", ErrInvalidComponentID, id)
+	}
 	return &Gen1LightComponent{
 		light: c.device.Light(id),
 		id:    id,
-	}
+	}, nil
 }
 
 // Color returns a color (RGBW) component accessor.
-func (c *Gen1Client) Color(id int) *Gen1ColorComponent {
+// Returns an error if the ID is negative.
+func (c *Gen1Client) Color(id int) (*Gen1ColorComponent, error) {
+	if id < 0 {
+		return nil, fmt.Errorf("%w: color ID %d", ErrInvalidComponentID, id)
+	}
 	return &Gen1ColorComponent{
 		color: c.device.Color(id),
 		id:    id,
-	}
+	}, nil
 }
 
 // White returns a white channel component accessor.
-func (c *Gen1Client) White(id int) *Gen1WhiteComponent {
+// Returns an error if the ID is negative.
+func (c *Gen1Client) White(id int) (*Gen1WhiteComponent, error) {
+	if id < 0 {
+		return nil, fmt.Errorf("%w: white ID %d", ErrInvalidComponentID, id)
+	}
 	return &Gen1WhiteComponent{
 		white: c.device.White(id),
 		id:    id,
-	}
+	}, nil
 }
 
 // Gen1RelayComponent wraps a Gen1 relay for switch-like operations.

@@ -23,7 +23,7 @@ type DeviceData struct {
 // It first checks config for static data, then tries to connect to get live data.
 // Devices that can't be reached use config data with Online=false.
 func CollectDeviceData(ctx context.Context, svc *shelly.Service, deviceNames []string) []DeviceData {
-	var result []DeviceData
+	result := make([]DeviceData, 0, len(deviceNames))
 
 	for _, device := range deviceNames {
 		data := DeviceData{Name: device}
@@ -63,8 +63,7 @@ func CollectDeviceData(ctx context.Context, svc *shelly.Service, deviceNames []s
 
 // SplitDevicesAndFile splits command args into device names and an optional file path.
 // If the last argument ends with one of the valid extensions, it's treated as the file path.
-// Returns (deviceNames, filePath).
-func SplitDevicesAndFile(args []string, validExtensions []string) ([]string, string) {
+func SplitDevicesAndFile(args, validExtensions []string) (deviceNames []string, filePath string) {
 	if len(args) <= 1 {
 		return args, ""
 	}

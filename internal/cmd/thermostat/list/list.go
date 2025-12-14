@@ -97,7 +97,8 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	return displayThermostats(ios, thermostats, opts.Device)
+	displayThermostats(ios, thermostats, opts.Device)
+	return nil
 }
 
 func collectThermostats(status map[string]json.RawMessage) []ThermostatInfo {
@@ -127,11 +128,11 @@ func collectThermostats(status map[string]json.RawMessage) []ThermostatInfo {
 	return thermostats
 }
 
-func displayThermostats(ios *iostreams.IOStreams, thermostats []ThermostatInfo, device string) error {
+func displayThermostats(ios *iostreams.IOStreams, thermostats []ThermostatInfo, device string) {
 	if len(thermostats) == 0 {
 		ios.Info("No thermostats found on %s", device)
 		ios.Info("Thermostat support is available on Shelly BLU TRV via BLU Gateway.")
-		return nil
+		return
 	}
 
 	ios.Println(theme.Bold().Render(fmt.Sprintf("Thermostats on %s:", device)))
@@ -152,5 +153,4 @@ func displayThermostats(ios *iostreams.IOStreams, thermostats []ThermostatInfo, 
 	}
 
 	ios.Success("Found %d thermostat(s)", len(thermostats))
-	return nil
 }

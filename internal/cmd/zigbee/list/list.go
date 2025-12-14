@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -66,109 +67,143 @@ func run(ctx context.Context, opts *Options) error {
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
-	cfg := config.Get()
 
-	if cfg == nil {
-		return fmt.Errorf("no configuration found; run 'shelly init' first")
+	devices, err := scanZigbeeDevices(ctx, svc, ios)
+	if err != nil {
+		return err
 	}
 
-	var devices []ZigbeeDevice
+	if opts.JSON {
+		return outputZigbeeJSON(ios, devices)
+	}
+
+	displayZigbeeDevices(ios, devices)
+	return nil
+}
+
+func scanZigbeeDevices(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams) ([]ZigbeeDevice, error) {
+	cfg := config.Get()
+	if cfg == nil {
+		return nil, fmt.Errorf("no configuration found; run 'shelly init' first")
+	}
+
+	devices := make([]ZigbeeDevice, 0, len(cfg.Devices))
 
 	for name, dev := range cfg.Devices {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		// Try to get Zigbee status from each device
-		result, err := svc.RawRPC(ctx, dev.Address, "Zigbee.GetConfig", nil)
-		if err != nil {
-			ios.Debug("device %s does not support Zigbee: %v", name, err)
+		device, ok := checkZigbeeSupport(ctx, svc, name, dev, ios)
+		if !ok {
 			continue
 		}
 
-		var cfg struct {
-			Enable bool `json:"enable"`
-		}
-		jsonBytes, marshalErr := json.Marshal(result)
-		if marshalErr != nil {
-			ios.Debug("failed to marshal result for %s: %v", name, marshalErr)
-			continue
-		}
-		if json.Unmarshal(jsonBytes, &cfg) != nil {
-			continue
-		}
-
-		device := ZigbeeDevice{
-			Name:    name,
-			Address: dev.Address,
-			Model:   dev.Model,
-			Enabled: cfg.Enable,
-		}
-
-		// Get status if enabled
-		if cfg.Enable {
-			statusResult, statusErr := svc.RawRPC(ctx, dev.Address, "Zigbee.GetStatus", nil)
-			if statusErr == nil {
-				var status struct {
-					NetworkState string `json:"network_state"`
-					EUI64        string `json:"eui64"`
-				}
-				statusBytes, statusMarshalErr := json.Marshal(statusResult)
-				if statusMarshalErr == nil && json.Unmarshal(statusBytes, &status) == nil {
-					device.NetworkState = status.NetworkState
-					device.EUI64 = status.EUI64
-				}
-			}
+		if device.Enabled {
+			enrichZigbeeStatus(ctx, svc, dev.Address, &device)
 		}
 
 		devices = append(devices, device)
 	}
 
-	if opts.JSON {
-		output, err := json.MarshalIndent(devices, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(output))
-		return nil
+	return devices, nil
+}
+
+func checkZigbeeSupport(ctx context.Context, svc *shelly.Service, name string, dev config.Device, ios *iostreams.IOStreams) (ZigbeeDevice, bool) {
+	result, err := svc.RawRPC(ctx, dev.Address, "Zigbee.GetConfig", nil)
+	if err != nil {
+		ios.Debug("device %s does not support Zigbee: %v", name, err)
+		return ZigbeeDevice{}, false
 	}
 
+	var cfg struct {
+		Enable bool `json:"enable"`
+	}
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		ios.Debug("failed to marshal result for %s: %v", name, err)
+		return ZigbeeDevice{}, false
+	}
+	if json.Unmarshal(jsonBytes, &cfg) != nil {
+		return ZigbeeDevice{}, false
+	}
+
+	return ZigbeeDevice{
+		Name:    name,
+		Address: dev.Address,
+		Model:   dev.Model,
+		Enabled: cfg.Enable,
+	}, true
+}
+
+func enrichZigbeeStatus(ctx context.Context, svc *shelly.Service, address string, device *ZigbeeDevice) {
+	statusResult, err := svc.RawRPC(ctx, address, "Zigbee.GetStatus", nil)
+	if err != nil {
+		return
+	}
+
+	var status struct {
+		NetworkState string `json:"network_state"`
+		EUI64        string `json:"eui64"`
+	}
+	statusBytes, err := json.Marshal(statusResult)
+	if err != nil {
+		return
+	}
+	if json.Unmarshal(statusBytes, &status) == nil {
+		device.NetworkState = status.NetworkState
+		device.EUI64 = status.EUI64
+	}
+}
+
+func outputZigbeeJSON(ios *iostreams.IOStreams, devices []ZigbeeDevice) error {
+	output, err := json.MarshalIndent(devices, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format JSON: %w", err)
+	}
+	ios.Println(string(output))
+	return nil
+}
+
+func displayZigbeeDevices(ios *iostreams.IOStreams, devices []ZigbeeDevice) {
 	if len(devices) == 0 {
 		ios.Info("No Zigbee-capable devices found.")
 		ios.Info("Zigbee is supported on Gen4 devices.")
-		return nil
+		return
 	}
 
 	ios.Println(theme.Bold().Render(fmt.Sprintf("Zigbee-Capable Devices (%d):", len(devices))))
 	ios.Println()
 
 	for _, dev := range devices {
-		ios.Printf("  %s\n", theme.Highlight().Render(dev.Name))
-		ios.Printf("    Address: %s\n", dev.Address)
-		if dev.Model != "" {
-			ios.Printf("    Model: %s\n", dev.Model)
-		}
+		displayZigbeeDevice(ios, dev)
+	}
+}
 
-		enabledStr := theme.Dim().Render("Disabled")
-		if dev.Enabled {
-			enabledStr = theme.StatusOK().Render("Enabled")
-		}
-		ios.Printf("    Zigbee: %s\n", enabledStr)
-
-		if dev.NetworkState != "" {
-			stateStyle := theme.Dim()
-			if dev.NetworkState == "joined" {
-				stateStyle = theme.StatusOK()
-			}
-			ios.Printf("    State: %s\n", stateStyle.Render(dev.NetworkState))
-		}
-		if dev.EUI64 != "" {
-			ios.Printf("    EUI64: %s\n", dev.EUI64)
-		}
-		ios.Println()
+func displayZigbeeDevice(ios *iostreams.IOStreams, dev ZigbeeDevice) {
+	ios.Printf("  %s\n", theme.Highlight().Render(dev.Name))
+	ios.Printf("    Address: %s\n", dev.Address)
+	if dev.Model != "" {
+		ios.Printf("    Model: %s\n", dev.Model)
 	}
 
-	return nil
+	enabledStr := theme.Dim().Render("Disabled")
+	if dev.Enabled {
+		enabledStr = theme.StatusOK().Render("Enabled")
+	}
+	ios.Printf("    Zigbee: %s\n", enabledStr)
+
+	if dev.NetworkState != "" {
+		stateStyle := theme.Dim()
+		if dev.NetworkState == "joined" {
+			stateStyle = theme.StatusOK()
+		}
+		ios.Printf("    State: %s\n", stateStyle.Render(dev.NetworkState))
+	}
+	if dev.EUI64 != "" {
+		ios.Printf("    EUI64: %s\n", dev.EUI64)
+	}
+	ios.Println()
 }

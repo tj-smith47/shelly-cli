@@ -104,6 +104,7 @@ else
 	@$(MAKE) lint
 endif
 	@$(MAKE) audit
+	@$(MAKE) build
 
 ## help: Show this help message
 help:
