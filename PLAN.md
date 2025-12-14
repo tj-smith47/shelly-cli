@@ -1355,6 +1355,13 @@ shelly-cli/
   - Built-in commands: help, info, status, config, methods, components
   - Persistent connection to device
 
+**Code Audit Notes (Phase 20.2):**
+- Duplication identified between `on/off/toggle` quick commands and `interactive` control helpers
+- Both implement component control logic (switch/light/rgb/cover on/off/toggle)
+- Patterns differ slightly: quick commands use spinner + return first error; interactive uses inline feedback
+- **Recommended refactor:** Extract shared `ComponentController` helper to `internal/control/` package
+- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
+
 ### 20.3 Debug Commands
 - [ ] `shelly debug log <device>` - Get device debug log (Gen1)
 - [ ] `shelly debug rpc <device> <method> [params]` - Raw RPC call
