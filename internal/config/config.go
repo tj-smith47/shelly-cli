@@ -41,6 +41,51 @@ type Config struct {
 
 	// Plugin settings
 	Plugins PluginsConfig `mapstructure:"plugins"`
+
+	// TUI settings
+	TUI TUIConfig `mapstructure:"tui"`
+}
+
+// TUIConfig holds TUI dashboard settings.
+type TUIConfig struct {
+	RefreshInterval int               `mapstructure:"refresh_interval"` // Refresh interval in seconds
+	Keybindings     KeybindingsConfig `mapstructure:"keybindings"`
+}
+
+// KeybindingsConfig holds customizable keybindings for the TUI.
+type KeybindingsConfig struct {
+	// Navigation
+	Up       []string `mapstructure:"up"`
+	Down     []string `mapstructure:"down"`
+	Left     []string `mapstructure:"left"`
+	Right    []string `mapstructure:"right"`
+	PageUp   []string `mapstructure:"page_up"`
+	PageDown []string `mapstructure:"page_down"`
+	Home     []string `mapstructure:"home"`
+	End      []string `mapstructure:"end"`
+
+	// Actions
+	Enter   []string `mapstructure:"enter"`
+	Escape  []string `mapstructure:"escape"`
+	Refresh []string `mapstructure:"refresh"`
+	Filter  []string `mapstructure:"filter"`
+	Command []string `mapstructure:"command"`
+	Help    []string `mapstructure:"help"`
+	Quit    []string `mapstructure:"quit"`
+
+	// Device actions
+	Toggle  []string `mapstructure:"toggle"`
+	TurnOn  []string `mapstructure:"turn_on"`
+	TurnOff []string `mapstructure:"turn_off"`
+	Reboot  []string `mapstructure:"reboot"`
+
+	// View switching
+	Tab      []string `mapstructure:"tab"`
+	ShiftTab []string `mapstructure:"shift_tab"`
+	View1    []string `mapstructure:"view1"`
+	View2    []string `mapstructure:"view2"`
+	View3    []string `mapstructure:"view3"`
+	View4    []string `mapstructure:"view4"`
 }
 
 // DiscoveryConfig holds device discovery settings.
@@ -205,6 +250,7 @@ func Save() error {
 	viper.Set("groups", c.Groups)
 	viper.Set("scenes", c.Scenes)
 	viper.Set("plugins", c.Plugins)
+	viper.Set("tui", c.TUI)
 
 	// Get config file path
 	configFile := viper.ConfigFileUsed()

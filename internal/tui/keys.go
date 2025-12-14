@@ -2,7 +2,11 @@
 package tui
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/key"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // KeyMap defines keyboard bindings for the TUI.
@@ -22,6 +26,7 @@ type KeyMap struct {
 	Escape    key.Binding
 	Refresh   key.Binding
 	Filter    key.Binding
+	Command   key.Binding
 	Help      key.Binding
 	Quit      key.Binding
 	ForceQuit key.Binding
@@ -95,6 +100,10 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("/"),
 			key.WithHelp("/", "filter"),
 		),
+		Command: key.NewBinding(
+			key.WithKeys(":"),
+			key.WithHelp(":", "command"),
+		),
 		Help: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "help"),
@@ -167,6 +176,88 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Enter, k.Escape, k.Refresh, k.Filter},
 		{k.Toggle, k.TurnOn, k.TurnOff, k.Reboot},
 		{k.Tab, k.View1, k.View2, k.View3},
-		{k.Help, k.Quit},
+		{k.Command, k.Help, k.Quit},
 	}
+}
+
+// KeyMapFromConfig creates a KeyMap with overrides from config.
+// Any keybinding not specified in config uses the default.
+func KeyMapFromConfig(cfg *config.Config) KeyMap {
+	km := DefaultKeyMap()
+	if cfg == nil {
+		return km
+	}
+
+	kb := cfg.TUI.Keybindings
+
+	// Apply navigation overrides
+	applyNavigationBindings(&km, &kb)
+
+	// Apply action overrides
+	applyActionBindings(&km, &kb)
+
+	// Apply device action overrides
+	applyDeviceActionBindings(&km, &kb)
+
+	// Apply view switching overrides
+	applyViewBindings(&km, &kb)
+
+	return km
+}
+
+// applyNavigationBindings applies navigation key overrides from config.
+func applyNavigationBindings(km *KeyMap, kb *config.KeybindingsConfig) {
+	applyBinding(&km.Up, kb.Up, "up")
+	applyBinding(&km.Down, kb.Down, "down")
+	applyBinding(&km.Left, kb.Left, "left")
+	applyBinding(&km.Right, kb.Right, "right")
+	applyBinding(&km.PageUp, kb.PageUp, "page up")
+	applyBinding(&km.PageDown, kb.PageDown, "page down")
+	applyBinding(&km.Home, kb.Home, "go to top")
+	applyBinding(&km.End, kb.End, "go to bottom")
+}
+
+// applyActionBindings applies action key overrides from config.
+func applyActionBindings(km *KeyMap, kb *config.KeybindingsConfig) {
+	applyBinding(&km.Enter, kb.Enter, "select")
+	applyBinding(&km.Escape, kb.Escape, "back")
+	applyBinding(&km.Refresh, kb.Refresh, "refresh")
+	applyBinding(&km.Filter, kb.Filter, "filter")
+	applyBinding(&km.Command, kb.Command, "command")
+	applyBinding(&km.Help, kb.Help, "help")
+	applyBinding(&km.Quit, kb.Quit, "quit")
+}
+
+// applyDeviceActionBindings applies device action key overrides from config.
+func applyDeviceActionBindings(km *KeyMap, kb *config.KeybindingsConfig) {
+	applyBinding(&km.Toggle, kb.Toggle, "toggle")
+	applyBinding(&km.TurnOn, kb.TurnOn, "turn on")
+	applyBinding(&km.TurnOff, kb.TurnOff, "turn off")
+	applyBinding(&km.Reboot, kb.Reboot, "reboot")
+}
+
+// applyViewBindings applies view switching key overrides from config.
+func applyViewBindings(km *KeyMap, kb *config.KeybindingsConfig) {
+	applyBinding(&km.Tab, kb.Tab, "next view")
+	applyBinding(&km.ShiftTab, kb.ShiftTab, "prev view")
+	applyBinding(&km.View1, kb.View1, "devices")
+	applyBinding(&km.View2, kb.View2, "monitor")
+	applyBinding(&km.View3, kb.View3, "events")
+	applyBinding(&km.View4, kb.View4, "energy")
+}
+
+// applyBinding applies a keybinding override if keys are provided.
+func applyBinding(binding *key.Binding, keys []string, helpText string) {
+	if len(keys) > 0 {
+		*binding = bindingWithHelp(keys, helpText)
+	}
+}
+
+// bindingWithHelp creates a key.Binding with keys and help text.
+func bindingWithHelp(keys []string, helpText string) key.Binding {
+	helpKey := strings.Join(keys, "/")
+	return key.NewBinding(
+		key.WithKeys(keys...),
+		key.WithHelp(helpKey, helpText),
+	)
 }

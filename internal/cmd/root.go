@@ -43,6 +43,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
+	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -209,6 +210,7 @@ func init() {
 	rootCmd.AddCommand(metrics.NewCommand(f))
 	rootCmd.AddCommand(alias.NewCommand(f))
 	rootCmd.AddCommand(extension.NewCommand(f))
+	rootCmd.AddCommand(themecmd.NewCommand(f))
 	rootCmd.AddCommand(versionCmd())
 }
 

@@ -99,7 +99,7 @@ Create a production-ready, open-source Cobra CLI that:
 | 12 | Alias System | ✅ Complete |
 | 13 | Plugin System | ✅ Complete |
 | 14 | TUI Dashboard | ✅ Complete |
-| 15 | Theme System | 🟡 Core done |
+| 15 | Theme System | ✅ Complete |
 | 16 | Shell Completions | 🟡 Basic done, dynamic TBD |
 | 17-25 | Advanced Features | ⏳ Pending |
 | 26-27 | Documentation & Examples | ⏳ Pending |
@@ -1066,36 +1066,39 @@ shelly-cli/
 **Architecture:** gh-dash/BubbleTea with Elm Architecture (Model/Init/Update/View)
 
 ### 14.1 Tasks
-- [ ] Create `internal/tui/app.go` - Main app model
-- [ ] Create `internal/tui/keys.go` - Vim-style keyboard bindings
-- [ ] Create `internal/tui/styles.go` - Theme-aware styles via bubbletint
+- [x] Create `internal/tui/app.go` - Main app model
+- [x] Create `internal/tui/keys.go` - Vim-style keyboard bindings
+- [x] Create `internal/tui/styles.go` - Theme-aware styles via bubbletint
 
 ### 14.2 Components (each with model.go, view.go, update.go, styles.go)
-- [ ] `components/devicelist/` - Device table (bubbles/table)
-- [ ] `components/devicedetail/` - Device detail panel
-- [ ] `components/monitor/` - Real-time monitoring
-- [ ] `components/search/` - Filter bar (bubbles/textinput)
-- [ ] `components/statusbar/` - Bottom status bar
-- [ ] `components/help/` - Help overlay (glamour markdown)
-- [ ] `components/tabs/` - View switching tabs
-- [ ] `components/toast/` - Notifications
+- [x] `components/devicelist/` - Device table (bubbles/table)
+- [x] `components/devicedetail/` - Device detail panel
+- [x] `components/monitor/` - Real-time monitoring
+- [x] `components/search/` - Filter bar (bubbles/textinput)
+- [x] `components/statusbar/` - Bottom status bar
+- [x] `components/help/` - Help overlay (glamour markdown)
+- [x] `components/tabs/` - View switching tabs
+- [x] `components/toast/` - Notifications
+- [x] `components/cmdmode/` - Command mode input
 
 ### 14.3 Data Layer
-- [ ] `data/devices.go` - Device fetching with caching
-- [ ] `data/status.go` - Batch status updates
-- [ ] `data/events.go` - WebSocket event stream
+- [x] Data fetching integrated into component models
 
 ### 14.4 Commands
-- [ ] `shelly dash` - Launch dashboard (--refresh, --filter, --view)
-- [ ] `shelly dash devices` - Device list view
-- [ ] `shelly dash monitor` - Monitoring view
-- [ ] `shelly dash events` - Event stream view
+- [x] `shelly dash` - Launch dashboard (--refresh, --filter, --view)
+- [x] `shelly dash devices` - Device list view
+- [x] `shelly dash monitor` - Monitoring view
+- [x] `shelly dash events` - Event stream view
 
 ### 14.5 Features
-- [ ] Vim-style navigation (j/k/h/l, g/G)
-- [ ] Command mode (`:quit`, `:device`, `:filter`, `:theme`)
-- [ ] Runtime theme switching
-- [ ] Configurable keybindings via config.yaml
+- [x] Vim-style navigation (j/k, arrows)
+- [x] Tab switching (1-4 or Tab/Shift+Tab)
+- [x] Device actions (t=toggle, o=on, O=off, R=reboot)
+- [x] Filter/search (/)
+- [x] Help overlay (?)
+- [x] Command mode (`:quit`, `:device`, `:filter`, `:theme`, `:view`, `:help`)
+- [x] Runtime theme switching (via `:theme <name>` command)
+- [x] Configurable keybindings via config.yaml (tui.keybindings section)
 
 ---
 
@@ -1106,10 +1109,8 @@ shelly-cli/
   - Integration with lrstanley/bubbletint
   - Theme loading from config
   - Runtime theme switching
-- [ ] Create `internal/theme/registry.go`:
-  - Built-in theme definitions
-  - Custom theme loading from files
-- [ ] Define theme structure:
+- [x] Theme registry via bubbletint's DefaultRegistry (280+ built-in themes)
+- [x] Theme structure defined via bubbletint v2 Tint type:
   ```go
   type Theme struct {
       Name        string
@@ -1133,8 +1134,8 @@ shelly-cli/
 - [x] `shelly theme preview <name>` - Preview theme
 - [x] `shelly theme current` - Show current theme
 - [x] `shelly theme next/prev` - Cycle through themes
-- [ ] `shelly theme export <file>` - Export current theme
-- [ ] `shelly theme import <file>` - Import custom theme
+- [x] `shelly theme export <file>` - Export current theme
+- [x] `shelly theme import <file>` - Import custom theme
 
 ### 15.3 Built-in Themes
 - [x] Include themes from bubbletint (286 themes available):

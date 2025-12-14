@@ -10,6 +10,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicedetail"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicelist"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/energy"
@@ -19,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/search"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/tabs"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 )
 
 // DeviceActionMsg reports the result of a device action.
@@ -84,8 +87,10 @@ type Model struct {
 	statusBar    statusbar.Model
 	tabs         tabs.Model
 	search       search.Model
+	cmdMode      cmdmode.Model
 	help         help.Model
 	deviceDetail devicedetail.Model
+	toast        toast.Model
 
 	// Settings
 	refreshInterval time.Duration
@@ -120,11 +125,14 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Create search component with initial filter
 	searchModel := search.NewWithFilter(opts.Filter)
 
+	// Load keybindings from config or use defaults
+	keys := KeyMapFromConfig(cfg)
+
 	return Model{
 		ctx:             ctx,
 		factory:         f,
 		cfg:             cfg,
-		keys:            DefaultKeyMap(),
+		keys:            keys,
 		styles:          DefaultStyles(),
 		currentView:     opts.InitialView,
 		refreshInterval: opts.RefreshInterval,
@@ -154,11 +162,13 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		statusBar: statusbar.New(),
 		tabs:      tabs.New(tabNames, int(opts.InitialView)),
 		search:    searchModel,
+		cmdMode:   cmdmode.New(),
 		help:      help.New(),
 		deviceDetail: devicedetail.New(devicedetail.Deps{
 			Ctx: ctx,
 			Svc: svc,
 		}),
+		toast: toast.New(),
 	}
 }
 
@@ -170,6 +180,7 @@ func (m Model) Init() tea.Cmd {
 		m.events.Init(),
 		m.energy.Init(),
 		m.statusBar.Init(),
+		m.toast.Init(),
 	)
 }
 
@@ -201,6 +212,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Device detail was closed, nothing special to do
 		return m, nil
 
+	case cmdmode.CommandMsg:
+		return m.handleCommand(msg)
+
+	case cmdmode.ErrorMsg:
+		return m, toast.Error(msg.Message)
+
+	case cmdmode.ClosedMsg:
+		// Command mode was closed without executing
+		return m, nil
+
 	case tea.KeyPressMsg:
 		if newModel, cmd, handled := m.handleKeyPressMsg(msg); handled {
 			return newModel, cmd
@@ -218,6 +239,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var statusCmd tea.Cmd
 	m.statusBar, statusCmd = m.statusBar.Update(msg)
 	cmds = append(cmds, statusCmd)
+
+	// Update toast notifications
+	var toastCmd tea.Cmd
+	m.toast, toastCmd = m.toast.Update(msg)
+	cmds = append(cmds, toastCmd)
 
 	return m, tea.Batch(cmds...)
 }
@@ -239,6 +265,13 @@ func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool)
 		}
 		var cmd tea.Cmd
 		m.help, cmd = m.help.Update(msg)
+		return m, cmd, true
+	}
+
+	// If command mode is active, forward all keys to it
+	if m.cmdMode.IsActive() {
+		var cmd tea.Cmd
+		m.cmdMode, cmd = m.cmdMode.Update(msg)
 		return m, cmd, true
 	}
 
@@ -268,6 +301,8 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.energy = m.energy.SetSize(m.width, contentHeight)
 	m.statusBar = m.statusBar.SetWidth(m.width)
 	m.search = m.search.SetWidth(m.width)
+	m.cmdMode = m.cmdMode.SetWidth(m.width)
+	m.toast = m.toast.SetSize(m.width, m.height)
 	return m, nil
 }
 
@@ -293,25 +328,107 @@ func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 	return m, nil, false
 }
 
-// handleDeviceAction handles device action results and updates the status bar.
+// handleDeviceAction handles device action results and updates the status bar and toast.
 func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
-	var statusCmd tea.Cmd
+	var statusCmd, toastCmd tea.Cmd
 	if msg.Err != nil {
 		statusCmd = statusbar.SetMessage(
 			msg.Device+": "+msg.Action+" failed - "+msg.Err.Error(),
 			statusbar.MessageError,
 		)
+		toastCmd = toast.Error(msg.Device + ": " + msg.Action + " failed")
 	} else {
 		statusCmd = statusbar.SetMessage(
 			msg.Device+": "+msg.Action+" success",
 			statusbar.MessageSuccess,
 		)
+		toastCmd = toast.Success(msg.Device + ": " + msg.Action + " success")
 	}
 
 	// Also refresh the current view to show updated state
 	refreshCmd := m.refreshCurrentView()
 
-	return m, tea.Batch(statusCmd, refreshCmd)
+	return m, tea.Batch(statusCmd, toastCmd, refreshCmd)
+}
+
+// handleCommand handles command mode commands.
+func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
+	switch msg.Command {
+	case cmdmode.CmdQuit:
+		m.quitting = true
+		return m, tea.Quit
+
+	case cmdmode.CmdDevice:
+		// Jump to device by name - set filter and switch to devices view
+		m.deviceList = m.deviceList.SetFilter(msg.Args)
+		m.currentView = ViewDevices
+		m.tabs = m.tabs.SetActive(int(m.currentView))
+		return m, tea.Batch(
+			toast.Success("Filter set: "+msg.Args),
+			m.refreshCurrentView(),
+		)
+
+	case cmdmode.CmdFilter:
+		// Set filter on device list
+		m.deviceList = m.deviceList.SetFilter(msg.Args)
+		m.currentView = ViewDevices
+		m.tabs = m.tabs.SetActive(int(m.currentView))
+		if msg.Args == "" {
+			return m, toast.Success("Filter cleared")
+		}
+		return m, toast.Success("Filter: " + msg.Args)
+
+	case cmdmode.CmdTheme:
+		// Set theme at runtime
+		if !theme.SetTheme(msg.Args) {
+			return m, toast.Error("Invalid theme: " + msg.Args)
+		}
+		// Refresh styles
+		m.styles = DefaultStyles()
+		return m, toast.Success("Theme: " + msg.Args)
+
+	case cmdmode.CmdView:
+		// Switch to a specific view
+		newView := m.parseView(msg.Args)
+		if newView < 0 {
+			return m, toast.Error("Unknown view: " + msg.Args)
+		}
+		m.currentView = ViewMode(newView)
+		m.tabs = m.tabs.SetActive(int(m.currentView))
+		return m, nil
+
+	case cmdmode.CmdHelp:
+		m.help = m.help.SetSize(m.width, m.height)
+		m.help = m.help.SetContext(m.currentHelpContext())
+		m.help = m.help.Toggle()
+		return m, nil
+
+	case cmdmode.CmdToggle:
+		// Toggle the selected device
+		if cmd := m.executeDeviceAction("toggle"); cmd != nil {
+			return m, cmd
+		}
+		return m, toast.Error("No device selected or device offline")
+
+	default:
+		return m, toast.Error("Unknown command")
+	}
+}
+
+// parseView parses a view name to a ViewMode index.
+func (m Model) parseView(name string) int {
+	switch name {
+	case "devices", "device", "dev", "d", "1":
+		return int(ViewDevices)
+	case "monitor", "mon", "m", "2":
+		return int(ViewMonitor)
+	case "events", "event", "e", "3":
+		return int(ViewEvents)
+	case "energy", "power", "p", "4":
+		return int(ViewEnergy)
+	default:
+		return -1
+	}
 }
 
 // handleKeyPress handles global key presses and returns whether it was handled.
@@ -356,6 +473,11 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 			m.search, cmd = m.search.Activate()
 			return m, cmd, true
 		}
+
+	case key.Matches(msg, m.keys.Command):
+		var cmd tea.Cmd
+		m.cmdMode, cmd = m.cmdMode.Activate()
+		return m, cmd, true
 	}
 
 	// Handle device actions (extracted for complexity)
@@ -492,10 +614,12 @@ func (m Model) View() tea.View {
 	// Header (tabs)
 	header := m.tabs.View()
 
-	// Search bar (if active)
-	var searchBar string
+	// Input bar (search or command mode)
+	var inputBar string
 	if m.search.IsActive() {
-		searchBar = m.search.View()
+		inputBar = m.search.View()
+	} else if m.cmdMode.IsActive() {
+		inputBar = m.cmdMode.View()
 	}
 
 	// Content based on current view
@@ -523,10 +647,10 @@ func (m Model) View() tea.View {
 
 	// Compose the layout
 	var result string
-	if searchBar != "" {
+	if inputBar != "" {
 		result = lipgloss.JoinVertical(lipgloss.Left,
 			header,
-			searchBar,
+			inputBar,
 			content,
 			footer,
 		)
@@ -536,6 +660,11 @@ func (m Model) View() tea.View {
 			content,
 			footer,
 		)
+	}
+
+	// Add toast overlay if there are toasts
+	if m.toast.HasToasts() {
+		result = m.toast.Overlay(result)
 	}
 
 	v := tea.NewView(result)
