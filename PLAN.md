@@ -98,7 +98,7 @@ Create a production-ready, open-source Cobra CLI that:
 | 11.5 | Metrics Export | ✅ Complete |
 | 12 | Alias System | ✅ Complete |
 | 13 | Plugin System | ✅ Complete |
-| 14 | TUI Dashboard | ⏳ Pending |
+| 14 | TUI Dashboard | ✅ Complete |
 | 15 | Theme System | 🟡 Core done |
 | 16 | Shell Completions | 🟡 Basic done, dynamic TBD |
 | 17-25 | Advanced Features | ⏳ Pending |

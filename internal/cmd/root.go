@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -23,6 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
 	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/dash"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
@@ -179,6 +180,7 @@ func init() {
 	f := cmdutil.NewFactory()
 
 	// Add commands
+	rootCmd.AddCommand(dash.NewCommand(f))
 	rootCmd.AddCommand(discover.NewCommand(f))
 	rootCmd.AddCommand(device.NewCommand(f))
 	rootCmd.AddCommand(group.NewCommand(f))
@@ -253,7 +255,7 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 	// Handle color settings
 	// Priority: --no-color flag > NO_COLOR env > SHELLY_NO_COLOR env
 	if shouldDisableColor() {
-		lipgloss.SetColorProfile(termenv.Ascii)
+		lipgloss.Writer.Profile = colorprofile.Ascii
 	}
 
 	return nil
