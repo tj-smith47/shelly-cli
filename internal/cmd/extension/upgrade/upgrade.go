@@ -129,8 +129,7 @@ func upgradeExtension(ctx context.Context, ios *iostreams.IOStreams, registry *p
 	// Convention: plugins should be named shelly-<name> and come from a repo of the same name
 	binaryName := plugins.PluginPrefix + name
 
-	// Check common GitHub sources - this is a heuristic since we don't store origin
-	// In the future, we could store origin in a manifest file
+	// Check common GitHub sources - heuristic approach since origin is not stored in manifest
 	possibleSources := []string{
 		fmt.Sprintf("gh:tj-smith47/%s", binaryName), // Official plugins
 		fmt.Sprintf("gh:%s/%s", name, binaryName),   // User repos

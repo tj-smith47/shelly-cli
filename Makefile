@@ -1,4 +1,4 @@
-.PHONY: build install test test-coverage lint fmt generate clean completions docs release-local help
+.PHONY: build install test test-coverage lint fmt generate clean completions docs release-local audit check help
 
 # Build variables
 BINARY_NAME := shelly
@@ -36,10 +36,14 @@ test-coverage:
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
-## lint: Run golangci-lint
+## lint: Run golangci-lint (supports FILE= for single file)
 lint:
 	@echo "Running linter..."
+ifdef FILE
+	@golangci-lint run --timeout 5m $(FILE)
+else
 	@golangci-lint run --timeout 5m
+endif
 
 ## fmt: Format code
 fmt:
@@ -87,8 +91,19 @@ deps:
 	@go mod download
 	@go mod tidy
 
-## check: Run all checks (lint, test)
-check: lint test
+## audit: Run compliance audit (RULES.md enforcement)
+audit:
+	@echo "Running compliance audit..."
+	@./scripts/audit-compliance.sh
+
+## check: Run all checks (lint, then compliance audit)
+check:
+ifdef FILE
+	@$(MAKE) lint FILE=$(FILE)
+else
+	@$(MAKE) lint
+endif
+	@$(MAKE) audit
 
 ## help: Show this help message
 help:

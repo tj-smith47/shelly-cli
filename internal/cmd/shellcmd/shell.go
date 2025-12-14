@@ -14,7 +14,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -80,9 +79,7 @@ type shellState struct {
 // run executes the device shell.
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
-
-	// Create service
-	svc := shelly.NewService()
+	svc := opts.Factory.ShellyService()
 
 	// Connect to device
 	ios.Info("Connecting to %s...", opts.Device)

@@ -28,8 +28,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "Import theme from file",
 		Long: `Import a theme configuration from a file.
 
-Currently supports importing theme files that reference built-in themes.
-Custom theme definitions will be supported in a future version.`,
+Supports importing theme files that reference any of the 280+ built-in themes.`,
 		Example: `  # Import and apply a theme
   shelly theme import mytheme.yaml --apply
 

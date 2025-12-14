@@ -105,8 +105,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Info("Type 'help' for available commands, 'exit' to quit")
 	ios.Println()
 
-	// Create service
-	svc := shelly.NewService()
+	svc := opts.Factory.ShellyService()
 
 	state := &replState{
 		activeDevice: opts.Device,

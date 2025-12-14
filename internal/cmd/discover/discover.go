@@ -84,9 +84,11 @@ func runDiscover(ctx context.Context, f *cmdutil.Factory, timeout time.Duration,
 		}
 	}()
 
-	// Use context for cancellation support
-	_ = ctx // TODO: Pass context to discoverer when shelly-go supports it
-	devices, err := mdnsDiscoverer.Discover(timeout)
+	// Create context with timeout for discovery
+	discoverCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	devices, err := mdnsDiscoverer.DiscoverWithContext(discoverCtx)
 	ios.StopProgress()
 
 	if err != nil {
