@@ -32,13 +32,22 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 By default, toggles switch component 0 on each device.
 Use --switch to specify a different component ID.
 
-Devices can be specified by name directly, by group membership,
-or by using --all to target all registered devices.`,
-		Example: `  # Toggle all devices in a group
-  shelly batch toggle --group living-room
+Target devices can be specified multiple ways:
+  - As arguments: device names or addresses
+  - Via stdin: pipe device names (one per line or space-separated)
+  - Via group: --group flag targets all devices in a group
+  - Via all: --all flag targets all registered devices
 
-  # Toggle specific devices
+Priority: explicit args > stdin > group > all
+
+Stdin input supports comments (lines starting with #) and
+blank lines are ignored, making it easy to use device lists
+from files or other commands.`,
+		Example: `  # Toggle specific devices
   shelly batch toggle light-1 light-2
+
+  # Toggle all devices in a group
+  shelly batch toggle --group living-room
 
   # Toggle all registered devices
   shelly batch toggle --all
@@ -47,7 +56,16 @@ or by using --all to target all registered devices.`,
   shelly batch toggle --group bedroom --switch 1
 
   # Control concurrency and timeout
-  shelly batch toggle --all --concurrent 10 --timeout 30s`,
+  shelly batch toggle --all --concurrent 10 --timeout 30s
+
+  # Pipe device names from a file
+  cat devices.txt | shelly batch toggle
+
+  # Pipe from device list command
+  shelly device list -o json | jq -r '.[].name' | shelly batch toggle
+
+  # Toggle only Gen2+ devices
+  shelly device list -o json | jq -r '.[] | select(.generation >= 2) | .name' | shelly batch toggle`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := helpers.ResolveBatchTargets(groupName, all, args)
 			if err != nil {

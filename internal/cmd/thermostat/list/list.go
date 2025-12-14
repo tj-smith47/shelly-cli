@@ -31,13 +31,35 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List thermostats",
 		Long: `List all thermostat components on a Shelly device.
 
-Shows basic information about each thermostat including its ID
-and current enabled state.`,
+Thermostat components are typically found on Shelly BLU TRV (Thermostatic
+Radiator Valve) devices connected via BLU Gateway. Each thermostat has
+an ID, enabled state, and target temperature.
+
+Use 'shelly thermostat status' for detailed readings including current
+temperature. Use 'shelly thermostat set' to adjust target temperature.
+
+Output is formatted as styled text by default. Use --json for
+structured output suitable for scripting.`,
 		Example: `  # List thermostats
   shelly thermostat list gateway
 
   # Output as JSON
-  shelly thermostat list gateway --json`,
+  shelly thermostat list gateway --json
+
+  # Get enabled thermostats only
+  shelly thermostat list gateway --json | jq '.[] | select(.enabled == true)'
+
+  # Get target temperatures
+  shelly thermostat list gateway --json | jq '.[] | {id, target_c}'
+
+  # Find thermostats set above 22°C
+  shelly thermostat list gateway --json | jq '.[] | select(.target_c > 22)'
+
+  # Count active thermostats
+  shelly thermostat list gateway --json | jq '[.[] | select(.enabled)] | length'
+
+  # Short form
+  shelly thermostat ls gateway`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -30,18 +30,42 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Turn off multiple devices simultaneously.
 
 By default, turns off switch component 0 on each device.
-Use --switch to specify a different component ID.`,
-		Example: `  # Turn off all devices in a group
-  shelly batch off --group living-room
+Use --switch to specify a different component ID.
 
-  # Turn off specific devices
+Target devices can be specified multiple ways:
+  - As arguments: device names or addresses
+  - Via stdin: pipe device names (one per line or space-separated)
+  - Via group: --group flag targets all devices in a group
+  - Via all: --all flag targets all registered devices
+
+Priority: explicit args > stdin > group > all
+
+Stdin input supports comments (lines starting with #) and
+blank lines are ignored, making it easy to use device lists
+from files or other commands.`,
+		Example: `  # Turn off specific devices
   shelly batch off light-1 light-2
+
+  # Turn off all devices in a group
+  shelly batch off --group living-room
 
   # Turn off all registered devices
   shelly batch off --all
 
   # Turn off switch 1 on all devices in group
-  shelly batch off --group bedroom --switch 1`,
+  shelly batch off --group bedroom --switch 1
+
+  # Control concurrency and timeout
+  shelly batch off --all --concurrent 10 --timeout 30s
+
+  # Pipe device names from a file
+  cat devices.txt | shelly batch off
+
+  # Pipe from device list command
+  shelly device list -o json | jq -r '.[].name' | shelly batch off
+
+  # Turn off only devices that are currently on
+  shelly device list -o json | jq -r '.[] | select(.online) | .name' | shelly batch off`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := helpers.ResolveBatchTargets(groupName, all, args)
 			if err != nil {

@@ -20,12 +20,40 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Use:     "list <device>",
 		Aliases: []string{"ls", "l"},
 		Short:   "List cover components",
-		Long:    `List all cover/roller components on the specified device with their current status.`,
+		Long: `List all cover/roller components on the specified device with their current status.
+
+Cover components control motorized blinds, shutters, and garage doors. Each
+cover has an ID, optional name, state (open/closed/opening/closing/stopped),
+position (percentage), and power consumption if supported.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: ID, Name, State, Position (%), Power (watts)`,
 		Example: `  # List all covers on a device
   shelly cover list bedroom
 
   # List covers with JSON output
-  shelly cv ls bedroom -o json`,
+  shelly cover list bedroom -o json
+
+  # Get covers that are fully open
+  shelly cover list bedroom -o json | jq '.[] | select(.current_pos == 100)'
+
+  # Find covers currently in motion
+  shelly cover list bedroom -o json | jq '.[] | select(.state == "opening" or .state == "closing")'
+
+  # Get position of all covers
+  shelly cover list bedroom -o json | jq '.[] | {id, position: .current_pos}'
+
+  # Check cover positions across multiple devices
+  for dev in bedroom living-room; do
+    echo "=== $dev ==="
+    shelly cover list "$dev" --no-color
+  done
+
+  # Short forms
+  shelly cover ls bedroom
+  shelly cv ls bedroom`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -22,9 +22,28 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List scripts on a device",
 		Long: `List all scripts on a Gen2+ Shelly device.
 
-Shows script ID, name, enabled status, and running status.`,
+Shows script ID, name, enabled status, and running status. Scripts are
+user-programmable JavaScript code that runs directly on the device for
+automation and custom logic.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: ID, Name, Enabled (yes/no), Running (running/stopped)`,
 		Example: `  # List all scripts
-  shelly script list living-room`,
+  shelly script list living-room
+
+  # Output as JSON
+  shelly script list living-room -o json
+
+  # Get IDs of running scripts
+  shelly script list living-room -o json | jq -r '.[] | select(.running) | .id'
+
+  # Check if any script is running
+  shelly script list living-room -o json | jq -e 'any(.running)' > /dev/null && echo "Scripts running"
+
+  # Short form
+  shelly script ls living-room`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -17,24 +17,43 @@ import (
 
 // NewCommand creates the scene list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var outputFormat string
-
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List saved scenes",
-		Long:    `List all saved scenes with their action counts and descriptions.`,
+		Long: `List all saved scenes with their action counts and descriptions.
+
+Scenes are collections of device actions that can be executed together.
+Each scene contains one or more actions targeting specific devices.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: Name, Actions (count), Description`,
 		Example: `  # List all scenes
   shelly scene list
 
   # Output as JSON
-  shelly scene list -o json`,
+  shelly scene list -o json
+
+  # Output as YAML for backup
+  shelly scene list -o yaml > scenes-backup.yaml
+
+  # Get scene names only
+  shelly scene list -o json | jq -r '.[].name'
+
+  # Find scenes with no actions
+  shelly scene list -o json | jq '.[] | select(.actions | length == 0)'
+
+  # Count total actions across all scenes
+  shelly scene list -o json | jq '[.[].actions | length] | add'
+
+  # Short form
+  shelly scene ls`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd)
 		},
 	}
-
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format (table, json, yaml)")
 
 	return cmd
 }

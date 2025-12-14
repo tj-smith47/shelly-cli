@@ -22,15 +22,39 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `List all available color themes.
 
 The CLI includes 280+ themes from bubbletint. Use --filter to search
-for themes by name.`,
+for themes by name pattern (case-insensitive).
+
+Use 'shelly theme set <name>' to apply a theme.
+Use 'shelly theme preview <name>' to see a theme before applying.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: Theme (name), Current (checkmark if active)`,
 		Example: `  # List all themes
   shelly theme list
 
-  # Filter themes by name
+  # Filter themes by name pattern
   shelly theme list --filter dark
+  shelly theme list --filter nord
 
   # Output as JSON
-  shelly theme list -o json`,
+  shelly theme list -o json
+
+  # Get theme names only
+  shelly theme list -o json | jq -r '.[].id'
+
+  # Find current theme
+  shelly theme list -o json | jq -r '.[] | select(.current) | .id'
+
+  # Count themes matching pattern
+  shelly theme list --filter monokai -o json | jq length
+
+  # Random theme selection
+  shelly theme set "$(shelly theme list -o json | jq -r '.[].id' | shuf -n1)"
+
+  # Short form
+  shelly theme ls`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return run(f, filter)
 		},

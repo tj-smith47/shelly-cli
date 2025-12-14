@@ -19,13 +19,34 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List installed extensions",
 		Long: `List installed extensions.
 
+Extensions are external plugins that add new commands to the CLI. They
+are standalone executables named 'shelly-*' that can be installed from
+git repositories or created locally.
+
 By default, only shows extensions installed in the user plugins directory.
-Use --all to show all discovered extensions including those in PATH.`,
+Use --all to show all discovered extensions including those in PATH.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: Name, Version, Path`,
 		Example: `  # List installed extensions
   shelly extension list
 
   # List all discovered extensions
-  shelly extension list --all`,
+  shelly extension list --all
+
+  # Output as JSON
+  shelly extension list -o json
+
+  # Get extension names only
+  shelly extension list -o json | jq -r '.[].name'
+
+  # Find extensions without versions
+  shelly extension list -o json | jq '.[] | select(.version == "")'
+
+  # Short form
+  shelly ext ls`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return run(f, all)
 		},

@@ -29,10 +29,17 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Use:     "list <device>",
 		Aliases: []string{"ls", "l"},
 		Short:   "List KVS keys",
-		Long: `List all keys stored in the device's Key-Value Storage.
+		Long: `List all keys stored in the device's Key-Value Storage (KVS).
+
+KVS provides persistent storage on Gen2+ devices for scripts and user
+data. Keys are strings and values can be strings, numbers, or booleans.
+Data persists across reboots and firmware updates.
 
 By default, only key names are listed. Use --values to also show
-the stored values.`,
+the stored values. Use --match for wildcard filtering.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.`,
 		Example: `  # List all keys
   shelly kvs list living-room
 
@@ -42,8 +49,20 @@ the stored values.`,
   # List keys matching a pattern
   shelly kvs list living-room --match "sensor_*"
 
-  # Output as JSON
-  shelly kvs list living-room -o json`,
+  # Output as JSON for scripting
+  shelly kvs list living-room -o json
+
+  # Get all values as JSON
+  shelly kvs list living-room --values -o json
+
+  # Export all KVS data to backup file
+  shelly kvs list living-room --values -o json > kvs-backup.json
+
+  # Find string-type keys only
+  shelly kvs list living-room --values -o json | jq '.[] | select(.type == "string")'
+
+  # Short form
+  shelly kvs ls living-room`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

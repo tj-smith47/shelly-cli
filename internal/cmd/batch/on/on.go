@@ -32,13 +32,22 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 By default, turns on switch component 0 on each device.
 Use --switch to specify a different component ID.
 
-Devices can be specified by name directly, by group membership,
-or by using --all to target all registered devices.`,
-		Example: `  # Turn on all devices in a group
-  shelly batch on --group living-room
+Target devices can be specified multiple ways:
+  - As arguments: device names or addresses
+  - Via stdin: pipe device names (one per line or space-separated)
+  - Via group: --group flag targets all devices in a group
+  - Via all: --all flag targets all registered devices
 
-  # Turn on specific devices
+Priority: explicit args > stdin > group > all
+
+Stdin input supports comments (lines starting with #) and
+blank lines are ignored, making it easy to use device lists
+from files or other commands.`,
+		Example: `  # Turn on specific devices
   shelly batch on light-1 light-2
+
+  # Turn on all devices in a group
+  shelly batch on --group living-room
 
   # Turn on all registered devices
   shelly batch on --all
@@ -47,7 +56,19 @@ or by using --all to target all registered devices.`,
   shelly batch on --group bedroom --switch 1
 
   # Control concurrency and timeout
-  shelly batch on --all --concurrent 10 --timeout 30s`,
+  shelly batch on --all --concurrent 10 --timeout 30s
+
+  # Pipe device names from a file
+  cat devices.txt | shelly batch on
+
+  # Pipe from device list command
+  shelly device list -o json | jq -r '.[].name' | shelly batch on
+
+  # Turn on only Gen2+ devices
+  shelly device list -o json | jq -r '.[] | select(.generation >= 2) | .name' | shelly batch on
+
+  # Combine with grep to filter by model
+  shelly device list -o json | jq -r '.[] | select(.model | contains("Plus")) | .name' | shelly batch on`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := helpers.ResolveBatchTargets(groupName, all, args)
 			if err != nil {

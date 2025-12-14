@@ -20,12 +20,29 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `List all energy monitoring components (EM/EM1) on a device.
 
 Shows component IDs and types for all energy monitors found on the device.
-EM components are 3-phase monitors, EM1 components are single-phase.`,
+EM components are 3-phase monitors (Shelly Pro 3EM, etc.), EM1 components
+are single-phase monitors (Shelly EM, Shelly Plus 1PM, etc.).
+
+Use 'shelly energy status' with a component ID to get real-time readings.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: ID, Type`,
 		Example: `  # List energy monitoring components on a device
   shelly energy list shelly-3em-pro
 
   # Output as JSON for scripting
-  shelly energy list shelly-3em-pro -o json`,
+  shelly energy list shelly-3em-pro -o json
+
+  # Get IDs of 3-phase monitors
+  shelly energy list shelly-3em-pro -o json | jq -r '.[] | select(.type | contains("3-phase")) | .id'
+
+  # Count total energy components
+  shelly energy list shelly-3em-pro -o json | jq length
+
+  # Short form
+  shelly energy ls shelly-3em-pro`,
 		Aliases:           []string{"ls"},
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),

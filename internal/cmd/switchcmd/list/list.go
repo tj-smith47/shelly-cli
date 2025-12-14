@@ -20,12 +20,39 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Use:     "list <device>",
 		Aliases: []string{"ls", "l"},
 		Short:   "List switch components",
-		Long:    `List all switch components on the specified device with their current status.`,
+		Long: `List all switch components on the specified device with their current status.
+
+Switch components control relay outputs (on/off). Each switch has an ID,
+optional name, current state (ON/OFF), and power consumption if supported.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: ID, Name, State (ON/OFF), Power (watts)`,
 		Example: `  # List all switches on a device
   shelly switch list kitchen
 
   # List switches with JSON output
-  shelly switch ls kitchen -o json`,
+  shelly switch list kitchen -o json
+
+  # Get switches that are currently ON
+  shelly switch list kitchen -o json | jq '.[] | select(.output == true)'
+
+  # Calculate total power consumption
+  shelly switch list kitchen -o json | jq '[.[].power] | add'
+
+  # Get switch IDs only
+  shelly switch list kitchen -o json | jq -r '.[].id'
+
+  # Check all switches across multiple devices
+  for dev in kitchen bedroom living-room; do
+    echo "=== $dev ==="
+    shelly switch list "$dev" --no-color
+  done
+
+  # Short forms
+  shelly switch ls kitchen
+  shelly sw ls kitchen`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

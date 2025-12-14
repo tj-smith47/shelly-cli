@@ -33,7 +33,18 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Send a raw RPC command to multiple devices simultaneously.
 
 The method is the RPC method name (e.g., "Switch.Set", "Shelly.GetStatus").
-Params should be a JSON object (e.g., '{"id":0,"on":true}').`,
+Params should be a JSON object (e.g., '{"id":0,"on":true}').
+
+Target devices can be specified multiple ways:
+  - As arguments: device names or addresses after the method/params
+  - Via stdin: pipe device names (one per line or space-separated)
+  - Via group: --group flag targets all devices in a group
+  - Via all: --all flag targets all registered devices
+
+Priority: explicit args > stdin > group > all
+
+Results are output as JSON or YAML (use -o yaml). Each result includes
+the device name and either the response or error message.`,
 		Example: `  # Get status from all devices in a group
   shelly batch command "Shelly.GetStatus" --group living-room
 
@@ -44,7 +55,23 @@ Params should be a JSON object (e.g., '{"id":0,"on":true}').`,
   shelly batch command "Light.Set" '{"id":0,"brightness":50}' --all
 
   # Using alias
-  shelly batch rpc "Switch.Toggle" '{"id":0}' --group bedroom`,
+  shelly batch rpc "Switch.Toggle" '{"id":0}' --group bedroom
+
+  # Output as YAML
+  shelly batch command "Shelly.GetDeviceInfo" --all -o yaml
+
+  # Pipe device names from a file
+  cat devices.txt | shelly batch command "Shelly.GetStatus"
+
+  # Pipe from device list command
+  shelly device list -o json | jq -r '.[].name' | shelly batch command "Shelly.Reboot"
+
+  # Get status of Gen2+ devices and extract uptime
+  shelly device list -o json | jq -r '.[] | select(.generation >= 2) | .name' | \
+    shelly batch command "Shelly.GetStatus" | jq '.[] | {device, uptime: .response.sys.uptime}'
+
+  # Check firmware versions across all devices
+  shelly batch command "Shelly.GetDeviceInfo" --all | jq '.[] | {device, fw: .response.fw_id}'`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			method := args[0]

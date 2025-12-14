@@ -32,18 +32,37 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 If no subnet is provided, attempts to detect the local network.
 This method is slower than mDNS or CoIoT but works when multicast
-is blocked or devices are on different VLANs.`,
-		Example: `  # Scan default network
+is blocked or devices are on different VLANs.
+
+The scan probes each IP address in the subnet range for Shelly device
+HTTP endpoints. Progress is shown in real-time. Discovered devices
+can be automatically registered with --register.
+
+Use --skip-existing (enabled by default) to avoid re-registering
+devices that are already in your registry.
+
+Output is formatted as a table showing: ID, Address, Model, Generation,
+Protocol, and Auth status.`,
+		Example: `  # Scan default network (auto-detect)
   shelly discover scan
 
   # Scan specific subnet
   shelly discover scan 192.168.1.0/24
 
+  # Scan a /16 network (large, use longer timeout)
+  shelly discover scan 10.0.0.0/16 --timeout 30m
+
   # Auto-register discovered devices
   shelly discover scan --register
 
   # Scan with custom timeout
-  shelly discover scan --timeout 5m`,
+  shelly discover scan --timeout 5m
+
+  # Force re-register all discovered devices
+  shelly discover scan --register --skip-existing=false
+
+  # Combine flags for initial network setup
+  shelly discover scan 192.168.1.0/24 --register --timeout 10m`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			subnet := ""

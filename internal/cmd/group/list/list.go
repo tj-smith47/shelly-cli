@@ -3,41 +3,14 @@ package list
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
-
-// NewCommand creates the group list command.
-func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var outputFormat string
-
-	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List all device groups",
-		Long:    `List all device groups and their member counts.`,
-		Example: `  # List all groups
-  shelly group list
-
-  # Output as JSON
-  shelly group list --output json
-
-  # Short form
-  shelly grp ls`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(outputFormat)
-		},
-	}
-
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format: table, json, yaml")
-
-	return cmd
-}
 
 // GroupInfo represents a group for JSON/YAML output.
 type GroupInfo struct {
@@ -46,26 +19,57 @@ type GroupInfo struct {
 	Devices     []string `json:"devices" yaml:"devices"`
 }
 
-func run(outputFormat string) error {
+// NewCommand creates the group list command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List all device groups",
+		Long: `List all device groups and their member counts.
+
+Groups allow organizing devices for batch operations. Each group can
+contain multiple devices, and devices can belong to multiple groups.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: Name, Devices (count)`,
+		Example: `  # List all groups
+  shelly group list
+
+  # Output as JSON
+  shelly group list -o json
+
+  # Get names of groups containing devices
+  shelly group list -o json | jq -r '.[] | select(.device_count > 0) | .name'
+
+  # List devices in all groups
+  shelly group list -o json | jq -r '.[] | "\(.name): \(.devices | join(", "))"'
+
+  # Count total groups
+  shelly group list -o json | jq length
+
+  # Short form
+  shelly grp ls`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return run(f)
+		},
+	}
+
+	return cmd
+}
+
+func run(f *cmdutil.Factory) error {
+	ios := f.IOStreams()
 	groups := config.ListGroups()
 
 	if len(groups) == 0 {
-		iostreams.Info("No groups defined")
-		iostreams.Info("Use 'shelly group create <name>' to create a group")
+		ios.Info("No groups defined")
+		ios.Info("Use 'shelly group create <name>' to create a group")
 		return nil
 	}
 
-	switch outputFormat {
-	case "json":
-		return outputJSON(groups)
-	case "yaml":
-		return outputYAML(groups)
-	default:
-		return outputTable(groups)
-	}
-}
-
-func outputJSON(groups map[string]config.Group) error {
+	// Build sorted list for consistent output
 	result := make([]GroupInfo, 0, len(groups))
 	for name, group := range groups {
 		result = append(result, GroupInfo{
@@ -74,31 +78,25 @@ func outputJSON(groups map[string]config.Group) error {
 			Devices:     group.Devices,
 		})
 	}
-	return output.PrintJSON(result)
-}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
 
-func outputYAML(groups map[string]config.Group) error {
-	result := make([]GroupInfo, 0, len(groups))
-	for name, group := range groups {
-		result = append(result, GroupInfo{
-			Name:        name,
-			DeviceCount: len(group.Devices),
-			Devices:     group.Devices,
-		})
+	// Handle structured output (JSON/YAML) via global -o flag
+	if cmdutil.WantsStructured() {
+		return cmdutil.FormatOutput(ios, result)
 	}
-	return output.PrintYAML(result)
-}
 
-func outputTable(groups map[string]config.Group) error {
+	// Table output
 	table := output.NewTable("Name", "Devices")
-
-	for name, group := range groups {
-		count := len(group.Devices)
-		table.AddRow(name, formatDeviceCount(count))
+	for _, g := range result {
+		table.AddRow(g.Name, formatDeviceCount(g.DeviceCount))
 	}
 
-	table.Print()
-	iostreams.Count("group", len(groups))
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+	ios.Count("group", len(result))
 
 	return nil
 }

@@ -23,12 +23,34 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List webhooks",
 		Long: `List all configured webhooks for a device.
 
-Displays webhook ID, event type, URLs, and enabled status.`,
+Webhooks are HTTP callbacks triggered by device events (button press,
+switch state change, etc.). Each webhook has an event type, target URL(s),
+and can be enabled or disabled.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: ID, Event, URLs (truncated if long), Enabled (Yes/No)`,
 		Example: `  # List all webhooks
   shelly webhook list living-room
 
-  # Output as JSON
-  shelly webhook list living-room -o json`,
+  # Output as JSON for scripting
+  shelly webhook list living-room -o json
+
+  # Get enabled webhooks only
+  shelly webhook list living-room -o json | jq '.[] | select(.enable == true)'
+
+  # Extract just webhook URLs
+  shelly webhook list living-room -o json | jq -r '.[].urls[]'
+
+  # Find webhooks for specific event
+  shelly webhook list living-room -o json | jq '.[] | select(.event | contains("switch"))'
+
+  # Count webhooks by event type
+  shelly webhook list living-room -o json | jq 'group_by(.event) | map({event: .[0].event, count: length})'
+
+  # Short form
+  shelly webhook ls living-room`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

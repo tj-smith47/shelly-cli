@@ -19,12 +19,31 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List configuration templates",
 		Long: `List all saved configuration templates.
 
-Shows template name, model compatibility, and creation date.`,
+Templates are snapshots of device configuration that can be applied to
+other devices of the same model. They're useful for provisioning multiple
+devices with identical settings or backing up specific configurations.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: Name, Model, Gen, Source (device), Created`,
 		Example: `  # List all templates
   shelly template list
 
   # Output as JSON
-  shelly template list -o json`,
+  shelly template list -o json
+
+  # Find templates for a specific model
+  shelly template list -o json | jq '.[] | select(.model | contains("Plus"))'
+
+  # Get template names only
+  shelly template list -o json | jq -r '.[].name'
+
+  # Export templates list to backup file
+  shelly template list -o yaml > templates-list.yaml
+
+  # Short form
+  shelly template ls`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(f)

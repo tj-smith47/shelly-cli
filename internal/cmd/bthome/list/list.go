@@ -33,13 +33,38 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List BTHome devices",
 		Long: `List all BTHome devices connected to a Shelly gateway.
 
-Shows configured BTHomeDevice and BTHomeSensor components with their
-current status, signal strength, and battery level.`,
+BTHome is a Bluetooth Low Energy (BLE) protocol for sensors and devices.
+Shelly BLU sensors (motion, door/window, button) connect to a gateway
+device that collects their readings.
+
+Shows configured BTHomeDevice components with their current status,
+signal strength (RSSI), battery level, and last update time.
+
+Use 'shelly bthome add' to discover and pair new devices.
+Use 'shelly bthome sensors' to view sensor readings.
+
+Output is formatted as styled text by default. Use --json for
+structured output suitable for scripting.`,
 		Example: `  # List all BTHome devices
   shelly bthome list living-room
 
   # Output as JSON
-  shelly bthome list living-room --json`,
+  shelly bthome list living-room --json
+
+  # Get devices with low battery
+  shelly bthome list living-room --json | jq '.[] | select(.battery != null and .battery < 20)'
+
+  # Find devices with weak signal
+  shelly bthome list living-room --json | jq '.[] | select(.rssi != null and .rssi < -80)'
+
+  # Get device addresses (MAC)
+  shelly bthome list living-room --json | jq -r '.[].addr'
+
+  # List device names and IDs
+  shelly bthome list living-room --json | jq '.[] | {name, id}'
+
+  # Short form
+  shelly bthome ls living-room`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

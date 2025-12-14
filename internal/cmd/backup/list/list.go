@@ -16,8 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-var formatFlag string
-
 // NewCommand creates the backup list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
@@ -26,8 +24,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List saved backups",
 		Long: `List backup files in a directory.
 
-By default, looks in the config directory's backups folder.
-You can specify a different directory as an argument.`,
+By default, looks in the config directory's backups folder. Backup files
+contain full device configuration snapshots that can be used to restore
+device settings or migrate configurations between devices.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.
+
+Columns: Filename, Device, Model, Created, Encrypted, Size`,
 		Example: `  # List backups in default location
   shelly backup list
 
@@ -35,7 +39,16 @@ You can specify a different directory as an argument.`,
   shelly backup list /path/to/backups
 
   # Output as JSON
-  shelly backup list --format json`,
+  shelly backup list -o json
+
+  # Find backups for a specific device model
+  shelly backup list -o json | jq '.[] | select(.device_model | contains("Plus"))'
+
+  # Get most recent backup filename
+  shelly backup list -o json | jq -r 'sort_by(.created_at) | last | .filename'
+
+  # Short form
+  shelly backup ls`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			dir := ""
@@ -45,8 +58,6 @@ You can specify a different directory as an argument.`,
 			return run(f, dir)
 		},
 	}
-
-	cmd.Flags().StringVarP(&formatFlag, "format", "f", "table", "Output format (table, json, yaml)")
 
 	return cmd
 }
@@ -149,15 +160,14 @@ func isBackupFile(name string) bool {
 }
 
 func outputBackups(ios *iostreams.IOStreams, backups []backupFileInfo) error {
-	switch formatFlag {
-	case "json":
-		return output.JSON(ios.Out, backups)
-	case "yaml", "yml":
-		return output.YAML(ios.Out, backups)
-	default:
-		printBackupsTable(ios, backups)
-		return nil
+	// Handle structured output (JSON/YAML) via global -o flag
+	if cmdutil.WantsStructured() {
+		return cmdutil.FormatOutput(ios, backups)
 	}
+
+	// Default table output
+	printBackupsTable(ios, backups)
+	return nil
 }
 
 func parseBackupFile(filePath string) (backupFileInfo, error) {
