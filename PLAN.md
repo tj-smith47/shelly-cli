@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-13 | **Current Phase:** 12 - Alias System | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 13 - Plugin System | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -96,7 +96,7 @@ Create a production-ready, open-source Cobra CLI that:
 | 11.1-11.3 | Monitoring (status, energy, power) | ✅ Complete |
 | 11.4 | Energy Dashboard | ✅ Complete |
 | 11.5 | Metrics Export | ✅ Complete |
-| 12 | Alias System | 🟡 Core done |
+| 12 | Alias System | ✅ Complete |
 | 13 | Plugin System | 🟡 Core done |
 | 14 | TUI Dashboard | ⏳ Pending |
 | 15 | Theme System | 🟡 Core done |
@@ -980,22 +980,32 @@ shelly-cli/
 
 ---
 
-## Phase 12: Alias System (gh-style)
+## Phase 12: Alias System (gh-style) ✅
 
-### 12.1 Alias Commands
-- [x] `shelly alias list` - List all aliases
-- [x] `shelly alias set <name> <command>` - Create alias
-- [x] `shelly alias delete <name>` - Delete alias
-- [x] `shelly alias import <file>` - Import aliases from file
-- [x] `shelly alias export <file>` - Export aliases to file
+### 12.1 Alias Commands ✅
+- [x] `shelly alias list` - List all aliases (aliases: ls, l)
+  - Supports JSON/YAML output formats
+  - Table display with name, command, type columns
+- [x] `shelly alias set <name> <command>` - Create alias (aliases: add, create)
+  - Supports `--shell` flag for shell aliases
+  - Auto-detects `!` prefix for shell commands
+- [x] `shelly alias delete <name>` - Delete alias (aliases: del, rm, remove)
+- [x] `shelly alias import <file>` - Import aliases from YAML file (alias: load)
+  - Supports `--merge` to skip existing aliases
+- [x] `shelly alias export [file]` - Export aliases to YAML file (aliases: save, dump)
+  - Outputs to stdout if no file specified
 
 ### 12.2 Device Aliases
-- [ ] `shelly alias device <name> <target>` - Alias device name (requires shelly-go)
+- [x] Device aliases handled via device registration (`shelly device add <name> <address>`)
+  - No separate command needed - device names ARE the aliases
 
-### 12.3 Alias Expansion
-- [x] Support argument interpolation with `$1`, `$2`, `$@`
+### 12.3 Alias Expansion ✅
+- [x] Support argument interpolation with `$1`, `$2`, `$@` (in config/aliases.go)
 - [x] Support shell command aliases (prefixed with `!`)
-- [ ] Implement alias expansion in command parsing (requires device commands)
+- [x] Implement alias expansion in command parsing (in root.go)
+  - Intercepts args before cobra processes them
+  - Expands command aliases and re-parses
+  - Shell aliases execute directly via $SHELL
 
 ---
 

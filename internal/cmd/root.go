@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/charmbracelet/lipgloss"
@@ -14,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/alias"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch"
@@ -69,6 +72,17 @@ func execute() int {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	// Expand aliases before cobra processes the command
+	expandedArgs, isShell := expandAlias(os.Args[1:])
+
+	// Handle shell aliases by executing in shell
+	if isShell {
+		return executeShellAlias(expandedArgs)
+	}
+
+	// Set the expanded args for cobra to process
+	rootCmd.SetArgs(expandedArgs)
+
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		// Check if we were cancelled by signal
 		if ctx.Err() != nil {
@@ -77,6 +91,67 @@ func execute() int {
 		}
 		return 1
 	}
+	return 0
+}
+
+// expandAlias checks if the first argument is an alias and expands it.
+// Returns the expanded args and whether it's a shell alias.
+func expandAlias(args []string) (expandedArgs []string, isShell bool) {
+	if len(args) == 0 {
+		return args, false
+	}
+
+	// Load config to check for aliases (config may not be loaded yet)
+	cfg := config.Get()
+	if cfg == nil {
+		return args, false
+	}
+
+	// Check if first arg is an alias
+	aliasObj := cfg.GetAlias(args[0])
+	if aliasObj == nil {
+		return args, false
+	}
+
+	// Expand the alias with remaining arguments
+	expanded := config.ExpandAlias(*aliasObj, args[1:])
+
+	if aliasObj.Shell {
+		return []string{expanded}, true
+	}
+
+	// Split expanded command into args
+	expandedArgs = strings.Fields(expanded)
+	return expandedArgs, false
+}
+
+// executeShellAlias runs a shell alias command.
+func executeShellAlias(args []string) int {
+	if len(args) == 0 {
+		return 0
+	}
+
+	// Execute via shell
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+
+	//nolint:gosec // G204: args are from user-defined aliases in their own config
+	cmd := exec.CommandContext(context.Background(), shell, "-c", args[0])
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "Error executing shell alias: %v\n", err)
+		return 1
+	}
+
 	return 0
 }
 
@@ -129,6 +204,7 @@ func init() {
 	rootCmd.AddCommand(migrate.NewCommand(f))
 	rootCmd.AddCommand(monitor.NewCommand(f))
 	rootCmd.AddCommand(metrics.NewCommand(f))
+	rootCmd.AddCommand(alias.NewCommand(f))
 	rootCmd.AddCommand(versionCmd())
 }
 
