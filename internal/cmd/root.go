@@ -36,6 +36,7 @@ import (
 	exportcmd "github.com/tj-smith47/shelly-cli/internal/cmd/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/extension"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	initcmd "github.com/tj-smith47/shelly-cli/internal/cmd/init"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
@@ -331,6 +332,7 @@ func init() {
 	addCommandWithGroup(rootCmd, zigbee.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, lora.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, matter.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, gen1.NewCommand(f), groupConfig)
 
 	// Monitoring commands - status and metrics
 	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)

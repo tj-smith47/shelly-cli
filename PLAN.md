@@ -1487,9 +1487,9 @@ shelly-cli/
 
 ---
 
-## Phase 23: Gen1 Device Support
+## Phase 23: Gen1 Device Support ✅ Partial
 
-> **Note:** Gen1 devices use a different API than Gen2+. The shelly-go library provides full Gen1 support via the `gen1/` package.
+> **Note:** Gen1 devices use a different API than Gen2+. Uses direct HTTP REST API calls (Gen1 doesn't use RPC).
 
 ### 23.1 Gen1 Client Integration
 - [ ] Create `internal/client/gen1.go`:
@@ -1508,15 +1508,32 @@ shelly-cli/
   - `shelly light on/off/set/status` - Use Gen1 light API (Bulbs, Duo)
   - `shelly rgb set/status` - Use Gen1 color API (RGBW, Bulb)
 
-### 23.4 Gen1-Specific Commands
-- [ ] `shelly gen1 settings <device>` - Get/set Gen1 settings
-- [ ] `shelly gen1 actions <device>` - Manage Gen1 actions (URLs)
-- [ ] `shelly gen1 status <device>` - Full Gen1 status dump
+### 23.4 Gen1-Specific Commands ✅
+- [x] `shelly gen1 status <device>` - Full Gen1 status dump
+  - Aliases: st, info
+  - Flags: --json
+  - Shows WiFi, relays, meters, rollers, temperature, uptime from /status endpoint
+- [x] `shelly gen1 settings <device>` - Show Gen1 device settings
+  - Aliases: config, cfg
+  - Flags: --json
+  - Shows device info, name, firmware, cloud, CoIoT, MQTT, relay settings from /settings endpoint
+- [x] `shelly gen1 actions <device>` - List Gen1 action URLs
+  - Aliases: urls, webhooks
+  - Flags: --json
+  - Parses action URLs from relays and inputs in settings
 - [ ] `shelly gen1 ota <device>` - Gen1 OTA firmware update
 
 ### 23.5 CoIoT Real-time Updates
 - [ ] `shelly gen1 coiot <device>` - Subscribe to CoIoT updates
 - [ ] Integrate CoIoT into TUI monitoring view
+
+**Code Audit Notes (Phase 23):**
+- HTTP fetch pattern (`fetchSettings`, `fetchStatus`) duplicated across all gen1 commands
+- Similar address resolution, http:// prefix handling, auth setup, response body close pattern
+- **Recommended refactor:** Extract shared `gen1http` package with `FetchEndpoint(ctx, ios, device, path)` helper
+- Display helper functions follow consistent pattern: `display<Section>(ios, data)`
+- Type assertion pattern with `hasX` variables for errcheck compliance
+- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
 
 ---
 
