@@ -65,6 +65,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/togglecmd"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
@@ -305,6 +306,7 @@ func init() {
 	addCommandWithGroup(rootCmd, light.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, rgb.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, input.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, thermostat.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, batch.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, scene.NewCommand(f), groupControl)
 

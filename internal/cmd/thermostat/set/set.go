@@ -1,0 +1,133 @@
+// Package set provides the thermostat set command.
+package set
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/gen2/components"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+)
+
+// Options holds command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+	Target  float64
+	Mode    string
+	Enable  bool
+	Disable bool
+}
+
+// NewCommand creates the thermostat set command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
+	cmd := &cobra.Command{
+		Use:     "set <device>",
+		Aliases: []string{"config", "configure"},
+		Short:   "Set thermostat configuration",
+		Long: `Set thermostat configuration options.
+
+Allows setting:
+- Target temperature (--target)
+- Operating mode (--mode): heat, cool, or auto
+- Enable/disable state (--enable/--disable)`,
+		Example: `  # Set target temperature to 22°C
+  shelly thermostat set gateway --target 22
+
+  # Set mode to heat
+  shelly thermostat set gateway --mode heat
+
+  # Set target and mode together
+  shelly thermostat set gateway --target 21 --mode auto
+
+  # Enable thermostat
+  shelly thermostat set gateway --enable`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: cmdutil.CompleteDeviceNames(),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
+		},
+	}
+
+	cmd.Flags().IntVar(&opts.ID, "id", 0, "Thermostat component ID")
+	cmd.Flags().Float64Var(&opts.Target, "target", 0, "Target temperature in Celsius")
+	cmd.Flags().StringVar(&opts.Mode, "mode", "", "Operating mode (heat, cool, auto)")
+	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable thermostat")
+	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable thermostat")
+
+	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
+
+	return cmd
+}
+
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
+
+	// Validate that at least one option is set
+	if opts.Target == 0 && opts.Mode == "" && !opts.Enable && !opts.Disable {
+		return fmt.Errorf("at least one of --target, --mode, --enable, or --disable must be specified")
+	}
+
+	// Validate mode
+	validModes := map[string]bool{"heat": true, "cool": true, "auto": true, "": true}
+	if !validModes[opts.Mode] {
+		return fmt.Errorf("invalid mode %q, must be one of: heat, cool, auto", opts.Mode)
+	}
+
+	conn, err := svc.Connect(ctx, opts.Device)
+	if err != nil {
+		return fmt.Errorf("failed to connect to device: %w", err)
+	}
+	defer iostreams.CloseWithDebug("closing connection", conn)
+
+	thermostat := conn.Thermostat(opts.ID)
+
+	// Build config
+	config := &components.ThermostatConfig{}
+	changes := []string{}
+
+	if opts.Target > 0 {
+		config.TargetC = &opts.Target
+		changes = append(changes, fmt.Sprintf("target temperature: %.1f°C", opts.Target))
+	}
+
+	if opts.Mode != "" {
+		config.ThermostatMode = &opts.Mode
+		changes = append(changes, fmt.Sprintf("mode: %s", opts.Mode))
+	}
+
+	if opts.Enable {
+		enable := true
+		config.Enable = &enable
+		changes = append(changes, "enabled: true")
+	}
+
+	if opts.Disable {
+		disable := false
+		config.Enable = &disable
+		changes = append(changes, "enabled: false")
+	}
+
+	ios.StartProgress("Updating thermostat configuration...")
+	err = thermostat.SetConfig(ctx, config)
+	ios.StopProgress()
+
+	if err != nil {
+		return fmt.Errorf("failed to set thermostat config: %w", err)
+	}
+
+	ios.Success("Thermostat %d configuration updated", opts.ID)
+	for _, change := range changes {
+		ios.Printf("  • %s\n", change)
+	}
+
+	return nil
+}

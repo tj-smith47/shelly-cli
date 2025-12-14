@@ -138,6 +138,15 @@ func (c *Client) Input(id int) *InputComponent {
 	}
 }
 
+// Thermostat returns a thermostat component accessor.
+func (c *Client) Thermostat(id int) *ThermostatComponent {
+	return &ThermostatComponent{
+		th:  components.NewThermostat(c.rpcClient, id),
+		rpc: c.rpcClient,
+		id:  id,
+	}
+}
+
 // ListComponents returns all components on the device.
 func (c *Client) ListComponents(ctx context.Context) ([]model.Component, error) {
 	rpcResult, err := c.rpcClient.Call(ctx, "Shelly.GetComponents", map[string]any{})

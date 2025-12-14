@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 24 - Sensor Commands | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-14 | **Current Phase:** 26 - Documentation | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -106,7 +106,8 @@ Create a production-ready, open-source Cobra CLI that:
 | 21 | BTHome/Zigbee/LoRa Commands | ✅ Complete |
 | 22 | Matter Commands | ✅ Complete |
 | 23 | Gen1 Device Support | ✅ Complete |
-| 24-25 | Sensor/Thermostat Commands | ⏳ Pending |
+| 24 | Sensor Commands | ✅ Complete |
+| 25 | Thermostat Commands | ✅ Complete |
 | 26-27 | Documentation & Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
 | 29 | Innovative Commands (82 new) | ⏳ Pending |
@@ -1588,22 +1589,40 @@ shelly-cli/
 
 ---
 
-## Phase 25: Thermostat Commands
+## Phase 25: Thermostat Commands ✅
 
 > **Note:** Thermostat support via shelly-go `gen2/components/thermostat.go`.
 
-### 25.1 Thermostat Control
-- [ ] `shelly thermostat list <device>` - List thermostats
-- [ ] `shelly thermostat status <device> [id]` - Thermostat status
-- [ ] `shelly thermostat set <device> [id]` - Set thermostat
-  - Flags: `--target-temp`, `--mode`, `--enable`
-- [ ] `shelly thermostat enable <device> [id]` - Enable thermostat
-- [ ] `shelly thermostat disable <device> [id]` - Disable thermostat
+### 25.1 Thermostat Control ✅
+- [x] `shelly thermostat list <device>` - List thermostats
+  - Aliases: ls, l
+  - Flags: --json
+- [x] `shelly thermostat status <device>` - Thermostat status
+  - Aliases: st, show, info
+  - Flags: --id, --json
+  - Shows temperature, valve position, humidity, boost/override status
+- [x] `shelly thermostat set <device>` - Set thermostat configuration
+  - Aliases: config, configure
+  - Flags: --id, --target, --mode, --enable, --disable
+- [x] `shelly thermostat enable <device>` - Enable thermostat
+  - Aliases: on, start
+  - Flags: --id, --mode
+- [x] `shelly thermostat disable <device>` - Disable thermostat
+  - Aliases: off, stop
+  - Flags: --id
+- [x] `shelly thermostat boost <device>` - Activate boost mode
+  - Aliases: turbo, rapid
+  - Flags: --id, --duration, --cancel
+- [x] `shelly thermostat override <device>` - Override target temperature
+  - Aliases: temp-override, manual
+  - Flags: --id, --target, --duration, --cancel
+- [x] `shelly thermostat calibrate <device>` - Calibrate valve
+  - Aliases: cal
+  - Flags: --id
 
 ### 25.2 Thermostat Schedules
-- [ ] `shelly thermostat schedule list <device> [id]` - List schedules
-- [ ] `shelly thermostat schedule set <device> [id]` - Set schedule
-  - Interactive mode for schedule configuration
+- [ ] `shelly thermostat schedule list <device> [id]` - List schedules (deferred - requires schedule API)
+- [ ] `shelly thermostat schedule set <device> [id]` - Set schedule (deferred - requires schedule API)
 
 ---
 
