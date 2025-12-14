@@ -88,23 +88,6 @@ func TestRootCommand_Subcommands(t *testing.T) {
 	}
 }
 
-func TestVersionCmd(t *testing.T) {
-	t.Parallel()
-
-	cmd := versionCmd()
-	if cmd == nil {
-		t.Fatal("versionCmd() returned nil")
-	}
-
-	if cmd.Use != "version" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "version")
-	}
-
-	if cmd.Short == "" {
-		t.Error("Short description is empty")
-	}
-}
-
 func TestMust_NilError(t *testing.T) {
 	t.Parallel()
 

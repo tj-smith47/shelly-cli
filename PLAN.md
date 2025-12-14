@@ -1230,28 +1230,59 @@ shelly-cli/
 
 ---
 
-## Phase 18: KVS Commands (Gen2+)
+## Phase 18: KVS Commands (Gen2+) ✅ Complete
 
 ### 18.1 KVS Management
-- [ ] `shelly kvs list <device>` - List KVS keys
-- [ ] `shelly kvs get <device> <key>` - Get KVS value
-- [ ] `shelly kvs set <device> <key> <value>` - Set KVS value
-- [ ] `shelly kvs delete <device> <key>` - Delete KVS key
-- [ ] `shelly kvs export <device> <file>` - Export all KVS data
-- [ ] `shelly kvs import <device> <file>` - Import KVS data
+- [x] `shelly kvs list <device>` - List KVS keys
+  - Aliases: ls, l
+  - Flags: --values (show values), --match (pattern filter)
+- [x] `shelly kvs get <device> <key>` - Get KVS value
+  - Aliases: g, read
+  - Flags: --raw (output raw value only)
+- [x] `shelly kvs set <device> <key> <value>` - Set KVS value
+  - Aliases: s, write, put
+  - Flags: --null (set null value)
+  - Auto-parses JSON, numbers, booleans
+- [x] `shelly kvs delete <device> <key>` - Delete KVS key
+  - Aliases: del, rm, remove
+  - Flags: --yes (skip confirmation)
+- [x] `shelly kvs export <device> <file>` - Export all KVS data
+  - Aliases: exp, save, dump
+  - Flags: --format (json, yaml)
+- [x] `shelly kvs import <device> <file>` - Import KVS data
+  - Aliases: load, restore
+  - Flags: --overwrite, --dry-run, --yes
 
 ---
 
 ## Phase 19: Advanced Features from shelly-manager
 
-### 19.1 Configuration Templates
-- [ ] `shelly template list` - List config templates
-- [ ] `shelly template create <name>` - Create template from device
-- [ ] `shelly template apply <name> <device>` - Apply template
-  - Flags: --dry-run
-- [ ] `shelly template diff <name> <device>` - Compare template to device
-- [ ] `shelly template export <name> <file>` - Export template
-- [ ] `shelly template import <file>` - Import template
+### 19.1 Configuration Templates ✅ Complete
+- [x] `shelly template list` - List config templates
+  - Aliases: ls, l
+  - JSON/YAML output support
+- [x] `shelly template create <name> <device>` - Create template from device
+  - Aliases: new, save
+  - Flags: --description, --include-wifi, --force
+  - Captures device config with WiFi credentials sanitized by default
+- [x] `shelly template apply <template> <device>` - Apply template
+  - Aliases: set, push
+  - Flags: --dry-run, --yes
+  - Model compatibility warnings
+- [x] `shelly template diff <template> <device>` - Compare template to device
+  - Aliases: compare, cmp
+  - Shows configuration differences in table format
+- [x] `shelly template export <name> [file]` - Export template
+  - Aliases: save, dump
+  - Flags: --format (json, yaml)
+  - Auto-detects format from file extension
+- [x] `shelly template import <file> [name]` - Import template
+  - Aliases: load
+  - Flags: --force
+  - Validates required fields
+- [x] `shelly template delete <name>` - Delete template
+  - Aliases: del, rm, remove
+  - Flags: --yes
 
 ### 19.2 Export Formats
 - [ ] `shelly export json <device> [file]` - Export as JSON

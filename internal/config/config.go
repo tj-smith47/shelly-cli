@@ -39,6 +39,9 @@ type Config struct {
 	// Scenes
 	Scenes map[string]Scene `mapstructure:"scenes"`
 
+	// Templates
+	Templates map[string]Template `mapstructure:"templates"`
+
 	// Plugin settings
 	Plugins PluginsConfig `mapstructure:"plugins"`
 
@@ -149,6 +152,18 @@ type SceneAction struct {
 	Params map[string]any `mapstructure:"params,omitempty" json:"params,omitempty" yaml:"params,omitempty"`
 }
 
+// Template represents a device configuration template.
+type Template struct {
+	Name         string         `mapstructure:"name" json:"name" yaml:"name"`
+	Description  string         `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
+	Model        string         `mapstructure:"model" json:"model" yaml:"model"`
+	App          string         `mapstructure:"app,omitempty" json:"app,omitempty" yaml:"app,omitempty"`
+	Generation   int            `mapstructure:"generation" json:"generation" yaml:"generation"`
+	Config       map[string]any `mapstructure:"config" json:"config" yaml:"config"`
+	CreatedAt    string         `mapstructure:"created_at" json:"created_at" yaml:"created_at"`
+	SourceDevice string         `mapstructure:"source_device,omitempty" json:"source_device,omitempty" yaml:"source_device,omitempty"`
+}
+
 // PluginsConfig holds plugin system settings.
 type PluginsConfig struct {
 	Enabled bool     `mapstructure:"enabled"`
@@ -168,14 +183,15 @@ func Get() *Config {
 
 	if cfg == nil {
 		return &Config{
-			Output:  "table",
-			Color:   true,
-			Theme:   "dracula",
-			APIMode: "local",
-			Devices: make(map[string]Device),
-			Aliases: make(map[string]Alias),
-			Groups:  make(map[string]Group),
-			Scenes:  make(map[string]Scene),
+			Output:    "table",
+			Color:     true,
+			Theme:     "dracula",
+			APIMode:   "local",
+			Devices:   make(map[string]Device),
+			Aliases:   make(map[string]Alias),
+			Groups:    make(map[string]Group),
+			Scenes:    make(map[string]Scene),
+			Templates: make(map[string]Template),
 		}
 	}
 	return cfg
@@ -204,6 +220,9 @@ func Load() (*Config, error) {
 		}
 		if c.Scenes == nil {
 			c.Scenes = make(map[string]Scene)
+		}
+		if c.Templates == nil {
+			c.Templates = make(map[string]Template)
 		}
 
 		cfgMu.Lock()

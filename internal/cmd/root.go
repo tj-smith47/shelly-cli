@@ -35,6 +35,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	initcmd "github.com/tj-smith47/shelly-cli/internal/cmd/init"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
@@ -46,6 +47,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
@@ -295,6 +297,8 @@ func init() {
 	addCommandWithGroup(rootCmd, auth.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, mqtt.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, webhook.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, kvs.NewCommand(f), groupConfig)
+	addCommandWithGroup(rootCmd, template.NewCommand(f), groupConfig)
 
 	// Monitoring commands - status and metrics
 	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)

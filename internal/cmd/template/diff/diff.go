@@ -1,0 +1,153 @@
+// Package diff provides the template diff subcommand.
+package diff
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
+)
+
+// Options holds command options.
+type Options struct {
+	Template string
+	Device   string
+	Factory  *cmdutil.Factory
+}
+
+// NewCommand creates the template diff command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
+	cmd := &cobra.Command{
+		Use:     "diff <template> <device>",
+		Aliases: []string{"compare", "cmp"},
+		Short:   "Compare a template with a device",
+		Long: `Compare a saved configuration template with a device's current configuration.
+
+Shows differences between the template and the device, highlighting
+what would change if the template were applied.`,
+		Example: `  # Compare template with device
+  shelly template diff my-config bedroom
+
+  # Output as JSON
+  shelly template diff my-config bedroom -o json`,
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: completeTemplateDevice(),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Template = args[0]
+			opts.Device = args[1]
+			return run(cmd.Context(), opts)
+		},
+	}
+
+	return cmd
+}
+
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	defer cancel()
+
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
+
+	// Get template
+	tpl, exists := config.GetTemplate(opts.Template)
+	if !exists {
+		return fmt.Errorf("template %q not found", opts.Template)
+	}
+
+	// Compare template with device
+	var diffs []shelly.ConfigDiff
+	err := cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
+		var compareErr error
+		diffs, compareErr = svc.CompareTemplate(ctx, opts.Device, tpl.Config)
+		return compareErr
+	})
+	if err != nil {
+		return err
+	}
+
+	// Handle output formats
+	switch viper.GetString("output") {
+	case "json", "yaml":
+		return cmdutil.PrintListResult(ios, diffs, nil)
+	default:
+		displayDiffs(opts, diffs)
+		return nil
+	}
+}
+
+func displayDiffs(opts *Options, diffs []shelly.ConfigDiff) {
+	ios := opts.Factory.IOStreams()
+	highlight := theme.Highlight()
+
+	if len(diffs) == 0 {
+		ios.Info("No differences - device matches template")
+		return
+	}
+
+	ios.Title("Configuration Differences")
+	ios.Printf("Template: %s  Device: %s\n\n", highlight.Render(opts.Template), highlight.Render(opts.Device))
+
+	table := output.NewTable("Key", "Type", "Device Value", "Template Value")
+	for _, d := range diffs {
+		currentStr := formatValue(d.Current)
+		backupStr := formatValue(d.Backup)
+		table.AddRow(d.Key, d.DiffType, currentStr, backupStr)
+	}
+	table.Print()
+
+	ios.Printf("\n%d difference(s) found\n", len(diffs))
+}
+
+func formatValue(v any) string {
+	if v == nil {
+		return "-"
+	}
+	switch val := v.(type) {
+	case map[string]any:
+		return fmt.Sprintf("{...%d keys}", len(val))
+	case []any:
+		return fmt.Sprintf("[...%d items]", len(val))
+	case string:
+		if len(val) > 30 {
+			return fmt.Sprintf("%q...", val[:27])
+		}
+		return fmt.Sprintf("%q", val)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// completeTemplateDevice provides completion for template and device arguments.
+func completeTemplateDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// First argument: template names
+			templates := config.ListTemplates()
+			completions := make([]string, 0, len(templates))
+			for name := range templates {
+				completions = append(completions, name)
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}
+		if len(args) == 1 {
+			// Second argument: device names
+			devices := config.ListDevices()
+			completions := make([]string, 0, len(devices))
+			for name := range devices {
+				completions = append(completions, name)
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
