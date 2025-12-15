@@ -101,8 +101,9 @@ audit:
 	@echo "Running compliance audit..."
 	@./scripts/audit-compliance.sh
 
-## check: Run all checks (lint, then compliance audit)
+## check: Run all checks (format, lint, then compliance audit)
 check:
+	@$(MAKE) fmt
 ifdef FILE
 	@$(MAKE) lint FILE=$(FILE)
 else

@@ -204,8 +204,8 @@ check_pattern 'context\.Background()' "Use cmd.Context() instead of context.Back
 
 # Rule 8: No fmt.Println in commands
 info "Checking for fmt.Println..."
-# Exclude: extension/create (contains template code for generated files)
-check_pattern 'fmt\.Println' "Use ios.Print() or ios.Success() instead of fmt.Println" "cmd" "error" "extension/create"
+# Exclude: extension/create and plugin/create (contain template code for generated files)
+check_pattern 'fmt\.Println' "Use ios.Print() or ios.Success() instead of fmt.Println" "cmd" "error" "extension/create\|plugin/create"
 
 # Rule 9: No spinner.New() - use iostreams.NewSpinner
 info "Checking for spinner.New()..."

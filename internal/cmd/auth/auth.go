@@ -5,8 +5,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/disable"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/rotate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/status"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/test"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -34,6 +36,8 @@ for all device operations.`,
 	cmd.AddCommand(status.NewCommand(f))
 	cmd.AddCommand(set.NewCommand(f))
 	cmd.AddCommand(disable.NewCommand(f))
+	cmd.AddCommand(rotate.NewCommand(f))
+	cmd.AddCommand(test.NewCommand(f))
 
 	return cmd
 }

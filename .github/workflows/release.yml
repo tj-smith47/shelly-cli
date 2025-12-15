@@ -36,7 +36,7 @@ jobs:
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
-        if: ${{ !contains(steps.pr.outputs.pr_title, 'skip-release') && !contains(steps.pr.outputs.pr_title, 'skip release') }}
+        if: ${{ !contains(steps.pr.outputs.pr_title, '[skip') && !contains(steps.pr.outputs.pr_title, 'release]') }}
         with:
           distribution: goreleaser
           version: latest

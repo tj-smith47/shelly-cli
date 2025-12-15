@@ -1,0 +1,72 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Audit Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+          cache: true
+
+      - name: Generate docs
+        run: |
+          go run ./cmd/docgen ./docs/commands
+          go run ./cmd/mangen ./docs/man
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet docs/; then
+            echo "status=clean" >> $GITHUB_OUTPUT
+            echo "Documentation is up to date"
+          else
+            echo "status=dirty" >> $GITHUB_OUTPUT
+            echo "Documentation is out of date!"
+            echo ""
+            echo "Changed files:"
+            git diff --name-only docs/
+            echo ""
+            echo "Run 'make docs' and 'make manpages' to update"
+            exit 1
+          fi
+
+      - name: Update docs badge
+        if: github.ref == 'refs/heads/master'
+        run: |
+          if [ "${{ steps.diff.outputs.status }}" == "clean" ]; then
+            COLOR="brightgreen"
+            MESSAGE="up to date"
+          else
+            COLOR="red"
+            MESSAGE="outdated"
+          fi
+          BADGE="{\"schemaVersion\":1,\"label\":\"docs\",\"message\":\"${MESSAGE}\",\"color\":\"${COLOR}\"}"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git stash --include-untracked || true
+          git fetch origin badges:badges || git checkout --orphan badges-temp
+          git checkout badges || git checkout badges-temp
+          echo "$BADGE" > docs.json
+          git add docs.json
+          git commit -m "Update docs badge" || true
+          git push origin HEAD:badges --force

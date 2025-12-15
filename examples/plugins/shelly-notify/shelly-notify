@@ -52,7 +52,7 @@ NOTIFY_CMD=$(detect_notify_cmd)
 send_notification() {
     local title="$1"
     local message="$2"
-    local urgency="${3:-normal}"  # low, normal, critical
+    local urgency="${3:-normal}" # low, normal, critical
 
     if [[ -z "$NOTIFY_CMD" ]]; then
         echo -e "${RED}Error:${NC} No notification tool found" >&2
@@ -76,7 +76,7 @@ send_notification() {
 # Get device IP from SHELLY_DEVICES_JSON
 get_device_ip() {
     local device="$1"
-    local devices_json="${SHELLY_DEVICES_JSON:-{}}"
+    local devices_json=${SHELLY_DEVICES_JSON:-"{}"}
 
     if ! command -v jq &>/dev/null; then
         echo -e "${RED}Error:${NC} jq is required for device lookup" >&2
@@ -106,14 +106,14 @@ get_device_status() {
         return 1
     fi
 
-    curl -s --connect-timeout "$timeout" "http://$ip/rpc/Shelly.GetStatus" 2>/dev/null || \
-    curl -s --connect-timeout "$timeout" "http://$ip/status" 2>/dev/null || \
-    echo "{}"
+    curl -s --connect-timeout "$timeout" "http://$ip/rpc/Shelly.GetStatus" 2>/dev/null ||
+        curl -s --connect-timeout "$timeout" "http://$ip/status" 2>/dev/null ||
+        echo "{}"
 }
 
 # Show help
 show_help() {
-    cat << EOF
+    cat <<EOF
 ${CYAN}shelly-notify${NC} - Desktop notifications for Shelly device events
 
 ${YELLOW}Usage:${NC}
@@ -317,36 +317,36 @@ main() {
     local cmd="${1:-help}"
 
     case "$cmd" in
-        -h|--help|help)
-            show_help
-            ;;
-        -v|--version|version)
-            show_version
-            ;;
-        send)
-            shift
-            cmd_send "$@"
-            ;;
-        test)
-            cmd_test
-            ;;
-        device)
-            shift
-            cmd_device "$@"
-            ;;
-        online)
-            shift
-            cmd_online "$@"
-            ;;
-        power)
-            shift
-            cmd_power "$@"
-            ;;
-        *)
-            echo -e "${RED}Error:${NC} Unknown command: $cmd" >&2
-            echo "Run 'shelly notify help' for usage" >&2
-            exit 1
-            ;;
+    -h | --help | help)
+        show_help
+        ;;
+    -v | --version | version)
+        show_version
+        ;;
+    send)
+        shift
+        cmd_send "$@"
+        ;;
+    test)
+        cmd_test
+        ;;
+    device)
+        shift
+        cmd_device "$@"
+        ;;
+    online)
+        shift
+        cmd_online "$@"
+        ;;
+    power)
+        shift
+        cmd_power "$@"
+        ;;
+    *)
+        echo -e "${RED}Error:${NC} Unknown command: $cmd" >&2
+        echo "Run 'shelly notify help' for usage" >&2
+        exit 1
+        ;;
     esac
 }
 

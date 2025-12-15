@@ -23,6 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/benchmark"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/bthome"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
@@ -31,12 +32,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/dash"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/debug"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/doctor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/diff"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/doctor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet"
 	exportcmd "github.com/tj-smith47/shelly-cli/internal/cmd/export"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/feedback"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	initcmd "github.com/tj-smith47/shelly-cli/internal/cmd/init"
@@ -44,10 +47,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/interactive"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
+	logcmd "github.com/tj-smith47/shelly-cli/internal/cmd/log"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/lora"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/matter"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/mock"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
@@ -58,7 +63,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/plugin"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/qr"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rebootcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/report"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/resetcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
@@ -69,6 +76,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sleep"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/statuscmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sync"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat"
@@ -266,12 +274,13 @@ func executeShellAlias(args []string) int {
 
 // Command group IDs for organized help output.
 const (
-	groupShortcuts  = "shortcuts"
-	groupControl    = "control"
-	groupManagement = "management"
-	groupConfig     = "config"
-	groupMonitoring = "monitoring"
-	groupUtility    = "utility"
+	groupShortcuts       = "shortcuts"
+	groupControl         = "control"
+	groupManagement      = "management"
+	groupConfig          = "config"
+	groupMonitoring      = "monitoring"
+	groupTroubleshooting = "troubleshooting"
+	groupUtility         = "utility"
 )
 
 func init() {
@@ -300,6 +309,7 @@ func init() {
 		&cobra.Group{ID: groupManagement, Title: "Device Management:"},
 		&cobra.Group{ID: groupConfig, Title: "Configuration:"},
 		&cobra.Group{ID: groupMonitoring, Title: "Monitoring:"},
+		&cobra.Group{ID: groupTroubleshooting, Title: "Troubleshooting:"},
 		&cobra.Group{ID: groupUtility, Title: "Utility:"},
 	)
 
@@ -307,85 +317,111 @@ func init() {
 	f := cmdutil.NewFactory()
 
 	// Quick commands - shortcuts for common operations
-	addCommandWithGroup(rootCmd, on.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, off.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, togglecmd.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, statuscmd.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, rebootcmd.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, resetcmd.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, open.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, ping.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, sleep.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, wake.NewCommand(f), groupShortcuts)
-	addCommandWithGroup(rootCmd, wait.NewCommand(f), groupShortcuts)
+	addCommandsToGroup(rootCmd, groupShortcuts,
+		on.NewCommand(f),
+		off.NewCommand(f),
+		togglecmd.NewCommand(f),
+		statuscmd.NewCommand(f),
+		rebootcmd.NewCommand(f),
+		resetcmd.NewCommand(f),
+		open.NewCommand(f),
+		ping.NewCommand(f),
+		qr.NewCommand(f),
+		sleep.NewCommand(f),
+		wake.NewCommand(f),
+		wait.NewCommand(f),
+	)
 
 	// Control commands - direct device control
-	addCommandWithGroup(rootCmd, switchcmd.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, cover.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, light.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, rgb.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, party.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, input.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, thermostat.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, batch.NewCommand(f), groupControl)
-	addCommandWithGroup(rootCmd, scene.NewCommand(f), groupControl)
+	addCommandsToGroup(rootCmd, groupControl,
+		switchcmd.NewCommand(f),
+		cover.NewCommand(f),
+		light.NewCommand(f),
+		rgb.NewCommand(f),
+		party.NewCommand(f),
+		input.NewCommand(f),
+		thermostat.NewCommand(f),
+		batch.NewCommand(f),
+		scene.NewCommand(f),
+	)
 
 	// Management commands - device and group management
-	addCommandWithGroup(rootCmd, device.NewCommand(f), groupManagement)
-	addCommandWithGroup(rootCmd, group.NewCommand(f), groupManagement)
-	addCommandWithGroup(rootCmd, discover.NewCommand(f), groupManagement)
-	addCommandWithGroup(rootCmd, script.NewCommand(f), groupManagement)
-	addCommandWithGroup(rootCmd, schedule.NewCommand(f), groupManagement)
-	addCommandWithGroup(rootCmd, backup.NewCommand(f), groupManagement)
-	addCommandWithGroup(rootCmd, migrate.NewCommand(f), groupManagement)
+	addCommandsToGroup(rootCmd, groupManagement,
+		device.NewCommand(f),
+		group.NewCommand(f),
+		discover.NewCommand(f),
+		script.NewCommand(f),
+		schedule.NewCommand(f),
+		backup.NewCommand(f),
+		migrate.NewCommand(f),
+		sync.NewCommand(f),
+	)
 
 	// Configuration commands - device and service configuration
-	addCommandWithGroup(rootCmd, configcmd.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, wifi.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, ethernet.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, cloud.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, auth.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, mqtt.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, webhook.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, kvs.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, template.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, provision.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, action.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, bthome.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, zigbee.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, lora.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, matter.NewCommand(f), groupConfig)
+	addCommandsToGroup(rootCmd, groupConfig,
+		configcmd.NewCommand(f),
+		wifi.NewCommand(f),
+		ethernet.NewCommand(f),
+		cloud.NewCommand(f),
+		auth.NewCommand(f),
+		mqtt.NewCommand(f),
+		webhook.NewCommand(f),
+		kvs.NewCommand(f),
+		template.NewCommand(f),
+		provision.NewCommand(f),
+		action.NewCommand(f),
+		bthome.NewCommand(f),
+		zigbee.NewCommand(f),
+		lora.NewCommand(f),
+		matter.NewCommand(f),
+	)
 
 	// Monitoring commands - status and metrics
-	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)
-	addCommandWithGroup(rootCmd, energy.NewCommand(f), groupMonitoring)
-	addCommandWithGroup(rootCmd, power.NewCommand(f), groupMonitoring)
-	addCommandWithGroup(rootCmd, sensor.NewCommand(f), groupMonitoring)
-	addCommandWithGroup(rootCmd, metrics.NewCommand(f), groupMonitoring)
-	addCommandWithGroup(rootCmd, dash.NewCommand(f), groupMonitoring)
+	addCommandsToGroup(rootCmd, groupMonitoring,
+		monitor.NewCommand(f),
+		energy.NewCommand(f),
+		power.NewCommand(f),
+		sensor.NewCommand(f),
+		metrics.NewCommand(f),
+		dash.NewCommand(f),
+		report.NewCommand(f),
+	)
+
+	// Troubleshooting commands - diagnostics and debugging
+	addCommandsToGroup(rootCmd, groupTroubleshooting,
+		interactive.NewCommand(f),
+		shellcmd.NewCommand(f),
+		debug.NewCommand(f),
+		doctor.NewCommand(f),
+		audit.NewCommand(f),
+		diff.NewCommand(f),
+		benchmark.NewCommand(f),
+		mock.NewCommand(f),
+	)
 
 	// Utility commands - CLI utilities
-	addCommandWithGroup(rootCmd, interactive.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, shellcmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, debug.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, doctor.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, audit.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, initcmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, exportcmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, alias.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, plugin.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, themecmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, updatecmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, completioncmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, versioncmd.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, cache.NewCommand(f), groupUtility)
+	addCommandsToGroup(rootCmd, groupUtility,
+		initcmd.NewCommand(f),
+		firmware.NewCommand(f),
+		exportcmd.NewCommand(f),
+		alias.NewCommand(f),
+		plugin.NewCommand(f),
+		themecmd.NewCommand(f),
+		updatecmd.NewCommand(f),
+		completioncmd.NewCommand(f),
+		versioncmd.NewCommand(f),
+		cache.NewCommand(f),
+		logcmd.NewCommand(f),
+		feedback.NewCommand(f),
+	)
 }
 
-// addCommandWithGroup adds a command to the root and assigns it to a group.
-func addCommandWithGroup(root, cmd *cobra.Command, groupID string) {
-	cmd.GroupID = groupID
-	root.AddCommand(cmd)
+// addCommandsToGroup adds multiple commands to the root and assigns them to a group.
+func addCommandsToGroup(root *cobra.Command, groupID string, cmds ...*cobra.Command) {
+	for _, cmd := range cmds {
+		cmd.GroupID = groupID
+		root.AddCommand(cmd)
+	}
 }
 
 func initializeConfig(_ *cobra.Command, _ []string) error {

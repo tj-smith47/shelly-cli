@@ -11,6 +11,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds the command options.
@@ -122,8 +124,10 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 			// Turn lights back on
 			for _, device := range devices {
 				if err := svc.LightOn(ctx, device, 0); err != nil {
-					// Silently ignore - might not be a light
-					_ = svc.SwitchOn(ctx, device, 0) //nolint:errcheck // Best-effort cleanup
+					// Silently ignore - might not be a light, try switch
+					if switchErr := svc.SwitchOn(ctx, device, 0); switchErr != nil {
+						ios.DebugErr("party cleanup for "+device, switchErr)
+					}
 				}
 			}
 			return nil
@@ -133,28 +137,46 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 
 			for _, device := range devices {
 				go func(dev string) {
-					// Try as light first
-					if toggleState {
-						if err := svc.LightOn(partyCtx, dev, 0); err != nil {
-							// Try as switch
-							_ = svc.SwitchOn(partyCtx, dev, 0) //nolint:errcheck // Fallback, ignore
-						}
-					} else {
-						if err := svc.LightOff(partyCtx, dev, 0); err != nil {
-							// Try as switch
-							_ = svc.SwitchOff(partyCtx, dev, 0) //nolint:errcheck // Fallback, ignore
-						}
-					}
-
-					// Try to set random color for RGB lights (ignore errors for non-RGB)
-					if toggleState {
-						color := colors[rand.Intn(len(colors))]                       //nolint:gosec // Not crypto, just random colors
-						_ = svc.RGBColor(partyCtx, dev, 0, color.r, color.g, color.b) //nolint:errcheck // Optional RGB
-					}
+					toggleDevice(partyCtx, svc, ios, dev, toggleState, colors)
 				}(device)
 			}
 
 			colorIndex = (colorIndex + 1) % len(colors)
+		}
+	}
+}
+
+// toggleDevice handles toggling a single device on or off with fallback to switch.
+func toggleDevice(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, dev string, on bool, colors []struct{ r, g, b int }) {
+	if on {
+		toggleDeviceOn(ctx, svc, ios, dev, colors)
+	} else {
+		toggleDeviceOff(ctx, svc, ios, dev)
+	}
+}
+
+// toggleDeviceOn turns a device on with light/switch fallback and sets random color.
+func toggleDeviceOn(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, dev string, colors []struct{ r, g, b int }) {
+	if err := svc.LightOn(ctx, dev, 0); err != nil {
+		// Try as switch (expected to fail for non-switch devices)
+		if switchErr := svc.SwitchOn(ctx, dev, 0); switchErr != nil {
+			ios.DebugErr("party toggle on "+dev, switchErr)
+		}
+	}
+
+	// Try to set random color for RGB lights (expected to fail for non-RGB)
+	color := colors[rand.Intn(len(colors))] //nolint:gosec // Not crypto, just random colors
+	if rgbErr := svc.RGBColor(ctx, dev, 0, color.r, color.g, color.b); rgbErr != nil {
+		ios.DebugErr("party RGB "+dev, rgbErr)
+	}
+}
+
+// toggleDeviceOff turns a device off with light/switch fallback.
+func toggleDeviceOff(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, dev string) {
+	if err := svc.LightOff(ctx, dev, 0); err != nil {
+		// Try as switch (expected to fail for non-switch devices)
+		if switchErr := svc.SwitchOff(ctx, dev, 0); switchErr != nil {
+			ios.DebugErr("party toggle off "+dev, switchErr)
 		}
 	}
 }
