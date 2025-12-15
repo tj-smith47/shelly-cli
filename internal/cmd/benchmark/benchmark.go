@@ -3,7 +3,6 @@ package benchmark
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -12,13 +11,13 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // Options holds the command options.
 type Options struct {
 	Iterations int
 	Warmup     int
-	JSONOutput bool
 }
 
 // Result holds benchmark results.
@@ -67,7 +66,7 @@ Results include min, max, average, and percentile statistics (P50, P95, P99).`,
   shelly benchmark kitchen-light --iterations 50
 
   # JSON output for logging
-  shelly benchmark kitchen-light -o json`,
+  shelly benchmark kitchen-light --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], opts)
@@ -76,7 +75,6 @@ Results include min, max, average, and percentile statistics (P50, P95, P99).`,
 
 	cmd.Flags().IntVarP(&opts.Iterations, "iterations", "n", 10, "Number of iterations")
 	cmd.Flags().IntVar(&opts.Warmup, "warmup", 2, "Number of warmup iterations (not counted)")
-	cmd.Flags().BoolVarP(&opts.JSONOutput, "json", "o", false, "Output as JSON")
 
 	return cmd
 }
@@ -123,8 +121,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 			rpcLatencies = append(rpcLatencies, elapsed)
 		}
 
-		// Show progress
-		if !opts.JSONOutput && (i+1)%5 == 0 {
+		// Show progress (only in table mode)
+		if !output.WantsStructured() && (i+1)%5 == 0 {
 			ios.Printf("  Progress: %d/%d\n", i+1, opts.Iterations)
 		}
 	}
@@ -161,8 +159,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		Timestamp:   time.Now(),
 	}
 
-	if opts.JSONOutput {
-		return outputJSON(ios, result)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, result)
 	}
 
 	// Display results
@@ -252,13 +250,4 @@ func displayStats(ios *iostreams.IOStreams, stats LatencyStats) {
 	if stats.Errors > 0 {
 		ios.Printf("  Errors: %d\n", stats.Errors)
 	}
-}
-
-func outputJSON(ios *iostreams.IOStreams, result Result) error {
-	data, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	ios.Println(string(data))
-	return nil
 }

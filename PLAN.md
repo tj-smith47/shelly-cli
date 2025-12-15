@@ -629,86 +629,86 @@ See `.claude/COMPLETED.md` for details.
 
 ### 29.1 User Experience Excellence
 
-- [ ] `shelly feedback` - Integrated issue reporting to GitHub
+- [x] `shelly feedback` - Integrated issue reporting to GitHub
   - Interactive mode or `--type bug|feature|device`
   - Auto-populates system info, CLI version, device context
   - Flags: `--attach-log`, `--screenshot`
-- [ ] `shelly doctor` - Comprehensive diagnostic health check (inspired by `brew doctor`)
+- [x] `shelly doctor` - Comprehensive diagnostic health check (inspired by `brew doctor`)
   - Checks: CLI version, config validity, network reachability, device health, firmware status, cloud auth
   - Flags: `--network`, `--devices`, `--full`
-- [ ] `shelly diff` - Visual diff between device configurations
+- [x] `shelly diff` - Visual diff between device configurations
   - `shelly diff <device1> <device2>` or `shelly diff <device> <backup.json>`
 
 ### 29.2 Power User Features
 
-- [ ] `shelly benchmark` - Device performance testing
+- [x] `shelly benchmark` - Device performance testing
   - Measures ping, API latency, toggle response times
   - `shelly benchmark <device> [--iterations N]`
 
 ### 29.3 Developer & Integration
 
-- [ ] `shelly webhook server` - Built-in local webhook receiver for testing
+- [x] `shelly webhook server` - Built-in local webhook receiver for testing
   - Auto-configures devices to send webhooks to this server
   - `shelly webhook server [--port 8080] [--log]`
-- [ ] `shelly export terraform` - Infrastructure as Code export
+- [x] `shelly export terraform` - Infrastructure as Code export
   - `shelly export terraform|ansible|homeassistant --all`
 
 
 ### 29.5 Fleet Management (Enterprise)
 
-- [ ] `shelly fleet` - Cloud-based fleet management (uses integrator.FleetManager)
+- [x] `shelly fleet` - Cloud-based fleet management (uses integrator.FleetManager)
   - `shelly fleet connect [--host]` - Connect to Shelly Cloud hosts
   - `shelly fleet status` - Fleet-wide device status and health
   - `shelly fleet stats` - Aggregate statistics (online/offline counts)
   - `shelly fleet health` - Device health monitoring (unhealthy devices)
   - `shelly fleet on|off|toggle --group <name>` - Group control via cloud
   - Note: Different from `batch` - uses cloud WebSocket, not local HTTP
-- [ ] `shelly audit` - Security audit for devices
+- [x] `shelly audit` - Security audit for devices
   - Checks: default credentials, outdated firmware, network exposure
   - `shelly audit [--check-auth] [--check-firmware] [--check-network]`
-- [ ] `shelly report` - Generate professional reports
+- [x] `shelly report` - Generate professional reports
   - `shelly report energy|devices|audit|usage --format pdf|html|json`
 
 
 ### 29.8 Convenience Shortcuts
 
-- [ ] `shelly open` - Open device in browser
+- [x] `shelly open` - Open device in browser
   - `shelly open <device> [--cloud] [--docs <component>]`
-- [ ] `shelly qr` - Generate QR codes
+- [x] `shelly qr` - Generate QR codes
   - `shelly qr <device> [--wifi] [--export file.png]`
 
 ### 29.10 Networking & Connectivity
 
-- [ ] `shelly ping` - Enhanced ping with latency stats
+- [x] `shelly ping` - Enhanced ping with latency stats
   - `shelly ping <device> [--all] [--continuous] [--graph]`
 
 ### 29.11 Security & Auth (Enhanced)
 
-- [ ] `shelly auth rotate` - Rotate device credentials
-- [ ] `shelly auth test` - Test auth connectivity
-- [ ] `shelly auth export|import` - Encrypted credential export/import
-- [ ] `shelly cert` - Certificate management (Gen2+ Shelly.PutUserCA)
-  - `shelly cert show|install|renew <device>`
+- [x] `shelly auth rotate` - Rotate device credentials
+- [x] `shelly auth test` - Test auth connectivity
+- [x] `shelly auth export|import` - Credential export/import
+- [x] `shelly cert` - Certificate management (Gen2+ Shelly.PutUserCA)
+  - `shelly cert show|install <device>`
 
 ### 29.12 Scripting & Automation
 
-- [ ] `shelly wait` - Wait for condition
+- [x] `shelly wait` - Wait for condition
   - `shelly wait <device> --state on|--online [--timeout 30s]`
 
 ### 29.13 Data & Export
 
-- [ ] `shelly sync` - Cloud synchronization
+- [x] `shelly sync` - Cloud synchronization
   - `shelly sync cloud [--push|--pull]`
 
 ### 29.14 Debugging & Development
 
-- [ ] `shelly mock` - Mock device mode for testing without hardware
+- [x] `shelly mock` - Mock device mode for testing without hardware
   - `shelly mock create|list|scenario <name>`
 
 
 ### 29.17 Notifications & Alerts
 
-- [ ] `shelly alert` - Alert management
+- [x] `shelly alert` - Alert management
   - `shelly alert create|list|test|snooze <name>`
   - `--condition "power > 1000W" --notify email:admin@...`
 
@@ -717,19 +717,19 @@ See `.claude/COMPLETED.md` for details.
 
 > **Note:** `shelly update` is defined in Phase 17. These are additional config/meta commands.
 
-- [ ] `shelly config edit` - Open config in $EDITOR
-- [ ] `shelly cache` - Cache management
+- [x] `shelly config edit` - Open config in $EDITOR
+- [x] `shelly cache` - Cache management
   - `shelly cache clear|stats|warm [--discovery]`
-- [ ] `shelly log` - CLI logging
+- [x] `shelly log` - CLI logging
   - `shelly log show|tail|level|export`
 
 ### 29.20 Fun & Easter Eggs
 
-- [ ] `shelly party` - Party mode (cycle colors on RGB devices)
+- [x] `shelly party` - Party mode (cycle colors on RGB devices)
   - `shelly party [--mode rainbow|disco] [--duration 5m]`
-- [ ] `shelly sleep` - Gradual lights off
+- [x] `shelly sleep` - Gradual lights off
   - `shelly sleep [--duration 30m] [--except bedroom]`
-- [ ] `shelly wake` - Gradual lights on
+- [x] `shelly wake` - Gradual lights on
   - `shelly wake [--simulate sunrise] [--duration 15m]`
 
 ---

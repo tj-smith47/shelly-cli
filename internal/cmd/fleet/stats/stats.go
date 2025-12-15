@@ -3,17 +3,15 @@ package stats
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // Options holds the command options.
-type Options struct {
-	JSONOutput bool
-}
+type Options struct{}
 
 // FleetStats represents fleet-wide statistics.
 type FleetStats struct {
@@ -37,19 +35,17 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly fleet stats
 
   # JSON output
-  shelly fleet stats -o json`,
+  shelly fleet stats --json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), f, opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.JSONOutput, "json", "o", false, "Output as JSON")
-
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
+func run(_ context.Context, f *cmdutil.Factory, _ *Options) error {
 	ios := f.IOStreams()
 
 	// Placeholder stats
@@ -61,13 +57,8 @@ func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
 		TotalGroups:      0,
 	}
 
-	if opts.JSONOutput {
-		data, err := json.MarshalIndent(stats, "", "  ")
-		if err != nil {
-			return err
-		}
-		ios.Println(string(data))
-		return nil
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, stats)
 	}
 
 	ios.Success("Fleet Statistics")

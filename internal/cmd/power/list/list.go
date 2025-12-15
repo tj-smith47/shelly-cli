@@ -98,8 +98,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	if len(components) == 0 {
-		_, err := fmt.Fprintf(ios.Out, "No power meter components found\n")
-		ios.DebugErr("writing output", err)
+		ios.NoResults("power meter components")
 		return nil
 	}
 

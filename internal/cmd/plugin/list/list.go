@@ -109,6 +109,7 @@ func run(f *cmdutil.Factory, all bool) error {
 	}
 
 	table.Print()
+	ios.Println()
 	ios.Count("extension", len(extensionList))
 
 	return nil

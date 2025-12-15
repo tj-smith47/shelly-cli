@@ -87,6 +87,6 @@ func printTable(ios *iostreams.IOStreams, groupName string, devices []string) {
 		t.AddRow(fmt.Sprintf("%d", i+1), device)
 	}
 	t.Print()
-
+	ios.Println()
 	ios.Count("member", len(devices))
 }

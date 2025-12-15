@@ -79,12 +79,13 @@ func (s *IOStreams) Subtitle(format string, args ...any) {
 }
 
 // Count prints a count summary (e.g., "Found 5 device(s)").
+// Callers should add ios.Println() before Count() if vertical separation is desired.
 func (s *IOStreams) Count(noun string, count int) {
 	suffix := "s"
 	if count == 1 {
 		suffix = ""
 	}
-	writeQuietly(s.Out, "\nFound %d %s%s\n", count, noun, suffix)
+	writeQuietly(s.Out, "Found %d %s%s\n", count, noun, suffix)
 }
 
 // NoResults prints a "no results" message with optional hints.
@@ -159,12 +160,13 @@ func SubtitleTo(w io.Writer, format string, args ...any) {
 }
 
 // CountTo prints a count summary to the specified writer.
+// Callers should print a blank line before CountTo() if vertical separation is desired.
 func CountTo(w io.Writer, noun string, count int) {
 	suffix := "s"
 	if count == 1 {
 		suffix = ""
 	}
-	writeQuietly(w, "\nFound %d %s%s\n", count, noun, suffix)
+	writeQuietly(w, "Found %d %s%s\n", count, noun, suffix)
 }
 
 // Package-level convenience functions that write to stdout/stderr.

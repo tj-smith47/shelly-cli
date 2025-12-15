@@ -88,14 +88,12 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	serverURL := fmt.Sprintf("http://%s:%d", localIP, opts.Port)
 
 	ios.Success("Webhook Server")
-	ios.Println("")
+	ios.Println()
 	ios.Info("Listening on: %s:%d", opts.Interface, opts.Port)
 	ios.Info("Webhook URL: %s/webhook", serverURL)
-	ios.Println("")
 	ios.Info("Configure your device webhooks to POST to: %s/webhook", serverURL)
-	ios.Println("")
+	ios.Println()
 	ios.Info("Press Ctrl+C to stop...")
-	ios.Println("")
 
 	// Auto-configure devices if requested
 	if opts.AutoConfig && len(opts.Devices) > 0 {

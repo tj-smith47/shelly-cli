@@ -192,6 +192,7 @@ func (c *MetricsCollector) collect(ctx context.Context) {
 	}
 
 	if err := g.Wait(); err != nil {
+		c.ios.DebugErr("collecting device metrics", err)
 		return
 	}
 

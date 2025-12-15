@@ -11,12 +11,12 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // Options holds the command options.
 type Options struct {
-	WiFi       bool
-	JSONOutput bool
+	WiFi bool
 }
 
 // DeviceQRInfo holds device information for QR code generation.
@@ -71,7 +71,7 @@ code generator to create a scannable code.`,
   shelly qr kitchen-light --wifi
 
   # JSON output for processing
-  shelly qr kitchen-light -o json`,
+  shelly qr kitchen-light --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], opts)
@@ -79,7 +79,6 @@ code generator to create a scannable code.`,
 	}
 
 	cmd.Flags().BoolVar(&opts.WiFi, "wifi", false, "Generate WiFi config QR content")
-	cmd.Flags().BoolVarP(&opts.JSONOutput, "json", "o", false, "Output as JSON")
 
 	return cmd
 }
@@ -154,8 +153,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		QRContent: qrContent,
 	}
 
-	if opts.JSONOutput {
-		return outputJSON(ios, info)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, info)
 	}
 
 	// Display QR info
@@ -195,13 +194,4 @@ func escapeWiFiQR(s string) string {
 	s = strings.ReplaceAll(s, ",", "\\,")
 	s = strings.ReplaceAll(s, ":", "\\:")
 	return s
-}
-
-func outputJSON(ios *iostreams.IOStreams, info DeviceQRInfo) error {
-	data, err := json.MarshalIndent(info, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	ios.Println(string(data))
-	return nil
 }

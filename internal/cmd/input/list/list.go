@@ -103,5 +103,6 @@ func displayList(ios *iostreams.IOStreams, inputs []shelly.InputInfo) {
 	}
 
 	table.Print()
+	ios.Println()
 	ios.Count("input", len(inputs))
 }

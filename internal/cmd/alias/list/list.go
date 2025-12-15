@@ -84,5 +84,6 @@ func printTable(ios *iostreams.IOStreams, aliases []config.Alias) {
 	}
 
 	table.Print()
+	ios.Println()
 	ios.Count("alias", len(aliases))
 }

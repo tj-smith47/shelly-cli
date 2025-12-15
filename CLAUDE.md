@@ -298,6 +298,8 @@ grep -r "func NewCommand(f \*cmdutil.Factory)" internal/cmd/ | wc -l
 2. **NEVER mark tasks complete prematurely** - Build + lint + test + manual verify FIRST
 3. **NEVER change scope without approval** - If the task seems too large, ask
 4. **Complete tasks fully** - Don't stop mid-task claiming context limits or time constraints
+5. **Own ALL bugs in this repo** - You wrote ALL the code in this repository. You are responsible for fixing ALL bugs, regardless of when they were introduced. Never dismiss a bug as "pre-existing" or "not from this session"
+6. **No half-baked features** - Every feature must be fully implemented and documented. No placeholder shells, stubs, or "coming soon" implementations
 
 ---
 

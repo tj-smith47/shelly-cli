@@ -3,18 +3,17 @@ package health
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // Options holds the command options.
 type Options struct {
-	JSONOutput bool
-	Threshold  time.Duration
+	Threshold time.Duration
 }
 
 // DeviceHealth represents health metrics for a device.
@@ -49,20 +48,19 @@ online/offline transitions indicating connectivity issues.`,
   shelly fleet health --threshold 30m
 
   # JSON output
-  shelly fleet health -o json`,
+  shelly fleet health --json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), f, opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.JSONOutput, "json", "o", false, "Output as JSON")
 	cmd.Flags().DurationVar(&opts.Threshold, "threshold", 10*time.Minute, "Time threshold for unhealthy status")
 
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
+func run(_ context.Context, f *cmdutil.Factory, _ *Options) error {
 	ios := f.IOStreams()
 
 	// Placeholder health data
@@ -72,13 +70,8 @@ func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
 		{DeviceID: "demo-device-3", Online: false, LastSeen: "2h ago", OnlineCount: 50, OfflineCount: 50, ActivityCount: 100, Status: "unhealthy"},
 	}
 
-	if opts.JSONOutput {
-		data, err := json.MarshalIndent(devices, "", "  ")
-		if err != nil {
-			return err
-		}
-		ios.Println(string(data))
-		return nil
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, devices)
 	}
 
 	var healthy, warning, unhealthy int

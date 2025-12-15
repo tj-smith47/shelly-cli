@@ -8,6 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alert/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alert/snooze"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alert/test"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/alert/watch"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -31,13 +32,17 @@ exceeding power thresholds, or temperature changes.`,
   shelly alert test kitchen-offline
 
   # Snooze an alert for 1 hour
-  shelly alert snooze kitchen-offline --duration 1h`,
+  shelly alert snooze kitchen-offline --duration 1h
+
+  # Start monitoring alerts
+  shelly alert watch`,
 	}
 
 	cmd.AddCommand(create.NewCommand(f))
 	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(test.NewCommand(f))
 	cmd.AddCommand(snooze.NewCommand(f))
+	cmd.AddCommand(watch.NewCommand(f))
 
 	return cmd
 }

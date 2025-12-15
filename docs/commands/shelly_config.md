@@ -55,6 +55,7 @@ component settings, system parameters, and feature configurations.
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
 * [shelly config diff](shelly_config_diff.md)	 - Compare device configuration with a file
+* [shelly config edit](shelly_config_edit.md)	 - Open CLI config in editor
 * [shelly config export](shelly_config_export.md)	 - Export device configuration to a file
 * [shelly config get](shelly_config_get.md)	 - Get device configuration
 * [shelly config import](shelly_config_import.md)	 - Import configuration from a file

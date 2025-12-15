@@ -114,7 +114,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 
 	// Get detailed BLE information
 	bleDevices := bleDiscoverer.GetDiscoveredDevices()
-	displayBLEDevices(bleDevices)
+	displayBLEDevices(ios, bleDevices)
 
 	return nil
 }
@@ -143,7 +143,7 @@ func isBLENotSupportedError(err error) bool {
 }
 
 // displayBLEDevices prints a table of BLE discovered devices.
-func displayBLEDevices(devices []discovery.BLEDiscoveredDevice) {
+func displayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscoveredDevice) {
 	if len(devices) == 0 {
 		return
 	}
@@ -190,5 +190,6 @@ func displayBLEDevices(devices []discovery.BLEDiscoveredDevice) {
 	}
 
 	table.Print()
+	ios.Println("")
 	iostreams.Count("BLE device", len(devices))
 }

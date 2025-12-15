@@ -3,18 +3,17 @@ package status
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // Options holds the command options.
 type Options struct {
-	JSONOutput bool
-	Online     bool
-	Offline    bool
+	Online  bool
+	Offline bool
 }
 
 // DeviceStatus represents a device in the fleet.
@@ -48,14 +47,13 @@ connected through Shelly Cloud.`,
   shelly fleet status --offline
 
   # JSON output
-  shelly fleet status -o json`,
+  shelly fleet status --json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), f, opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.JSONOutput, "json", "o", false, "Output as JSON")
 	cmd.Flags().BoolVar(&opts.Online, "online", false, "Show only online devices")
 	cmd.Flags().BoolVar(&opts.Offline, "offline", false, "Show only offline devices")
 
@@ -84,13 +82,8 @@ func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
 		filtered = append(filtered, d)
 	}
 
-	if opts.JSONOutput {
-		data, err := json.MarshalIndent(filtered, "", "  ")
-		if err != nil {
-			return err
-		}
-		ios.Println(string(data))
-		return nil
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, filtered)
 	}
 
 	if len(filtered) == 0 {

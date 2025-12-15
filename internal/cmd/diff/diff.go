@@ -14,14 +14,14 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // Options holds the command options.
 type Options struct {
-	JSONOutput bool
-	OnlyDiffs  bool
+	OnlyDiffs bool
 }
 
 // NewCommand creates the diff command.
@@ -53,20 +53,19 @@ Differences are shown with:
   shelly diff device1 device2 --only-diff
 
   # JSON output
-  shelly diff device1 device2 -o json`,
+  shelly diff device1 device2 --json`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), f, args[0], args[1], opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.JSONOutput, "json", "o", false, "Output as JSON")
 	cmd.Flags().BoolVar(&opts.OnlyDiffs, "only-diff", false, "Show only differences")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, source, target string, opts *Options) error {
+func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
@@ -91,8 +90,8 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, opts *O
 	// Calculate diff
 	diffs := compareConfigs("", sourceConfig, targetConfig)
 
-	if opts.JSONOutput {
-		return outputJSON(ios, diffs)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, diffs)
 	}
 
 	// Display results
@@ -275,13 +274,4 @@ func compareConfigs(prefix string, source, target map[string]any) []Diff {
 	}
 
 	return diffs
-}
-
-func outputJSON(ios *iostreams.IOStreams, diffs []Diff) error {
-	data, err := json.MarshalIndent(diffs, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-	ios.Println(string(data))
-	return nil
 }

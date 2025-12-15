@@ -96,6 +96,7 @@ func run(f *cmdutil.Factory) error {
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
+	ios.Println()
 	ios.Count("group", len(result))
 
 	return nil
