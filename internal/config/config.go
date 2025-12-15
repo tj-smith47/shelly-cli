@@ -230,6 +230,21 @@ func (c *Config) GetTUIThemeConfig() *ThemeConfig {
 	return c.TUI.Theme
 }
 
+// DefaultAliases are built-in aliases provided out of the box.
+// These provide shortcuts for common operations.
+var DefaultAliases = map[string]Alias{
+	"api": {
+		Name:    "api",
+		Command: "debug rpc $@",
+		Shell:   false,
+	},
+	"cron": {
+		Name:    "cron",
+		Command: "schedule create --timespec \"$1\" $2",
+		Shell:   false,
+	},
+}
+
 // Load reads configuration from file and environment.
 func Load() (*Config, error) {
 	var loadErr error

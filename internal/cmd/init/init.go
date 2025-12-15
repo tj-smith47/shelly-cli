@@ -325,11 +325,20 @@ func stepConfiguration(_ context.Context, ios *iostreams.IOStreams, opts *Option
 	cfg.Color = true
 	cfg.APIMode = "local"
 
+	// Add default aliases
+	if cfg.Aliases == nil {
+		cfg.Aliases = make(map[string]config.Alias)
+	}
+	for name, alias := range config.DefaultAliases {
+		cfg.Aliases[name] = alias
+	}
+
 	// Save config
 	viper.Set("output", outputFormat)
 	viper.Set("theme", themeName)
 	viper.Set("color", true)
 	viper.Set("api_mode", "local")
+	viper.Set("aliases", cfg.Aliases)
 
 	if err := config.Save(); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)

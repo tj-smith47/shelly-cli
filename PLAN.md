@@ -112,7 +112,7 @@ Create a production-ready, open-source Cobra CLI that:
 | 26 | Documentation | ✅ Complete |
 | 27 | Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
-| 29 | Innovative Commands (82 new) | ⏳ Pending |
+| 29 | Innovative Commands (~25) | ⏳ Pending |
 | 30 | Polish & Release (FINAL) | ⏳ Pending |
 
 **Test Coverage:** ~19% (target: 90%+ in Phase 28)
@@ -152,6 +152,7 @@ Create a production-ready, open-source Cobra CLI that:
 | `--timeout` | | duration | 30s | Request timeout for device operations |
 | `--config` | | string | auto | Config file path (default: `~/.config/shelly/config.yaml`) |
 | `--device` | `-d` | string | | Default device for commands that require one |
+| `--clipboard` | | bool | false | Copy command output to clipboard (TODO: implement) |
 
 ### Output Format Examples
 
@@ -635,221 +636,92 @@ See `.claude/COMPLETED.md` for details.
 - [ ] `shelly doctor` - Comprehensive diagnostic health check (inspired by `brew doctor`)
   - Checks: CLI version, config validity, network reachability, device health, firmware status, cloud auth
   - Flags: `--network`, `--devices`, `--full`
-- [ ] `shelly context` - Context management (kubectl-style)
-  - `shelly context list|use|create|export|import`
-  - Switch between device groups/locations seamlessly
-- [ ] `shelly history` - Command history with replay
-  - `shelly history [--device]`, `shelly history replay <id>`, `shelly history export`
 - [ ] `shelly diff` - Visual diff between device configurations
   - `shelly diff <device1> <device2>` or `shelly diff <device> <backup.json>`
 
 ### 29.2 Power User Features
 
-- [ ] `shelly watch` - Real-time monitoring dashboard (BubbleTea TUI)
-  - `shelly watch [devices...]`, `--power`, `--events`, `--interval`
-  - Live updates via WebSocket
-- [ ] `shelly simulate` - Dry run mode for commands
-  - `shelly simulate <any-command>` - shows what would execute without changes
-- [ ] `shelly record` - Macro recording and replay
-  - `shelly record start|stop|list|play|export <name>`
 - [ ] `shelly benchmark` - Device performance testing
   - Measures ping, API latency, toggle response times
   - `shelly benchmark <device> [--iterations N]`
-- [ ] `shelly profile usage` - Analyze device usage patterns
-  - Peak hours, average on-time, energy consumption, toggle frequency
 
 ### 29.3 Developer & Integration
 
-- [ ] `shelly api` - Direct RPC access for developers
-  - `shelly api <device> <method> [params]`
-  - Flags: `--list-methods`, `--interactive` (REPL)
 - [ ] `shelly webhook server` - Built-in local webhook receiver for testing
   - Auto-configures devices to send webhooks to this server
   - `shelly webhook server [--port 8080] [--log]`
 - [ ] `shelly export terraform` - Infrastructure as Code export
   - `shelly export terraform|ansible|homeassistant --all`
-- [ ] `shelly mqtt bridge` - Act as MQTT bridge for devices
-  - `shelly mqtt bridge --broker mqtt://localhost:1883 [--ha-discovery]`
-- [ ] `shelly test` - Integration testing for devices
-  - `shelly test <device> [--stress] [--network] [--power]`
 
-### 29.4 Smart Automation
-
-- [ ] `shelly trigger` - Event-based automation rules
-  - `shelly trigger create <name> --event <type> --action <command>`
-  - Events: sunset, sunrise, device events, thresholds
-- [ ] `shelly chain` - Command chaining with conditions
-  - `shelly chain "cmd1" --then "cmd2" --on-error "notify"`
-- [ ] `shelly schedule smart` - Intelligent scheduling
-  - `--trigger sunset|sunrise [--offset +30m] [--condition "not weekend"]`
 
 ### 29.5 Fleet Management (Enterprise)
 
-- [ ] `shelly fleet` - Fleet management for large deployments
-  - `shelly fleet list|health|firmware|update|export|sync`
-  - Staged rollouts: `shelly fleet update --staged 10%`
+- [ ] `shelly fleet` - Cloud-based fleet management (uses integrator.FleetManager)
+  - `shelly fleet connect [--host]` - Connect to Shelly Cloud hosts
+  - `shelly fleet status` - Fleet-wide device status and health
+  - `shelly fleet stats` - Aggregate statistics (online/offline counts)
+  - `shelly fleet health` - Device health monitoring (unhealthy devices)
+  - `shelly fleet on|off|toggle --group <name>` - Group control via cloud
+  - Note: Different from `batch` - uses cloud WebSocket, not local HTTP
 - [ ] `shelly audit` - Security audit for devices
   - Checks: default credentials, outdated firmware, network exposure
   - `shelly audit [--check-auth] [--check-firmware] [--check-network]`
 - [ ] `shelly report` - Generate professional reports
   - `shelly report energy|devices|audit|usage --format pdf|html|json`
 
-### 29.6 Quality of Life
-
-- [ ] `shelly tips` - Contextual tips based on usage
-  - `shelly tips [--command X] [--new]`
-- [ ] `shelly undo` - Undo last action where possible
-- [ ] `shelly favorite` - Quick access to frequent commands
-  - `shelly favorite add|list|run|delete <name>`
-  - Shortcut: `shelly @morning`
-- [ ] `shelly notify` - Desktop notifications on events
-  - `shelly notify on <event> [--threshold]`
-
-### 29.7 Interactive Features
-
-- [ ] `shelly wizard` - Guided setup wizards
-  - `shelly wizard [discover|scene|automation]`
-- [ ] `shelly learn` - Built-in interactive tutorial
-  - `shelly learn [basics|automation|scripting]`
 
 ### 29.8 Convenience Shortcuts
 
-- [ ] `shelly @<alias>` - Quick alias invocation prefix
-- [ ] `shelly last` - Repeat last command
-  - `shelly last [--device other-device]`
-- [ ] `shelly clipboard` - Copy output to clipboard
-  - `shelly <command> --clipboard`
 - [ ] `shelly open` - Open device in browser
   - `shelly open <device> [--cloud] [--docs <component>]`
 - [ ] `shelly qr` - Generate QR codes
   - `shelly qr <device> [--wifi] [--export file.png]`
 
-### 29.9 Analysis & Insights
-
-- [ ] `shelly stats` - Usage statistics
-  - `shelly stats [devices|commands|energy] [--period]`
-- [ ] `shelly trends` - Usage trend visualization
-  - `shelly trends power|usage <device> [--export chart.svg]`
-- [ ] `shelly compare` - Compare devices or time periods
-  - `shelly compare <device1> <device2>` or `--this-week --last-week`
-- [ ] `shelly forecast` - Usage/cost forecasting
-  - `shelly forecast energy|cost --period month [--rate 0.15]`
-- [ ] `shelly anomaly` - Anomaly detection
-  - `shelly anomaly detect [--device X] [--alert]`
-
 ### 29.10 Networking & Connectivity
 
 - [ ] `shelly ping` - Enhanced ping with latency stats
   - `shelly ping <device> [--all] [--continuous] [--graph]`
-- [ ] `shelly trace` - Connection trace
-  - `shelly trace <device> [--protocol]`
-- [ ] `shelly network` - Network diagnostics
-  - `shelly network scan|topology|bandwidth|latency-map`
-- [ ] `shelly proxy` - Local proxy mode for remote access
-  - `shelly proxy start [--port 8080]`
 
 ### 29.11 Security & Auth (Enhanced)
 
 - [ ] `shelly auth rotate` - Rotate device credentials
 - [ ] `shelly auth test` - Test auth connectivity
 - [ ] `shelly auth export|import` - Encrypted credential export/import
-- [ ] `shelly cert` - Certificate management
+- [ ] `shelly cert` - Certificate management (Gen2+ Shelly.PutUserCA)
   - `shelly cert show|install|renew <device>`
-- [ ] `shelly vault` - Secure credential storage
-  - `shelly vault init|add|list|export`
-- [ ] `shelly firewall` - Device firewall rules
-  - `shelly firewall show|allow|deny <device> [subnet]`
 
 ### 29.12 Scripting & Automation
 
-- [ ] `shelly cron` - Cron-style scheduling
-  - `shelly cron "0 7 * * *" "scene activate morning"`
 - [ ] `shelly wait` - Wait for condition
   - `shelly wait <device> --state on|--online [--timeout 30s]`
-- [ ] `shelly if` - Conditional execution
-  - `shelly if "<condition>" then "<command>"`
-- [ ] `shelly loop` - Loop execution
-  - `shelly loop N "command" [--delay 1s] [--until "time"]`
-- [ ] `shelly pipeline` - Command pipelines
-  - `shelly pipeline create|run|list <name>`
 
 ### 29.13 Data & Export
 
-- [ ] `shelly dump` - Full data dump
-  - `shelly dump <device> [--all] [--format json] [--schema]`
-- [ ] `shelly import` - Bulk import
-  - `shelly import devices.yaml|scenes.yaml|config.json`
 - [ ] `shelly sync` - Cloud synchronization
   - `shelly sync cloud [--push|--pull]`
-- [ ] `shelly archive` - Archive management
-  - `shelly archive create|list|restore|--rotate N`
 
 ### 29.14 Debugging & Development
 
-- [ ] `shelly debug trace` - Trace all API calls
-- [ ] `shelly debug memory|crash-log|performance` - Device diagnostics
 - [ ] `shelly mock` - Mock device mode for testing without hardware
   - `shelly mock create|list|scenario <name>`
-- [ ] `shelly replay` - Replay recorded API calls
-  - `shelly replay record|stop|play <file>`
-- [ ] `shelly profile perf` - Performance profiling
-  - `shelly profile perf <device>|network|cli`
 
-### 29.15 Integration Commands
-
-- [ ] `shelly homeassistant` - Home Assistant integration
-  - `shelly homeassistant status|discover|export|mqtt-config`
-- [ ] `shelly node-red` - Node-RED integration
-  - `shelly node-red flows export|palette`
-- [ ] `shelly openhab` - OpenHAB integration
-  - `shelly openhab things|items`
-- [ ] `shelly alexa` - Alexa integration info
-  - `shelly alexa status|devices`
-- [ ] `shelly google-home` - Google Home integration info
-  - `shelly google-home status|devices`
-
-### 29.16 Maintenance & Lifecycle
-
-- [ ] `shelly maintenance` - Maintenance mode
-  - `shelly maintenance enable|disable|schedule <device>`
-- [ ] `shelly lifecycle` - Device lifecycle info
-  - `shelly lifecycle <device> [--warranty|--age|--usage]`
-- [ ] `shelly inventory` - Inventory management
-  - `shelly inventory list|add|export|value`
 
 ### 29.17 Notifications & Alerts
 
 - [ ] `shelly alert` - Alert management
   - `shelly alert create|list|test|snooze <name>`
   - `--condition "power > 1000W" --notify email:admin@...`
-- [ ] `shelly notify setup` - Notification channel setup
-  - `shelly notify setup email|slack|telegram|pushover|gotify`
-- [ ] `shelly subscribe` - Event subscriptions
-  - `shelly subscribe <device> --event <type>`
 
-### 29.18 Documentation & Help
-
-- [ ] `shelly man` - Manual pages
-  - `shelly man <command> [--all] [--pdf]`
-- [ ] `shelly examples` - Command examples
-  - `shelly examples <command> [--scenario X] [--level advanced]`
-- [ ] `shelly explain` - Explain what a command does
-  - `shelly explain "switch on kitchen --timer 300"`
-- [ ] `shelly cheatsheet` - Quick reference
-  - `shelly cheatsheet [--pdf] [--poster]`
 
 ### 29.19 Meta & CLI Management
 
 > **Note:** `shelly update` is defined in Phase 17. These are additional config/meta commands.
 
 - [ ] `shelly config edit` - Open config in $EDITOR
-- [ ] `shelly config validate|doctor|migrate` - Config management
 - [ ] `shelly cache` - Cache management
   - `shelly cache clear|stats|warm [--discovery]`
 - [ ] `shelly log` - CLI logging
   - `shelly log show|tail|level|export`
-- [ ] `shelly telemetry` - Anonymous telemetry control
-  - `shelly telemetry status|on|off|show`
 
 ### 29.20 Fun & Easter Eggs
 
@@ -859,8 +731,6 @@ See `.claude/COMPLETED.md` for details.
   - `shelly sleep [--duration 30m] [--except bedroom]`
 - [ ] `shelly wake` - Gradual lights on
   - `shelly wake [--simulate sunrise] [--duration 15m]`
-- [ ] `shelly demo` - Demo mode without real devices
-  - `shelly demo [--scenario home] [--speed fast]`
 
 ---
 
@@ -902,6 +772,7 @@ See `.claude/COMPLETED.md` for details.
 ### 30.5 Documentation Site (Post-Release)
 - [ ] Create docs site using Hugo
 - [ ] Deploy to GitHub Pages
+- [ ] Add `shelly docsite` command - opens documentation site in browser
 - [ ] Include:
   - Getting started guide
   - Command reference (generated from Cobra)
@@ -925,7 +796,7 @@ See `.claude/COMPLETED.md` for details.
 | **High** | Energy, Scripts, Schedules, KVS, MQTT, Webhooks, WiFi | Phases 5, 7, 8, 11, 18 |
 | **Medium** | BTHome, Zigbee, Gen1, Sensors, Thermostat | Phases 21, 23-25 |
 | **Low** | Matter, LoRa, Z-Wave, ModBus, Virtual | Phases 21, 22 |
-| **Innovative** | 82 new commands for QoL, fleet, automation, integrations | Phase 29 |
+| **Innovative** | ~25 commands for QoL, fleet, security, scripting | Phase 29 |
 
 ---
 
@@ -951,7 +822,7 @@ See `.claude/COMPLETED.md` for details.
 - [ ] Full documentation (godoc, user docs, examples)
 - [ ] Automated releases via GitHub Actions
 - [ ] Clean golangci-lint with strict settings
-- [ ] Phase 29 innovative commands: `feedback`, `doctor`, `watch`, `api`, `audit`, `fleet`
+- [ ] Phase 29 innovative commands: `feedback`, `doctor`, `watch`, `audit`, `fleet`
 - [ ] Home Assistant, Node-RED, OpenHAB integration commands
 - [ ] Demo mode working without real devices (for showcasing)
 - [ ] Professional branding (logo, ASCII banner)
