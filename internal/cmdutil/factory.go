@@ -327,15 +327,6 @@ func (f *Factory) ConfirmAction(message string, yes bool) (bool, error) {
 	return f.IOStreams().Confirm(message, false)
 }
 
-// ConfirmDangerousAction prompts for dangerous operation confirmation.
-// Requires typing "yes" to confirm. Respects yes flag.
-func (f *Factory) ConfirmDangerousAction(message string, yes bool) (bool, error) {
-	if yes {
-		return true, nil
-	}
-	return f.IOStreams().ConfirmDanger(message)
-}
-
 // =============================================================================
 // Output Format Helpers
 // =============================================================================

@@ -448,7 +448,7 @@ type Factory struct {
 // - GetDevice/GetGroup/GetAlias - config accessor helpers
 // - ResolveAddress/ResolveDevice - device name resolution
 // - ExpandTargets - batch operation target expansion
-// - ConfirmAction/ConfirmDangerousAction - user confirmation
+// - ConfirmAction - user confirmation
 // - OutputFormat/IsJSONOutput/IsYAMLOutput - output format helpers
 // - Logger - structured logging access
 
