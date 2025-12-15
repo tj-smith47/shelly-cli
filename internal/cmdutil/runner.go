@@ -15,6 +15,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// Output format constants.
+const (
+	outputJSON = "json"
+	outputYAML = "yaml"
+)
+
 // logVerbose logs a message to stderr only if verbose mode is enabled.
 func logVerbose(format string, args ...any) {
 	if viper.GetBool("verbose") {
@@ -224,11 +230,11 @@ func RunStatus[T any](
 // PrintResult outputs result data in the configured format (JSON, YAML, or human-readable).
 func PrintResult[T any](ios *iostreams.IOStreams, data T, display StatusDisplay[T]) error {
 	switch viper.GetString("output") {
-	case "json":
+	case outputJSON:
 		enc := json.NewEncoder(ios.Out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(data)
-	case "yaml":
+	case outputYAML:
 		enc := yaml.NewEncoder(ios.Out)
 		return enc.Encode(data)
 	default:
@@ -297,11 +303,11 @@ func RunList[T any](
 // PrintListResult outputs list data in the configured format (JSON, YAML, or human-readable).
 func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDisplay[T]) error {
 	switch viper.GetString("output") {
-	case "json":
+	case outputJSON:
 		enc := json.NewEncoder(ios.Out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(items)
-	case "yaml":
+	case outputYAML:
 		enc := yaml.NewEncoder(ios.Out)
 		return enc.Encode(items)
 	default:

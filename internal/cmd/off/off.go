@@ -54,11 +54,12 @@ Use --all to turn off all controllable components on the device.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	f := opts.Factory
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	var result *shelly.QuickResult
 	err := cmdutil.RunWithSpinner(ctx, ios, "Turning off...", func(ctx context.Context) error {

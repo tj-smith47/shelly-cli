@@ -60,7 +60,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/on"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/open"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/party"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ping"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/plugin"
@@ -293,17 +292,21 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringP("output", "o", "table", "Output format (table, json, yaml, template)")
 	rootCmd.PersistentFlags().String("template", "", "Go template string for output (use with -o template)")
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().CountP("verbose", "v", "Increase verbosity (-v=info, -vv=debug, -vvv=trace)")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
 	rootCmd.PersistentFlags().String("config", "", "Config file (default $HOME/.config/shelly/config.yaml)")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output")
+	rootCmd.PersistentFlags().Bool("log-json", false, "Output logs in JSON format")
+	rootCmd.PersistentFlags().String("log-categories", "", "Filter logs by category (comma-separated: network,api,device,config,auth,plugin)")
 
 	// Bind to viper - errors indicate programming bugs, panic is appropriate
 	must(viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output")))
 	must(viper.BindPFlag("template", rootCmd.PersistentFlags().Lookup("template")))
-	must(viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose")))
+	must(viper.BindPFlag("verbosity", rootCmd.PersistentFlags().Lookup("verbose")))
 	must(viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet")))
 	must(viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color")))
+	must(viper.BindPFlag("log.json", rootCmd.PersistentFlags().Lookup("log-json")))
+	must(viper.BindPFlag("log.categories", rootCmd.PersistentFlags().Lookup("log-categories")))
 
 	// Define command groups for organized help output
 	rootCmd.AddGroup(
@@ -327,7 +330,6 @@ func init() {
 		statuscmd.NewCommand(f),
 		rebootcmd.NewCommand(f),
 		resetcmd.NewCommand(f),
-		open.NewCommand(f),
 		ping.NewCommand(f),
 		qr.NewCommand(f),
 		sleep.NewCommand(f),
@@ -482,6 +484,9 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 	if shouldDisableColor() {
 		lipgloss.Writer.Profile = colorprofile.Ascii
 	}
+
+	// Configure structured logging based on verbosity and log settings
+	iostreams.ConfigureLogger()
 
 	return nil
 }

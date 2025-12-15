@@ -66,7 +66,6 @@ and controlling Shelly devices on your local network.
 * [shelly mqtt](shelly_mqtt.md)	 - Manage device MQTT configuration
 * [shelly off](shelly_off.md)	 - Turn off a device (auto-detects type)
 * [shelly on](shelly_on.md)	 - Turn on a device (auto-detects type)
-* [shelly open](shelly_open.md)	 - Open device web UI in browser
 * [shelly party](shelly_party.md)	 - Party mode - flash lights!
 * [shelly ping](shelly_ping.md)	 - Test device connectivity
 * [shelly plugin](shelly_plugin.md)	 - Manage CLI plugins

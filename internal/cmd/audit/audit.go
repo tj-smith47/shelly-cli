@@ -11,7 +11,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -113,7 +112,6 @@ func runAll(ctx context.Context, f *cmdutil.Factory) error {
 
 func run(ctx context.Context, f *cmdutil.Factory, devices []string) error {
 	ios := f.IOStreams()
-	svc := f.ShellyService()
 
 	ios.Println("")
 	ios.Println(theme.Title().Render("Shelly Security Audit"))
@@ -124,7 +122,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string) error {
 	totalWarnings := 0
 
 	for _, device := range devices {
-		result := auditDevice(ctx, svc, device)
+		result := auditDevice(ctx, f, device)
 		printAuditResult(ios, result)
 		totalIssues += len(result.Issues)
 		totalWarnings += len(result.Warnings)
@@ -149,7 +147,9 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string) error {
 	return nil
 }
 
-func auditDevice(ctx context.Context, svc *shelly.Service, device string) *Result {
+func auditDevice(ctx context.Context, f *cmdutil.Factory, device string) *Result {
+	svc := f.ShellyService()
+
 	result := &Result{
 		Device:    device,
 		Issues:    []string{},
@@ -158,7 +158,7 @@ func auditDevice(ctx context.Context, svc *shelly.Service, device string) *Resul
 	}
 
 	// Resolve device address
-	if d, ok := config.GetDevice(device); ok {
+	if d := f.GetDevice(device); d != nil {
 		result.Address = d.Address
 	} else {
 		result.Address = device

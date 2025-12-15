@@ -10,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -60,7 +59,7 @@ Note: Only devices of the same model/generation are fully compatible.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
@@ -87,15 +86,13 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Confirm unless --yes
-	if !opts.Yes {
-		confirmed, err := ios.Confirm(fmt.Sprintf("Apply template %q to device %q?", opts.Template, opts.Device), false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Cancelled")
-			return nil
-		}
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Apply template %q to device %q?", opts.Template, opts.Device), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	// Apply template

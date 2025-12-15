@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // DefaultTimeout is the default mDNS discovery timeout.
@@ -80,7 +81,7 @@ func run(f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool)
 	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
 	defer func() {
 		if err := mdnsDiscoverer.Stop(); err != nil {
-			ios.DebugErr("stopping mDNS discoverer", err)
+			ios.DebugErrCat(iostreams.CategoryDiscovery, "stopping mDNS discoverer", err)
 		}
 	}()
 

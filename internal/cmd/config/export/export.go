@@ -11,7 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var formatFlag string
@@ -46,7 +45,7 @@ for YAML output.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()

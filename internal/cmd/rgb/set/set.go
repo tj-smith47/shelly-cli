@@ -56,7 +56,7 @@ Values not specified will be left unchanged.`,
 func run(ctx context.Context, f *cmdutil.Factory, device string, rgbID, red, green, blue, brightness int, on bool) error {
 	params := buildParams(red, green, blue, brightness, on)
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()

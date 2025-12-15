@@ -7,10 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // NewCommand creates the device ui command.
@@ -44,36 +42,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 
 	// Resolve device to get its address
-	addr := resolveDeviceAddress(device)
+	addr := f.ResolveAddress(device)
 
 	url := fmt.Sprintf("http://%s", addr)
 
 	ios.Info("Opening %s in browser...", url)
 
-	b := browser.New()
-	if err := b.Browse(ctx, url); err != nil {
+	if err := f.Browser().Browse(ctx, url); err != nil {
 		return fmt.Errorf("failed to open browser: %w", err)
 	}
 
 	return nil
-}
-
-// resolveDeviceAddress resolves a device identifier to its IP address or hostname.
-// If the device is found in config, returns its address; otherwise assumes
-// the identifier is already an address.
-func resolveDeviceAddress(device string) string {
-	// Try to find device in config
-	d, err := config.ResolveDevice(device)
-	if err != nil {
-		// Not found in config - assume device is an address
-		return device
-	}
-
-	// Found in config - use its address if available
-	if d.Address != "" {
-		return d.Address
-	}
-
-	// Device found but no address - use the identifier as-is
-	return device
 }

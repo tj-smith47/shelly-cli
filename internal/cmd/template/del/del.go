@@ -55,16 +55,14 @@ func run(opts *Options) error {
 	}
 
 	// Confirm unless --yes
-	if !opts.Yes {
-		msg := fmt.Sprintf("Delete template %q (model: %s)?", tpl.Name, tpl.Model)
-		confirmed, err := ios.Confirm(msg, false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Cancelled")
-			return nil
-		}
+	msg := fmt.Sprintf("Delete template %q (model: %s)?", tpl.Name, tpl.Model)
+	confirmed, err := opts.Factory.ConfirmAction(msg, opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	// Delete template

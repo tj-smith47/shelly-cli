@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the group remove command.
@@ -34,16 +33,18 @@ Removing a device from a group does not delete the device.`,
   shelly grp rm office 192.168.1.100`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], args[1:])
+			return run(f, args[0], args[1:])
 		},
 	}
 
 	return cmd
 }
 
-func run(groupName string, devices []string) error {
+func run(f *cmdutil.Factory, groupName string, devices []string) error {
+	ios := f.IOStreams()
+
 	// Check if group exists
-	if _, exists := config.GetGroup(groupName); !exists {
+	if f.GetGroup(groupName) == nil {
 		return fmt.Errorf("group %q not found", groupName)
 	}
 
@@ -51,7 +52,7 @@ func run(groupName string, devices []string) error {
 	for _, device := range devices {
 		err := config.RemoveDeviceFromGroup(groupName, device)
 		if err != nil {
-			iostreams.Warning("Failed to remove %q: %v", device, err)
+			ios.Warning("Failed to remove %q: %v", device, err)
 			continue
 		}
 		removed++
@@ -62,9 +63,9 @@ func run(groupName string, devices []string) error {
 	}
 
 	if removed == 1 {
-		iostreams.Success("Removed 1 device from group %q", groupName)
+		ios.Success("Removed 1 device from group %q", groupName)
 	} else {
-		iostreams.Success("Removed %d devices from group %q", removed, groupName)
+		ios.Success("Removed %d devices from group %q", removed, groupName)
 	}
 
 	return nil

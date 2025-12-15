@@ -11,7 +11,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 const (
@@ -93,7 +92,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		return fmt.Errorf("--password or --generate is required")
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Rotating credentials...", func(ctx context.Context) error {

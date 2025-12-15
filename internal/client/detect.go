@@ -81,7 +81,7 @@ func tryGen2Detection(ctx context.Context, client *http.Client, baseURL string, 
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
-			iostreams.DebugErr("closing gen2 detection response body", cerr)
+			iostreams.DebugErrCat(iostreams.CategoryNetwork, "closing gen2 detection response body", cerr)
 		}
 	}()
 
@@ -150,7 +150,7 @@ func tryGen1Detection(ctx context.Context, client *http.Client, baseURL string, 
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
-			iostreams.DebugErr("closing gen1 detection response body", cerr)
+			iostreams.DebugErrCat(iostreams.CategoryNetwork, "closing gen1 detection response body", cerr)
 		}
 	}()
 

@@ -3,12 +3,16 @@ package cmdutil_test
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
+
+const testDeviceAddress = "testDeviceAddress"
 
 func TestNew(t *testing.T) {
 	t.Parallel()
@@ -263,5 +267,305 @@ func TestFactory_SetShellyService_OverridesOriginal(t *testing.T) {
 	gotSvc := f.ShellyService()
 	if gotSvc != svc2 {
 		t.Error("SetShellyService should override previous service")
+	}
+}
+
+func TestFactory_Browser_LazyInit(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// First call should initialize
+	br1 := f.Browser()
+	if br1 == nil {
+		t.Fatal("Browser() returned nil")
+	}
+
+	// Second call should return same instance
+	br2 := f.Browser()
+	if br1 != br2 {
+		t.Error("Browser() should return cached instance")
+	}
+}
+
+func TestFactory_SetBrowser(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Set custom browser (using nil as mock since we're just testing the setter)
+	result := f.SetBrowser(nil)
+	if result != f {
+		t.Error("SetBrowser should return factory for chaining")
+	}
+}
+
+func TestFactory_WithTimeout(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	ctx := t.Context()
+
+	// Create context with timeout
+	timeoutCtx, cancel := f.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+
+	if timeoutCtx == nil {
+		t.Fatal("WithTimeout returned nil context")
+	}
+
+	// Verify deadline is set
+	deadline, ok := timeoutCtx.Deadline()
+	if !ok {
+		t.Error("WithTimeout should set a deadline")
+	}
+	if deadline.IsZero() {
+		t.Error("WithTimeout deadline should not be zero")
+	}
+}
+
+func TestFactory_WithDefaultTimeout(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	ctx := t.Context()
+
+	// Create context with default timeout
+	timeoutCtx, cancel := f.WithDefaultTimeout(ctx)
+	defer cancel()
+
+	if timeoutCtx == nil {
+		t.Fatal("WithDefaultTimeout returned nil context")
+	}
+
+	// Verify deadline is set
+	_, ok := timeoutCtx.Deadline()
+	if !ok {
+		t.Error("WithDefaultTimeout should set a deadline")
+	}
+}
+
+func TestFactory_GetDevice(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Set config with a device
+	cfg := &config.Config{
+		Devices: map[string]model.Device{
+			"test-device": {Address: testDeviceAddress},
+		},
+	}
+	f.SetConfig(cfg)
+
+	// Should find existing device
+	dev := f.GetDevice("test-device")
+	if dev == nil {
+		t.Fatal("GetDevice should return device")
+	}
+	if dev.Address != testDeviceAddress {
+		t.Errorf("GetDevice address = %q, want %q", dev.Address, testDeviceAddress)
+	}
+
+	// Should return nil for non-existent device
+	if f.GetDevice("non-existent") != nil {
+		t.Error("GetDevice should return nil for non-existent device")
+	}
+}
+
+func TestFactory_GetGroup(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Set config with a group
+	cfg := &config.Config{
+		Groups: map[string]config.Group{
+			"test-group": {Devices: []string{"dev1", "dev2"}},
+		},
+	}
+	f.SetConfig(cfg)
+
+	// Should find existing group
+	grp := f.GetGroup("test-group")
+	if grp == nil {
+		t.Fatal("GetGroup should return group")
+	}
+	if len(grp.Devices) != 2 {
+		t.Errorf("GetGroup devices = %d, want 2", len(grp.Devices))
+	}
+
+	// Should return nil for non-existent group
+	if f.GetGroup("non-existent") != nil {
+		t.Error("GetGroup should return nil for non-existent group")
+	}
+}
+
+func TestFactory_GetAlias(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Set config with an alias
+	cfg := &config.Config{
+		Aliases: map[string]config.Alias{
+			"test-alias": {Command: "device list"},
+		},
+	}
+	f.SetConfig(cfg)
+
+	// Should find existing alias
+	alias := f.GetAlias("test-alias")
+	if alias == nil {
+		t.Fatal("GetAlias should return alias")
+	}
+
+	// Should return nil for non-existent alias
+	if f.GetAlias("non-existent") != nil {
+		t.Error("GetAlias should return nil for non-existent alias")
+	}
+}
+
+func TestFactory_ResolveAddress(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Set config with a device
+	cfg := &config.Config{
+		Devices: map[string]model.Device{
+			"test-device": {Address: testDeviceAddress},
+		},
+	}
+	f.SetConfig(cfg)
+
+	// Should resolve device name to address
+	addr := f.ResolveAddress("test-device")
+	if addr != testDeviceAddress {
+		t.Errorf("ResolveAddress = %q, want %q", addr, testDeviceAddress)
+	}
+
+	// Should return identifier as-is if not found
+	addr = f.ResolveAddress("192.168.1.200")
+	if addr != "192.168.1.200" {
+		t.Errorf("ResolveAddress = %q, want %q", addr, "192.168.1.200")
+	}
+}
+
+func TestFactory_ResolveDevice(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Set config with a device
+	cfg := &config.Config{
+		Devices: map[string]model.Device{
+			"test-device": {Address: testDeviceAddress},
+		},
+	}
+	f.SetConfig(cfg)
+
+	// Should resolve device name
+	dev, ok := f.ResolveDevice("test-device")
+	if !ok {
+		t.Fatal("ResolveDevice should return true for existing device")
+	}
+	if dev.Address != testDeviceAddress {
+		t.Errorf("ResolveDevice address = %q, want %q", dev.Address, testDeviceAddress)
+	}
+
+	// Should return false for non-existent device
+	_, ok = f.ResolveDevice("non-existent")
+	if ok {
+		t.Error("ResolveDevice should return false for non-existent device")
+	}
+}
+
+func TestFactory_ExpandTargets(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Set config with devices and groups
+	cfg := &config.Config{
+		Devices: map[string]model.Device{
+			"dev1": {Address: "192.168.1.1"},
+			"dev2": {Address: "192.168.1.2"},
+			"dev3": {Address: "192.168.1.3"},
+		},
+		Groups: map[string]config.Group{
+			"test-group": {Devices: []string{"dev1", "dev2"}},
+		},
+	}
+	f.SetConfig(cfg)
+
+	// Test with args
+	targets, err := f.ExpandTargets([]string{"dev1"}, "", false)
+	if err != nil {
+		t.Fatalf("ExpandTargets error: %v", err)
+	}
+	if len(targets) != 1 || targets[0] != "192.168.1.1" {
+		t.Errorf("ExpandTargets args = %v, want [192.168.1.1]", targets)
+	}
+
+	// Test with group
+	targets, err = f.ExpandTargets(nil, "test-group", false)
+	if err != nil {
+		t.Fatalf("ExpandTargets group error: %v", err)
+	}
+	if len(targets) != 2 {
+		t.Errorf("ExpandTargets group len = %d, want 2", len(targets))
+	}
+
+	// Test with all
+	targets, err = f.ExpandTargets(nil, "", true)
+	if err != nil {
+		t.Fatalf("ExpandTargets all error: %v", err)
+	}
+	if len(targets) != 3 {
+		t.Errorf("ExpandTargets all len = %d, want 3", len(targets))
+	}
+
+	// Test with non-existent group
+	_, err = f.ExpandTargets(nil, "non-existent", false)
+	if err == nil {
+		t.Error("ExpandTargets should error for non-existent group")
+	}
+
+	// Test with no targets
+	_, err = f.ExpandTargets(nil, "", false)
+	if err == nil {
+		t.Error("ExpandTargets should error for no targets")
+	}
+}
+
+func TestFactory_OutputFormat(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Default output format is empty
+	// Note: We can't easily test viper-based output format without setting up viper
+	// This test just ensures the method doesn't panic
+	_ = f.OutputFormat()
+	_ = f.IsJSONOutput()
+	_ = f.IsYAMLOutput()
+	_ = f.IsStructuredOutput()
+}
+
+func TestFactory_Logger(t *testing.T) {
+	t.Parallel()
+
+	in := &bytes.Buffer{}
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(in, out, errOut)
+
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	// Logger should not return nil
+	logger := f.Logger()
+	if logger == nil {
+		t.Error("Logger should not return nil")
 	}
 }

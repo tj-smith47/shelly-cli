@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the group add command.
@@ -34,16 +33,18 @@ Devices can belong to multiple groups.`,
   shelly grp add bedroom lamp`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], args[1:])
+			return run(f, args[0], args[1:])
 		},
 	}
 
 	return cmd
 }
 
-func run(groupName string, devices []string) error {
+func run(f *cmdutil.Factory, groupName string, devices []string) error {
+	ios := f.IOStreams()
+
 	// Check if group exists
-	if _, exists := config.GetGroup(groupName); !exists {
+	if f.GetGroup(groupName) == nil {
 		return fmt.Errorf("group %q not found", groupName)
 	}
 
@@ -51,7 +52,7 @@ func run(groupName string, devices []string) error {
 	for _, device := range devices {
 		err := config.AddDeviceToGroup(groupName, device)
 		if err != nil {
-			iostreams.Warning("Failed to add %q: %v", device, err)
+			ios.Warning("Failed to add %q: %v", device, err)
 			continue
 		}
 		added++
@@ -62,9 +63,9 @@ func run(groupName string, devices []string) error {
 	}
 
 	if added == 1 {
-		iostreams.Success("Added 1 device to group %q", groupName)
+		ios.Success("Added 1 device to group %q", groupName)
 	} else {
-		iostreams.Success("Added %d devices to group %q", added, groupName)
+		ios.Success("Added %d devices to group %q", added, groupName)
 	}
 
 	return nil

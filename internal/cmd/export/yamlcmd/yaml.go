@@ -12,8 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -71,15 +69,15 @@ type DeviceExport struct {
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
 	// Get device config for name/address
-	deviceCfg, exists := config.GetDevice(opts.Device)
-	if !exists {
+	deviceCfg := opts.Factory.GetDevice(opts.Device)
+	if deviceCfg == nil {
 		return fmt.Errorf("device %q not found in config", opts.Device)
 	}
 

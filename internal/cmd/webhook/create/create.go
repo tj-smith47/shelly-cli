@@ -63,7 +63,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		return fmt.Errorf("--url is required (at least one URL)")
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

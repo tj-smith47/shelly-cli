@@ -104,7 +104,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 
 	// Optional: Device connectivity
 	if opts.Devices {
-		issues += checkDeviceConnectivity(ctx, f, ios)
+		issues += checkDeviceConnectivity(ctx, f)
 	}
 
 	printSummary(ios, issues, warnings)
@@ -113,10 +113,10 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 }
 
 func printHeader(ios *iostreams.IOStreams) {
-	ios.Println("")
+	ios.Println()
 	ios.Println(theme.Title().Render("Shelly CLI Doctor"))
 	ios.Println(theme.Dim().Render(strings.Repeat("━", 50)))
-	ios.Println("")
+	ios.Println()
 }
 
 // warnStdout prints a warning message to stdout (not stderr) for consistent diagnostic output ordering.
@@ -132,7 +132,7 @@ func checkCLIVersion(ios *iostreams.IOStreams) (issues, warnings int) {
 	currentVersion := version.Version
 	if currentVersion == "" || currentVersion == "dev" {
 		ios.Info("  Version: development build")
-		ios.Println("")
+		ios.Println()
 		return 0, 0
 	}
 
@@ -152,14 +152,14 @@ func checkCLIVersion(ios *iostreams.IOStreams) (issues, warnings int) {
 			if latest > current {
 				warnStdout(ios, "  Update available: %s -> %s", currentVersion, latestVersion)
 				ios.Info("    Run 'shelly update' to upgrade")
-				ios.Println("")
+				ios.Println()
 				return 0, 1 // Warning, not issue
 			}
 		}
 	}
 
 	ios.Success("  Up to date")
-	ios.Println("")
+	ios.Println()
 	return 0, 0
 }
 
@@ -170,7 +170,7 @@ func checkConfig(ios *iostreams.IOStreams) int {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		ios.Error("  Cannot determine home directory: %v", err)
-		ios.Println("")
+		ios.Println()
 		return 1
 	}
 
@@ -191,7 +191,7 @@ func checkConfig(ios *iostreams.IOStreams) int {
 		ios.Info("    API mode: %s", cfg.APIMode)
 	}
 
-	ios.Println("")
+	ios.Println()
 	return issues
 }
 
@@ -202,7 +202,7 @@ func checkDevices(ios *iostreams.IOStreams) (issues, warnings int) {
 	if len(devices) == 0 {
 		warnStdout(ios, "  No devices registered")
 		ios.Info("    Run 'shelly discover mdns --register' to find devices")
-		ios.Println("")
+		ios.Println()
 		return 0, 1
 	}
 
@@ -218,7 +218,7 @@ func checkDevices(ios *iostreams.IOStreams) (issues, warnings int) {
 		}
 	}
 
-	ios.Println("")
+	ios.Println()
 	return issues, 0
 }
 
@@ -236,7 +236,7 @@ func checkCloudAuth(ios *iostreams.IOStreams) int {
 		ios.Info("    Run 'shelly cloud login' to enable remote control")
 	}
 
-	ios.Println("")
+	ios.Println()
 	return 0
 }
 
@@ -277,17 +277,18 @@ func checkNetwork(ctx context.Context, ios *iostreams.IOStreams) int {
 		ios.Success("  %s: reachable", ep.name)
 	}
 
-	ios.Println("")
+	ios.Println()
 	return issues
 }
 
-func checkDeviceConnectivity(ctx context.Context, f *cmdutil.Factory, ios *iostreams.IOStreams) int {
+func checkDeviceConnectivity(ctx context.Context, f *cmdutil.Factory) int {
+	ios := f.IOStreams()
 	ios.Println(theme.Bold().Render("Device Connectivity"))
 
 	devices := config.ListDevices()
 	if len(devices) == 0 {
 		ios.Info("  No devices to test")
-		ios.Println("")
+		ios.Println()
 		return 0
 	}
 
@@ -319,7 +320,7 @@ func checkDeviceConnectivity(ctx context.Context, f *cmdutil.Factory, ios *iostr
 		warnStdout(ios, "  %d device(s) unreachable", issues)
 	}
 
-	ios.Println("")
+	ios.Println()
 	return issues
 }
 
@@ -341,8 +342,8 @@ func printSummary(ios *iostreams.IOStreams, issues, warnings int) {
 		}
 	}
 
-	ios.Println("")
+	ios.Println()
 	ios.Println(fmt.Sprintf("Run %s for all diagnostics including device tests.",
 		theme.Code().Render("shelly doctor --full")))
-	ios.Println("")
+	ios.Println()
 }

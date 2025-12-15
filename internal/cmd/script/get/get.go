@@ -49,7 +49,7 @@ detailed status including memory usage and errors.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

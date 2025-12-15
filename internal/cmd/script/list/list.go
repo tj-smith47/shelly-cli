@@ -56,7 +56,7 @@ Columns: ID, Name, Enabled (yes/no), Running (running/stopped)`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

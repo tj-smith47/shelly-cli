@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
@@ -43,8 +42,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 func run(f *cmdutil.Factory, cmd *cobra.Command, groupName string) error {
 	ios := f.IOStreams()
 
-	group, ok := config.GetGroup(groupName)
-	if !ok {
+	group := f.GetGroup(groupName)
+	if group == nil {
 		return fmt.Errorf("group %q not found", groupName)
 	}
 

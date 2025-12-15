@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -68,7 +69,7 @@ Use --dry-run to see what would be imported without making changes.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2) // Allow more time for imports
+	ctx, cancel := opts.Factory.WithTimeout(ctx, 20*time.Second) // Allow more time for imports
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
@@ -95,11 +96,14 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Confirm import
-	if !opts.Yes {
-		if !confirmImport(ios, len(data.Items), opts.Device, opts.Overwrite) {
-			ios.Info("Aborted")
-			return nil
-		}
+	msg := buildConfirmMessage(len(data.Items), opts.Device, opts.Overwrite)
+	confirmed, err := opts.Factory.ConfirmAction(msg, opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Aborted")
+		return nil
 	}
 
 	// Execute import
@@ -143,18 +147,13 @@ func handleDryRun(ios *iostreams.IOStreams, count int, overwrite bool) {
 	}
 }
 
-// confirmImport prompts for user confirmation.
-func confirmImport(ios *iostreams.IOStreams, count int, device string, overwrite bool) bool {
+// buildConfirmMessage builds the confirmation message.
+func buildConfirmMessage(count int, device string, overwrite bool) string {
 	action := "Import"
 	if overwrite {
 		action = "Import and overwrite"
 	}
-	msg := fmt.Sprintf("%s %d key(s) to %s?", action, count, device)
-	confirmed, err := ios.Confirm(msg, false)
-	if err != nil {
-		return false
-	}
-	return confirmed
+	return fmt.Sprintf("%s %d key(s) to %s?", action, count, device)
 }
 
 // executeImport performs the actual import operation.

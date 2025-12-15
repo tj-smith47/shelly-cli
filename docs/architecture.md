@@ -434,12 +434,23 @@ type Factory struct {
     IOStreams     func() *iostreams.IOStreams
     Config        func() (*config.Config, error)
     ShellyService func() *shelly.Service
+    Browser       func() browser.Browser
 
     // Cached instances (set after first call)
     ioStreams     *iostreams.IOStreams
     cfg           *config.Config
     shellyService *shelly.Service
+    browserInst   browser.Browser
 }
+
+// Factory also provides helper methods for common operations:
+// - WithTimeout/WithDefaultTimeout - context timeout management
+// - GetDevice/GetGroup/GetAlias - config accessor helpers
+// - ResolveAddress/ResolveDevice - device name resolution
+// - ExpandTargets - batch operation target expansion
+// - ConfirmAction/ConfirmDangerousAction - user confirmation
+// - OutputFormat/IsJSONOutput/IsYAMLOutput - output format helpers
+// - Logger - structured logging access
 
 // NewFactory creates a Factory with production dependencies
 func NewFactory() *Factory {

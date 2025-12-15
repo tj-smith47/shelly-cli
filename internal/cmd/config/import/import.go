@@ -14,7 +14,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var (
@@ -55,7 +54,7 @@ to replace the entire configuration.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	// Read and parse file

@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
@@ -39,23 +38,21 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
 	// Confirm unless --yes
-	if !yesFlag {
-		ios.Warning("This will delete ALL schedules from the device.")
-		confirmed, err := ios.Confirm("Delete all schedules?", false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Warning("Delete cancelled")
-			return nil
-		}
+	ios.Warning("This will delete ALL schedules from the device.")
+	confirmed, err := f.ConfirmAction("Delete all schedules?", yesFlag)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Warning("Delete cancelled")
+		return nil
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {

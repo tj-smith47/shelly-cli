@@ -48,11 +48,26 @@ theme: dracula
 # API mode: local (direct device access), cloud (via Shelly Cloud), auto
 api_mode: local
 
-# Debug output
-verbose: false
+# Verbosity level (0=silent, 1=info, 2=debug, 3=trace)
+# Can also be set via -v/-vv/-vvv flags
+verbosity: 0
 
 # Suppress non-essential output
 quiet: false
+
+# =============================================================================
+# Logging Settings (for debugging)
+# =============================================================================
+
+log:
+  # Log output format: false=human-readable, true=JSON (for log aggregation)
+  json: false
+
+  # Filter logs by category (comma-separated)
+  # Available: network, config, device, api, auth, plugin, discovery, firmware
+  # Example: "network,api" to only see network and API logs
+  # Leave empty to see all categories
+  categories: ""
 
 # =============================================================================
 # Discovery Settings

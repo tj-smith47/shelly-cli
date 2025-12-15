@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the script eval command.
@@ -50,7 +49,7 @@ multiple words that will be joined together.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, id int, code string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

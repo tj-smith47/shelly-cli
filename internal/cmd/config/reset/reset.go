@@ -11,9 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-var (
-	yesFlag bool
-)
+var yesFlag bool
 
 // NewCommand creates the config reset command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
@@ -40,7 +38,7 @@ Note: This does not perform a full factory reset. For that, use:
 			if len(args) > 1 {
 				component = args[1]
 			}
-			return run(f, cmd.Context(), device, component)
+			return run(cmd.Context(), f, device, component)
 		},
 	}
 
@@ -49,7 +47,7 @@ Note: This does not perform a full factory reset. For that, use:
 	return cmd
 }
 
-func run(f *cmdutil.Factory, ctx context.Context, device, component string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device, component string) error {
 	ios := f.IOStreams()
 
 	if component == "" {
@@ -58,21 +56,19 @@ func run(f *cmdutil.Factory, ctx context.Context, device, component string) erro
 	}
 
 	// Confirm reset
-	if !yesFlag {
-		confirmed, err := ios.Confirm(
-			fmt.Sprintf("Reset %s configuration on %s to defaults?", component, device),
-			false,
-		)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Warning("Reset cancelled")
-			return nil
-		}
+	confirmed, err := f.ConfirmAction(
+		fmt.Sprintf("Reset %s configuration on %s to defaults?", component, device),
+		yesFlag,
+	)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Warning("Reset cancelled")
+		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()
@@ -82,7 +78,7 @@ func run(f *cmdutil.Factory, ctx context.Context, device, component string) erro
 	// Reset by setting config to empty/defaults
 	// Note: The actual reset behavior depends on the component type
 	// For now, we use a raw RPC call if available, or set to empty config
-	err := resetComponent(ctx, svc, device, component)
+	err = resetComponent(ctx, svc, device, component)
 	ios.StopProgress()
 
 	if err != nil {
@@ -95,7 +91,7 @@ func run(f *cmdutil.Factory, ctx context.Context, device, component string) erro
 
 // showComponents lists available components that can be reset.
 func showComponents(f *cmdutil.Factory, ctx context.Context, device string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()

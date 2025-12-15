@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
@@ -47,21 +46,19 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, webhookID int) 
 	ios := f.IOStreams()
 
 	// Confirm deletion
-	if !yesFlag {
-		confirmed, err := ios.Confirm(
-			fmt.Sprintf("Delete webhook %d on %s?", webhookID, device),
-			false,
-		)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Warning("Cancelled")
-			return nil
-		}
+	confirmed, err := f.ConfirmAction(
+		fmt.Sprintf("Delete webhook %d on %s?", webhookID, device),
+		yesFlag,
+	)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Warning("Cancelled")
+		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()

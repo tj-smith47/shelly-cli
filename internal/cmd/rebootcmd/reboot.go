@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -55,25 +54,24 @@ set a delay in milliseconds before the reboot occurs.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ios := opts.Factory.IOStreams()
+	f := opts.Factory
+	ios := f.IOStreams()
 
-	if !opts.Yes {
-		confirmed, err := ios.Confirm(fmt.Sprintf("Reboot device %q?", opts.Device), false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Cancelled")
-			return nil
-		}
+	confirmed, err := f.ConfirmAction(fmt.Sprintf("Reboot device %q?", opts.Device), opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := opts.Factory.ShellyService()
+	svc := f.ShellyService()
 
-	err := cmdutil.RunWithSpinner(ctx, ios, "Rebooting device...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Rebooting device...", func(ctx context.Context) error {
 		return svc.DeviceReboot(ctx, opts.Device, opts.Delay)
 	})
 	if err != nil {

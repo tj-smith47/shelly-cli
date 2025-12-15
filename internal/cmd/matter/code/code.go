@@ -10,9 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -69,7 +67,7 @@ type CommissioningInfo struct {
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
@@ -98,7 +96,7 @@ func run(ctx context.Context, opts *Options) error {
 		if opts.JSON {
 			return outputJSON(ios, CommissioningInfo{Available: false})
 		}
-		displayNotAvailable(ios, opts.Device)
+		displayNotAvailable(opts.Factory, opts.Device)
 		return nil
 	}
 
@@ -114,7 +112,7 @@ func run(ctx context.Context, opts *Options) error {
 		return outputJSON(ios, info)
 	}
 
-	displayCommissioningInfo(ios, info, opts.Device)
+	displayCommissioningInfo(opts.Factory, info, opts.Device)
 	return nil
 }
 
@@ -127,12 +125,13 @@ func outputJSON(ios *iostreams.IOStreams, info CommissioningInfo) error {
 	return nil
 }
 
-func displayCommissioningInfo(ios *iostreams.IOStreams, info CommissioningInfo, device string) {
+func displayCommissioningInfo(f *cmdutil.Factory, info CommissioningInfo, device string) {
+	ios := f.IOStreams()
 	if info.Available && info.ManualCode != "" {
 		displayAvailableCode(ios, info)
 		return
 	}
-	displayNotAvailable(ios, device)
+	displayNotAvailable(f, device)
 }
 
 func displayAvailableCode(ios *iostreams.IOStreams, info CommissioningInfo) {
@@ -152,9 +151,11 @@ func displayAvailableCode(ios *iostreams.IOStreams, info CommissioningInfo) {
 	ios.Info("Use this code in your Matter controller app.")
 }
 
-func displayNotAvailable(ios *iostreams.IOStreams, device string) {
+func displayNotAvailable(f *cmdutil.Factory, device string) {
+	ios := f.IOStreams()
+
 	deviceIP := ""
-	if devCfg, cfgErr := config.ResolveDevice(device); cfgErr == nil {
+	if devCfg, ok := f.ResolveDevice(device); ok && devCfg.Address != "" {
 		deviceIP = devCfg.Address
 	}
 

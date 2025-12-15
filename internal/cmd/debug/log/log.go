@@ -9,8 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -54,7 +52,7 @@ and other device behavior.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
@@ -83,8 +81,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	if info.Generation == 1 {
 		// Get the resolved address for the curl hint
-		deviceCfg, cfgErr := config.ResolveDevice(opts.Device)
-		if cfgErr == nil && deviceCfg.Address != "" {
+		if deviceCfg, ok := opts.Factory.ResolveDevice(opts.Device); ok && deviceCfg.Address != "" {
 			ios.Info("Try: curl http://%s/debug/log", deviceCfg.Address)
 		} else {
 			ios.Info("Try: curl http://<device-ip>/debug/log")

@@ -38,7 +38,7 @@ and number of clients connected to the access point (if enabled).`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

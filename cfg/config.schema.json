@@ -36,10 +36,30 @@
       "enum": ["local", "cloud", "auto"],
       "default": "local"
     },
-    "verbose": {
-      "type": "boolean",
-      "description": "Enable verbose output",
-      "default": false
+    "verbosity": {
+      "type": "integer",
+      "description": "Verbosity level (0=silent, 1=info, 2=debug, 3=trace). Can be set via -v/-vv/-vvv flags.",
+      "minimum": 0,
+      "maximum": 3,
+      "default": 0
+    },
+    "log": {
+      "type": "object",
+      "description": "Logging settings for debugging",
+      "properties": {
+        "json": {
+          "type": "boolean",
+          "description": "Output logs in JSON format for machine parsing",
+          "default": false
+        },
+        "categories": {
+          "type": "string",
+          "description": "Filter logs by category (comma-separated). Available: network, config, device, api, auth, plugin, discovery, firmware",
+          "examples": ["network,api", "device,config", ""],
+          "default": ""
+        }
+      },
+      "additionalProperties": false
     },
     "quiet": {
       "type": "boolean",

@@ -23,6 +23,7 @@ import (
 )
 
 type options struct {
+	Factory    *cmdutil.Factory
 	Check      bool
 	Version    string
 	Channel    string
@@ -33,7 +34,7 @@ type options struct {
 
 // NewCommand creates the update command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &options{}
+	opts := &options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -59,7 +60,7 @@ Use --version to install a specific version.`,
   # Update without confirmation
   shelly update --yes`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -73,8 +74,8 @@ Use --version to install a specific version.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *options) error {
+	ios := opts.Factory.IOStreams()
 	ghClient := github.NewClient(ios)
 
 	currentVersion := version.Version
@@ -84,7 +85,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *options) error {
 
 	// Handle rollback
 	if opts.Rollback {
-		return handleRollback(ctx, ios, ghClient, currentVersion, opts)
+		return handleRollback(ctx, ghClient, currentVersion, opts)
 	}
 
 	// Get target release
@@ -110,7 +111,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *options) error {
 	}
 
 	// Show update info and confirm
-	if err := confirmUpdate(ios, opts, currentVersion, availableVersion, targetRelease); err != nil {
+	if err := confirmUpdate(opts, currentVersion, availableVersion, targetRelease); err != nil {
 		return err
 	}
 
@@ -162,10 +163,8 @@ func fetchLatestVersion(ctx context.Context, ios *iostreams.IOStreams, ghClient 
 	return release, nil
 }
 
-func confirmUpdate(ios *iostreams.IOStreams, opts *options, currentVersion, availableVersion string, release *github.Release) error {
-	if opts.Yes {
-		return nil
-	}
+func confirmUpdate(opts *options, currentVersion, availableVersion string, release *github.Release) error {
+	ios := opts.Factory.IOStreams()
 
 	ios.Printf("\nCurrent version: %s\n", currentVersion)
 	ios.Printf("Available version: %s\n", availableVersion)
@@ -174,7 +173,7 @@ func confirmUpdate(ios *iostreams.IOStreams, opts *options, currentVersion, avai
 		ios.Printf("\nRelease notes:\n%s\n", formatReleaseNotes(release.Body))
 	}
 
-	confirm, err := ios.Confirm("\nProceed with update?", true)
+	confirm, err := opts.Factory.ConfirmAction("\nProceed with update?", opts.Yes)
 	if err != nil {
 		return fmt.Errorf("failed to read confirmation: %w", err)
 	}
@@ -217,7 +216,9 @@ func showUpdateStatus(ios *iostreams.IOStreams, currentVersion, availableVersion
 	return nil
 }
 
-func handleRollback(ctx context.Context, ios *iostreams.IOStreams, ghClient *github.Client, currentVersion string, opts *options) error {
+func handleRollback(ctx context.Context, ghClient *github.Client, currentVersion string, opts *options) error {
+	ios := opts.Factory.IOStreams()
+
 	// Get all releases to find the previous version
 	releases, err := ghClient.ListReleases(ctx, github.DefaultOwner, github.DefaultRepo, opts.IncludePre)
 	if err != nil {
@@ -246,15 +247,13 @@ func handleRollback(ctx context.Context, ios *iostreams.IOStreams, ghClient *git
 
 	ios.Printf("Rolling back from %s to %s\n", currentVersion, previousRelease.Version())
 
-	if !opts.Yes {
-		confirm, err := ios.Confirm("Proceed with rollback?", true)
-		if err != nil {
-			return fmt.Errorf("failed to read confirmation: %w", err)
-		}
-		if !confirm {
-			ios.Info("Rollback cancelled")
-			return nil
-		}
+	confirm, err := opts.Factory.ConfirmAction("Proceed with rollback?", opts.Yes)
+	if err != nil {
+		return fmt.Errorf("failed to read confirmation: %w", err)
+	}
+	if !confirm {
+		ios.Info("Rollback cancelled")
+		return nil
 	}
 
 	return performUpdate(ctx, ios, ghClient, previousRelease)

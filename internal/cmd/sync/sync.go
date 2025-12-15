@@ -181,7 +181,7 @@ func runPull(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	if opts.DryRun {
 		ios.Warning("[DRY RUN] No changes will be made")
 	}
-	ios.Println("")
+	ios.Println()
 
 	var success, failed int
 
@@ -217,7 +217,7 @@ func runPull(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		success++
 	}
 
-	ios.Println("")
+	ios.Println()
 	if failed > 0 {
 		ios.Warning("Completed: %d succeeded, %d failed", success, failed)
 	} else {
@@ -258,7 +258,7 @@ func runPush(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	if opts.DryRun {
 		ios.Warning("[DRY RUN] No changes will be made")
 	}
-	ios.Println("")
+	ios.Println()
 
 	var success, failed, skipped int
 
@@ -300,7 +300,7 @@ func runPush(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		success++
 	}
 
-	ios.Println("")
+	ios.Println()
 	if failed > 0 {
 		ios.Warning("Completed: %d succeeded, %d failed, %d skipped", success, failed, skipped)
 	} else {

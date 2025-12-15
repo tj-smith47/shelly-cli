@@ -63,7 +63,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, webhookID int) 
 		return fmt.Errorf("specify at least one option to update (--event, --url, --name, --enable, --disable)")
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

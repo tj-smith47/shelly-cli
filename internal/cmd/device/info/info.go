@@ -12,7 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the device info command.
@@ -49,7 +48,7 @@ The device can be specified by its registered name or IP address.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()

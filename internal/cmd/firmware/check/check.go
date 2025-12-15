@@ -51,7 +51,7 @@ Use --all to check all registered devices.`,
 }
 
 func run(f *cmdutil.Factory, ctx context.Context, device string) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

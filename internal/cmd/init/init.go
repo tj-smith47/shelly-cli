@@ -200,7 +200,7 @@ func run(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Command, opts *
 	}
 
 	// Run all setup steps
-	return runSetupSteps(ctx, ios, rootCmd, opts)
+	return runSetupSteps(ctx, f, rootCmd, opts)
 }
 
 func checkAndConfirmConfig(ios *iostreams.IOStreams, opts *Options) (bool, error) {
@@ -226,7 +226,9 @@ func checkAndConfirmConfig(ios *iostreams.IOStreams, opts *Options) (bool, error
 	return true, nil
 }
 
-func runSetupSteps(ctx context.Context, ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *Options) error {
+func runSetupSteps(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Command, opts *Options) error {
+	ios := f.IOStreams()
+
 	// Step 1: Configuration
 	if err := stepConfiguration(ctx, ios, opts); err != nil {
 		return fmt.Errorf("configuration step failed: %w", err)
@@ -237,7 +239,7 @@ func runSetupSteps(ctx context.Context, ios *iostreams.IOStreams, rootCmd *cobra
 
 	// Step 3: Device Registration
 	if len(discoveredDevices) > 0 {
-		if err := stepRegistration(ctx, ios, opts, discoveredDevices); err != nil {
+		if err := stepRegistration(ctx, f, opts, discoveredDevices); err != nil {
 			ios.Warning("Registration failed: %v", err)
 		}
 	}
@@ -410,7 +412,9 @@ func stepDiscovery(_ context.Context, ios *iostreams.IOStreams, opts *Options) (
 	return devices, nil
 }
 
-func stepRegistration(_ context.Context, ios *iostreams.IOStreams, opts *Options, devices []discovery.DiscoveredDevice) error {
+func stepRegistration(_ context.Context, f *cmdutil.Factory, opts *Options, devices []discovery.DiscoveredDevice) error {
+	ios := f.IOStreams()
+
 	if !opts.NonInteractive {
 		proceed, err := ios.Confirm("Register these devices with friendly names?", true)
 		if err != nil {
@@ -452,7 +456,7 @@ func stepRegistration(_ context.Context, ios *iostreams.IOStreams, opts *Options
 		}
 
 		// Check if already registered
-		if _, exists := config.GetDevice(name); exists {
+		if f.GetDevice(name) != nil {
 			ios.Info("Device %q already registered, skipping", name)
 			continue
 		}

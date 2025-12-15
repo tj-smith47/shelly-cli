@@ -58,12 +58,12 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if allFlag {
-				return runAll(f, cmd.Context())
+				return runAll(cmd.Context(), f)
 			}
 			if len(args) == 0 {
 				return fmt.Errorf("device name required (or use --all)")
 			}
-			return run(f, cmd.Context(), args[0])
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
@@ -77,7 +77,7 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
 	return cmd
 }
 
-func run(f *cmdutil.Factory, ctx context.Context, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
@@ -98,19 +98,17 @@ func run(f *cmdutil.Factory, ctx context.Context, device string) error {
 	displayUpdateTarget(ios, info)
 
 	// Confirm unless --yes
-	if !yesFlag {
-		confirmed, confirmErr := ios.Confirm("Proceed with firmware update?", false)
-		if confirmErr != nil {
-			return confirmErr
-		}
-		if !confirmed {
-			ios.Warning("Update cancelled")
-			return nil
-		}
+	confirmed, confirmErr := f.ConfirmAction("Proceed with firmware update?", yesFlag)
+	if confirmErr != nil {
+		return confirmErr
+	}
+	if !confirmed {
+		ios.Warning("Update cancelled")
+		return nil
 	}
 
 	// Extended timeout for firmware updates
-	updateCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	updateCtx, cancel := f.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	return cmdutil.RunWithSpinner(updateCtx, ios, "Updating firmware...", func(ctx context.Context) error {
@@ -161,7 +159,7 @@ type updateResult struct {
 	err     error
 }
 
-func runAll(f *cmdutil.Factory, ctx context.Context) error {
+func runAll(ctx context.Context, f *cmdutil.Factory) error {
 	ios := f.IOStreams()
 
 	cfg, err := config.Load()
@@ -178,7 +176,7 @@ func runAll(f *cmdutil.Factory, ctx context.Context) error {
 	svc := f.ShellyService()
 
 	// Check all devices for updates
-	toUpdate := checkDevicesForUpdates(ctx, ios, svc, devices)
+	toUpdate := checkDevicesForUpdates(ctx, ios, svc, devices, stagedFlag)
 
 	if len(toUpdate) == 0 {
 		ios.Info("All devices are up to date")
@@ -186,7 +184,7 @@ func runAll(f *cmdutil.Factory, ctx context.Context) error {
 	}
 
 	// Display and confirm
-	if err := displayAndConfirmUpdates(ios, toUpdate); err != nil {
+	if err := displayAndConfirmUpdates(ios, f, toUpdate); err != nil {
 		return err
 	}
 
@@ -199,6 +197,7 @@ func checkDevicesForUpdates(
 	ios *iostreams.IOStreams,
 	svc *shelly.Service,
 	devices map[string]model.Device,
+	staged int,
 ) []deviceStatus {
 	ios.StartProgress("Checking devices for updates...")
 
@@ -240,8 +239,8 @@ func checkDevicesForUpdates(
 	}
 
 	// Apply staged percentage
-	targetCount := len(toUpdate) * stagedFlag / 100
-	if targetCount == 0 && stagedFlag > 0 && len(toUpdate) > 0 {
+	targetCount := len(toUpdate) * staged / 100
+	if targetCount == 0 && staged > 0 && len(toUpdate) > 0 {
 		targetCount = 1
 	}
 	if targetCount < len(toUpdate) {
@@ -251,7 +250,7 @@ func checkDevicesForUpdates(
 	return toUpdate
 }
 
-func displayAndConfirmUpdates(ios *iostreams.IOStreams, toUpdate []deviceStatus) error {
+func displayAndConfirmUpdates(ios *iostreams.IOStreams, f *cmdutil.Factory, toUpdate []deviceStatus) error {
 	ios.Println("")
 	ios.Printf("%s\n", theme.Bold().Render("Devices to update:"))
 	table := output.NewTable("Device", "Current", "Available")
@@ -263,15 +262,13 @@ func displayAndConfirmUpdates(ios *iostreams.IOStreams, toUpdate []deviceStatus)
 	}
 	ios.Println("")
 
-	if !yesFlag {
-		confirmed, confirmErr := ios.Confirm(fmt.Sprintf("Update %d device(s)?", len(toUpdate)), false)
-		if confirmErr != nil {
-			return confirmErr
-		}
-		if !confirmed {
-			ios.Warning("Update cancelled")
-			return fmt.Errorf("cancelled")
-		}
+	confirmed, confirmErr := f.ConfirmAction(fmt.Sprintf("Update %d device(s)?", len(toUpdate)), yesFlag)
+	if confirmErr != nil {
+		return confirmErr
+	}
+	if !confirmed {
+		ios.Warning("Update cancelled")
+		return fmt.Errorf("cancelled")
 	}
 	return nil
 }

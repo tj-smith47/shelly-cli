@@ -4,6 +4,7 @@ package list
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -65,7 +66,7 @@ Columns: ID, Name, State (ON/OFF), Power (watts)`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := context.WithTimeout(ctx, 15*shelly.DefaultTimeout/10) // 15s
+	ctx, cancel := f.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	ios := f.IOStreams()

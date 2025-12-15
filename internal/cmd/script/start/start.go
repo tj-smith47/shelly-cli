@@ -10,7 +10,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the script start command.
@@ -39,7 +38,7 @@ The script must be enabled before it can be started.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

@@ -10,7 +10,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -59,26 +58,20 @@ Use 'shelly bthome list' to see device IDs.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	if !opts.Yes {
-		ios.Warning("This will remove BTHome device %d and its sensors.", opts.ID)
-		ios.Printf("Continue? [y/N]: ")
-
-		var response string
-		if _, err := fmt.Scanln(&response); err != nil {
-			ios.Debug("failed to read response: %v", err)
-			return fmt.Errorf("operation cancelled")
-		}
-
-		if response != "y" && response != "Y" && response != "yes" && response != "Yes" {
-			ios.Info("Operation cancelled.")
-			return nil
-		}
+	ios.Warning("This will remove BTHome device %d and its sensors.", opts.ID)
+	confirmed, err := opts.Factory.ConfirmAction("Continue?", opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Operation cancelled.")
+		return nil
 	}
 
 	if err := svc.BTHomeRemoveDevice(ctx, opts.Device, opts.ID); err != nil {

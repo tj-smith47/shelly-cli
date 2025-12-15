@@ -61,7 +61,7 @@ You can update the timespec, calls, or enabled status.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

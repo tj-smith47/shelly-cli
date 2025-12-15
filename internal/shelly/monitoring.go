@@ -535,7 +535,7 @@ func (s *Service) SubscribeEvents(ctx context.Context, device string, handler Ev
 
 		// Handler errors are logged but don't stop event streaming
 		if err := handler(event); err != nil {
-			iostreams.DebugErr("event handler error", err)
+			iostreams.DebugErrCat(iostreams.CategoryNetwork, "event handler error", err)
 		}
 	}
 
@@ -550,7 +550,7 @@ func (s *Service) SubscribeEvents(ctx context.Context, device string, handler Ev
 
 func closeWebSocket(ws *transport.WebSocket) {
 	if err := ws.Close(); err != nil {
-		iostreams.DebugErr("closing websocket", err)
+		iostreams.DebugErrCat(iostreams.CategoryNetwork, "closing websocket", err)
 	}
 }
 

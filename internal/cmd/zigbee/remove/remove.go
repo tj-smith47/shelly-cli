@@ -3,13 +3,11 @@ package remove
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -53,26 +51,20 @@ Note: The device will still be accessible via WiFi/HTTP.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	if !opts.Yes {
-		ios.Warning("This will disconnect from the Zigbee network and disable Zigbee.")
-		ios.Printf("Continue? [y/N]: ")
-
-		var response string
-		if _, err := fmt.Scanln(&response); err != nil {
-			ios.Debug("failed to read response: %v", err)
-			return fmt.Errorf("operation cancelled")
-		}
-
-		if response != "y" && response != "Y" && response != "yes" && response != "Yes" {
-			ios.Info("Operation cancelled.")
-			return nil
-		}
+	ios.Warning("This will disconnect from the Zigbee network and disable Zigbee.")
+	confirmed, err := opts.Factory.ConfirmAction("Continue?", opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Operation cancelled.")
+		return nil
 	}
 
 	// Disable Zigbee (this also causes the device to leave the network)

@@ -672,8 +672,8 @@ See `.claude/COMPLETED.md` for details.
 
 ### 29.8 Convenience Shortcuts
 
-- [x] `shelly open` - Open device in browser
-  - `shelly open <device> [--cloud] [--docs <component>]`
+- [x] ~~`shelly open`~~ - REMOVED (redundant with `shelly device ui`)
+  - Use `shelly device ui <device>` instead
 - [x] `shelly qr` - Generate QR codes
   - `shelly qr <device> [--wifi] [--export file.png]`
 

@@ -55,7 +55,7 @@ You can provide credentials via:
 }
 
 func run(f *cmdutil.Factory, ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

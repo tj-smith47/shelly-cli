@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -51,23 +50,21 @@ This operation is irreversible. Use --yes to skip the confirmation prompt.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
 	// Confirm deletion
-	if !opts.Yes {
-		msg := fmt.Sprintf("Delete key %q from %s?", opts.Key, opts.Device)
-		confirmed, err := ios.Confirm(msg, false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Info("Aborted")
-			return nil
-		}
+	msg := fmt.Sprintf("Delete key %q from %s?", opts.Key, opts.Device)
+	confirmed, err := opts.Factory.ConfirmAction(msg, opts.Yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Aborted")
+		return nil
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %q...", opts.Key), func(ctx context.Context) error {

@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the cover position command.
@@ -47,7 +46,7 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, coverID, position int) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()

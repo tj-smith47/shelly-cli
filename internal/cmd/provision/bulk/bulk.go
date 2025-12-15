@@ -111,7 +111,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Validate all device names before starting
-	if err := validateDeviceNames(&cfg); err != nil {
+	if err := validateDeviceNames(opts.Factory, &cfg); err != nil {
 		return err
 	}
 
@@ -214,7 +214,7 @@ func provisionDevice(ctx context.Context, svc *shelly.Service, cfg *Config, devi
 
 // validateDeviceNames validates all device names in the config before starting.
 // For devices without an explicit address, the name must be a registered device.
-func validateDeviceNames(cfg *Config) error {
+func validateDeviceNames(f *cmdutil.Factory, cfg *Config) error {
 	var errors []string
 
 	for _, d := range cfg.Devices {
@@ -226,7 +226,7 @@ func validateDeviceNames(cfg *Config) error {
 
 		// If no address specified, device must be registered
 		if d.Address == "" {
-			if _, ok := config.GetDevice(d.Name); !ok {
+			if f.GetDevice(d.Name) == nil {
 				errors = append(errors, fmt.Sprintf("%s: not a registered device and no address specified", d.Name))
 			}
 		}

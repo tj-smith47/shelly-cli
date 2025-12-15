@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
@@ -45,21 +44,19 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 
 	// Confirm before disabling
-	if !yesFlag {
-		confirmed, err := ios.Confirm(
-			fmt.Sprintf("Disable authentication on %s? This will allow unauthenticated access.", device),
-			false,
-		)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			ios.Warning("Cancelled")
-			return nil
-		}
+	confirmed, err := f.ConfirmAction(
+		fmt.Sprintf("Disable authentication on %s? This will allow unauthenticated access.", device),
+		yesFlag,
+	)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Warning("Cancelled")
+		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()

@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -73,7 +72,7 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("missing required confirmation flags")
 	}
 
-	// Final interactive confirmation
+	// Final interactive confirmation (--yes flags already checked above)
 	confirmed, err := ios.Confirm(fmt.Sprintf("FINAL WARNING: Factory reset device %q? This cannot be undone!", opts.Device), false)
 	if err != nil {
 		return fmt.Errorf("confirmation failed: %w", err)
@@ -83,7 +82,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := opts.Factory.ShellyService()

@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the switch toggle command.
@@ -38,7 +37,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, switchID int) error {
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()

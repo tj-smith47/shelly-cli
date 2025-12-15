@@ -27,7 +27,7 @@ touch ~/.config/shelly/config.yaml
 | `color` | bool | `true` | Enable colored output |
 | `theme` | string/object | `dracula` | Color theme (name or configuration block) |
 | `api_mode` | string | `local` | API mode: `local`, `cloud`, or `auto` |
-| `verbose` | bool | `false` | Enable verbose output |
+| `verbosity` | int | `0` | Verbosity level: 0=silent, 1=info, 2=debug, 3=trace |
 | `quiet` | bool | `false` | Suppress non-essential output |
 
 ```yaml
@@ -35,8 +35,37 @@ output: table
 color: true
 theme: dracula
 api_mode: local
-verbose: false
+verbosity: 0
 quiet: false
+```
+
+### Logging Settings
+
+Configure debug logging behavior for troubleshooting.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `log.json` | bool | `false` | Output logs in JSON format for machine parsing |
+| `log.categories` | string | `""` | Filter logs by category (comma-separated) |
+
+**Verbosity levels:**
+- `0` (default): Silent - no debug output
+- `1` (`-v`): Info level - basic operational logs
+- `2` (`-vv`): Debug level - detailed diagnostic information
+- `3` (`-vvv`): Trace level - maximum verbosity
+
+**Log categories:** `network`, `config`, `device`, `api`, `auth`, `plugin`, `discovery`, `firmware`
+
+```yaml
+verbosity: 0
+
+log:
+  # JSON format for log aggregation tools
+  json: false
+
+  # Filter to specific categories (empty = all)
+  # Example: "network,api" to only see network and API logs
+  categories: ""
 ```
 
 ### Theme Configuration
@@ -408,8 +437,10 @@ Configuration can be set via environment variables with the `SHELLY_` prefix. Ne
 | `SHELLY_NO_COLOR` | - | Disable colors (presence = disabled) |
 | `SHELLY_THEME` | `theme` | Theme name |
 | `SHELLY_API_MODE` | `api_mode` | API mode (`local`, `cloud`, `auto`) |
-| `SHELLY_VERBOSE` | `verbose` | Verbose output (`true`/`false`) |
+| `SHELLY_VERBOSITY` | `verbosity` | Verbosity level (0-3) |
 | `SHELLY_QUIET` | `quiet` | Quiet mode (`true`/`false`) |
+| `SHELLY_LOG_JSON` | `log.json` | JSON log output (`true`/`false`) |
+| `SHELLY_LOG_CATEGORIES` | `log.categories` | Log category filter (comma-separated) |
 | `SHELLY_NO_UPDATE_CHECK` | - | Disable update notifications (presence = disabled) |
 | `SHELLY_CLOUD_ACCESS_TOKEN` | `cloud.access_token` | Cloud API token |
 | `SHELLY_CLOUD_EMAIL` | - | Cloud login email (used by `shelly cloud login`) |
@@ -436,8 +467,28 @@ These flags are available on all commands and override config values.
 | `--output` | `-o` | Output format |
 | `--no-color` | - | Disable colors |
 | `--quiet` | `-q` | Suppress non-essential output |
-| `--verbose` | `-v` | Enable verbose output |
+| `--verbose` | `-v` | Increase verbosity (stackable: `-v`, `-vv`, `-vvv`) |
+| `--log-json` | - | Output logs in JSON format |
+| `--log-categories` | - | Filter logs by category (comma-separated) |
 | `--template` | - | Go template (with `-o template`) |
+
+**Verbosity examples:**
+```bash
+# Info level - basic operation logs
+shelly device list -v
+
+# Debug level - detailed diagnostics
+shelly device info kitchen -vv
+
+# Trace level - maximum verbosity
+shelly discover mdns -vvv
+
+# Filter to specific categories
+shelly device list -v --log-categories network,api
+
+# JSON logs for parsing
+shelly device list -vv --log-json
+```
 
 ## Full Configuration Example
 
@@ -449,8 +500,13 @@ output: table
 color: true
 theme: dracula
 api_mode: local
-verbose: false
+verbosity: 0
 quiet: false
+
+# Logging settings (for debugging)
+log:
+  json: false
+  categories: ""
 
 # Discovery settings
 discovery:

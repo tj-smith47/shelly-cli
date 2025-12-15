@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
@@ -60,19 +59,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	// Confirm unless --yes
-	if !yesFlag {
-		ios.Warning("This will rollback the firmware to the previous version.")
-		confirmed, confirmErr := ios.Confirm("Proceed with rollback?", false)
-		if confirmErr != nil {
-			return confirmErr
-		}
-		if !confirmed {
-			ios.Warning("Rollback cancelled")
-			return nil
-		}
+	ios.Warning("This will rollback the firmware to the previous version.")
+	confirmed, confirmErr := f.ConfirmAction("Proceed with rollback?", yesFlag)
+	if confirmErr != nil {
+		return confirmErr
+	}
+	if !confirmed {
+		ios.Warning("Rollback cancelled")
+		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Rolling back firmware...", func(ctx context.Context) error {

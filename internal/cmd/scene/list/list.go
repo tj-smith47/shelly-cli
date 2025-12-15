@@ -101,7 +101,7 @@ func printTable(scenes []config.Scene) {
 		t.AddRow(scene.Name, actions, description)
 	}
 	t.Print()
-	fmt.Println()
+	iostreams.Plain("")
 	iostreams.Count("scene", len(scenes))
 }
 

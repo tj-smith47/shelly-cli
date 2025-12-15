@@ -40,7 +40,7 @@ func TestRootCommand_GlobalFlags(t *testing.T) {
 	}{
 		{"output", "output", "o", "table"},
 		{"template", "template", "", ""},
-		{"verbose", "verbose", "v", "false"},
+		{"verbose", "verbose", "v", "0"},
 		{"quiet", "quiet", "q", "false"},
 		{"config", "config", "", ""},
 		{"no-color", "no-color", "", "false"},

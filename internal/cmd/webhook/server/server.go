@@ -99,7 +99,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	if opts.AutoConfig && len(opts.Devices) > 0 {
 		ios.Info("Auto-configuring devices...")
 		configureDevices(ctx, f, opts.Devices, serverURL)
-		ios.Println("")
+		ios.Println()
 	}
 
 	// Create HTTP server

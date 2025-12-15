@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
@@ -83,7 +82,7 @@ pre-populated system information.`,
 
 func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
-	br := browser.New()
+	br := f.Browser()
 
 	// If --issues flag, just open issues page
 	if opts.OpenIssues {
