@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -120,8 +121,8 @@ func showEMStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Ser
 		return fmt.Errorf("failed to get EM status: %w", err)
 	}
 
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, status)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, status)
 	}
 
 	// Human-readable format
@@ -185,8 +186,8 @@ func showEM1Status(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 		return fmt.Errorf("failed to get EM1 status: %w", err)
 	}
 
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, status)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, status)
 	}
 
 	// Human-readable format

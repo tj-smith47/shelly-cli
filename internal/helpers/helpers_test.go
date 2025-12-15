@@ -10,15 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-func TestDeviceConnection_Close_NilDevice(t *testing.T) {
-	t.Parallel()
-	dc := &DeviceConnection{}
-	err := dc.Close()
-	if err != nil {
-		t.Errorf("Close() on nil device = %v, want nil", err)
-	}
-}
-
 func TestDiscoveredDeviceToConfig_Basic(t *testing.T) {
 	t.Parallel()
 	d := discovery.DiscoveredDevice{

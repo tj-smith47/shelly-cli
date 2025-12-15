@@ -50,7 +50,7 @@ used as data source for infrastructure as code workflows.`,
 		Args:              cobra.MinimumNArgs(1),
 		ValidArgsFunction: completion.DevicesWithGroups(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Devices, opts.File = cmdutil.SplitDevicesAndFile(args, tfExtensions)
+			opts.Devices, opts.File = shelly.SplitDevicesAndFile(args, tfExtensions)
 			return run(cmd.Context(), opts)
 		},
 	}
@@ -110,9 +110,9 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Collect device data using shared helper
-	var deviceData []cmdutil.DeviceData
+	var deviceData []shelly.DeviceData
 	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching device data...", func(ctx context.Context) error {
-		deviceData = cmdutil.CollectDeviceData(ctx, svc, devices)
+		deviceData = svc.CollectDeviceData(ctx, devices)
 		return nil
 	})
 	if err != nil {

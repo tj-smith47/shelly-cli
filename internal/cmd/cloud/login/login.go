@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -59,8 +60,11 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 
 	ios := f.IOStreams()
 
-	// Get email
+	// Get email: flag > env var > interactive prompt
 	email := emailFlag
+	if email == "" {
+		email = os.Getenv("SHELLY_CLOUD_EMAIL")
+	}
 	if email == "" {
 		if !ios.CanPrompt() {
 			return errors.New("email required (use --email flag or SHELLY_CLOUD_EMAIL env var)")
@@ -72,8 +76,11 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 		}
 	}
 
-	// Get password
+	// Get password: flag > env var > interactive prompt
 	password := passwordFlag
+	if password == "" {
+		password = os.Getenv("SHELLY_CLOUD_PASSWORD")
+	}
 	if password == "" {
 		if !ios.CanPrompt() {
 			return errors.New("password required (use --password flag or SHELLY_CLOUD_PASSWORD env var)")

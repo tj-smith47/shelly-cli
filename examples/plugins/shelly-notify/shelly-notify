@@ -1,0 +1,353 @@
+#!/usr/bin/env bash
+# shelly-notify - Desktop notifications for Shelly device events
+#
+# A Shelly CLI plugin that sends desktop notifications when device
+# states change or thresholds are exceeded.
+#
+# Dependencies:
+#   Linux: notify-send (libnotify-bin package)
+#   macOS: osascript (built-in)
+#
+# Environment Variables (provided by Shelly CLI):
+#   SHELLY_CONFIG_PATH   - Path to config file
+#   SHELLY_DEVICES_JSON  - JSON of registered devices
+#   SHELLY_OUTPUT_FORMAT - Current output format (table, json, yaml)
+#   SHELLY_NO_COLOR      - Set to 1 if colors disabled
+#   SHELLY_VERBOSE       - Set to 1 if verbose mode enabled
+
+set -euo pipefail
+
+VERSION="0.1.0"
+SCRIPT_NAME="shelly-notify"
+
+# Colors (respects SHELLY_NO_COLOR)
+if [[ -z "${SHELLY_NO_COLOR:-}" ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    CYAN='\033[0;36m'
+    NC='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    CYAN=''
+    NC=''
+fi
+
+# Detect notification command
+detect_notify_cmd() {
+    if command -v notify-send &>/dev/null; then
+        echo "notify-send"
+    elif command -v osascript &>/dev/null; then
+        echo "osascript"
+    else
+        echo ""
+    fi
+}
+
+NOTIFY_CMD=$(detect_notify_cmd)
+
+# Send a desktop notification
+send_notification() {
+    local title="$1"
+    local message="$2"
+    local urgency="${3:-normal}"  # low, normal, critical
+
+    if [[ -z "$NOTIFY_CMD" ]]; then
+        echo -e "${RED}Error:${NC} No notification tool found" >&2
+        echo "  Linux: install libnotify-bin (apt) or libnotify (dnf)" >&2
+        echo "  macOS: osascript should be available by default" >&2
+        return 1
+    fi
+
+    if [[ "$NOTIFY_CMD" == "notify-send" ]]; then
+        notify-send -a "Shelly CLI" -u "$urgency" "$title" "$message"
+    else
+        # macOS osascript
+        osascript -e "display notification \"$message\" with title \"$title\" subtitle \"Shelly CLI\""
+    fi
+
+    if [[ -n "${SHELLY_VERBOSE:-}" ]]; then
+        echo -e "${GREEN}✓${NC} Notification sent: $title"
+    fi
+}
+
+# Get device IP from SHELLY_DEVICES_JSON
+get_device_ip() {
+    local device="$1"
+    local devices_json="${SHELLY_DEVICES_JSON:-{}}"
+
+    if ! command -v jq &>/dev/null; then
+        echo -e "${RED}Error:${NC} jq is required for device lookup" >&2
+        return 1
+    fi
+
+    local ip
+    ip=$(echo "$devices_json" | jq -r --arg d "$device" '.[$d].ip // .[$d].host // empty')
+
+    if [[ -z "$ip" ]]; then
+        echo -e "${RED}Error:${NC} Device '$device' not found in registry" >&2
+        echo "Available devices:" >&2
+        echo "$devices_json" | jq -r 'keys[]' 2>/dev/null | sed 's/^/  /' >&2
+        return 1
+    fi
+
+    echo "$ip"
+}
+
+# Get device status via HTTP
+get_device_status() {
+    local ip="$1"
+    local timeout=5
+
+    if ! command -v curl &>/dev/null; then
+        echo -e "${RED}Error:${NC} curl is required for device communication" >&2
+        return 1
+    fi
+
+    curl -s --connect-timeout "$timeout" "http://$ip/rpc/Shelly.GetStatus" 2>/dev/null || \
+    curl -s --connect-timeout "$timeout" "http://$ip/status" 2>/dev/null || \
+    echo "{}"
+}
+
+# Show help
+show_help() {
+    cat << EOF
+${CYAN}shelly-notify${NC} - Desktop notifications for Shelly device events
+
+${YELLOW}Usage:${NC}
+    shelly notify <command> [options]
+
+${YELLOW}Commands:${NC}
+    send <title> <message>   Send a custom notification
+    device <device>          Show device status notification
+    online <device>          Notify if device is online/offline
+    power <device>           Notify current power consumption
+    test                     Send a test notification
+    help                     Show this help
+    version                  Show version
+
+${YELLOW}Options:${NC}
+    -h, --help      Show help
+    -v, --version   Show version
+
+${YELLOW}Examples:${NC}
+    # Send custom notification
+    shelly notify send "Kitchen" "Light turned on"
+
+    # Check device and notify
+    shelly notify device kitchen
+    shelly notify power kitchen
+
+    # Test notification system
+    shelly notify test
+
+${YELLOW}Environment:${NC}
+    SHELLY_DEVICES_JSON  - JSON of registered devices (provided by CLI)
+    SHELLY_VERBOSE       - Set for verbose output
+EOF
+}
+
+# Show version
+show_version() {
+    echo "$SCRIPT_NAME version $VERSION"
+}
+
+# Command: send
+cmd_send() {
+    if [[ $# -lt 2 ]]; then
+        echo -e "${RED}Error:${NC} Missing arguments" >&2
+        echo "Usage: shelly notify send <title> <message>" >&2
+        return 1
+    fi
+
+    local title="$1"
+    local message="$2"
+
+    send_notification "$title" "$message"
+}
+
+# Command: test
+cmd_test() {
+    echo -e "${CYAN}Testing notification system...${NC}"
+
+    if [[ -z "$NOTIFY_CMD" ]]; then
+        echo -e "${RED}✗${NC} No notification tool available"
+        echo "  Linux: apt install libnotify-bin"
+        echo "  macOS: osascript should work automatically"
+        return 1
+    fi
+
+    echo -e "${GREEN}✓${NC} Using: $NOTIFY_CMD"
+    send_notification "Shelly CLI Test" "Notifications are working!"
+    echo -e "${GREEN}✓${NC} Test notification sent"
+}
+
+# Command: device
+cmd_device() {
+    if [[ $# -lt 1 ]]; then
+        echo -e "${RED}Error:${NC} Missing device name" >&2
+        echo "Usage: shelly notify device <device>" >&2
+        return 1
+    fi
+
+    local device="$1"
+    local ip
+
+    ip=$(get_device_ip "$device") || return 1
+
+    echo -e "${CYAN}Checking device:${NC} $device ($ip)"
+
+    local status
+    status=$(get_device_status "$ip")
+
+    if [[ "$status" == "{}" ]]; then
+        send_notification "Shelly: $device" "Device is offline or unreachable" "critical"
+        return 1
+    fi
+
+    # Try to extract useful info
+    local switch_state=""
+    local power=""
+
+    if command -v jq &>/dev/null; then
+        # Gen2 format
+        switch_state=$(echo "$status" | jq -r '.["switch:0"].output // empty' 2>/dev/null)
+        power=$(echo "$status" | jq -r '.["switch:0"].apower // empty' 2>/dev/null)
+
+        # Gen1 fallback
+        if [[ -z "$switch_state" ]]; then
+            switch_state=$(echo "$status" | jq -r '.relays[0].ison // empty' 2>/dev/null)
+            power=$(echo "$status" | jq -r '.meters[0].power // empty' 2>/dev/null)
+        fi
+    fi
+
+    local message="Device is online"
+    if [[ -n "$switch_state" ]]; then
+        if [[ "$switch_state" == "true" ]]; then
+            message="Switch is ON"
+        else
+            message="Switch is OFF"
+        fi
+    fi
+    if [[ -n "$power" ]]; then
+        message="$message, Power: ${power}W"
+    fi
+
+    send_notification "Shelly: $device" "$message"
+}
+
+# Command: online
+cmd_online() {
+    if [[ $# -lt 1 ]]; then
+        echo -e "${RED}Error:${NC} Missing device name" >&2
+        echo "Usage: shelly notify online <device>" >&2
+        return 1
+    fi
+
+    local device="$1"
+    local ip
+
+    ip=$(get_device_ip "$device") || return 1
+
+    local status
+    status=$(get_device_status "$ip")
+
+    if [[ "$status" == "{}" ]]; then
+        send_notification "Shelly: $device" "OFFLINE - Device unreachable" "critical"
+        echo -e "${RED}✗${NC} $device is offline"
+        return 1
+    else
+        send_notification "Shelly: $device" "Online and responding"
+        echo -e "${GREEN}✓${NC} $device is online"
+    fi
+}
+
+# Command: power
+cmd_power() {
+    if [[ $# -lt 1 ]]; then
+        echo -e "${RED}Error:${NC} Missing device name" >&2
+        echo "Usage: shelly notify power <device>" >&2
+        return 1
+    fi
+
+    local device="$1"
+    local ip
+
+    ip=$(get_device_ip "$device") || return 1
+
+    local status
+    status=$(get_device_status "$ip")
+
+    if [[ "$status" == "{}" ]]; then
+        send_notification "Shelly: $device" "Cannot read power - device offline" "critical"
+        return 1
+    fi
+
+    local power=""
+
+    if command -v jq &>/dev/null; then
+        # Try Gen2 format first
+        power=$(echo "$status" | jq -r '.["switch:0"].apower // .["pm1:0"].apower // empty' 2>/dev/null)
+
+        # Gen1 fallback
+        if [[ -z "$power" ]]; then
+            power=$(echo "$status" | jq -r '.meters[0].power // empty' 2>/dev/null)
+        fi
+    fi
+
+    if [[ -z "$power" ]]; then
+        send_notification "Shelly: $device" "No power meter available"
+        return 0
+    fi
+
+    local urgency="normal"
+    local power_int="${power%.*}"
+    if [[ "$power_int" -gt 1000 ]]; then
+        urgency="critical"
+    fi
+
+    send_notification "Shelly: $device" "Power: ${power}W" "$urgency"
+    echo -e "${GREEN}✓${NC} $device: ${power}W"
+}
+
+# Main entry point
+main() {
+    local cmd="${1:-help}"
+
+    case "$cmd" in
+        -h|--help|help)
+            show_help
+            ;;
+        -v|--version|version)
+            show_version
+            ;;
+        send)
+            shift
+            cmd_send "$@"
+            ;;
+        test)
+            cmd_test
+            ;;
+        device)
+            shift
+            cmd_device "$@"
+            ;;
+        online)
+            shift
+            cmd_online "$@"
+            ;;
+        power)
+            shift
+            cmd_power "$@"
+            ;;
+        *)
+            echo -e "${RED}Error:${NC} Unknown command: $cmd" >&2
+            echo "Run 'shelly notify help' for usage" >&2
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

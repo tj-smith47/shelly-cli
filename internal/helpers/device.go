@@ -2,107 +2,14 @@
 package helpers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
-	"github.com/tj-smith47/shelly-go/gen2"
-	"github.com/tj-smith47/shelly-go/rpc"
-	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
-
-// DeviceConnection represents an active connection to a Shelly device.
-type DeviceConnection struct {
-	Device     *gen2.Device
-	Client     *rpc.Client
-	Transport  transport.Transport
-	Config     model.Device
-	Generation int
-}
-
-// Close closes the device connection and releases resources.
-func (dc *DeviceConnection) Close() error {
-	if dc.Device != nil {
-		return dc.Device.Close()
-	}
-	if dc.Client != nil {
-		return dc.Client.Close()
-	}
-	return nil
-}
-
-// CloseQuietly closes the device connection, logging any errors in verbose mode.
-// Use this in defer statements where connection close errors are not critical.
-func (dc *DeviceConnection) CloseQuietly() {
-	if err := dc.Close(); err != nil {
-		if viper.GetBool("verbose") {
-			fmt.Fprintf(os.Stderr, "debug: failed to close connection: %v\n", err)
-		}
-	}
-}
-
-// ConnectToDevice establishes a connection to a device by name or address.
-// It resolves the device from the registry if a name is provided,
-// or treats the identifier as a direct address.
-func ConnectToDevice(ctx context.Context, identifier string) (*DeviceConnection, error) {
-	// Resolve device from registry or use as address
-	device, err := config.ResolveDevice(identifier)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve device %q: %w", identifier, err)
-	}
-
-	return ConnectToDeviceConfig(ctx, device)
-}
-
-// ConnectToDeviceConfig establishes a connection using a device config.
-func ConnectToDeviceConfig(ctx context.Context, device model.Device) (*DeviceConnection, error) {
-	// Build URL from address
-	url := device.Address
-	if url != "" && url[0] != 'h' {
-		url = "http://" + url
-	}
-
-	// Build transport options
-	var opts []transport.Option
-
-	// Configure authentication if provided
-	if device.Auth != nil && device.Auth.Password != "" {
-		opts = append(opts, transport.WithAuth(device.Auth.Username, device.Auth.Password))
-	}
-
-	// Create HTTP transport with options
-	httpTransport := transport.NewHTTP(url, opts...)
-
-	// Create RPC client
-	client := rpc.NewClient(httpTransport)
-
-	// Create Gen2+ device wrapper
-	gen2Device := gen2.NewDevice(client)
-
-	// Try to get device info to verify connection
-	info, err := gen2Device.GetDeviceInfo(ctx)
-	if err != nil {
-		// Close on error
-		if closeErr := gen2Device.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to connect to device: %w (close error: %w)", err, closeErr)
-		}
-		return nil, fmt.Errorf("failed to connect to device %q: %w", device.Address, err)
-	}
-
-	return &DeviceConnection{
-		Device:     gen2Device,
-		Client:     client,
-		Transport:  httpTransport,
-		Config:     device,
-		Generation: info.Gen,
-	}, nil
-}
 
 // DiscoveredDeviceToConfig converts a discovered device to a model.Device.
 func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {

@@ -83,8 +83,8 @@ func run(f *cmdutil.Factory) error {
 	})
 
 	// Handle structured output (JSON/YAML) via global -o flag
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, result)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, result)
 	}
 
 	// Table output

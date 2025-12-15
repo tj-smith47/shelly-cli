@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/ping"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/reboot"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/status"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/device/ui"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -39,6 +40,7 @@ Registered devices can be referenced by name in other commands.`,
 	cmd.AddCommand(ping.NewCommand(f))
 	cmd.AddCommand(reboot.NewCommand(f))
 	cmd.AddCommand(factoryreset.NewCommand(f))
+	cmd.AddCommand(ui.NewCommand(f))
 
 	return cmd
 }

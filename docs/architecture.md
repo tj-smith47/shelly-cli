@@ -77,7 +77,7 @@ func NewCommand() *cobra.Command {
 
 **Rationale**:
 - Enables dependency injection for testing
-- Provides consistent access to IOStreams, Config, ShellyService, and Browser
+- Provides consistent access to IOStreams, Config, and ShellyService
 - Prevents direct instantiation anti-pattern (`iostreams.System()`, `shelly.NewService()`)
 
 ### Parent-Child Command Structure
@@ -109,12 +109,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 ### What the Factory Provides
 
-The factory provides four core dependencies:
+The factory provides three core dependencies:
 
 1. **IOStreams** - Terminal I/O with progress indicators, colors, prompts
 2. **Config** - CLI configuration (devices, aliases, groups, scenes)
 3. **ShellyService** - Business logic for device operations
-4. **Browser** - Open device web UI in default browser
 
 ### Accessing Dependencies
 
@@ -123,7 +122,6 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
     // Get dependencies from factory
     ios := f.IOStreams()
     svc := f.ShellyService()
-    browser := f.Browser()
 
     // Use dependencies
     ios.StartProgress("Processing...")
@@ -135,13 +133,6 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
     }
 
     ios.Success("Device rebooted")
-
-    // Optionally open device UI
-    confirmed, _ := ios.Confirm("Open device web UI?", false)
-    if confirmed {
-        browser.Browse(fmt.Sprintf("http://%s", device))
-    }
-
     return nil
 }
 ```
@@ -380,7 +371,7 @@ When creating a new command or updating an existing one:
 
 - [ ] Command constructor named `NewCommand(f *cmdutil.Factory)`
 - [ ] Factory passed to all subcommands
-- [ ] Dependencies accessed via factory (`f.IOStreams()`, `f.ShellyService()`, `f.Browser()`)
+- [ ] Dependencies accessed via factory (`f.IOStreams()`, `f.ShellyService()`, `f.Config()`)
 - [ ] Context from `cmd.Context()`, not `context.Background()`
 - [ ] Progress indicators use `ios.StartProgress()/StopProgress()`
 - [ ] No package-level iostreams calls
@@ -434,26 +425,25 @@ package cmdutil
 import (
     "github.com/tj-smith47/shelly-cli/internal/config"
     "github.com/tj-smith47/shelly-cli/internal/iostreams"
-    "github.com/tj-smith47/shelly-cli/internal/client"
     "github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Factory provides dependencies to commands
 type Factory struct {
     // Lazy initializers - called on first access
-    IOStreams    func() *iostreams.IOStreams
-    Config       func() (*config.Config, error)
-    ShellyClient func(device string) (*client.Client, error)
-    Resolver     func() shelly.DeviceResolver
+    IOStreams     func() *iostreams.IOStreams
+    Config        func() (*config.Config, error)
+    ShellyService func() *shelly.Service
 
     // Cached instances (set after first call)
-    ioStreams    *iostreams.IOStreams
-    config       *config.Config
+    ioStreams     *iostreams.IOStreams
+    cfg           *config.Config
+    shellyService *shelly.Service
 }
 
-// New creates a Factory with production dependencies
-func New() *Factory {
-    var f Factory
+// NewFactory creates a Factory with production dependencies
+func NewFactory() *Factory {
+    f := &Factory{}
 
     f.IOStreams = func() *iostreams.IOStreams {
         if f.ioStreams == nil {
@@ -463,29 +453,24 @@ func New() *Factory {
     }
 
     f.Config = func() (*config.Config, error) {
-        if f.config == nil {
+        if f.cfg == nil {
             cfg, err := config.Load()
             if err != nil {
                 return nil, err
             }
-            f.config = cfg
+            f.cfg = cfg
         }
-        return f.config, nil
+        return f.cfg, nil
     }
 
-    f.ShellyClient = func(device string) (*client.Client, error) {
-        cfg, err := f.Config()
-        if err != nil {
-            return nil, err
+    f.ShellyService = func() *shelly.Service {
+        if f.shellyService == nil {
+            f.shellyService = shelly.NewService()
         }
-        return client.New(device, cfg)
+        return f.shellyService
     }
 
-    f.Resolver = func() shelly.DeviceResolver {
-        return shelly.NewConfigResolver(f.Config)
-    }
-
-    return &f
+    return f
 }
 ```
 
@@ -498,21 +483,34 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
     var switchID int
 
     cmd := &cobra.Command{
-        Use:   "on <device>",
-        Short: "Turn switch on",
+        Use:     "on <device>",
+        Aliases: []string{"enable"},
+        Short:   "Turn switch on",
+        Example: `  shelly switch on living-room
+  shelly switch on kitchen --id 1`,
         RunE: func(cmd *cobra.Command, args []string) error {
-            ios := f.IOStreams()
-            client, err := f.ShellyClient(args[0])
-            if err != nil {
-                return err
-            }
-
-            return runOn(cmd.Context(), ios, client, switchID)
+            return run(cmd.Context(), f, args[0], switchID)
         },
     }
 
     cmd.Flags().IntVarP(&switchID, "id", "i", 0, "Switch ID")
     return cmd
+}
+
+func run(ctx context.Context, f *cmdutil.Factory, device string, switchID int) error {
+    ios := f.IOStreams()
+    svc := f.ShellyService()
+
+    ios.StartProgress("Turning switch on...")
+    err := svc.SwitchOn(ctx, device, switchID)
+    ios.StopProgress()
+
+    if err != nil {
+        return fmt.Errorf("failed to turn switch on: %w", err)
+    }
+
+    ios.Success("Switch %d turned on", switchID)
+    return nil
 }
 ```
 
@@ -805,22 +803,28 @@ internal/
 │   └── ...
 │
 ├── cmdutil/                # Command utilities (NOT under cmd/)
-│   ├── factory.go
-│   ├── runner.go
-│   ├── flags.go
-│   └── output.go
+│   ├── factory.go          # Dependency injection factory
+│   ├── runner.go           # RunWithSpinner, RunBatch helpers
+│   └── flags.go            # Flag helpers (AddTimeoutFlag, etc.)
 │
 ├── iostreams/              # I/O abstraction (NOT under cmd/)
-│   ├── iostreams.go
-│   ├── color.go
-│   └── progress.go
+│   ├── iostreams.go        # IOStreams struct and methods
+│   ├── color.go            # Color detection and handling
+│   └── progress.go         # Progress indicator management
 │
-├── client/                 # Device client
-├── config/                 # Configuration
+├── browser/                # Cross-platform URL opening
+├── config/                 # Configuration management
+├── helpers/                # Device discovery and conversion helpers
 ├── model/                  # Domain models
-├── output/                 # Output formatters
-├── shelly/                 # Business logic
-└── theme/                  # Theming
+├── output/                 # Output formatters (JSON, YAML, table)
+│   ├── format.go           # Format routing (WantsStructured, FormatOutput)
+│   └── table.go            # Table formatting
+├── shelly/                 # Business logic service layer
+│   ├── shelly.go           # Core service
+│   ├── quick.go            # Quick commands (QuickOn/Off/Toggle)
+│   ├── devicedata.go       # Device data collection
+│   └── ...                 # Component-specific services
+└── theme/                  # Theming (bubbletint integration)
 ```
 
 ### Command Structure Pattern
@@ -839,7 +843,6 @@ import (
     "github.com/spf13/cobra"
 
     "github.com/tj-smith47/shelly-cli/internal/cmdutil"
-    "github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the switch on command
@@ -847,30 +850,33 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
     var switchID int
 
     cmd := &cobra.Command{
-        Use:   "on <device>",
-        Short: "Turn switch on",
-        Long:  `Turn on a switch component on the specified device.`,
-        Args:  cobra.ExactArgs(1),
+        Use:     "on <device>",
+        Aliases: []string{"enable"},
+        Short:   "Turn switch on",
+        Long:    `Turn on a switch component on the specified device.`,
+        Example: `  shelly switch on living-room
+  shelly switch on kitchen --id 1`,
+        Args: cobra.ExactArgs(1),
         RunE: func(cmd *cobra.Command, args []string) error {
             return run(cmd.Context(), f, args[0], switchID)
         },
     }
 
-    cmdutil.AddComponentIDFlag(cmd, &switchID, "Switch")
+    cmd.Flags().IntVarP(&switchID, "id", "i", 0, "Switch ID")
 
     return cmd
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, switchID int) error {
     ios := f.IOStreams()
-    svc := shelly.NewService()
+    svc := f.ShellyService()  // Use factory, not shelly.NewService()
 
     return cmdutil.RunWithSpinner(ctx, ios, "Turning switch on...", func(ctx context.Context) error {
         if err := svc.SwitchOn(ctx, device, switchID); err != nil {
             return fmt.Errorf("failed to turn switch on: %w", err)
         }
 
-        fmt.Fprintf(ios.Out, "Switch %d turned on\n", switchID)
+        ios.Success("Switch %d turned on", switchID)
         return nil
     })
 }

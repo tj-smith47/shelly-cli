@@ -1,4 +1,4 @@
-.PHONY: build install test test-coverage lint fmt generate clean completions docs release-local audit check help
+.PHONY: build install test test-coverage lint fmt generate clean completions docs manpages release-local audit check help
 
 # Build variables
 BINARY_NAME := shelly
@@ -74,11 +74,16 @@ completions: build
 	@echo "Completions generated in completions/"
 
 ## docs: Generate command documentation
-docs: build
+docs:
 	@echo "Generating documentation..."
-	@mkdir -p docs/commands
-	@./bin/$(BINARY_NAME) doc --dir docs/commands
+	@go run ./cmd/docgen ./docs/commands
 	@echo "Documentation generated in docs/commands/"
+
+## manpages: Generate man pages
+manpages:
+	@echo "Generating man pages..."
+	@go run ./cmd/mangen ./docs/man
+	@echo "Man pages generated in docs/man/"
 
 ## release-local: Run goreleaser locally (snapshot)
 release-local:

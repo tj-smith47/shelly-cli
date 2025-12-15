@@ -20,9 +20,11 @@ const (
 
 // Plugin represents a discovered plugin.
 type Plugin struct {
-	Name    string // Plugin name (without shelly- prefix)
-	Path    string // Full path to executable
-	Version string // Plugin version (if available)
+	Name     string    // Plugin name (without shelly- prefix)
+	Path     string    // Full path to executable
+	Version  string    // Plugin version (if available)
+	Dir      string    // Plugin directory (new format only)
+	Manifest *Manifest // Manifest (new format only)
 }
 
 // Loader discovers and loads plugins.
@@ -59,6 +61,7 @@ func getSearchPaths() []string {
 }
 
 // Discover finds all available plugins.
+// Supports both new format (directory with manifest) and old format (bare binary).
 func (l *Loader) Discover() ([]Plugin, error) {
 	seen := make(map[string]bool)
 	var plugins []Plugin
@@ -70,10 +73,6 @@ func (l *Loader) Discover() ([]Plugin, error) {
 		}
 
 		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-
 			name := entry.Name()
 			if !strings.HasPrefix(name, PluginPrefix) {
 				continue
@@ -91,9 +90,19 @@ func (l *Loader) Discover() ([]Plugin, error) {
 				continue
 			}
 
-			fullPath := filepath.Join(dir, name)
+			// Check if this is the new format (directory with manifest)
+			if entry.IsDir() {
+				pluginDir := filepath.Join(dir, name)
+				plugin := l.loadFromDir(pluginDir, pluginName)
+				if plugin != nil {
+					seen[pluginName] = true
+					plugins = append(plugins, *plugin)
+				}
+				continue
+			}
 
-			// Check if executable
+			// Old format: bare binary
+			fullPath := filepath.Join(dir, name)
 			if !isExecutable(fullPath) {
 				continue
 			}
@@ -106,18 +115,61 @@ func (l *Loader) Discover() ([]Plugin, error) {
 		}
 	}
 
-	// Try to get versions for each plugin concurrently
+	// Try to get versions for plugins without manifests concurrently
 	var wg sync.WaitGroup
 	for i := range plugins {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			plugins[idx].Version = getPluginVersion(plugins[idx].Path)
-		}(i)
+		if plugins[i].Version == "" && plugins[i].Manifest == nil {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				plugins[idx].Version = getPluginVersion(plugins[idx].Path)
+			}(i)
+		}
 	}
 	wg.Wait()
 
 	return plugins, nil
+}
+
+// loadFromDir loads a plugin from a directory (new format).
+func (l *Loader) loadFromDir(pluginDir, pluginName string) *Plugin {
+	// Try to load manifest
+	manifest, err := LoadManifest(pluginDir)
+	if err != nil {
+		// No manifest, try to find binary in directory
+		binaryName := PluginPrefix + pluginName
+		binaryPath := filepath.Join(pluginDir, binaryName)
+		if !isExecutable(binaryPath) {
+			// Try with .exe
+			binaryPath += ".exe"
+			if !isExecutable(binaryPath) {
+				return nil
+			}
+		}
+		return &Plugin{
+			Name: pluginName,
+			Path: binaryPath,
+			Dir:  pluginDir,
+		}
+	}
+
+	// Have manifest, use it
+	binaryPath := manifest.BinaryPath(pluginDir)
+	if !isExecutable(binaryPath) {
+		// Try with .exe
+		binaryPath += ".exe"
+		if !isExecutable(binaryPath) {
+			return nil
+		}
+	}
+
+	return &Plugin{
+		Name:     pluginName,
+		Path:     binaryPath,
+		Version:  manifest.Version,
+		Dir:      pluginDir,
+		Manifest: manifest,
+	}
 }
 
 // Find finds a specific plugin by name.
@@ -138,12 +190,20 @@ func (l *Loader) Find(name string) (*Plugin, error) {
 }
 
 func (l *Loader) findByName(name string) *Plugin {
-	for _, dir := range l.paths {
-		path := filepath.Join(dir, name)
+	pluginName := strings.TrimPrefix(name, PluginPrefix)
 
-		// Try exact name
+	for _, dir := range l.paths {
+		// First, check for new format (directory)
+		pluginDir := filepath.Join(dir, name)
+		if info, err := os.Stat(pluginDir); err == nil && info.IsDir() {
+			if plugin := l.loadFromDir(pluginDir, pluginName); plugin != nil {
+				return plugin
+			}
+		}
+
+		// Then check old format (bare binary)
+		path := filepath.Join(dir, name)
 		if isExecutable(path) {
-			pluginName := strings.TrimPrefix(name, PluginPrefix)
 			return &Plugin{
 				Name:    pluginName,
 				Path:    path,
@@ -154,7 +214,6 @@ func (l *Loader) findByName(name string) *Plugin {
 		// Try with .exe extension (Windows)
 		pathExe := path + ".exe"
 		if isExecutable(pathExe) {
-			pluginName := strings.TrimPrefix(name, PluginPrefix)
 			return &Plugin{
 				Name:    pluginName,
 				Path:    pathExe,

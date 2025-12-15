@@ -88,7 +88,7 @@ func run(f *cmdutil.Factory, filter string) error {
 	}
 
 	// Handle output format
-	if cmdutil.WantsStructured() {
+	if output.WantsStructured() {
 		data := make([]map[string]any, len(themes))
 		for i, t := range themes {
 			data[i] = map[string]any{
@@ -96,7 +96,7 @@ func run(f *cmdutil.Factory, filter string) error {
 				"current": t == currentID,
 			}
 		}
-		return cmdutil.FormatOutput(ios, data)
+		return output.FormatOutput(ios.Out, data)
 	}
 
 	// Text output

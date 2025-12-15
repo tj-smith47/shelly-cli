@@ -194,8 +194,8 @@ check_pattern 'shelly\.NewService()' "Use f.ShellyService() instead of shelly.Ne
 
 # Rule 6: No exec.Command("open"
 info "Checking for exec.Command browser calls..."
-check_pattern 'exec\.Command("open"' "Use f.Browser().Browse() instead of exec.Command" "all" "error"
-check_pattern 'exec\.Command("xdg-open"' "Use f.Browser().Browse() instead of exec.Command" "all" "error"
+check_pattern 'exec\.Command("open"' "Use browser.New().Browse() instead of exec.Command" "all" "error"
+check_pattern 'exec\.Command("xdg-open"' "Use browser.New().Browse() instead of exec.Command" "all" "error"
 
 # Rule 7: No context.Background() in commands
 info "Checking for context.Background()..."

@@ -76,11 +76,18 @@ make lint
 shelly-cli/
 ├── cmd/shelly/          # Entry point
 ├── internal/            # Private packages
-│   ├── cli/             # Command implementations
-│   ├── tui/             # TUI components
+│   ├── cmd/             # Command implementations (subdirectory per command)
+│   ├── cmdutil/         # Command utilities (factory, runner, flags)
+│   ├── iostreams/       # I/O abstraction (output, progress, prompts)
+│   ├── shelly/          # Business logic service layer
+│   ├── tui/             # TUI components (BubbleTea)
 │   ├── config/          # Configuration management
-│   ├── output/          # Output formatting
+│   ├── output/          # Output formatting (JSON, YAML, table)
+│   ├── helpers/         # Device discovery helpers
 │   ├── plugins/         # Plugin system
+│   ├── browser/         # Cross-platform URL opening
+│   ├── theme/           # Theme management (bubbletint)
+│   ├── model/           # Domain models
 │   └── version/         # Version info
 ├── pkg/api/             # Public API for plugins
 ├── docs/                # Documentation

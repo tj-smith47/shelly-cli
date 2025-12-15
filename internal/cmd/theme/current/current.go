@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -39,13 +40,13 @@ func run(f *cmdutil.Factory) error {
 	}
 
 	// Handle output format
-	if cmdutil.WantsStructured() {
+	if output.WantsStructured() {
 		data := map[string]any{
 			"id":          current.ID,
 			"name":        current.ID,
 			"displayName": current.DisplayName,
 		}
-		return cmdutil.FormatOutput(ios, data)
+		return output.FormatOutput(ios.Out, data)
 	}
 
 	// Text output

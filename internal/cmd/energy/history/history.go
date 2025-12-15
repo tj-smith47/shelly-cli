@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -106,8 +107,8 @@ func showEMDataHistory(ctx context.Context, ios *iostreams.IOStreams, svc *shell
 		return fmt.Errorf("failed to get EMData history: %w", err)
 	}
 
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, data)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, data)
 	}
 
 	// Human-readable format
@@ -172,8 +173,8 @@ func showEM1DataHistory(ctx context.Context, ios *iostreams.IOStreams, svc *shel
 		return fmt.Errorf("failed to get EM1Data history: %w", err)
 	}
 
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, data)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, data)
 	}
 
 	// Human-readable format

@@ -119,8 +119,8 @@ func run(f *cmdutil.Factory, generation int, deviceType string) error {
 	}
 
 	// Handle structured output (JSON/YAML)
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, filtered)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, filtered)
 	}
 
 	// Table output

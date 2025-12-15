@@ -30,7 +30,7 @@ func TestNewCommand_Subcommands(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expected := []string{"list", "info", "status", "ping", "reboot", "factory-reset"}
+	expected := []string{"list", "info", "status", "ping", "reboot", "factory-reset", "ui"}
 	subCmds := cmd.Commands()
 
 	if len(subCmds) != len(expected) {

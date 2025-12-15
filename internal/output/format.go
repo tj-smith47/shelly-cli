@@ -256,3 +256,42 @@ func Template(w io.Writer, tmpl string, data any) error {
 func PrintTemplate(tmpl string, data any) error {
 	return Template(os.Stdout, tmpl, data)
 }
+
+// IsQuiet returns true if quiet mode is enabled.
+func IsQuiet() bool {
+	return viper.GetBool("quiet")
+}
+
+// IsVerbose returns true if verbose mode is enabled.
+func IsVerbose() bool {
+	return viper.GetBool("verbose")
+}
+
+// WantsJSON returns true if the output format is JSON.
+func WantsJSON() bool {
+	return GetFormat() == FormatJSON
+}
+
+// WantsYAML returns true if the output format is YAML.
+func WantsYAML() bool {
+	return GetFormat() == FormatYAML
+}
+
+// WantsTable returns true if the output format is table.
+func WantsTable() bool {
+	return GetFormat() == FormatTable
+}
+
+// WantsStructured returns true if the output format is JSON or YAML.
+func WantsStructured() bool {
+	format := GetFormat()
+	return format == FormatJSON || format == FormatYAML
+}
+
+// FormatOutput prints data in the configured output format.
+// For table format, it uses the Table type from the output package.
+// For other formats (json, yaml, template), it uses the standard formatters.
+func FormatOutput(w io.Writer, data any) error {
+	formatter := NewFormatter(GetFormat())
+	return formatter.Format(w, data)
+}

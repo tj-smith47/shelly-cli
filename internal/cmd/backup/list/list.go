@@ -161,8 +161,8 @@ func isBackupFile(name string) bool {
 
 func outputBackups(ios *iostreams.IOStreams, backups []backupFileInfo) error {
 	// Handle structured output (JSON/YAML) via global -o flag
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, backups)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, backups)
 	}
 
 	// Default table output

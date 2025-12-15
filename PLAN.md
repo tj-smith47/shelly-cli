@@ -1,6 +1,6 @@
 # Shelly CLI - Comprehensive Implementation Plan
 
-> ⛔ **STOP. READ [RULES.md](RULES.md) FIRST.** All mandatory workflow rules are there.
+> ⛔ **STOP. READ [CLAUDE.md](CLAUDE.md) FIRST.** All mandatory workflow rules are there.
 
 ---
 
@@ -12,7 +12,7 @@
 A production-ready Cobra CLI for Shelly smart home devices, targeting adoption by ALLTERCO Robotics as the official Shelly CLI. Built on the `shelly-go` library (at `/db/appdata/shelly-go`).
 
 ### Before You Code
-1. **Read [RULES.md](RULES.md)** - Mandatory workflow rules (factory pattern, IOStreams, error handling)
+1. **Read [CLAUDE.md](CLAUDE.md)** - Mandatory workflow rules (factory pattern, IOStreams, error handling)
 2. **Check Current Phase** (see status table below) - Pick up where we left off
 3. **Verify shelly-go API** - Check `gen2/components/` before assuming features exist
 4. **Run existing tests** - `go test ./...` to ensure you don't break anything
@@ -77,7 +77,7 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-14 | **Current Phase:** 26 - Documentation | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-15 | **Current Phase:** 27 - Examples | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
@@ -97,7 +97,8 @@ Create a production-ready, open-source Cobra CLI that:
 | 11.4 | Energy Dashboard | ✅ Complete |
 | 11.5 | Metrics Export | ✅ Complete |
 | 12 | Alias System | ✅ Complete |
-| 13 | Plugin System | ✅ Complete |
+| 13.1 | Plugin System | ✅ Complete |
+| 13.2 | Plugin Manifest System | ✅ Complete |
 | 14 | TUI Dashboard | ✅ Complete |
 | 15 | Theme System | ✅ Complete |
 | 16 | Shell Completions | ✅ Complete |
@@ -108,7 +109,8 @@ Create a production-ready, open-source Cobra CLI that:
 | 23 | Gen1 Device Support | ✅ Complete |
 | 24 | Sensor Commands | ✅ Complete |
 | 25 | Thermostat Commands | ✅ Complete |
-| 26-27 | Documentation & Examples | ⏳ Pending |
+| 26 | Documentation | ✅ Complete |
+| 27 | Examples | ⏳ Pending |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
 | 29 | Innovative Commands (82 new) | ⏳ Pending |
 | 30 | Polish & Release (FINAL) | ⏳ Pending |
@@ -204,1126 +206,64 @@ These commands MUST produce clean, parseable output when piped:
 
 ---
 
-## Phase 0: Architecture Refactoring (PREREQUISITE)
+## Phase 0: Architecture Refactoring ✅ COMPLETE
 
-> **IMPORTANT:** This phase must be completed before Phase 5. It addresses critical code quality issues identified during the architecture audit against gh, kubectl, docker, jira-cli, gh-dash, and k9s.
-
-### 0.1 IOStreams Package (gh pattern) ✅
-Create unified I/O handling following gh CLI's iostreams pattern:
-
-- [x] Create `internal/iostreams/iostreams.go`:
-  ```go
-  type IOStreams struct {
-      In       io.Reader
-      Out      io.Writer
-      ErrOut   io.Writer
-
-      // Terminal detection
-      IsStdinTTY   bool
-      IsStdoutTTY  bool
-      IsStderrTTY  bool
-
-      // Color management
-      colorEnabled bool
-
-      // Progress indicators
-      progressIndicator *spinner.Spinner
-  }
-
-  func (s *IOStreams) StartProgress(msg string)
-  func (s *IOStreams) StopProgress()
-  func (s *IOStreams) ColorEnabled() bool
-  ```
-- [x] Create `internal/iostreams/color.go` - Theme-aware color utilities
-- [x] Create `internal/iostreams/progress.go` - Spinner/progress indicators
-- [x] Create `internal/iostreams/multiwriter.go` - Docker-style multi-line output (see `docs/architecture.md`)
-- [x] Add comprehensive tests (92.3% coverage)
-
-### 0.2 Command Utilities Package (gh/kubectl pattern) ✅
-Create shared utilities for commands (NOT under `internal/cmd/` - only commands live there):
-
-- [x] Create `internal/cmdutil/factory.go`:
-  ```go
-  // Factory provides dependencies to commands (gh pattern)
-  type Factory struct {
-      IOStreams    func() *IOStreams
-      Config       func() (*config.Config, error)
-      ShellyClient func(device string) (*client.Client, error)
-      Resolver     func() shelly.DeviceResolver
-  }
-  ```
-- [x] Create `internal/cmdutil/runner.go`:
-  ```go
-  // Generic command runner (kubectl pattern)
-  type ComponentAction func(ctx context.Context, svc *shelly.Service, device string, id int) error
-
-  func RunWithSpinner(ctx context.Context, ios *IOStreams, msg string, action func(context.Context) error) error
-  func RunBatch(ctx context.Context, ios *IOStreams, targets []string, action ComponentAction) error
-  ```
-- [x] Create `internal/cmdutil/flags.go`:
-  ```go
-  func AddComponentIDFlag(cmd *cobra.Command, target *int, name string)
-  func AddOutputFlag(cmd *cobra.Command)
-  func AddTimeoutFlag(cmd *cobra.Command, target *time.Duration)
-  ```
-- [x] Create `internal/cmdutil/output.go`:
-  ```go
-  func PrintResult(ios *IOStreams, format string, data any, tableFn func(any)) error
-  ```
-- [x] Add comprehensive tests (92.3% coverage)
-
-### 0.3 Package Consolidation ✅
-Consolidated duplicate packages into `internal/iostreams/`:
-- [x] All message functions consolidated to `iostreams/color.go`
-- [x] All spinner functions consolidated to `iostreams/progress.go`
-- [x] All prompt functions consolidated to `iostreams/prompt.go`
-- [x] Debug functions added to `iostreams/debug.go`
-- [x] Deleted `internal/ui/` directory
-- [x] Deleted `internal/output/messages.go`, `spinner.go`, `prompt.go`
-- [x] Kept `internal/output/format.go` and `table.go` (formatters)
-- [x] Fixed batch/command and scene/activate to use `errgroup` instead of `WaitGroup`
-
-### 0.4 Context Propagation ✅
-Fix context handling throughout codebase:
-
-- [x] Update `internal/cmd/root.go` to setup cancellation-aware context
-- [x] Update all 41+ command run() functions to accept context parameter
-- [x] Use `cmd.Context()` instead of `context.Background()`
-- [x] Ensure Ctrl+C cancels in-flight HTTP requests (inherent via context propagation)
-
-### 0.5 Concurrency Patterns ✅
-Replace manual patterns with errgroup and add multi-writer output:
-
-- [x] Refactor `internal/cmd/batch/on/on.go` to use errgroup + MultiWriter (already used cmdutil.RunBatch)
-- [x] Refactor `internal/cmd/batch/off/off.go` to use errgroup + MultiWriter (already used cmdutil.RunBatch)
-- [x] Refactor `internal/cmd/batch/toggle/toggle.go` to use errgroup + MultiWriter (already used cmdutil.RunBatch)
-- [x] Refactor `internal/cmd/batch/command/command.go` to use errgroup + MultiWriter
-- [x] Refactor `internal/cmd/scene/activate/activate.go` to use errgroup + MultiWriter
-- [x] Refactor `internal/cmd/discover/scan/scan.go` to use MultiWriter with progress callback
-- [x] Refactor `internal/plugins/loader.go` to parallelize version detection
-
-**Current pattern (to replace):**
-```go
-// internal/cmd/batch/on/on.go - Current verbose pattern
-var wg sync.WaitGroup
-sem := make(chan struct{}, concurrent)
-results := make(chan Result, len(targets))
-for _, target := range targets {
-    wg.Add(1)
-    go func(device string) {
-        defer wg.Done()
-        sem <- struct{}{}
-        defer func() { <-sem }()
-        // work...
-    }(target)
-}
-```
-
-**Target pattern:**
-```go
-// Using errgroup + MultiWriter
-mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
-for _, t := range targets {
-    mw.AddLine(t, "pending")
-}
-g, ctx := errgroup.WithContext(ctx)
-g.SetLimit(concurrent)
-for _, t := range targets {
-    target := t
-    g.Go(func() error {
-        mw.UpdateLine(target, StatusRunning, "turning on...")
-        if err := svc.SwitchOn(ctx, target, switchID); err != nil {
-            mw.UpdateLine(target, StatusError, err.Error())
-            return nil
-        }
-        mw.UpdateLine(target, StatusSuccess, "on")
-        return nil
-    })
-}
-return g.Wait()
-```
-
-### 0.6 Command Refactoring (DRY)
-Refactor all duplicate command patterns to use cmdutil:
-
-**Problem:** 38+ nearly identical `run()` functions across command files. Example from `internal/cmd/light/on/on.go`:
-```go
-// This pattern repeats 38+ times with only method/message changes:
-func run(device string, componentID int) error {
-    ctx, cancel := context.WithTimeout(context.Background(), shelly.DefaultTimeout)
-    defer cancel()
-    svc := shelly.NewService()
-    spin := ui.NewSpinner("Turning light on...")  // Only these 3 things change
-    spin.Start()
-    err := svc.LightOn(ctx, device, componentID)  // Method name
-    spin.Stop()
-    if err != nil {
-        return fmt.Errorf("failed to turn light on: %w", err)  // Error message
-    }
-    ui.Success("Light %d turned on", componentID)  // Success message
-    return nil
-}
-```
-
-**Solution:** Use `cmdutil.RunWithSpinner`:
-```go
-func run(ctx context.Context, f *cmdutil.Factory, device string, lightID int) error {
-    ios := f.IOStreams()
-    svc := shelly.NewService()
-    return cmdutil.RunWithSpinner(ctx, ios, "Turning light on...", func(ctx context.Context) error {
-        if err := svc.LightOn(ctx, device, lightID); err != nil {
-            return fmt.Errorf("failed to turn light on: %w", err)
-        }
-        fmt.Fprintf(ios.Out, "Light %d turned on\n", lightID)
-        return nil
-    })
-}
-```
-
-**Files to refactor:**
-- [x] Refactor all `on.go` commands (switch, light, rgb) to use `cmdutil.RunSimple`
-- [x] Refactor all `off.go` commands to use `cmdutil.RunSimple`
-- [x] Refactor all `toggle.go` commands to use `cmdutil.RunWithSpinner`
-- [x] Refactor all `status.go` commands to use `cmdutil.RunStatus`/`cmdutil.PrintResult`
-- [x] Refactor component `list.go` commands to use `cmdutil.RunList`/`cmdutil.PrintListResult`
-- [x] Apply consistent flag patterns via `cmdutil.AddComponentIDFlag`
-
-### 0.7 Test Coverage Foundation
-Establish testing patterns for new packages:
-
-- [ ] Add comprehensive tests for `internal/iostreams/` (target: 90%+) - **currently 79.1%** - DEFERRED to Phase 25
-  - Note: Gap is primarily interactive prompt functions that require terminal input
-- [x] Add comprehensive tests for `internal/cmdutil/` (target: 90%+) - **93.6% achieved**
-- [x] Add table-driven tests for runner patterns (RunStatus, RunList, PrintResult)
-- [x] Update existing command tests to use new patterns (all tests pass with refactored code)
-
-**Note:** Remaining test coverage work deferred to Phase 25 (Testing). Proceeding with functionality.
+See `.claude/COMPLETED.md` for details.
 
 ---
 
-## Phase 1: Project Foundation
+## Phases 1-6: Foundation & Core Commands ✅ COMPLETE
 
-### 1.1 Repository Setup
-- [x] Initialize Go module: `go mod init github.com/tj-smith47/shelly-cli`
-- [x] Configure `go.mod` with Go 1.25.5 minimum version
-- [x] Add shelly-go library dependency: `github.com/tj-smith47/shelly-go` v0.1.3
-- [x] Create `.gitignore` with Go-specific patterns and build artifacts
-- [x] Create `LICENSE` (MIT)
-- [x] Create `CONTRIBUTING.md` with contribution guidelines
-- [x] Create `SECURITY.md` with security policy
-- [x] Create `CODE_OF_CONDUCT.md`
-
-### 1.2 Directory Structure
-```
-shelly-cli/
-├── cmd/
-│   └── shelly/
-│       └── main.go                 # Entry point
-├── internal/
-│   ├── cmd/                        # CLI commands ONLY (subdirectory-per-command)
-│   │   ├── root.go                 # Root command
-│   │   ├── switchcmd/              # Switch control (on/, off/, toggle/, status/, list/)
-│   │   ├── cover/                  # Cover control (open/, closecmd/, stop/, position/, status/, list/)
-│   │   ├── light/                  # Light control (on/, off/, toggle/, set/, status/, list/)
-│   │   ├── rgb/                    # RGB control (on/, off/, toggle/, set/, status/, list/)
-│   │   ├── input/                  # Input status (list/, status/, trigger/)
-│   │   ├── discover/               # Discovery (mdns/, ble/, coiot/, scan/)
-│   │   ├── device/                 # Device management (list/, add/, remove/, info/, etc.)
-│   │   ├── group/                  # Group management (list/, create/, delete/, add/, etc.)
-│   │   ├── batch/                  # Batch operations (on/, off/, toggle/, command/)
-│   │   ├── scene/                  # Scene management (list/, create/, activate/, etc.)
-│   │   ├── config/                 # Config commands (get/, set/, export/, import/)
-│   │   ├── firmware/               # Firmware commands (check/, update/, rollback/)
-│   │   ├── script/                 # Script commands (list/, create/, start/, stop/)
-│   │   ├── schedule/               # Schedule commands (list/, create/, enable/)
-│   │   ├── cloud/                  # Cloud commands (login/, devices/, events/)
-│   │   ├── wifi/                   # WiFi configuration (status/, scan/, set/)
-│   │   ├── mqtt/                   # MQTT configuration (status/, set/, disable/)
-│   │   ├── webhook/                # Webhook management (list/, create/, delete/)
-│   │   ├── kvs/                    # KVS storage (list/, get/, set/, delete/)
-│   │   ├── energy/                 # Energy monitoring (status/, history/, export/)
-│   │   ├── bthome/                 # BTHome devices (list/, add/, remove/, status/)
-│   │   ├── zigbee/                 # Zigbee gateway (status/, discover/, pair/)
-│   │   └── matter/                 # Matter protocol (status/, enable/, code/)
-│   │   # NOTE: NO shared utilities here - only command definitions!
-│   │
-│   ├── iostreams/                  # Unified I/O handling (gh pattern) [NEW]
-│   │   ├── iostreams.go            # IOStreams struct and methods
-│   │   ├── color.go                # Theme-aware color utilities
-│   │   └── progress.go             # Spinner/progress indicators
-│   │
-│   ├── cmdutil/                    # Command utilities (gh/kubectl pattern) [NEW]
-│   │   ├── factory.go              # Factory for dependency injection
-│   │   ├── runner.go               # Generic command runners
-│   │   ├── flags.go                # Shared flag definitions
-│   │   └── output.go               # Output format routing
-│   │
-│   ├── model/                      # Core domain types
-│   │   ├── device.go               # Device types
-│   │   ├── component.go            # Component types (Switch, Cover, Light, RGB status/config)
-│   │   └── errors.go               # Domain errors
-│   ├── client/                     # SDK wrapper for device communication
-│   │   ├── client.go               # Connection management
-│   │   ├── switch.go               # Switch operations
-│   │   ├── cover.go                # Cover operations
-│   │   ├── light.go                # Light operations
-│   │   └── rgb.go                  # RGB operations
-│   ├── shelly/                     # Business logic service layer
-│   │   ├── shelly.go               # Service with connection management
-│   │   ├── resolver.go             # Device resolution (name/IP/alias)
-│   │   ├── switch.go               # Switch business logic
-│   │   ├── cover.go                # Cover business logic
-│   │   ├── light.go                # Light business logic
-│   │   └── rgb.go                  # RGB business logic
-│   ├── helpers/                    # Utility functions
-│   │   ├── device.go               # Device helpers
-│   │   └── display.go              # Display helpers
-│   ├── tui/                        # TUI dashboard (gh-dash/BubbleTea pattern)
-│   │   ├── app.go                  # Main app model (Elm Architecture)
-│   │   ├── keys.go                 # Keyboard bindings (vim-style)
-│   │   └── components/             # Reusable TUI components
-│   │       ├── devicelist/         # Device list table
-│   │       ├── devicedetail/       # Device detail panel
-│   │       ├── monitor/            # Real-time monitoring
-│   │       ├── search/             # Filter/search bar
-│   │       └── help/               # Help overlay
-│   ├── config/
-│   │   ├── config.go               # Viper configuration
-│   │   ├── aliases.go              # Alias management
-│   │   ├── devices.go              # Device registry
-│   │   └── scenes.go               # Scene management
-│   ├── output/                     # Structured output formatters
-│   │   ├── format.go               # Output formatters (json, yaml, table, text)
-│   │   └── table.go                # Table rendering
-│   ├── plugins/
-│   │   ├── loader.go               # Plugin discovery and loading
-│   │   ├── executor.go             # Plugin execution
-│   │   └── registry.go             # Plugin registry
-│   ├── theme/
-│   │   └── theme.go                # bubbletint theme integration
-│   ├── testutil/
-│   │   └── testutil.go             # Test utilities
-│   └── version/
-│       └── version.go              # Version info (ldflags)
-├── pkg/
-│   └── api/                        # Public API for plugins
-├── docs/
-│   ├── commands/                   # Command documentation
-│   ├── architecture.md             # Architecture patterns reference [NEW]
-│   ├── configuration.md            # Config file reference
-│   ├── plugins.md                  # Plugin development guide
-│   └── themes.md                   # Theming guide
-├── examples/
-│   ├── aliases/                    # Example alias configurations
-│   ├── scripts/                    # Example automation scripts
-│   └── plugins/                    # Example plugins
-├── completions/
-│   ├── shelly.bash
-│   ├── shelly.zsh
-│   ├── shelly.fish
-│   └── shelly.ps1
-├── themes/
-│   └── default.yaml                # Default theme configuration
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                  # CI pipeline
-│       ├── auto-tag.yml            # Auto-tagging on merge
-│       └── release.yml             # GoReleaser workflow
-├── .goreleaser.yaml
-├── .golangci.yml
-├── Makefile
-├── README.md
-├── CHANGELOG.md
-└── PLAN.md                         # This file
-```
-
-- [x] Create all directories per structure above
-- [x] Create placeholder files with package declarations
-
-### 1.3 GitHub Actions CI/CD
-- [x] Create `.github/workflows/ci.yml` (badges branch coverage, not Codecov)
-- [x] Create `.github/workflows/auto-tag.yml`
-- [x] Create `.github/workflows/release.yml`
-
-### 1.4 GoReleaser Configuration
-- [x] Create `.goreleaser.yaml`
-
-### 1.5 Linting Configuration
-- [x] Create `.golangci.yml` with strict settings
-
-### 1.6 Makefile
-- [x] Create `Makefile` with all targets
+See `.claude/COMPLETED.md` for details.
 
 ---
 
-## Phase 2: Core CLI Infrastructure
+## Phase 7: Script Commands ✅ COMPLETE (except templates)
 
-### 2.1 Entry Point & Version
-- [x] Create `cmd/shelly/main.go`
-- [x] Create `internal/version/version.go`
+### 7.1 Script Management ✅ COMPLETE
 
-### 2.2 Root Command
-- [x] Create `internal/cli/root.go`
-- [x] Implement config file loading via Viper
-
-### 2.3 Configuration System
-- [x] Create `internal/config/config.go`
-- [x] Config structure:
-  ```go
-  type Config struct {
-      // Global settings
-      Output       string            // default output format
-      Color        bool              // enable color output
-      Theme        string            // bubbletint theme name
-      APIMode      string            // "local" (default) | "cloud" | "auto"
-
-      // Device discovery
-      Discovery    DiscoveryConfig
-
-      // Cloud settings (used when APIMode is "cloud" or "auto" with local fallback)
-      Cloud        CloudConfig
-
-      // Aliases
-      Aliases      map[string]Alias
-
-      // Device registry
-      Devices      map[string]Device
-
-      // Plugin settings
-      Plugins      PluginsConfig
-  }
-  ```
-  - `APIMode`:
-    - `local` (default): Direct device communication via HTTP/WebSocket
-    - `cloud`: Control via Shelly Cloud API
-    - `auto`: Try local first, fall back to cloud if device unreachable
-- [x] Create `internal/config/aliases.go`:
-  - Alias struct (Name, Command, Shell bool)
-  - Add, Remove, List, Get functions
-  - Validate alias names (no conflicts with built-in commands)
-- [x] Create `internal/config/devices.go`:
-  - Device struct (Name, Address, Auth, Generation, etc.)
-  - Register, Unregister, List, Get functions
-  - Device groups support
-
-### 2.4 Output Formatting
-- [x] Create `internal/output/format.go`:
-  - Formatter interface
-  - JSON, YAML, Table, Text implementations
-  - Auto-detect format from config/flags
-- [x] Create `internal/output/table.go`:
-  - Table renderer using lipgloss
-  - Column alignment and wrapping
-  - Header styling
-  - Row alternation colors
-- [x] Create `internal/output/color.go` (merged into messages.go):
-  - Theme-aware color utilities
-  - Status colors (success, warning, error, info)
-  - Device state colors (online, offline, updating)
-
----
-
-## Phase 3: Device Management Commands
-
-### 3.1 Discovery Commands
-- [x] `shelly discover` - Discover devices on network
-  - Flags: --timeout, --network (subnet), --mdns, --ble, --coiot
-  - Output discovered devices with name, IP, generation, type
-  - Progress indicator during discovery
-  - Filter by generation, type
-- [x] `shelly discover mdns` - mDNS discovery only
-- [x] `shelly discover ble` - BLE discovery only
-  - Flags: --timeout, --bthome (include BTHome sensor broadcasts), --filter (device name prefix)
-  - Shows BLE discovered devices with RSSI, connectable status, BTHome indicator
-  - Gracefully handles BLE not supported on system
-- [x] `shelly discover coiot` - CoIoT discovery (Gen1)
-- [x] `shelly discover scan <subnet>` - Subnet scan (HTTP probing)
-
-### 3.2 Device Registry Commands
-- [x] `shelly device list` - List registered devices
-  - Flags: --all, --online, --offline, --generation, --type
-  - Table output with status indicators
-- [x] `shelly device add <name> <address>` - Add device to registry
-  - Flags: --auth, --generation (auto-detect if omitted)
-  - Validate connectivity before adding
-- [x] `shelly device remove <name>` - Remove device from registry
-  - Confirmation prompt (--yes to skip)
-- [x] `shelly device rename <old> <new>` - Rename device
-- [x] `shelly device info <name|address>` - Show device details
-  - Device info, config, status
-  - Component list
-  - Network info
-- [x] `shelly device status <name|address>` - Show device status
-  - Real-time status with auto-refresh option
-- [x] `shelly device ping <name|address>` - Check device connectivity
-- [x] `shelly device reboot <name|address>` - Reboot device
-- [x] `shelly device factory-reset <name|address>` - Factory reset
-  - Strong confirmation required (--yes --confirm)
-
-### 3.3 Device Group Commands
-- [x] `shelly group list` - List device groups
-- [x] `shelly group create <name>` - Create group
-- [x] `shelly group delete <name>` - Delete group
-- [x] `shelly group add <group> <device>` - Add device to group
-- [x] `shelly group remove <group> <device>` - Remove device from group
-- [x] `shelly group members <name>` - List group members
-
----
-
-## Phase 4: Device Control Commands
-
-### 4.1 Switch Control (alias: sw)
-- [x] `shelly switch list [device]` - List switches
-- [x] `shelly switch on <device> [id]` - Turn switch on
-  - Flags: --timer (auto-off after N seconds)
-- [x] `shelly switch off <device> [id]` - Turn switch off
-- [x] `shelly switch toggle <device> [id]` - Toggle switch
-- [x] `shelly switch status <device> [id]` - Show switch status (alias: st)
-
-### 4.2 Cover/Roller Control (aliases: cv, roller)
-- [x] `shelly cover list [device]` - List covers
-- [x] `shelly cover open <device> [id]` - Open cover
-- [x] `shelly cover close <device> [id]` - Close cover
-- [x] `shelly cover stop <device> [id]` - Stop cover
-- [x] `shelly cover position <device> [id] <percent>` - Set position (aliases: pos, set)
-- [x] `shelly cover calibrate <device> [id]` - Start calibration
-- [x] `shelly cover status <device> [id]` - Show cover status (alias: st)
-
-### 4.3 Light Control (aliases: lt, dim)
-- [x] `shelly light list [device]` - List lights
-- [x] `shelly light on <device> [id]` - Turn light on
-  - Flags: --brightness, --transition
-- [x] `shelly light off <device> [id]` - Turn light off
-- [x] `shelly light toggle <device> [id]` - Toggle light
-- [x] `shelly light set <device> [id]` - Set light parameters
-  - Flags: --brightness, --transition
-- [x] `shelly light status <device> [id]` - Show light status (alias: st)
-
-### 4.4 RGB/RGBW Control (alias: color)
-- [x] `shelly rgb on <device> [id]` - Turn RGB on
-- [x] `shelly rgb off <device> [id]` - Turn RGB off
-- [x] `shelly rgb set <device> [id>` - Set RGB color
-  - Flags: --color (R,G,B), --hex, --brightness, --transition
-- [x] `shelly rgb status <device> [id]` - Show RGB status (alias: st)
-- [x] `shelly rgb toggle <device> [id]` - Toggle RGB
-- [x] `shelly rgb list <device>` - List RGB components
-
-### 4.5 Input Status
-- [x] `shelly input list [device]` - List inputs
-- [x] `shelly input status <device> [id]` - Show input status
-- [x] `shelly input trigger <device> [id]` - Manually trigger input event
-
-### 4.6 Batch Operations
-- [x] `shelly batch on <devices...>` - Turn on multiple devices
-- [x] `shelly batch off <devices...>` - Turn off multiple devices
-- [x] `shelly batch toggle <devices...>` - Toggle multiple devices
-- [x] `shelly batch command <command> <devices...>` - Run command on multiple devices
-  - Flags: --parallel, --timeout, --continue-on-error
-
-### 4.7 Scene Management
-- [x] `shelly scene list` - List saved scenes
-- [x] `shelly scene create <name>` - Create scene from current state
-  - Flags: --devices (select which devices)
-- [x] `shelly scene delete <name>` - Delete scene
-- [x] `shelly scene activate <name>` - Activate scene
-- [x] `shelly scene show <name>` - Show scene details
-- [x] `shelly scene export <name> <file>` - Export scene to file
-- [x] `shelly scene import <file>` - Import scene from file
-
----
-
-## Phase 5: Configuration Commands
-
-### 5.1 Device Configuration ✅
-- [x] `shelly config get <device>` - Get device config (all components)
-- [x] `shelly config get <device> <component>` - Get component config
-- [x] `shelly config set <device> <component> <key>=<value>...` - Set config
-- [x] `shelly config diff <device> <file>` - Compare config with file
-- [x] `shelly config export <device> <file>` - Export config to file
-- [x] `shelly config import <device> <file>` - Import config from file
-  - Flags: --dry-run, --merge, --overwrite
-- [x] `shelly config reset <device> [component]` - Reset to defaults
-
-*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-5-configuration-commands)*
-
-### 5.2 Network Configuration ✅
-- [x] `shelly wifi status <device>` - Show WiFi status
-- [x] `shelly wifi scan <device>` - Scan for networks
-- [x] `shelly wifi set <device>` - Configure WiFi
-  - Flags: --ssid, --password, --static-ip, --gateway, --dns
-- [x] `shelly wifi ap <device>` - Configure AP mode (--clients to list connected clients)
-- [x] `shelly ethernet status <device>` - Show ethernet status (Pro devices)
-- [x] `shelly ethernet set <device>` - Configure ethernet
-
-
-### 5.3 Cloud Configuration ✅
-- [x] `shelly cloud status <device>` - Show cloud status
-- [x] `shelly cloud enable <device>` - Enable cloud connection
-- [x] `shelly cloud disable <device>` - Disable cloud connection
-
-
-### 5.4 Auth Configuration ✅
-- [x] `shelly auth status <device>` - Show auth status
-- [x] `shelly auth set <device>` - Set auth credentials
-  - Flags: --user, --password
-- [x] `shelly auth disable <device>` - Disable auth
-
-
-### 5.5 MQTT Configuration ✅
-- [x] `shelly mqtt status <device>` - Show MQTT status
-- [x] `shelly mqtt set <device>` - Configure MQTT
-  - Flags: --server, --user, --password, --topic-prefix
-- [x] `shelly mqtt disable <device>` - Disable MQTT
-
-
-### 5.6 Webhook Configuration ✅
-- [x] `shelly webhook list <device>` - List webhooks
-- [x] `shelly webhook create <device>` - Create webhook
-  - Flags: --event, --url, --name, --disable, --cid
-- [x] `shelly webhook delete <device> <id>` - Delete webhook
-- [x] `shelly webhook update <device> <id>` - Update webhook
-  - Flags: --event, --url, --name, --enable, --disable
-
-
----
-
-## Phase 6: Firmware Commands ✅
-
-### 6.1 Firmware Status ✅
-- [x] `shelly firmware check [device|--all]` - Check for updates
-  - Show current version, available version, release notes summary
-- [x] `shelly firmware status <device>` - Show firmware status
-
-### 6.2 Firmware Updates ✅
-- [x] `shelly firmware update <device>` - Update device firmware
-  - Flags: --beta, --url (custom firmware), --yes (skip confirmation)
-  - Progress indicator
-  - Wait for device to come back online
-- [x] `shelly firmware update --all` - Update all devices
-  - Flags: --parallel, --staged (percentage-based rollout)
-- [x] `shelly firmware rollback <device>` - Rollback to previous version
-
-### 6.3 Firmware Download ✅
-- [x] `shelly firmware download <device>` - Download firmware file
-  - Flags: --output, --latest, --beta
-
-*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-6-firmware-commands)*
-
----
-
-## Phase 7: Script Commands (Gen2+) ✅
-
-### 7.1 Script Management ✅
-- [x] `shelly script list <device>` - List scripts (alias: ls)
-- [x] `shelly script get <device> <id>` - Get script code (alias: code)
-  - Flags: --status (show status instead of code)
-- [x] `shelly script create <device>` - Create script (alias: new)
-  - Flags: --code (inline), --file (from file), --enable, --name
-- [x] `shelly script update <device> <id>` - Update script code (alias: up)
-  - Flags: --code, --file, --name, --append, --enable
-- [x] `shelly script delete <device> <id>` - Delete script (aliases: del, rm)
-  - Flags: --yes (skip confirmation)
-- [x] `shelly script start <device> <id>` - Start script (alias: run)
-- [x] `shelly script stop <device> <id>` - Stop script
-- [x] `shelly script eval <device> <id> <code>` - Evaluate code snippet (alias: exec)
-- [x] `shelly script upload <device> <id> <file>` - Upload script from file (alias: put)
-  - Flags: --append
-- [x] `shelly script download <device> <id> <file>` - Download script to file (alias: save)
-
-*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-7-script-commands-gen2)*
-
-### 7.2 Script Library
-- [ ] `shelly script-lib list` - List available script templates
-- [ ] `shelly script-lib show <name>` - Show script template
-- [ ] `shelly script-lib install <device> <name>` - Install template to device
+### 7.2 Script Templates
+- [ ] `shelly script template list` - List available script templates
+- [ ] `shelly script template show <name>` - Show script template
+- [ ] `shelly script template install <device> <name>` - Install template to device
   - Flags: --configure (interactive configuration)
 
 ---
 
-## Phase 8: Schedule Commands ✅
+## Phase 8: Schedule Commands ✅ COMPLETE
 
-### 8.1 Schedule Management ✅
-- [x] `shelly schedule list <device>` - List schedules (alias: ls)
-- [x] `shelly schedule create <device>` - Create schedule (alias: new)
-  - Flags: --timespec (required), --calls (required), --enable
-- [x] `shelly schedule update <device> <id>` - Update schedule (alias: up)
-  - Flags: --timespec, --calls, --enable, --disable
-- [x] `shelly schedule delete <device> <id>` - Delete schedule (aliases: del, rm)
-  - Flags: --yes
-- [x] `shelly schedule delete-all <device>` - Delete all schedules (alias: clear)
-  - Flags: --yes
-- [x] `shelly schedule enable <device> <id>` - Enable schedule
-- [x] `shelly schedule disable <device> <id>` - Disable schedule
-
-*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-8-schedule-commands)*
-
-### 8.2 Schedule Helpers
-- [ ] `shelly schedule sunrise <device>` - Create sunrise-based schedule
-  - Flags: --offset, --action, --days
-- [ ] `shelly schedule sunset <device>` - Create sunset-based schedule
-- [ ] `shelly schedule timer <device>` - Create timer-based schedule
+See `.claude/COMPLETED.md` for details. (Note: `--timespec "@sunrise"` and `"@sunset"` already supported)
 
 ---
 
-## Phase 9: Cloud Commands ✅
+## Phases 9-12: Cloud, Backup, Monitoring, Alias ✅ COMPLETE
 
-### 9.1 Cloud Authentication ✅
-- [x] `shelly cloud login` - Authenticate with Shelly Cloud
-  - Email/password authentication (interactive or via flags)
-  - Saves token and server URL to config
-- [x] `shelly cloud logout` - Clear cloud credentials
-- [x] `shelly cloud auth-status` - Show cloud auth status (alias: whoami)
-- [x] `shelly cloud token` - Show/manage access token
-
-### 9.2 Cloud Device Management ✅
-- [x] `shelly cloud devices` - List cloud-registered devices (aliases: ls, list)
-- [x] `shelly cloud device <id>` - Show cloud device details (alias: get)
-  - Flags: --status (show full status JSON)
-- [x] `shelly cloud control <id> <action>` - Control via cloud
-  - Actions: on, off, toggle, open, close, stop, position=N, brightness=N, light-on, light-off, light-toggle
-  - Flags: --channel
-- [x] `shelly cloud events` - Subscribe to real-time events (aliases: watch, subscribe)
-  - WebSocket connection to Shelly Cloud
-  - Output events as they arrive (text or JSON)
-  - Flags: --device (filter), --event (filter), --format (text/json), --raw
-
-*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-9-cloud-commands)*
+See `.claude/COMPLETED.md` for details.
 
 ---
 
-## Phase 10: Backup & Restore Commands ✅
+## Phase 13: Plugin System ✅ COMPLETE
 
-*Implementation details: See [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md#phase-10-backup--restore)*
+See `.claude/COMPLETED.md` for details and `docs/plugins.md` for plugin development guide.
 
-### 10.1 Backup Operations ✅
-- [x] `shelly backup create <device> [file]` - Create device backup
-  - Includes: config, scripts, schedules, webhooks, KVS
-  - Flags: --encrypt (password-protected via AES-256-GCM)
-- [x] `shelly backup restore <device> <file>` - Restore from backup
-  - Flags: --dry-run, --skip-network, --decrypt
-- [x] `shelly backup list` - List saved backups
-- [x] `shelly backup export --all <directory>` - Backup all devices
+Example plugin: `examples/plugins/shelly-notify/`
 
-### 10.2 Migration ✅
-- [x] `shelly migrate <source> <target>` - Migrate config between devices
-  - Flags: --dry-run, --force (different device types)
-- [x] `shelly migrate validate <backup>` - Validate backup file
-- [x] `shelly migrate diff <device> <backup>` - Show differences
+### 13.2 Plugin Manifest System ✅ Complete
+
+See `docs/plugins.md` "Plugin Manifest System" section for documentation.
+
+- [x] Create `internal/plugins/manifest.go` with Manifest, Source, Binary types
+- [x] Create `internal/plugins/migrate.go` for automatic migration of existing plugins
+- [x] Update `internal/cmd/plugin/install/` to create manifest on install
+- [x] Update `internal/cmd/plugin/upgrade/` to read manifest for source info
+- [x] Update `internal/cmd/plugin/list/` to show manifest metadata (version, source, install date)
+- [x] Update `internal/cmd/plugin/remove/` to remove entire plugin directory
 
 ---
 
-## Phase 11: Monitoring Commands
+## Phases 14-19: TUI, Themes, Completions, Update, KVS, Advanced Features ✅ COMPLETE
 
-> **Note:** Energy monitoring uses shelly-go `gen2/components/em.go`, `em1.go`, `pm.go`, `pm1.go` components.
-
-### 11.1 Real-time Monitoring
-- [x] `shelly monitor <device>` - Real-time status monitoring
-  - Auto-refresh with configurable interval
-  - Color-coded status changes
-- [x] `shelly monitor power <device>` - Monitor power consumption
-- [x] `shelly monitor events <device>` - Monitor device events
-  - WebSocket subscription via shelly-go events package
-- [x] `shelly monitor all` - Monitor all registered devices
-
-### 11.2 Energy Monitoring (EM/EM1 Components) ✅
-- [x] `shelly energy list <device>` - List energy meters (EM components)
-  - Fully implemented and linted in `internal/cmd/energy/list/`
-  - Lists both EM (3-phase) and EM1 (single-phase) components
-  - Uses existing service methods from `internal/shelly/monitoring.go`
-- [x] `shelly energy status <device> [id]` - Current power/energy status
-  - Shows: voltage, current, power, energy, power factor, frequency
-  - Fully implemented in `internal/cmd/energy/status/status.go` with auto-detection
-  - Supports both EM (3-phase) and EM1 (single-phase) components
-- [x] `shelly energy history <device> [id]` - Energy history (aliases: hist, events)
-  - Flags: `--period` (hour, day, week, month), `--from`, `--to` (date range), `--limit`
-  - Auto-detects EM vs EM1 component type
-  - Calculates total kWh consumption from historical data
-  - Comprehensive tests for time parsing and energy calculations
-  - **Implementation:** Uses EMData/EM1Data components from shelly-go v0.1.5
-- [x] `shelly energy export <device> [id]` - Export energy data (aliases: exp, dump)
-  - Flags: `--format` (csv, json, yaml), `--output`, `--period`, `--from`, `--to`
-  - Supports structured export (JSON/YAML) and CSV via HTTP endpoints
-  - **Implementation:** Service methods with CSV URL generation (optimized to avoid unnecessary connections)
-- [x] `shelly energy reset <device> [id]` - Reset energy counters
-  - Fully implemented in `internal/cmd/energy/reset/reset.go`
-  - Supports both EM and EM1 components with confirmation prompt
-
-### 11.3 Power Monitoring (PM/PM1 Components) ✅
-- [x] `shelly power list <device>` - List power meters (PM components)
-- [x] `shelly power status <device> [id]` - Current power status
-  - Shows: power (W), energy (Wh), voltage, current, frequency
-  - Includes accumulated energy counters and return energy
-
-**Note:** PM/PM1 components do not have historical data storage (unlike EM/EM1 which have EMData/EM1Data). PM also has no calibration method - calibration is only available for Cover and Thermostat components. The plan items for `power history` and `power calibrate` were incorrect assumptions.
-
-### 11.4 Aggregated Energy Dashboard ✅
-- [x] `shelly energy dashboard` - Summary of all energy meters (aliases: dash, summary)
-  - Total power consumption
-  - Per-device breakdown
-  - Cost estimation via `--cost` and `--currency` flags
-  - Concurrent device queries with errgroup
-  - Supports EM, EM1, PM, PM1 components
-- [x] `shelly energy compare` - Compare energy usage (aliases: cmp, diff)
-  - Flags: `--devices`, `--period`, `--from`, `--to`
-  - Historical energy comparison using EMData/EM1Data
-  - Visual bar chart of energy distribution
-  - Per-device percentage breakdown
-
-### 11.5 Metrics Export ✅
-- [x] `shelly metrics prometheus` - Start Prometheus exporter (aliases: prom)
-  - Flags: `--port` (default 9090), `--devices`, `--interval` (default 15s)
-  - HTTP server at /metrics with Prometheus format
-  - Exports: shelly_power_watts, shelly_voltage_volts, shelly_current_amps, shelly_energy_wh, shelly_device_online
-  - Collects from PM, PM1, EM, EM1 components concurrently
-- [x] `shelly metrics json` - Output metrics as JSON
-  - Flags: `--devices`, `--continuous`, `--interval`, `--output`
-  - Structured JSON with timestamp, devices, components
-  - For integration with other monitoring tools
-- [x] `shelly metrics influxdb` - InfluxDB line protocol output (aliases: influx, line)
-  - Flags: `--devices`, `--continuous`, `--interval`, `--output`, `--measurement`, `--tags`
-  - InfluxDB line protocol format for time-series databases
-  - Supports custom measurement names and additional tags
-
----
-
-## Phase 12: Alias System (gh-style) ✅
-
-### 12.1 Alias Commands ✅
-- [x] `shelly alias list` - List all aliases (aliases: ls, l)
-  - Supports JSON/YAML output formats
-  - Table display with name, command, type columns
-- [x] `shelly alias set <name> <command>` - Create alias (aliases: add, create)
-  - Supports `--shell` flag for shell aliases
-  - Auto-detects `!` prefix for shell commands
-- [x] `shelly alias delete <name>` - Delete alias (aliases: del, rm, remove)
-- [x] `shelly alias import <file>` - Import aliases from YAML file (alias: load)
-  - Supports `--merge` to skip existing aliases
-- [x] `shelly alias export [file]` - Export aliases to YAML file (aliases: save, dump)
-  - Outputs to stdout if no file specified
-
-### 12.2 Device Aliases
-- [x] Device aliases handled via device registration (`shelly device add <name> <address>`)
-  - No separate command needed - device names ARE the aliases
-
-### 12.3 Alias Expansion ✅
-- [x] Support argument interpolation with `$1`, `$2`, `$@` (in config/aliases.go)
-- [x] Support shell command aliases (prefixed with `!`)
-- [x] Implement alias expansion in command parsing (in root.go)
-  - Intercepts args before cobra processes them
-  - Expands command aliases and re-parses
-  - Shell aliases execute directly via $SHELL
-
----
-
-## Phase 13: Plugin/Extension System (gh-style) ✅
-
-### 13.1 Plugin Infrastructure (PATH-based, gh-style) ✅
-- [x] Create `internal/plugins/loader.go`:
-  - Discover plugins in PATH and ~/.config/shelly/plugins/
-  - Plugin naming convention: `shelly-*` executables
-  - Validate plugin executables (exists, executable bit)
-  - Version detection via `shelly-<name> --version`
-- [x] Create `internal/plugins/executor.go`:
-  - Execute plugins with argument forwarding
-  - Environment variable injection:
-    - SHELLY_CONFIG_PATH: Config file location
-    - SHELLY_DEVICES_JSON: JSON of registered devices
-    - SHELLY_OUTPUT_FORMAT: Current output format
-    - SHELLY_NO_COLOR: Color disabled flag
-    - SHELLY_VERBOSE: Verbose mode flag
-  - Capture and display output
-  - Handle exit codes
-- [x] Create `internal/plugins/registry.go`:
-  - Track installed plugins with metadata
-  - Version tracking and update checking
-  - Plugin manifest support (optional .shelly-plugin.yaml)
-
-### 13.2 Plugin Commands ✅
-- [x] `shelly extension list` - List installed extensions (aliases: ls, l)
-  - Supports --all flag to show all discovered extensions
-  - JSON/YAML output support
-- [x] `shelly extension install <source>` - Install extension (alias: add)
-  - Support local files, URLs, and GitHub repos (gh:user/repo)
-  - GitHub integration via `internal/github/` package (downloads latest release binary)
-  - Platform detection for correct binary (linux/darwin, amd64/arm64)
-  - Archive extraction (tar.gz, zip)
-  - Force reinstall with --force
-- [x] `shelly extension remove <name>` - Remove extension (aliases: rm, uninstall, delete)
-- [x] `shelly extension upgrade [name]` - Upgrade extension(s) (alias: update)
-  - Supports --all flag
-  - GitHub release version checking and automatic download
-  - Uses shared `internal/github/` package for release handling
-- [x] `shelly extension create <name>` - Scaffold new extension (aliases: new, init, scaffold)
-  - Supports --lang (bash, go, python)
-  - Creates full project structure with README, main file
-- [x] `shelly extension exec <name> [args]` - Execute extension explicitly (alias: run)
-
-### 13.3 Plugin SDK (Deferred)
-- [ ] Create `pkg/api/` public package (future)
-- [ ] Document plugin development in `docs/plugins.md` (future)
-- [ ] Create example plugins in `examples/plugins/` (future)
-
----
-
-## Phase 14: TUI Dashboard
-
-> **READ WHEN IMPLEMENTING:** See [docs/architecture.md](docs/architecture.md) for full TUI architecture patterns, component structure, and code examples.
-
-**Architecture:** gh-dash/BubbleTea with Elm Architecture (Model/Init/Update/View)
-
-### 14.1 Tasks
-- [x] Create `internal/tui/app.go` - Main app model
-- [x] Create `internal/tui/keys.go` - Vim-style keyboard bindings
-- [x] Create `internal/tui/styles.go` - Theme-aware styles via bubbletint
-
-### 14.2 Components (each with model.go, view.go, update.go, styles.go)
-- [x] `components/devicelist/` - Device table (bubbles/table)
-- [x] `components/devicedetail/` - Device detail panel
-- [x] `components/monitor/` - Real-time monitoring
-- [x] `components/search/` - Filter bar (bubbles/textinput)
-- [x] `components/statusbar/` - Bottom status bar
-- [x] `components/help/` - Help overlay (glamour markdown)
-- [x] `components/tabs/` - View switching tabs
-- [x] `components/toast/` - Notifications
-- [x] `components/cmdmode/` - Command mode input
-
-### 14.3 Data Layer
-- [x] Data fetching integrated into component models
-
-### 14.4 Commands
-- [x] `shelly dash` - Launch dashboard (--refresh, --filter, --view)
-- [x] `shelly dash devices` - Device list view
-- [x] `shelly dash monitor` - Monitoring view
-- [x] `shelly dash events` - Event stream view
-
-### 14.5 Features
-- [x] Vim-style navigation (j/k, arrows)
-- [x] Tab switching (1-4 or Tab/Shift+Tab)
-- [x] Device actions (t=toggle, o=on, O=off, R=reboot)
-- [x] Filter/search (/)
-- [x] Help overlay (?)
-- [x] Command mode (`:quit`, `:device`, `:filter`, `:theme`, `:view`, `:help`)
-- [x] Runtime theme switching (via `:theme <name>` command)
-- [x] Configurable keybindings via config.yaml (tui.keybindings section)
-
----
-
-## Phase 15: Theme System
-
-### 15.1 Theme Infrastructure
-- [x] Create `internal/theme/theme.go`:
-  - Integration with lrstanley/bubbletint
-  - Theme loading from config
-  - Runtime theme switching
-- [x] Theme registry via bubbletint's DefaultRegistry (280+ built-in themes)
-- [x] Theme structure defined via bubbletint v2 Tint type:
-  ```go
-  type Theme struct {
-      Name        string
-      Tint        tint.Tint        // bubbletint theme
-
-      // Override colors
-      StatusOK    lipgloss.Color
-      StatusWarn  lipgloss.Color
-      StatusError lipgloss.Color
-
-      // Component styles
-      Header      lipgloss.Style
-      Table       TableStyles
-      Panel       PanelStyles
-  }
-  ```
-
-### 15.2 Theme Commands
-- [x] `shelly theme list` - List available themes
-- [x] `shelly theme set <name>` - Set theme
-- [x] `shelly theme preview <name>` - Preview theme
-- [x] `shelly theme current` - Show current theme
-- [x] `shelly theme next/prev` - Cycle through themes
-- [x] `shelly theme export <file>` - Export current theme
-- [x] `shelly theme import <file>` - Import custom theme
-
-### 15.3 Built-in Themes
-- [x] Include themes from bubbletint (286 themes available):
-  - Dracula (default)
-  - Nord
-  - Tokyo Night
-  - GitHub Dark
-  - Gruvbox
-  - Catppuccin
-  - One Dark
-  - Solarized
-
----
-
-## Phase 16: Shell Completions
-
-### 16.1 Completion Generation
-- [x] Create `internal/cli/completion/completion.go`:
-  - Bash completion
-  - Zsh completion
-  - Fish completion
-  - PowerShell completion
-- [x] `shelly completion bash` - Output bash completions
-- [x] `shelly completion zsh` - Output zsh completions
-- [x] `shelly completion fish` - Output fish completions
-- [x] `shelly completion powershell` - Output PowerShell completions
-- [x] Generated completion files in `completions/` directory
-
-### 16.2 Dynamic Completions
-- [x] Implement dynamic completions for:
-  - Device names (from registry) - CompleteDevices()
-  - Device addresses (from discovery cache) - CompleteDiscoveredDevices()
-  - Group names - CompleteGroups()
-  - Script names (per device) - CompleteDeviceThenScriptID()
-  - Schedule IDs (per device) - CompleteDeviceThenScheduleID()
-  - Alias names - CompleteAliases()
-  - Theme names - CompleteThemes()
-  - Extension names - CompleteExtensions()
-  - Scene names - CompleteScenes()
-- [x] Cache completion data for performance (in-memory with TTL + filesystem cache for discovery)
-- [x] Support completion descriptions
-
-### 16.3 Completion Installation
-- [x] `shelly completion install` - Install completions to shell config
-  - Auto-detect shell
-  - Add source line to rc file
-
----
-
-## Phase 17: Update Command
-
-### 17.0 Init Command ✅
-
-> **INIT:** Before implementing, analyze and discuss:
-> 1. What should `shelly init` do exactly? (First-run setup? Config generation? Device discovery?)
-> 2. What's the optimal UX for the init flow? (Interactive wizard? Guided prompts? Non-interactive flags?)
-> 3. How do other CLIs handle this? (gh auth login, docker init, npm init, git init)
-> 4. What should be configured? (Default device, output format, theme, shell completions, cloud auth?)
-> 5. Should it detect existing config and offer to migrate/update?
-
-- [x] `shelly init` - First-run setup wizard (aliases: `setup`, `configure`)
-  - Interactive guided setup for new users
-  - Flags: `--non-interactive`, `--force` (overwrite existing config)
-  - Creates config directory and example config file
-  - Installs shell completions for detected shell
-  - Offers to run device discovery
-
-### 17.1 Update System ✅
-- [x] Create `internal/cmd/update/update.go`:
-  - Check for new releases via GitHub API
-  - Download and verify checksums (SHA256)
-  - Replace binary in-place with backup/restore
-- [x] `shelly update` - Update CLI to latest version (aliases: `upgrade`, `self-update`)
-  - Flags: `--check` (just check, don't update)
-  - Flags: `--version <tag>` (specific version)
-  - Flags: `--channel stable|beta` (release channel)
-  - Flags: `--rollback` (revert to previous version)
-  - Flags: `--yes` (skip confirmation)
-  - Flags: `--include-pre` (include prereleases)
-- [x] `shelly version` - Show current version
-  - Include available update info (from cache)
-  - Flags: `--short` (version only), `--json` (machine-readable), `--check` (check for updates)
-
-### 17.2 Version Checking ✅
-- [x] Check for updates on startup (configurable)
-  - Rate limit to once per 24 hours
-  - Cache check result in ~/.config/shelly/cache/latest-version
-- [x] Display update notification if available
-- [x] Respect `SHELLY_NO_UPDATE_CHECK` environment variable
-- [x] Respect `--quiet` global flag to suppress notifications
-
----
-
-## Phase 18: KVS Commands (Gen2+) ✅ Complete
-
-### 18.1 KVS Management
-- [x] `shelly kvs list <device>` - List KVS keys
-  - Aliases: ls, l
-  - Flags: --values (show values), --match (pattern filter)
-- [x] `shelly kvs get <device> <key>` - Get KVS value
-  - Aliases: g, read
-  - Flags: --raw (output raw value only)
-- [x] `shelly kvs set <device> <key> <value>` - Set KVS value
-  - Aliases: s, write, put
-  - Flags: --null (set null value)
-  - Auto-parses JSON, numbers, booleans
-- [x] `shelly kvs delete <device> <key>` - Delete KVS key
-  - Aliases: del, rm, remove
-  - Flags: --yes (skip confirmation)
-- [x] `shelly kvs export <device> <file>` - Export all KVS data
-  - Aliases: exp, save, dump
-  - Flags: --format (json, yaml)
-- [x] `shelly kvs import <device> <file>` - Import KVS data
-  - Aliases: load, restore
-  - Flags: --overwrite, --dry-run, --yes
-
----
-
-## Phase 19: Advanced Features from shelly-manager
-
-### 19.1 Configuration Templates ✅ Complete
-- [x] `shelly template list` - List config templates
-  - Aliases: ls, l
-  - JSON/YAML output support
-- [x] `shelly template create <name> <device>` - Create template from device
-  - Aliases: new, save
-  - Flags: --description, --include-wifi, --force
-  - Captures device config with WiFi credentials sanitized by default
-- [x] `shelly template apply <template> <device>` - Apply template
-  - Aliases: set, push
-  - Flags: --dry-run, --yes
-  - Model compatibility warnings
-- [x] `shelly template diff <template> <device>` - Compare template to device
-  - Aliases: compare, cmp
-  - Shows configuration differences in table format
-- [x] `shelly template export <name> [file]` - Export template
-  - Aliases: save, dump
-  - Flags: --format (json, yaml)
-  - Auto-detects format from file extension
-- [x] `shelly template import <file> [name]` - Import template
-  - Aliases: load
-  - Flags: --force
-  - Validates required fields
-- [x] `shelly template delete <name>` - Delete template
-  - Aliases: del, rm, remove
-  - Flags: --yes
-
-### 19.2 Export Formats ✅ Complete
-- [x] `shelly export json <device> [file]` - Export as JSON
-- [x] `shelly export yaml <device> [file]` - Export as YAML
-- [x] `shelly export csv <devices...> [file]` - Export devices list as CSV
-- [x] `shelly export ansible <devices...> [file]` - Export as Ansible inventory
-- [x] `shelly export terraform <devices...> [file]` - Export as Terraform config
-
-### 19.3 Provisioning ✅ Complete
-- [x] `shelly provision wifi <device>` - Provision WiFi settings
-  - Aliases: network, wlan
-  - Interactive network scan and selection
-  - Direct provisioning via --ssid and --password flags
-  - --no-scan flag to skip scan and prompt for SSID
-- [x] `shelly provision bulk <file>` - Bulk provision from config file
-  - Aliases: batch, mass
-  - YAML file with global and per-device WiFi settings
-  - Parallel provisioning with --parallel flag
-  - --dry-run for config validation
-- [x] `shelly provision ble <device>` - BLE-based provisioning
-  - Placeholder with workaround instructions
-  - Guides users to use AP mode provisioning
-
-### 19.4 Actions/Webhooks Helper ✅ Complete
-- [x] `shelly action list <device>` - List available actions (Gen1)
-  - Aliases: ls, show
-  - Placeholder with workaround instructions (curl)
-- [x] `shelly action set <device> <action> <url>` - Set action URL
-  - Aliases: add, configure
-  - Placeholder with workaround instructions
-- [x] `shelly action clear <device> <action>` - Clear action URL
-  - Aliases: delete, remove, rm
-  - Placeholder with workaround instructions
-- [x] `shelly action test <device> <action>` - Test action trigger
-  - Aliases: trigger, fire
-  - Documents that Gen1 actions trigger via state changes
+See `.claude/COMPLETED.md` for details.
 
 ---
 
@@ -1365,7 +305,7 @@ shelly-cli/
 - Both implement component control logic (switch/light/rgb/cover on/off/toggle)
 - Patterns differ slightly: quick commands use spinner + return first error; interactive uses inline feedback
 - **Recommended refactor:** Extract shared `ComponentController` helper to `internal/control/` package
-- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
+- Address in Phase 28 (Testing) with comprehensive test coverage
 
 ### 20.3 Debug Commands ✅ Complete
 - [x] `shelly debug log <device>` - Get device debug log (Gen1)
@@ -1394,7 +334,7 @@ shelly-cli/
 - websocket.go extracts `printJSONResult` helper; similar pattern could be shared across debug commands
 - Sys.GetConfig section extraction appears in both coiot.go and websocket.go (fallback)
 - **Recommended refactor:** Extract shared `debugutil` package with `PrintJSON()` and `ExtractConfigSection()` helpers
-- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
+- Address in Phase 28 (Testing) with comprehensive test coverage
 
 ---
 
@@ -1455,7 +395,7 @@ shelly-cli/
 - Complexity warnings (gocyclo) in list.go and status.go due to conditional rendering logic
 - Similar struct patterns for config/status responses could be consolidated
 - **Recommended refactor:** Extract shared `rpcutil.UnmarshalResult()` helper
-- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
+- Address in Phase 28 (Testing) with comprehensive test coverage
 
 ---
 
@@ -1485,7 +425,7 @@ shelly-cli/
 - Follows same marshal/unmarshal pattern as Phase 21 commands
 - Complexity in code.go due to fallback logic for commissioning info
 - Matter API is simpler (enable/disable/reset) compared to Zigbee/BTHome
-- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
+- Address in Phase 28 (Testing) with comprehensive test coverage
 
 ---
 
@@ -1531,7 +471,7 @@ shelly-cli/
   - Aliases: monitor, watch, listen
   - Flags: --timeout, --follow
   - Listens on 224.0.1.187:5683 for device broadcasts
-- [ ] Integrate CoIoT into TUI monitoring view (deferred to Phase 29)
+- [ ] Integrate CoIoT into TUI monitoring view (Phase 29)
 
 **Code Audit Notes (Phase 23):**
 - HTTP fetch pattern (`fetchSettings`, `fetchStatus`) duplicated across all gen1 commands
@@ -1539,7 +479,7 @@ shelly-cli/
 - **Recommended refactor:** Extract shared `gen1http` package with `FetchEndpoint(ctx, ios, device, path)` helper
 - Display helper functions follow consistent pattern: `display<Section>(ios, data)`
 - Type assertion pattern with `hasX` variables for errcheck compliance
-- Deferred to Phase 28 (Testing) for comprehensive refactoring with test coverage
+- Address in Phase 28 (Testing) with comprehensive test coverage
 
 ---
 
@@ -1577,7 +517,7 @@ shelly-cli/
 
 ### 24.7 Combined Sensor Status ✅
 - [x] `shelly sensor status <device>` - All sensor readings in one view
-- [ ] ~~`shelly sensor monitor <device>` - Real-time sensor monitoring~~ **DEFERRED** - WebSocket TUI monitoring requires Phase 29 TUI improvements
+- [ ] `shelly sensor monitor <device>` - Real-time sensor monitoring (Phase 29 TUI improvements)
 
 **Code Audit Notes (Phase 24):**
 - Factory pattern with `*cmdutil.Factory`
@@ -1589,109 +529,50 @@ shelly-cli/
 
 ---
 
-## Phase 25: Thermostat Commands ✅
+## Phase 25: Thermostat Commands ✅ COMPLETE
 
-> **Note:** Thermostat support via shelly-go `gen2/components/thermostat.go`.
-
-### 25.1 Thermostat Control ✅
-- [x] `shelly thermostat list <device>` - List thermostats
-  - Aliases: ls, l
-  - Flags: --json
-- [x] `shelly thermostat status <device>` - Thermostat status
-  - Aliases: st, show, info
-  - Flags: --id, --json
-  - Shows temperature, valve position, humidity, boost/override status
-- [x] `shelly thermostat set <device>` - Set thermostat configuration
-  - Aliases: config, configure
-  - Flags: --id, --target, --mode, --enable, --disable
-- [x] `shelly thermostat enable <device>` - Enable thermostat
-  - Aliases: on, start
-  - Flags: --id, --mode
-- [x] `shelly thermostat disable <device>` - Disable thermostat
-  - Aliases: off, stop
-  - Flags: --id
-- [x] `shelly thermostat boost <device>` - Activate boost mode
-  - Aliases: turbo, rapid
-  - Flags: --id, --duration, --cancel
-- [x] `shelly thermostat override <device>` - Override target temperature
-  - Aliases: temp-override, manual
-  - Flags: --id, --target, --duration, --cancel
-- [x] `shelly thermostat calibrate <device>` - Calibrate valve
-  - Aliases: cal
-  - Flags: --id
-
-### 25.2 Thermostat Schedules ✅
-- [x] `shelly thermostat schedule list <device>` - List thermostat schedules
-  - Aliases: ls, l
-  - Flags: --thermostat-id, --all, --json
-  - Filters schedules by Thermostat.* method calls
-- [x] `shelly thermostat schedule create <device>` - Create thermostat schedule
-  - Aliases: add, new
-  - Flags: --thermostat-id, --time, --target, --mode, --enable, --disable, --enabled
-  - Timespec format: cron-like "ss mm hh DD WW" with @sunrise/@sunset support
-- [x] `shelly thermostat schedule delete <device>` - Delete schedule
-  - Aliases: del, rm, remove
-  - Flags: --id, --all
-- [x] `shelly thermostat schedule enable <device>` - Enable a schedule
-  - Aliases: on
-  - Flags: --id (required)
-- [x] `shelly thermostat schedule disable <device>` - Disable a schedule
-  - Aliases: off
-  - Flags: --id (required)
+See `.claude/COMPLETED.md` for details.
 
 ---
 
-## Phase 26: Documentation
+## Phase 26: Documentation ✅ Complete
 
-### 26.1 README.md
-- [ ] Project overview and features
-- [ ] Installation instructions (all methods)
-- [ ] Quick start guide
-- [ ] Configuration overview
-- [ ] Link to full documentation
+### 26.1 README.md ✅
+- [x] Project overview and features
+- [x] Installation instructions (all methods)
+- [x] Quick start guide
+- [x] Configuration overview
+- [x] Link to full documentation
 
-### 26.2 Command Documentation
-- [ ] Generate `docs/commands/` from Cobra command help
-- [ ] Include examples for each command
-- [ ] Document all flags and options
-- [ ] Add common use cases
+### 26.2 Command Documentation ✅
+- [x] Generate `docs/commands/` from Cobra command help (296 files)
+- [x] Include examples for each command
+- [x] Document all flags and options
+- [x] Created `cmd/docgen/` tool for regeneration
 
-### 26.3 Configuration Reference
-- [ ] Create `docs/configuration.md`:
+### 26.3 Configuration Reference ✅
+- [x] Create `docs/configuration.md`:
   - Config file format and location
   - All configuration options
   - Environment variables
   - Example configurations
 
-### 26.4 Plugin Development Guide
-- [ ] Create `docs/plugins.md`:
-  - Plugin architecture overview
-  - SDK documentation
-  - Example plugin walkthrough
-  - Publishing plugins
+### 26.4 Plugin Development Guide ✅
+- [x] `docs/plugins.md` already existed and was comprehensive
+- [x] Added Plugin Manifest System section
+- [x] Plugin architecture, SDK, examples, publishing all documented
 
-### 26.5 Theming Guide
-- [ ] Create `docs/themes.md`:
-  - Built-in themes
+### 26.5 Theming Guide ✅
+- [x] Create `docs/themes.md`:
+  - Built-in themes (280+)
   - Custom theme creation
   - Theme file format
   - TUI component styling
 
-### 26.6 Man Pages
-- [ ] Generate man pages via Cobra
-- [ ] Include in release artifacts
-
-### 26.7 Documentation Site
-- [ ] Create docs site using mkdocs-material or docusaurus
-- [ ] Deploy to GitHub Pages
-- [ ] Include:
-  - Getting started guide
-  - Command reference (generated from Cobra)
-  - Configuration guide
-  - Plugin development guide
-  - TUI usage guide
-  - Examples and tutorials
-  - Terminal GIFs using Charm VHS
+### 26.6 Man Pages ✅
+- [x] Generate man pages via Cobra (296 files in `docs/man/`)
+- [x] Created `cmd/mangen/` tool for regeneration
+- [x] Added `make manpages` target
 
 ---
 
@@ -1717,7 +598,8 @@ shelly-cli/
   - shelly-prometheus - Prometheus metrics
 
 ### 27.4 Config Examples
-- [ ] Currently in `cfg/` with a full example and schema - needs update once here:
+- [ ] Currently in `cfg/` with a full example and schema
+  - Migrate config example to `examples/config/` (replaces one or both of next 2), leave schema
   - minimal.yaml - Minimal configuration
   - full.yaml - Full configuration with all options
   - multi-site.yaml - Multiple location setup
@@ -2016,6 +898,18 @@ shelly-cli/
 - [ ] Create professional ASCII banner/logo
 - [ ] Final documentation review
 - [ ] Create v1.0.0 tag
+
+### 30.5 Documentation Site (Post-Release)
+- [ ] Create docs site using Hugo
+- [ ] Deploy to GitHub Pages
+- [ ] Include:
+  - Getting started guide
+  - Command reference (generated from Cobra)
+  - Configuration guide
+  - Plugin development guide
+  - TUI usage guide
+  - Examples and tutorials
+  - Terminal GIFs using Charm VHS
 
 ---
 

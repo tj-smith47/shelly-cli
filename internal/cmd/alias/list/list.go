@@ -63,8 +63,8 @@ func run(f *cmdutil.Factory) error {
 	}
 
 	// Handle JSON/YAML output
-	if cmdutil.WantsStructured() {
-		return cmdutil.FormatOutput(ios, aliases)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, aliases)
 	}
 
 	// Table output

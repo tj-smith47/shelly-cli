@@ -3,14 +3,11 @@ package on
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -63,68 +60,20 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	var turnedOn int
+	var result *shelly.QuickResult
 	err := cmdutil.RunWithSpinner(ctx, ios, "Turning on...", func(ctx context.Context) error {
-		return svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
-			components, err := conn.ListComponents(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to list components: %w", err)
-			}
-
-			// Find controllable components
-			var controllable []model.Component
-			for _, comp := range components {
-				switch comp.Type {
-				case model.ComponentSwitch, model.ComponentLight, model.ComponentRGB, model.ComponentCover:
-					controllable = append(controllable, comp)
-				default:
-					ios.Debug("skipping non-controllable component %s:%d", comp.Type, comp.ID)
-				}
-			}
-
-			if len(controllable) == 0 {
-				return fmt.Errorf("no controllable components found on device")
-			}
-
-			// If not --all, just control the first one (or first of each type)
-			toControl := controllable
-			if !opts.All && len(controllable) > 1 {
-				// Just use the first controllable component
-				toControl = controllable[:1]
-			}
-
-			for _, comp := range toControl {
-				var opErr error
-				switch comp.Type {
-				case model.ComponentSwitch:
-					opErr = conn.Switch(comp.ID).On(ctx)
-				case model.ComponentLight:
-					opErr = conn.Light(comp.ID).On(ctx)
-				case model.ComponentRGB:
-					opErr = conn.RGB(comp.ID).On(ctx)
-				case model.ComponentCover:
-					opErr = conn.Cover(comp.ID).Open(ctx, nil)
-				default:
-					ios.Debug("skipping unsupported component type %s:%d", comp.Type, comp.ID)
-					continue
-				}
-				if opErr != nil {
-					return fmt.Errorf("failed to turn on %s:%d: %w", comp.Type, comp.ID, opErr)
-				}
-				turnedOn++
-			}
-
-			return nil
-		})
+		var opErr error
+		result, opErr = svc.QuickOn(ctx, opts.Device, opts.All)
+		return opErr
 	})
 	if err != nil {
 		return err
 	}
 
-	if turnedOn == 1 {
+	if result.Count == 1 {
 		ios.Success("Device %q turned on", opts.Device)
 	} else {
-		ios.Success("Turned on %d components on %q", turnedOn, opts.Device)
+		ios.Success("Turned on %d components on %q", result.Count, opts.Device)
 	}
 	return nil
 }

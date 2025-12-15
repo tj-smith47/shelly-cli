@@ -28,22 +28,8 @@ func TestNewCommand(t *testing.T) {
 	}
 }
 
-func TestNewCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	outputFlag := cmd.Flags().Lookup("output")
-	if outputFlag == nil {
-		t.Fatal("output flag not found")
-	}
-	if outputFlag.Shorthand != "o" {
-		t.Errorf("output shorthand = %q, want o", outputFlag.Shorthand)
-	}
-	if outputFlag.DefValue != "table" {
-		t.Errorf("output default = %q, want table", outputFlag.DefValue)
-	}
-}
+// Note: This command uses the global -o/--output flag defined on the root command,
+// not a local flag. The global flag is tested in the root command tests.
 
 func TestFormatActionCount(t *testing.T) {
 	t.Parallel()

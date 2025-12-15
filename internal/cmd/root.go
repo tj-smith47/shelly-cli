@@ -34,9 +34,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/ethernet"
 	exportcmd "github.com/tj-smith47/shelly-cli/internal/cmd/export"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/extension"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/gen1"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	initcmd "github.com/tj-smith47/shelly-cli/internal/cmd/init"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
@@ -51,6 +49,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/on"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/plugin"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rebootcmd"
@@ -90,6 +89,12 @@ and controlling Shelly devices on your local network.`,
 	CompletionOptions: cobra.CompletionOptions{
 		DisableDefaultCmd: true,
 	},
+}
+
+// GetRootCmd returns the root command for documentation generation.
+// The command tree is fully initialized with all subcommands.
+func GetRootCmd() *cobra.Command {
+	return rootCmd
 }
 
 // Execute runs the root command with signal-aware context.
@@ -335,7 +340,6 @@ func init() {
 	addCommandWithGroup(rootCmd, zigbee.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, lora.NewCommand(f), groupConfig)
 	addCommandWithGroup(rootCmd, matter.NewCommand(f), groupConfig)
-	addCommandWithGroup(rootCmd, gen1.NewCommand(f), groupConfig)
 
 	// Monitoring commands - status and metrics
 	addCommandWithGroup(rootCmd, monitor.NewCommand(f), groupMonitoring)
@@ -353,7 +357,7 @@ func init() {
 	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, exportcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, alias.NewCommand(f), groupUtility)
-	addCommandWithGroup(rootCmd, extension.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, plugin.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, themecmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, updatecmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, completioncmd.NewCommand(f), groupUtility)
@@ -367,10 +371,15 @@ func addCommandWithGroup(root, cmd *cobra.Command, groupID string) {
 }
 
 func initializeConfig(_ *cobra.Command, _ []string) error {
-	// Load config
+	// Load config: flag > env var > default
 	configFile, err := rootCmd.Flags().GetString("config")
 	if err != nil {
 		return fmt.Errorf("failed to get config flag: %w", err)
+	}
+
+	// Check SHELLY_CONFIG env var if flag not set
+	if configFile == "" {
+		configFile = os.Getenv("SHELLY_CONFIG")
 	}
 
 	if configFile != "" {
