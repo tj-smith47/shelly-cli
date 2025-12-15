@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/alert"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/audit"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
@@ -26,6 +27,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/benchmark"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/bthome"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cache"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/cert"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
 	completioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/completion"
 	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
@@ -366,6 +368,7 @@ func init() {
 		ethernet.NewCommand(f),
 		cloud.NewCommand(f),
 		auth.NewCommand(f),
+		cert.NewCommand(f),
 		mqtt.NewCommand(f),
 		webhook.NewCommand(f),
 		kvs.NewCommand(f),
@@ -381,6 +384,7 @@ func init() {
 	// Monitoring commands - status and metrics
 	addCommandsToGroup(rootCmd, groupMonitoring,
 		monitor.NewCommand(f),
+		alert.NewCommand(f),
 		energy.NewCommand(f),
 		power.NewCommand(f),
 		sensor.NewCommand(f),

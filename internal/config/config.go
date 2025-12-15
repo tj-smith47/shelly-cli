@@ -53,6 +53,9 @@ type Config struct {
 	// Templates
 	Templates map[string]Template `mapstructure:"templates"`
 
+	// Alerts
+	Alerts map[string]Alert `mapstructure:"alerts"`
+
 	// Plugin settings
 	Plugins PluginsConfig `mapstructure:"plugins"`
 
@@ -158,6 +161,18 @@ type Template struct {
 	Config       map[string]any `mapstructure:"config" json:"config" yaml:"config"`
 	CreatedAt    string         `mapstructure:"created_at" json:"created_at" yaml:"created_at"`
 	SourceDevice string         `mapstructure:"source_device,omitempty" json:"source_device,omitempty" yaml:"source_device,omitempty"`
+}
+
+// Alert represents a monitoring alert configuration.
+type Alert struct {
+	Name         string `mapstructure:"name" json:"name" yaml:"name"`
+	Description  string `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
+	Device       string `mapstructure:"device" json:"device" yaml:"device"`
+	Condition    string `mapstructure:"condition" json:"condition" yaml:"condition"` // e.g., "offline", "power>100", "temperature>30"
+	Action       string `mapstructure:"action" json:"action" yaml:"action"`          // e.g., "notify", "webhook:http://...", "command:..."
+	Enabled      bool   `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	SnoozedUntil string `mapstructure:"snoozed_until,omitempty" json:"snoozed_until,omitempty" yaml:"snoozed_until,omitempty"`
+	CreatedAt    string `mapstructure:"created_at" json:"created_at" yaml:"created_at"`
 }
 
 // PluginsConfig holds plugin system settings.
@@ -272,6 +287,9 @@ func Load() (*Config, error) {
 		if c.Templates == nil {
 			c.Templates = make(map[string]Template)
 		}
+		if c.Alerts == nil {
+			c.Alerts = make(map[string]Alert)
+		}
 
 		cfgMu.Lock()
 		cfg = c
@@ -316,6 +334,8 @@ func Save() error {
 	viper.Set("aliases", c.Aliases)
 	viper.Set("groups", c.Groups)
 	viper.Set("scenes", c.Scenes)
+	viper.Set("templates", c.Templates)
+	viper.Set("alerts", c.Alerts)
 	viper.Set("plugins", c.Plugins)
 	viper.Set("tui", c.TUI)
 
@@ -359,4 +379,39 @@ func PluginsDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(configDir, "plugins"), nil
+}
+
+// GetAllDeviceCredentials returns credentials for all devices that have auth configured.
+func (c *Config) GetAllDeviceCredentials() map[string]struct{ Username, Password string } {
+	cfgMu.RLock()
+	defer cfgMu.RUnlock()
+
+	creds := make(map[string]struct{ Username, Password string })
+	for name, dev := range c.Devices {
+		if dev.Auth != nil && dev.Auth.Password != "" {
+			creds[name] = struct{ Username, Password string }{
+				Username: dev.Auth.Username,
+				Password: dev.Auth.Password,
+			}
+		}
+	}
+	return creds
+}
+
+// SetDeviceAuth sets authentication credentials for a device.
+func (c *Config) SetDeviceAuth(deviceName, username, password string) error {
+	cfgMu.Lock()
+	defer cfgMu.Unlock()
+
+	dev, ok := c.Devices[deviceName]
+	if !ok {
+		return fmt.Errorf("device %q not found", deviceName)
+	}
+
+	dev.Auth = &model.Auth{
+		Username: username,
+		Password: password,
+	}
+	c.Devices[deviceName] = dev
+	return nil
 }
