@@ -199,8 +199,8 @@ check_pattern 'exec\.Command("xdg-open"' "Use browser.New().Browse() instead of 
 
 # Rule 7: No context.Background() in commands
 info "Checking for context.Background()..."
-# Exclude: root.go (signal handling), test files, prometheus.go (shutdown handler), install.go (utility function)
-check_pattern 'context\.Background()' "Use cmd.Context() instead of context.Background()" "cmd" "error" "_test.go\|root.go\|prometheus.go\|install.go"
+# Exclude: root.go (signal handling), test files, prometheus.go (shutdown handler), install.go (utility function), webhook/server (shutdown handler)
+check_pattern 'context\.Background()' "Use cmd.Context() instead of context.Background()" "cmd" "error" "_test.go\|root.go\|prometheus.go\|install.go\|webhook/server"
 
 # Rule 8: No fmt.Println in commands
 info "Checking for fmt.Println..."

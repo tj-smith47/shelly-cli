@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/create"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/del"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/list"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/server"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/update"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
@@ -38,6 +39,7 @@ enabling integration with external services and automation systems.`,
 	cmd.AddCommand(create.NewCommand(f))
 	cmd.AddCommand(del.NewCommand(f))
 	cmd.AddCommand(update.NewCommand(f))
+	cmd.AddCommand(server.NewCommand(f))
 
 	return cmd
 }
