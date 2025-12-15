@@ -262,6 +262,66 @@ scenes:
 | `method` | string | yes | RPC method to call |
 | `params` | object | no | Method parameters |
 
+### Alerts
+
+Configure monitoring alerts for device conditions.
+
+```yaml
+alerts:
+  kitchen-offline:
+    name: kitchen-offline
+    description: Alert when kitchen device goes offline
+    device: kitchen
+    condition: offline
+    action: notify
+    enabled: true
+    created_at: "2025-01-15T10:00:00Z"
+
+  high-power:
+    name: high-power
+    description: Alert on high power consumption
+    device: heater
+    condition: "power>2000"
+    action: "webhook:http://example.com/alert"
+    enabled: true
+    snoozed_until: ""
+    created_at: "2025-01-15T10:00:00Z"
+```
+
+#### Alert Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | string | yes | Unique alert identifier |
+| `description` | string | no | Human-readable description |
+| `device` | string | yes | Device to monitor |
+| `condition` | string | yes | Trigger condition (e.g., `offline`, `power>100`, `temperature>30`) |
+| `action` | string | yes | Action when triggered: `notify`, `webhook:URL`, or `command:CMD` |
+| `enabled` | bool | yes | Whether alert is active |
+| `snoozed_until` | string | no | RFC3339 timestamp if temporarily snoozed |
+| `created_at` | string | yes | When alert was created |
+
+#### Alert Commands
+
+```bash
+# Create an alert
+shelly alert create kitchen-offline --device kitchen --condition offline
+
+# List all alerts
+shelly alert list
+
+# Test an alert (dry-run)
+shelly alert test kitchen-offline
+
+# Snooze for 1 hour
+shelly alert snooze kitchen-offline --duration 1h
+
+# Clear snooze
+shelly alert snooze kitchen-offline --clear
+```
+
+**Note:** The alert system stores configurations only. Active monitoring requires integration with `shelly monitor` or external scheduling.
+
 ### Templates
 
 Store device configuration templates for provisioning.
@@ -485,6 +545,16 @@ aliases:
     command: status
   off-all:
     command: batch off all-lights
+
+# Alerts
+alerts:
+  kitchen-offline:
+    name: kitchen-offline
+    device: kitchen
+    condition: offline
+    action: notify
+    enabled: true
+    created_at: "2025-01-15T10:00:00Z"
 
 # Templates
 templates:
