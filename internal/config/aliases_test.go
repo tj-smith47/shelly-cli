@@ -49,16 +49,34 @@ func TestExpandAlias(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "no placeholders",
+			name:  "no placeholders no args",
 			alias: Alias{Command: "switch status"},
 			args:  []string{},
 			want:  "switch status",
 		},
 		{
-			name:  "single placeholder",
+			name:  "no placeholders with args auto-appends",
+			alias: Alias{Command: "device info"},
+			args:  []string{"kitchen"},
+			want:  "device info kitchen",
+		},
+		{
+			name:  "no placeholders with multiple args auto-appends",
+			alias: Alias{Command: "batch on"},
+			args:  []string{"light1", "light2", "light3"},
+			want:  "batch on light1 light2 light3",
+		},
+		{
+			name:  "single placeholder consumes arg",
 			alias: Alias{Command: "switch toggle $1"},
 			args:  []string{"living-room"},
 			want:  "switch toggle living-room",
+		},
+		{
+			name:  "placeholder with extra args auto-appends remaining",
+			alias: Alias{Command: "config export $1"},
+			args:  []string{"kitchen", "-o", "yaml"},
+			want:  "config export kitchen -o yaml",
 		},
 		{
 			name:  "multiple placeholders",
@@ -67,19 +85,19 @@ func TestExpandAlias(t *testing.T) {
 			want:  "switch on kitchen",
 		},
 		{
-			name:  "all args placeholder",
+			name:  "all args placeholder consumes all",
 			alias: Alias{Command: "batch $@"},
 			args:  []string{"device1", "device2", "device3"},
 			want:  "batch device1 device2 device3",
 		},
 		{
-			name:  "mixed placeholders",
-			alias: Alias{Command: "script $1 run $@"},
-			args:  []string{"mydevice", "arg1", "arg2"},
-			want:  "script mydevice run mydevice arg1 arg2",
+			name:  "explicit $@ prevents auto-append",
+			alias: Alias{Command: "echo $@"},
+			args:  []string{"a", "b", "c"},
+			want:  "echo a b c",
 		},
 		{
-			name:  "unused placeholder",
+			name:  "unused placeholder kept as-is",
 			alias: Alias{Command: "switch $1 $2 $3"},
 			args:  []string{"on"},
 			want:  "switch on $2 $3",

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -188,7 +189,7 @@ func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceS
 			deviceModel = snap.Info.Model
 		}
 
-		powerStr := formatPowerColored(devicePower)
+		powerStr := helpers.FormatPowerColored(devicePower)
 		energyStr := ""
 		if deviceEnergy > 0 {
 			energyStr = fmt.Sprintf("  %.2f Wh", deviceEnergy)
@@ -203,7 +204,7 @@ func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceS
 	ios.Printf("  Online:       %s / %d devices\n",
 		theme.StatusOK().Render(fmt.Sprintf("%d", onlineCount)),
 		onlineCount+offlineCount)
-	ios.Printf("  Total Power:  %s\n", theme.StatusOK().Render(formatPower(totalPower)))
+	ios.Printf("  Total Power:  %s\n", theme.StatusOK().Render(helpers.FormatPower(totalPower)))
 	if totalEnergy > 0 {
 		ios.Printf("  Total Energy: %.2f Wh\n", totalEnergy)
 	}
@@ -211,21 +212,4 @@ func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceS
 
 func clearScreen(ios *iostreams.IOStreams) {
 	ios.Printf("\033[H\033[2J")
-}
-
-func formatPower(w float64) string {
-	if w >= 1000 {
-		return fmt.Sprintf("%.2f kW", w/1000)
-	}
-	return fmt.Sprintf("%.1f W", w)
-}
-
-func formatPowerColored(w float64) string {
-	s := formatPower(w)
-	if w >= 1000 {
-		return theme.StatusError().Render(s)
-	} else if w >= 100 {
-		return theme.StatusWarn().Render(s)
-	}
-	return theme.StatusOK().Render(s)
 }

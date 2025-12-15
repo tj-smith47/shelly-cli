@@ -1,0 +1,156 @@
+# Multi-Site Shelly CLI Configuration
+#
+# Example for users with devices across multiple locations.
+# Uses device groups and naming conventions to organize by location.
+#
+# Copy to ~/.config/shelly/config.yaml
+
+output: table
+color: true
+theme: nord
+
+# API mode: local requires network access to each site
+# Consider using cloud mode for remote sites
+api_mode: local
+
+# Devices organized by location using naming convention
+devices:
+  # === HOME ===
+  home-living-room:
+    address: 192.168.1.50
+    generation: 2
+    type: switch
+
+  home-kitchen:
+    address: 192.168.1.51
+    generation: 2
+    type: switch
+
+  home-bedroom:
+    address: 192.168.1.52
+    generation: 2
+    type: light
+
+  home-garage:
+    address: 192.168.1.53
+    generation: 2
+    type: switch
+
+  # === CABIN ===
+  # Note: Requires VPN or cloud mode when accessing remotely
+  cabin-main:
+    address: 10.20.30.50
+    generation: 2
+    type: switch
+
+  cabin-heater:
+    address: 10.20.30.51
+    generation: 2
+    type: switch
+
+  cabin-water-heater:
+    address: 10.20.30.52
+    generation: 2
+    type: switch
+
+  # === OFFICE ===
+  office-desk-lamp:
+    address: 172.16.0.50
+    generation: 2
+    type: light
+
+  office-server-room:
+    address: 172.16.0.51
+    generation: 2
+    type: switch
+
+# Device groups by location for batch operations
+groups:
+  home:
+    devices:
+      - home-living-room
+      - home-kitchen
+      - home-bedroom
+      - home-garage
+
+  cabin:
+    devices:
+      - cabin-main
+      - cabin-heater
+      - cabin-water-heater
+
+  office:
+    devices:
+      - office-desk-lamp
+      - office-server-room
+
+  # Cross-site groups
+  all-heaters:
+    devices:
+      - cabin-heater
+      - cabin-water-heater
+
+  all-lights:
+    devices:
+      - home-living-room
+      - home-kitchen
+      - home-bedroom
+      - office-desk-lamp
+
+# Scenes for different locations
+scenes:
+  cabin-arrival:
+    description: Prepare cabin for arrival
+    actions:
+      - device: cabin-main
+        method: Switch.Set
+        params:
+          id: 0
+          on: true
+      - device: cabin-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: true
+      - device: cabin-water-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: true
+
+  cabin-departure:
+    description: Shut down cabin when leaving
+    actions:
+      - device: cabin-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: false
+      - device: cabin-water-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: false
+      - device: cabin-main
+        method: Switch.Set
+        params:
+          id: 0
+          on: false
+
+  office-workday:
+    description: Start office workday
+    actions:
+      - device: office-desk-lamp
+        method: Light.Set
+        params:
+          id: 0
+          on: true
+          brightness: 80
+
+# Aliases for quick access to different sites
+aliases:
+  home: "batch status --group home"
+  cabin: "batch status --group cabin"
+  office: "batch status --group office"
+  cabin-on: "scene activate cabin-arrival"
+  cabin-off: "scene activate cabin-departure"

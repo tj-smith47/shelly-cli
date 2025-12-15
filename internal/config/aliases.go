@@ -120,18 +120,41 @@ func ValidateAliasName(name string) error {
 }
 
 // ExpandAlias expands an alias command with arguments.
-// Supports $1, $2, etc. for argument interpolation.
+// Supports $1, $2, etc. for explicit argument interpolation.
+// Any remaining arguments not consumed by $N placeholders are auto-appended,
+// unless $@ is used (which consumes all remaining arguments explicitly).
 func ExpandAlias(alias Alias, args []string) string {
 	cmd := alias.Command
+	hasExplicitAll := strings.Contains(cmd, "$@")
+
+	// Track which args were consumed by $N placeholders
+	consumed := make([]bool, len(args))
 
 	// Replace $N with corresponding argument
 	for i, arg := range args {
 		placeholder := fmt.Sprintf("$%d", i+1)
-		cmd = strings.ReplaceAll(cmd, placeholder, arg)
+		if strings.Contains(cmd, placeholder) {
+			cmd = strings.ReplaceAll(cmd, placeholder, arg)
+			consumed[i] = true
+		}
 	}
 
-	// Replace $@ with all remaining arguments
-	cmd = strings.ReplaceAll(cmd, "$@", strings.Join(args, " "))
+	// Replace $@ with all remaining arguments (marks all as consumed)
+	if hasExplicitAll {
+		cmd = strings.ReplaceAll(cmd, "$@", strings.Join(args, " "))
+		return cmd
+	}
+
+	// Auto-append unconsumed arguments
+	var remaining []string
+	for i, arg := range args {
+		if !consumed[i] {
+			remaining = append(remaining, arg)
+		}
+	}
+	if len(remaining) > 0 {
+		cmd = cmd + " " + strings.Join(remaining, " ")
+	}
 
 	return cmd
 }
@@ -161,16 +184,28 @@ func (c *Config) ImportAliases(filename string, merge bool) (imported, skipped i
 		return 0, 0, fmt.Errorf("failed to parse file: %w", err)
 	}
 
+	// Validate all alias names before acquiring lock
+	for name := range af.Aliases {
+		if err := ValidateAliasName(name); err != nil {
+			return 0, 0, fmt.Errorf("invalid alias %q: %w", name, err)
+		}
+	}
+
+	// Lock once for all modifications
+	cfgMu.Lock()
+	defer cfgMu.Unlock()
+
+	if c.Aliases == nil {
+		c.Aliases = make(map[string]Alias)
+	}
+
 	for name, command := range af.Aliases {
 		// Check if alias exists and we're in merge mode
-		if merge && c.GetAlias(name) != nil {
-			skipped++
-			continue
-		}
-
-		// Validate the alias name
-		if err := ValidateAliasName(name); err != nil {
-			return imported, skipped, fmt.Errorf("invalid alias %q: %w", name, err)
+		if merge {
+			if _, exists := c.Aliases[name]; exists {
+				skipped++
+				continue
+			}
 		}
 
 		// Detect shell aliases (prefixed with !)
@@ -179,16 +214,11 @@ func (c *Config) ImportAliases(filename string, merge bool) (imported, skipped i
 			command = strings.TrimPrefix(command, "!")
 		}
 
-		cfgMu.Lock()
-		if c.Aliases == nil {
-			c.Aliases = make(map[string]Alias)
-		}
 		c.Aliases[name] = Alias{
 			Name:    name,
 			Command: command,
 			Shell:   shell,
 		}
-		cfgMu.Unlock()
 
 		imported++
 	}

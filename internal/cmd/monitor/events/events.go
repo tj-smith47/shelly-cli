@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -119,7 +120,7 @@ func formatEventData(data map[string]any) string {
 	}
 
 	if power, ok := data["apower"].(float64); ok {
-		parts = append(parts, formatPower(power))
+		parts = append(parts, helpers.FormatPowerColored(power))
 	}
 
 	if temp, ok := data["temperature"].(map[string]any); ok {
@@ -145,16 +146,6 @@ func formatEventData(data map[string]any) string {
 		result += p
 	}
 	return result
-}
-
-func formatPower(w float64) string {
-	var s string
-	if w >= 1000 {
-		s = fmt.Sprintf("%.2f kW", w/1000)
-		return theme.StatusWarn().Render(s)
-	}
-	s = fmt.Sprintf("%.1f W", w)
-	return theme.StatusOK().Render(s)
 }
 
 func formatTemp(c float64) string {

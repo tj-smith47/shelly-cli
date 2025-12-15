@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -342,8 +343,8 @@ func displayComparison(ios *iostreams.IOStreams, data ComparisonData) {
 
 		if dev.Online {
 			energyStr = formatEnergy(dev.Energy)
-			avgStr = formatPower(dev.AvgPower)
-			peakStr = formatPower(dev.PeakPower)
+			avgStr = helpers.FormatPower(dev.AvgPower)
+			peakStr = helpers.FormatPower(dev.PeakPower)
 			if dev.Percentage > 0 {
 				shareStr = fmt.Sprintf("%.1f%%", dev.Percentage)
 			}
@@ -396,13 +397,6 @@ func formatEnergy(kwh float64) string {
 		return fmt.Sprintf("%.2f kWh", kwh)
 	}
 	return fmt.Sprintf("%.0f Wh", kwh*1000)
-}
-
-func formatPower(watts float64) string {
-	if watts >= 1000 {
-		return fmt.Sprintf("%.2f kW", watts/1000)
-	}
-	return fmt.Sprintf("%.1f W", watts)
 }
 
 func truncate(s string, maxLen int) string {

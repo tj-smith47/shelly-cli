@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -332,7 +333,7 @@ func displayDashboard(ios *iostreams.IOStreams, data Data) {
 			statusStr = theme.StatusError().Render("offline")
 		}
 
-		powerStr := formatPower(dev.TotalPower)
+		powerStr := helpers.FormatPower(dev.TotalPower)
 		if !dev.Online {
 			powerStr = "-"
 		}
@@ -345,13 +346,6 @@ func displayDashboard(ios *iostreams.IOStreams, data Data) {
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
-}
-
-func formatPower(watts float64) string {
-	if watts >= 1000 {
-		return fmt.Sprintf("%.2f kW", watts/1000)
-	}
-	return fmt.Sprintf("%.1f W", watts)
 }
 
 func formatComponentSummary(components []ComponentPower) string {

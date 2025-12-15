@@ -17,6 +17,8 @@ func RegisterDevice(name, address string, generation int, deviceType, deviceMode
 	c := Get()
 
 	cfgMu.Lock()
+	defer cfgMu.Unlock()
+
 	c.Devices[name] = model.Device{
 		Name:       name,
 		Address:    address,
@@ -25,9 +27,8 @@ func RegisterDevice(name, address string, generation int, deviceType, deviceMode
 		Model:      deviceModel,
 		Auth:       auth,
 	}
-	cfgMu.Unlock()
 
-	return Save()
+	return saveWithoutLock()
 }
 
 // UnregisterDevice removes a device from the registry.
@@ -35,12 +36,12 @@ func UnregisterDevice(name string) error {
 	c := Get()
 
 	cfgMu.Lock()
+	defer cfgMu.Unlock()
+
 	if _, ok := c.Devices[name]; !ok {
-		cfgMu.Unlock()
 		return fmt.Errorf("device %q not found", name)
 	}
 	delete(c.Devices, name)
-	cfgMu.Unlock()
 
 	// Also remove from any groups
 	for groupName, group := range c.Groups {
@@ -56,7 +57,7 @@ func UnregisterDevice(name string) error {
 		}
 	}
 
-	return Save()
+	return saveWithoutLock()
 }
 
 // GetDevice returns a device by name.
@@ -92,14 +93,14 @@ func RenameDevice(oldName, newName string) error {
 	c := Get()
 
 	cfgMu.Lock()
+	defer cfgMu.Unlock()
+
 	device, ok := c.Devices[oldName]
 	if !ok {
-		cfgMu.Unlock()
 		return fmt.Errorf("device %q not found", oldName)
 	}
 
 	if _, exists := c.Devices[newName]; exists {
-		cfgMu.Unlock()
 		return fmt.Errorf("device %q already exists", newName)
 	}
 
@@ -118,9 +119,8 @@ func RenameDevice(oldName, newName string) error {
 			}
 		}
 	}
-	cfgMu.Unlock()
 
-	return Save()
+	return saveWithoutLock()
 }
 
 // ValidateDeviceName checks if a device name is valid.
@@ -160,8 +160,9 @@ func CreateGroup(name string) error {
 	c := Get()
 
 	cfgMu.Lock()
+	defer cfgMu.Unlock()
+
 	if _, exists := c.Groups[name]; exists {
-		cfgMu.Unlock()
 		return fmt.Errorf("group %q already exists", name)
 	}
 
@@ -169,9 +170,8 @@ func CreateGroup(name string) error {
 		Name:    name,
 		Devices: []string{},
 	}
-	cfgMu.Unlock()
 
-	return Save()
+	return saveWithoutLock()
 }
 
 // DeleteGroup deletes a device group.
@@ -179,14 +179,14 @@ func DeleteGroup(name string) error {
 	c := Get()
 
 	cfgMu.Lock()
+	defer cfgMu.Unlock()
+
 	if _, ok := c.Groups[name]; !ok {
-		cfgMu.Unlock()
 		return fmt.Errorf("group %q not found", name)
 	}
 	delete(c.Groups, name)
-	cfgMu.Unlock()
 
-	return Save()
+	return saveWithoutLock()
 }
 
 // GetGroup returns a group by name.
@@ -237,7 +237,7 @@ func AddDeviceToGroup(groupName, deviceName string) error {
 	group.Devices = append(group.Devices, deviceName)
 	c.Groups[groupName] = group
 
-	return Save()
+	return saveWithoutLock()
 }
 
 // RemoveDeviceFromGroup removes a device from a group.
@@ -269,7 +269,7 @@ func RemoveDeviceFromGroup(groupName, deviceName string) error {
 	group.Devices = newDevices
 	c.Groups[groupName] = group
 
-	return Save()
+	return saveWithoutLock()
 }
 
 // ValidateGroupName checks if a group name is valid.

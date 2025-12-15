@@ -1,0 +1,39 @@
+# Common Shortcut Aliases for Shelly CLI
+#
+# Import: shelly alias import examples/aliases/shortcuts.yaml
+#
+# Simple, memorable shortcuts for everyday device control.
+# Perfect for beginners and quick command-line usage.
+# Arguments are auto-appended - no placeholders needed.
+
+aliases:
+  # List all devices
+  ls: "device list"
+
+  # Quick device info
+  info: "device info"
+
+  # Reboot shortcut
+  boot: "reboot"
+
+  # Discover devices
+  find: "discover scan"
+
+  # Energy check
+  power: "energy status"
+
+  # Update firmware
+  update: "firmware update"
+
+  # Open device UI
+  web: "device ui"
+
+  # Quick config view
+  cfg: "config get"
+
+  # Scene shortcuts
+  run: "scene activate"
+  save: "scene save"
+
+  # Version info
+  ver: "version"

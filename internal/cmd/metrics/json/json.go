@@ -26,19 +26,9 @@ type MetricsOutput struct {
 
 // DeviceMetrics represents metrics for a single device.
 type DeviceMetrics struct {
-	Device     string             `json:"device"`
-	Online     bool               `json:"online"`
-	Components []ComponentMetrics `json:"components,omitempty"`
-}
-
-// ComponentMetrics represents metrics for a single component.
-type ComponentMetrics struct {
-	Type    string  `json:"type"`
-	ID      int     `json:"id"`
-	Power   float64 `json:"power_w,omitempty"`
-	Voltage float64 `json:"voltage_v,omitempty"`
-	Current float64 `json:"current_a,omitempty"`
-	Energy  float64 `json:"energy_wh,omitempty"`
+	Device     string                    `json:"device"`
+	Online     bool                      `json:"online"`
+	Components []shelly.ComponentReading `json:"components,omitempty"`
 }
 
 // NewCommand creates the JSON metrics command.
@@ -164,9 +154,13 @@ func collectMetrics(ctx context.Context, svc *shelly.Service, devices []string) 
 		idx := i
 		dev := device
 		g.Go(func() error {
-			metrics := collectDeviceMetrics(ctx, svc, dev)
+			readings := svc.CollectComponentReadings(ctx, dev)
 			mu.Lock()
-			output.Devices[idx] = metrics
+			output.Devices[idx] = DeviceMetrics{
+				Device:     dev,
+				Online:     len(readings) > 0,
+				Components: readings,
+			}
 			mu.Unlock()
 			return nil
 		})
@@ -177,114 +171,4 @@ func collectMetrics(ctx context.Context, svc *shelly.Service, devices []string) 
 	}
 
 	return output
-}
-
-func collectDeviceMetrics(ctx context.Context, svc *shelly.Service, device string) DeviceMetrics {
-	metrics := DeviceMetrics{
-		Device: device,
-		Online: true,
-	}
-
-	// Collect each component type
-	collectPMMetrics(ctx, svc, device, &metrics)
-	collectPM1Metrics(ctx, svc, device, &metrics)
-	collectEMMetrics(ctx, svc, device, &metrics)
-	collectEM1Metrics(ctx, svc, device, &metrics)
-
-	// Mark offline if no components found
-	if len(metrics.Components) == 0 {
-		metrics.Online = false
-	}
-
-	return metrics
-}
-
-func collectPMMetrics(ctx context.Context, svc *shelly.Service, device string, metrics *DeviceMetrics) {
-	pmIDs, err := svc.ListPMComponents(ctx, device)
-	if err != nil {
-		return
-	}
-	for _, id := range pmIDs {
-		status, err := svc.GetPMStatus(ctx, device, id)
-		if err != nil {
-			continue
-		}
-		comp := ComponentMetrics{
-			Type:    "pm",
-			ID:      id,
-			Power:   status.APower,
-			Voltage: status.Voltage,
-			Current: status.Current,
-		}
-		if status.AEnergy != nil {
-			comp.Energy = status.AEnergy.Total
-		}
-		metrics.Components = append(metrics.Components, comp)
-	}
-}
-
-func collectPM1Metrics(ctx context.Context, svc *shelly.Service, device string, metrics *DeviceMetrics) {
-	pm1IDs, err := svc.ListPM1Components(ctx, device)
-	if err != nil {
-		return
-	}
-	for _, id := range pm1IDs {
-		status, err := svc.GetPM1Status(ctx, device, id)
-		if err != nil {
-			continue
-		}
-		comp := ComponentMetrics{
-			Type:    "pm1",
-			ID:      id,
-			Power:   status.APower,
-			Voltage: status.Voltage,
-			Current: status.Current,
-		}
-		if status.AEnergy != nil {
-			comp.Energy = status.AEnergy.Total
-		}
-		metrics.Components = append(metrics.Components, comp)
-	}
-}
-
-func collectEMMetrics(ctx context.Context, svc *shelly.Service, device string, metrics *DeviceMetrics) {
-	emIDs, err := svc.ListEMComponents(ctx, device)
-	if err != nil {
-		return
-	}
-	for _, id := range emIDs {
-		status, err := svc.GetEMStatus(ctx, device, id)
-		if err != nil {
-			continue
-		}
-		comp := ComponentMetrics{
-			Type:    "em",
-			ID:      id,
-			Power:   status.TotalActivePower,
-			Voltage: status.AVoltage,
-			Current: status.TotalCurrent,
-		}
-		metrics.Components = append(metrics.Components, comp)
-	}
-}
-
-func collectEM1Metrics(ctx context.Context, svc *shelly.Service, device string, metrics *DeviceMetrics) {
-	em1IDs, err := svc.ListEM1Components(ctx, device)
-	if err != nil {
-		return
-	}
-	for _, id := range em1IDs {
-		status, err := svc.GetEM1Status(ctx, device, id)
-		if err != nil {
-			continue
-		}
-		comp := ComponentMetrics{
-			Type:    "em1",
-			ID:      id,
-			Power:   status.ActPower,
-			Voltage: status.Voltage,
-			Current: status.Current,
-		}
-		metrics.Components = append(metrics.Components, comp)
-	}
 }

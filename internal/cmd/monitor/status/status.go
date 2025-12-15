@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -107,21 +108,21 @@ func displaySingleEM(ios *iostreams.IOStreams, em, prev *shelly.EMStatus) {
 	ios.Printf("  EM %d:\n", em.ID)
 
 	// Phase A
-	powerA := formatPower(em.AActivePower)
+	powerA := helpers.FormatPower(em.AActivePower)
 	if prev != nil && em.AActivePower != prev.AActivePower {
 		powerA = theme.StatusWarn().Render(powerA + " ↑")
 	}
 	ios.Printf("    Phase A: %s  %.1fV  %.2fA\n", powerA, em.AVoltage, em.ACurrent)
 
 	// Phase B
-	powerB := formatPower(em.BActivePower)
+	powerB := helpers.FormatPower(em.BActivePower)
 	if prev != nil && em.BActivePower != prev.BActivePower {
 		powerB = theme.StatusWarn().Render(powerB + " ↑")
 	}
 	ios.Printf("    Phase B: %s  %.1fV  %.2fA\n", powerB, em.BVoltage, em.BCurrent)
 
 	// Phase C
-	powerC := formatPower(em.CActivePower)
+	powerC := helpers.FormatPower(em.CActivePower)
 	if prev != nil && em.CActivePower != prev.CActivePower {
 		powerC = theme.StatusWarn().Render(powerC + " ↑")
 	}
@@ -145,7 +146,7 @@ func displayEM1Status(ios *iostreams.IOStreams, statuses []shelly.EM1Status, pre
 }
 
 func displaySingleEM1(ios *iostreams.IOStreams, em1, prev *shelly.EM1Status) {
-	power := formatPower(em1.ActPower)
+	power := helpers.FormatPower(em1.ActPower)
 	if prev != nil && em1.ActPower != prev.ActPower {
 		power = theme.StatusWarn().Render(power + " ↑")
 	}
@@ -167,7 +168,7 @@ func displayPMStatus(ios *iostreams.IOStreams, statuses []shelly.PMStatus, previ
 }
 
 func displaySinglePM(ios *iostreams.IOStreams, pm, prev *shelly.PMStatus) {
-	power := formatPower(pm.APower)
+	power := helpers.FormatPower(pm.APower)
 	if prev != nil && pm.APower != prev.APower {
 		power = theme.StatusWarn().Render(power + " ↑")
 	}
@@ -179,13 +180,6 @@ func displaySinglePM(ios *iostreams.IOStreams, pm, prev *shelly.PMStatus) {
 
 	ios.Printf("  PM %d: %s  %.1fV  %.2fA%s\n",
 		pm.ID, power, pm.Voltage, pm.Current, energyStr)
-}
-
-func formatPower(w float64) string {
-	if w >= 1000 {
-		return fmt.Sprintf("%.2f kW", w/1000)
-	}
-	return fmt.Sprintf("%.1f W", w)
 }
 
 func clearScreen(ios *iostreams.IOStreams) {

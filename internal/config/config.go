@@ -316,10 +316,16 @@ func (c *Config) Save() error {
 
 // Save writes the current configuration to file.
 func Save() error {
-	c := Get()
-
 	cfgMu.Lock()
 	defer cfgMu.Unlock()
+
+	return saveWithoutLock()
+}
+
+// saveWithoutLock writes the current configuration to file.
+// Caller must hold cfgMu lock.
+func saveWithoutLock() error {
+	c := Get()
 
 	// Set all values in viper
 	viper.Set("output", c.Output)

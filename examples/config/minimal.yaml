@@ -1,0 +1,17 @@
+# Minimal Shelly CLI Configuration
+#
+# This is the bare minimum needed to get started.
+# Copy to ~/.config/shelly/config.yaml
+#
+# For full options, see: cfg/config.example.yaml or run 'shelly init'
+
+# Register your devices
+devices:
+  living-room:
+    address: 192.168.1.50
+
+  kitchen:
+    address: 192.168.1.51
+
+  bedroom:
+    address: 192.168.1.52

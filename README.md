@@ -477,6 +477,18 @@ shelly backup restore kitchen backup.json
 shelly backup list
 ```
 
+## Examples
+
+The `examples/` directory contains ready-to-use configurations and scripts:
+
+- **[examples/config/](examples/config/)** - Configuration templates (minimal, multi-site)
+- **[examples/aliases/](examples/aliases/)** - Alias collections (shortcuts, automation, power-users)
+- **[examples/scripts/](examples/scripts/)** - Shell scripts (presence detection, workstation sync, bulk updates)
+- **[examples/plugins/](examples/plugins/)** - Plugin examples (desktop notifications)
+- **[examples/deployments/](examples/deployments/)** - Kubernetes, Docker, and Docker Compose deployment examples
+
+**We welcome script / manifest contributions!** If you've written useful automation scripts or integrations, please submit a PR to add them to the examples directory.
+
 ## Documentation
 
 - [Configuration Reference](docs/configuration.md) - Complete configuration options

@@ -1,0 +1,62 @@
+# Power User Aliases for Shelly CLI
+#
+# Import: shelly alias import examples/aliases/power-users.yaml
+#
+# These aliases provide shortcuts for common command+flag combinations
+# that power users type frequently. Arguments are auto-appended.
+#
+# Note: Reserved command names (on, off, toggle, status, device, batch, etc.)
+# cannot be used as alias names.
+
+aliases:
+  # Device inspection shortcuts
+  # 'shelly i kitchen' → 'shelly device info kitchen'
+  i: "device info"
+  ij: "device info -o json"
+
+  # List all devices (shorter than 'device list')
+  ls: "device list"
+  lsj: "device list -o json"
+
+  # Discovery with common timeout
+  scan: "discover scan --timeout 30s"
+  scan-reg: "discover scan --register"
+
+  # Batch operations with all devices
+  all-on: "batch on --all"
+  all-off: "batch off --all"
+
+  # Configuration export shortcuts
+  cfgx: "config export -o yaml"
+  cfgj: "config export -o json"
+
+  # Firmware check all devices at once
+  fw-check: "firmware check --all"
+  fw-update: "firmware update --all --yes"
+
+  # Energy monitoring shortcut
+  pwr: "energy status"
+  pwr-all: "energy status --all"
+  pwr-hist: "energy history"
+
+  # Quick debug/diagnostics
+  methods: "debug methods"
+  rpc: "debug rpc"
+
+  # Backup shortcuts
+  bk: "backup create"
+  bk-all: "backup create --all"
+
+  # TUI dashboard access
+  ui: "tui dash"
+
+  # Open device web interface
+  web: "device ui"
+
+  # Shell aliases for JSON filtering (requires jq)
+  # List only online devices
+  online: "!shelly device list -o json | jq -r '.[] | select(.online == true) | .name'"
+  # List only offline devices
+  offline: "!shelly device list -o json | jq -r '.[] | select(.online == false) | .name'"
+  # Power summary for all devices
+  pwr-summary: "!shelly energy status --all -o json | jq -r '.[] | \"\\(.name): \\(.power // 0)W\"'"

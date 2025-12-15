@@ -156,20 +156,28 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 }
 
 func collectAndWrite(ctx context.Context, svc *shelly.Service, devices []string, writer *LineProtocolWriter) {
-	timestamp := time.Now().UnixNano()
+	now := time.Now()
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
 
 	var mu sync.Mutex
-	var lines []string
+	var allPoints []shelly.InfluxDBPoint
 
 	for _, device := range devices {
 		dev := device
 		g.Go(func() error {
-			deviceLines := collectDeviceLines(ctx, svc, dev, writer, timestamp)
+			readings := svc.CollectComponentReadings(ctx, dev)
+			points := shelly.ReadingsToInfluxDBPoints(readings, now)
+			// Apply custom measurement name and additional tags
+			for i := range points {
+				points[i].Measurement = writer.measurement
+				for k, v := range writer.tags {
+					points[i].Tags[k] = v
+				}
+			}
 			mu.Lock()
-			lines = append(lines, deviceLines...)
+			allPoints = append(allPoints, points...)
 			mu.Unlock()
 			return nil
 		})
@@ -179,167 +187,11 @@ func collectAndWrite(ctx context.Context, svc *shelly.Service, devices []string,
 		return
 	}
 
-	// Write all lines
-	for _, line := range lines {
+	// Write all points
+	for _, p := range allPoints {
+		line := shelly.FormatInfluxDBPoint(p)
 		if _, err := fmt.Fprintln(writer.out, line); err != nil {
 			writer.ios.DebugErr("writing line", err)
 		}
 	}
-}
-
-func collectDeviceLines(ctx context.Context, svc *shelly.Service, device string, writer *LineProtocolWriter, timestamp int64) []string {
-	var lines []string
-
-	// Collect PM components
-	pmIDs, err := svc.ListPMComponents(ctx, device)
-	if err == nil {
-		for _, id := range pmIDs {
-			status, err := svc.GetPMStatus(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			tags := mergeTags(writer.tags, map[string]string{
-				"device":         device,
-				"component_type": "pm",
-				"component_id":   fmt.Sprintf("%d", id),
-			})
-
-			fields := map[string]float64{
-				"power":   status.APower,
-				"voltage": status.Voltage,
-				"current": status.Current,
-			}
-
-			if status.AEnergy != nil {
-				fields["energy"] = status.AEnergy.Total
-			}
-
-			lines = append(lines, formatLine(writer.measurement, tags, fields, timestamp))
-		}
-	}
-
-	// Collect PM1 components
-	pm1IDs, err := svc.ListPM1Components(ctx, device)
-	if err == nil {
-		for _, id := range pm1IDs {
-			status, err := svc.GetPM1Status(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			tags := mergeTags(writer.tags, map[string]string{
-				"device":         device,
-				"component_type": "pm1",
-				"component_id":   fmt.Sprintf("%d", id),
-			})
-
-			fields := map[string]float64{
-				"power":   status.APower,
-				"voltage": status.Voltage,
-				"current": status.Current,
-			}
-
-			if status.AEnergy != nil {
-				fields["energy"] = status.AEnergy.Total
-			}
-
-			lines = append(lines, formatLine(writer.measurement, tags, fields, timestamp))
-		}
-	}
-
-	// Collect EM components
-	emIDs, err := svc.ListEMComponents(ctx, device)
-	if err == nil {
-		for _, id := range emIDs {
-			status, err := svc.GetEMStatus(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			tags := mergeTags(writer.tags, map[string]string{
-				"device":         device,
-				"component_type": "em",
-				"component_id":   fmt.Sprintf("%d", id),
-			})
-
-			fields := map[string]float64{
-				"power":   status.TotalActivePower,
-				"voltage": status.AVoltage,
-				"current": status.TotalCurrent,
-			}
-
-			lines = append(lines, formatLine(writer.measurement, tags, fields, timestamp))
-		}
-	}
-
-	// Collect EM1 components
-	em1IDs, err := svc.ListEM1Components(ctx, device)
-	if err == nil {
-		for _, id := range em1IDs {
-			status, err := svc.GetEM1Status(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			tags := mergeTags(writer.tags, map[string]string{
-				"device":         device,
-				"component_type": "em1",
-				"component_id":   fmt.Sprintf("%d", id),
-			})
-
-			fields := map[string]float64{
-				"power":   status.ActPower,
-				"voltage": status.Voltage,
-				"current": status.Current,
-			}
-
-			lines = append(lines, formatLine(writer.measurement, tags, fields, timestamp))
-		}
-	}
-
-	return lines
-}
-
-func mergeTags(base, additional map[string]string) map[string]string {
-	result := make(map[string]string)
-	for k, v := range base {
-		result[k] = v
-	}
-	for k, v := range additional {
-		result[k] = v
-	}
-	return result
-}
-
-func formatLine(measurement string, tags map[string]string, fields map[string]float64, timestamp int64) string {
-	// Format: measurement,tag1=value1,tag2=value2 field1=value1,field2=value2 timestamp
-
-	// Build tags string
-	tagParts := make([]string, 0, len(tags))
-	for k, v := range tags {
-		tagParts = append(tagParts, fmt.Sprintf("%s=%s", escapeTag(k), escapeTag(v)))
-	}
-	sort.Strings(tagParts)
-	tagsStr := strings.Join(tagParts, ",")
-
-	// Build fields string
-	fieldParts := make([]string, 0, len(fields))
-	for k, v := range fields {
-		fieldParts = append(fieldParts, fmt.Sprintf("%s=%g", escapeTag(k), v))
-	}
-	sort.Strings(fieldParts)
-	fieldsStr := strings.Join(fieldParts, ",")
-
-	if tagsStr != "" {
-		return fmt.Sprintf("%s,%s %s %d", measurement, tagsStr, fieldsStr, timestamp)
-	}
-	return fmt.Sprintf("%s %s %d", measurement, fieldsStr, timestamp)
-}
-
-func escapeTag(s string) string {
-	s = strings.ReplaceAll(s, " ", "\\ ")
-	s = strings.ReplaceAll(s, ",", "\\,")
-	s = strings.ReplaceAll(s, "=", "\\=")
-	return s
 }

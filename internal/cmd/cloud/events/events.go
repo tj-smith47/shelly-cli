@@ -110,6 +110,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	// Setup signal handling for graceful shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
 
 	// Create context that cancels on signal
 	ctx, cancel := context.WithCancel(ctx)

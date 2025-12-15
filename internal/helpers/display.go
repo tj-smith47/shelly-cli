@@ -88,18 +88,23 @@ func DisplayDiscoveredDevices(devices []discovery.DiscoveredDevice) {
 	iostreams.Count("device", len(devices))
 }
 
-// DisplayDeviceSummary prints a summary line for a single device with themed formatting.
-func DisplayDeviceSummary(d discovery.DiscoveredDevice) {
-	auth := ""
-	if d.AuthRequired {
-		auth = theme.StatusWarn().Render(" (auth required)")
+// FormatPower returns a human-readable power string (W or kW).
+func FormatPower(watts float64) string {
+	if watts >= 1000 {
+		return fmt.Sprintf("%.2f kW", watts/1000)
 	}
+	return fmt.Sprintf("%.1f W", watts)
+}
 
-	id := theme.Bold().Render(d.ID)
-	address := theme.Highlight().Render(d.Address.String())
-	model := theme.Dim().Render(d.Model)
-
-	iostreams.Plain("  %s @ %s - %s Gen%d%s", id, address, model, d.Generation, auth)
+// FormatPowerColored returns a themed power string based on usage level.
+func FormatPowerColored(watts float64) string {
+	s := FormatPower(watts)
+	if watts >= 1000 {
+		return theme.StatusError().Render(s)
+	} else if watts >= 100 {
+		return theme.StatusWarn().Render(s)
+	}
+	return theme.StatusOK().Render(s)
 }
 
 // ResolveBatchTargets resolves batch operation targets from flags and arguments.

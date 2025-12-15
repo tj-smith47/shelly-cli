@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,25 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
-
-// MetricsCollector collects metrics from devices.
-type MetricsCollector struct {
-	svc     *shelly.Service
-	devices []string
-	ios     *iostreams.IOStreams
-
-	mu      sync.RWMutex
-	metrics map[string][]Metric
-}
-
-// Metric represents a single Prometheus metric.
-type Metric struct {
-	Name   string
-	Value  float64
-	Labels map[string]string
-	Help   string
-	Type   string
-}
 
 // NewCommand creates the prometheus metrics command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
@@ -50,17 +30,28 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short: "Start Prometheus metrics exporter",
 		Long: `Start an HTTP server that exports metrics in Prometheus format.
 
-The exporter collects power, voltage, current, and energy metrics from
-all registered devices (or a specified subset) and exposes them at /metrics.
+The exporter collects metrics from all registered devices (or a specified
+subset) and exposes them at /metrics for Prometheus scraping.
 
 Metrics exported:
+  Power metering (PM/PM1/EM/EM1 components):
   - shelly_power_watts: Current power consumption
   - shelly_voltage_volts: Voltage reading
   - shelly_current_amps: Current reading
-  - shelly_energy_wh: Total energy consumption
-  - shelly_device_online: Device online status (1=online, 0=offline)
+  - shelly_energy_wh_total: Total energy consumption
 
-Labels include: device, component_type, component_id`,
+  System metrics:
+  - shelly_device_online: Device reachability (1=online, 0=offline)
+  - shelly_wifi_rssi: WiFi signal strength in dBm
+  - shelly_uptime_seconds: Device uptime
+  - shelly_temperature_celsius: Device temperature
+  - shelly_ram_free_bytes: Free RAM
+  - shelly_ram_total_bytes: Total RAM
+
+  Component state:
+  - shelly_switch_on: Switch state (1=on, 0=off)
+
+Labels include: device, component, component_id, phase`,
 		Example: `  # Start exporter on default port 9090
   shelly metrics prometheus
 
@@ -104,10 +95,9 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 
 	sort.Strings(devices)
 
-	collector := &MetricsCollector{
+	collector := &metricsCollector{
 		svc:     svc,
 		devices: devices,
-		metrics: make(map[string][]Metric),
 		ios:     ios,
 	}
 
@@ -172,8 +162,18 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 	return nil
 }
 
-func (c *MetricsCollector) collect(ctx context.Context) {
-	newMetrics := make(map[string][]Metric)
+// metricsCollector collects and caches metrics from devices.
+type metricsCollector struct {
+	svc     *shelly.Service
+	devices []string
+	ios     *iostreams.IOStreams
+
+	mu      sync.RWMutex
+	metrics map[string]*shelly.PrometheusMetrics
+}
+
+func (c *metricsCollector) collect(ctx context.Context) {
+	newMetrics := make(map[string]*shelly.PrometheusMetrics)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
@@ -183,9 +183,12 @@ func (c *MetricsCollector) collect(ctx context.Context) {
 	for _, device := range c.devices {
 		dev := device
 		g.Go(func() error {
-			metrics := c.collectDevice(ctx, dev)
+			m, err := c.svc.CollectPrometheusMetrics(ctx, dev)
+			if err != nil {
+				c.ios.DebugErr(fmt.Sprintf("collecting metrics for %s", dev), err)
+			}
 			mu.Lock()
-			newMetrics[dev] = metrics
+			newMetrics[dev] = m
 			mu.Unlock()
 			return nil
 		})
@@ -193,7 +196,6 @@ func (c *MetricsCollector) collect(ctx context.Context) {
 
 	if err := g.Wait(); err != nil {
 		c.ios.DebugErr("collecting device metrics", err)
-		return
 	}
 
 	c.mu.Lock()
@@ -201,274 +203,21 @@ func (c *MetricsCollector) collect(ctx context.Context) {
 	c.mu.Unlock()
 }
 
-func (c *MetricsCollector) collectDevice(ctx context.Context, device string) []Metric {
-	var metrics []Metric
-
-	// Device online metric
-	online := 1.0
-
-	// Collect PM components
-	pmIDs, err := c.svc.ListPMComponents(ctx, device)
-	if err == nil {
-		for _, id := range pmIDs {
-			status, err := c.svc.GetPMStatus(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			labels := map[string]string{
-				"device":         device,
-				"component_type": "pm",
-				"component_id":   fmt.Sprintf("%d", id),
-			}
-
-			metrics = append(metrics,
-				Metric{
-					Name:   "shelly_power_watts",
-					Value:  status.APower,
-					Labels: labels,
-					Help:   "Current active power in watts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_voltage_volts",
-					Value:  status.Voltage,
-					Labels: labels,
-					Help:   "Voltage in volts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_current_amps",
-					Value:  status.Current,
-					Labels: labels,
-					Help:   "Current in amps",
-					Type:   "gauge",
-				},
-			)
-
-			if status.AEnergy != nil {
-				metrics = append(metrics, Metric{
-					Name:   "shelly_energy_wh",
-					Value:  status.AEnergy.Total,
-					Labels: labels,
-					Help:   "Total energy in watt-hours",
-					Type:   "counter",
-				})
-			}
-		}
-	} else {
-		online = 0
-	}
-
-	// Collect PM1 components
-	pm1IDs, err := c.svc.ListPM1Components(ctx, device)
-	if err == nil {
-		for _, id := range pm1IDs {
-			status, err := c.svc.GetPM1Status(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			labels := map[string]string{
-				"device":         device,
-				"component_type": "pm1",
-				"component_id":   fmt.Sprintf("%d", id),
-			}
-
-			metrics = append(metrics,
-				Metric{
-					Name:   "shelly_power_watts",
-					Value:  status.APower,
-					Labels: labels,
-					Help:   "Current active power in watts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_voltage_volts",
-					Value:  status.Voltage,
-					Labels: labels,
-					Help:   "Voltage in volts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_current_amps",
-					Value:  status.Current,
-					Labels: labels,
-					Help:   "Current in amps",
-					Type:   "gauge",
-				},
-			)
-
-			if status.AEnergy != nil {
-				metrics = append(metrics, Metric{
-					Name:   "shelly_energy_wh",
-					Value:  status.AEnergy.Total,
-					Labels: labels,
-					Help:   "Total energy in watt-hours",
-					Type:   "counter",
-				})
-			}
-		}
-	}
-
-	// Collect EM components
-	emIDs, err := c.svc.ListEMComponents(ctx, device)
-	if err == nil {
-		for _, id := range emIDs {
-			status, err := c.svc.GetEMStatus(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			labels := map[string]string{
-				"device":         device,
-				"component_type": "em",
-				"component_id":   fmt.Sprintf("%d", id),
-			}
-
-			metrics = append(metrics,
-				Metric{
-					Name:   "shelly_power_watts",
-					Value:  status.TotalActivePower,
-					Labels: labels,
-					Help:   "Current active power in watts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_voltage_volts",
-					Value:  status.AVoltage,
-					Labels: labels,
-					Help:   "Phase A voltage in volts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_current_amps",
-					Value:  status.TotalCurrent,
-					Labels: labels,
-					Help:   "Total current in amps",
-					Type:   "gauge",
-				},
-			)
-		}
-	}
-
-	// Collect EM1 components
-	em1IDs, err := c.svc.ListEM1Components(ctx, device)
-	if err == nil {
-		for _, id := range em1IDs {
-			status, err := c.svc.GetEM1Status(ctx, device, id)
-			if err != nil {
-				continue
-			}
-
-			labels := map[string]string{
-				"device":         device,
-				"component_type": "em1",
-				"component_id":   fmt.Sprintf("%d", id),
-			}
-
-			metrics = append(metrics,
-				Metric{
-					Name:   "shelly_power_watts",
-					Value:  status.ActPower,
-					Labels: labels,
-					Help:   "Current active power in watts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_voltage_volts",
-					Value:  status.Voltage,
-					Labels: labels,
-					Help:   "Voltage in volts",
-					Type:   "gauge",
-				},
-				Metric{
-					Name:   "shelly_current_amps",
-					Value:  status.Current,
-					Labels: labels,
-					Help:   "Current in amps",
-					Type:   "gauge",
-				},
-			)
-		}
-	}
-
-	// Add device online metric
-	metrics = append(metrics, Metric{
-		Name:  "shelly_device_online",
-		Value: online,
-		Labels: map[string]string{
-			"device": device,
-		},
-		Help: "Device online status (1=online, 0=offline)",
-		Type: "gauge",
-	})
-
-	return metrics
-}
-
-func (c *MetricsCollector) writeMetrics(w http.ResponseWriter) {
+func (c *metricsCollector) writeMetrics(w http.ResponseWriter) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	// Collect all metrics grouped by name
-	byName := make(map[string][]Metric)
-	for _, metrics := range c.metrics {
-		for _, m := range metrics {
-			byName[m.Name] = append(byName[m.Name], m)
+	// Combine all metrics
+	combined := &shelly.PrometheusMetrics{}
+	for _, m := range c.metrics {
+		if m != nil {
+			combined.Metrics = append(combined.Metrics, m.Metrics...)
 		}
 	}
 
-	// Sort metric names for consistent output
-	names := make([]string, 0, len(byName))
-	for name := range byName {
-		names = append(names, name)
+	// Use service layer formatter
+	output := shelly.FormatPrometheusMetrics(combined)
+	if _, err := w.Write([]byte(output)); err != nil {
+		c.ios.DebugErr("writing metrics response", err)
 	}
-	sort.Strings(names)
-
-	// Write metrics in Prometheus format
-	for _, name := range names {
-		metrics := byName[name]
-		if len(metrics) == 0 {
-			continue
-		}
-
-		// Write HELP and TYPE once per metric name
-		if _, err := fmt.Fprintf(w, "# HELP %s %s\n", name, metrics[0].Help); err != nil {
-			c.ios.DebugErr("writing metric help", err)
-			return
-		}
-		if _, err := fmt.Fprintf(w, "# TYPE %s %s\n", name, metrics[0].Type); err != nil {
-			c.ios.DebugErr("writing metric type", err)
-			return
-		}
-
-		for _, m := range metrics {
-			if _, err := fmt.Fprintf(w, "%s%s %g\n", name, formatLabels(m.Labels), m.Value); err != nil {
-				c.ios.DebugErr("writing metric value", err)
-				return
-			}
-		}
-	}
-}
-
-func formatLabels(labels map[string]string) string {
-	if len(labels) == 0 {
-		return ""
-	}
-
-	parts := make([]string, 0, len(labels))
-	for k, v := range labels {
-		parts = append(parts, fmt.Sprintf("%s=%q", k, escapeLabel(v)))
-	}
-	sort.Strings(parts)
-
-	return "{" + strings.Join(parts, ",") + "}"
-}
-
-func escapeLabel(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	s = strings.ReplaceAll(s, "\n", `\n`)
-	return s
 }

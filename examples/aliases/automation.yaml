@@ -1,0 +1,64 @@
+# Automation-Focused Aliases for Shelly CLI
+#
+# Import: shelly alias import examples/aliases/automation.yaml
+#
+# Aliases designed for scripting, scheduling, and home automation workflows.
+# Shell aliases (prefixed with !) enable pipes and complex operations.
+
+aliases:
+  # Silent operations for scripts (quiet mode)
+  qon: "on -q"
+  qoff: "off -q"
+  qtog: "toggle -q"
+
+  # Wait for device conditions
+  wait-on: "wait --state on --timeout 60s"
+  wait-off: "wait --state off --timeout 60s"
+  wait-online: "wait --online --timeout 30s"
+
+  # Batch operations (quiet for cron)
+  batch-on-q: "batch on -q"
+  batch-off-q: "batch off -q"
+
+  # Scene automation (define your scenes in config)
+  morning: "scene activate morning"
+  evening: "scene activate evening"
+  night: "scene activate night"
+  away: "scene activate away"
+  home: "scene activate home"
+
+  # Energy logging (shell mode for file output)
+  log-power: "!shelly energy status --all -o csv >> ~/shelly-power.csv"
+
+  # Health checks for monitoring
+  check-all: "!shelly device list -o json | jq -e 'all(.online)' > /dev/null && echo OK || echo FAIL"
+  check-offline: "!shelly device list -o json | jq -r '.[] | select(.online == false) | .name'"
+
+  # Webhook testing
+  hook-test: "webhook server --port 8080 --log"
+
+  # Backup automation
+  backup-daily: "!shelly backup create --all --dir ~/shelly-backups/$(date +%Y-%m-%d)"
+
+  # Device discovery and registration
+  scan-register: "discover scan --register"
+
+  # Alert management
+  alert-test: "alert test"
+  alert-snooze: "alert snooze"
+
+  # Report generation
+  report-daily: "!shelly report energy --format json > ~/shelly-reports/energy-$(date +%Y-%m-%d).json"
+  report-audit: "audit --check-firmware --check-auth -o json"
+
+  # Prometheus metrics export
+  metrics: "metrics export prometheus"
+
+  # Party and fun
+  party-mode: "party --duration 5m"
+  sleep-mode: "sleep --duration 30m"
+  wake-mode: "wake --duration 15m --simulate sunrise"
+
+  # Conditional operations (shell mode with proper bash syntax)
+  if-on: "!shelly status \"$1\" --plain 2>/dev/null | grep -q on && shelly \"$2\" \"$3\" \"$4\""
+  if-off: "!shelly status \"$1\" --plain 2>/dev/null | grep -q off && shelly \"$2\" \"$3\" \"$4\""
