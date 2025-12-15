@@ -19,16 +19,19 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/audit"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/batch"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/bthome"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cloud"
 	completioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/completion"
 	configcmd "github.com/tj-smith47/shelly-cli/internal/cmd/config"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/dash"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/debug"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/doctor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
@@ -49,6 +52,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/on"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/open"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/party"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/ping"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/plugin"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
@@ -60,6 +66,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/shellcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sleep"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/statuscmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
@@ -68,6 +75,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/togglecmd"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/wait"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/wake"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/zigbee"
@@ -304,12 +313,18 @@ func init() {
 	addCommandWithGroup(rootCmd, statuscmd.NewCommand(f), groupShortcuts)
 	addCommandWithGroup(rootCmd, rebootcmd.NewCommand(f), groupShortcuts)
 	addCommandWithGroup(rootCmd, resetcmd.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, open.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, ping.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, sleep.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, wake.NewCommand(f), groupShortcuts)
+	addCommandWithGroup(rootCmd, wait.NewCommand(f), groupShortcuts)
 
 	// Control commands - direct device control
 	addCommandWithGroup(rootCmd, switchcmd.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, cover.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, light.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, rgb.NewCommand(f), groupControl)
+	addCommandWithGroup(rootCmd, party.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, input.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, thermostat.NewCommand(f), groupControl)
 	addCommandWithGroup(rootCmd, batch.NewCommand(f), groupControl)
@@ -353,6 +368,8 @@ func init() {
 	addCommandWithGroup(rootCmd, interactive.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, shellcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, debug.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, doctor.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, audit.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, initcmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, firmware.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, exportcmd.NewCommand(f), groupUtility)
@@ -362,6 +379,7 @@ func init() {
 	addCommandWithGroup(rootCmd, updatecmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, completioncmd.NewCommand(f), groupUtility)
 	addCommandWithGroup(rootCmd, versioncmd.NewCommand(f), groupUtility)
+	addCommandWithGroup(rootCmd, cache.NewCommand(f), groupUtility)
 }
 
 // addCommandWithGroup adds a command to the root and assigns it to a group.

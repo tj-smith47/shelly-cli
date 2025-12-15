@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/diff"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/config/edit"
 	configexport "github.com/tj-smith47/shelly-cli/internal/cmd/config/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/get"
 	configimport "github.com/tj-smith47/shelly-cli/internal/cmd/config/import"
@@ -51,6 +52,7 @@ component settings, system parameters, and feature configurations.`,
 	cmd.AddCommand(configexport.NewCommand(f))
 	cmd.AddCommand(configimport.NewCommand(f))
 	cmd.AddCommand(reset.NewCommand(f))
+	cmd.AddCommand(edit.NewCommand(f))
 
 	return cmd
 }
