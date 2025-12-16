@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -16,43 +16,14 @@ import (
 
 // NewCommand creates the light status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var lightID int
-
-	cmd := &cobra.Command{
-		Use:     "status <device>",
-		Aliases: []string{"st", "s"},
-		Short:   "Show light status",
-		Long:    `Show the current status of a light component on the specified device.`,
-		Example: `  # Show light status
-  shelly light status kitchen
-
-  # Show status with JSON output
-  shelly lt st kitchen -o json`,
-		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completion.DeviceNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], lightID)
-		},
-	}
-
-	cmdutil.AddComponentIDFlag(cmd, &lightID, "Light")
-
-	return cmd
-}
-
-func run(ctx context.Context, f *cmdutil.Factory, device string, lightID int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
-	defer cancel()
-
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	return cmdutil.RunStatus(ctx, ios, svc, device, lightID,
-		"Fetching light status...",
-		func(ctx context.Context, svc *shelly.Service, device string, id int) (*model.LightStatus, error) {
+	return factories.NewStatusCommand(f, factories.StatusOpts[*model.LightStatus]{
+		Component: "Light",
+		Aliases:   []string{"st", "s"},
+		Fetcher: func(ctx context.Context, svc *shelly.Service, device string, id int) (*model.LightStatus, error) {
 			return svc.LightStatus(ctx, device, id)
 		},
-		displayStatus)
+		Display: displayStatus,
+	})
 }
 
 func displayStatus(ios *iostreams.IOStreams, status *model.LightStatus) {
