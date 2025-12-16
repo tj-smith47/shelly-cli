@@ -81,13 +81,13 @@ func displayFirmwareInfo(ios *iostreams.IOStreams, info *shelly.FirmwareInfo) {
 	case info.HasUpdate:
 		ios.Printf("  Available:  %s %s\n",
 			info.Available,
-			theme.StatusOK().Render("(update available)"))
+			output.RenderUpdateStatus(true))
 	case info.Available != "":
 		ios.Printf("  Available:  %s %s\n",
 			info.Available,
-			theme.Dim().Render("(up to date)"))
+			output.RenderUpdateStatus(false))
 	default:
-		ios.Printf("  Available:  %s\n", theme.Dim().Render("(up to date)"))
+		ios.Printf("  Available:  %s\n", output.RenderUpdateStatus(false))
 	}
 
 	if info.Beta != "" {
@@ -150,18 +150,18 @@ func runAll(f *cmdutil.Factory, ctx context.Context) error {
 	for _, r := range results {
 		var status, current, available string
 		if r.err != nil {
-			status = theme.StatusError().Render("error")
-			current = "-"
+			status = output.RenderErrorState()
+			current = output.LabelPlaceholder
 			available = r.err.Error()
 		} else {
 			current = r.info.Current
 			if r.info.HasUpdate {
-				status = theme.StatusOK().Render("update available")
+				status = output.RenderBoolState(true, "update available", "")
 				available = r.info.Available
 				updatesAvailable++
 			} else {
-				status = theme.Dim().Render("up to date")
-				available = "-"
+				status = output.FormatPlaceholder("up to date")
+				available = output.LabelPlaceholder
 			}
 		}
 		table.AddRow(r.name, current, available, status)

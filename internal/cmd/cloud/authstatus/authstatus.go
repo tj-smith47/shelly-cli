@@ -9,8 +9,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the cloud auth-status command.
@@ -45,14 +45,14 @@ func run(f *cmdutil.Factory) error {
 
 	// Check if logged in
 	if cfg.Cloud.AccessToken == "" {
-		ios.Printf("  Status: %s\n", theme.StatusError().Render("Not logged in"))
+		ios.Printf("  Status: %s\n", output.RenderLoggedInState(false))
 		ios.Println()
 		ios.Info("Use 'shelly cloud login' to authenticate")
 		return nil
 	}
 
 	// Show logged in status
-	ios.Printf("  Status: %s\n", theme.StatusOK().Render("Logged in"))
+	ios.Printf("  Status: %s\n", output.RenderLoggedInState(true))
 
 	if cfg.Cloud.Email != "" {
 		ios.Printf("  Email:  %s\n", cfg.Cloud.Email)
@@ -89,20 +89,20 @@ type tokenStatusInfo struct {
 func getTokenStatus(token string) tokenStatusInfo {
 	if err := shelly.ValidateToken(token); err != nil {
 		return tokenStatusInfo{
-			display: theme.StatusError().Render("Invalid"),
+			display: output.RenderTokenValidity(false, false),
 			warning: "Token is invalid. Please run 'shelly cloud login' to re-authenticate.",
 		}
 	}
 
 	if shelly.IsTokenExpired(token) {
 		return tokenStatusInfo{
-			display: theme.StatusError().Render("Expired"),
+			display: output.RenderTokenValidity(true, true),
 			warning: "Token has expired. Please run 'shelly cloud login' to re-authenticate.",
 		}
 	}
 
 	return tokenStatusInfo{
-		display: theme.StatusOK().Render("Valid"),
+		display: output.RenderTokenValidity(true, false),
 	}
 }
 

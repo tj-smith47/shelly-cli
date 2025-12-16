@@ -1,10 +1,15 @@
-// Package cmdutil provides command utilities and shared infrastructure for CLI commands.
-package cmdutil
+// Package factories provides command factory functions for creating standard CLI commands.
+package factories
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // ConfigDeleteOpts configures a config-based delete command.
@@ -32,7 +37,7 @@ type ConfigDeleteOpts struct {
 }
 
 // NewConfigDeleteCommand creates a config-based delete command.
-func NewConfigDeleteCommand(f *Factory, opts ConfigDeleteOpts) *cobra.Command {
+func NewConfigDeleteCommand(f *cmdutil.Factory, opts ConfigDeleteOpts) *cobra.Command {
 	var yesFlag bool
 
 	use := fmt.Sprintf("delete <%s>", opts.Resource)
@@ -72,7 +77,7 @@ func NewConfigDeleteCommand(f *Factory, opts ConfigDeleteOpts) *cobra.Command {
 	return cmd
 }
 
-func runConfigDelete(f *Factory, opts ConfigDeleteOpts, name string, skipConfirm bool) error {
+func runConfigDelete(f *cmdutil.Factory, opts ConfigDeleteOpts, name string, skipConfirm bool) error {
 	ios := f.IOStreams()
 
 	// Check if resource exists
@@ -104,4 +109,89 @@ func runConfigDelete(f *Factory, opts ConfigDeleteOpts, name string, skipConfirm
 
 	ios.Success("%s %q deleted", capitalize(opts.Resource), name)
 	return nil
+}
+
+// ConfigListOpts configures a config-based list command.
+type ConfigListOpts[T any] struct {
+	// Resource name (e.g., "alias", "group", "scene", "template").
+	Resource string
+
+	// FetchFunc retrieves items from config.
+	FetchFunc func() []T
+
+	// DisplayFunc renders table output.
+	DisplayFunc func(ios *iostreams.IOStreams, items []T)
+
+	// EmptyMsg shown when no items exist.
+	// If empty, defaults to "No <resource>s configured".
+	EmptyMsg string
+
+	// HintMsg shown after empty message to suggest next action.
+	HintMsg string
+}
+
+// NewConfigListCommand creates a config-based list command.
+func NewConfigListCommand[T any](f *cmdutil.Factory, opts ConfigListOpts[T]) *cobra.Command {
+	short := fmt.Sprintf("List %ss", opts.Resource)
+	long := fmt.Sprintf(`List all configured %ss.
+
+Output is formatted as a table by default. Use -o json or -o yaml for
+structured output suitable for scripting.`, opts.Resource)
+
+	examples := fmt.Sprintf(`  # List all %ss
+  shelly %s list
+
+  # Output as JSON
+  shelly %s list -o json
+
+  # Output as YAML
+  shelly %s list -o yaml`, opts.Resource, opts.Resource, opts.Resource, opts.Resource)
+
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls", "l"},
+		Short:   short,
+		Long:    long,
+		Example: examples,
+		Args:    cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return runConfigList(f, opts)
+		},
+	}
+
+	return cmd
+}
+
+func runConfigList[T any](f *cmdutil.Factory, opts ConfigListOpts[T]) error {
+	ios := f.IOStreams()
+	items := opts.FetchFunc()
+
+	if len(items) == 0 {
+		msg := opts.EmptyMsg
+		if msg == "" {
+			msg = fmt.Sprintf("No %ss configured", opts.Resource)
+		}
+		ios.Info("%s", msg)
+		if opts.HintMsg != "" {
+			ios.Info("%s", opts.HintMsg)
+		}
+		return nil
+	}
+
+	// Handle structured output (JSON/YAML/template)
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, items)
+	}
+
+	// Table output
+	opts.DisplayFunc(ios, items)
+	return nil
+}
+
+// capitalize returns the string with first letter capitalized.
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

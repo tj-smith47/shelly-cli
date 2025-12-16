@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -92,29 +93,21 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(status, "", "  ")
+		jsonBytes, err := json.MarshalIndent(status, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonBytes))
 		return nil
 	}
 
 	ios.Println(theme.Bold().Render("Matter Status:"))
 	ios.Println()
 
-	enabledStr := theme.Dim().Render("Disabled")
-	if status.Enabled {
-		enabledStr = theme.StatusOK().Render("Enabled")
-	}
-	ios.Printf("  Enabled: %s\n", enabledStr)
+	ios.Printf("  Enabled: %s\n", output.RenderEnabledState(status.Enabled))
 
 	if status.Enabled {
-		commissionStr := theme.Dim().Render("Not Commissionable")
-		if status.Commissionable {
-			commissionStr = theme.StatusOK().Render("Commissionable")
-		}
-		ios.Printf("  Status: %s\n", commissionStr)
+		ios.Printf("  Status: %s\n", output.RenderBoolState(status.Commissionable, "Commissionable", "Not Commissionable"))
 		ios.Printf("  Paired Fabrics: %d\n", status.FabricsCount)
 
 		if status.Commissionable {

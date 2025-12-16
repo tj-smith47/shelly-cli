@@ -10,8 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the input status command.
@@ -62,12 +62,7 @@ func displayStatus(ios *iostreams.IOStreams, status *model.InputStatus) {
 	ios.Title("Input %d Status", status.ID)
 	ios.Println()
 
-	state := theme.StatusError().Render("inactive")
-	if status.State {
-		state = theme.StatusOK().Render("active")
-	}
-	ios.Printf("  State: %s\n", state)
-
+	ios.Printf("  State: %s\n", output.RenderActiveState(status.State))
 	if status.Type != "" {
 		ios.Printf("  Type:  %s\n", status.Type)
 	}

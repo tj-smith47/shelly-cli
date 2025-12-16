@@ -11,8 +11,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 var statusFlag bool
@@ -92,13 +92,7 @@ func displayDevice(ios *iostreams.IOStreams, device *shelly.CloudDevice) {
 		ios.Printf("  FW:     %s\n", device.FirmwareVersion)
 	}
 
-	var online string
-	if device.Online {
-		online = theme.StatusOK().Render("Online")
-	} else {
-		online = theme.StatusError().Render("Offline")
-	}
-	ios.Printf("  Status: %s\n", online)
+	ios.Printf("  Status: %s\n", output.RenderOnlineStateTitle(device.Online))
 
 	// Show status JSON if requested and available
 	if statusFlag && len(device.Status) > 0 {

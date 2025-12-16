@@ -89,10 +89,7 @@ func displayList(ios *iostreams.IOStreams, inputs []shelly.InputInfo) {
 			name = theme.Dim().Render("-")
 		}
 
-		state := theme.StatusError().Render("inactive")
-		if input.State {
-			state = theme.StatusOK().Render("active")
-		}
+		state := output.RenderActiveState(input.State)
 
 		table.AddRow(
 			fmt.Sprintf("%d", input.ID),

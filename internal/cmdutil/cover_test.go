@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -21,8 +22,8 @@ func TestNewCoverCommand_Open(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionOpen,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionOpen,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, _ string, _ int, _ *int) error {
 			return nil
 		},
@@ -69,8 +70,8 @@ func TestNewCoverCommand_Close(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionClose,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionClose,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, _ string, _ int, _ *int) error {
 			return nil
 		},
@@ -111,8 +112,8 @@ func TestNewCoverCommand_Stop(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionStop,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionStop,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, _ string, _ int, _ *int) error {
 			return nil
 		},
@@ -163,8 +164,8 @@ func TestNewCoverCommand_Execute_Success(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionOpen,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionOpen,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, device string, id int, duration *int) error {
 			calledDevice = device
 			calledID = id
@@ -203,8 +204,8 @@ func TestNewCoverCommand_Execute_NoDuration(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionOpen,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionOpen,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, _ string, _ int, duration *int) error {
 			calledDuration = duration
 			return nil
@@ -234,8 +235,8 @@ func TestNewCoverCommand_Execute_Error(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionOpen,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionOpen,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, _ string, _ int, _ *int) error {
 			return errors.New("device unreachable")
 		},
@@ -266,8 +267,8 @@ func TestNewCoverCommand_Execute_Stop(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionStop,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionStop,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, device string, id int, _ *int) error {
 			calledDevice = device
 			calledID = id
@@ -300,8 +301,8 @@ func TestNewCoverCommand_RequiresDevice(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewCoverCommand(f, cmdutil.CoverOpts{
-		Action: cmdutil.CoverActionOpen,
+	cmd := factories.NewCoverCommand(f, factories.CoverOpts{
+		Action: factories.CoverActionOpen,
 		ServiceFunc: func(_ context.Context, _ *shelly.Service, _ string, _ int, _ *int) error {
 			return nil
 		},

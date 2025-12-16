@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -22,7 +23,7 @@ func TestNewConfigDeleteCommand_Structure(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource:   "scene",
 		ExistsFunc: func(_ string) (any, bool) { return nil, true },
 		DeleteFunc: func(_ string) error { return nil },
@@ -69,7 +70,7 @@ func TestNewConfigDeleteCommand_SkipConfirmation(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource:         "alias",
 		SkipConfirmation: true,
 		ExistsFunc:       func(_ string) (any, bool) { return nil, true },
@@ -95,7 +96,7 @@ func TestNewConfigDeleteCommand_Execute_Success(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource: "scene",
 		ExistsFunc: func(name string) (any, bool) {
 			return map[string]string{"name": name}, true
@@ -135,7 +136,7 @@ func TestNewConfigDeleteCommand_Execute_SkipConfirmation(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource:         "alias",
 		SkipConfirmation: true,
 		ExistsFunc: func(name string) (any, bool) {
@@ -170,7 +171,7 @@ func TestNewConfigDeleteCommand_Execute_NotFound(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource: "scene",
 		ExistsFunc: func(_ string) (any, bool) {
 			return nil, false // Not found
@@ -202,7 +203,7 @@ func TestNewConfigDeleteCommand_Execute_DeleteError(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource: "scene",
 		ExistsFunc: func(_ string) (any, bool) {
 			return nil, true
@@ -236,7 +237,7 @@ func TestNewConfigDeleteCommand_Execute_Cancelled(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource: "scene",
 		ExistsFunc: func(_ string) (any, bool) {
 			return nil, true
@@ -280,7 +281,7 @@ func TestNewConfigDeleteCommand_Execute_WithInfoFunc(t *testing.T) {
 		Actions int
 	}
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource: "scene",
 		ExistsFunc: func(name string) (any, bool) {
 			return scene{Name: name, Actions: 5}, true
@@ -314,7 +315,7 @@ func TestNewConfigDeleteCommand_RequiresArg(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource: "scene",
 		ExistsFunc: func(_ string) (any, bool) {
 			return nil, true
@@ -343,7 +344,7 @@ func TestNewConfigDeleteCommand_WithValidArgsFunc(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	cmd := factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource: "scene",
 		ValidArgsFunc: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return []string{"scene1", "scene2"}, cobra.ShellCompDirectiveNoFileComp

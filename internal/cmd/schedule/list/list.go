@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the schedule list command.
@@ -78,15 +77,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 func displaySchedules(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) {
 	table := output.NewTable("ID", "Enabled", "Timespec", "Calls")
 	for _, s := range schedules {
-		enabled := theme.Dim().Render("no")
-		if s.Enable {
-			enabled = theme.StatusOK().Render("yes")
-		}
-
 		// Format calls summary
 		callsSummary := formatCallsSummary(s.Calls)
 
-		table.AddRow(fmt.Sprintf("%d", s.ID), enabled, s.Timespec, callsSummary)
+		table.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNoDim(s.Enable), s.Timespec, callsSummary)
 	}
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
@@ -95,7 +89,7 @@ func displaySchedules(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) 
 
 func formatCallsSummary(calls []shelly.ScheduleCall) string {
 	if len(calls) == 0 {
-		return theme.Dim().Render("(none)")
+		return output.FormatPlaceholder("(none)")
 	}
 
 	if len(calls) == 1 {

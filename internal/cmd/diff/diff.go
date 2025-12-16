@@ -16,7 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // Options holds the command options.
@@ -118,7 +117,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 
 	// Display differences
 	if len(removed) > 0 {
-		ios.Println(theme.StatusError().Render("Removed (only in source):"))
+		ios.Println(output.RenderDiffRemoved())
 		for _, d := range removed {
 			ios.Printf("  - %s: %v\n", d.Path, d.SourceValue)
 		}
@@ -126,7 +125,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 	}
 
 	if len(added) > 0 {
-		ios.Println(theme.StatusOK().Render("Added (only in target):"))
+		ios.Println(output.RenderDiffAdded())
 		for _, d := range added {
 			ios.Printf("  + %s: %v\n", d.Path, d.TargetValue)
 		}
@@ -134,7 +133,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 	}
 
 	if len(changed) > 0 {
-		ios.Println(theme.StatusWarn().Render("Changed:"))
+		ios.Println(output.RenderDiffChanged())
 		for _, d := range changed {
 			ios.Printf("  ~ %s:\n", d.Path)
 			ios.Printf("    - %v\n", d.SourceValue)

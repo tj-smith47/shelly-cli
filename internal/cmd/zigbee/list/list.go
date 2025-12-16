@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -160,11 +161,11 @@ func enrichZigbeeStatus(ctx context.Context, svc *shelly.Service, address string
 }
 
 func outputZigbeeJSON(ios *iostreams.IOStreams, devices []ZigbeeDevice) error {
-	output, err := json.MarshalIndent(devices, "", "  ")
+	jsonBytes, err := json.MarshalIndent(devices, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to format JSON: %w", err)
 	}
-	ios.Println(string(output))
+	ios.Println(string(jsonBytes))
 	return nil
 }
 
@@ -190,18 +191,10 @@ func displayZigbeeDevice(ios *iostreams.IOStreams, dev ZigbeeDevice) {
 		ios.Printf("    Model: %s\n", dev.Model)
 	}
 
-	enabledStr := theme.Dim().Render("Disabled")
-	if dev.Enabled {
-		enabledStr = theme.StatusOK().Render("Enabled")
-	}
-	ios.Printf("    Zigbee: %s\n", enabledStr)
+	ios.Printf("    Zigbee: %s\n", output.RenderEnabledState(dev.Enabled))
 
 	if dev.NetworkState != "" {
-		stateStyle := theme.Dim()
-		if dev.NetworkState == "joined" {
-			stateStyle = theme.StatusOK()
-		}
-		ios.Printf("    State: %s\n", stateStyle.Render(dev.NetworkState))
+		ios.Printf("    State: %s\n", output.RenderNetworkState(dev.NetworkState))
 	}
 	if dev.EUI64 != "" {
 		ios.Printf("    EUI64: %s\n", dev.EUI64)

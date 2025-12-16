@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -81,12 +82,7 @@ func displayStatus(ios *iostreams.IOStreams, status *shelly.ScriptStatus) {
 	ios.Println("")
 
 	ios.Printf("  ID:      %d\n", status.ID)
-
-	runningStr := theme.Dim().Render("stopped")
-	if status.Running {
-		runningStr = theme.StatusOK().Render("running")
-	}
-	ios.Printf("  Status:  %s\n", runningStr)
+	ios.Printf("  Status:  %s\n", output.RenderRunningState(status.Running))
 	ios.Println("")
 
 	ios.Println(theme.Bold().Render("Memory"))

@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -112,11 +113,11 @@ func run(ctx context.Context, opts *Options) error {
 	thermostats := collectThermostats(fullStatus)
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(thermostats, "", "  ")
+		jsonBytes, err := json.MarshalIndent(thermostats, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonBytes))
 		return nil
 	}
 
@@ -162,13 +163,8 @@ func displayThermostats(ios *iostreams.IOStreams, thermostats []ThermostatInfo, 
 	ios.Println()
 
 	for _, t := range thermostats {
-		status := theme.Dim().Render("Off")
-		if t.Enabled {
-			status = theme.StatusOK().Render("Active")
-		}
-
 		ios.Printf("  %s %d\n", theme.Highlight().Render("Thermostat"), t.ID)
-		ios.Printf("    Status: %s\n", status)
+		ios.Printf("    Status: %s\n", output.RenderActiveStateDim(t.Enabled))
 		if t.TargetC > 0 {
 			ios.Printf("    Target: %.1f°C\n", t.TargetC)
 		}

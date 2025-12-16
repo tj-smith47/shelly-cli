@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the rgb list command.
@@ -81,16 +80,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 func displayList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
 	t := output.NewTable("ID", "Name", "State", "Color", "Brightness", "Power")
 	for _, rgb := range rgbs {
-		name := rgb.Name
-		if name == "" {
-			name = fmt.Sprintf("rgb:%d", rgb.ID)
-		}
-
-		state := theme.StatusError().Render("OFF")
-		if rgb.Output {
-			state = theme.StatusOK().Render("ON")
-		}
-
+		name := output.FormatComponentName(rgb.Name, "rgb", rgb.ID)
+		state := output.RenderOnOffState(rgb.Output)
 		color := fmt.Sprintf("R:%d G:%d B:%d", rgb.Red, rgb.Green, rgb.Blue)
 
 		brightness := "-"
@@ -98,11 +89,7 @@ func displayList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
 			brightness = fmt.Sprintf("%d%%", rgb.Brightness)
 		}
 
-		power := "-"
-		if rgb.Power > 0 {
-			power = fmt.Sprintf("%.1f W", rgb.Power)
-		}
-
+		power := output.FormatPowerValue(rgb.Power)
 		t.AddRow(fmt.Sprintf("%d", rgb.ID), name, state, color, brightness, power)
 	}
 	if err := t.PrintTo(ios.Out); err != nil {

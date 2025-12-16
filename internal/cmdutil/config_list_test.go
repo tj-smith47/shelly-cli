@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
@@ -27,7 +28,7 @@ func TestNewConfigListCommand_Structure(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return nil
@@ -75,7 +76,7 @@ func TestNewConfigListCommand_Execute_Empty(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return nil // Empty list
@@ -107,7 +108,7 @@ func TestNewConfigListCommand_Execute_Empty_CustomMessage(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return nil
@@ -147,7 +148,7 @@ func TestNewConfigListCommand_Execute_TableOutput(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return []testItem{
@@ -191,7 +192,7 @@ func TestNewConfigListCommand_Execute_JSONOutput(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return []testItem{
@@ -237,7 +238,7 @@ func TestNewConfigListCommand_Execute_YAMLOutput(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return []testItem{
@@ -282,7 +283,7 @@ func TestNewConfigListCommand_Execute_TemplateOutput(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return []testItem{
@@ -321,7 +322,7 @@ func TestNewConfigListCommand_RejectsArgs(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return nil
@@ -347,7 +348,7 @@ func TestNewConfigListCommand_Examples(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	cmd := cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[testItem]{
+	cmd := factories.NewConfigListCommand(f, factories.ConfigListOpts[testItem]{
 		Resource: "widget",
 		FetchFunc: func() []testItem {
 			return nil

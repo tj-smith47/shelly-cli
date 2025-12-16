@@ -10,8 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the switch status command.
@@ -59,21 +59,8 @@ func displayStatus(ios *iostreams.IOStreams, status *model.SwitchStatus) {
 	ios.Title("Switch %d Status", status.ID)
 	ios.Println()
 
-	state := theme.StatusError().Render("OFF")
-	if status.Output {
-		state = theme.StatusOK().Render("ON")
-	}
-	ios.Printf("  State:   %s\n", state)
-
-	if status.Power != nil {
-		ios.Printf("  Power:   %.1f W\n", *status.Power)
-	}
-	if status.Voltage != nil {
-		ios.Printf("  Voltage: %.1f V\n", *status.Voltage)
-	}
-	if status.Current != nil {
-		ios.Printf("  Current: %.3f A\n", *status.Current)
-	}
+	ios.Printf("  State:   %s\n", output.RenderOnOffState(status.Output))
+	cmdutil.PrintPowerMetrics(ios, status.Power, status.Voltage, status.Current)
 	if status.Energy != nil {
 		ios.Printf("  Energy:  %.2f Wh\n", status.Energy.Total)
 	}

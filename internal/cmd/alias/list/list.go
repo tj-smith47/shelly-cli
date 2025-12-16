@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -12,7 +13,7 @@ import (
 
 // NewCommand creates the alias list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[config.Alias]{
+	return factories.NewConfigListCommand(f, factories.ConfigListOpts[config.Alias]{
 		Resource:    "alias",
 		FetchFunc:   config.ListAliasesSorted,
 		DisplayFunc: displayAliases,

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -22,7 +23,7 @@ type GroupInfo struct {
 
 // NewCommand creates the group list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[GroupInfo]{
+	return factories.NewConfigListCommand(f, factories.ConfigListOpts[GroupInfo]{
 		Resource: "group",
 		FetchFunc: func() []GroupInfo {
 			groups := config.ListGroups()

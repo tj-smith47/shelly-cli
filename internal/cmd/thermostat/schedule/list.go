@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -107,11 +108,11 @@ func runList(ctx context.Context, opts *ListOptions) error {
 	thermostatSchedules := filterThermostatSchedules(scheduleResp.Jobs, opts.ThermostatID, opts.All)
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(thermostatSchedules, "", "  ")
+		jsonBytes, err := json.MarshalIndent(thermostatSchedules, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonBytes))
 		return nil
 	}
 
@@ -230,13 +231,8 @@ func displaySchedules(ios *iostreams.IOStreams, schedules []ThermostatSchedule, 
 	ios.Println()
 
 	for _, sched := range schedules {
-		status := theme.Dim().Render("Disabled")
-		if sched.Enabled {
-			status = theme.StatusOK().Render("Enabled")
-		}
-
 		ios.Printf("  %s %d\n", theme.Highlight().Render("Schedule"), sched.ID)
-		ios.Printf("    Status:   %s\n", status)
+		ios.Printf("    Status:   %s\n", output.RenderEnabledState(sched.Enabled))
 		ios.Printf("    Timespec: %s\n", sched.Timespec)
 
 		if sched.ThermostatID > 0 {

@@ -2,21 +2,20 @@
 package list
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the scene list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[config.Scene]{
+	return factories.NewConfigListCommand(f, factories.ConfigListOpts[config.Scene]{
 		Resource: "scene",
 		FetchFunc: func() []config.Scene {
 			scenes := config.ListScenes()
@@ -52,11 +51,5 @@ func displayScenes(ios *iostreams.IOStreams, scenes []config.Scene) {
 }
 
 func formatActionCount(count int) string {
-	if count == 0 {
-		return theme.StatusWarn().Render("0 (empty)")
-	}
-	if count == 1 {
-		return theme.StatusOK().Render("1 action")
-	}
-	return theme.StatusOK().Render(fmt.Sprintf("%d actions", count))
+	return output.FormatActionCount(count)
 }

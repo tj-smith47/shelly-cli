@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the cloud devices command.
@@ -80,24 +79,17 @@ func displayDevices(ios *iostreams.IOStreams, devices []shelly.CloudDevice) {
 	table := output.NewTable("ID", "Model", "Gen", "Online")
 
 	for _, d := range devices {
-		var online string
-		if d.Online {
-			online = theme.StatusOK().Render("yes")
-		} else {
-			online = theme.StatusError().Render("no")
-		}
-
 		model := d.Model
 		if model == "" {
-			model = theme.Dim().Render("unknown")
+			model = output.FormatPlaceholder("unknown")
 		}
 
-		gen := theme.Dim().Render("-")
+		gen := output.FormatPlaceholder("-")
 		if d.Generation > 0 {
 			gen = fmt.Sprintf("%d", d.Generation)
 		}
 
-		table.AddRow(d.ID, model, gen, online)
+		table.AddRow(d.ID, model, gen, output.RenderYesNoLC(d.Online))
 	}
 
 	ios.Printf("Found %d device(s):\n\n", len(devices))

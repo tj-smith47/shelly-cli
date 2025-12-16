@@ -1,5 +1,5 @@
-// Package cmdutil provides command utilities and shared infrastructure for CLI commands.
-package cmdutil
+// Package factories provides command factory functions for creating standard CLI commands.
+package factories
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -43,7 +44,7 @@ type BatchComponentOpts struct {
 // NewBatchComponentCommand creates a batch on/off/toggle command for any component type.
 // This factory consolidates the common pattern across batch commands and supports
 // multiple component types (Switch, Light, RGB, etc.).
-func NewBatchComponentCommand(f *Factory, opts BatchComponentOpts) *cobra.Command {
+func NewBatchComponentCommand(f *cmdutil.Factory, opts BatchComponentOpts) *cobra.Command {
 	var (
 		groupName   string
 		all         bool
@@ -160,7 +161,7 @@ from files or other commands.`, short, componentLower, componentLower, component
 	return cmd
 }
 
-func runBatchComponent(ctx context.Context, f *Factory, opts BatchComponentOpts, targets []string, componentID int, timeout time.Duration, concurrent int) error {
+func runBatchComponent(ctx context.Context, f *cmdutil.Factory, opts BatchComponentOpts, targets []string, componentID int, timeout time.Duration, concurrent int) error {
 	if len(targets) == 0 {
 		return fmt.Errorf("no target devices specified")
 	}
@@ -171,7 +172,7 @@ func runBatchComponent(ctx context.Context, f *Factory, opts BatchComponentOpts,
 	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(targets)))
 	defer cancel()
 
-	return RunBatch(ctx, ios, svc, targets, concurrent, func(ctx context.Context, svc *shelly.Service, device string) error {
+	return cmdutil.RunBatch(ctx, ios, svc, targets, concurrent, func(ctx context.Context, svc *shelly.Service, device string) error {
 		return opts.ServiceFunc(ctx, svc, device, componentID)
 	})
 }

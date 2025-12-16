@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -24,7 +25,7 @@ type templateInfo struct {
 
 // NewCommand creates the template list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[templateInfo]{
+	return factories.NewConfigListCommand(f, factories.ConfigListOpts[templateInfo]{
 		Resource: "template",
 		FetchFunc: func() []templateInfo {
 			templates := config.ListTemplates()

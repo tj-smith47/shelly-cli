@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the cover list command.
@@ -85,30 +84,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 func displayList(ios *iostreams.IOStreams, covers []shelly.CoverInfo) {
 	t := output.NewTable("ID", "Name", "State", "Position", "Power")
 	for _, cover := range covers {
-		name := cover.Name
-		if name == "" {
-			name = fmt.Sprintf("cover:%d", cover.ID)
-		}
-
-		stateStyle := theme.StatusWarn()
-		switch cover.State {
-		case "open":
-			stateStyle = theme.StatusOK()
-		case "closed":
-			stateStyle = theme.StatusError()
-		}
-		state := stateStyle.Render(cover.State)
+		name := output.FormatComponentName(cover.Name, "cover", cover.ID)
+		state := output.RenderCoverState(cover.State)
 
 		position := "-"
 		if cover.Position >= 0 {
 			position = fmt.Sprintf("%d%%", cover.Position)
 		}
 
-		power := "-"
-		if cover.Power > 0 {
-			power = fmt.Sprintf("%.1f W", cover.Power)
-		}
-
+		power := output.FormatPowerValue(cover.Power)
 		t.AddRow(fmt.Sprintf("%d", cover.ID), name, state, position, power)
 	}
 	if err := t.PrintTo(ios.Out); err != nil {

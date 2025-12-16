@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -61,13 +62,9 @@ func displayStatus(ios *iostreams.IOStreams, status *shelly.FirmwareStatus) {
 	ios.Printf("  Status:      %s\n", statusStr)
 
 	// Update available
-	if status.HasUpdate {
-		ios.Printf("  Update:      %s\n", theme.StatusOK().Render("available"))
-		if status.NewVersion != "" {
-			ios.Printf("  New Version: %s\n", status.NewVersion)
-		}
-	} else {
-		ios.Printf("  Update:      %s\n", theme.Dim().Render("up to date"))
+	ios.Printf("  Update:      %s\n", output.RenderAvailableState(status.HasUpdate, "up to date"))
+	if status.HasUpdate && status.NewVersion != "" {
+		ios.Printf("  New Version: %s\n", status.NewVersion)
 	}
 
 	// Progress (if updating)
@@ -76,9 +73,5 @@ func displayStatus(ios *iostreams.IOStreams, status *shelly.FirmwareStatus) {
 	}
 
 	// Rollback
-	if status.CanRollback {
-		ios.Printf("  Rollback:    %s\n", theme.StatusOK().Render("available"))
-	} else {
-		ios.Printf("  Rollback:    %s\n", theme.Dim().Render("not available"))
-	}
+	ios.Printf("  Rollback:    %s\n", output.RenderAvailableState(status.CanRollback, "not available"))
 }

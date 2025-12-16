@@ -1,5 +1,5 @@
-// Package cmdutil provides command utilities and shared infrastructure for CLI commands.
-package cmdutil
+// Package factories provides command factory functions for creating standard CLI commands.
+package factories
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -35,7 +36,7 @@ type ComponentOpts struct {
 
 	// SimpleFunc is used for on/off actions (returns error only).
 	// Ignored for toggle actions.
-	SimpleFunc ComponentAction
+	SimpleFunc cmdutil.ComponentAction
 
 	// ToggleFunc is used for toggle actions (returns output state and error).
 	// Ignored for on/off actions.
@@ -44,7 +45,7 @@ type ComponentOpts struct {
 
 // NewComponentCommand creates a component on/off/toggle command.
 // This factory consolidates the common pattern across Light, RGB, Switch, etc.
-func NewComponentCommand(f *Factory, opts ComponentOpts) *cobra.Command {
+func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command {
 	var componentID int
 
 	componentLower := strings.ToLower(opts.Component)
@@ -107,12 +108,12 @@ func NewComponentCommand(f *Factory, opts ComponentOpts) *cobra.Command {
 		},
 	}
 
-	AddComponentIDFlag(cmd, &componentID, opts.Component)
+	cmdutil.AddComponentIDFlag(cmd, &componentID, opts.Component)
 
 	return cmd
 }
 
-func runComponent(ctx context.Context, f *Factory, opts ComponentOpts, device string, componentID int, actionStr string) error {
+func runComponent(ctx context.Context, f *cmdutil.Factory, opts ComponentOpts, device string, componentID int, actionStr string) error {
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
@@ -125,12 +126,12 @@ func runComponent(ctx context.Context, f *Factory, opts ComponentOpts, device st
 		spinnerMsg := fmt.Sprintf("Turning %s %s...", componentLower, actionStr)
 		successMsg := fmt.Sprintf("%s %d turned %s", opts.Component, componentID, actionStr)
 
-		return RunSimple(ctx, ios, svc, device, componentID, spinnerMsg, successMsg, opts.SimpleFunc)
+		return cmdutil.RunSimple(ctx, ios, svc, device, componentID, spinnerMsg, successMsg, opts.SimpleFunc)
 
 	case ActionToggle:
 		spinnerMsg := fmt.Sprintf("Toggling %s...", componentLower)
 
-		return RunWithSpinner(ctx, ios, spinnerMsg, func(ctx context.Context) error {
+		return cmdutil.RunWithSpinner(ctx, ios, spinnerMsg, func(ctx context.Context) error {
 			outputOn, err := opts.ToggleFunc(ctx, svc, device, componentID)
 			if err != nil {
 				return err

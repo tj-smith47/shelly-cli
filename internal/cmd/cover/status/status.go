@@ -10,8 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the cover status command.
@@ -59,25 +59,9 @@ func displayStatus(ios *iostreams.IOStreams, status *model.CoverStatus) {
 	ios.Title("Cover %d Status", status.ID)
 	ios.Println()
 
-	stateStyle := theme.StatusWarn()
-	switch status.State {
-	case "open":
-		stateStyle = theme.StatusOK()
-	case "closed":
-		stateStyle = theme.StatusError()
-	}
-	ios.Printf("  State:    %s\n", stateStyle.Render(status.State))
-
+	ios.Printf("  State:    %s\n", output.RenderCoverState(status.State))
 	if status.CurrentPosition != nil {
 		ios.Printf("  Position: %d%%\n", *status.CurrentPosition)
 	}
-	if status.Power != nil {
-		ios.Printf("  Power:    %.1f W\n", *status.Power)
-	}
-	if status.Voltage != nil {
-		ios.Printf("  Voltage:  %.1f V\n", *status.Voltage)
-	}
-	if status.Current != nil {
-		ios.Printf("  Current:  %.3f A\n", *status.Current)
-	}
+	cmdutil.PrintPowerMetricsWide(ios, status.Power, status.Voltage, status.Current)
 }

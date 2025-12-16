@@ -7,14 +7,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the light off command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return cmdutil.NewComponentCommand(f, cmdutil.ComponentOpts{
+	return factories.NewComponentCommand(f, factories.ComponentOpts{
 		Component: "Light",
-		Action:    cmdutil.ActionOff,
+		Action:    factories.ActionOff,
 		SimpleFunc: func(ctx context.Context, svc *shelly.Service, device string, id int) error {
 			return svc.LightOff(ctx, device, id)
 		},

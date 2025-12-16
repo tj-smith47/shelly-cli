@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -102,11 +103,11 @@ func runList(ctx context.Context, opts *ListOptions) error {
 	sensors := collectFloodSensors(fullStatus, ios)
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(sensors, "", "  ")
+		jsonBytes, err := json.MarshalIndent(sensors, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonBytes))
 		return nil
 	}
 
@@ -118,14 +119,8 @@ func runList(ctx context.Context, opts *ListOptions) error {
 	ios.Println(theme.Bold().Render("Flood Sensors:"))
 	ios.Println()
 	for _, s := range sensors {
-		status := theme.StatusOK().Render("Clear")
-		if s.Alarm {
-			status = theme.StatusError().Render("WATER DETECTED!")
-		}
-		muteStr := ""
-		if s.Mute {
-			muteStr = " " + theme.Dim().Render("(muted)")
-		}
+		status := output.RenderAlarmState(s.Alarm, "WATER DETECTED!")
+		muteStr := output.RenderMuteAnnotation(s.Mute)
 		ios.Printf("  Sensor %d: %s%s\n", s.ID, status, muteStr)
 	}
 
@@ -196,28 +191,19 @@ func runStatus(ctx context.Context, opts *StatusOptions) error {
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(status, "", "  ")
+		jsonBytes, err := json.MarshalIndent(status, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonBytes))
 		return nil
 	}
 
 	ios.Println(theme.Bold().Render(fmt.Sprintf("Flood Sensor %d:", opts.ID)))
 	ios.Println()
 
-	if status.Alarm {
-		ios.Printf("  Status: %s\n", theme.StatusError().Render("WATER DETECTED!"))
-	} else {
-		ios.Printf("  Status: %s\n", theme.StatusOK().Render("Clear"))
-	}
-
-	if status.Mute {
-		ios.Printf("  Alarm: %s\n", theme.Dim().Render("Muted"))
-	} else {
-		ios.Printf("  Alarm: %s\n", theme.Highlight().Render("Active"))
-	}
+	ios.Printf("  Status: %s\n", output.RenderAlarmState(status.Alarm, "WATER DETECTED!"))
+	ios.Printf("  Alarm: %s\n", output.RenderMuteState(status.Mute))
 
 	if len(status.Errors) > 0 {
 		ios.Println()

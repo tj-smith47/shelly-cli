@@ -1,14 +1,14 @@
-// Package cmdutil provides command utilities and shared infrastructure for CLI commands.
-package cmdutil
+// Package factories provides command factory functions for creating standard CLI commands.
+package factories
 
 import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -43,7 +43,7 @@ type DeviceDeleteOpts struct {
 
 // NewDeviceDeleteCommand creates a device-based delete command.
 // This factory consolidates the common pattern for schedule/del, script/del, webhook/del, etc.
-func NewDeviceDeleteCommand(f *Factory, opts DeviceDeleteOpts) *cobra.Command {
+func NewDeviceDeleteCommand(f *cmdutil.Factory, opts DeviceDeleteOpts) *cobra.Command {
 	var yesFlag bool
 
 	// Apply defaults
@@ -90,12 +90,12 @@ func NewDeviceDeleteCommand(f *Factory, opts DeviceDeleteOpts) *cobra.Command {
 		cmd.ValidArgsFunction = opts.ValidArgsFunc
 	}
 
-	AddYesFlag(cmd, &yesFlag)
+	cmdutil.AddYesFlag(cmd, &yesFlag)
 
 	return cmd
 }
 
-func runDeviceDelete(ctx context.Context, f *Factory, opts DeviceDeleteOpts, device string, id int, skipConfirm bool) error {
+func runDeviceDelete(ctx context.Context, f *cmdutil.Factory, opts DeviceDeleteOpts, device string, id int, skipConfirm bool) error {
 	ios := f.IOStreams()
 
 	// Show warning if configured
@@ -119,19 +119,12 @@ func runDeviceDelete(ctx context.Context, f *Factory, opts DeviceDeleteOpts, dev
 
 	svc := f.ShellyService()
 
-	return RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %s...", opts.Resource), func(ctx context.Context) error {
+	resourceCapitalized := capitalize(opts.Resource)
+	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %s...", opts.Resource), func(ctx context.Context) error {
 		if err := opts.ServiceFunc(ctx, svc, device, id); err != nil {
 			return fmt.Errorf("failed to delete %s: %w", opts.Resource, err)
 		}
-		ios.Success("%s %d deleted", capitalize(opts.Resource), id)
+		ios.Success("%s %d deleted", resourceCapitalized, id)
 		return nil
 	})
-}
-
-// capitalize returns the string with first letter capitalized.
-func capitalize(s string) string {
-	if s == "" {
-		return s
-	}
-	return strings.ToUpper(s[:1]) + s[1:]
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the script list command.
@@ -76,17 +75,9 @@ func displayScripts(ios *iostreams.IOStreams, scripts []shelly.ScriptInfo) {
 	for _, s := range scripts {
 		name := s.Name
 		if name == "" {
-			name = theme.Dim().Render("(unnamed)")
+			name = output.FormatPlaceholder("(unnamed)")
 		}
-		enabled := theme.Dim().Render("no")
-		if s.Enable {
-			enabled = theme.StatusOK().Render("yes")
-		}
-		running := theme.Dim().Render("stopped")
-		if s.Running {
-			running = theme.StatusOK().Render("running")
-		}
-		table.AddRow(fmt.Sprintf("%d", s.ID), name, enabled, running)
+		table.AddRow(fmt.Sprintf("%d", s.ID), name, output.RenderYesNoDim(s.Enable), output.RenderRunningState(s.Running))
 	}
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)

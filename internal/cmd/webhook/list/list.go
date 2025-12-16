@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the webhook list command.
@@ -88,13 +87,7 @@ func displayWebhooks(ios *iostreams.IOStreams, webhooks []shelly.WebhookInfo) {
 		if len(urls) > 40 {
 			urls = urls[:37] + "..."
 		}
-		var enabled string
-		if w.Enable {
-			enabled = theme.StatusOK().Render("Yes")
-		} else {
-			enabled = theme.StatusError().Render("No")
-		}
-		table.AddRow(fmt.Sprintf("%d", w.ID), w.Event, urls, enabled)
+		table.AddRow(fmt.Sprintf("%d", w.ID), w.Event, urls, output.RenderYesNo(w.Enable))
 	}
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
 
+	"github.com/tj-smith47/shelly-cli/internal/branding"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/completion/install"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -280,6 +281,8 @@ func runDiscoveryStep(ctx context.Context, ios *iostreams.IOStreams, opts *Optio
 }
 
 func printWelcome(ios *iostreams.IOStreams) {
+	ios.Println("")
+	ios.Println(branding.StyledBanner())
 	ios.Println("")
 	ios.Println(theme.Title().Render("Welcome to Shelly CLI!"))
 	ios.Println("")

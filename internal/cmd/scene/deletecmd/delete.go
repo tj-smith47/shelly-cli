@@ -7,13 +7,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // NewCommand creates the scene delete command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+	return factories.NewConfigDeleteCommand(f, factories.ConfigDeleteOpts{
 		Resource:      "scene",
 		ValidArgsFunc: completion.SceneNames(),
 		ExistsFunc: func(name string) (any, bool) {

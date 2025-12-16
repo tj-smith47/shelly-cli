@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -83,11 +84,11 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(status, "", "  ")
+		jsonBytes, err := json.MarshalIndent(status, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonBytes))
 		return nil
 	}
 
@@ -132,11 +133,7 @@ func displayValve(ios *iostreams.IOStreams, status *components.ThermostatStatus)
 		ios.Printf("    Position: %s %d%%\n", posBar, *status.Pos)
 	}
 	if status.Output != nil {
-		outputStr := theme.Dim().Render("Closed")
-		if *status.Output {
-			outputStr = theme.StatusOK().Render("Open (heating)")
-		}
-		ios.Printf("    Output:   %s\n", outputStr)
+		ios.Printf("    Output:   %s\n", output.RenderValveState(*status.Output))
 	}
 	ios.Println()
 }

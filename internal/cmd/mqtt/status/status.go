@@ -9,8 +9,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the mqtt status command.
@@ -56,11 +56,5 @@ func displayStatus(ios *iostreams.IOStreams, status *shelly.MQTTStatus) {
 	ios.Title("MQTT Status")
 	ios.Println()
 
-	var state string
-	if status.Connected {
-		state = theme.StatusOK().Render("Connected")
-	} else {
-		state = theme.StatusError().Render("Disconnected")
-	}
-	ios.Printf("  Status: %s\n", state)
+	ios.Printf("  Status: %s\n", output.RenderBoolState(status.Connected, "Connected", "Disconnected"))
 }

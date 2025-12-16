@@ -1,5 +1,5 @@
-// Package cmdutil provides command utilities and shared infrastructure for CLI commands.
-package cmdutil
+// Package factories provides command factory functions for creating standard CLI commands.
+package factories
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -35,7 +36,7 @@ type CoverOpts struct {
 }
 
 // NewCoverCommand creates a cover open/close/stop command.
-func NewCoverCommand(f *Factory, opts CoverOpts) *cobra.Command {
+func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
 	var (
 		coverID  int
 		duration int
@@ -101,7 +102,7 @@ func NewCoverCommand(f *Factory, opts CoverOpts) *cobra.Command {
 		},
 	}
 
-	AddComponentIDFlag(cmd, &coverID, "Cover")
+	cmdutil.AddComponentIDFlag(cmd, &coverID, "Cover")
 	if hasDuration {
 		cmd.Flags().IntVarP(&duration, "duration", "d", 0, fmt.Sprintf("Duration in seconds (0 = full %s)", actionStr))
 	}
@@ -109,7 +110,7 @@ func NewCoverCommand(f *Factory, opts CoverOpts) *cobra.Command {
 	return cmd
 }
 
-func runCover(ctx context.Context, f *Factory, opts CoverOpts, device string, coverID, duration int, hasDuration bool) error {
+func runCover(ctx context.Context, f *cmdutil.Factory, opts CoverOpts, device string, coverID, duration int, hasDuration bool) error {
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
@@ -127,7 +128,7 @@ func runCover(ctx context.Context, f *Factory, opts CoverOpts, device string, co
 		spinnerMsg = "Stopping cover..."
 	}
 
-	return RunWithSpinner(ctx, ios, spinnerMsg, func(ctx context.Context) error {
+	return cmdutil.RunWithSpinner(ctx, ios, spinnerMsg, func(ctx context.Context) error {
 		var dur *int
 		if hasDuration && duration > 0 {
 			dur = &duration

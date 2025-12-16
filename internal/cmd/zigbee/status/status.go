@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -125,11 +126,11 @@ func fetchZigbeeStatus(ctx context.Context, svc *shelly.Service, device string, 
 }
 
 func outputStatusJSON(ios *iostreams.IOStreams, status ZigbeeStatus) error {
-	output, err := json.MarshalIndent(status, "", "  ")
+	jsonBytes, err := json.MarshalIndent(status, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to format JSON: %w", err)
 	}
-	ios.Println(string(output))
+	ios.Println(string(jsonBytes))
 	return nil
 }
 
@@ -150,11 +151,7 @@ func displayZigbeeStatus(ios *iostreams.IOStreams, status ZigbeeStatus) {
 }
 
 func displayEnabledState(ios *iostreams.IOStreams, enabled bool) {
-	enabledStr := theme.Dim().Render("Disabled")
-	if enabled {
-		enabledStr = theme.StatusOK().Render("Enabled")
-	}
-	ios.Printf("  Enabled: %s\n", enabledStr)
+	ios.Printf("  Enabled: %s\n", output.RenderEnabledState(enabled))
 }
 
 func displayNetworkState(ios *iostreams.IOStreams, state string) {

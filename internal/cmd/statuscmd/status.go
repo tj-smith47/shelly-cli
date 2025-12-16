@@ -152,49 +152,34 @@ func getSwitchState(ctx context.Context, ios *iostreams.IOStreams, conn *client.
 	status, err := conn.Switch(id).GetStatus(ctx)
 	if err != nil {
 		ios.DebugErr("failed to get switch status", err)
-		return &componentState{Name: name, State: theme.StatusError().Render("error")}
+		return &componentState{Name: name, State: output.RenderErrorState()}
 	}
-	if status.Output {
-		return &componentState{Name: name, State: theme.StatusOK().Render("ON")}
-	}
-	return &componentState{Name: name, State: theme.Dim().Render("off")}
+	return &componentState{Name: name, State: output.RenderOnOffStateDim(status.Output)}
 }
 
 func getLightState(ctx context.Context, ios *iostreams.IOStreams, conn *client.Client, id int, name string) *componentState {
 	status, err := conn.Light(id).GetStatus(ctx)
 	if err != nil {
 		ios.DebugErr("failed to get light status", err)
-		return &componentState{Name: name, State: theme.StatusError().Render("error")}
+		return &componentState{Name: name, State: output.RenderErrorState()}
 	}
-	if status.Output {
-		if status.Brightness != nil && *status.Brightness > 0 {
-			return &componentState{Name: name, State: theme.StatusOK().Render(fmt.Sprintf("ON (%d%%)", *status.Brightness))}
-		}
-		return &componentState{Name: name, State: theme.StatusOK().Render("ON")}
-	}
-	return &componentState{Name: name, State: theme.Dim().Render("off")}
+	return &componentState{Name: name, State: output.RenderOnOffStateWithBrightness(status.Output, status.Brightness)}
 }
 
 func getRGBState(ctx context.Context, ios *iostreams.IOStreams, conn *client.Client, id int, name string) *componentState {
 	status, err := conn.RGB(id).GetStatus(ctx)
 	if err != nil {
 		ios.DebugErr("failed to get RGB status", err)
-		return &componentState{Name: name, State: theme.StatusError().Render("error")}
+		return &componentState{Name: name, State: output.RenderErrorState()}
 	}
-	if status.Output {
-		if status.Brightness != nil {
-			return &componentState{Name: name, State: theme.StatusOK().Render(fmt.Sprintf("ON (%d%%)", *status.Brightness))}
-		}
-		return &componentState{Name: name, State: theme.StatusOK().Render("ON")}
-	}
-	return &componentState{Name: name, State: theme.Dim().Render("off")}
+	return &componentState{Name: name, State: output.RenderOnOffStateWithBrightness(status.Output, status.Brightness)}
 }
 
 func getCoverState(ctx context.Context, ios *iostreams.IOStreams, conn *client.Client, id int, name string) *componentState {
 	status, err := conn.Cover(id).GetStatus(ctx)
 	if err != nil {
 		ios.DebugErr("failed to get cover status", err)
-		return &componentState{Name: name, State: theme.StatusError().Render("error")}
+		return &componentState{Name: name, State: output.RenderErrorState()}
 	}
 	state := status.State
 	if status.CurrentPosition != nil && *status.CurrentPosition >= 0 {
@@ -207,12 +192,9 @@ func getInputState(ctx context.Context, ios *iostreams.IOStreams, conn *client.C
 	status, err := conn.Input(id).GetStatus(ctx)
 	if err != nil {
 		ios.DebugErr("failed to get input status", err)
-		return &componentState{Name: name, State: theme.StatusError().Render("error")}
+		return &componentState{Name: name, State: output.RenderErrorState()}
 	}
-	if status.State {
-		return &componentState{Name: name, State: theme.StatusWarn().Render("triggered")}
-	}
-	return &componentState{Name: name, State: theme.Dim().Render("idle")}
+	return &componentState{Name: name, State: output.RenderInputTriggeredState(status.State)}
 }
 
 func showAllDevicesStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service) error {
@@ -241,15 +223,15 @@ func showAllDevicesStatus(ctx context.Context, ios *iostreams.IOStreams, svc *sh
 		for _, name := range names {
 			ds := deviceStatus{Name: name}
 
-			err := svc.WithConnection(ctx, name, func(conn *client.Client) error {
+			connErr := svc.WithConnection(ctx, name, func(conn *client.Client) error {
 				info := conn.Info()
 				ds.Model = info.Model
-				ds.Status = theme.StatusOK().Render("online")
+				ds.Status = output.RenderOnlineState(true)
 				return nil
 			})
-			if err != nil {
+			if connErr != nil {
 				ds.Model = "-"
-				ds.Status = theme.StatusError().Render("offline")
+				ds.Status = output.RenderOnlineState(false)
 			}
 
 			statuses = append(statuses, ds)

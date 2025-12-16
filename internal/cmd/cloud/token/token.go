@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -86,7 +87,7 @@ func run(f *cmdutil.Factory) error {
 		if remaining > 0 {
 			ios.Printf("  Remaining:  %s\n", formatDuration(remaining))
 		} else {
-			ios.Printf("  Status:     %s\n", theme.StatusError().Render("Expired"))
+			ios.Printf("  Status:     %s\n", output.RenderTokenValidity(true, true))
 		}
 	}
 
