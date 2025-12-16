@@ -96,7 +96,9 @@ func displayWebhooks(ios *iostreams.IOStreams, webhooks []shelly.WebhookInfo) {
 		}
 		table.AddRow(fmt.Sprintf("%d", w.ID), w.Event, urls, enabled)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 
 	ios.Printf("\n%d webhook(s) configured\n", len(webhooks))
 }

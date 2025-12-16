@@ -11,10 +11,10 @@ func TestNewCommand(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "delete <name>" {
-		t.Errorf("Use = %q, want \"delete <name>\"", cmd.Use)
+	if cmd.Use != "delete <group>" {
+		t.Errorf("Use = %q, want \"delete <group>\"", cmd.Use)
 	}
-	aliases := []string{"rm", "del"}
+	aliases := []string{"rm", "del", "remove"}
 	if len(cmd.Aliases) != len(aliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, aliases)
 	}

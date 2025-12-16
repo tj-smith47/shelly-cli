@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -56,25 +55,25 @@ func run(f *cmdutil.Factory, cmd *cobra.Command, groupName string) error {
 }
 
 func outputMembers(ios *iostreams.IOStreams, cmd *cobra.Command, groupName string, devices []string) error {
-	switch viper.GetString("output") {
-	case string(output.FormatJSON):
+	if output.WantsJSON() {
 		data := map[string]any{
 			"group":   groupName,
 			"members": devices,
 			"count":   len(devices),
 		}
 		return output.JSON(cmd.OutOrStdout(), data)
-	case string(output.FormatYAML):
+	}
+	if output.WantsYAML() {
 		data := map[string]any{
 			"group":   groupName,
 			"members": devices,
 			"count":   len(devices),
 		}
 		return output.YAML(cmd.OutOrStdout(), data)
-	default:
-		printTable(ios, groupName, devices)
-		return nil
 	}
+
+	printTable(ios, groupName, devices)
+	return nil
 }
 
 func printTable(ios *iostreams.IOStreams, groupName string, devices []string) {
@@ -85,7 +84,9 @@ func printTable(ios *iostreams.IOStreams, groupName string, devices []string) {
 	for i, device := range devices {
 		t.AddRow(fmt.Sprintf("%d", i+1), device)
 	}
-	t.Print()
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print group members table", err)
+	}
 	ios.Println()
 	ios.Count("member", len(devices))
 }

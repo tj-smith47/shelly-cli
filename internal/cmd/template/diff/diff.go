@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -77,13 +76,12 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Handle output formats
-	switch viper.GetString("output") {
-	case "json", "yaml":
+	if output.WantsStructured() {
 		return cmdutil.PrintListResult(ios, diffs, nil)
-	default:
-		displayDiffs(opts, diffs)
-		return nil
 	}
+
+	displayDiffs(opts, diffs)
+	return nil
 }
 
 func displayDiffs(opts *Options, diffs []shelly.ConfigDiff) {
@@ -104,7 +102,9 @@ func displayDiffs(opts *Options, diffs []shelly.ConfigDiff) {
 		backupStr := formatValue(d.Backup)
 		table.AddRow(d.Key, d.DiffType, currentStr, backupStr)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print diff table", err)
+	}
 
 	ios.Printf("\n%d difference(s) found\n", len(diffs))
 }

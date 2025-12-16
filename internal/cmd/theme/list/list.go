@@ -116,7 +116,9 @@ func run(f *cmdutil.Factory, filter string) error {
 		}
 		table.AddRow(t, isCurrent)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print theme list table", err)
+	}
 
 	return nil
 }

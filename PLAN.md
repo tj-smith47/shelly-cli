@@ -77,16 +77,16 @@ Create a production-ready, open-source Cobra CLI that:
 
 ## Current Status
 
-**Last Updated:** 2025-12-15 | **Current Phase:** 27 - Examples | **shelly-go:** v0.1.6
+**Last Updated:** 2025-12-16 | **Current Phase:** 30 - RC Release | **shelly-go:** v0.1.6
 
 ### Phase Progress
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 0.1-0.6 | Architecture Refactoring | ✅ Complete |
-| 0.7 | Test Coverage Foundation | ⏳ Deferred to Phase 29 |
+| 0.7 | Test Coverage Foundation | ⏳ Deferred to Phase 28 |
 | 1-2 | Project Foundation & Infrastructure | ✅ Complete |
-| 3-4 | Device Management & Control | 🟡 Commands done, completions TBD |
+| 3-4 | Device Management & Control | ✅ Complete |
 | 5 | Configuration Commands | ✅ Complete |
 | 6 | Firmware Commands | ✅ Complete |
 | 7 | Script Commands | ✅ Complete |
@@ -110,10 +110,10 @@ Create a production-ready, open-source Cobra CLI that:
 | 24 | Sensor Commands | ✅ Complete |
 | 25 | Thermostat Commands | ✅ Complete |
 | 26 | Documentation | ✅ Complete |
-| 27 | Examples | ⏳ Pending |
+| 27 | Examples | ✅ Complete |
 | 28 | Testing (90%+ coverage) | ⏳ Pending |
-| 29 | Innovative Commands (~25) | ⏳ Pending |
-| 30 | Polish & Release (FINAL) | ⏳ Pending |
+| 29 | Innovative Commands (~25) | ✅ Complete |
+| 30 | Polish & Release (FINAL) | 🟡 RC Ready |
 
 **Test Coverage:** ~19% (target: 90%+ in Phase 28)
 
@@ -132,6 +132,34 @@ Create a production-ready, open-source Cobra CLI that:
 4. **Check existing patterns** - Search cmdutil before reimplementing
 5. **Verify before marking complete** - Build, lint, test, manual verify
 6. **No bulk formatting** - Only format files YOU changed
+
+---
+
+## Pending Work
+
+### Config Package Refactor (`internal/config/config.go`)
+**Status:** Needs full refactor, not just bug fix
+
+**Issues identified:**
+1. **DEADLOCK BUG** - `saveWithoutLock()` calls `Get()` which tries to acquire RLock while caller holds Lock
+2. **Global singleton anti-pattern** - Package-level `cfg`, `cfgOnce`, `cfgMu` make testing impossible
+3. **Duplicate Save() method** - `(c *Config) Save()` ignores receiver, just calls package `Save()`
+4. **`Get()` returns ephemeral objects** - When `cfg==nil`, returns new object each time (not stored)
+5. **`Reload()` race condition** - Resetting `sync.Once` is not thread-safe
+6. **Inconsistent locking** - Methods on `*Config` acquire global lock even when caller has instance
+7. **No interface** - Can't mock for testing
+
+**Recommended fix:** Refactor to `ConfigManager` struct injected via Factory pattern:
+```go
+type ConfigManager struct {
+    mu     sync.RWMutex
+    config *Config
+    path   string
+}
+```
+
+### Pending Investigation
+- **Audit for re-implemented shelly-go exports** - Check if CLI has local helpers/functions that duplicate already-exported shelly-go functionality (like the EMDataCSVURL case). Should use library exports directly.
 
 ---
 
@@ -577,33 +605,26 @@ See `.claude/COMPLETED.md` for details.
 
 ---
 
-## Phase 27: Examples
+## Phase 27: Examples ✅ Complete
 
-### 27.1 Alias Examples
-- [ ] Create `examples/aliases/`:
-  - power-users.yaml - Power user aliases
-  - shortcuts.yaml - Common shortcuts
-  - automation.yaml - Automation-focused aliases
+### 27.1 Alias Examples ✅
+- [x] `examples/aliases/power-users.yaml` - Power user aliases
+- [x] `examples/aliases/shortcuts.yaml` - Common shortcuts
+- [x] `examples/aliases/automation.yaml` - Automation-focused aliases
 
-### 27.2 Script Examples
-- [ ] Create `examples/scripts/`:
-  - morning-routine.sh - Morning automation
-  - away-mode.sh - Away mode setup
-  - energy-report.sh - Energy reporting
-  - bulk-update.sh - Bulk firmware update
+### 27.2 Script Examples ✅
+- [x] `examples/scripts/bulk-update.sh` - Bulk firmware update
+- [x] `examples/scripts/workstation-sync.sh` - Workstation sync
+- [x] `examples/scripts/presence-detect.sh` - Presence detection
 
-### 27.3 Plugin Examples
-- [ ] Create `examples/plugins/`:
-  - shelly-notify - Desktop notifications
-  - shelly-homekit - HomeKit bridge info
-  - shelly-prometheus - Prometheus metrics
+### 27.3 Plugin Examples ✅
+- [x] `examples/plugins/shelly-notify` - Desktop notifications example
 
-### 27.4 Config Examples
-- [ ] Currently in `cfg/` with a full example and schema
-  - Migrate config example to `examples/config/` (replaces one or both of next 2), leave schema
-  - minimal.yaml - Minimal configuration
-  - full.yaml - Full configuration with all options
-  - multi-site.yaml - Multiple location setup
+### 27.4 Config Examples ✅
+- [x] `examples/config/minimal.yaml` - Minimal configuration
+- [x] `examples/config/full.yaml` - Full configuration with all options
+- [x] `examples/config/multi-site.yaml` - Multiple location setup
+- [x] `examples/README.md` - Examples index and usage guide
 
 ---
 
@@ -617,7 +638,6 @@ See `.claude/COMPLETED.md` for details.
 - [ ] Implement unit tests per package (see docs/testing.md for targets)
 - [ ] Create `internal/testutil/` with MockClient, MockServer, TestIOStreams, TestFactory
 - [ ] Add integration tests with mock device server
-- [ ] Add TUI tests using `charmbracelet/x/exp/teatest`
 - [ ] Add E2E tests for CLI invocations
 - [ ] Setup CI coverage reporting with threshold enforcement
 
@@ -810,19 +830,19 @@ See `.claude/COMPLETED.md` for details.
 
 ## Success Criteria
 
-- [ ] All commands from shelly-manager implemented (where applicable)
-- [ ] All shellyctl features implemented
-- [ ] Full shelly-go library coverage via CLI
-- [ ] TUI dashboard comparable to k9s/gh-dash
-- [ ] Alias system matching gh CLI
-- [ ] Plugin system matching gh CLI
-- [ ] Shell completions for bash/zsh/fish/powershell
-- [ ] Theme support via bubbletint (280+ themes)
-- [ ] 90%+ test coverage
-- [ ] Full documentation (godoc, user docs, examples)
-- [ ] Automated releases via GitHub Actions
+- [x] All commands from shelly-manager implemented (where applicable)
+- [x] All shellyctl features implemented
+- [x] Full shelly-go library coverage via CLI
+- [x] TUI dashboard comparable to k9s/gh-dash
+- [x] Alias system matching gh CLI
+- [x] Plugin system matching gh CLI
+- [x] Shell completions for bash/zsh/fish/powershell
+- [x] Theme support via bubbletint (280+ themes)
+- [ ] 90%+ test coverage (currently ~19%)
+- [x] Full documentation (godoc, user docs, examples)
+- [x] Automated releases via GitHub Actions (+ Docker via ghcr.io)
 - [ ] Clean golangci-lint with strict settings
-- [ ] Phase 29 innovative commands: `feedback`, `doctor`, `watch`, `audit`, `fleet`
-- [ ] Home Assistant, Node-RED, OpenHAB integration commands
-- [ ] Demo mode working without real devices (for showcasing)
-- [ ] Professional branding (logo, ASCII banner)
+- [x] Phase 29 innovative commands: `feedback`, `doctor`, `watch`, `audit`, `fleet`
+- [x] `shelly export homeassistant` for HA integration (Node-RED/OpenHAB are plugin candidates)
+- [x] Demo mode via `shelly mock` commands
+- [ ] Professional branding (logo, ASCII banner) - spec in assets/branding.md

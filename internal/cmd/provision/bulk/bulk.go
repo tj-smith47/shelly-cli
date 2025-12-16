@@ -154,17 +154,14 @@ func provisionDevices(ctx context.Context, ios *iostreams.IOStreams, opts *Optio
 
 	var wg sync.WaitGroup
 	for _, device := range cfg.Devices {
-		wg.Add(1)
-		go func(d DeviceConfig) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			// Acquire semaphore
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			err := provisionDevice(ctx, svc, cfg, d)
-			results <- result{Device: d.Name, Err: err}
-		}(device)
+			err := provisionDevice(ctx, svc, cfg, device)
+			results <- result{Device: device.Name, Err: err}
+		})
 	}
 
 	// Wait for all to complete

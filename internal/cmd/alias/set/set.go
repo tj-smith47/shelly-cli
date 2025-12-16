@@ -62,13 +62,13 @@ func run(f *cmdutil.Factory, name, command string, shell bool) error {
 	}
 
 	// Check if updating existing alias
-	existing := config.Get().GetAlias(name)
+	_, isUpdate := config.GetAlias(name)
 
 	if err := config.AddAlias(name, command, shell); err != nil {
 		return fmt.Errorf("failed to create alias: %w", err)
 	}
 
-	if existing != nil {
+	if isUpdate {
 		ios.Success("Updated alias '%s'", name)
 	} else {
 		ios.Success("Created alias '%s'", name)

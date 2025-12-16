@@ -96,18 +96,15 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 func fetchAllSnapshots(ctx context.Context, svc *shelly.Service, devices map[string]model.Device, snapshots map[string]*deviceSnapshot, mu *sync.Mutex) {
 	var wg sync.WaitGroup
 	for name, dev := range devices {
-		wg.Add(1)
-		go func(n string, d model.Device) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			snapshot := &deviceSnapshot{
-				Device:    n,
-				Address:   d.Address,
+				Device:    name,
+				Address:   dev.Address,
 				UpdatedAt: time.Now(),
 			}
 
 			// Get device info
-			info, err := svc.DeviceInfo(ctx, d.Address)
+			info, err := svc.DeviceInfo(ctx, dev.Address)
 			if err != nil {
 				snapshot.Error = err
 			} else {
@@ -116,7 +113,7 @@ func fetchAllSnapshots(ctx context.Context, svc *shelly.Service, devices map[str
 
 			// Get monitoring snapshot
 			if snapshot.Error == nil {
-				snap, err := svc.GetMonitoringSnapshot(ctx, d.Address)
+				snap, err := svc.GetMonitoringSnapshot(ctx, dev.Address)
 				if err != nil {
 					snapshot.Error = err
 				} else {
@@ -125,9 +122,9 @@ func fetchAllSnapshots(ctx context.Context, svc *shelly.Service, devices map[str
 			}
 
 			mu.Lock()
-			snapshots[n] = snapshot
+			snapshots[name] = snapshot
 			mu.Unlock()
-		}(name, dev)
+		})
 	}
 	wg.Wait()
 }

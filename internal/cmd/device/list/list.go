@@ -124,11 +124,11 @@ func run(f *cmdutil.Factory, generation int, deviceType string) error {
 	}
 
 	// Table output
-	table := output.NewTable("Name", "Address", "Model", "Generation", "Auth")
+	table := output.NewTable("Name", "Address", "Type", "Model", "Generation", "Auth")
 	for _, dev := range filtered {
 		gen := helpers.FormatGeneration(dev.Generation)
 		auth := helpers.FormatAuth(dev.Auth)
-		table.AddRow(dev.Name, dev.Address, dev.Model, gen, auth)
+		table.AddRow(dev.Name, dev.Address, dev.Type, dev.Model, gen, auth)
 	}
 
 	if err := table.PrintTo(ios.Out); err != nil {

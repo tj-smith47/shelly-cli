@@ -1,0 +1,293 @@
+# yaml-language-server: $schema=../../cfg/config.schema.json
+#
+# Shelly CLI - Full Configuration Reference
+#
+# This file documents ALL available configuration options.
+# Copy to ~/.config/shelly/config.yaml and customize as needed.
+#
+# For a minimal starting configuration, see: examples/config/minimal.yaml
+# For multi-location setups, see: examples/config/multi-site.yaml
+#
+# Run 'shelly init' for guided setup, or 'shelly init --check' to verify.
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+
+# Output format: table, json, yaml, text, template
+output: table
+
+# Enable colored output (respects NO_COLOR env var)
+color: true
+
+# Color theme (280+ themes available, run 'shelly theme list' to see all)
+# Popular choices: dracula, nord, tokyo-night, gruvbox, catppuccin, one-dark
+#
+# Simple format - just the theme name:
+theme: dracula
+#
+# Block format - theme name with color overrides:
+# theme:
+#   name: dracula
+#   colors:
+#     green: "#50fa7b"
+#     red: "#ff5555"
+#
+# External file format - load from a theme file:
+# theme:
+#   file: ~/.config/shelly/themes/my-theme.yaml
+#
+# Full custom format - only custom colors (no base theme):
+# theme:
+#   colors:
+#     foreground: "#f8f8f2"
+#     background: "#282a36"
+#     green: "#50fa7b"
+#     red: "#ff5555"
+#     yellow: "#f1fa8c"
+#     blue: "#6272a4"
+#     cyan: "#8be9fd"
+#     purple: "#bd93f9"
+#     bright_black: "#6272a4"
+
+# API mode: local (direct device access), cloud (via Shelly Cloud), auto
+api_mode: local
+
+# Verbosity level (0=silent, 1=info, 2=debug, 3=trace)
+# Can also be set via -v/-vv/-vvv flags
+verbosity: 0
+
+# Suppress non-essential output
+quiet: false
+
+# =============================================================================
+# Logging Settings (for debugging)
+# =============================================================================
+
+log:
+  # Log output format: false=human-readable, true=JSON (for log aggregation)
+  json: false
+
+  # Filter logs by category (comma-separated)
+  # Available: network, config, device, api, auth, plugin, discovery, firmware
+  # Example: "network,api" to only see network and API logs
+  # Leave empty to see all categories
+  categories: ""
+
+# =============================================================================
+# Discovery Settings
+# =============================================================================
+
+discovery:
+  # Discovery timeout
+  timeout: 10s
+
+  # Enable mDNS discovery (recommended for Gen2+ devices)
+  mdns: true
+
+  # Enable Bluetooth LE discovery
+  ble: false
+
+  # Enable CoIoT discovery (Gen1 devices)
+  coiot: false
+
+  # Default network for subnet scanning (CIDR notation)
+  # network: 192.168.1.0/24
+
+# =============================================================================
+# Shelly Cloud Settings (optional)
+# =============================================================================
+
+cloud:
+  # Enable cloud integration for remote access
+  enabled: false
+
+  # Cloud account email (set via 'shelly cloud login')
+  # email: user@example.com
+
+  # Tokens are managed automatically - do not edit manually
+  # access_token: ""
+  # refresh_token: ""
+
+  # Cloud server URL (default is Shelly's production server)
+  server_url: https://shelly-api.shelly.cloud
+
+# =============================================================================
+# Registered Devices
+# =============================================================================
+
+# Devices can be added via:
+#   shelly device add <name> <address>
+#   shelly discover mdns --register
+#   shelly init (guided setup)
+
+devices:
+  # Example device entries:
+  #
+  # kitchen-light:
+  #   address: 192.168.1.50
+  #   generation: 2
+  #   type: switch
+  #   model: SHSW-PM
+  #
+  # desk-lamp:
+  #   address: 192.168.1.51
+  #   generation: 2
+  #   type: plug
+  #   model: SHPLG-S
+  #   auth:
+  #     username: admin
+  #     password: secret123
+  #
+  # living-room-dimmer:
+  #   address: 192.168.1.52
+  #   generation: 2
+  #   type: light
+  #   model: SHDM-2
+
+# =============================================================================
+# Command Aliases
+# =============================================================================
+
+# Create shortcuts for frequently used commands.
+# Use $1, $2, etc. for positional arguments, $@ for all arguments.
+
+aliases:
+  # Example aliases:
+  #
+  # lights-off:
+  #   command: batch off kitchen-light living-room desk-lamp
+  #
+  # status:
+  #   command: device list --output table
+  #
+  # morning:
+  #   command: scene activate morning-routine
+  #
+  # # Shell alias (enables pipes and redirects)
+  # backup-all:
+  #   command: shelly backup create --all | gzip > ~/shelly-backup.gz
+  #   shell: true
+
+# =============================================================================
+# Device Groups
+# =============================================================================
+
+# Group devices for batch operations:
+#   shelly batch on --group living-room
+
+groups:
+  # Example groups:
+  #
+  # living-room:
+  #   devices:
+  #     - living-room-light
+  #     - living-room-lamp
+  #     - tv-backlight
+  #
+  # bedroom:
+  #   devices:
+  #     - bedroom-light
+  #     - nightstand-lamp
+  #
+  # all-lights:
+  #   devices:
+  #     - kitchen-light
+  #     - living-room-light
+  #     - bedroom-light
+
+# =============================================================================
+# Scenes
+# =============================================================================
+
+# Save and recall device states:
+#   shelly scene activate movie-time
+#   shelly scene save current-state
+
+scenes:
+  # Example scenes:
+  #
+  # movie-time:
+  #   description: Dim lights for movie watching
+  #   actions:
+  #     - device: living-room-dimmer
+  #       method: Light.Set
+  #       params:
+  #         id: 0
+  #         on: true
+  #         brightness: 20
+  #     - device: tv-backlight
+  #       method: Light.Set
+  #       params:
+  #         id: 0
+  #         on: true
+  #         brightness: 50
+  #
+  # all-off:
+  #   description: Turn off all lights
+  #   actions:
+  #     - device: kitchen-light
+  #       method: Switch.Set
+  #       params:
+  #         id: 0
+  #         on: false
+  #     - device: living-room-light
+  #       method: Switch.Set
+  #       params:
+  #         id: 0
+  #         on: false
+
+# =============================================================================
+# Plugin Settings
+# =============================================================================
+
+plugins:
+  # Enable plugin system
+  enabled: false
+
+  # Additional plugin search paths (beyond ~/.config/shelly/plugins)
+  # path:
+  #   - /usr/local/share/shelly/plugins
+  #   - ~/my-shelly-plugins
+
+# =============================================================================
+# TUI Dashboard Settings
+# =============================================================================
+
+tui:
+  # Auto-refresh interval in seconds (1-300)
+  refresh_interval: 5
+
+  # TUI-specific theme (independent - completely replaces main theme when set)
+  # Supports same formats as main theme: string, block with colors, or file
+  # theme: nord
+  # theme:
+  #   name: tokyo-night
+  #   colors:
+  #     green: "#9ece6a"
+
+  # Custom keybindings (uncomment to override defaults)
+  # keybindings:
+  #   # Navigation (vim-style by default)
+  #   up: [up, k]
+  #   down: [down, j]
+  #   left: [left, h]
+  #   right: [right, l]
+  #
+  #   # Actions
+  #   toggle: [space, t]
+  #   turn_on: ["1", o]
+  #   turn_off: ["0", x]
+  #   refresh: [r, ctrl+r]
+  #   filter: ["/"]
+  #   command: [":"]
+  #   help: ["?"]
+  #   quit: [q, ctrl+c]
+  #
+  #   # View switching
+  #   tab: [tab]
+  #   shift_tab: [shift+tab]
+  #   view1: ["1"]
+  #   view2: ["2"]
+  #   view3: ["3"]
+  #   view4: ["4"]

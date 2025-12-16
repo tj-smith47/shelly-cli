@@ -7,53 +7,20 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the switch toggle command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var switchID int
-
-	cmd := &cobra.Command{
-		Use:     "toggle <device>",
-		Aliases: []string{"flip", "t"},
-		Short:   "Toggle switch state",
-		Long:    `Toggle the state of a switch component on the specified device.`,
-		Example: `  # Toggle switch on bedroom device
-  shelly switch toggle bedroom
-
-  # Toggle specific switch ID
-  shelly switch flip bedroom --id 1`,
-		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completion.DeviceNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], switchID)
+	return cmdutil.NewComponentCommand(f, cmdutil.ComponentOpts{
+		Component: "Switch",
+		Action:    cmdutil.ActionToggle,
+		ToggleFunc: func(ctx context.Context, svc *shelly.Service, device string, id int) (bool, error) {
+			status, err := svc.SwitchToggle(ctx, device, id)
+			if err != nil {
+				return false, err
+			}
+			return status.Output, nil
 		},
-	}
-
-	cmdutil.AddComponentIDFlag(cmd, &switchID, "Switch")
-
-	return cmd
-}
-
-func run(ctx context.Context, f *cmdutil.Factory, device string, switchID int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
-	defer cancel()
-
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	return cmdutil.RunWithSpinner(ctx, ios, "Toggling switch...", func(ctx context.Context) error {
-		status, err := svc.SwitchToggle(ctx, device, switchID)
-		if err != nil {
-			return err
-		}
-
-		state := "off"
-		if status.Output {
-			state = "on"
-		}
-		ios.Success("Switch %d toggled to %s", switchID, state)
-		return nil
 	})
 }

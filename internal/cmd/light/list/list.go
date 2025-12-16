@@ -110,5 +110,7 @@ func displayList(ios *iostreams.IOStreams, lights []shelly.LightInfo) {
 
 		t.AddRow(fmt.Sprintf("%d", lt.ID), name, state, brightness, power)
 	}
-	t.Print()
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }

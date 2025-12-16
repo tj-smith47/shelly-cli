@@ -1,5 +1,15 @@
 name: AutoTag
 
+# Auto-tags on push to master based on commit message:
+#   #major - bump major version (1.0.0 -> 2.0.0)
+#   #minor - bump minor version (1.0.0 -> 1.1.0)
+#   #patch - bump patch version (default) (1.0.0 -> 1.0.1)
+#   #none  - skip tagging (use when pushing workflow changes)
+#
+# For RC releases, create and push tag manually:
+#   git tag -a v1.0.0-rc.1 -m "Release Candidate 1"
+#   git push origin v1.0.0-rc.1
+
 on:
   push:
     branches:

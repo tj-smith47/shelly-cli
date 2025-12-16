@@ -7,12 +7,12 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -53,7 +53,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	jsonOutput := viper.GetString("output") == "json"
+	jsonOutput := output.WantsJSON()
 
 	if !jsonOutput {
 		ios.Title("Event Monitor: %s", device)
@@ -111,8 +111,8 @@ func formatEventData(data map[string]any) string {
 	var parts []string
 
 	// Common fields
-	if output, ok := data["output"].(bool); ok {
-		if output {
+	if outputState, ok := data["output"].(bool); ok {
+		if outputState {
 			parts = append(parts, theme.StatusOK().Render("ON"))
 		} else {
 			parts = append(parts, theme.StatusError().Render("OFF"))

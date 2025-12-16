@@ -59,20 +59,22 @@ Use --dry-run to preview actions without executing them.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Duration, concurrent int, dryRun bool) error {
+	ios := f.IOStreams()
+
 	scene, exists := config.GetScene(name)
 	if !exists {
 		return fmt.Errorf("scene %q not found", name)
 	}
 
 	if len(scene.Actions) == 0 {
-		iostreams.Warning("Scene %q has no actions", name)
+		ios.Warning("Scene %q has no actions", name)
 		return nil
 	}
 
 	if dryRun {
-		iostreams.Info("Dry run - would execute %d action(s):", len(scene.Actions))
+		ios.Info("Dry run - would execute %d action(s):", len(scene.Actions))
 		for i, action := range scene.Actions {
-			iostreams.Info("  %d. %s %s %s",
+			ios.Info("  %d. %s %s %s",
 				i+1,
 				theme.Bold().Render(action.Device),
 				theme.Highlight().Render(action.Method),
@@ -82,8 +84,7 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 		return nil
 	}
 
-	ios := f.IOStreams()
-	iostreams.Info("Activating scene %q (%d actions)...", theme.Bold().Render(name), len(scene.Actions))
+	ios.Info("Activating scene %q (%d actions)...", theme.Bold().Render(name), len(scene.Actions))
 
 	svc := f.ShellyService()
 
@@ -136,11 +137,11 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 
 	// Print summary
 	if failed > 0 {
-		iostreams.Warning("Scene %q: %d/%d actions failed", name, failed, len(scene.Actions))
+		ios.Warning("Scene %q: %d/%d actions failed", name, failed, len(scene.Actions))
 		return fmt.Errorf("%d/%d actions failed", failed, len(scene.Actions))
 	}
 
-	iostreams.Success("Scene %q activated (%d actions)", name, succeeded)
+	ios.Success("Scene %q activated (%d actions)", name, succeeded)
 	return nil
 }
 

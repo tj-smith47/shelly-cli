@@ -12,6 +12,8 @@ import (
 type Browser interface {
 	// Browse opens a URL in the default web browser.
 	Browse(ctx context.Context, url string) error
+	// OpenDeviceUI opens a Shelly device's web interface by IP address.
+	OpenDeviceUI(ctx context.Context, deviceIP string) error
 }
 
 // browserImpl is the default implementation of Browser.
@@ -42,8 +44,7 @@ func (b *browserImpl) Browse(ctx context.Context, url string) error {
 }
 
 // OpenDeviceUI opens a Shelly device's web interface by IP address.
-// It constructs the HTTP URL and opens it in the browser.
-func OpenDeviceUI(ctx context.Context, browser Browser, deviceIP string) error {
+func (b *browserImpl) OpenDeviceUI(ctx context.Context, deviceIP string) error {
 	url := fmt.Sprintf("http://%s", deviceIP)
-	return browser.Browse(ctx, url)
+	return b.Browse(ctx, url)
 }

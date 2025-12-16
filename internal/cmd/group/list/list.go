@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
@@ -21,75 +22,32 @@ type GroupInfo struct {
 
 // NewCommand creates the group list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List all device groups",
-		Long: `List all device groups and their member counts.
-
-Groups allow organizing devices for batch operations. Each group can
-contain multiple devices, and devices can belong to multiple groups.
-
-Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.
-
-Columns: Name, Devices (count)`,
-		Example: `  # List all groups
-  shelly group list
-
-  # Output as JSON
-  shelly group list -o json
-
-  # Get names of groups containing devices
-  shelly group list -o json | jq -r '.[] | select(.device_count > 0) | .name'
-
-  # List devices in all groups
-  shelly group list -o json | jq -r '.[] | "\(.name): \(.devices | join(", "))"'
-
-  # Count total groups
-  shelly group list -o json | jq length
-
-  # Short form
-  shelly grp ls`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f)
+	return cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[GroupInfo]{
+		Resource: "group",
+		FetchFunc: func() []GroupInfo {
+			groups := config.ListGroups()
+			result := make([]GroupInfo, 0, len(groups))
+			for name, group := range groups {
+				result = append(result, GroupInfo{
+					Name:        name,
+					DeviceCount: len(group.Devices),
+					Devices:     group.Devices,
+				})
+			}
+			sort.Slice(result, func(i, j int) bool {
+				return result[i].Name < result[j].Name
+			})
+			return result
 		},
-	}
-
-	return cmd
+		DisplayFunc: displayGroups,
+		EmptyMsg:    "No groups defined",
+		HintMsg:     "Use 'shelly group create <name>' to create a group",
+	})
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
-	groups := config.ListGroups()
-
-	if len(groups) == 0 {
-		ios.Info("No groups defined")
-		ios.Info("Use 'shelly group create <name>' to create a group")
-		return nil
-	}
-
-	// Build sorted list for consistent output
-	result := make([]GroupInfo, 0, len(groups))
-	for name, group := range groups {
-		result = append(result, GroupInfo{
-			Name:        name,
-			DeviceCount: len(group.Devices),
-			Devices:     group.Devices,
-		})
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-
-	// Handle structured output (JSON/YAML) via global -o flag
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, result)
-	}
-
-	// Table output
+func displayGroups(ios *iostreams.IOStreams, groups []GroupInfo) {
 	table := output.NewTable("Name", "Devices")
-	for _, g := range result {
+	for _, g := range groups {
 		table.AddRow(g.Name, formatDeviceCount(g.DeviceCount))
 	}
 
@@ -97,9 +55,7 @@ func run(f *cmdutil.Factory) error {
 		ios.DebugErr("print table", err)
 	}
 	ios.Println()
-	ios.Count("group", len(result))
-
-	return nil
+	ios.Count("group", len(groups))
 }
 
 func formatDeviceCount(count int) string {

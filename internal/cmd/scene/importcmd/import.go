@@ -13,7 +13,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the scene import command.
@@ -44,7 +43,7 @@ Use --name to override the scene name from the file.`,
   shelly scene import scene.yaml --overwrite`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], name, overwrite)
+			return run(f, args[0], name, overwrite)
 		},
 	}
 
@@ -61,7 +60,9 @@ type Scene struct {
 	Actions     []config.SceneAction `json:"actions" yaml:"actions"`
 }
 
-func run(file, nameOverride string, overwrite bool) error {
+func run(f *cmdutil.Factory, file, nameOverride string, overwrite bool) error {
+	ios := f.IOStreams()
+
 	scene, err := parseSceneFile(file)
 	if err != nil {
 		return err
@@ -80,7 +81,7 @@ func run(file, nameOverride string, overwrite bool) error {
 		return err
 	}
 
-	iostreams.Success("Imported scene %q with %d action(s)", scene.Name, len(scene.Actions))
+	ios.Success("Imported scene %q with %d action(s)", scene.Name, len(scene.Actions))
 	return nil
 }
 

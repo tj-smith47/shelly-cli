@@ -1129,16 +1129,11 @@ func (s *Service) DeleteEMData(ctx context.Context, device string, id int) error
 
 // GetEMDataCSVURL returns the HTTP URL for downloading EMData as CSV.
 func (s *Service) GetEMDataCSVURL(device string, id int, startTS, endTS *int64, addKeys bool) (string, error) {
-	// Resolve device address
 	addr, err := s.resolver.Resolve(device)
 	if err != nil {
 		return "", err
 	}
-
-	// Build CSV URL directly - no connection needed, just URL construction
-	emdata := components.NewEMData(nil, id)
-	csvURL := emdata.GetDataCSVURL(addr.Address, startTS, endTS, addKeys)
-	return csvURL, nil
+	return components.EMDataCSVURL(addr.Address, id, startTS, endTS, addKeys), nil
 }
 
 // GetEM1DataRecords retrieves available time intervals with stored EM1Data.
@@ -1175,16 +1170,11 @@ func (s *Service) DeleteEM1Data(ctx context.Context, device string, id int) erro
 
 // GetEM1DataCSVURL returns the HTTP URL for downloading EM1Data as CSV.
 func (s *Service) GetEM1DataCSVURL(device string, id int, startTS, endTS *int64, addKeys bool) (string, error) {
-	// Resolve device address
 	addr, err := s.resolver.Resolve(device)
 	if err != nil {
 		return "", err
 	}
-
-	// Build CSV URL directly - no connection needed, just URL construction
-	em1data := components.NewEM1Data(nil, id)
-	csvURL := em1data.GetDataCSVURL(addr.Address, startTS, endTS, addKeys)
-	return csvURL, nil
+	return components.EM1DataCSVURL(addr.Address, id, startTS, endTS, addKeys), nil
 }
 
 // FormatInfluxDBLineProtocol formats points as InfluxDB line protocol.

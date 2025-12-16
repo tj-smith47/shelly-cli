@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -83,15 +82,14 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 	}
 
 	// Output based on format
-	format := viper.GetString("output")
-	switch format {
-	case "json":
+	if output.WantsJSON() {
 		return output.PrintJSON(result)
-	case "yaml":
-		return output.PrintYAML(result)
-	default:
-		return printConfigTable(ios, result)
 	}
+	if output.WantsYAML() {
+		return output.PrintYAML(result)
+	}
+
+	return printConfigTable(ios, result)
 }
 
 // printConfigTable prints configuration as a formatted table.
@@ -121,7 +119,9 @@ func printConfigTable(ios *iostreams.IOStreams, config any) error {
 		for key, value := range cfgMap {
 			table.AddRow(key, formatValue(value, ios))
 		}
-		table.Print()
+		if err := table.PrintTo(ios.Out); err != nil {
+			ios.DebugErr("print config table", err)
+		}
 		ios.Printf("\n")
 	}
 

@@ -82,13 +82,15 @@ Protocol, and Auth status.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Duration, register, skipExisting bool) error {
+	ios := f.IOStreams()
+
 	if subnet == "" {
 		var err error
 		subnet, err = detectSubnet()
 		if err != nil {
 			return fmt.Errorf("failed to detect subnet: %w", err)
 		}
-		iostreams.Info("Detected subnet: %s", subnet)
+		ios.Info("Detected subnet: %s", subnet)
 	}
 
 	_, ipNet, err := net.ParseCIDR(subnet)
@@ -102,9 +104,7 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 		return fmt.Errorf("no addresses to scan in subnet %s", subnet)
 	}
 
-	iostreams.Info("Scanning %d addresses in %s...", len(addresses), ipNet)
-
-	ios := f.IOStreams()
+	ios.Info("Scanning %d addresses in %s...", len(addresses), ipNet)
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
@@ -132,7 +132,7 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 	mw.Finalize()
 
 	if len(devices) == 0 {
-		iostreams.NoResults("devices", "Ensure devices are powered on and accessible on the network")
+		ios.NoResults("devices", "Ensure devices are powered on and accessible on the network")
 		return nil
 	}
 
@@ -150,9 +150,9 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 	if register {
 		added, err := helpers.RegisterDiscoveredDevices(devices, skipExisting)
 		if err != nil {
-			iostreams.Warning("Registration error: %v", err)
+			ios.Warning("Registration error: %v", err)
 		}
-		iostreams.Added("device", added)
+		ios.Added("device", added)
 	}
 
 	return nil

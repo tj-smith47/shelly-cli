@@ -123,7 +123,9 @@ func displayKeys(ios *iostreams.IOStreams, result *shelly.KVSListResult) {
 	for _, key := range result.Keys {
 		table.AddRow(key)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 
 	ios.Printf("\n%d key(s), revision %d\n", len(result.Keys), result.Rev)
 }
@@ -138,7 +140,9 @@ func displayItems(ios *iostreams.IOStreams, items []shelly.KVSItem) {
 		typeStr := valueType(item.Value)
 		table.AddRow(item.Key, valueStr, typeStr)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 
 	ios.Printf("\n%d key(s)\n", len(items))
 }

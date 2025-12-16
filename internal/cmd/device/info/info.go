@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -64,11 +63,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	// Check output format
-	format := viper.GetString("output")
-	if format == "json" {
+	if output.WantsJSON() {
 		return output.PrintJSON(info)
 	}
-	if format == "yaml" {
+	if output.WantsYAML() {
 		return output.PrintYAML(info)
 	}
 
@@ -83,7 +81,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	table.AddRow("Application", info.App)
 	table.AddRow("Auth Enabled", helpers.FormatAuth(info.AuthEn))
 
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print device info table", err)
+	}
 
 	return nil
 }

@@ -80,7 +80,9 @@ func displayResults(ios *iostreams.IOStreams, results []shelly.WiFiScanResult) {
 		signal := formatSignal(r.RSSI)
 		table.AddRow(ssid, signal, fmt.Sprintf("%d", r.Channel), r.Auth)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print wifi scan table", err)
+	}
 
 	ios.Printf("\n%d network(s) found\n", len(results))
 }

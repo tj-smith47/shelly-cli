@@ -119,11 +119,9 @@ func (l *Loader) Discover() ([]Plugin, error) {
 	var wg sync.WaitGroup
 	for i := range plugins {
 		if plugins[i].Version == "" && plugins[i].Manifest == nil {
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
-				plugins[idx].Version = getPluginVersion(plugins[idx].Path)
-			}(i)
+			wg.Go(func() {
+				plugins[i].Version = getPluginVersion(plugins[i].Path)
+			})
 		}
 	}
 	wg.Wait()

@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the device factory-reset command.
@@ -60,25 +59,27 @@ This command requires both --yes and --confirm flags for safety.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, yes, confirm bool) error {
+	ios := f.IOStreams()
+
 	// Require both flags for safety
 	if !yes || !confirm {
-		iostreams.Error("Factory reset requires both --yes and --confirm flags for safety")
-		iostreams.Info("")
-		iostreams.Info("WARNING: Factory reset will ERASE ALL settings on the device!")
-		iostreams.Info("The device will return to AP mode and need to be reconfigured.")
-		iostreams.Info("")
-		iostreams.Info("To proceed, use:")
-		iostreams.Info("  shelly device factory-reset %s --yes --confirm", device)
+		ios.Error("Factory reset requires both --yes and --confirm flags for safety")
+		ios.Info("")
+		ios.Info("WARNING: Factory reset will ERASE ALL settings on the device!")
+		ios.Info("The device will return to AP mode and need to be reconfigured.")
+		ios.Info("")
+		ios.Info("To proceed, use:")
+		ios.Info("  shelly device factory-reset %s --yes --confirm", device)
 		return fmt.Errorf("missing required confirmation flags")
 	}
 
 	// Final interactive confirmation (default to false for safety)
-	confirmed, err := iostreams.Confirm(fmt.Sprintf("FINAL WARNING: Factory reset device %q? This cannot be undone!", device), false)
+	confirmed, err := f.ConfirmAction(fmt.Sprintf("FINAL WARNING: Factory reset device %q? This cannot be undone!", device), false)
 	if err != nil {
 		return fmt.Errorf("confirmation failed: %w", err)
 	}
 	if !confirmed {
-		iostreams.Info("Factory reset cancelled")
+		ios.Info("Factory reset cancelled")
 		return nil
 	}
 
@@ -87,18 +88,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, yes, confirm bo
 
 	svc := f.ShellyService()
 
-	spin := iostreams.NewSpinner("Factory resetting device...")
-	spin.Start()
+	ios.StartProgress("Factory resetting device...")
 
 	err = svc.DeviceFactoryReset(ctx, device)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to factory reset device: %w", err)
 	}
 
-	iostreams.Success("Device %q has been factory reset", device)
-	iostreams.Info("The device is now in AP mode and needs to be reconfigured")
+	ios.Success("Device %q has been factory reset", device)
+	ios.Info("The device is now in AP mode and needs to be reconfigured")
 
 	return nil
 }

@@ -1297,35 +1297,52 @@ func run(ctx context.Context, ios *iostreams.IOStreams, targets []string, switch
 
 **Source:** gh, kubectl, best practices
 
-### Use errgroup Instead of WaitGroup
+### WaitGroup.Go() (Go 1.25+) - Fire and Forget
+
+Use `WaitGroup.Go()` when goroutines don't return errors or errors are handled via channels/shared state:
 
 ```go
-// BEFORE (verbose, error-prone)
+// WRONG (pre-Go 1.25 pattern - DO NOT USE)
 var wg sync.WaitGroup
-sem := make(chan struct{}, concurrent)
-results := make(chan Result, len(targets))
 for _, target := range targets {
     wg.Add(1)
     go func(device string) {
         defer wg.Done()
-        sem <- struct{}{}
-        defer func() { <-sem }()
         // work...
     }(target)
 }
 
-// AFTER (cleaner)
+// CORRECT (Go 1.25+)
+var wg sync.WaitGroup
+for _, target := range targets {
+    wg.Go(func() {
+        // work with target
+    })
+}
+wg.Wait()
+```
+
+### errgroup - Error Propagation & Concurrency Limits
+
+Use `errgroup` when you need error handling, context cancellation on first error, or concurrency limits:
+
+```go
 g, ctx := errgroup.WithContext(ctx)
 g.SetLimit(concurrent)
 for _, target := range targets {
-    t := target
     g.Go(func() error {
-        // work...
+        // work with target
         return nil
     })
 }
-return g.Wait()
+if err := g.Wait(); err != nil {
+    return err
+}
 ```
+
+**When to use which:**
+- `WaitGroup.Go()`: Simple parallel work, errors handled separately (channels, mutex-protected state)
+- `errgroup`: Need to propagate errors, cancel on first failure, or limit concurrency
 
 ### Context Propagation
 

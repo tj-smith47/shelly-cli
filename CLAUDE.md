@@ -300,6 +300,7 @@ grep -r "func NewCommand(f \*cmdutil.Factory)" internal/cmd/ | wc -l
 4. **Complete tasks fully** - Don't stop mid-task claiming context limits or time constraints
 5. **Own ALL bugs in this repo** - You wrote ALL the code in this repository. You are responsible for fixing ALL bugs, regardless of when they were introduced. Never dismiss a bug as "pre-existing" or "not from this session"
 6. **No half-baked features** - Every feature must be fully implemented and documented. No placeholder shells, stubs, or "coming soon" implementations
+7. **When editing docs, stick to facts** - Never add priority qualifiers ("optional", "low priority", "nice to have") to tasks. Mark items complete/incomplete only. Re-read rules before editing PLAN.md or REFACTOR.md. When uncertain about priority, ask.
 
 ---
 

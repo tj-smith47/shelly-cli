@@ -37,7 +37,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.SceneNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], outputFormat)
+			return run(f, args[0], outputFormat)
 		},
 	}
 
@@ -46,7 +46,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func run(name, outputFormat string) error {
+func run(f *cmdutil.Factory, name, outputFormat string) error {
 	scene, exists := config.GetScene(name)
 	if !exists {
 		return fmt.Errorf("scene %q not found", name)
@@ -58,26 +58,26 @@ func run(name, outputFormat string) error {
 	case "yaml":
 		return output.PrintYAML(scene)
 	default:
-		return printDetails(scene)
+		return printDetails(f.IOStreams(), scene)
 	}
 }
 
-func printDetails(scene config.Scene) error {
+func printDetails(ios *iostreams.IOStreams, scene config.Scene) error {
 	// Header
-	iostreams.Info("Scene: %s", theme.Bold().Render(scene.Name))
+	ios.Info("Scene: %s", theme.Bold().Render(scene.Name))
 	if scene.Description != "" {
-		iostreams.Info("Description: %s", scene.Description)
+		ios.Info("Description: %s", scene.Description)
 	}
 
 	if len(scene.Actions) == 0 {
-		iostreams.Info("")
-		iostreams.Info("%s", theme.Dim().Render("No actions defined"))
-		iostreams.Info("Add actions with: shelly scene add-action %s <device> <method> [params]", scene.Name)
+		ios.Info("")
+		ios.Info("%s", theme.Dim().Render("No actions defined"))
+		ios.Info("Add actions with: shelly scene add-action %s <device> <method> [params]", scene.Name)
 		return nil
 	}
 
-	iostreams.Info("")
-	iostreams.Info("Actions (%d):", len(scene.Actions))
+	ios.Info("")
+	ios.Info("Actions (%d):", len(scene.Actions))
 
 	table := output.NewTable("#", "Device", "Method", "Parameters")
 
@@ -94,7 +94,9 @@ func printDetails(scene config.Scene) error {
 		)
 	}
 
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print scene actions table", err)
+	}
 	return nil
 }
 

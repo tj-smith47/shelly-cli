@@ -46,19 +46,10 @@ The file format is:
 
 func run(f *cmdutil.Factory, filename string, merge bool) error {
 	ios := f.IOStreams()
-	cfg, err := f.Config()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
 
-	imported, skipped, err := cfg.ImportAliases(filename, merge)
+	imported, skipped, err := config.ImportAliases(filename, merge)
 	if err != nil {
 		return fmt.Errorf("failed to import aliases: %w", err)
-	}
-
-	// Save the updated config
-	if err := config.Save(); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	ios.Success("Imported %d alias(es) from %s", imported, filename)

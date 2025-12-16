@@ -76,16 +76,16 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	if err != nil {
 		ios.StopProgress()
 		if isBLENotSupportedError(err) {
-			iostreams.Error("BLE discovery is not available on this system")
-			iostreams.Hint("Ensure you have a Bluetooth adapter and it is enabled")
-			iostreams.Hint("On Linux, you may need to run with elevated privileges")
+			ios.Error("BLE discovery is not available on this system")
+			ios.Hint("Ensure you have a Bluetooth adapter and it is enabled")
+			ios.Hint("On Linux, you may need to run with elevated privileges")
 			return nil
 		}
 		return fmt.Errorf("failed to initialize BLE: %w", err)
 	}
 	defer func() {
 		if err := bleDiscoverer.Stop(); err != nil {
-			iostreams.DebugErr("stopping BLE discoverer", err)
+			ios.DebugErr("stopping BLE discoverer", err)
 		}
 	}()
 
@@ -106,7 +106,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	}
 
 	if len(devices) == 0 {
-		iostreams.NoResults("BLE devices",
+		ios.NoResults("BLE devices",
 			"Put devices in provisioning mode (AP mode) to discover via BLE",
 			"Ensure Bluetooth is enabled on this machine")
 		return nil
@@ -189,7 +189,9 @@ func displayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscover
 		)
 	}
 
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print BLE devices table", err)
+	}
 	ios.Println("")
-	iostreams.Count("BLE device", len(devices))
+	ios.Count("BLE device", len(devices))
 }

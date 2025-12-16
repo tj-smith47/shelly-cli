@@ -189,9 +189,9 @@ func run(ctx context.Context, f *cmdutil.Factory, targets []string, method strin
 	// Print summary
 	success, failed, _ := mw.Summary()
 	if failed > 0 {
-		iostreams.Warning("%d/%d devices failed", failed, len(targets))
+		ios.Warning("%d/%d devices failed", failed, len(targets))
 		return fmt.Errorf("%d/%d devices failed", failed, len(targets))
 	}
-	iostreams.Info("Command sent to %d device(s)", success)
+	ios.Info("Command sent to %d device(s)", success)
 	return nil
 }

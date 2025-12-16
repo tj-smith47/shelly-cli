@@ -3,52 +3,20 @@ package on
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the rgb on command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var rgbID int
-
-	cmd := &cobra.Command{
-		Use:     "on <device>",
-		Aliases: []string{"enable", "1"},
-		Short:   "Turn RGB on",
-		Long:    `Turn on an RGB light component on the specified device.`,
-		Example: `  # Turn on RGB light
-  shelly rgb on living-room
-
-  # Turn on specific RGB ID
-  shelly rgb on living-room --id 1`,
-		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completion.DeviceNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], rgbID)
-		},
-	}
-
-	cmdutil.AddComponentIDFlag(cmd, &rgbID, "RGB")
-
-	return cmd
-}
-
-func run(ctx context.Context, f *cmdutil.Factory, device string, rgbID int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
-	defer cancel()
-
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	return cmdutil.RunSimple(ctx, ios, svc, device, rgbID,
-		"Turning RGB on...",
-		fmt.Sprintf("RGB %d turned on", rgbID),
-		func(ctx context.Context, svc *shelly.Service, device string, id int) error {
+	return cmdutil.NewComponentCommand(f, cmdutil.ComponentOpts{
+		Component: "RGB",
+		Action:    cmdutil.ActionOn,
+		SimpleFunc: func(ctx context.Context, svc *shelly.Service, device string, id int) error {
 			return svc.RGBOn(ctx, device, id)
-		})
+		},
+	})
 }

@@ -2,8 +2,6 @@
 package exec
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -38,15 +36,5 @@ or when you want to explicitly invoke an extension.`,
 }
 
 func run(_ *cmdutil.Factory, name string, args []string) error {
-	loader := plugins.NewLoader()
-	plugin, err := loader.Find(name)
-	if err != nil {
-		return fmt.Errorf("error finding extension: %w", err)
-	}
-	if plugin == nil {
-		return fmt.Errorf("extension %q not found", name)
-	}
-
-	executor := plugins.NewExecutor()
-	return executor.Execute(plugin, args)
+	return plugins.RunPlugin(name, args)
 }

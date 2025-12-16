@@ -158,13 +158,6 @@ func (t *Table) String() string {
 	return t.Render()
 }
 
-// PrintTable is a convenience function to create and print a table.
-func PrintTable(headers []string, rows [][]string) {
-	t := NewTable(headers...)
-	t.AddRows(rows)
-	t.Print()
-}
-
 // PrintTableTo is a convenience function to create and print a table to a writer.
 func PrintTableTo(w io.Writer, headers []string, rows [][]string) error {
 	t := NewTable(headers...)
@@ -179,29 +172,6 @@ func KeyValueTable(pairs map[string]string) *Table {
 		t.AddRow(k, v)
 	}
 	return t
-}
-
-// StatusTable creates a table suitable for device status display.
-func StatusTable() *Table {
-	return NewTable("Name", "Address", "Type", "Status", "Power")
-}
-
-// DeviceTable creates a table for device listings.
-func DeviceTable() *Table {
-	return NewTable("Name", "Address", "Generation", "Type", "Model")
-}
-
-// PrintTableToWriter outputs the table to the given writer.
-func PrintTableToWriter(w io.Writer, t *Table) error {
-	_, err := io.WriteString(w, t.Render())
-	return err
-}
-
-// MustPrintTable prints a table and panics on error.
-func MustPrintTable(w io.Writer, t *Table) {
-	if err := PrintTableToWriter(w, t); err != nil {
-		panic(err)
-	}
 }
 
 // Empty returns true if the table has no rows.

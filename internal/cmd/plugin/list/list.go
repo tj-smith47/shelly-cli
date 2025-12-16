@@ -108,7 +108,9 @@ func run(f *cmdutil.Factory, all bool) error {
 		table.AddRow(ext.Name, version, source, ext.Path)
 	}
 
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print extension list table", err)
+	}
 	ios.Println()
 	ios.Count("extension", len(extensionList))
 

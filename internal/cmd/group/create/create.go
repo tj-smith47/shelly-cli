@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the group create command.
@@ -30,21 +29,22 @@ Group names must be unique and cannot contain spaces or special characters.`,
   shelly grp create office`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0])
+			return run(f, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(name string) error {
-	err := config.CreateGroup(name)
-	if err != nil {
+func run(f *cmdutil.Factory, name string) error {
+	ios := f.IOStreams()
+
+	if err := config.CreateGroup(name); err != nil {
 		return fmt.Errorf("failed to create group: %w", err)
 	}
 
-	iostreams.Success("Group %q created", name)
-	iostreams.Info("Add devices with: shelly group add %s <device>...", name)
+	ios.Success("Group %q created", name)
+	ios.Info("Add devices with: shelly group add %s <device>...", name)
 
 	return nil
 }

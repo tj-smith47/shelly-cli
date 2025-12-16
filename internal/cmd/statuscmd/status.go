@@ -117,7 +117,9 @@ func showDeviceStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly
 	for _, cs := range componentStates {
 		table.AddRow(cs.Name, cs.State)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print component status table", err)
+	}
 
 	return nil
 }
@@ -262,7 +264,9 @@ func showAllDevicesStatus(ctx context.Context, ios *iostreams.IOStreams, svc *sh
 	for _, ds := range statuses {
 		table.AddRow(ds.Name, ds.Model, ds.Status)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print devices status table", err)
+	}
 
 	return nil
 }

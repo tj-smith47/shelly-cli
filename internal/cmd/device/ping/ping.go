@@ -10,7 +10,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the device ping command.
@@ -42,27 +41,28 @@ This is useful for verifying network connectivity and device availability.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+	ios := f.IOStreams()
+
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	svc := f.ShellyService()
 
 	start := time.Now()
-	spin := iostreams.NewSpinner("Pinging device...")
-	spin.Start()
+	ios.StartProgress("Pinging device...")
 
 	info, err := svc.DevicePing(ctx, device)
 	elapsed := time.Since(start)
-	spin.Stop()
+	ios.StopProgress()
 
 	if err != nil {
-		iostreams.Error("Device %s is not reachable", device)
+		ios.Error("Device %s is not reachable", device)
 		return fmt.Errorf("ping failed: %w", err)
 	}
 
-	iostreams.Success("Device %s is online", info.ID)
-	iostreams.Info("  Model: %s (Gen%d)", info.Model, info.Generation)
-	iostreams.Info("  Response time: %v", elapsed.Round(time.Millisecond))
+	ios.Success("Device %s is online", info.ID)
+	ios.Info("  Model: %s (Gen%d)", info.Model, info.Generation)
+	ios.Info("  Response time: %v", elapsed.Round(time.Millisecond))
 
 	return nil
 }

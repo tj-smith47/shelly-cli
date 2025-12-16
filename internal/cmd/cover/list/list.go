@@ -111,5 +111,7 @@ func displayList(ios *iostreams.IOStreams, covers []shelly.CoverInfo) {
 
 		t.AddRow(fmt.Sprintf("%d", cover.ID), name, state, position, power)
 	}
-	t.Print()
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }

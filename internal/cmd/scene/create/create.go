@@ -6,7 +6,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the scene create command.
@@ -34,7 +33,7 @@ or import an existing scene definition from a file.`,
   shelly sc create morning-routine`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(args[0], description)
+			return run(f, args[0], description)
 		},
 	}
 
@@ -43,14 +42,15 @@ or import an existing scene definition from a file.`,
 	return cmd
 }
 
-func run(name, description string) error {
-	err := config.CreateScene(name, description)
-	if err != nil {
+func run(f *cmdutil.Factory, name, description string) error {
+	ios := f.IOStreams()
+
+	if err := config.CreateScene(name, description); err != nil {
 		return err
 	}
 
-	iostreams.Success("Scene %q created", name)
-	iostreams.Info("Add actions with: shelly scene add-action %s <device> <method> [params]", name)
+	ios.Success("Scene %q created", name)
+	ios.Info("Add actions with: shelly scene add-action %s <device> <method> [params]", name)
 
 	return nil
 }

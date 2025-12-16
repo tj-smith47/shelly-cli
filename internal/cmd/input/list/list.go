@@ -102,7 +102,9 @@ func displayList(ios *iostreams.IOStreams, inputs []shelly.InputInfo) {
 		)
 	}
 
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 	ios.Println()
 	ios.Count("input", len(inputs))
 }

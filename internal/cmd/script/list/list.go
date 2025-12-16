@@ -62,8 +62,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, device,
+	return cmdutil.RunList(ctx, ios, svc, device,
 		"Getting scripts...",
+		"scripts",
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.ScriptInfo, error) {
 			return svc.ListScripts(ctx, device)
 		},
@@ -71,11 +72,6 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 }
 
 func displayScripts(ios *iostreams.IOStreams, scripts []shelly.ScriptInfo) {
-	if len(scripts) == 0 {
-		ios.Info("No scripts found on this device")
-		return
-	}
-
 	table := output.NewTable("ID", "Name", "Enabled", "Running")
 	for _, s := range scripts {
 		name := s.Name

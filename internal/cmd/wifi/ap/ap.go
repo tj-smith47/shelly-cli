@@ -122,7 +122,9 @@ func displayClients(ios *iostreams.IOStreams, clients []shelly.WiFiAPClient) {
 		}
 		table.AddRow(c.MAC, ip)
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print wifi ap clients table", err)
+	}
 
 	ios.Printf("\n%d client(s) connected\n", len(clients))
 }

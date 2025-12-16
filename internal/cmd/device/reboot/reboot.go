@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // NewCommand creates the device reboot command.
@@ -44,15 +43,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, delay int, yes bool) error {
-	if !yes {
-		confirmed, err := iostreams.Confirm(fmt.Sprintf("Reboot device %q?", device), false)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			iostreams.Info("Cancelled")
-			return nil
-		}
+	ios := f.IOStreams()
+
+	confirmed, err := f.ConfirmAction(fmt.Sprintf("Reboot device %q?", device), yes)
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		ios.Info("Cancelled")
+		return nil
 	}
 
 	ctx, cancel := f.WithDefaultTimeout(ctx)
@@ -60,16 +59,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, delay int, yes 
 
 	svc := f.ShellyService()
 
-	spin := iostreams.NewSpinner("Rebooting device...")
-	spin.Start()
+	ios.StartProgress("Rebooting device...")
 
-	err := svc.DeviceReboot(ctx, device, delay)
-	spin.Stop()
+	err = svc.DeviceReboot(ctx, device, delay)
+	ios.StopProgress()
 
 	if err != nil {
 		return fmt.Errorf("failed to reboot device: %w", err)
 	}
 
-	iostreams.Success("Device %q rebooting", device)
+	ios.Success("Device %q rebooting", device)
 	return nil
 }

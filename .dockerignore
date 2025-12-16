@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+shelly
+*.exe
+
+# Test files
+*_test.go
+testdata/
+coverage.out
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Examples and configs
+examples/
+cfg/
+.claude/
+assets/
+
+# CI/CD
+.github/
+.goreleaser.yaml
+
+# Misc
+.DS_Store
+Thumbs.db

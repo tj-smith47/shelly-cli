@@ -71,14 +71,17 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("template %q not found", opts.Template)
 	}
 
-	// Warn about model compatibility
+	// Warn about model/generation compatibility
 	info, err := svc.GetDeviceInfo(ctx, opts.Device)
 	if err != nil {
 		return fmt.Errorf("failed to get device info: %w", err)
 	}
 
-	if info.Model != tpl.Model {
+	if !config.IsCompatibleModel(tpl, info.Model) {
 		ios.Warning("Template was created for %s but device is %s", tpl.Model, info.Model)
+	}
+	if !config.IsCompatibleGeneration(tpl, info.Generation) {
+		ios.Warning("Template was created for Gen%d but device is Gen%d", tpl.Generation, info.Generation)
 	}
 
 	if opts.DryRun {

@@ -1,13 +1,23 @@
+<div align="center">
+
 # Shelly CLI
 
 [![CI](https://github.com/tj-smith47/shelly-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/tj-smith47/shelly-cli/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/tj-smith47/shelly-cli/badges/docs.json)](https://github.com/tj-smith47/shelly-cli/actions/workflows/docs.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/tj-smith47/shelly-cli/badges/coverage.json)](https://github.com/tj-smith47/shelly-cli/actions)
+<!-- [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/tj-smith47/shelly-cli/badges/coverage.json)](https://github.com/tj-smith47/shelly-cli/actions) -->
 [![Go Reference](https://pkg.go.dev/badge/github.com/tj-smith47/shelly-cli.svg)](https://pkg.go.dev/github.com/tj-smith47/shelly-cli)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tj-smith47/shelly-cli)](https://goreportcard.com/report/github.com/tj-smith47/shelly-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A powerful, intuitive command-line interface for managing Shelly smart home devices.
+
+[Installation](#installation) •
+[Quick Start](#quick-start) •
+[Documentation](#documentation) •
+[Examples](examples/) •
+[Contributing](CONTRIBUTING.md)
+
+</div>
 
 ## Features
 
@@ -40,6 +50,19 @@ brew install tj-smith47/tap/shelly
 
 ```bash
 go install github.com/tj-smith47/shelly-cli/cmd/shelly@latest
+```
+
+### Docker
+
+```bash
+# Pull the image
+docker pull ghcr.io/tj-smith47/shelly-cli:latest
+
+# Run a command
+docker run --rm ghcr.io/tj-smith47/shelly-cli:latest device list
+
+# With config mount
+docker run --rm -v ~/.config/shelly:/home/shelly/.config/shelly ghcr.io/tj-smith47/shelly-cli:latest status kitchen
 ```
 
 ### Download Binary
@@ -491,11 +514,24 @@ The `examples/` directory contains ready-to-use configurations and scripts:
 
 ## Documentation
 
+### Guides
 - [Configuration Reference](docs/configuration.md) - Complete configuration options
 - [Plugin Development](docs/plugins.md) - Create custom plugins
 - [Theme Customization](docs/themes.md) - Theme system details
+
+### Reference
+- [Command Reference](docs/commands/) - Auto-generated docs for all 347 commands
+- [Man Pages](docs/man/) - Unix manual pages
 - [Architecture](docs/architecture.md) - Development patterns
-- [Testing](docs/testing.md) - Testing strategy
+- [Dependencies](docs/dependencies.md) - Library dependencies
+- [Testing Strategy](docs/testing.md) - Test coverage approach
+
+### Examples
+- [Example Configurations](examples/config/) - Ready-to-use config files
+- [Example Aliases](examples/aliases/) - Pre-built command shortcuts
+- [Example Scripts](examples/scripts/) - Automation shell scripts
+- [Example Plugins](examples/plugins/) - Plugin implementation examples
+- [Deployment Examples](examples/deployments/) - Docker, Kubernetes, Prometheus
 
 ## Contributing
 
@@ -520,6 +556,20 @@ go test ./...
 # Lint
 golangci-lint run ./...
 ```
+
+## Support & Feedback
+
+Found a bug? Have a feature request? Use the built-in feedback command:
+
+```bash
+# Submit feedback (opens GitHub issue form)
+shelly feedback
+
+# Run diagnostics for bug reports
+shelly doctor
+```
+
+You can also [open an issue directly](https://github.com/tj-smith47/shelly-cli/issues) on GitHub.
 
 ## License
 

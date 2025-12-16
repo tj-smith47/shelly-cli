@@ -105,5 +105,7 @@ func displayList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
 
 		t.AddRow(fmt.Sprintf("%d", rgb.ID), name, state, color, brightness, power)
 	}
-	t.Print()
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }

@@ -282,10 +282,10 @@ func WantsTable() bool {
 	return GetFormat() == FormatTable
 }
 
-// WantsStructured returns true if the output format is JSON or YAML.
+// WantsStructured returns true if the output format needs raw data (JSON, YAML, or template).
 func WantsStructured() bool {
 	format := GetFormat()
-	return format == FormatJSON || format == FormatYAML
+	return format == FormatJSON || format == FormatYAML || format == FormatTemplate
 }
 
 // FormatOutput prints data in the configured output format.

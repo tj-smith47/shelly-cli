@@ -104,6 +104,21 @@ var rootCmd = &cobra.Command{
 
 This tool provides a comprehensive interface for discovering, monitoring,
 and controlling Shelly devices on your local network.`,
+	Example: `  # Initialize configuration
+  shelly init
+
+  # Discover and control devices
+  shelly discover scan
+  shelly switch on kitchen
+
+  # Pipe output to jq for processing
+  shelly device list -o json | jq '.[].name'
+
+  # Pipe device names to batch commands
+  echo -e "kitchen\nbedroom" | shelly batch on
+
+  # Launch interactive dashboard
+  shelly dash`,
 	// Disable Cobra's auto-generated completion to use our own with install subcommand
 	CompletionOptions: cobra.CompletionOptions{
 		DisableDefaultCmd: true,
@@ -220,20 +235,14 @@ func expandAlias(args []string) (expandedArgs []string, isShell bool) {
 		return args, false
 	}
 
-	// Load config to check for aliases (config may not be loaded yet)
-	cfg := config.Get()
-	if cfg == nil {
-		return args, false
-	}
-
 	// Check if first arg is an alias
-	aliasObj := cfg.GetAlias(args[0])
-	if aliasObj == nil {
+	aliasObj, ok := config.GetAlias(args[0])
+	if !ok {
 		return args, false
 	}
 
 	// Expand the alias with remaining arguments
-	expanded := config.ExpandAlias(*aliasObj, args[1:])
+	expanded := config.ExpandAlias(aliasObj, args[1:])
 
 	if aliasObj.Shell {
 		return []string{expanded}, true

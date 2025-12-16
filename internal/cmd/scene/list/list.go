@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -17,92 +16,39 @@ import (
 
 // NewCommand creates the scene list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List saved scenes",
-		Long: `List all saved scenes with their action counts and descriptions.
-
-Scenes are collections of device actions that can be executed together.
-Each scene contains one or more actions targeting specific devices.
-
-Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.
-
-Columns: Name, Actions (count), Description`,
-		Example: `  # List all scenes
-  shelly scene list
-
-  # Output as JSON
-  shelly scene list -o json
-
-  # Output as YAML for backup
-  shelly scene list -o yaml > scenes-backup.yaml
-
-  # Get scene names only
-  shelly scene list -o json | jq -r '.[].name'
-
-  # Find scenes with no actions
-  shelly scene list -o json | jq '.[] | select(.actions | length == 0)'
-
-  # Count total actions across all scenes
-  shelly scene list -o json | jq '[.[].actions | length] | add'
-
-  # Short form
-  shelly scene ls`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd)
+	return cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[config.Scene]{
+		Resource: "scene",
+		FetchFunc: func() []config.Scene {
+			scenes := config.ListScenes()
+			result := make([]config.Scene, 0, len(scenes))
+			for _, scene := range scenes {
+				result = append(result, scene)
+			}
+			sort.Slice(result, func(i, j int) bool {
+				return result[i].Name < result[j].Name
+			})
+			return result
 		},
-	}
-
-	return cmd
-}
-
-func run(cmd *cobra.Command) error {
-	scenes := config.ListScenes()
-
-	if len(scenes) == 0 {
-		iostreams.NoResults("scenes")
-		return nil
-	}
-
-	return outputList(cmd, scenes)
-}
-
-func outputList(cmd *cobra.Command, scenes map[string]config.Scene) error {
-	// Convert to slice for consistent ordering
-	sceneList := make([]config.Scene, 0, len(scenes))
-	for _, scene := range scenes {
-		sceneList = append(sceneList, scene)
-	}
-	sort.Slice(sceneList, func(i, j int) bool {
-		return sceneList[i].Name < sceneList[j].Name
+		DisplayFunc: displayScenes,
 	})
-
-	switch viper.GetString("output") {
-	case string(output.FormatJSON):
-		return output.JSON(cmd.OutOrStdout(), sceneList)
-	case string(output.FormatYAML):
-		return output.YAML(cmd.OutOrStdout(), sceneList)
-	default:
-		printTable(sceneList)
-		return nil
-	}
 }
 
-func printTable(scenes []config.Scene) {
-	t := output.NewTable("Name", "Actions", "Description")
+func displayScenes(ios *iostreams.IOStreams, scenes []config.Scene) {
+	table := output.NewTable("Name", "Actions", "Description")
 	for _, scene := range scenes {
 		actions := formatActionCount(len(scene.Actions))
 		description := scene.Description
 		if description == "" {
 			description = "-"
 		}
-		t.AddRow(scene.Name, actions, description)
+		table.AddRow(scene.Name, actions, description)
 	}
-	t.Print()
-	iostreams.Plain("")
-	iostreams.Count("scene", len(scenes))
+
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+	ios.Println()
+	ios.Count("scene", len(scenes))
 }
 
 func formatActionCount(count int) string {

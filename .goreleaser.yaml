@@ -73,6 +73,12 @@ release:
     go install github.com/tj-smith47/shelly-cli/cmd/shelly@v{{.Version}}
     ```
 
+    ### Docker
+    ```bash
+    docker pull ghcr.io/tj-smith47/shelly-cli:{{.Version}}
+    docker run --rm ghcr.io/tj-smith47/shelly-cli:{{.Version}} --help
+    ```
+
     ### Download Binary
     Download the appropriate binary for your platform from the assets below.
 
@@ -82,3 +88,81 @@ release:
 source:
   enabled: true
   name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+
+# =============================================================================
+# Docker Images (ghcr.io)
+# =============================================================================
+
+dockers:
+  # AMD64 image
+  - id: shelly-amd64
+    goos: linux
+    goarch: amd64
+    image_templates:
+      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-amd64"
+      - "ghcr.io/tj-smith47/shelly-cli:latest-amd64"
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=COMMIT={{.Commit}}"
+      - "--build-arg=DATE={{.Date}}"
+    use: buildx
+
+  # ARM64 image
+  - id: shelly-arm64
+    goos: linux
+    goarch: arm64
+    image_templates:
+      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-arm64"
+      - "ghcr.io/tj-smith47/shelly-cli:latest-arm64"
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--build-arg=VERSION={{.Version}}"
+      - "--build-arg=COMMIT={{.Commit}}"
+      - "--build-arg=DATE={{.Date}}"
+    use: buildx
+
+# Multi-arch manifest
+docker_manifests:
+  - name_template: "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-amd64"
+      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/tj-smith47/shelly-cli:latest"
+    image_templates:
+      - "ghcr.io/tj-smith47/shelly-cli:latest-amd64"
+      - "ghcr.io/tj-smith47/shelly-cli:latest-arm64"
+
+# =============================================================================
+# Homebrew Tap
+# =============================================================================
+
+brews:
+  - name: shelly
+    repository:
+      owner: tj-smith47
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/tj-smith47/shelly-cli"
+    description: "Command-line interface for Shelly smart home devices"
+    license: "MIT"
+    install: |
+      bin.install "shelly"
+
+      # Install shell completions
+      generate_completions_from_executable(bin/"shelly", "completion")
+    test: |
+      system "#{bin}/shelly", "--version"
+    dependencies:
+      - name: go
+        type: build

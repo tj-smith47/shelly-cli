@@ -44,11 +44,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	// Resolve device to get its address
 	addr := f.ResolveAddress(device)
 
-	url := fmt.Sprintf("http://%s", addr)
+	ios.Info("Opening http://%s in browser...", addr)
 
-	ios.Info("Opening %s in browser...", url)
-
-	if err := f.Browser().Browse(ctx, url); err != nil {
+	if err := f.Browser().OpenDeviceUI(ctx, addr); err != nil {
 		return fmt.Errorf("failed to open browser: %w", err)
 	}
 

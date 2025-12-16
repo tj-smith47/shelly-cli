@@ -62,7 +62,9 @@ func displayStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) {
 	for key, value := range status.Status {
 		table.AddRow(key, formatValue(value))
 	}
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print device status table", err)
+	}
 }
 
 func formatValue(v any) string {

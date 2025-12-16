@@ -11,68 +11,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
-var yesFlag bool
-
 // NewCommand creates the group delete command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete <name>",
-		Aliases: []string{"rm", "del"},
-		Short:   "Delete a device group",
-		Long: `Delete a device group.
-
-This only removes the group definition, not the devices themselves.`,
-		Example: `  # Delete a group (with confirmation)
-  shelly group delete living-room
-
-  # Delete without confirmation
-  shelly group delete living-room --yes
-
-  # Using alias
-  shelly group rm bedroom
-
-  # Short form
-  shelly grp del office`,
-		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completion.GroupNames(),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0])
+	return cmdutil.NewConfigDeleteCommand(f, cmdutil.ConfigDeleteOpts{
+		Resource:      "group",
+		ValidArgsFunc: completion.GroupNames(),
+		ExistsFunc: func(name string) (any, bool) {
+			return config.GetGroup(name)
 		},
-	}
-
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
-
-	return cmd
-}
-
-func run(f *cmdutil.Factory, name string) error {
-	ios := f.IOStreams()
-
-	// Check if group exists
-	group := f.GetGroup(name)
-	if group == nil {
-		return fmt.Errorf("group %q not found", name)
-	}
-
-	// Confirm unless --yes is specified
-	msg := fmt.Sprintf("Delete group %q?", name)
-	if len(group.Devices) > 0 {
-		msg = fmt.Sprintf("Delete group %q with %d device(s)?", name, len(group.Devices))
-	}
-	confirmed, err := f.ConfirmAction(msg, yesFlag)
-	if err != nil {
-		return fmt.Errorf("confirmation failed: %w", err)
-	}
-	if !confirmed {
-		ios.Info("Deletion cancelled")
-		return nil
-	}
-
-	if err := config.DeleteGroup(name); err != nil {
-		return fmt.Errorf("failed to delete group: %w", err)
-	}
-
-	ios.Success("Group %q deleted", name)
-
-	return nil
+		DeleteFunc: config.DeleteGroup,
+		InfoFunc: func(resource any, name string) string {
+			group, ok := resource.(config.Group)
+			if !ok || len(group.Devices) == 0 {
+				return fmt.Sprintf("Delete group %q?", name)
+			}
+			return fmt.Sprintf("Delete group %q with %d device(s)?", name, len(group.Devices))
+		},
+	})
 }

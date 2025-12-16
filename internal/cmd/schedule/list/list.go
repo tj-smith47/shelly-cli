@@ -66,8 +66,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, device,
+	return cmdutil.RunList(ctx, ios, svc, device,
 		"Getting schedules...",
+		"schedules",
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.ScheduleJob, error) {
 			return svc.ListSchedules(ctx, device)
 		},
@@ -75,11 +76,6 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 }
 
 func displaySchedules(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) {
-	if len(schedules) == 0 {
-		ios.Info("No schedules found on this device")
-		return
-	}
-
 	table := output.NewTable("ID", "Enabled", "Timespec", "Calls")
 	for _, s := range schedules {
 		enabled := theme.Dim().Render("no")

@@ -184,20 +184,3 @@ func TestPrintTableTo(t *testing.T) {
 		t.Error("PrintTableTo() produced no output")
 	}
 }
-
-func TestPrintTableToWriter(t *testing.T) {
-	t.Parallel()
-
-	table := NewTable("X")
-	table.AddRow("Y")
-
-	var buf bytes.Buffer
-	err := PrintTableToWriter(&buf, table)
-	if err != nil {
-		t.Fatalf("PrintTableToWriter() error: %v", err)
-	}
-
-	if buf.Len() == 0 {
-		t.Error("PrintTableToWriter() produced no output")
-	}
-}
