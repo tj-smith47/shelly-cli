@@ -8,121 +8,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-// RegisterDevice adds a device to the registry.
-func RegisterDevice(name, address string, generation int, deviceType, deviceModel string, auth *model.Auth) error {
-	if err := ValidateDeviceName(name); err != nil {
-		return err
-	}
-
-	c := Get()
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	c.Devices[name] = model.Device{
-		Name:       name,
-		Address:    address,
-		Generation: generation,
-		Type:       deviceType,
-		Model:      deviceModel,
-		Auth:       auth,
-	}
-
-	return saveWithoutLock()
-}
-
-// UnregisterDevice removes a device from the registry.
-func UnregisterDevice(name string) error {
-	c := Get()
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	if _, ok := c.Devices[name]; !ok {
-		return fmt.Errorf("device %q not found", name)
-	}
-	delete(c.Devices, name)
-
-	// Also remove from any groups
-	for groupName, group := range c.Groups {
-		newDevices := make([]string, 0, len(group.Devices))
-		for _, d := range group.Devices {
-			if d != name {
-				newDevices = append(newDevices, d)
-			}
-		}
-		if len(newDevices) != len(group.Devices) {
-			group.Devices = newDevices
-			c.Groups[groupName] = group
-		}
-	}
-
-	return saveWithoutLock()
-}
-
-// GetDevice returns a device by name.
-func GetDevice(name string) (model.Device, bool) {
-	c := Get()
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-
-	device, ok := c.Devices[name]
-	return device, ok
-}
-
-// ListDevices returns all registered devices.
-func ListDevices() map[string]model.Device {
-	c := Get()
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-
-	// Return a copy to avoid race conditions
-	result := make(map[string]model.Device, len(c.Devices))
-	for k, v := range c.Devices {
-		result[k] = v
-	}
-	return result
-}
-
-// RenameDevice renames a device.
-func RenameDevice(oldName, newName string) error {
-	if err := ValidateDeviceName(newName); err != nil {
-		return err
-	}
-
-	c := Get()
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	device, ok := c.Devices[oldName]
-	if !ok {
-		return fmt.Errorf("device %q not found", oldName)
-	}
-
-	if _, exists := c.Devices[newName]; exists {
-		return fmt.Errorf("device %q already exists", newName)
-	}
-
-	// Update device
-	device.Name = newName
-	delete(c.Devices, oldName)
-	c.Devices[newName] = device
-
-	// Update group references
-	for groupName, group := range c.Groups {
-		for i, d := range group.Devices {
-			if d == oldName {
-				group.Devices[i] = newName
-				c.Groups[groupName] = group
-				break
-			}
-		}
-	}
-
-	return saveWithoutLock()
-}
-
 // ValidateDeviceName checks if a device name is valid.
 func ValidateDeviceName(name string) error {
 	if name == "" {
@@ -134,142 +19,6 @@ func ValidateDeviceName(name string) error {
 	}
 
 	return nil
-}
-
-// ResolveDevice resolves a device identifier to a Device.
-// The identifier can be a device name (from registry) or an address.
-func ResolveDevice(identifier string) (model.Device, error) {
-	// First, check if it's a registered device name
-	if device, ok := GetDevice(identifier); ok {
-		return device, nil
-	}
-
-	// Otherwise, treat it as an address
-	return model.Device{
-		Name:    identifier,
-		Address: identifier,
-	}, nil
-}
-
-// CreateGroup creates a new device group.
-func CreateGroup(name string) error {
-	if err := ValidateGroupName(name); err != nil {
-		return err
-	}
-
-	c := Get()
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	if _, exists := c.Groups[name]; exists {
-		return fmt.Errorf("group %q already exists", name)
-	}
-
-	c.Groups[name] = Group{
-		Name:    name,
-		Devices: []string{},
-	}
-
-	return saveWithoutLock()
-}
-
-// DeleteGroup deletes a device group.
-func DeleteGroup(name string) error {
-	c := Get()
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	if _, ok := c.Groups[name]; !ok {
-		return fmt.Errorf("group %q not found", name)
-	}
-	delete(c.Groups, name)
-
-	return saveWithoutLock()
-}
-
-// GetGroup returns a group by name.
-func GetGroup(name string) (Group, bool) {
-	c := Get()
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-
-	group, ok := c.Groups[name]
-	return group, ok
-}
-
-// ListGroups returns all groups.
-func ListGroups() map[string]Group {
-	c := Get()
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-
-	result := make(map[string]Group, len(c.Groups))
-	for k, v := range c.Groups {
-		result[k] = v
-	}
-	return result
-}
-
-// AddDeviceToGroup adds a device to a group.
-func AddDeviceToGroup(groupName, deviceName string) error {
-	c := Get()
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	group, ok := c.Groups[groupName]
-	if !ok {
-		return fmt.Errorf("group %q not found", groupName)
-	}
-
-	// Note: We allow adding unregistered devices (by address) to groups.
-	// This provides flexibility for ad-hoc grouping.
-
-	// Check if already in group
-	for _, d := range group.Devices {
-		if d == deviceName {
-			return fmt.Errorf("device %q already in group %q", deviceName, groupName)
-		}
-	}
-
-	group.Devices = append(group.Devices, deviceName)
-	c.Groups[groupName] = group
-
-	return saveWithoutLock()
-}
-
-// RemoveDeviceFromGroup removes a device from a group.
-func RemoveDeviceFromGroup(groupName, deviceName string) error {
-	c := Get()
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	group, ok := c.Groups[groupName]
-	if !ok {
-		return fmt.Errorf("group %q not found", groupName)
-	}
-
-	found := false
-	newDevices := make([]string, 0, len(group.Devices))
-	for _, d := range group.Devices {
-		if d == deviceName {
-			found = true
-		} else {
-			newDevices = append(newDevices, d)
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("device %q not in group %q", deviceName, groupName)
-	}
-
-	group.Devices = newDevices
-	c.Groups[groupName] = group
-
-	return saveWithoutLock()
 }
 
 // ValidateGroupName checks if a group name is valid.
@@ -285,21 +34,69 @@ func ValidateGroupName(name string) error {
 	return nil
 }
 
+// Package-level functions delegate to the default manager.
+
+// RegisterDevice adds a device to the registry.
+func RegisterDevice(name, address string, generation int, deviceType, deviceModel string, auth *model.Auth) error {
+	return getDefaultManager().RegisterDevice(name, address, generation, deviceType, deviceModel, auth)
+}
+
+// UnregisterDevice removes a device from the registry.
+func UnregisterDevice(name string) error {
+	return getDefaultManager().UnregisterDevice(name)
+}
+
+// GetDevice returns a device by name.
+func GetDevice(name string) (model.Device, bool) {
+	return getDefaultManager().GetDevice(name)
+}
+
+// ListDevices returns all registered devices.
+func ListDevices() map[string]model.Device {
+	return getDefaultManager().ListDevices()
+}
+
+// RenameDevice renames a device.
+func RenameDevice(oldName, newName string) error {
+	return getDefaultManager().RenameDevice(oldName, newName)
+}
+
+// ResolveDevice resolves a device identifier to a Device.
+func ResolveDevice(identifier string) (model.Device, error) {
+	return getDefaultManager().ResolveDevice(identifier)
+}
+
+// CreateGroup creates a new device group.
+func CreateGroup(name string) error {
+	return getDefaultManager().CreateGroup(name)
+}
+
+// DeleteGroup deletes a device group.
+func DeleteGroup(name string) error {
+	return getDefaultManager().DeleteGroup(name)
+}
+
+// GetGroup returns a group by name.
+func GetGroup(name string) (Group, bool) {
+	return getDefaultManager().GetGroup(name)
+}
+
+// ListGroups returns all groups.
+func ListGroups() map[string]Group {
+	return getDefaultManager().ListGroups()
+}
+
+// AddDeviceToGroup adds a device to a group.
+func AddDeviceToGroup(groupName, deviceName string) error {
+	return getDefaultManager().AddDeviceToGroup(groupName, deviceName)
+}
+
+// RemoveDeviceFromGroup removes a device from a group.
+func RemoveDeviceFromGroup(groupName, deviceName string) error {
+	return getDefaultManager().RemoveDeviceFromGroup(groupName, deviceName)
+}
+
 // GetGroupDevices returns all devices in a group as Device structs.
 func GetGroupDevices(groupName string) ([]model.Device, error) {
-	group, ok := GetGroup(groupName)
-	if !ok {
-		return nil, fmt.Errorf("group %q not found", groupName)
-	}
-
-	devices := make([]model.Device, 0, len(group.Devices))
-	for _, name := range group.Devices {
-		device, err := ResolveDevice(name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve device %q: %w", name, err)
-		}
-		devices = append(devices, device)
-	}
-
-	return devices, nil
+	return getDefaultManager().GetGroupDevices(groupName)
 }

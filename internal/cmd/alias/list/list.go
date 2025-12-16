@@ -12,67 +12,15 @@ import (
 
 // NewCommand creates the alias list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls", "l"},
-		Short:   "List all command aliases",
-		Long: `Display all configured command aliases with their expansion.
-
-Aliases are shortcuts that expand to longer commands. They can be either
-command aliases (expand to shelly subcommands) or shell aliases (expand
-to shell commands for more complex operations).
-
-Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.
-
-Columns: Name, Command, Type (command/shell)`,
-		Example: `  # List all aliases
-  shelly alias list
-
-  # Output as JSON
-  shelly alias list -o json
-
-  # Get names of shell aliases
-  shelly alias list -o json | jq -r '.[] | select(.shell) | .name'
-
-  # Export aliases to backup file
-  shelly alias list -o yaml > aliases-backup.yaml
-
-  # Short form
-  shelly alias ls`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f)
-		},
-	}
-
-	return cmd
+	return cmdutil.NewConfigListCommand(f, cmdutil.ConfigListOpts[config.Alias]{
+		Resource:    "alias",
+		FetchFunc:   config.ListAliasesSorted,
+		DisplayFunc: displayAliases,
+		HintMsg:     "Use 'shelly alias set <name> <command>' to create one.",
+	})
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
-	cfg, err := f.Config()
-	if err != nil {
-		return err
-	}
-
-	aliases := cfg.ListAliases()
-
-	if len(aliases) == 0 {
-		ios.Info("No aliases configured. Use 'shelly alias set <name> <command>' to create one.")
-		return nil
-	}
-
-	// Handle JSON/YAML output
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, aliases)
-	}
-
-	// Table output
-	printTable(ios, aliases)
-	return nil
-}
-
-func printTable(ios *iostreams.IOStreams, aliases []config.Alias) {
+func displayAliases(ios *iostreams.IOStreams, aliases []config.Alias) {
 	table := output.NewTable("Name", "Command", "Type")
 
 	for _, alias := range aliases {
@@ -83,7 +31,9 @@ func printTable(ios *iostreams.IOStreams, aliases []config.Alias) {
 		table.AddRow(alias.Name, alias.Command, aliasType)
 	}
 
-	table.Print()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 	ios.Println()
 	ios.Count("alias", len(aliases))
 }

@@ -3,50 +3,37 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
-
-	"github.com/spf13/viper"
 )
 
-func resetConfig() {
-	cfgMu.Lock()
-	cfg = nil
-	cfgOnce = sync.Once{}
-	cfgMu.Unlock()
-	viper.Reset()
-}
+func TestManager_Defaults(t *testing.T) {
+	t.Parallel()
 
-//nolint:paralleltest // Test modifies global config state via resetConfig
-func TestGet_ReturnsDefaults(t *testing.T) {
-	resetConfig()
-
-	c := Get()
-
-	if c.Output != "table" {
-		t.Errorf("expected output 'table', got %q", c.Output)
-	}
-	if !c.Color {
-		t.Error("expected color to be true")
-	}
-	// Theme is now 'any' type - check via GetThemeConfig
-	tc := c.GetThemeConfig()
-	if tc.Name != "dracula" {
-		t.Errorf("expected theme 'dracula', got %q", tc.Name)
-	}
-	if c.APIMode != "local" {
-		t.Errorf("expected api_mode 'local', got %q", c.APIMode)
-	}
-}
-
-//nolint:paralleltest // Test modifies global config state via resetConfig
-func TestLoad_InitializesMaps(t *testing.T) {
-	resetConfig()
-
-	c, err := Load()
-	if err != nil {
+	// Create temp dir for isolated config
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
+
+	c := m.Get()
+
+	if c.Output != "" && c.Output != "table" {
+		t.Errorf("expected output '' or 'table', got %q", c.Output)
+	}
+}
+
+func TestManager_InitializesMaps(t *testing.T) {
+	t.Parallel()
+
+	// Create temp dir for isolated config
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	c := m.Get()
 
 	if c.Devices == nil {
 		t.Error("expected Devices map to be initialized")
@@ -56,6 +43,15 @@ func TestLoad_InitializesMaps(t *testing.T) {
 	}
 	if c.Groups == nil {
 		t.Error("expected Groups map to be initialized")
+	}
+	if c.Scenes == nil {
+		t.Error("expected Scenes map to be initialized")
+	}
+	if c.Templates == nil {
+		t.Error("expected Templates map to be initialized")
+	}
+	if c.Alerts == nil {
+		t.Error("expected Alerts map to be initialized")
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -182,16 +181,37 @@ type PluginsConfig struct {
 }
 
 var (
-	cfg     *Config
-	cfgOnce sync.Once
-	cfgMu   sync.RWMutex
+	defaultManager     *Manager
+	defaultManagerOnce sync.Once
 )
 
-// Get returns the current configuration.
-func Get() *Config {
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
+// getDefaultManager returns the package-level default manager.
+// This is used for backward compatibility with package-level functions.
+func getDefaultManager() *Manager {
+	defaultManagerOnce.Do(func() {
+		defaultManager = NewManager("")
+		if err := defaultManager.Load(); err != nil {
+			// Load failure is not fatal - Get() will return nil and we handle that
+			// This can happen if config file is missing or unreadable
+			defaultManager.config = &Config{
+				Devices:   make(map[string]model.Device),
+				Aliases:   make(map[string]Alias),
+				Groups:    make(map[string]Group),
+				Scenes:    make(map[string]Scene),
+				Templates: make(map[string]Template),
+				Alerts:    make(map[string]Alert),
+			}
+			defaultManager.loaded = true
+		}
+	})
+	return defaultManager
+}
 
+// Get returns the current configuration.
+// For mutations, use a Manager instance directly.
+func Get() *Config {
+	mgr := getDefaultManager()
+	cfg := mgr.Get()
 	if cfg == nil {
 		return &Config{
 			Output:    "table",
@@ -203,6 +223,7 @@ func Get() *Config {
 			Groups:    make(map[string]Group),
 			Scenes:    make(map[string]Scene),
 			Templates: make(map[string]Template),
+			Alerts:    make(map[string]Alert),
 		}
 	}
 	return cfg
@@ -261,52 +282,23 @@ var DefaultAliases = map[string]Alias{
 }
 
 // Load reads configuration from file and environment.
+// This uses the default manager for backward compatibility.
 func Load() (*Config, error) {
-	var loadErr error
-
-	cfgOnce.Do(func() {
-		c := &Config{}
-		if err := viper.Unmarshal(c); err != nil {
-			loadErr = fmt.Errorf("failed to unmarshal config: %w", err)
-			return
-		}
-
-		// Initialize maps if nil
-		if c.Devices == nil {
-			c.Devices = make(map[string]model.Device)
-		}
-		if c.Aliases == nil {
-			c.Aliases = make(map[string]Alias)
-		}
-		if c.Groups == nil {
-			c.Groups = make(map[string]Group)
-		}
-		if c.Scenes == nil {
-			c.Scenes = make(map[string]Scene)
-		}
-		if c.Templates == nil {
-			c.Templates = make(map[string]Template)
-		}
-		if c.Alerts == nil {
-			c.Alerts = make(map[string]Alert)
-		}
-
-		cfgMu.Lock()
-		cfg = c
-		cfgMu.Unlock()
-	})
-
-	if loadErr != nil {
-		return nil, loadErr
+	mgr := getDefaultManager()
+	// Manager.Load() is safe to call multiple times
+	if err := mgr.Load(); err != nil {
+		return nil, err
 	}
-
-	return Get(), nil
+	return mgr.Get(), nil
 }
 
 // Reload forces a reload of the configuration.
 func Reload() (*Config, error) {
-	cfgOnce = sync.Once{} // Reset the once
-	return Load()
+	mgr := getDefaultManager()
+	if err := mgr.Reload(); err != nil {
+		return nil, err
+	}
+	return mgr.Get(), nil
 }
 
 // Save writes the current configuration to file (method version).
@@ -316,57 +308,7 @@ func (c *Config) Save() error {
 
 // Save writes the current configuration to file.
 func Save() error {
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	return saveWithoutLock()
-}
-
-// saveWithoutLock writes the current configuration to file.
-// Caller must hold cfgMu lock.
-func saveWithoutLock() error {
-	c := Get()
-
-	// Set all values in viper
-	viper.Set("output", c.Output)
-	viper.Set("color", c.Color)
-	viper.Set("theme", c.Theme)
-	viper.Set("api_mode", c.APIMode)
-	viper.Set("verbose", c.Verbose)
-	viper.Set("quiet", c.Quiet)
-	viper.Set("discovery", c.Discovery)
-	viper.Set("cloud", c.Cloud)
-	viper.Set("devices", c.Devices)
-	viper.Set("aliases", c.Aliases)
-	viper.Set("groups", c.Groups)
-	viper.Set("scenes", c.Scenes)
-	viper.Set("templates", c.Templates)
-	viper.Set("alerts", c.Alerts)
-	viper.Set("plugins", c.Plugins)
-	viper.Set("tui", c.TUI)
-
-	// Get config file path
-	configFile := viper.ConfigFileUsed()
-	if configFile == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
-		}
-		configFile = filepath.Join(home, ".config", "shelly", "config.yaml")
-	}
-
-	// Ensure directory exists
-	dir := filepath.Dir(configFile)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	// Write config
-	if err := viper.WriteConfigAs(configFile); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
-	}
-
-	return nil
+	return getDefaultManager().Save()
 }
 
 // Dir returns the configuration directory path.
@@ -389,35 +331,10 @@ func PluginsDir() (string, error) {
 
 // GetAllDeviceCredentials returns credentials for all devices that have auth configured.
 func (c *Config) GetAllDeviceCredentials() map[string]struct{ Username, Password string } {
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-
-	creds := make(map[string]struct{ Username, Password string })
-	for name, dev := range c.Devices {
-		if dev.Auth != nil && dev.Auth.Password != "" {
-			creds[name] = struct{ Username, Password string }{
-				Username: dev.Auth.Username,
-				Password: dev.Auth.Password,
-			}
-		}
-	}
-	return creds
+	return getDefaultManager().GetAllDeviceCredentials()
 }
 
 // SetDeviceAuth sets authentication credentials for a device.
 func (c *Config) SetDeviceAuth(deviceName, username, password string) error {
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	dev, ok := c.Devices[deviceName]
-	if !ok {
-		return fmt.Errorf("device %q not found", deviceName)
-	}
-
-	dev.Auth = &model.Auth{
-		Username: username,
-		Password: password,
-	}
-	c.Devices[deviceName] = dev
-	return nil
+	return getDefaultManager().SetDeviceAuth(deviceName, username, password)
 }

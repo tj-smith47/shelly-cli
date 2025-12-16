@@ -3,11 +3,7 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"sort"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 // ReservedCommands are built-in commands that cannot be aliased.
@@ -41,65 +37,6 @@ var ReservedCommands = map[string]bool{
 	"status":     true,
 	"reboot":     true,
 	"reset":      true,
-}
-
-// AddAlias adds or updates an alias.
-func (c *Config) AddAlias(name, command string, shell bool) error {
-	if err := ValidateAliasName(name); err != nil {
-		return err
-	}
-
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	if c.Aliases == nil {
-		c.Aliases = make(map[string]Alias)
-	}
-
-	c.Aliases[name] = Alias{
-		Name:    name,
-		Command: command,
-		Shell:   shell,
-	}
-
-	return nil
-}
-
-// RemoveAlias removes an alias by name.
-func (c *Config) RemoveAlias(name string) {
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	delete(c.Aliases, name)
-}
-
-// GetAlias returns an alias by name, or nil if not found.
-func (c *Config) GetAlias(name string) *Alias {
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-
-	if alias, ok := c.Aliases[name]; ok {
-		return &alias
-	}
-	return nil
-}
-
-// ListAliases returns all aliases sorted by name.
-func (c *Config) ListAliases() []Alias {
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-
-	result := make([]Alias, 0, len(c.Aliases))
-	for _, v := range c.Aliases {
-		result = append(result, v)
-	}
-
-	// Sort by name
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-
-	return result
 }
 
 // ValidateAliasName checks if an alias name is valid.
@@ -159,151 +96,49 @@ func ExpandAlias(alias Alias, args []string) string {
 	return cmd
 }
 
-// IsAlias checks if a command name is an alias.
-func (c *Config) IsAlias(name string) bool {
-	return c.GetAlias(name) != nil
-}
-
 // aliasFile represents the structure for import/export files.
 type aliasFile struct {
 	Aliases map[string]string `yaml:"aliases"`
 }
 
-// ImportAliases imports aliases from a YAML file.
-// Returns the number of imported aliases, skipped aliases, and any error.
-// If merge is true, existing aliases are not overwritten.
-func (c *Config) ImportAliases(filename string, merge bool) (imported, skipped int, err error) {
-	//nolint:gosec // G304: filename is user-provided intentionally (import command)
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to read file: %w", err)
-	}
+// Package-level functions delegate to the default manager.
 
-	var af aliasFile
-	if err := yaml.Unmarshal(data, &af); err != nil {
-		return 0, 0, fmt.Errorf("failed to parse file: %w", err)
-	}
-
-	// Validate all alias names before acquiring lock
-	for name := range af.Aliases {
-		if err := ValidateAliasName(name); err != nil {
-			return 0, 0, fmt.Errorf("invalid alias %q: %w", name, err)
-		}
-	}
-
-	// Lock once for all modifications
-	cfgMu.Lock()
-	defer cfgMu.Unlock()
-
-	if c.Aliases == nil {
-		c.Aliases = make(map[string]Alias)
-	}
-
-	for name, command := range af.Aliases {
-		// Check if alias exists and we're in merge mode
-		if merge {
-			if _, exists := c.Aliases[name]; exists {
-				skipped++
-				continue
-			}
-		}
-
-		// Detect shell aliases (prefixed with !)
-		shell := strings.HasPrefix(command, "!")
-		if shell {
-			command = strings.TrimPrefix(command, "!")
-		}
-
-		c.Aliases[name] = Alias{
-			Name:    name,
-			Command: command,
-			Shell:   shell,
-		}
-
-		imported++
-	}
-
-	return imported, skipped, nil
-}
-
-// ExportAliases exports all aliases to a YAML file.
-// If filename is empty, exports to stdout.
-func (c *Config) ExportAliases(filename string) error {
-	aliases := c.ListAliases()
-
-	af := aliasFile{
-		Aliases: make(map[string]string, len(aliases)),
-	}
-
-	for _, a := range aliases {
-		cmd := a.Command
-		if a.Shell {
-			cmd = "!" + cmd
-		}
-		af.Aliases[a.Name] = cmd
-	}
-
-	data, err := yaml.Marshal(&af)
-	if err != nil {
-		return fmt.Errorf("failed to marshal aliases: %w", err)
-	}
-
-	if filename == "" {
-		fmt.Print(string(data))
-		return nil
-	}
-
-	if err := os.WriteFile(filename, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
-	return nil
-}
-
-// Package-level functions for backward compatibility
-
-// AddAlias adds or updates an alias (package-level).
+// AddAlias adds or updates an alias.
 func AddAlias(name, command string, shell bool) error {
-	c := Get()
-	if err := c.AddAlias(name, command, shell); err != nil {
-		return err
-	}
-	return Save()
+	return getDefaultManager().AddAlias(name, command, shell)
 }
 
-// RemoveAlias removes an alias by name (package-level).
+// RemoveAlias removes an alias by name.
 func RemoveAlias(name string) error {
-	c := Get()
-	if c.GetAlias(name) == nil {
-		return fmt.Errorf("alias %q not found", name)
-	}
-	c.RemoveAlias(name)
-	return Save()
+	return getDefaultManager().RemoveAlias(name)
 }
 
-// GetAlias returns an alias by name (package-level).
+// GetAlias returns an alias by name.
 func GetAlias(name string) (Alias, bool) {
-	c := Get()
-	alias := c.GetAlias(name)
-	if alias == nil {
-		return Alias{}, false
-	}
-	return *alias, true
+	return getDefaultManager().GetAlias(name)
 }
 
-// ListAliases returns all aliases (package-level).
+// ListAliases returns all aliases as a map.
 func ListAliases() map[string]Alias {
-	c := Get()
-	aliases := c.ListAliases()
-
-	result := make(map[string]Alias, len(aliases))
-	for _, a := range aliases {
-		result[a.Name] = a
-	}
-	return result
+	return getDefaultManager().ListAliasesMap()
 }
 
-// IsAlias checks if a command name is an alias (package-level).
+// ListAliasesSorted returns all aliases sorted by name.
+func ListAliasesSorted() []Alias {
+	return getDefaultManager().ListAliases()
+}
+
+// IsAlias checks if a command name is an alias.
 func IsAlias(name string) bool {
-	return Get().IsAlias(name)
+	return getDefaultManager().IsAlias(name)
+}
+
+// ImportAliases imports aliases from a YAML file.
+func ImportAliases(filename string, merge bool) (imported, skipped int, err error) {
+	return getDefaultManager().ImportAliases(filename, merge)
+}
+
+// ExportAliases exports all aliases to a YAML file or returns YAML string if filename is empty.
+func ExportAliases(filename string) (string, error) {
+	return getDefaultManager().ExportAliases(filename)
 }

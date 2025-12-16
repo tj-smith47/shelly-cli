@@ -114,18 +114,19 @@ func TestFactory_SetIOStreams(t *testing.T) {
 	}
 }
 
-func TestFactory_SetConfig(t *testing.T) {
+func TestFactory_SetConfigManager(t *testing.T) {
 	t.Parallel()
 
 	f := cmdutil.NewFactory()
 
-	// Create custom config
+	// Create custom config manager
 	cfg := &config.Config{}
+	mgr := config.NewTestManager(cfg)
 
-	// Set custom config
-	result := f.SetConfig(cfg)
+	// Set custom config manager
+	result := f.SetConfigManager(mgr)
 	if result != f {
-		t.Error("SetConfig should return factory for chaining")
+		t.Error("SetConfigManager should return factory for chaining")
 	}
 
 	// Should return the custom config
@@ -134,7 +135,7 @@ func TestFactory_SetConfig(t *testing.T) {
 		t.Fatalf("Config() returned error: %v", err)
 	}
 	if gotCfg != cfg {
-		t.Error("SetConfig should set the config")
+		t.Error("SetConfigManager should set the config")
 	}
 }
 
@@ -167,11 +168,12 @@ func TestFactory_Chaining(t *testing.T) {
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(in, out, errOut)
 	cfg := &config.Config{}
+	mgr := config.NewTestManager(cfg)
 	svc := shelly.NewService()
 
 	f := cmdutil.NewFactory().
 		SetIOStreams(ios).
-		SetConfig(cfg).
+		SetConfigManager(mgr).
 		SetShellyService(svc)
 
 	if f.IOStreams() != ios {
@@ -182,7 +184,7 @@ func TestFactory_Chaining(t *testing.T) {
 		t.Fatalf("Config() error: %v", err)
 	}
 	if gotCfg != cfg {
-		t.Error("Chained SetConfig failed")
+		t.Error("Chained SetConfigManager failed")
 	}
 	if f.ShellyService() != svc {
 		t.Error("Chained SetShellyService failed")
@@ -194,7 +196,8 @@ func TestFactory_MustConfig(t *testing.T) {
 
 	f := cmdutil.NewFactory()
 	cfg := &config.Config{}
-	f.SetConfig(cfg)
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
 
 	// MustConfig should return config when no error
 	gotCfg := f.MustConfig()
@@ -227,18 +230,20 @@ func TestFactory_SetIOStreams_OverridesOriginal(t *testing.T) {
 	}
 }
 
-func TestFactory_SetConfig_OverridesOriginal(t *testing.T) {
+func TestFactory_SetConfigManager_OverridesOriginal(t *testing.T) {
 	t.Parallel()
 
 	f := cmdutil.NewFactory()
 
 	// Set first config
 	cfg1 := &config.Config{}
-	f.SetConfig(cfg1)
+	mgr1 := config.NewTestManager(cfg1)
+	f.SetConfigManager(mgr1)
 
 	// Override with second config
 	cfg2 := &config.Config{}
-	f.SetConfig(cfg2)
+	mgr2 := config.NewTestManager(cfg2)
+	f.SetConfigManager(mgr2)
 
 	// Should return the new config
 	gotCfg, err := f.Config()
@@ -246,7 +251,7 @@ func TestFactory_SetConfig_OverridesOriginal(t *testing.T) {
 		t.Fatalf("Config() error: %v", err)
 	}
 	if gotCfg != cfg2 {
-		t.Error("SetConfig should override previous config")
+		t.Error("SetConfigManager should override previous config")
 	}
 }
 
@@ -356,7 +361,8 @@ func TestFactory_GetDevice(t *testing.T) {
 			"test-device": {Address: testDeviceAddress},
 		},
 	}
-	f.SetConfig(cfg)
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
 
 	// Should find existing device
 	dev := f.GetDevice("test-device")
@@ -384,7 +390,8 @@ func TestFactory_GetGroup(t *testing.T) {
 			"test-group": {Devices: []string{"dev1", "dev2"}},
 		},
 	}
-	f.SetConfig(cfg)
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
 
 	// Should find existing group
 	grp := f.GetGroup("test-group")
@@ -412,7 +419,8 @@ func TestFactory_GetAlias(t *testing.T) {
 			"test-alias": {Command: "device list"},
 		},
 	}
-	f.SetConfig(cfg)
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
 
 	// Should find existing alias
 	alias := f.GetAlias("test-alias")
@@ -437,7 +445,8 @@ func TestFactory_ResolveAddress(t *testing.T) {
 			"test-device": {Address: testDeviceAddress},
 		},
 	}
-	f.SetConfig(cfg)
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
 
 	// Should resolve device name to address
 	addr := f.ResolveAddress("test-device")
@@ -463,7 +472,8 @@ func TestFactory_ResolveDevice(t *testing.T) {
 			"test-device": {Address: testDeviceAddress},
 		},
 	}
-	f.SetConfig(cfg)
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
 
 	// Should resolve device name
 	dev, ok := f.ResolveDevice("test-device")
@@ -497,7 +507,8 @@ func TestFactory_ExpandTargets(t *testing.T) {
 			"test-group": {Devices: []string{"dev1", "dev2"}},
 		},
 	}
-	f.SetConfig(cfg)
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
 
 	// Test with args
 	targets, err := f.ExpandTargets([]string{"dev1"}, "", false)

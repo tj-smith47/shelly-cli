@@ -24,7 +24,13 @@ type Factory struct {
 	// IOStreams provides access to stdin/stdout/stderr and terminal capabilities.
 	IOStreams func() *iostreams.IOStreams
 
-	// Config provides access to the CLI configuration.
+	// ConfigManager provides the config manager for all config operations.
+	// Use this for mutations (RegisterDevice, CreateGroup, etc.).
+	ConfigManager func() (*config.Manager, error)
+
+	// Config provides access to the CLI configuration data.
+	// This is a convenience that calls ConfigManager().Get().
+	// Use ConfigManager() directly for mutations.
 	Config func() (*config.Config, error)
 
 	// ShellyService provides the business logic service for device operations.
@@ -35,7 +41,7 @@ type Factory struct {
 
 	// Cached instances - set after first call to avoid re-initialization.
 	ioStreams     *iostreams.IOStreams
-	cfg           *config.Config
+	cfgMgr        *config.Manager
 	shellyService *shelly.Service
 	browserInst   browser.Browser
 }
@@ -52,15 +58,22 @@ func NewFactory() *Factory {
 		return f.ioStreams
 	}
 
-	f.Config = func() (*config.Config, error) {
-		if f.cfg == nil {
-			cfg, err := config.Load()
-			if err != nil {
+	f.ConfigManager = func() (*config.Manager, error) {
+		if f.cfgMgr == nil {
+			f.cfgMgr = config.NewManager("")
+			if err := f.cfgMgr.Load(); err != nil {
 				return nil, err
 			}
-			f.cfg = cfg
 		}
-		return f.cfg, nil
+		return f.cfgMgr, nil
+	}
+
+	f.Config = func() (*config.Config, error) {
+		mgr, err := f.ConfigManager()
+		if err != nil {
+			return nil, err
+		}
+		return mgr.Get(), nil
 	}
 
 	f.ShellyService = func() *shelly.Service {
@@ -105,16 +118,25 @@ func (f *Factory) SetIOStreams(ios *iostreams.IOStreams) *Factory {
 	return f
 }
 
-// SetConfig sets a custom config instance on an existing factory.
+// SetConfigManager sets a custom config manager on an existing factory.
 // This modifies the factory in-place and returns it for chaining.
-func (f *Factory) SetConfig(cfg *config.Config) *Factory {
-	f.cfg = cfg
-	origConfig := f.Config
-	f.Config = func() (*config.Config, error) {
-		if f.cfg != nil {
-			return f.cfg, nil
+// Use this for testing with isolated config.
+func (f *Factory) SetConfigManager(mgr *config.Manager) *Factory {
+	f.cfgMgr = mgr
+	origMgr := f.ConfigManager
+	f.ConfigManager = func() (*config.Manager, error) {
+		if f.cfgMgr != nil {
+			return f.cfgMgr, nil
 		}
-		return origConfig()
+		return origMgr()
+	}
+	// Update Config to use the new manager
+	f.Config = func() (*config.Config, error) {
+		mgr, err := f.ConfigManager()
+		if err != nil {
+			return nil, err
+		}
+		return mgr.Get(), nil
 	}
 	return f
 }
@@ -141,6 +163,16 @@ func (f *Factory) MustConfig() *config.Config {
 		panic("failed to load config: " + err.Error())
 	}
 	return cfg
+}
+
+// MustConfigManager returns the config manager, panicking on error.
+// Use this only when config errors should be fatal (e.g., during initialization).
+func (f *Factory) MustConfigManager() *config.Manager {
+	mgr, err := f.ConfigManager()
+	if err != nil {
+		panic("failed to load config manager: " + err.Error())
+	}
+	return mgr
 }
 
 // SetBrowser sets a custom browser instance on an existing factory.
