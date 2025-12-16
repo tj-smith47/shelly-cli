@@ -1,13 +1,11 @@
 # Agents & Session Files
 .claude/
+REFACTOR.md
 RULES.md
 PLAN.md
 docs/IMPLEMENTATION-NOTES.md
 /root/.claude/plans/
 *.plan.md
-
-# Branding assets (generated separately)
-assets/
 
 # Binaries
 /shelly
