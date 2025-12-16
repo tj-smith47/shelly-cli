@@ -4,7 +4,6 @@
 
 [![CI](https://github.com/tj-smith47/shelly-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/tj-smith47/shelly-cli/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/tj-smith47/shelly-cli/badges/docs.json)](https://github.com/tj-smith47/shelly-cli/actions/workflows/docs.yml)
-<!-- [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/tj-smith47/shelly-cli/badges/coverage.json)](https://github.com/tj-smith47/shelly-cli/actions) -->
 [![Go Reference](https://pkg.go.dev/badge/github.com/tj-smith47/shelly-cli.svg)](https://pkg.go.dev/github.com/tj-smith47/shelly-cli)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tj-smith47/shelly-cli)](https://goreportcard.com/report/github.com/tj-smith47/shelly-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -581,3 +580,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 - TUI powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea)
 - Themes by [bubbletint](https://github.com/lrstanley/bubbletint)
 - Inspired by [gh CLI](https://github.com/cli/cli) and [k9s](https://github.com/derailed/k9s)
+
+## Disclaimer
+
+Generated entirely by Claude Opus 4.5 over many iterations 🤖

@@ -161,6 +161,50 @@ type ConfigManager struct {
 ### Pending Investigation
 - **Audit for re-implemented shelly-go exports** - Check if CLI has local helpers/functions that duplicate already-exported shelly-go functionality (like the EMDataCSVURL case). Should use library exports directly.
 
+### macOS Binary Distribution Blocker
+
+**Status:** Blocking macOS pre-built binaries and Homebrew distribution
+
+**Root Cause:**
+The BLE (Bluetooth Low Energy) discovery feature uses `tinygo.org/x/bluetooth` which depends on `github.com/tinygo-org/cbgo` for macOS CoreBluetooth support. This library requires CGO and cannot be cross-compiled.
+
+**Dependency Chain:**
+```
+shelly-cli
+  └── shelly-go
+        └── tinygo.org/x/bluetooth (discovery/ble.go, provisioning/ble_transmitter.go)
+              └── github.com/tinygo-org/cbgo (macOS CoreBluetooth bindings - requires CGO)
+```
+
+**Current Workaround:**
+- macOS excluded from GoReleaser builds (`goos` list)
+- Homebrew tap disabled
+- macOS users must use `go install github.com/tj-smith47/shelly-cli/cmd/shelly@latest`
+
+**Solutions (in order of preference):**
+
+1. **Build tags in shelly-go** (Recommended)
+   - Add `//go:build !darwin || cgo` to BLE files
+   - Create stub implementations for `!cgo` builds
+   - Allows non-CGO darwin builds without BLE support
+   - Effort: Medium (requires shelly-go changes)
+
+2. **GitHub-hosted macOS runner for release**
+   - Use `macos-latest` runner for darwin builds only
+   - Native CGO compilation, no cross-compile issues
+   - Effort: Low (workflow change only)
+   - Downside: Slower releases, more complex workflow
+
+3. **Alternative BLE library**
+   - Research pure-Go BLE options that don't require CGO
+   - May not exist with full macOS CoreBluetooth support
+   - Effort: High (significant library change)
+
+**Recommended Next Steps:**
+1. Implement build tags in shelly-go to make BLE optional
+2. Provide two darwin builds: with BLE (CGO) and without BLE (pure Go)
+3. Re-enable Homebrew tap with pure-Go darwin build
+
 ---
 
 ## Global Flags & Output Control
