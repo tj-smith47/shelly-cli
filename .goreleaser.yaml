@@ -91,57 +91,27 @@ source:
   name_template: "{{ .ProjectName }}_{{ .Version }}_source"
 
 # =============================================================================
-# Docker Images (ghcr.io)
+# Docker Images (ghcr.io) - using dockers_v2 for multi-arch support
 # =============================================================================
 
-dockers:
-  # AMD64 image
-  - id: shelly-amd64
-    goos: linux
-    goarch: amd64
-    image_templates:
-      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-amd64"
-      - "ghcr.io/tj-smith47/shelly-cli:latest-amd64"
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--build-arg=VERSION={{.Version}}"
-      - "--build-arg=COMMIT={{.Commit}}"
-      - "--build-arg=DATE={{.Date}}"
-    use: buildx
-
-  # ARM64 image
-  - id: shelly-arm64
-    goos: linux
-    goarch: arm64
-    image_templates:
-      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-arm64"
-      - "ghcr.io/tj-smith47/shelly-cli:latest-arm64"
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/arm64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--build-arg=VERSION={{.Version}}"
-      - "--build-arg=COMMIT={{.Commit}}"
-      - "--build-arg=DATE={{.Date}}"
-    use: buildx
-
-# Multi-arch manifest
-docker_manifests:
-  - name_template: "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-amd64"
-      - "ghcr.io/tj-smith47/shelly-cli:{{ .Version }}-arm64"
-
-  - name_template: "ghcr.io/tj-smith47/shelly-cli:latest"
-    image_templates:
-      - "ghcr.io/tj-smith47/shelly-cli:latest-amd64"
-      - "ghcr.io/tj-smith47/shelly-cli:latest-arm64"
+dockers_v2:
+  - images:
+      - "ghcr.io/tj-smith47/shelly-cli"
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: "Shelly CLI"
+      org.opencontainers.image.description: "Command-line interface for Shelly smart home devices"
+      org.opencontainers.image.url: "https://github.com/tj-smith47/shelly-cli"
+      org.opencontainers.image.source: "https://github.com/tj-smith47/shelly-cli"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.licenses: "MIT"
 
 # =============================================================================
 # Homebrew Tap (disabled - macOS builds require CGO for BLE support)
