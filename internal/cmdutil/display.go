@@ -659,7 +659,7 @@ func DisplayRestoreResult(ios *iostreams.IOStreams, result *shelly.RestoreResult
 }
 
 // DisplayBackupsTable prints a table of backup files.
-func DisplayBackupsTable(ios *iostreams.IOStreams, backups []export.BackupFileInfo) {
+func DisplayBackupsTable(ios *iostreams.IOStreams, backups []model.BackupFileInfo) {
 	table := output.FormatBackupsTable(backups)
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
@@ -171,25 +170,14 @@ func FailedResults(results []BackupResult) []BackupResult {
 	return failures
 }
 
-// BackupFileInfo holds information about a backup file.
-type BackupFileInfo struct {
-	Filename    string    `json:"filename"`
-	DeviceID    string    `json:"device_id"`
-	DeviceModel string    `json:"device_model"`
-	FWVersion   string    `json:"fw_version"`
-	CreatedAt   time.Time `json:"created_at"`
-	Encrypted   bool      `json:"encrypted"`
-	Size        int64     `json:"size"`
-}
-
 // ScanBackupFiles scans a directory for backup files and returns their info.
-func ScanBackupFiles(dir string) ([]BackupFileInfo, error) {
+func ScanBackupFiles(dir string) ([]model.BackupFileInfo, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	backups := make([]BackupFileInfo, 0, len(entries))
+	backups := make([]model.BackupFileInfo, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -216,8 +204,8 @@ func IsBackupFile(name string) bool {
 }
 
 // ParseBackupFile reads and parses a backup file, returning its metadata.
-func ParseBackupFile(filePath string) (BackupFileInfo, error) {
-	var info BackupFileInfo
+func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
+	var info model.BackupFileInfo
 
 	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is derived from directory listing
 	if err != nil {

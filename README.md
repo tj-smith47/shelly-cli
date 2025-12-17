@@ -5,7 +5,7 @@
 <img src="assets/shelly-gopher.png" alt="Shelly Gopher" width="200">
 
 [![CI](https://github.com/tj-smith47/shelly-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/tj-smith47/shelly-cli/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/tj-smith47/shelly-cli/badges/docs.json)](https://github.com/tj-smith47/shelly-cli/actions/workflows/docs.yml)
+[![Docs](https://github.com/tj-smith47/shelly-cli/actions/workflows/docs.yml/badge.svg)](https://github.com/tj-smith47/shelly-cli/actions/workflows/docs.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/tj-smith47/shelly-cli.svg)](https://pkg.go.dev/github.com/tj-smith47/shelly-cli)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tj-smith47/shelly-cli)](https://goreportcard.com/report/github.com/tj-smith47/shelly-cli)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)

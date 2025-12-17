@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -361,6 +362,21 @@ func FormatConfigTable(config interface{}) *Table {
 		table.AddRow(key, FormatConfigValue(value))
 	}
 	return table
+}
+
+// FormatFloat formats a float64 value for CSV/data export.
+// It uses automatic precision to avoid unnecessary trailing zeros.
+func FormatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// FormatFloatPtr formats a *float64 value for CSV/data export.
+// It returns an empty string for nil values.
+func FormatFloatPtr(f *float64) string {
+	if f == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*f, 'f', -1, 64)
 }
 
 // FormatSize formats a byte count as a human-readable string.

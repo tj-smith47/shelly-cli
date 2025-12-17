@@ -1,4 +1,4 @@
-.PHONY: build install test test-coverage lint fmt generate clean completions docs manpages release-local audit check help
+.PHONY: build install test test-coverage lint fmt generate clean completions docs manpages release-local audit check push help
 
 # Build variables
 BINARY_NAME := shelly
@@ -111,6 +111,25 @@ else
 endif
 	@$(MAKE) audit
 	@$(MAKE) build
+
+## push: Validate commit message and docs, then push
+push:
+	@echo "Validating commit message..."
+	@COMMIT_MSG=$$(git log -1 --format=%s); \
+	if ! echo "$$COMMIT_MSG" | grep -qE '#(none|patch|minor|major)'; then \
+		echo "Error: Most recent commit must contain #none, #patch, #minor, or #major"; \
+		echo "Commit message: $$COMMIT_MSG"; \
+		exit 1; \
+	fi
+	@echo "Validating docs are up to date..."
+	@$(MAKE) docs
+	@if ! git diff --quiet docs/commands/; then \
+		echo "Error: docs/commands/ is out of date. Run 'make docs' and commit changes."; \
+		git diff --stat docs/commands/; \
+		exit 1; \
+	fi
+	@echo "All checks passed. Pushing..."
+	@git push
 
 ## help: Show this help message
 help:

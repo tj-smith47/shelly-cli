@@ -89,5 +89,7 @@ func displayList(ios *iostreams.IOStreams, switches []shelly.SwitchInfo) {
 		power := output.FormatPowerTableValue(sw.Power)
 		t.AddRow(fmt.Sprintf("%d", sw.ID), name, state, power)
 	}
-	t.Print()
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 }

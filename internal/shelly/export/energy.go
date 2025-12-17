@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
+
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // EMDataCSVHeaders defines the CSV header row for 3-phase energy meter data.
@@ -116,30 +117,30 @@ func FormatEM1DataCSV(data *components.EM1DataGetDataResult) ([]byte, error) {
 func formatEMDataRow(timestamp string, v components.EMDataValues) []string {
 	return []string{
 		timestamp,
-		FormatFloat(v.AVoltage),
-		FormatFloat(v.ACurrent),
-		FormatFloat(v.AActivePower),
-		FormatFloat(v.AApparentPower),
-		FormatFloatPtr(v.APowerFactor),
-		FormatFloatPtr(v.AFreq),
-		FormatFloat(v.BVoltage),
-		FormatFloat(v.BCurrent),
-		FormatFloat(v.BActivePower),
-		FormatFloat(v.BApparentPower),
-		FormatFloatPtr(v.BPowerFactor),
-		FormatFloatPtr(v.BFreq),
-		FormatFloat(v.CVoltage),
-		FormatFloat(v.CCurrent),
-		FormatFloat(v.CActivePower),
-		FormatFloat(v.CApparentPower),
-		FormatFloatPtr(v.CPowerFactor),
-		FormatFloatPtr(v.CFreq),
-		FormatFloat(v.TotalCurrent),
-		FormatFloat(v.TotalActivePower),
-		FormatFloat(v.TotalAprtPower),
-		FormatFloatPtr(v.TotalActEnergy),
-		FormatFloatPtr(v.TotalActRetEnergy),
-		FormatFloatPtr(v.NCurrent),
+		output.FormatFloat(v.AVoltage),
+		output.FormatFloat(v.ACurrent),
+		output.FormatFloat(v.AActivePower),
+		output.FormatFloat(v.AApparentPower),
+		output.FormatFloatPtr(v.APowerFactor),
+		output.FormatFloatPtr(v.AFreq),
+		output.FormatFloat(v.BVoltage),
+		output.FormatFloat(v.BCurrent),
+		output.FormatFloat(v.BActivePower),
+		output.FormatFloat(v.BApparentPower),
+		output.FormatFloatPtr(v.BPowerFactor),
+		output.FormatFloatPtr(v.BFreq),
+		output.FormatFloat(v.CVoltage),
+		output.FormatFloat(v.CCurrent),
+		output.FormatFloat(v.CActivePower),
+		output.FormatFloat(v.CApparentPower),
+		output.FormatFloatPtr(v.CPowerFactor),
+		output.FormatFloatPtr(v.CFreq),
+		output.FormatFloat(v.TotalCurrent),
+		output.FormatFloat(v.TotalActivePower),
+		output.FormatFloat(v.TotalAprtPower),
+		output.FormatFloatPtr(v.TotalActEnergy),
+		output.FormatFloatPtr(v.TotalActRetEnergy),
+		output.FormatFloatPtr(v.NCurrent),
 	}
 }
 
@@ -147,28 +148,13 @@ func formatEMDataRow(timestamp string, v components.EMDataValues) []string {
 func formatEM1DataRow(timestamp string, v components.EM1DataValues) []string {
 	return []string{
 		timestamp,
-		FormatFloat(v.Voltage),
-		FormatFloat(v.Current),
-		FormatFloat(v.ActivePower),
-		FormatFloat(v.ApparentPower),
-		FormatFloatPtr(v.PowerFactor),
-		FormatFloatPtr(v.Freq),
-		FormatFloatPtr(v.ActEnergy),
-		FormatFloatPtr(v.ActRetEnergy),
+		output.FormatFloat(v.Voltage),
+		output.FormatFloat(v.Current),
+		output.FormatFloat(v.ActivePower),
+		output.FormatFloat(v.ApparentPower),
+		output.FormatFloatPtr(v.PowerFactor),
+		output.FormatFloatPtr(v.Freq),
+		output.FormatFloatPtr(v.ActEnergy),
+		output.FormatFloatPtr(v.ActRetEnergy),
 	}
-}
-
-// FormatFloat formats a float64 value for CSV export.
-// It uses automatic precision to avoid unnecessary trailing zeros.
-func FormatFloat(f float64) string {
-	return strconv.FormatFloat(f, 'f', -1, 64)
-}
-
-// FormatFloatPtr formats a *float64 value for CSV export.
-// It returns an empty string for nil values.
-func FormatFloatPtr(f *float64) string {
-	if f == nil {
-		return ""
-	}
-	return strconv.FormatFloat(*f, 'f', -1, 64)
 }
