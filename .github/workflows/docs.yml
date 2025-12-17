@@ -53,9 +53,10 @@ jobs:
       - name: Update docs badge
         if: github.ref == 'refs/heads/master'
         run: |
+          CMD_COUNT=$(ls -1 docs/commands/*.md 2>/dev/null | wc -l)
           if [ "${{ steps.diff.outputs.status }}" == "clean" ]; then
             COLOR="brightgreen"
-            MESSAGE="up to date"
+            MESSAGE="current (${CMD_COUNT} cmds)"
           else
             COLOR="red"
             MESSAGE="outdated"

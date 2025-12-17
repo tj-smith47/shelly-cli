@@ -23,6 +23,17 @@ func main() {
 		log.Fatalf("failed to create output directory: %v", err)
 	}
 
+	// Clean stale .1 files before regenerating
+	staleFiles, err := filepath.Glob(filepath.Join(outputDir, "*.1"))
+	if err != nil {
+		log.Printf("warning: failed to find stale files: %v", err)
+	}
+	for _, f := range staleFiles {
+		if err := os.Remove(f); err != nil {
+			log.Printf("warning: failed to remove %s: %v", f, err)
+		}
+	}
+
 	// Get the root command with all subcommands
 	rootCmd := cmd.GetRootCmd()
 
