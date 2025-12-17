@@ -12,10 +12,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DefaultTimeout is the default discovery timeout.
@@ -132,7 +132,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.Register {
-		added, err := helpers.RegisterDiscoveredDevices(devices, opts.SkipExisting)
+		added, err := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
 		if err != nil {
 			ios.Warning("Registration error: %v", err)
 		}

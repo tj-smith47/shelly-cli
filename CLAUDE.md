@@ -209,7 +209,7 @@ internal/
 │
 ├── browser/                # Cross-platform URL opening
 ├── config/                 # Configuration management
-├── helpers/                # Device discovery helpers
+├── utils/                  # Shared utilities (batch, device helpers)
 ├── model/                  # Domain models
 ├── output/                 # Output formatters (JSON, YAML, table)
 ├── plugins/                # Plugin system
@@ -314,7 +314,8 @@ grep -r "func NewCommand(f \*cmdutil.Factory)" internal/cmd/ | wc -l
 | `.claude/SESSION-START.md` | Quick pre-flight checklist |
 | `.claude/COMPACT-INSTRUCTIONS.md` | Compaction rules for context |
 | `.claude/IMPLEMENTATION-NOTES.md` | Historical implementation details |
-| `docs/architecture.md` | Full architectural patterns |
+| `docs/architecture.md` | Directory structure and placement guide |
+| `docs/development.md` | Development standards and patterns |
 | `docs/testing.md` | Testing strategy |
 
 ---

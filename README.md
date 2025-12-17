@@ -523,7 +523,8 @@ The `examples/` directory contains ready-to-use configurations and scripts:
 ### Reference
 - [Command Reference](docs/commands/) - Auto-generated docs for all 347 commands
 - [Man Pages](docs/man/) - Unix manual pages
-- [Architecture](docs/architecture.md) - Development patterns
+- [Architecture](docs/architecture.md) - Directory structure and placement guide
+- [Development Guide](docs/development.md) - Development patterns and standards
 - [Dependencies](docs/dependencies.md) - Library dependencies
 - [Testing Strategy](docs/testing.md) - Test coverage approach
 

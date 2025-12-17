@@ -6,15 +6,31 @@ import (
 
 	"github.com/tj-smith47/shelly-go/discovery"
 
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
-// AlarmSensorReading represents a sensor with alarm and mute state (flood, smoke).
-type AlarmSensorReading struct {
-	ID    int  `json:"id"`
-	Alarm bool `json:"alarm"`
-	Mute  bool `json:"mute"`
+// GetLightLevel returns a human-readable description of a lux value.
+func GetLightLevel(lux float64) string {
+	switch {
+	case lux < 1:
+		return "Very dark"
+	case lux < 50:
+		return "Dark"
+	case lux < 200:
+		return "Dim"
+	case lux < 500:
+		return "Indoor light"
+	case lux < 1000:
+		return "Bright indoor"
+	case lux < 10000:
+		return "Overcast daylight"
+	case lux < 25000:
+		return "Daylight"
+	default:
+		return "Direct sunlight"
+	}
 }
 
 // MeterReading provides uniform access to power meter values.
@@ -58,7 +74,7 @@ func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *Table {
 
 // FormatAlarmSensor formats a single alarm sensor reading as a styled string.
 // sensorType is "Flood" or "Smoke", alarmMsg is the alarm text like "WATER DETECTED!".
-func FormatAlarmSensor(s AlarmSensorReading, sensorType, alarmMsg string, okStyle, errorStyle, dimStyle theme.StyleFunc) string {
+func FormatAlarmSensor(s model.AlarmSensorReading, sensorType, alarmMsg string, okStyle, errorStyle, dimStyle theme.StyleFunc) string {
 	status := okStyle("Clear")
 	if s.Alarm {
 		status = errorStyle(alarmMsg)
@@ -72,7 +88,7 @@ func FormatAlarmSensor(s AlarmSensorReading, sensorType, alarmMsg string, okStyl
 
 // FormatAlarmSensors formats multiple alarm sensor readings as styled strings.
 // Returns nil if sensors slice is empty.
-func FormatAlarmSensors(sensors []AlarmSensorReading, sensorType, alarmMsg string, okStyle, errorStyle, dimStyle theme.StyleFunc) []string {
+func FormatAlarmSensors(sensors []model.AlarmSensorReading, sensorType, alarmMsg string, okStyle, errorStyle, dimStyle theme.StyleFunc) []string {
 	if len(sensors) == 0 {
 		return nil
 	}
@@ -128,24 +144,36 @@ func FormatPowerTableValue(power float64) string {
 	return "-"
 }
 
-// FormatPowerWithChange formats power value with change indicator if different from previous.
+// FormatPowerWithChange formats power value with directional change indicator.
+// Shows ↑ (warning) for increases, ↓ (ok) for decreases.
 func FormatPowerWithChange(power float64, prevPower *float64) string {
 	formatted := FormatPower(power)
-	if prevPower != nil && power != *prevPower {
+	if prevPower == nil {
+		return formatted
+	}
+	if power > *prevPower {
 		return theme.StatusWarn().Render(formatted + " ↑")
+	} else if power < *prevPower {
+		return theme.StatusOK().Render(formatted + " ↓")
 	}
 	return formatted
 }
 
 // FormatMeterLine formats a single meter reading with optional change indicator.
-func FormatMeterLine(label string, id int, power, voltage, current float64, prevPower *float64) string {
+// Optional pf (power factor) is displayed if non-nil.
+func FormatMeterLine(label string, id int, power, voltage, current float64, pf, prevPower *float64) string {
 	powerStr := FormatPowerWithChange(power, prevPower)
-	return fmt.Sprintf("  %s %d: %s  %.1fV  %.2fA", label, id, powerStr, voltage, current)
+	pfStr := ""
+	if pf != nil {
+		pfStr = fmt.Sprintf("  PF:%.2f", *pf)
+	}
+	return fmt.Sprintf("  %s %d: %s  %.1fV  %.2fA%s", label, id, powerStr, voltage, current, pfStr)
 }
 
 // FormatMeterLineWithEnergy formats a meter line including energy total.
-func FormatMeterLineWithEnergy(label string, id int, power, voltage, current float64, energy, prevPower *float64) string {
-	base := FormatMeterLine(label, id, power, voltage, current, prevPower)
+// Optional pf (power factor) is displayed if non-nil.
+func FormatMeterLineWithEnergy(label string, id int, power, voltage, current float64, pf, energy, prevPower *float64) string {
+	base := FormatMeterLine(label, id, power, voltage, current, pf, prevPower)
 	if energy != nil {
 		return fmt.Sprintf("%s  %.2f Wh", base, *energy)
 	}
@@ -153,9 +181,14 @@ func FormatMeterLineWithEnergy(label string, id int, power, voltage, current flo
 }
 
 // FormatEMPhase formats a single phase line for 3-phase EM.
-func FormatEMPhase(label string, power, voltage, current float64, prevPower *float64) string {
+// Optional pf (power factor) is displayed if non-nil.
+func FormatEMPhase(label string, power, voltage, current float64, pf, prevPower *float64) string {
 	powerStr := FormatPowerWithChange(power, prevPower)
-	return fmt.Sprintf("    %s: %s  %.1fV  %.2fA", label, powerStr, voltage, current)
+	pfStr := ""
+	if pf != nil {
+		pfStr = fmt.Sprintf("  PF:%.2f", *pf)
+	}
+	return fmt.Sprintf("    %s: %s  %.1fV  %.2fA%s", label, powerStr, voltage, current, pfStr)
 }
 
 // FormatEMLines returns formatted lines for a 3-phase energy meter.
@@ -169,9 +202,9 @@ func FormatEMLines(em, prev *shelly.EMStatus) []string {
 
 	return []string{
 		fmt.Sprintf("  EM %d:", em.ID),
-		FormatEMPhase("Phase A", em.AActivePower, em.AVoltage, em.ACurrent, prevA),
-		FormatEMPhase("Phase B", em.BActivePower, em.BVoltage, em.BCurrent, prevB),
-		FormatEMPhase("Phase C", em.CActivePower, em.CVoltage, em.CCurrent, prevC),
+		FormatEMPhase("Phase A", em.AActivePower, em.AVoltage, em.ACurrent, em.APowerFactor, prevA),
+		FormatEMPhase("Phase B", em.BActivePower, em.BVoltage, em.BCurrent, em.BPowerFactor, prevB),
+		FormatEMPhase("Phase C", em.CActivePower, em.CVoltage, em.CCurrent, em.CPowerFactor, prevC),
 		fmt.Sprintf("    Total:   %.1f W", em.TotalActivePower),
 	}
 }
@@ -182,7 +215,7 @@ func FormatEM1Line(em1, prev *shelly.EM1Status) string {
 	if prev != nil {
 		prevPower = &prev.ActPower
 	}
-	return FormatMeterLine("EM1", em1.ID, em1.ActPower, em1.Voltage, em1.Current, prevPower)
+	return FormatMeterLine("EM1", em1.ID, em1.ActPower, em1.Voltage, em1.Current, em1.PF, prevPower)
 }
 
 // FormatPMLine returns formatted line for a power meter.
@@ -195,7 +228,7 @@ func FormatPMLine(pm, prev *shelly.PMStatus) string {
 	if pm.AEnergy != nil {
 		energy = &pm.AEnergy.Total
 	}
-	return FormatMeterLineWithEnergy("PM", pm.ID, pm.APower, pm.Voltage, pm.Current, energy, prevPower)
+	return FormatMeterLineWithEnergy("PM", pm.ID, pm.APower, pm.Voltage, pm.Current, nil, energy, prevPower)
 }
 
 // FindPrevious is a generic finder for previous status by ID.
@@ -230,4 +263,55 @@ func FindPreviousPM(id int, prev *shelly.MonitoringSnapshot) *shelly.PMStatus {
 		return nil
 	}
 	return FindPrevious(id, prev.PM, func(e *shelly.PMStatus) int { return e.ID })
+}
+
+// GetPrevEMPhasePower returns previous phase power values for an EM by ID.
+// Returns nil pointers if previous snapshot is nil or EM not found.
+func GetPrevEMPhasePower(id int, prev *shelly.MonitoringSnapshot) (prevA, prevB, prevC *float64) {
+	em := FindPreviousEM(id, prev)
+	if em == nil {
+		return nil, nil, nil
+	}
+	return &em.AActivePower, &em.BActivePower, &em.CActivePower
+}
+
+// GetPrevEM1Power returns previous power value for an EM1 by ID.
+func GetPrevEM1Power(id int, prev *shelly.MonitoringSnapshot) *float64 {
+	em1 := FindPreviousEM1(id, prev)
+	if em1 == nil {
+		return nil
+	}
+	return &em1.ActPower
+}
+
+// GetPrevPMPower returns previous power value for a PM by ID.
+func GetPrevPMPower(id int, prev *shelly.MonitoringSnapshot) *float64 {
+	pm := FindPreviousPM(id, prev)
+	if pm == nil {
+		return nil
+	}
+	return &pm.APower
+}
+
+// CalculateSnapshotTotals calculates total power and energy from a monitoring snapshot.
+func CalculateSnapshotTotals(snapshot *shelly.MonitoringSnapshot) (totalPower, totalEnergy float64) {
+	if snapshot == nil {
+		return 0, 0
+	}
+
+	for i := range snapshot.EM {
+		totalPower += snapshot.EM[i].TotalActivePower
+	}
+	for i := range snapshot.EM1 {
+		totalPower += snapshot.EM1[i].ActPower
+	}
+	for i := range snapshot.PM {
+		pm := &snapshot.PM[i]
+		totalPower += pm.APower
+		if pm.AEnergy != nil {
+			totalEnergy += pm.AEnergy.Total
+		}
+	}
+
+	return totalPower, totalEnergy
 }

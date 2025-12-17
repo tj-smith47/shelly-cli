@@ -12,8 +12,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DefaultTimeout is the default scan timeout.
@@ -148,7 +148,7 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 	}
 
 	if register {
-		added, err := helpers.RegisterDiscoveredDevices(devices, skipExisting)
+		added, err := utils.RegisterDiscoveredDevices(devices, skipExisting)
 		if err != nil {
 			ios.Warning("Registration error: %v", err)
 		}

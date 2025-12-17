@@ -9,8 +9,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DefaultTimeout is the default mDNS discovery timeout.
@@ -109,7 +109,7 @@ func run(f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool)
 	}
 
 	if register {
-		added, err := helpers.RegisterDiscoveredDevices(devices, skipExisting)
+		added, err := utils.RegisterDiscoveredDevices(devices, skipExisting)
 		if err != nil {
 			ios.Warning("Registration error: %v", err)
 		}

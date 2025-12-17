@@ -63,37 +63,3 @@ func TestNewCommand_Flags(t *testing.T) {
 		t.Errorf("overwrite default = %q, want false", overwriteFlag.DefValue)
 	}
 }
-
-func TestParseUnknownFormat(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		data    string
-		wantErr bool
-	}{
-		{
-			name:    "valid yaml",
-			data:    "name: test\nactions: []",
-			wantErr: false,
-		},
-		{
-			name:    "valid json",
-			data:    `{"name":"test","actions":[]}`,
-			wantErr: false,
-		},
-		{
-			name:    "invalid format",
-			data:    "not valid yaml or json {{{",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		var scene Scene
-		err := parseUnknownFormat([]byte(tt.data), &scene)
-		if (err != nil) != tt.wantErr {
-			t.Errorf("%s: parseUnknownFormat() error = %v, wantErr %v", tt.name, err, tt.wantErr)
-		}
-	}
-}

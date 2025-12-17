@@ -14,8 +14,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/scan"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // NewCommand creates the discover command group.
@@ -112,7 +112,7 @@ func runDiscover(ctx context.Context, f *cmdutil.Factory, timeout time.Duration,
 	}
 
 	if register {
-		added, err := helpers.RegisterDiscoveredDevices(devices, skipExisting)
+		added, err := utils.RegisterDiscoveredDevices(devices, skipExisting)
 		if err != nil {
 			ios.Warning("Registration error: %v", err)
 		}

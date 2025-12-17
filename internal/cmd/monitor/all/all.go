@@ -3,7 +3,6 @@ package all
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -11,11 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 var intervalFlag time.Duration
@@ -46,16 +41,6 @@ Press Ctrl+C to stop monitoring.`,
 	return cmd
 }
 
-// deviceSnapshot holds the latest status for a device.
-type deviceSnapshot struct {
-	Device    string
-	Address   string
-	Info      *shelly.DeviceInfo
-	Snapshot  *shelly.MonitoringSnapshot
-	Error     error
-	UpdatedAt time.Time
-}
-
 func run(f *cmdutil.Factory, ctx context.Context) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
@@ -70,13 +55,21 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	ios.Title("Monitoring %d devices", len(devices))
 	ios.Printf("Press Ctrl+C to stop\n\n")
 
+	// Build device map for FetchAllSnapshots
+	deviceAddrs := make(map[string]string, len(devices))
+	for name, dev := range devices {
+		deviceAddrs[name] = dev.Address
+	}
+
 	// Create snapshot storage
-	snapshots := make(map[string]*deviceSnapshot)
+	snapshots := make(map[string]*shelly.DeviceSnapshot)
 	var mu sync.Mutex
 
 	// Initial fetch
-	fetchAllSnapshots(ctx, svc, devices, snapshots, &mu)
-	displayAllSnapshots(ios, snapshots, &mu)
+	svc.FetchAllSnapshots(ctx, deviceAddrs, snapshots, &mu)
+	mu.Lock()
+	cmdutil.DisplayAllSnapshots(ios, snapshots)
+	mu.Unlock()
 
 	// Monitoring loop
 	ticker := time.NewTicker(intervalFlag)
@@ -87,123 +80,10 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			fetchAllSnapshots(ctx, svc, devices, snapshots, &mu)
-			displayAllSnapshots(ios, snapshots, &mu)
-		}
-	}
-}
-
-func fetchAllSnapshots(ctx context.Context, svc *shelly.Service, devices map[string]model.Device, snapshots map[string]*deviceSnapshot, mu *sync.Mutex) {
-	var wg sync.WaitGroup
-	for name, dev := range devices {
-		wg.Go(func() {
-			snapshot := &deviceSnapshot{
-				Device:    name,
-				Address:   dev.Address,
-				UpdatedAt: time.Now(),
-			}
-
-			// Get device info
-			info, err := svc.DeviceInfo(ctx, dev.Address)
-			if err != nil {
-				snapshot.Error = err
-			} else {
-				snapshot.Info = info
-			}
-
-			// Get monitoring snapshot
-			if snapshot.Error == nil {
-				snap, err := svc.GetMonitoringSnapshot(ctx, dev.Address)
-				if err != nil {
-					snapshot.Error = err
-				} else {
-					snapshot.Snapshot = snap
-				}
-			}
-
+			svc.FetchAllSnapshots(ctx, deviceAddrs, snapshots, &mu)
 			mu.Lock()
-			snapshots[name] = snapshot
+			cmdutil.DisplayAllSnapshots(ios, snapshots)
 			mu.Unlock()
-		})
-	}
-	wg.Wait()
-}
-
-func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceSnapshot, mu *sync.Mutex) {
-	// Clear screen
-	ios.ClearScreen()
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	ios.Title("Device Status Summary")
-	ios.Printf("  Updated: %s\n\n", time.Now().Format("15:04:05"))
-
-	totalPower := 0.0
-	totalEnergy := 0.0
-	onlineCount := 0
-	offlineCount := 0
-
-	// Display each device
-	for name, snap := range snapshots {
-		if snap.Error != nil {
-			ios.Printf("%s %s: %s\n",
-				theme.StatusError().Render("●"),
-				name,
-				theme.Dim().Render(snap.Error.Error()))
-			offlineCount++
-			continue
 		}
-
-		onlineCount++
-
-		// Calculate device power
-		devicePower := 0.0
-		deviceEnergy := 0.0
-		if snap.Snapshot != nil {
-			for i := range snap.Snapshot.EM {
-				devicePower += snap.Snapshot.EM[i].TotalActivePower
-			}
-			for i := range snap.Snapshot.EM1 {
-				devicePower += snap.Snapshot.EM1[i].ActPower
-			}
-			for i := range snap.Snapshot.PM {
-				pm := &snap.Snapshot.PM[i]
-				devicePower += pm.APower
-				if pm.AEnergy != nil {
-					deviceEnergy += pm.AEnergy.Total
-				}
-			}
-		}
-
-		totalPower += devicePower
-		totalEnergy += deviceEnergy
-
-		// Display device line
-		statusIcon := theme.StatusOK().Render("●")
-		deviceModel := "Unknown"
-		if snap.Info != nil {
-			deviceModel = snap.Info.Model
-		}
-
-		powerStr := output.FormatPowerColored(devicePower)
-		energyStr := ""
-		if deviceEnergy > 0 {
-			energyStr = fmt.Sprintf("  %.2f Wh", deviceEnergy)
-		}
-		ios.Printf("%s %s (%s): %s%s\n",
-			statusIcon, name, deviceModel, powerStr, energyStr)
-	}
-
-	// Display summary
-	ios.Println()
-	ios.Printf("═══════════════════════════════════════\n")
-	ios.Printf("  Online:       %s / %d devices\n",
-		theme.StatusOK().Render(fmt.Sprintf("%d", onlineCount)),
-		onlineCount+offlineCount)
-	ios.Printf("  Total Power:  %s\n", theme.StatusOK().Render(output.FormatPower(totalPower)))
-	if totalEnergy > 0 {
-		ios.Printf("  Total Energy: %.2f Wh\n", totalEnergy)
 	}
 }
-

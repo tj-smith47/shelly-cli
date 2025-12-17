@@ -2,14 +2,9 @@
 package importcmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -53,17 +48,10 @@ Use --name to override the scene name from the file.`,
 	return cmd
 }
 
-// Scene represents an imported scene definition.
-type Scene struct {
-	Name        string               `json:"name" yaml:"name"`
-	Description string               `json:"description,omitempty" yaml:"description,omitempty"`
-	Actions     []config.SceneAction `json:"actions" yaml:"actions"`
-}
-
 func run(f *cmdutil.Factory, file, nameOverride string, overwrite bool) error {
 	ios := f.IOStreams()
 
-	scene, err := parseSceneFile(file)
+	scene, err := config.ParseSceneFile(file)
 	if err != nil {
 		return err
 	}
@@ -77,76 +65,10 @@ func run(f *cmdutil.Factory, file, nameOverride string, overwrite bool) error {
 		return fmt.Errorf("scene name is required (use --name to specify)")
 	}
 
-	if err := saveScene(scene, overwrite); err != nil {
+	if err := config.ImportScene(scene, overwrite); err != nil {
 		return err
 	}
 
 	ios.Success("Imported scene %q with %d action(s)", scene.Name, len(scene.Actions))
-	return nil
-}
-
-func parseSceneFile(file string) (*Scene, error) {
-	// #nosec G304 -- file path comes from user CLI argument
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	var scene Scene
-
-	// Determine format from file extension
-	ext := strings.ToLower(filepath.Ext(file))
-	switch ext {
-	case ".json":
-		if err := json.Unmarshal(data, &scene); err != nil {
-			return nil, fmt.Errorf("failed to parse JSON: %w", err)
-		}
-	case ".yaml", ".yml":
-		if err := yaml.Unmarshal(data, &scene); err != nil {
-			return nil, fmt.Errorf("failed to parse YAML: %w", err)
-		}
-	default:
-		if err := parseUnknownFormat(data, &scene); err != nil {
-			return nil, err
-		}
-	}
-
-	return &scene, nil
-}
-
-func parseUnknownFormat(data []byte, scene *Scene) error {
-	// Try YAML first, then JSON
-	if err := yaml.Unmarshal(data, scene); err != nil {
-		if jsonErr := json.Unmarshal(data, scene); jsonErr != nil {
-			return fmt.Errorf("failed to parse file (tried YAML and JSON)")
-		}
-	}
-	return nil
-}
-
-func saveScene(scene *Scene, overwrite bool) error {
-	// Check if scene exists
-	if _, exists := config.GetScene(scene.Name); exists {
-		if !overwrite {
-			return fmt.Errorf("scene %q already exists (use --overwrite to replace)", scene.Name)
-		}
-		// Delete existing scene first
-		if err := config.DeleteScene(scene.Name); err != nil {
-			return fmt.Errorf("failed to delete existing scene: %w", err)
-		}
-	}
-
-	// Create scene
-	if err := config.CreateScene(scene.Name, scene.Description); err != nil {
-		return fmt.Errorf("failed to create scene: %w", err)
-	}
-
-	// Add actions
-	if len(scene.Actions) > 0 {
-		if err := config.SetSceneActions(scene.Name, scene.Actions); err != nil {
-			return fmt.Errorf("failed to set scene actions: %w", err)
-		}
-	}
-
 	return nil
 }

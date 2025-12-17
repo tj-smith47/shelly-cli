@@ -9,8 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -64,71 +62,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 
 	var lastSnapshot *shelly.MonitoringSnapshot
 	return svc.MonitorDevice(ctx, device, opts, func(snapshot shelly.MonitoringSnapshot) error {
-		displaySnapshot(ios, &snapshot, lastSnapshot)
+		cmdutil.DisplayStatusSnapshot(ios, &snapshot, lastSnapshot)
 		lastSnapshot = &snapshot
 		return nil
 	})
 }
-
-func displaySnapshot(ios *iostreams.IOStreams, current, previous *shelly.MonitoringSnapshot) {
-	// Clear screen for non-first updates (simple approach)
-	if previous != nil {
-		ios.ClearScreen()
-	}
-
-	ios.Title("Device Status")
-	ios.Printf("  Timestamp: %s\n\n", current.Timestamp.Format(time.RFC3339))
-
-	// Display energy meters
-	displayEMStatus(ios, current.EM, previous)
-	displayEM1Status(ios, current.EM1, previous)
-
-	// Display power meters
-	displayPMStatus(ios, current.PM, previous)
-
-	ios.Println()
-}
-
-func displayEMStatus(ios *iostreams.IOStreams, statuses []shelly.EMStatus, previous *shelly.MonitoringSnapshot) {
-	if len(statuses) == 0 {
-		return
-	}
-
-	ios.Printf("Energy Meters (3-phase):\n")
-	for i := range statuses {
-		em := &statuses[i]
-		prev := output.FindPreviousEM(em.ID, previous)
-		for _, line := range output.FormatEMLines(em, prev) {
-			ios.Println(line)
-		}
-	}
-	ios.Println()
-}
-
-func displayEM1Status(ios *iostreams.IOStreams, statuses []shelly.EM1Status, previous *shelly.MonitoringSnapshot) {
-	if len(statuses) == 0 {
-		return
-	}
-
-	ios.Printf("Energy Meters (single-phase):\n")
-	for i := range statuses {
-		em1 := &statuses[i]
-		prev := output.FindPreviousEM1(em1.ID, previous)
-		ios.Println(output.FormatEM1Line(em1, prev))
-	}
-	ios.Println()
-}
-
-func displayPMStatus(ios *iostreams.IOStreams, statuses []shelly.PMStatus, previous *shelly.MonitoringSnapshot) {
-	if len(statuses) == 0 {
-		return
-	}
-
-	ios.Printf("Power Meters:\n")
-	for i := range statuses {
-		pm := &statuses[i]
-		prev := output.FindPreviousPM(pm.ID, previous)
-		ios.Println(output.FormatPMLine(pm, prev))
-	}
-}
-

@@ -1,5 +1,5 @@
-// Package helpers provides common functionality shared across CLI commands.
-package helpers
+// Package utils provides common functionality shared across CLI commands.
+package utils
 
 import (
 	"net"

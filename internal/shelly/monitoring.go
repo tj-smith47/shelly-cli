@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
@@ -448,6 +449,52 @@ func (s *Service) GetMonitoringSnapshot(ctx context.Context, device string) (*Mo
 	}
 	status := s.collectDeviceStatus(ctx, device, opts)
 	return &status, nil
+}
+
+// DeviceSnapshot holds the latest status for a device in multi-device monitoring.
+type DeviceSnapshot struct {
+	Device   string
+	Address  string
+	Info     *DeviceInfo
+	Snapshot *MonitoringSnapshot
+	Error    error
+}
+
+// FetchAllSnapshots fetches device info and monitoring snapshots for all devices concurrently.
+// The devices map is keyed by device name with address as value.
+func (s *Service) FetchAllSnapshots(ctx context.Context, devices map[string]string, snapshots map[string]*DeviceSnapshot, mu *sync.Mutex) {
+	var wg sync.WaitGroup
+	for name, address := range devices {
+		wg.Go(func() {
+			snapshot := &DeviceSnapshot{
+				Device:  name,
+				Address: address,
+			}
+
+			// Get device info
+			info, err := s.DeviceInfo(ctx, address)
+			if err != nil {
+				snapshot.Error = err
+			} else {
+				snapshot.Info = info
+			}
+
+			// Get monitoring snapshot
+			if snapshot.Error == nil {
+				snap, err := s.GetMonitoringSnapshot(ctx, address)
+				if err != nil {
+					snapshot.Error = err
+				} else {
+					snapshot.Snapshot = snap
+				}
+			}
+
+			mu.Lock()
+			snapshots[name] = snapshot
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
 }
 
 func (s *Service) collectEMStatus(ctx context.Context, device string) []EMStatus {

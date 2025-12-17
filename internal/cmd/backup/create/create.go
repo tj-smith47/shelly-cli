@@ -3,17 +3,14 @@ package create
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
 var (
@@ -95,14 +92,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Format the output
-	var data []byte
-	format := strings.ToLower(formatFlag)
-	switch format {
-	case "yaml", "yml":
-		data, err = yaml.Marshal(backup)
-	default:
-		data, err = json.MarshalIndent(backup, "", "  ")
-	}
+	data, err := export.MarshalBackup(backup, formatFlag)
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
@@ -115,27 +105,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 			return fmt.Errorf("failed to write backup file: %w", err)
 		}
 		ios.Success("Backup created: %s", filePath)
-		printBackupSummary(ios, backup)
+		cmdutil.DisplayBackupSummary(ios, backup)
 	}
 
 	return nil
-}
-
-func printBackupSummary(ios *iostreams.IOStreams, backup *shelly.DeviceBackup) {
-	ios.Println()
-	ios.Printf("  Device:    %s (%s)\n", backup.Device().ID, backup.Device().Model)
-	ios.Printf("  Firmware:  %s\n", backup.Device().FWVersion)
-	ios.Printf("  Config:    %d keys\n", len(backup.Config))
-	if len(backup.Scripts) > 0 {
-		ios.Printf("  Scripts:   %d\n", len(backup.Scripts))
-	}
-	if len(backup.Schedules) > 0 {
-		ios.Printf("  Schedules: %d\n", len(backup.Schedules))
-	}
-	if len(backup.Webhooks) > 0 {
-		ios.Printf("  Webhooks:  %d\n", len(backup.Webhooks))
-	}
-	if backup.Encrypted() {
-		ios.Printf("  Encrypted: yes\n")
-	}
 }

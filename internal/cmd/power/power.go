@@ -29,7 +29,7 @@ PM/PM1 components provide real-time measurements including:
   - Return energy (for bidirectional meters)
 
 For professional energy monitors (EM/EM1 components), use 'shelly energy'.`,
-		Aliases: []string{"pm"},
+		Aliases: []string{"pm", "meter"},
 		Example: `  # List power meter components
   shelly power list kitchen
 

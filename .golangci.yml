@@ -6,6 +6,14 @@ run:
   allow-parallel-runners: true
 
 linters:
+  exclusions:
+    rules:
+      # Allow "utils" package name - user-chosen name
+      - path: 'internal/utils/.*\.go'
+        linters:
+          - revive
+        text: 'var-naming: avoid meaningless package names'
+
   enable:
     # Core linters
     - errcheck

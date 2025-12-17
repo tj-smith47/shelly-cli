@@ -3,17 +3,13 @@ package events
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 var filterFlag string
@@ -66,93 +62,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		}
 
 		if jsonOutput {
-			return outputJSON(ios, event)
+			return cmdutil.OutputEventJSON(ios, event)
 		}
-		return displayEvent(ios, event)
+		return cmdutil.DisplayEvent(ios, event)
 	})
-}
-
-func outputJSON(ios *iostreams.IOStreams, event shelly.DeviceEvent) error {
-	enc := json.NewEncoder(ios.Out)
-	return enc.Encode(event)
-}
-
-func displayEvent(ios *iostreams.IOStreams, event shelly.DeviceEvent) error {
-	timestamp := event.Timestamp.Format("15:04:05.000")
-
-	// Color code by event type
-	eventStyle := theme.StatusOK()
-	switch event.Event {
-	case "state_changed":
-		eventStyle = theme.StatusWarn()
-	case "error":
-		eventStyle = theme.StatusError()
-	case "notification":
-		eventStyle = theme.StatusInfo()
-	}
-
-	ios.Printf("[%s] %s %s:%d %s\n",
-		theme.Dim().Render(timestamp),
-		eventStyle.Render(event.Event),
-		event.Component,
-		event.ComponentID,
-		formatEventData(event.Data))
-
-	return nil
-}
-
-func formatEventData(data map[string]any) string {
-	if len(data) == 0 {
-		return ""
-	}
-
-	// Format key fields
-	var parts []string
-
-	// Common fields
-	if outputState, ok := data["output"].(bool); ok {
-		if outputState {
-			parts = append(parts, theme.StatusOK().Render("ON"))
-		} else {
-			parts = append(parts, theme.StatusError().Render("OFF"))
-		}
-	}
-
-	if power, ok := data["apower"].(float64); ok {
-		parts = append(parts, output.FormatPowerColored(power))
-	}
-
-	if temp, ok := data["temperature"].(map[string]any); ok {
-		if tc, ok := temp["tC"].(float64); ok {
-			parts = append(parts, formatTemp(tc))
-		}
-	}
-
-	if len(parts) == 0 {
-		// Fallback to JSON for unknown data
-		bytes, err := json.Marshal(data)
-		if err != nil {
-			return ""
-		}
-		return string(bytes)
-	}
-
-	result := ""
-	for i, p := range parts {
-		if i > 0 {
-			result += " "
-		}
-		result += p
-	}
-	return result
-}
-
-func formatTemp(c float64) string {
-	s := fmt.Sprintf("%.1f°C", c)
-	if c >= 70 {
-		return theme.StatusError().Render(s)
-	} else if c >= 50 {
-		return theme.StatusWarn().Render(s)
-	}
-	return theme.StatusOK().Render(s)
 }

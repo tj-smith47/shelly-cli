@@ -3,20 +3,15 @@ package export
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
-	"sync"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
 var (
@@ -78,107 +73,28 @@ func run(ctx context.Context, f *cmdutil.Factory, dir string) error {
 	ios.Info("Exporting backups for %d devices...", len(cfg.Devices))
 	ios.Println()
 
-	svc := f.ShellyService()
-	opts := shelly.BackupOptions{}
-
-	var (
-		mu       sync.Mutex
-		success  int
-		failed   int
-		failures []string
-	)
-
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(parallelFlag)
-
-	for name, device := range cfg.Devices {
-		deviceName := name
-		deviceAddr := device.Address
-		g.Go(func() error {
-			ios.Printf("  Backing up %s (%s)...", deviceName, deviceAddr)
-
-			backup, err := svc.CreateBackup(ctx, deviceAddr, opts)
-			if err != nil {
-				ios.Printf(" FAILED\n")
-				mu.Lock()
-				failed++
-				failures = append(failures, fmt.Sprintf("%s: %v", deviceName, err))
-				mu.Unlock()
-				return nil // Continue with other devices
-			}
-
-			// Write backup file
-			filename := sanitizeFilename(deviceName) + "." + formatFlag
-			filePath := filepath.Join(dir, filename)
-
-			if err := writeBackup(filePath, backup); err != nil {
-				ios.Printf(" FAILED\n")
-				mu.Lock()
-				failed++
-				failures = append(failures, fmt.Sprintf("%s: %v", deviceName, err))
-				mu.Unlock()
-				return nil
-			}
-
-			ios.Printf(" OK\n")
-			mu.Lock()
-			success++
-			mu.Unlock()
-			return nil
-		})
+	exporter := export.NewBackupExporter(f.ShellyService())
+	opts := export.BackupExportOptions{
+		Directory:  dir,
+		Format:     formatFlag,
+		Parallel:   parallelFlag,
+		BackupOpts: shelly.BackupOptions{},
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
-	}
+	results := exporter.ExportAll(ctx, cfg.Devices, opts)
+	cmdutil.DisplayBackupExportResults(ios, results)
 
 	ios.Println()
+
+	success, failed := export.CountResults(results)
 	if success > 0 {
 		ios.Success("Successfully exported %d backup(s) to %s", success, dir)
 	}
 	if failed > 0 {
 		ios.Warning("Failed to export %d device(s):", failed)
-		for _, f := range failures {
-			ios.Printf("  - %s\n", f)
+		for _, r := range export.FailedResults(results) {
+			ios.Printf("  - %s: %v\n", r.DeviceName, r.Error)
 		}
-	}
-
-	return nil
-}
-
-func sanitizeFilename(name string) string {
-	// Replace problematic characters
-	replacer := strings.NewReplacer(
-		"/", "_",
-		"\\", "_",
-		":", "_",
-		"*", "_",
-		"?", "_",
-		"\"", "_",
-		"<", "_",
-		">", "_",
-		"|", "_",
-		" ", "_",
-	)
-	return replacer.Replace(name)
-}
-
-func writeBackup(filePath string, backup *shelly.DeviceBackup) error {
-	var data []byte
-	var err error
-
-	switch formatFlag {
-	case "yaml", "yml":
-		data, err = yaml.Marshal(backup)
-	default:
-		data, err = json.MarshalIndent(backup, "", "  ")
-	}
-	if err != nil {
-		return fmt.Errorf("failed to marshal backup: %w", err)
-	}
-
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
 	}
 
 	return nil

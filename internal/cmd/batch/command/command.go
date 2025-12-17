@@ -11,9 +11,9 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // NewCommand creates the batch command command.
@@ -86,7 +86,7 @@ the device name and either the response or error message.`,
 				deviceArgs = args[2:]
 			}
 
-			targets, err := helpers.ResolveBatchTargets(groupName, all, deviceArgs)
+			targets, err := utils.ResolveBatchTargets(groupName, all, deviceArgs)
 			if err != nil {
 				return err
 			}

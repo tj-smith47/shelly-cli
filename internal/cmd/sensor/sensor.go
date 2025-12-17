@@ -4,6 +4,7 @@ package sensor
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/devicepower"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/flood"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/humidity"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor/illuminance"
@@ -23,11 +24,12 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Manage environmental sensors on Shelly devices.
 
 Supports reading from various sensor types available on Gen2+ devices:
-- Temperature sensors (built-in or external DS18B20)
-- Humidity sensors (DHT22, HTU21D)
+- Device power (battery status)
 - Flood sensors (water leak detection)
-- Smoke sensors (smoke detection with alarm)
+- Humidity sensors (DHT22, HTU21D)
 - Illuminance sensors (light level)
+- Smoke sensors (smoke detection with alarm)
+- Temperature sensors (built-in or external DS18B20)
 - Voltmeters (voltage measurement)
 
 Use the status command to get a combined view of all sensors on a device,
@@ -45,12 +47,13 @@ or use specific subcommands for individual sensor types.`,
   shelly sensor smoke mute kitchen`,
 	}
 
+	cmd.AddCommand(devicepower.NewCommand(f))
+	cmd.AddCommand(flood.NewCommand(f))
+	cmd.AddCommand(humidity.NewCommand(f))
+	cmd.AddCommand(illuminance.NewCommand(f))
+	cmd.AddCommand(smoke.NewCommand(f))
 	cmd.AddCommand(status.NewCommand(f))
 	cmd.AddCommand(temperature.NewCommand(f))
-	cmd.AddCommand(humidity.NewCommand(f))
-	cmd.AddCommand(flood.NewCommand(f))
-	cmd.AddCommand(smoke.NewCommand(f))
-	cmd.AddCommand(illuminance.NewCommand(f))
 	cmd.AddCommand(voltmeter.NewCommand(f))
 
 	return cmd

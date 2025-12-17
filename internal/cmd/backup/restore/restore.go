@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -100,7 +99,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	if dryRunFlag {
 		ios.Title("Dry run - Restore preview")
 		ios.Println()
-		printRestorePreview(ios, backup, opts)
+		cmdutil.DisplayRestorePreview(ios, backup, opts)
 		return nil
 	}
 
@@ -116,89 +115,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 
 	// Print results
 	ios.Success("Backup restored to %s", device)
-	printRestoreResult(ios, result)
+	cmdutil.DisplayRestoreResult(ios, result)
 
 	return nil
-}
-
-func printRestorePreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	printBackupSource(ios, backup)
-	ios.Printf("Will restore:\n")
-	printConfigPreview(ios, backup, opts)
-	printScriptsPreview(ios, backup, opts)
-	printSchedulesPreview(ios, backup, opts)
-	printWebhooksPreview(ios, backup, opts)
-}
-
-func printBackupSource(ios *iostreams.IOStreams, backup *shelly.DeviceBackup) {
-	device := backup.Device()
-	ios.Printf("Backup source:\n")
-	ios.Printf("  Device:    %s (%s)\n", device.ID, device.Model)
-	ios.Printf("  Firmware:  %s\n", device.FWVersion)
-	ios.Printf("  Created:   %s\n", backup.CreatedAt.Format("2006-01-02 15:04:05"))
-	ios.Println()
-}
-
-func printConfigPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	if len(backup.Config) > 0 {
-		if opts.SkipNetwork {
-			ios.Printf("  Config:    %d keys (network config excluded)\n", len(backup.Config))
-		} else {
-			ios.Printf("  Config:    %d keys\n", len(backup.Config))
-		}
-	}
-}
-
-func printScriptsPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	if len(backup.Scripts) > 0 {
-		if opts.SkipScripts {
-			ios.Printf("  Scripts:   %d (skipped)\n", len(backup.Scripts))
-		} else {
-			ios.Printf("  Scripts:   %d\n", len(backup.Scripts))
-		}
-	}
-}
-
-func printSchedulesPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	if len(backup.Schedules) > 0 {
-		if opts.SkipSchedules {
-			ios.Printf("  Schedules: %d (skipped)\n", len(backup.Schedules))
-		} else {
-			ios.Printf("  Schedules: %d\n", len(backup.Schedules))
-		}
-	}
-}
-
-func printWebhooksPreview(ios *iostreams.IOStreams, backup *shelly.DeviceBackup, opts shelly.RestoreOptions) {
-	if len(backup.Webhooks) > 0 {
-		if opts.SkipWebhooks {
-			ios.Printf("  Webhooks:  %d (skipped)\n", len(backup.Webhooks))
-		} else {
-			ios.Printf("  Webhooks:  %d\n", len(backup.Webhooks))
-		}
-	}
-}
-
-func printRestoreResult(ios *iostreams.IOStreams, result *shelly.RestoreResult) {
-	ios.Println()
-	if result.ConfigRestored {
-		ios.Printf("  Config:    restored\n")
-	}
-	if result.ScriptsRestored > 0 {
-		ios.Printf("  Scripts:   %d restored\n", result.ScriptsRestored)
-	}
-	if result.SchedulesRestored > 0 {
-		ios.Printf("  Schedules: %d restored\n", result.SchedulesRestored)
-	}
-	if result.WebhooksRestored > 0 {
-		ios.Printf("  Webhooks:  %d restored\n", result.WebhooksRestored)
-	}
-
-	if len(result.Warnings) > 0 {
-		ios.Println()
-		ios.Warning("Warnings:")
-		for _, w := range result.Warnings {
-			ios.Printf("  - %s\n", w)
-		}
-	}
 }

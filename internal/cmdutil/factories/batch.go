@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // pluralize returns the plural form of a word.
@@ -139,7 +139,7 @@ from files or other commands.`, short, componentLower, componentLower, component
 		Long:    longDesc,
 		Example: examples,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			targets, err := helpers.ResolveBatchTargets(groupName, all, args)
+			targets, err := utils.ResolveBatchTargets(groupName, all, args)
 			if err != nil {
 				return err
 			}
