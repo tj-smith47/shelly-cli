@@ -100,7 +100,7 @@ func runDiscover(ctx context.Context, f *cmdutil.Factory, timeout time.Duration,
 		return nil
 	}
 
-	helpers.DisplayDiscoveredDevices(devices)
+	cmdutil.DisplayDiscoveredDevices(ios, devices)
 
 	// Save discovered addresses to completion cache
 	addresses := make([]string, 0, len(devices))

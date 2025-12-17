@@ -18,7 +18,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/completion/install"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -409,7 +408,7 @@ func stepDiscovery(_ context.Context, ios *iostreams.IOStreams, opts *Options) (
 	ios.Println("")
 
 	// Display discovered devices
-	helpers.DisplayDiscoveredDevices(devices)
+	cmdutil.DisplayDiscoveredDevices(ios, devices)
 	ios.Println("")
 
 	return devices, nil

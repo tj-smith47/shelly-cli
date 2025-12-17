@@ -97,7 +97,7 @@ func run(f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool)
 		return nil
 	}
 
-	helpers.DisplayDiscoveredDevices(devices)
+	cmdutil.DisplayDiscoveredDevices(ios, devices)
 
 	// Save discovered addresses to completion cache
 	addresses := make([]string, 0, len(devices))

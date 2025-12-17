@@ -128,7 +128,7 @@ func run(f *cmdutil.Factory, themeName string) error {
 	b.WriteString("\n")
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(theme.Fg()).Render("Power/Energy:"))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("  %s  %s\n", theme.FormatPower(1234.5), theme.FormatEnergy(5678.9)))
+	b.WriteString(fmt.Sprintf("  %s  %s\n", theme.StyledPower(1234.5), theme.StyledEnergy(5678.9)))
 
 	// Table sample
 	b.WriteString("\n")
@@ -143,7 +143,7 @@ func run(f *cmdutil.Factory, themeName string) error {
 	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
 		lipgloss.NewStyle().Foreground(theme.Fg()).Render("kitchen"),
 		theme.StatusOnline().Render("online"),
-		theme.FormatPower(45.2)))
+		theme.StyledPower(45.2)))
 	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
 		dimStyle.Render("bedroom"),
 		theme.StatusOffline().Render("offline"),

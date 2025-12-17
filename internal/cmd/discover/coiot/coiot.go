@@ -119,7 +119,7 @@ func run(ctx context.Context, opts *Options) error {
 	if opts.Verbose {
 		displayGen1Details(ctx, ios, devices)
 	} else {
-		helpers.DisplayDiscoveredDevices(devices)
+		cmdutil.DisplayDiscoveredDevices(ios, devices)
 	}
 
 	// Save discovered addresses to completion cache

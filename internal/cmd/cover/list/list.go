@@ -92,7 +92,7 @@ func displayList(ios *iostreams.IOStreams, covers []shelly.CoverInfo) {
 			position = fmt.Sprintf("%d%%", cover.Position)
 		}
 
-		power := output.FormatPowerValue(cover.Power)
+		power := output.FormatPowerTableValue(cover.Power)
 		t.AddRow(fmt.Sprintf("%d", cover.ID), name, state, position, power)
 	}
 	if err := t.PrintTo(ios.Out); err != nil {

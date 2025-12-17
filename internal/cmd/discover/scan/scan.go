@@ -136,7 +136,7 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 		return nil
 	}
 
-	helpers.DisplayDiscoveredDevices(devices)
+	cmdutil.DisplayDiscoveredDevices(ios, devices)
 
 	// Save discovered addresses to completion cache
 	deviceAddrs := make([]string, 0, len(devices))

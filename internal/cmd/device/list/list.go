@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
@@ -126,8 +125,8 @@ func run(f *cmdutil.Factory, generation int, deviceType string) error {
 	// Table output
 	table := output.NewTable("Name", "Address", "Type", "Model", "Generation", "Auth")
 	for _, dev := range filtered {
-		gen := helpers.FormatGeneration(dev.Generation)
-		auth := helpers.FormatAuth(dev.Auth)
+		gen := output.RenderGeneration(dev.Generation)
+		auth := output.RenderAuthRequired(dev.Auth)
 		table.AddRow(dev.Name, dev.Address, dev.Type, dev.Model, gen, auth)
 	}
 

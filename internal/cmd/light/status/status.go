@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the light status command.
@@ -30,7 +31,7 @@ func displayStatus(ios *iostreams.IOStreams, status *model.LightStatus) {
 	ios.Title("Light %d Status", status.ID)
 	ios.Println()
 
-	ios.Printf("  State:      %s\n", output.RenderOnOffState(status.Output))
+	ios.Printf("  State:      %s\n", output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseError))
 	if status.Brightness != nil {
 		ios.Printf("  Brightness: %d%%\n", *status.Brightness)
 	}

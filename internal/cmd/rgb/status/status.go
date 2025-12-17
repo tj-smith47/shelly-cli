@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the rgb status command.
@@ -30,7 +31,7 @@ func displayStatus(ios *iostreams.IOStreams, status *model.RGBStatus) {
 	ios.Title("RGB %d Status", status.ID)
 	ios.Println()
 
-	ios.Printf("  State:      %s\n", output.RenderOnOffState(status.Output))
+	ios.Printf("  State:      %s\n", output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseError))
 	if status.RGB != nil {
 		ios.Printf("  Color:      R:%d G:%d B:%d\n",
 			status.RGB.Red, status.RGB.Green, status.RGB.Blue)

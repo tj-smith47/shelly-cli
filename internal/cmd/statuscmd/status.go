@@ -154,7 +154,7 @@ func getSwitchState(ctx context.Context, ios *iostreams.IOStreams, conn *client.
 		ios.DebugErr("failed to get switch status", err)
 		return &componentState{Name: name, State: output.RenderErrorState()}
 	}
-	return &componentState{Name: name, State: output.RenderOnOffStateDim(status.Output)}
+	return &componentState{Name: name, State: output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseDim)}
 }
 
 func getLightState(ctx context.Context, ios *iostreams.IOStreams, conn *client.Client, id int, name string) *componentState {
@@ -226,12 +226,12 @@ func showAllDevicesStatus(ctx context.Context, ios *iostreams.IOStreams, svc *sh
 			connErr := svc.WithConnection(ctx, name, func(conn *client.Client) error {
 				info := conn.Info()
 				ds.Model = info.Model
-				ds.Status = output.RenderOnlineState(true)
+				ds.Status = output.RenderOnline(true, output.CaseLower)
 				return nil
 			})
 			if connErr != nil {
 				ds.Model = "-"
-				ds.Status = output.RenderOnlineState(false)
+				ds.Status = output.RenderOnline(false, output.CaseLower)
 			}
 
 			statuses = append(statuses, ds)

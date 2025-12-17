@@ -92,7 +92,7 @@ func displayDevice(ios *iostreams.IOStreams, device *shelly.CloudDevice) {
 		ios.Printf("  FW:     %s\n", device.FirmwareVersion)
 	}
 
-	ios.Printf("  Status: %s\n", output.RenderOnlineStateTitle(device.Online))
+	ios.Printf("  Status: %s\n", output.RenderOnline(device.Online, output.CaseTitle))
 
 	// Show status JSON if requested and available
 	if statusFlag && len(device.Status) > 0 {

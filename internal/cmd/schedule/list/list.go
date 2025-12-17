@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the schedule list command.
@@ -80,7 +81,7 @@ func displaySchedules(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) 
 		// Format calls summary
 		callsSummary := formatCallsSummary(s.Calls)
 
-		table.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNoDim(s.Enable), s.Timespec, callsSummary)
+		table.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), s.Timespec, callsSummary)
 	}
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)

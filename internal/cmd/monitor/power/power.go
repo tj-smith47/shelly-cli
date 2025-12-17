@@ -10,8 +10,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -76,7 +76,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 func displayPowerSnapshot(ios *iostreams.IOStreams, current, previous *shelly.MonitoringSnapshot) {
 	// Clear screen for non-first updates
 	if previous != nil {
-		clearScreen(ios)
+		ios.ClearScreen()
 	}
 
 	ios.Title("Power Consumption")
@@ -93,7 +93,7 @@ func displayPowerSnapshot(ios *iostreams.IOStreams, current, previous *shelly.Mo
 		displayPhase(ios, "A", em.AActivePower, em.AVoltage, em.ACurrent, em.APowerFactor, getPrevEMPowerA(em.ID, previous))
 		displayPhase(ios, "B", em.BActivePower, em.BVoltage, em.BCurrent, em.BPowerFactor, getPrevEMPowerB(em.ID, previous))
 		displayPhase(ios, "C", em.CActivePower, em.CVoltage, em.CCurrent, em.CPowerFactor, getPrevEMPowerC(em.ID, previous))
-		ios.Printf("  Total: %s\n\n", helpers.FormatPowerColored(em.TotalActivePower))
+		ios.Printf("  Total: %s\n\n", output.FormatPowerColored(em.TotalActivePower))
 		totalPower += em.TotalActivePower
 	}
 
@@ -121,23 +121,19 @@ func displayPowerSnapshot(ios *iostreams.IOStreams, current, previous *shelly.Mo
 	// Display totals
 	ios.Println()
 	ios.Printf("═══════════════════════════════════════\n")
-	ios.Printf("  Total Power:  %s\n", theme.StatusOK().Render(helpers.FormatPower(totalPower)))
+	ios.Printf("  Total Power:  %s\n", theme.StatusOK().Render(output.FormatPower(totalPower)))
 	if totalEnergy > 0 {
 		ios.Printf("  Total Energy: %.2f Wh\n", totalEnergy)
 	}
 }
 
-func clearScreen(ios *iostreams.IOStreams) {
-	ios.Printf("\033[H\033[2J")
-}
-
 func displayPhase(ios *iostreams.IOStreams, phase string, power, voltage, current float64, pf, prevPower *float64) {
-	powerStr := helpers.FormatPowerColored(power)
+	powerStr := output.FormatPowerColored(power)
 	if prevPower != nil && power != *prevPower {
 		if power > *prevPower {
-			powerStr = theme.StatusWarn().Render(helpers.FormatPower(power) + " ↑")
+			powerStr = theme.StatusWarn().Render(output.FormatPower(power) + " ↑")
 		} else {
-			powerStr = theme.StatusOK().Render(helpers.FormatPower(power) + " ↓")
+			powerStr = theme.StatusOK().Render(output.FormatPower(power) + " ↓")
 		}
 	}
 	pfStr := ""
@@ -148,12 +144,12 @@ func displayPhase(ios *iostreams.IOStreams, phase string, power, voltage, curren
 }
 
 func displayMeter(ios *iostreams.IOStreams, power, voltage, current float64, pf, prevPower *float64) {
-	powerStr := helpers.FormatPowerColored(power)
+	powerStr := output.FormatPowerColored(power)
 	if prevPower != nil && power != *prevPower {
 		if power > *prevPower {
-			powerStr = theme.StatusWarn().Render(helpers.FormatPower(power) + " ↑")
+			powerStr = theme.StatusWarn().Render(output.FormatPower(power) + " ↑")
 		} else {
-			powerStr = theme.StatusOK().Render(helpers.FormatPower(power) + " ↓")
+			powerStr = theme.StatusOK().Render(output.FormatPower(power) + " ↓")
 		}
 	}
 	pfStr := ""

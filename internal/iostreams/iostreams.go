@@ -265,3 +265,12 @@ func (s *IOStreams) Errorf(format string, args ...any) {
 func (s *IOStreams) Errorln(args ...any) {
 	writelnQuietly(s.ErrOut, args...)
 }
+
+// ClearScreen clears the terminal screen and moves cursor to top-left.
+// Uses ANSI escape codes. No-op if stdout is not a TTY.
+func (s *IOStreams) ClearScreen() {
+	if !s.isStdoutTTY {
+		return
+	}
+	writeQuietly(s.Out, "\033[H\033[2J")
+}

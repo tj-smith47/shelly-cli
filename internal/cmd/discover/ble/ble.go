@@ -168,7 +168,7 @@ func displayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscover
 		}
 
 		// Connectable status
-		connStr := output.RenderYesNo(d.Connectable)
+		connStr := output.RenderYesNo(d.Connectable, output.CaseTitle, theme.FalseError)
 
 		// BTHome data indicator
 		btHomeStr := "-"

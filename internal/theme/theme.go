@@ -44,6 +44,10 @@ type File struct {
 	Colors CustomColors `yaml:"colors" json:"colors,omitempty"`
 }
 
+// StyleFunc represents a styling function compatible with lipgloss Style.Render.
+// Used to pass theme styling functions to formatters.
+type StyleFunc func(...string) string
+
 var (
 	initOnce        sync.Once
 	customOverrides *CustomColors
@@ -480,6 +484,32 @@ func Code() lipgloss.Style {
 }
 
 // =============================================================================
+// FalseStyle - Styling for false case in boolean renderers
+// =============================================================================
+
+// FalseStyle defines how to style the false case in boolean renderers.
+type FalseStyle int
+
+const (
+	// FalseError uses StatusError (red) for the false case.
+	// Use when false represents a bad/error state (offline, failed, etc).
+	FalseError FalseStyle = iota
+	// FalseDim uses Dim (gray) for the false case.
+	// Use when false is the normal/expected state (disabled, stopped, etc).
+	FalseDim
+)
+
+// Render applies the false style to the given text.
+func (s FalseStyle) Render(text string) string {
+	switch s {
+	case FalseDim:
+		return Dim().Render(text)
+	default:
+		return StatusError().Render(text)
+	}
+}
+
+// =============================================================================
 // Rendered Functions - Return pre-styled strings for direct output
 // =============================================================================
 
@@ -508,14 +538,14 @@ func SwitchOff() string {
 	return StatusOffline().Render("OFF")
 }
 
-// FormatPower formats power value with appropriate styling.
-func FormatPower(watts float64) string {
+// StyledPower formats power value with cyan styling for dashboard display.
+func StyledPower(watts float64) string {
 	style := lipgloss.NewStyle().Foreground(Cyan())
 	return style.Render(formatFloat(watts) + "W")
 }
 
-// FormatEnergy formats energy value with appropriate styling.
-func FormatEnergy(wh float64) string {
+// StyledEnergy formats energy value with blue styling for dashboard display.
+func StyledEnergy(wh float64) string {
 	style := lipgloss.NewStyle().Foreground(Blue())
 	if wh >= 1000 {
 		return style.Render(formatFloat(wh/1000) + "kWh")

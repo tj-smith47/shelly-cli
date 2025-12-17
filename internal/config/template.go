@@ -1,25 +1,8 @@
 package config
 
-import (
-	"fmt"
-	"regexp"
-)
-
-// templateNameRegex validates template names (alphanumeric, hyphens, underscores).
-var templateNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
-
 // ValidateTemplateName checks if a template name is valid.
 func ValidateTemplateName(name string) error {
-	if name == "" {
-		return fmt.Errorf("template name cannot be empty")
-	}
-	if len(name) > 64 {
-		return fmt.Errorf("template name too long (max 64 characters)")
-	}
-	if !templateNameRegex.MatchString(name) {
-		return fmt.Errorf("template name contains invalid characters (use alphanumeric, hyphens, underscores)")
-	}
-	return nil
+	return ValidateName(name, "template")
 }
 
 // IsCompatibleModel checks if a template is compatible with a device model.

@@ -34,5 +34,5 @@ func displayStatus(ios *iostreams.IOStreams, status *model.CoverStatus) {
 	if status.CurrentPosition != nil {
 		ios.Printf("  Position: %d%%\n", *status.CurrentPosition)
 	}
-	cmdutil.PrintPowerMetricsWide(ios, status.Power, status.Voltage, status.Current)
+	cmdutil.DisplayPowerMetricsWide(ios, status.Power, status.Voltage, status.Current)
 }

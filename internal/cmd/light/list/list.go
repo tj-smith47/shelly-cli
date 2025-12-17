@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the light list command.
@@ -88,14 +89,14 @@ func displayList(ios *iostreams.IOStreams, lights []shelly.LightInfo) {
 	t := output.NewTable("ID", "Name", "State", "Brightness", "Power")
 	for _, lt := range lights {
 		name := output.FormatComponentName(lt.Name, "light", lt.ID)
-		state := output.RenderOnOffState(lt.Output)
+		state := output.RenderOnOff(lt.Output, output.CaseUpper, theme.FalseError)
 
 		brightness := "-"
 		if lt.Brightness >= 0 {
 			brightness = fmt.Sprintf("%d%%", lt.Brightness)
 		}
 
-		power := output.FormatPowerValue(lt.Power)
+		power := output.FormatPowerTableValue(lt.Power)
 		t.AddRow(fmt.Sprintf("%d", lt.ID), name, state, brightness, power)
 	}
 	if err := t.PrintTo(ios.Out); err != nil {

@@ -12,7 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -308,10 +307,10 @@ func displayDashboard(ios *iostreams.IOStreams, data Data) {
 	ios.Printf("%s\n", theme.Bold().Render("Summary"))
 	ios.Printf("  Devices:     %d total (%d online, %d offline)\n",
 		data.DeviceCount, data.OnlineCount, data.OfflineCount)
-	ios.Printf("  Total Power: %s\n", theme.FormatPower(data.TotalPower))
+	ios.Printf("  Total Power: %s\n", theme.StyledPower(data.TotalPower))
 
 	if data.TotalEnergy > 0 {
-		ios.Printf("  Total Energy: %s\n", theme.FormatEnergy(data.TotalEnergy))
+		ios.Printf("  Total Energy: %s\n", theme.StyledEnergy(data.TotalEnergy))
 	}
 
 	if data.EstimatedCost != nil {
@@ -333,7 +332,7 @@ func displayDashboard(ios *iostreams.IOStreams, data Data) {
 			statusStr = theme.StatusError().Render("offline")
 		}
 
-		powerStr := helpers.FormatPower(dev.TotalPower)
+		powerStr := output.FormatPower(dev.TotalPower)
 		if !dev.Online {
 			powerStr = "-"
 		}

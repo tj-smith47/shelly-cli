@@ -35,33 +35,3 @@ func CollectSensorsByPrefix[T any](status map[string]json.RawMessage, prefix str
 func CollectSensorsByPrefixSilent[T any](status map[string]json.RawMessage, prefix string) []T {
 	return CollectSensorsByPrefix[T](status, prefix, nil)
 }
-
-// AlarmSensorReading represents a sensor with alarm and mute state (flood, smoke).
-type AlarmSensorReading struct {
-	ID    int  `json:"id"`
-	Alarm bool `json:"alarm"`
-	Mute  bool `json:"mute"`
-}
-
-// StyleFunc represents a styling function compatible with lipgloss Style.Render.
-type StyleFunc func(...string) string
-
-// DisplayAlarmSensors displays alarm-type sensors (flood, smoke) with a consistent format.
-// Returns true if any sensors were displayed.
-func DisplayAlarmSensors(ios *iostreams.IOStreams, sensors []AlarmSensorReading, sensorType, alarmMsg string, okStyle, errorStyle, dimStyle StyleFunc) bool {
-	if len(sensors) == 0 {
-		return false
-	}
-	for _, s := range sensors {
-		status := okStyle("Clear")
-		if s.Alarm {
-			status = errorStyle(alarmMsg)
-		}
-		muteStr := ""
-		if s.Mute {
-			muteStr = " " + dimStyle("(muted)")
-		}
-		ios.Printf("    %s Sensor %d: %s%s\n", sensorType, s.ID, status, muteStr)
-	}
-	return true
-}

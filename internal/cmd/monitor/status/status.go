@@ -3,17 +3,15 @@ package status
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 var (
@@ -75,7 +73,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 func displaySnapshot(ios *iostreams.IOStreams, current, previous *shelly.MonitoringSnapshot) {
 	// Clear screen for non-first updates (simple approach)
 	if previous != nil {
-		clearScreen(ios)
+		ios.ClearScreen()
 	}
 
 	ios.Title("Device Status")
@@ -99,37 +97,12 @@ func displayEMStatus(ios *iostreams.IOStreams, statuses []shelly.EMStatus, previ
 	ios.Printf("Energy Meters (3-phase):\n")
 	for i := range statuses {
 		em := &statuses[i]
-		displaySingleEM(ios, em, findPreviousEM(em.ID, previous))
+		prev := output.FindPreviousEM(em.ID, previous)
+		for _, line := range output.FormatEMLines(em, prev) {
+			ios.Println(line)
+		}
 	}
 	ios.Println()
-}
-
-func displaySingleEM(ios *iostreams.IOStreams, em, prev *shelly.EMStatus) {
-	ios.Printf("  EM %d:\n", em.ID)
-
-	// Phase A
-	powerA := helpers.FormatPower(em.AActivePower)
-	if prev != nil && em.AActivePower != prev.AActivePower {
-		powerA = theme.StatusWarn().Render(powerA + " ↑")
-	}
-	ios.Printf("    Phase A: %s  %.1fV  %.2fA\n", powerA, em.AVoltage, em.ACurrent)
-
-	// Phase B
-	powerB := helpers.FormatPower(em.BActivePower)
-	if prev != nil && em.BActivePower != prev.BActivePower {
-		powerB = theme.StatusWarn().Render(powerB + " ↑")
-	}
-	ios.Printf("    Phase B: %s  %.1fV  %.2fA\n", powerB, em.BVoltage, em.BCurrent)
-
-	// Phase C
-	powerC := helpers.FormatPower(em.CActivePower)
-	if prev != nil && em.CActivePower != prev.CActivePower {
-		powerC = theme.StatusWarn().Render(powerC + " ↑")
-	}
-	ios.Printf("    Phase C: %s  %.1fV  %.2fA\n", powerC, em.CVoltage, em.CCurrent)
-
-	// Totals
-	ios.Printf("    Total:   %.1f W\n", em.TotalActivePower)
 }
 
 func displayEM1Status(ios *iostreams.IOStreams, statuses []shelly.EM1Status, previous *shelly.MonitoringSnapshot) {
@@ -140,19 +113,10 @@ func displayEM1Status(ios *iostreams.IOStreams, statuses []shelly.EM1Status, pre
 	ios.Printf("Energy Meters (single-phase):\n")
 	for i := range statuses {
 		em1 := &statuses[i]
-		displaySingleEM1(ios, em1, findPreviousEM1(em1.ID, previous))
+		prev := output.FindPreviousEM1(em1.ID, previous)
+		ios.Println(output.FormatEM1Line(em1, prev))
 	}
 	ios.Println()
-}
-
-func displaySingleEM1(ios *iostreams.IOStreams, em1, prev *shelly.EM1Status) {
-	power := helpers.FormatPower(em1.ActPower)
-	if prev != nil && em1.ActPower != prev.ActPower {
-		power = theme.StatusWarn().Render(power + " ↑")
-	}
-
-	ios.Printf("  EM1 %d: %s  %.1fV  %.2fA\n",
-		em1.ID, power, em1.Voltage, em1.Current)
 }
 
 func displayPMStatus(ios *iostreams.IOStreams, statuses []shelly.PMStatus, previous *shelly.MonitoringSnapshot) {
@@ -163,61 +127,8 @@ func displayPMStatus(ios *iostreams.IOStreams, statuses []shelly.PMStatus, previ
 	ios.Printf("Power Meters:\n")
 	for i := range statuses {
 		pm := &statuses[i]
-		displaySinglePM(ios, pm, findPreviousPM(pm.ID, previous))
+		prev := output.FindPreviousPM(pm.ID, previous)
+		ios.Println(output.FormatPMLine(pm, prev))
 	}
 }
 
-func displaySinglePM(ios *iostreams.IOStreams, pm, prev *shelly.PMStatus) {
-	power := helpers.FormatPower(pm.APower)
-	if prev != nil && pm.APower != prev.APower {
-		power = theme.StatusWarn().Render(power + " ↑")
-	}
-
-	energyStr := ""
-	if pm.AEnergy != nil {
-		energyStr = fmt.Sprintf("  %.2f Wh", pm.AEnergy.Total)
-	}
-
-	ios.Printf("  PM %d: %s  %.1fV  %.2fA%s\n",
-		pm.ID, power, pm.Voltage, pm.Current, energyStr)
-}
-
-func clearScreen(ios *iostreams.IOStreams) {
-	ios.Printf("\033[H\033[2J")
-}
-
-func findPreviousEM(id int, prev *shelly.MonitoringSnapshot) *shelly.EMStatus {
-	if prev == nil {
-		return nil
-	}
-	for i := range prev.EM {
-		if prev.EM[i].ID == id {
-			return &prev.EM[i]
-		}
-	}
-	return nil
-}
-
-func findPreviousEM1(id int, prev *shelly.MonitoringSnapshot) *shelly.EM1Status {
-	if prev == nil {
-		return nil
-	}
-	for i := range prev.EM1 {
-		if prev.EM1[i].ID == id {
-			return &prev.EM1[i]
-		}
-	}
-	return nil
-}
-
-func findPreviousPM(id int, prev *shelly.MonitoringSnapshot) *shelly.PMStatus {
-	if prev == nil {
-		return nil
-	}
-	for i := range prev.PM {
-		if prev.PM[i].ID == id {
-			return &prev.PM[i]
-		}
-	}
-	return nil
-}

@@ -164,7 +164,7 @@ func displayThermostats(ios *iostreams.IOStreams, thermostats []ThermostatInfo, 
 
 	for _, t := range thermostats {
 		ios.Printf("  %s %d\n", theme.Highlight().Render("Thermostat"), t.ID)
-		ios.Printf("    Status: %s\n", output.RenderActiveStateDim(t.Enabled))
+		ios.Printf("    Status: %s\n", output.RenderActive(t.Enabled, output.CaseTitle, theme.FalseDim))
 		if t.TargetC > 0 {
 			ios.Printf("    Target: %.1f°C\n", t.TargetC)
 		}

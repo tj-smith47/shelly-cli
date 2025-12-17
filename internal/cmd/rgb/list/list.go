@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the rgb list command.
@@ -81,7 +82,7 @@ func displayList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
 	t := output.NewTable("ID", "Name", "State", "Color", "Brightness", "Power")
 	for _, rgb := range rgbs {
 		name := output.FormatComponentName(rgb.Name, "rgb", rgb.ID)
-		state := output.RenderOnOffState(rgb.Output)
+		state := output.RenderOnOff(rgb.Output, output.CaseUpper, theme.FalseError)
 		color := fmt.Sprintf("R:%d G:%d B:%d", rgb.Red, rgb.Green, rgb.Blue)
 
 		brightness := "-"
@@ -89,7 +90,7 @@ func displayList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
 			brightness = fmt.Sprintf("%d%%", rgb.Brightness)
 		}
 
-		power := output.FormatPowerValue(rgb.Power)
+		power := output.FormatPowerTableValue(rgb.Power)
 		t.AddRow(fmt.Sprintf("%d", rgb.ID), name, state, color, brightness, power)
 	}
 	if err := t.PrintTo(ios.Out); err != nil {

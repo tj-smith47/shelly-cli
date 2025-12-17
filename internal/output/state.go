@@ -7,33 +7,49 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Case defines text casing for boolean labels.
+type Case int
+
+const (
+	// CaseLower uses lowercase labels (on/off, yes/no, active/inactive).
+	CaseLower Case = iota
+	// CaseTitle uses title case labels (On/Off, Yes/No, Active/Inactive).
+	CaseTitle
+	// CaseUpper uses uppercase labels (ON/OFF). Only valid for OnOff family.
+	CaseUpper
+)
+
 // State label constants for consistent display text.
 const (
-	// On/Off states.
-	LabelOn    = "ON"
-	LabelOff   = "OFF"
-	LabelOnLC  = "on"  // lowercase variant for dim styling
-	LabelOffLC = "off" // lowercase variant for dim styling
+	// On/Off states (all casings).
+	LabelOnUpper  = "ON"
+	LabelOffUpper = "OFF"
+	LabelOnTitle  = "On"
+	LabelOffTitle = "Off"
+	LabelOnLower  = "on"
+	LabelOffLower = "off"
 
-	// Active/Inactive states.
-	LabelActive   = "Active"
-	LabelInactive = "inactive"
-	LabelActiveLC = "active" // lowercase
-	LabelOffTitle = "Off"    // title case for thermostat inactive
+	// Active/Inactive states (all casings).
+	LabelActiveTitle   = "Active"
+	LabelInactiveTitle = "Inactive"
+	LabelActiveLower   = "active"
+	LabelInactiveLower = "inactive"
 
 	// Enabled/Disabled states.
 	LabelEnabled  = "Enabled"
 	LabelDisabled = "Disabled"
 
-	// Yes/No states.
-	LabelYes   = "Yes"
-	LabelNo    = "No"
-	LabelYesLC = "yes" // lowercase
-	LabelNoLC  = "no"  // lowercase
+	// Yes/No states (all casings).
+	LabelYesTitle = "Yes"
+	LabelNoTitle  = "No"
+	LabelYesLower = "yes"
+	LabelNoLower  = "no"
 
-	// Online/Offline states.
-	LabelOnline  = "online"
-	LabelOffline = "offline"
+	// Online/Offline states (all casings).
+	LabelOnlineTitle  = "Online"
+	LabelOfflineTitle = "Offline"
+	LabelOnlineLower  = "online"
+	LabelOfflineLower = "offline"
 
 	// Running/Stopped states.
 	LabelRunning = "running"
@@ -75,10 +91,6 @@ const (
 	LabelInvalid     = "Invalid"
 	LabelExpired     = "Expired"
 
-	// Online/Offline title case variants.
-	LabelOnlineTitle  = "Online"
-	LabelOfflineTitle = "Offline"
-
 	// Firmware update status.
 	LabelUpdateAvailable = "(update available)"
 	LabelUpToDate        = "(up to date)"
@@ -94,21 +106,76 @@ const (
 	LabelChanged = "Changed:"
 )
 
-// RenderOnOffState returns a themed "ON" or "OFF" string based on state.
-func RenderOnOffState(on bool) string {
-	if on {
-		return theme.StatusOK().Render(LabelOn)
+// =============================================================================
+// Consolidated Boolean Renderers
+// =============================================================================
+
+// RenderOnOff returns a themed on/off string with configurable case and false style.
+func RenderOnOff(on bool, c Case, fs theme.FalseStyle) string {
+	var trueLabel, falseLabel string
+	switch c {
+	case CaseUpper:
+		trueLabel, falseLabel = LabelOnUpper, LabelOffUpper
+	case CaseTitle:
+		trueLabel, falseLabel = LabelOnTitle, LabelOffTitle
+	default:
+		trueLabel, falseLabel = LabelOnLower, LabelOffLower
 	}
-	return theme.StatusError().Render(LabelOff)
+	if on {
+		return theme.StatusOK().Render(trueLabel)
+	}
+	return fs.Render(falseLabel)
 }
 
-// RenderActiveState returns a themed "active" or "inactive" string.
-func RenderActiveState(active bool) string {
-	if active {
-		return theme.StatusOK().Render(LabelActiveLC)
+// RenderYesNo returns a themed yes/no string with configurable case and false style.
+func RenderYesNo(value bool, c Case, fs theme.FalseStyle) string {
+	var trueLabel, falseLabel string
+	switch c {
+	case CaseTitle, CaseUpper: // Yes/No only has Title and Lower
+		trueLabel, falseLabel = LabelYesTitle, LabelNoTitle
+	default:
+		trueLabel, falseLabel = LabelYesLower, LabelNoLower
 	}
-	return theme.StatusError().Render(LabelInactive)
+	if value {
+		return theme.StatusOK().Render(trueLabel)
+	}
+	return fs.Render(falseLabel)
 }
+
+// RenderOnline returns a themed online/offline string with configurable case.
+// Always uses FalseError style since offline is typically a problem.
+func RenderOnline(online bool, c Case) string {
+	var trueLabel, falseLabel string
+	switch c {
+	case CaseTitle, CaseUpper: // Online only has Title and Lower
+		trueLabel, falseLabel = LabelOnlineTitle, LabelOfflineTitle
+	default:
+		trueLabel, falseLabel = LabelOnlineLower, LabelOfflineLower
+	}
+	if online {
+		return theme.StatusOK().Render(trueLabel)
+	}
+	return theme.StatusError().Render(falseLabel)
+}
+
+// RenderActive returns a themed active/inactive string with configurable case and false style.
+func RenderActive(active bool, c Case, fs theme.FalseStyle) string {
+	var trueLabel, falseLabel string
+	switch c {
+	case CaseTitle, CaseUpper: // Active only has Title and Lower
+		trueLabel, falseLabel = LabelActiveTitle, LabelInactiveTitle
+	default:
+		trueLabel, falseLabel = LabelActiveLower, LabelInactiveLower
+	}
+	if active {
+		return theme.StatusOK().Render(trueLabel)
+	}
+	return fs.Render(falseLabel)
+}
+
+// =============================================================================
+// Other Renderers (not part of the consolidated families)
+// =============================================================================
 
 // RenderBoolState returns a themed string with custom labels.
 func RenderBoolState(value bool, trueLabel, falseLabel string) string {
@@ -119,7 +186,6 @@ func RenderBoolState(value bool, trueLabel, falseLabel string) string {
 }
 
 // RenderEnabledState returns themed "Enabled" or "Disabled" string.
-// Uses Dim style for disabled (less alarming than error style).
 func RenderEnabledState(enabled bool) string {
 	if enabled {
 		return theme.StatusOK().Render(LabelEnabled)
@@ -128,7 +194,6 @@ func RenderEnabledState(enabled bool) string {
 }
 
 // RenderAvailableState returns themed "available" or custom unavailable text.
-// Uses Dim style for unavailable (less alarming than error style).
 func RenderAvailableState(available bool, unavailableText string) string {
 	if available {
 		return theme.StatusOK().Render(LabelAvailable)
@@ -137,7 +202,6 @@ func RenderAvailableState(available bool, unavailableText string) string {
 }
 
 // RenderCoverState returns a themed cover state string.
-// States: open (green), closed (red), opening/closing/stopped (yellow).
 func RenderCoverState(state string) string {
 	switch state {
 	case LabelCoverOpen:
@@ -147,39 +211,6 @@ func RenderCoverState(state string) string {
 	default:
 		return theme.StatusWarn().Render(state)
 	}
-}
-
-// FormatComponentName returns the component name or a fallback "{type}:{id}".
-func FormatComponentName(name, componentType string, id int) string {
-	if name != "" {
-		return name
-	}
-	return fmt.Sprintf("%s:%d", componentType, id)
-}
-
-// FormatPowerValue returns formatted power string or "-" if zero.
-func FormatPowerValue(power float64) string {
-	if power > 0 {
-		return fmt.Sprintf("%.1f W", power)
-	}
-	return "-"
-}
-
-// RenderYesNo returns themed "Yes" or "No" string.
-func RenderYesNo(value bool) string {
-	if value {
-		return theme.StatusOK().Render(LabelYes)
-	}
-	return theme.StatusError().Render(LabelNo)
-}
-
-// RenderYesNoDim returns themed "yes" or dimmed "no" string.
-// Useful when "no" is the normal/default state.
-func RenderYesNoDim(value bool) string {
-	if value {
-		return theme.StatusOK().Render(LabelYesLC)
-	}
-	return theme.Dim().Render(LabelNoLC)
 }
 
 // RenderRunningState returns themed "running" or dimmed "stopped" string.
@@ -198,30 +229,6 @@ func RenderNetworkState(state string) string {
 	return theme.Dim().Render(state)
 }
 
-// FormatPlaceholder returns dimmed placeholder text.
-func FormatPlaceholder(text string) string {
-	return theme.Dim().Render(text)
-}
-
-// FormatActionCount returns themed action count string.
-func FormatActionCount(count int) string {
-	if count == 0 {
-		return theme.StatusWarn().Render(LabelEmpty)
-	}
-	if count == 1 {
-		return theme.StatusOK().Render(LabelAction)
-	}
-	return theme.StatusOK().Render(fmt.Sprintf(LabelActions, count))
-}
-
-// RenderOnlineState returns themed "online" or "offline" string.
-func RenderOnlineState(online bool) string {
-	if online {
-		return theme.StatusOK().Render(LabelOnline)
-	}
-	return theme.StatusError().Render(LabelOffline)
-}
-
 // RenderInputTriggeredState returns themed "triggered" or "idle" string.
 func RenderInputTriggeredState(triggered bool) string {
 	if triggered {
@@ -235,33 +242,15 @@ func RenderErrorState() string {
 	return theme.StatusError().Render(LabelError)
 }
 
-// RenderOnOffStateDim returns themed "ON" or dimmed "off" string.
-// Useful when OFF is the normal/default state.
-func RenderOnOffStateDim(on bool) string {
-	if on {
-		return theme.StatusOK().Render(LabelOn)
-	}
-	return theme.Dim().Render(LabelOffLC)
-}
-
 // RenderOnOffStateWithBrightness returns themed "ON (X%)" or dimmed "off" string.
 func RenderOnOffStateWithBrightness(on bool, brightness *int) string {
 	if on {
 		if brightness != nil && *brightness > 0 {
-			return theme.StatusOK().Render(fmt.Sprintf("%s (%d%%)", LabelOn, *brightness))
+			return theme.StatusOK().Render(fmt.Sprintf("%s (%d%%)", LabelOnUpper, *brightness))
 		}
-		return theme.StatusOK().Render(LabelOn)
+		return theme.StatusOK().Render(LabelOnUpper)
 	}
-	return theme.Dim().Render(LabelOffLC)
-}
-
-// RenderActiveStateDim returns themed "Active" or dimmed "Off" string.
-// Useful for thermostat and similar active/inactive states.
-func RenderActiveStateDim(active bool) string {
-	if active {
-		return theme.StatusOK().Render(LabelActive)
-	}
-	return theme.Dim().Render(LabelOffTitle)
+	return theme.Dim().Render(LabelOffLower)
 }
 
 // RenderValveState returns themed "Open (heating)" or dimmed "Closed" string.
@@ -291,22 +280,6 @@ func RenderTokenValidity(valid, expired bool) string {
 	default:
 		return theme.StatusOK().Render(LabelValid)
 	}
-}
-
-// RenderOnlineStateTitle returns themed "Online" or "Offline" string (title case).
-func RenderOnlineStateTitle(online bool) string {
-	if online {
-		return theme.StatusOK().Render(LabelOnlineTitle)
-	}
-	return theme.StatusError().Render(LabelOfflineTitle)
-}
-
-// RenderYesNoLC returns themed lowercase "yes" or "no" string with error style for no.
-func RenderYesNoLC(value bool) string {
-	if value {
-		return theme.StatusOK().Render(LabelYesLC)
-	}
-	return theme.StatusError().Render(LabelNoLC)
 }
 
 // RenderUpdateStatus returns themed firmware update status string.
@@ -354,4 +327,20 @@ func RenderDiffAdded() string {
 // RenderDiffChanged returns themed diff "Changed" section header.
 func RenderDiffChanged() string {
 	return theme.StatusWarn().Render(LabelChanged)
+}
+
+// RenderAuthRequired returns themed "Yes" (warning) or "No" (ok) for auth status.
+func RenderAuthRequired(required bool) string {
+	if required {
+		return theme.StatusWarn().Render(LabelYesTitle)
+	}
+	return theme.StatusOK().Render(LabelNoTitle)
+}
+
+// RenderGeneration returns themed generation string (e.g., "Gen2") or dimmed "unknown".
+func RenderGeneration(gen int) string {
+	if gen == 0 {
+		return theme.Dim().Render("unknown")
+	}
+	return theme.Bold().Render(fmt.Sprintf("Gen%d", gen))
 }

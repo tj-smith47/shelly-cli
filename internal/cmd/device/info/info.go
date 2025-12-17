@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
@@ -76,10 +75,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	table.AddRow("ID", info.ID)
 	table.AddRow("MAC", info.MAC)
 	table.AddRow("Model", info.Model)
-	table.AddRow("Generation", helpers.FormatGeneration(info.Generation))
+	table.AddRow("Generation", output.RenderGeneration(info.Generation))
 	table.AddRow("Firmware", info.Firmware)
 	table.AddRow("Application", info.App)
-	table.AddRow("Auth Enabled", helpers.FormatAuth(info.AuthEn))
+	table.AddRow("Auth Enabled", output.RenderAuthRequired(info.AuthEn))
 
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print device info table", err)

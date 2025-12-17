@@ -3,13 +3,11 @@ package get
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
@@ -89,74 +87,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 		return output.PrintYAML(result)
 	}
 
-	return printConfigTable(ios, result)
-}
-
-// printConfigTable prints configuration as a formatted table.
-func printConfigTable(ios *iostreams.IOStreams, config any) error {
-	configMap, ok := config.(map[string]any)
-	if !ok {
-		return output.PrintJSON(config)
-	}
-
-	for component, cfg := range configMap {
-		ios.Title("%s", component)
-
-		cfgMap, ok := cfg.(map[string]any)
-		if !ok {
-			// If it's not a map, just print it as JSON
-			data, err := json.MarshalIndent(cfg, "", "  ")
-			if err != nil {
-				ios.DebugErr("marshaling config component", err)
-			} else {
-				ios.Printf("%s\n", data)
-			}
-			ios.Printf("\n")
-			continue
-		}
-
-		table := output.NewTable("Setting", "Value")
-		for key, value := range cfgMap {
-			table.AddRow(key, formatValue(value, ios))
-		}
-		if err := table.PrintTo(ios.Out); err != nil {
-			ios.DebugErr("print config table", err)
-		}
-		ios.Printf("\n")
-	}
-
-	return nil
-}
-
-// formatValue formats a configuration value for display.
-func formatValue(v any, ios *iostreams.IOStreams) string {
-	switch val := v.(type) {
-	case nil:
-		return "<not set>"
-	case bool:
-		if val {
-			return "true"
-		}
-		return "false"
-	case float64:
-		// Check if it's an integer
-		if val == float64(int64(val)) {
-			return fmt.Sprintf("%d", int64(val))
-		}
-		return fmt.Sprintf("%.2f", val)
-	case string:
-		if val == "" {
-			return "<empty>"
-		}
-		return val
-	case map[string]any, []any:
-		data, err := json.Marshal(val)
-		if err != nil {
-			ios.DebugErr("marshaling config value", err)
-			return fmt.Sprintf("%v", val)
-		}
-		return string(data)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
+	return cmdutil.DisplayConfigTable(ios, result)
 }

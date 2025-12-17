@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -309,9 +308,9 @@ func displayComparison(ios *iostreams.IOStreams, data ComparisonData) {
 
 	// Summary
 	ios.Printf("%s\n", theme.Bold().Render("Summary"))
-	ios.Printf("  Total Energy: %s\n", theme.FormatEnergy(data.TotalEnergy*1000))
-	ios.Printf("  Max Device:   %s\n", theme.FormatEnergy(data.MaxEnergy*1000))
-	ios.Printf("  Min Device:   %s\n", theme.FormatEnergy(data.MinEnergy*1000))
+	ios.Printf("  Total Energy: %s\n", theme.StyledEnergy(data.TotalEnergy*1000))
+	ios.Printf("  Max Device:   %s\n", theme.StyledEnergy(data.MaxEnergy*1000))
+	ios.Printf("  Min Device:   %s\n", theme.StyledEnergy(data.MinEnergy*1000))
 	ios.Printf("\n")
 
 	// Sort by energy consumption (descending)
@@ -342,9 +341,9 @@ func displayComparison(ios *iostreams.IOStreams, data ComparisonData) {
 		shareStr := "-"
 
 		if dev.Online {
-			energyStr = formatEnergy(dev.Energy)
-			avgStr = helpers.FormatPower(dev.AvgPower)
-			peakStr = helpers.FormatPower(dev.PeakPower)
+			energyStr = output.FormatEnergy(dev.Energy * 1000) // dev.Energy is kWh, FormatEnergy takes Wh
+			avgStr = output.FormatPower(dev.AvgPower)
+			peakStr = output.FormatPower(dev.PeakPower)
 			if dev.Percentage > 0 {
 				shareStr = fmt.Sprintf("%.1f%%", dev.Percentage)
 			}
@@ -390,13 +389,6 @@ func displayBarChart(ios *iostreams.IOStreams, devices []DeviceEnergy, maxEnergy
 		bar := strings.Repeat("█", barLen)
 		ios.Printf("  %s │ %s %.2f kWh\n", name, theme.Highlight().Render(bar), dev.Energy)
 	}
-}
-
-func formatEnergy(kwh float64) string {
-	if kwh >= 1 {
-		return fmt.Sprintf("%.2f kWh", kwh)
-	}
-	return fmt.Sprintf("%.0f Wh", kwh*1000)
 }
 
 func truncate(s string, maxLen int) string {

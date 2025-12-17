@@ -3,20 +3,17 @@ package export
 
 import (
 	"context"
-	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
 const (
@@ -124,7 +121,9 @@ func exportEMData(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Ser
 	// Export based on format
 	switch format {
 	case formatCSV:
-		return exportEMDataCSV(ios, data, outputFile)
+		return exportCSV(ios, outputFile, func() ([]byte, error) {
+			return shellyexport.FormatEMDataCSV(data)
+		})
 	case formatJSON:
 		return exportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
 	case formatYAML:
@@ -144,7 +143,9 @@ func exportEM1Data(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 	// Export based on format
 	switch format {
 	case formatCSV:
-		return exportEM1DataCSV(ios, data, outputFile)
+		return exportCSV(ios, outputFile, func() ([]byte, error) {
+			return shellyexport.FormatEM1DataCSV(data)
+		})
 	case formatJSON:
 		return exportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
 	case formatYAML:
@@ -154,9 +155,10 @@ func exportEM1Data(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 	}
 }
 
-func exportEMDataCSV(ios *iostreams.IOStreams, data *components.EMDataGetDataResult, outputFile string) error {
-	if data == nil || len(data.Data) == 0 {
-		return fmt.Errorf("no data to export")
+func exportCSV(ios *iostreams.IOStreams, outputFile string, formatter func() ([]byte, error)) error {
+	csvData, err := formatter()
+	if err != nil {
+		return err
 	}
 
 	writer, closer, err := getWriter(ios, outputFile)
@@ -165,123 +167,8 @@ func exportEMDataCSV(ios *iostreams.IOStreams, data *components.EMDataGetDataRes
 	}
 	defer closer()
 
-	csvWriter := csv.NewWriter(writer)
-	defer csvWriter.Flush()
-
-	// Write CSV headers for 3-phase energy meter
-	headers := []string{
-		"timestamp",
-		"a_voltage", "a_current", "a_act_power", "a_aprt_power", "a_pf", "a_freq",
-		"b_voltage", "b_current", "b_act_power", "b_aprt_power", "b_pf", "b_freq",
-		"c_voltage", "c_current", "c_act_power", "c_aprt_power", "c_pf", "c_freq",
-		"total_current", "total_act_power", "total_aprt_power",
-		"total_act_energy", "total_act_ret_energy",
-		"n_current",
-	}
-	if err := csvWriter.Write(headers); err != nil {
-		return fmt.Errorf("failed to write CSV headers: %w", err)
-	}
-
-	// Write data rows
-	for _, block := range data.Data {
-		ts := block.TS
-		period := int64(block.Period)
-
-		for i, v := range block.Values {
-			// Calculate timestamp for this measurement
-			measurementTS := ts + int64(i)*period
-			timeStr := time.Unix(measurementTS, 0).UTC().Format(time.RFC3339)
-
-			row := []string{
-				timeStr,
-				formatFloat(v.AVoltage),
-				formatFloat(v.ACurrent),
-				formatFloat(v.AActivePower),
-				formatFloat(v.AApparentPower),
-				formatFloatPtr(v.APowerFactor),
-				formatFloatPtr(v.AFreq),
-				formatFloat(v.BVoltage),
-				formatFloat(v.BCurrent),
-				formatFloat(v.BActivePower),
-				formatFloat(v.BApparentPower),
-				formatFloatPtr(v.BPowerFactor),
-				formatFloatPtr(v.BFreq),
-				formatFloat(v.CVoltage),
-				formatFloat(v.CCurrent),
-				formatFloat(v.CActivePower),
-				formatFloat(v.CApparentPower),
-				formatFloatPtr(v.CPowerFactor),
-				formatFloatPtr(v.CFreq),
-				formatFloat(v.TotalCurrent),
-				formatFloat(v.TotalActivePower),
-				formatFloat(v.TotalAprtPower),
-				formatFloatPtr(v.TotalActEnergy),
-				formatFloatPtr(v.TotalActRetEnergy),
-				formatFloatPtr(v.NCurrent),
-			}
-
-			if err := csvWriter.Write(row); err != nil {
-				return fmt.Errorf("failed to write CSV row: %w", err)
-			}
-		}
-	}
-
-	if outputFile != "" {
-		ios.Success("Exported to %s (CSV)", outputFile)
-	}
-	return nil
-}
-
-func exportEM1DataCSV(ios *iostreams.IOStreams, data *components.EM1DataGetDataResult, outputFile string) error {
-	if data == nil || len(data.Data) == 0 {
-		return fmt.Errorf("no data to export")
-	}
-
-	writer, closer, err := getWriter(ios, outputFile)
-	if err != nil {
-		return err
-	}
-	defer closer()
-
-	csvWriter := csv.NewWriter(writer)
-	defer csvWriter.Flush()
-
-	// Write CSV headers for single-phase energy meter
-	headers := []string{
-		"timestamp",
-		"voltage", "current", "act_power", "aprt_power", "pf", "freq",
-		"act_energy", "act_ret_energy",
-	}
-	if err := csvWriter.Write(headers); err != nil {
-		return fmt.Errorf("failed to write CSV headers: %w", err)
-	}
-
-	// Write data rows
-	for _, block := range data.Data {
-		ts := block.TS
-		period := int64(block.Period)
-
-		for i, v := range block.Values {
-			// Calculate timestamp for this measurement
-			measurementTS := ts + int64(i)*period
-			timeStr := time.Unix(measurementTS, 0).UTC().Format(time.RFC3339)
-
-			row := []string{
-				timeStr,
-				formatFloat(v.Voltage),
-				formatFloat(v.Current),
-				formatFloat(v.ActivePower),
-				formatFloat(v.ApparentPower),
-				formatFloatPtr(v.PowerFactor),
-				formatFloatPtr(v.Freq),
-				formatFloatPtr(v.ActEnergy),
-				formatFloatPtr(v.ActRetEnergy),
-			}
-
-			if err := csvWriter.Write(row); err != nil {
-				return fmt.Errorf("failed to write CSV row: %w", err)
-			}
-		}
+	if _, err := writer.Write(csvData); err != nil {
+		return fmt.Errorf("failed to write CSV data: %w", err)
 	}
 
 	if outputFile != "" {
@@ -324,15 +211,4 @@ func getWriter(ios *iostreams.IOStreams, outputFile string) (io.Writer, func(), 
 			ios.DebugErr("close output file", err)
 		}
 	}, nil
-}
-
-func formatFloat(f float64) string {
-	return strconv.FormatFloat(f, 'f', -1, 64)
-}
-
-func formatFloatPtr(f *float64) string {
-	if f == nil {
-		return ""
-	}
-	return strconv.FormatFloat(*f, 'f', -1, 64)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the switch list command.
@@ -84,8 +85,8 @@ func displayList(ios *iostreams.IOStreams, switches []shelly.SwitchInfo) {
 	t := output.NewTable("ID", "Name", "State", "Power")
 	for _, sw := range switches {
 		name := output.FormatComponentName(sw.Name, "switch", sw.ID)
-		state := output.RenderOnOffState(sw.Output)
-		power := output.FormatPowerValue(sw.Power)
+		state := output.RenderOnOff(sw.Output, output.CaseUpper, theme.FalseError)
+		power := output.FormatPowerTableValue(sw.Power)
 		t.AddRow(fmt.Sprintf("%d", sw.ID), name, state, power)
 	}
 	t.Print()

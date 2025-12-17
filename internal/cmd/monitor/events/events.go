@@ -10,7 +10,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -120,7 +119,7 @@ func formatEventData(data map[string]any) string {
 	}
 
 	if power, ok := data["apower"].(float64); ok {
-		parts = append(parts, helpers.FormatPowerColored(power))
+		parts = append(parts, output.FormatPowerColored(power))
 	}
 
 	if temp, ok := data["temperature"].(map[string]any); ok {

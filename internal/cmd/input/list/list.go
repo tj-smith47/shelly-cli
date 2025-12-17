@@ -89,7 +89,7 @@ func displayList(ios *iostreams.IOStreams, inputs []shelly.InputInfo) {
 			name = theme.Dim().Render("-")
 		}
 
-		state := output.RenderActiveState(input.State)
+		state := output.RenderActive(input.State, output.CaseLower, theme.FalseError)
 
 		table.AddRow(
 			fmt.Sprintf("%d", input.ID),

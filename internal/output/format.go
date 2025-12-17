@@ -11,6 +11,8 @@ import (
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
+
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // Format represents an output format.
@@ -294,4 +296,69 @@ func WantsStructured() bool {
 func FormatOutput(w io.Writer, data any) error {
 	formatter := NewFormatter(GetFormat())
 	return formatter.Format(w, data)
+}
+
+// FormatPlaceholder returns dimmed placeholder text.
+func FormatPlaceholder(text string) string {
+	return theme.Dim().Render(text)
+}
+
+// FormatActionCount returns themed action count string.
+func FormatActionCount(count int) string {
+	if count == 0 {
+		return theme.StatusWarn().Render("0 (empty)")
+	}
+	if count == 1 {
+		return theme.StatusOK().Render("1 action")
+	}
+	return theme.StatusOK().Render(fmt.Sprintf("%d actions", count))
+}
+
+// FormatConfigValue converts any configuration value to a display string.
+// It handles nil, bool, float64, string, maps, and slices appropriately.
+func FormatConfigValue(v interface{}) string {
+	switch val := v.(type) {
+	case nil:
+		return "<not set>"
+	case bool:
+		if val {
+			return "true"
+		}
+		return "false"
+	case float64:
+		// Check if it's an integer
+		if val == float64(int64(val)) {
+			return fmt.Sprintf("%d", int64(val))
+		}
+		return fmt.Sprintf("%.2f", val)
+	case string:
+		if val == "" {
+			return "<empty>"
+		}
+		return val
+	case map[string]interface{}, []interface{}:
+		data, err := json.Marshal(val)
+		if err != nil {
+			return fmt.Sprintf("%v", val)
+		}
+		return string(data)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// FormatConfigTable builds a table from a configuration map.
+// It expects a map[string]interface{} where keys are setting names.
+// Returns nil if config is not a map.
+func FormatConfigTable(config interface{}) *Table {
+	cfgMap, ok := config.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	table := NewTable("Setting", "Value")
+	for key, value := range cfgMap {
+		table.AddRow(key, FormatConfigValue(value))
+	}
+	return table
 }

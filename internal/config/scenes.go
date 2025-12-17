@@ -1,25 +1,8 @@
 package config
 
-import (
-	"fmt"
-	"regexp"
-)
-
-// sceneNameRegex validates scene names (alphanumeric, hyphens, underscores).
-var sceneNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
-
 // ValidateSceneName checks if a scene name is valid.
 func ValidateSceneName(name string) error {
-	if name == "" {
-		return fmt.Errorf("scene name cannot be empty")
-	}
-	if len(name) > 64 {
-		return fmt.Errorf("scene name too long (max 64 characters)")
-	}
-	if !sceneNameRegex.MatchString(name) {
-		return fmt.Errorf("scene name contains invalid characters")
-	}
-	return nil
+	return ValidateName(name, "scene")
 }
 
 // Package-level functions delegate to the default manager.

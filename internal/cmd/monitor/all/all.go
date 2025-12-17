@@ -11,9 +11,9 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -131,7 +131,7 @@ func fetchAllSnapshots(ctx context.Context, svc *shelly.Service, devices map[str
 
 func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceSnapshot, mu *sync.Mutex) {
 	// Clear screen
-	clearScreen(ios)
+	ios.ClearScreen()
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -186,7 +186,7 @@ func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceS
 			deviceModel = snap.Info.Model
 		}
 
-		powerStr := helpers.FormatPowerColored(devicePower)
+		powerStr := output.FormatPowerColored(devicePower)
 		energyStr := ""
 		if deviceEnergy > 0 {
 			energyStr = fmt.Sprintf("  %.2f Wh", deviceEnergy)
@@ -201,12 +201,9 @@ func displayAllSnapshots(ios *iostreams.IOStreams, snapshots map[string]*deviceS
 	ios.Printf("  Online:       %s / %d devices\n",
 		theme.StatusOK().Render(fmt.Sprintf("%d", onlineCount)),
 		onlineCount+offlineCount)
-	ios.Printf("  Total Power:  %s\n", theme.StatusOK().Render(helpers.FormatPower(totalPower)))
+	ios.Printf("  Total Power:  %s\n", theme.StatusOK().Render(output.FormatPower(totalPower)))
 	if totalEnergy > 0 {
 		ios.Printf("  Total Energy: %.2f Wh\n", totalEnergy)
 	}
 }
 
-func clearScreen(ios *iostreams.IOStreams) {
-	ios.Printf("\033[H\033[2J")
-}

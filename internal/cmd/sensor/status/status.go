@@ -12,7 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -313,12 +313,11 @@ func displayFlood(ios *iostreams.IOStreams, floods []FloodReading) bool {
 	}
 	ios.Println("  " + theme.Highlight().Render("Flood Detection:"))
 	// Convert to AlarmReading for shared display
-	alarms := make([]shelly.AlarmSensorReading, len(floods))
+	alarms := make([]output.AlarmSensorReading, len(floods))
 	for i, f := range floods {
-		alarms[i] = shelly.AlarmSensorReading{ID: f.ID, Alarm: f.Alarm, Mute: f.Mute}
+		alarms[i] = output.AlarmSensorReading{ID: f.ID, Alarm: f.Alarm, Mute: f.Mute}
 	}
-	shelly.DisplayAlarmSensors(ios, alarms, "Flood", "WATER DETECTED!",
-		theme.StatusOK().Render, theme.StatusError().Render, theme.Dim().Render)
+	cmdutil.DisplayAlarmSensors(ios, alarms, "Flood", "WATER DETECTED!")
 	ios.Println()
 	return true
 }
@@ -329,12 +328,11 @@ func displaySmoke(ios *iostreams.IOStreams, smokes []SmokeReading) bool {
 	}
 	ios.Println("  " + theme.Highlight().Render("Smoke Detection:"))
 	// Convert to AlarmReading for shared display
-	alarms := make([]shelly.AlarmSensorReading, len(smokes))
+	alarms := make([]output.AlarmSensorReading, len(smokes))
 	for i, s := range smokes {
-		alarms[i] = shelly.AlarmSensorReading{ID: s.ID, Alarm: s.Alarm, Mute: s.Mute}
+		alarms[i] = output.AlarmSensorReading{ID: s.ID, Alarm: s.Alarm, Mute: s.Mute}
 	}
-	shelly.DisplayAlarmSensors(ios, alarms, "Smoke", "SMOKE DETECTED!",
-		theme.StatusOK().Render, theme.StatusError().Render, theme.Dim().Render)
+	cmdutil.DisplayAlarmSensors(ios, alarms, "Smoke", "SMOKE DETECTED!")
 	ios.Println()
 	return true
 }
