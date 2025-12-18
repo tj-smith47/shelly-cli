@@ -113,9 +113,10 @@ push:
 	fi
 	@echo "Validating docs are up to date..."
 	@$(MAKE) docs
-	@if ! git diff --quiet docs/commands/; then \
-		echo "Error: docs/commands/ is out of date. Run 'make docs' and commit changes."; \
-		git diff --stat docs/commands/; \
+	@$(MAKE) manpages
+	@if ! git diff --quiet docs/; then \
+		echo "Error: docs/ is out of date. Run 'make docs' and 'make manpages', then commit."; \
+		git diff --stat docs/; \
 		exit 1; \
 	fi
 	@echo "All checks passed. Pushing..."

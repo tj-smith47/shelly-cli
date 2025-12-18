@@ -1,0 +1,69 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-sensor-devicepower - Manage device power sensors
+
+
+.SH SYNOPSIS
+\fBshelly sensor devicepower [flags]\fP
+
+
+.SH DESCRIPTION
+Manage device power sensors on Shelly devices.
+
+.PP
+Device power sensors provide battery and external power status for
+battery-powered Shelly devices (Plus HT, H&T, etc.).
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for devicepower
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # List device power sensors
+  shelly sensor devicepower list sensor1
+
+  # Get battery status
+  shelly sensor devicepower status sensor1
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-sensor(1)\fP, \fBshelly-sensor-devicepower-list(1)\fP, \fBshelly-sensor-devicepower-status(1)\fP

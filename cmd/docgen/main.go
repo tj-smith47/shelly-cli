@@ -37,6 +37,9 @@ func main() {
 	// Get the root command with all subcommands
 	rootCmd := cmd.GetRootCmd()
 
+	// Disable auto-generated timestamp to avoid churn on every regeneration
+	rootCmd.DisableAutoGenTag = true
+
 	// Generate markdown documentation
 	if err := doc.GenMarkdownTree(rootCmd, outputDir); err != nil {
 		log.Fatalf("failed to generate markdown docs: %v", err)

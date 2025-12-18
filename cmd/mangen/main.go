@@ -37,6 +37,9 @@ func main() {
 	// Get the root command with all subcommands
 	rootCmd := cmd.GetRootCmd()
 
+	// Disable auto-generated timestamp to avoid churn on every regeneration
+	rootCmd.DisableAutoGenTag = true
+
 	// Set up man page header
 	header := &doc.GenManHeader{
 		Title:   "SHELLY",
