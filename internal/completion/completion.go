@@ -9,7 +9,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +23,65 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
+
+// Shell type constants.
+const (
+	ShellBash       = "bash"
+	ShellZsh        = "zsh"
+	ShellFish       = "fish"
+	ShellPowerShell = "powershell"
+)
+
+// DetectShell attempts to detect the user's shell.
+func DetectShell() (string, error) {
+	// Check SHELL environment variable first
+	shell := os.Getenv("SHELL")
+	if shell != "" {
+		base := filepath.Base(shell)
+		switch base {
+		case "bash":
+			return ShellBash, nil
+		case "zsh":
+			return ShellZsh, nil
+		case "fish":
+			return ShellFish, nil
+		}
+	}
+
+	// On Windows, check for PowerShell
+	if runtime.GOOS == "windows" {
+		// Check if running in PowerShell
+		if os.Getenv("PSModulePath") != "" {
+			return ShellPowerShell, nil
+		}
+	}
+
+	// Try to get parent process name
+	ppid := os.Getppid()
+	if ppid > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		//nolint:gosec // G204: ppid is from os.Getppid(), not user input
+		cmd := exec.CommandContext(ctx, "ps", "-p", fmt.Sprintf("%d", ppid), "-o", "comm=")
+		output, err := cmd.Output()
+		if err == nil {
+			procName := strings.TrimSpace(string(output))
+			procName = filepath.Base(procName)
+			switch {
+			case strings.Contains(procName, "bash"):
+				return ShellBash, nil
+			case strings.Contains(procName, "zsh"):
+				return ShellZsh, nil
+			case strings.Contains(procName, "fish"):
+				return ShellFish, nil
+			case strings.Contains(procName, "pwsh"), strings.Contains(procName, "powershell"):
+				return ShellPowerShell, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not detect shell")
+}
 
 // cache holds cached completion data to avoid slow network queries.
 var cache = &completionCache{
