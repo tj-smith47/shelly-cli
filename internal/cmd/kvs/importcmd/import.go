@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -133,7 +134,7 @@ func parseImportFile(file string) (*shelly.KVSExport, error) {
 func showPreview(ios *iostreams.IOStreams, data *shelly.KVSExport) {
 	ios.Printf("Found %d key(s) to import:\n", len(data.Items))
 	for _, item := range data.Items {
-		ios.Printf("  - %s = %s\n", item.Key, formatValue(item.Value))
+		ios.Printf("  - %s = %s\n", item.Key, output.FormatDisplayValue(item.Value))
 	}
 	ios.Println()
 }
@@ -188,27 +189,5 @@ func reportResults(ios *iostreams.IOStreams, imported, skipped int) {
 		ios.Success("%s", result)
 	} else {
 		ios.Info("%s", result)
-	}
-}
-
-func formatValue(v any) string {
-	if v == nil {
-		return "null"
-	}
-	switch val := v.(type) {
-	case string:
-		if len(val) > 30 {
-			return fmt.Sprintf("%q...", val[:27])
-		}
-		return fmt.Sprintf("%q", val)
-	case bool:
-		return fmt.Sprintf("%t", val)
-	case float64:
-		if val == float64(int64(val)) {
-			return fmt.Sprintf("%.0f", val)
-		}
-		return fmt.Sprintf("%g", val)
-	default:
-		return fmt.Sprintf("%v", val)
 	}
 }

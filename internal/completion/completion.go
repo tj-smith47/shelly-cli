@@ -536,6 +536,18 @@ func DeviceThenFile() func(*cobra.Command, []string, string) ([]string, cobra.Sh
 	}
 }
 
+// DeviceThenNoComplete returns a completion function that completes
+// device names for the first arg and disables completion for subsequent args.
+// Useful for commands like kvs get/set/del where the second arg is a user-defined key.
+func DeviceThenNoComplete() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return deviceNamesFiltered(toComplete)
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // NameThenDevice returns a completion function that skips completion
 // for the first arg (user-provided name) and completes device names for the second arg.
 func NameThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {

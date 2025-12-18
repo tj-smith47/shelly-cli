@@ -3,7 +3,6 @@ package list
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -136,52 +135,11 @@ func displayItems(ios *iostreams.IOStreams, items []shelly.KVSItem) {
 
 	table := output.NewTable("Key", "Value", "Type")
 	for _, item := range items {
-		valueStr := formatValue(item.Value)
-		typeStr := valueType(item.Value)
-		table.AddRow(item.Key, valueStr, typeStr)
+		table.AddRow(item.Key, output.FormatDisplayValue(item.Value), output.ValueType(item.Value))
 	}
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
 
 	ios.Printf("\n%d key(s)\n", len(items))
-}
-
-func formatValue(v any) string {
-	if v == nil {
-		return "null"
-	}
-	switch val := v.(type) {
-	case string:
-		if len(val) > 40 {
-			return fmt.Sprintf("%q...", val[:37])
-		}
-		return fmt.Sprintf("%q", val)
-	case bool:
-		return fmt.Sprintf("%t", val)
-	case float64:
-		// Check if it's an integer
-		if val == float64(int64(val)) {
-			return fmt.Sprintf("%.0f", val)
-		}
-		return fmt.Sprintf("%g", val)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
-}
-
-func valueType(v any) string {
-	if v == nil {
-		return "null"
-	}
-	switch v.(type) {
-	case string:
-		return "string"
-	case bool:
-		return "bool"
-	case float64:
-		return "number"
-	default:
-		return "unknown"
-	}
 }

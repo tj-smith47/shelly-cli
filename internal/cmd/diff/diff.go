@@ -6,14 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -86,8 +85,8 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 
 	ios.StopProgress()
 
-	// Calculate diff
-	diffs := compareConfigs("", sourceConfig, targetConfig)
+	// Calculate diff using shared comparison function
+	diffs := output.CompareConfigs(sourceConfig, targetConfig)
 
 	if output.WantsStructured() {
 		return output.FormatOutput(ios.Out, diffs)
@@ -103,14 +102,14 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 	}
 
 	// Group by type
-	var added, removed, changed []Diff
+	var added, removed, changed []model.ConfigDiff
 	for _, d := range diffs {
-		switch d.Type {
-		case "added":
+		switch d.DiffType {
+		case model.DiffAdded:
 			added = append(added, d)
-		case "removed":
+		case model.DiffRemoved:
 			removed = append(removed, d)
-		case "changed":
+		case model.DiffChanged:
 			changed = append(changed, d)
 		}
 	}
@@ -119,7 +118,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 	if len(removed) > 0 {
 		ios.Println(output.RenderDiffRemoved())
 		for _, d := range removed {
-			ios.Printf("  - %s: %v\n", d.Path, d.SourceValue)
+			ios.Printf("  - %s: %v\n", d.Path, d.OldValue)
 		}
 		ios.Println("")
 	}
@@ -127,7 +126,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 	if len(added) > 0 {
 		ios.Println(output.RenderDiffAdded())
 		for _, d := range added {
-			ios.Printf("  + %s: %v\n", d.Path, d.TargetValue)
+			ios.Printf("  + %s: %v\n", d.Path, d.NewValue)
 		}
 		ios.Println("")
 	}
@@ -136,8 +135,8 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 		ios.Println(output.RenderDiffChanged())
 		for _, d := range changed {
 			ios.Printf("  ~ %s:\n", d.Path)
-			ios.Printf("    - %v\n", d.SourceValue)
-			ios.Printf("    + %v\n", d.TargetValue)
+			ios.Printf("    - %v\n", d.OldValue)
+			ios.Printf("    + %v\n", d.NewValue)
 		}
 		ios.Println("")
 	}
@@ -146,14 +145,6 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string, _ *Opti
 		len(added), len(removed), len(changed))
 
 	return nil
-}
-
-// Diff represents a single configuration difference.
-type Diff struct {
-	Path        string `json:"path"`
-	Type        string `json:"type"` // "added", "removed", "changed"
-	SourceValue any    `json:"source_value,omitempty"`
-	TargetValue any    `json:"target_value,omitempty"`
 }
 
 func getConfig(ctx context.Context, svc *shelly.Service, source string) (cfg map[string]any, name string, err error) {
@@ -208,69 +199,4 @@ func isFile(path string) bool {
 		return true
 	}
 	return false
-}
-
-func compareConfigs(prefix string, source, target map[string]any) []Diff {
-	var diffs []Diff
-
-	// Get all keys from both
-	allKeys := make(map[string]bool)
-	for k := range source {
-		allKeys[k] = true
-	}
-	for k := range target {
-		allKeys[k] = true
-	}
-
-	// Sort keys for consistent output
-	keys := make([]string, 0, len(allKeys))
-	for k := range allKeys {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		path := key
-		if prefix != "" {
-			path = prefix + "." + key
-		}
-
-		sourceVal, sourceOK := source[key]
-		targetVal, targetOK := target[key]
-
-		switch {
-		case !sourceOK:
-			// Key only in target
-			diffs = append(diffs, Diff{
-				Path:        path,
-				Type:        "added",
-				TargetValue: targetVal,
-			})
-		case !targetOK:
-			// Key only in source
-			diffs = append(diffs, Diff{
-				Path:        path,
-				Type:        "removed",
-				SourceValue: sourceVal,
-			})
-		default:
-			// Key in both - compare values
-			sourceMap, sourceIsMap := sourceVal.(map[string]any)
-			targetMap, targetIsMap := targetVal.(map[string]any)
-
-			if sourceIsMap && targetIsMap {
-				// Recursively compare nested objects
-				diffs = append(diffs, compareConfigs(path, sourceMap, targetMap)...)
-			} else if !reflect.DeepEqual(sourceVal, targetVal) {
-				diffs = append(diffs, Diff{
-					Path:        path,
-					Type:        "changed",
-					SourceValue: sourceVal,
-					TargetValue: targetVal,
-				})
-			}
-		}
-	}
-
-	return diffs
 }

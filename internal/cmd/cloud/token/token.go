@@ -85,29 +85,11 @@ func run(f *cmdutil.Factory) error {
 
 		remaining := shelly.TimeUntilExpiry(cfg.Cloud.AccessToken)
 		if remaining > 0 {
-			ios.Printf("  Remaining:  %s\n", formatDuration(remaining))
+			ios.Printf("  Remaining:  %s\n", output.FormatDuration(remaining))
 		} else {
 			ios.Printf("  Status:     %s\n", output.RenderTokenValidity(true, true))
 		}
 	}
 
 	return nil
-}
-
-func formatDuration(d any) string {
-	dur, ok := d.(interface{ Hours() float64 })
-	if !ok {
-		return "unknown"
-	}
-
-	hours := dur.Hours()
-	if hours < 1 {
-		mins := hours * 60
-		return fmt.Sprintf("%.0fm", mins)
-	}
-	if hours < 24 {
-		return fmt.Sprintf("%.0fh", hours)
-	}
-	days := hours / 24
-	return fmt.Sprintf("%.0fd %.0fh", days, float64(int(hours)%24))
 }

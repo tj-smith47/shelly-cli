@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -94,12 +95,6 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	return nil
 }
 
-const (
-	diffAdded   = "added"
-	diffRemoved = "removed"
-	diffChanged = "changed"
-)
-
 func loadSource(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, source string) (*shelly.DeviceBackup, string, error) {
 	if fileExists(source) {
 		return loadFromFile(source)
@@ -174,78 +169,12 @@ func showDryRunPreview(ctx context.Context, svc *shelly.Service, ios *iostreams.
 	return nil
 }
 
-func printDiff(ios *iostreams.IOStreams, d *shelly.BackupDiff) {
-	printConfigDiffs(ios, d.ConfigDiffs)
-	printScriptDiffs(ios, d.ScriptDiffs)
-	printScheduleDiffs(ios, d.ScheduleDiffs)
-	printWebhookDiffs(ios, d.WebhookDiffs)
-}
-
-func printConfigDiffs(ios *iostreams.IOStreams, diffs []shelly.ConfigDiff) {
-	if len(diffs) == 0 {
-		return
-	}
-	ios.Printf("Configuration changes:\n")
-	for _, cd := range diffs {
-		switch cd.DiffType {
-		case diffAdded:
-			ios.Printf("  + %s\n", cd.Key)
-		case diffRemoved:
-			ios.Printf("  - %s\n", cd.Key)
-		case diffChanged:
-			ios.Printf("  ~ %s\n", cd.Key)
-		}
-	}
-	ios.Println()
-}
-
-func printScriptDiffs(ios *iostreams.IOStreams, diffs []shelly.ScriptDiff) {
-	if len(diffs) == 0 {
-		return
-	}
-	ios.Printf("Script changes:\n")
-	for _, sd := range diffs {
-		switch sd.DiffType {
-		case diffAdded:
-			ios.Printf("  + %s\n", sd.Name)
-		case diffRemoved:
-			ios.Printf("  - %s (not in source)\n", sd.Name)
-		case diffChanged:
-			ios.Printf("  ~ %s\n", sd.Name)
-		}
-	}
-	ios.Println()
-}
-
-func printScheduleDiffs(ios *iostreams.IOStreams, diffs []shelly.ScheduleDiff) {
-	if len(diffs) == 0 {
-		return
-	}
-	ios.Printf("Schedule changes:\n")
-	for _, sd := range diffs {
-		switch sd.DiffType {
-		case diffAdded:
-			ios.Printf("  + %s\n", sd.Timespec)
-		case diffRemoved:
-			ios.Printf("  - %s (not in source)\n", sd.Timespec)
-		}
-	}
-	ios.Println()
-}
-
-func printWebhookDiffs(ios *iostreams.IOStreams, diffs []shelly.WebhookDiff) {
-	if len(diffs) == 0 {
-		return
-	}
-	ios.Printf("Webhook changes:\n")
-	for _, wd := range diffs {
-		switch wd.DiffType {
-		case diffAdded:
-			ios.Printf("  + %s: %s\n", wd.Event, wd.Name)
-		case diffRemoved:
-			ios.Printf("  - %s: %s (not in source)\n", wd.Event, wd.Name)
-		}
-	}
+func printDiff(ios *iostreams.IOStreams, d *model.BackupDiff) {
+	// Use consolidated display functions with verbose=false for concise output
+	cmdutil.DisplayConfigDiffs(ios, d.ConfigDiffs, false)
+	cmdutil.DisplayScriptDiffs(ios, d.ScriptDiffs, false)
+	cmdutil.DisplayScheduleDiffs(ios, d.ScheduleDiffs, false)
+	cmdutil.DisplayWebhookDiffs(ios, d.WebhookDiffs, false)
 }
 
 func printResult(ios *iostreams.IOStreams, result *shelly.RestoreResult) {

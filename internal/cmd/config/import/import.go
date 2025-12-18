@@ -14,6 +14,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 var (
@@ -109,36 +110,10 @@ func showDiff(ios *iostreams.IOStreams, current, incoming map[string]any) {
 	for key, incomingVal := range incoming {
 		currentVal, exists := current[key]
 		if !exists {
-			ios.Printf("  + %s: %v (new)\n", key, formatValue(incomingVal))
+			ios.Printf("  + %s: %v (new)\n", key, output.FormatDisplayValue(incomingVal))
 		} else if !deepEqual(currentVal, incomingVal) {
-			ios.Printf("  ~ %s: %v -> %v\n", key, formatValue(currentVal), formatValue(incomingVal))
+			ios.Printf("  ~ %s: %v -> %v\n", key, output.FormatDisplayValue(currentVal), output.FormatDisplayValue(incomingVal))
 		}
-	}
-}
-
-// formatValue formats a value for display.
-func formatValue(v any) string {
-	if v == nil {
-		return "<null>"
-	}
-	switch val := v.(type) {
-	case string:
-		if val == "" {
-			return `""`
-		}
-		return fmt.Sprintf("%q", val)
-	case map[string]any, []any:
-		data, err := json.Marshal(val)
-		if err != nil {
-			return fmt.Sprintf("%v", val)
-		}
-		s := string(data)
-		if len(s) > 50 {
-			return s[:47] + "..."
-		}
-		return s
-	default:
-		return fmt.Sprintf("%v", val)
 	}
 }
 

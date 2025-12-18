@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // DeviceBackup wraps the shelly-go backup.Backup for backward compatibility.
@@ -252,8 +253,8 @@ func ValidateBackup(data []byte) (*DeviceBackup, error) {
 }
 
 // CompareBackup compares a backup with a device's current state.
-func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBackup *DeviceBackup) (*BackupDiff, error) {
-	diff := &BackupDiff{}
+func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBackup *DeviceBackup) (*model.BackupDiff, error) {
+	diff := &model.BackupDiff{}
 
 	// Get current configuration
 	currentConfig, err := s.GetConfig(ctx, identifier)
@@ -298,50 +299,6 @@ func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBa
 	}
 
 	return diff, nil
-}
-
-// BackupDiff contains differences between a backup and current device state.
-type BackupDiff struct {
-	ConfigDiffs   []ConfigDiff
-	ScriptDiffs   []ScriptDiff
-	ScheduleDiffs []ScheduleDiff
-	WebhookDiffs  []WebhookDiff
-}
-
-// HasDifferences returns true if there are any differences.
-func (d *BackupDiff) HasDifferences() bool {
-	return len(d.ConfigDiffs) > 0 || len(d.ScriptDiffs) > 0 ||
-		len(d.ScheduleDiffs) > 0 || len(d.WebhookDiffs) > 0
-}
-
-// ConfigDiff represents a configuration difference.
-type ConfigDiff struct {
-	Key      string
-	Current  any
-	Backup   any
-	DiffType string // "added", "removed", "changed"
-}
-
-// ScriptDiff represents a script difference.
-type ScriptDiff struct {
-	Name     string
-	DiffType string // "added", "removed", "changed"
-	Details  string
-}
-
-// ScheduleDiff represents a schedule difference.
-type ScheduleDiff struct {
-	Timespec string
-	DiffType string // "added", "removed", "changed"
-	Details  string
-}
-
-// WebhookDiff represents a webhook difference.
-type WebhookDiff struct {
-	Event    string
-	Name     string
-	DiffType string // "added", "removed", "changed"
-	Details  string
 }
 
 // Helper functions for converting backup data structures
@@ -409,24 +366,24 @@ func convertBackupWebhooks(data json.RawMessage) []WebhookInfo {
 
 // Comparison functions
 
-func compareConfigs(current, bkup map[string]any) []ConfigDiff {
-	var diffs []ConfigDiff
+func compareConfigs(current, bkup map[string]any) []model.ConfigDiff {
+	var diffs []model.ConfigDiff
 
 	// Check for keys in backup that differ from current
 	for key, backupVal := range bkup {
 		currentVal, exists := current[key]
 		if !exists {
-			diffs = append(diffs, ConfigDiff{
-				Key:      key,
-				Backup:   backupVal,
-				DiffType: "added",
+			diffs = append(diffs, model.ConfigDiff{
+				Path:     key,
+				NewValue: backupVal,
+				DiffType: model.DiffAdded,
 			})
 		} else if !deepEqualJSON(currentVal, backupVal) {
-			diffs = append(diffs, ConfigDiff{
-				Key:      key,
-				Current:  currentVal,
-				Backup:   backupVal,
-				DiffType: "changed",
+			diffs = append(diffs, model.ConfigDiff{
+				Path:     key,
+				OldValue: currentVal,
+				NewValue: backupVal,
+				DiffType: model.DiffChanged,
 			})
 		}
 	}
@@ -434,10 +391,10 @@ func compareConfigs(current, bkup map[string]any) []ConfigDiff {
 	// Check for keys in current that are not in backup
 	for key, currentVal := range current {
 		if _, exists := bkup[key]; !exists {
-			diffs = append(diffs, ConfigDiff{
-				Key:      key,
-				Current:  currentVal,
-				DiffType: "removed",
+			diffs = append(diffs, model.ConfigDiff{
+				Path:     key,
+				OldValue: currentVal,
+				DiffType: model.DiffRemoved,
 			})
 		}
 	}
@@ -445,8 +402,8 @@ func compareConfigs(current, bkup map[string]any) []ConfigDiff {
 	return diffs
 }
 
-func compareScripts(current []ScriptInfo, bkup []BackupScript) []ScriptDiff {
-	var diffs []ScriptDiff
+func compareScripts(current []ScriptInfo, bkup []BackupScript) []model.ScriptDiff {
+	var diffs []model.ScriptDiff
 
 	currentMap := make(map[string]ScriptInfo)
 	for _, s := range current {
@@ -461,15 +418,15 @@ func compareScripts(current []ScriptInfo, bkup []BackupScript) []ScriptDiff {
 	// Check backup scripts
 	for name, backupScript := range backupMap {
 		if _, exists := currentMap[name]; !exists {
-			diffs = append(diffs, ScriptDiff{
+			diffs = append(diffs, model.ScriptDiff{
 				Name:     name,
-				DiffType: "added",
+				DiffType: model.DiffAdded,
 				Details:  "script will be created",
 			})
 		} else {
-			diffs = append(diffs, ScriptDiff{
+			diffs = append(diffs, model.ScriptDiff{
 				Name:     name,
-				DiffType: "changed",
+				DiffType: model.DiffChanged,
 				Details:  fmt.Sprintf("enable: %v", backupScript.Enable),
 			})
 		}
@@ -478,9 +435,9 @@ func compareScripts(current []ScriptInfo, bkup []BackupScript) []ScriptDiff {
 	// Check for scripts not in backup
 	for name := range currentMap {
 		if _, exists := backupMap[name]; !exists {
-			diffs = append(diffs, ScriptDiff{
+			diffs = append(diffs, model.ScriptDiff{
 				Name:     name,
-				DiffType: "removed",
+				DiffType: model.DiffRemoved,
 				Details:  "script not in backup (will not be deleted)",
 			})
 		}
@@ -489,8 +446,8 @@ func compareScripts(current []ScriptInfo, bkup []BackupScript) []ScriptDiff {
 	return diffs
 }
 
-func compareSchedules(current []ScheduleJob, bkup []BackupSchedule) []ScheduleDiff {
-	var diffs []ScheduleDiff
+func compareSchedules(current []ScheduleJob, bkup []BackupSchedule) []model.ScheduleDiff {
+	var diffs []model.ScheduleDiff
 
 	// Simple comparison by timespec
 	currentTimespecs := make(map[string]bool)
@@ -505,9 +462,9 @@ func compareSchedules(current []ScheduleJob, bkup []BackupSchedule) []ScheduleDi
 
 	for _, s := range bkup {
 		if !currentTimespecs[s.Timespec] {
-			diffs = append(diffs, ScheduleDiff{
+			diffs = append(diffs, model.ScheduleDiff{
 				Timespec: s.Timespec,
-				DiffType: "added",
+				DiffType: model.DiffAdded,
 				Details:  fmt.Sprintf("enable: %v", s.Enable),
 			})
 		}
@@ -515,9 +472,9 @@ func compareSchedules(current []ScheduleJob, bkup []BackupSchedule) []ScheduleDi
 
 	for _, s := range current {
 		if !backupTimespecs[s.Timespec] {
-			diffs = append(diffs, ScheduleDiff{
+			diffs = append(diffs, model.ScheduleDiff{
 				Timespec: s.Timespec,
-				DiffType: "removed",
+				DiffType: model.DiffRemoved,
 				Details:  "schedule not in backup",
 			})
 		}
@@ -526,8 +483,8 @@ func compareSchedules(current []ScheduleJob, bkup []BackupSchedule) []ScheduleDi
 	return diffs
 }
 
-func compareWebhooks(current, bkup []WebhookInfo) []WebhookDiff {
-	var diffs []WebhookDiff
+func compareWebhooks(current, bkup []WebhookInfo) []model.WebhookDiff {
+	var diffs []model.WebhookDiff
 
 	currentMap := make(map[string]WebhookInfo)
 	for _, w := range current {
@@ -543,10 +500,10 @@ func compareWebhooks(current, bkup []WebhookInfo) []WebhookDiff {
 
 	for key, backupWh := range backupMap {
 		if _, exists := currentMap[key]; !exists {
-			diffs = append(diffs, WebhookDiff{
+			diffs = append(diffs, model.WebhookDiff{
 				Event:    backupWh.Event,
 				Name:     backupWh.Name,
-				DiffType: "added",
+				DiffType: model.DiffAdded,
 				Details:  fmt.Sprintf("urls: %v", backupWh.URLs),
 			})
 		}
@@ -554,10 +511,10 @@ func compareWebhooks(current, bkup []WebhookInfo) []WebhookDiff {
 
 	for key, currentWh := range currentMap {
 		if _, exists := backupMap[key]; !exists {
-			diffs = append(diffs, WebhookDiff{
+			diffs = append(diffs, model.WebhookDiff{
 				Event:    currentWh.Event,
 				Name:     currentWh.Name,
-				DiffType: "removed",
+				DiffType: model.DiffRemoved,
 				Details:  "webhook not in backup",
 			})
 		}

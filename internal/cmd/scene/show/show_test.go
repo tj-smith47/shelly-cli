@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -62,7 +63,7 @@ func TestNewCommand_Flags(t *testing.T) {
 	}
 }
 
-func TestFormatParams(t *testing.T) {
+func TestFormatParamsInline(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -76,12 +77,12 @@ func TestFormatParams(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := formatParams(tt.params)
-		if tt.empty && result != "-" {
-			t.Errorf("%s: formatParams() = %q, want \"-\"", tt.name, result)
+		result := output.FormatParamsInline(tt.params)
+		if tt.empty && result != "" {
+			t.Errorf("%s: FormatParamsInline() = %q, want empty", tt.name, result)
 		}
-		if !tt.empty && result == "-" {
-			t.Errorf("%s: formatParams() = \"-\", want non-empty", tt.name)
+		if !tt.empty && result == "" {
+			t.Errorf("%s: FormatParamsInline() = empty, want non-empty", tt.name)
 		}
 	}
 }

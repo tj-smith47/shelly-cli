@@ -657,3 +657,15 @@ func SortReleasesByVersion(releases []Release) {
 		return CompareVersions(releases[i].TagName, releases[j].TagName) > 0
 	})
 }
+
+// ReleaseFetcher creates a function that fetches the latest version string.
+// The returned function signature is compatible with version.ReleaseFetcher.
+func ReleaseFetcher(ios *iostreams.IOStreams) func(ctx context.Context) (string, error) {
+	return func(ctx context.Context) (string, error) {
+		rel, err := NewClient(ios).GetLatestRelease(ctx, DefaultOwner, DefaultRepo)
+		if err != nil || rel == nil {
+			return "", err
+		}
+		return rel.Version(), nil
+	}
+}

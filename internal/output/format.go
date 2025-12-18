@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -392,3 +393,124 @@ func FormatSize(bytes int64) string {
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
+
+// ValueTruncateTable is the default truncation length for table display.
+const ValueTruncateTable = 40
+
+// valueNull is the standard null representation.
+const valueNull = "null"
+
+// FormatJSONValue formats a value for JSON-like display.
+// Strings are quoted, numbers are formatted cleanly, nil becomes "null".
+func FormatJSONValue(v any) string {
+	if v == nil {
+		return valueNull
+	}
+	switch val := v.(type) {
+	case string:
+		return fmt.Sprintf("%q", val)
+	case bool:
+		return fmt.Sprintf("%t", val)
+	case float64:
+		if val == float64(int64(val)) {
+			return fmt.Sprintf("%.0f", val)
+		}
+		return fmt.Sprintf("%g", val)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// FormatDisplayValue formats a value for table display with truncation.
+// Strings are quoted and truncated, maps/arrays are summarized.
+func FormatDisplayValue(v any) string {
+	if v == nil {
+		return valueNull
+	}
+	switch val := v.(type) {
+	case string:
+		if len(val) > ValueTruncateTable {
+			return fmt.Sprintf("%q...", val[:ValueTruncateTable-3])
+		}
+		return fmt.Sprintf("%q", val)
+	case bool:
+		return fmt.Sprintf("%t", val)
+	case float64:
+		if val == float64(int64(val)) {
+			return fmt.Sprintf("%.0f", val)
+		}
+		return fmt.Sprintf("%g", val)
+	case map[string]any:
+		return fmt.Sprintf("{%d fields}", len(val))
+	case []any:
+		return fmt.Sprintf("[%d items]", len(val))
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// ValueType returns the type name of a value for display.
+func ValueType(v any) string {
+	if v == nil {
+		return valueNull
+	}
+	switch v.(type) {
+	case string:
+		return "string"
+	case bool:
+		return "boolean"
+	case float64:
+		return "number"
+	case map[string]any:
+		return "object"
+	case []any:
+		return "array"
+	default:
+		return "unknown"
+	}
+}
+
+// FormatDuration formats a duration for human-readable display.
+func FormatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	days := int(d.Hours() / 24)
+	return fmt.Sprintf("%dd", days)
+}
+
+// FormatParamsInline formats parameters as an inline string.
+// Example: key1=value1, key2=value2.
+func FormatParamsInline(params map[string]any) string {
+	if len(params) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(params))
+	for k, v := range params {
+		parts = append(parts, fmt.Sprintf("%s=%v", k, v))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// FormatParamsTable formats parameters as multi-line for table display.
+// Example:
+//
+//	key1: value1
+//	key2: value2
+func FormatParamsTable(params map[string]any) string {
+	if len(params) == 0 {
+		return "-"
+	}
+	lines := make([]string, 0, len(params))
+	for k, v := range params {
+		lines = append(lines, fmt.Sprintf("%s: %v", k, v))
+	}
+	return strings.Join(lines, "\n")
+}
+

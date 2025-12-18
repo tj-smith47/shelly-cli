@@ -3,14 +3,13 @@ package code
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -83,7 +82,7 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Warning("Device is not commissionable.")
 		ios.Info("Enable Matter first: shelly matter enable %s", opts.Device)
 		if opts.JSON {
-			return outputJSON(ios, CommissioningInfo{Available: false})
+			return output.JSON(ios.Out, CommissioningInfo{Available: false})
 		}
 		return nil
 	}
@@ -94,7 +93,7 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Debug("failed to get commissioning code: %v", err)
 		// Code not available via API, show instructions
 		if opts.JSON {
-			return outputJSON(ios, CommissioningInfo{Available: false})
+			return output.JSON(ios.Out, CommissioningInfo{Available: false})
 		}
 		displayNotAvailable(opts.Factory, opts.Device)
 		return nil
@@ -109,19 +108,10 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.JSON {
-		return outputJSON(ios, info)
+		return output.JSON(ios.Out, info)
 	}
 
 	displayCommissioningInfo(opts.Factory, info, opts.Device)
-	return nil
-}
-
-func outputJSON(ios *iostreams.IOStreams, info CommissioningInfo) error {
-	output, err := json.MarshalIndent(info, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to format JSON: %w", err)
-	}
-	ios.Println(string(output))
 	return nil
 }
 

@@ -3,6 +3,7 @@
 package cmdutil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
 // DisplayPowerMetrics outputs power, voltage, and current with units.
@@ -768,4 +770,147 @@ func displayAllVoltmeter(ios *iostreams.IOStreams, volts []model.VoltmeterReadin
 	}
 	ios.Println()
 	return true
+}
+
+// Migration diff display uses model.DiffAdded, model.DiffRemoved, model.DiffChanged constants.
+
+// displayDiffSection is a generic helper for printing diff sections.
+// It handles the common pattern of: empty check, header, loop with switch on diff type.
+func displayDiffSection[T any](
+	ios *iostreams.IOStreams,
+	diffs []T,
+	verbose bool,
+	header, addedMsg string,
+	getLabel func(T) string,
+	getDiffType func(T) string,
+) {
+	if len(diffs) == 0 {
+		return
+	}
+	if verbose {
+		ios.Printf("%s:\n", header)
+	} else {
+		ios.Printf("%s changes:\n", header)
+	}
+	for _, d := range diffs {
+		label := getLabel(d)
+		switch getDiffType(d) {
+		case model.DiffAdded:
+			if verbose {
+				ios.Printf("  + %s (%s)\n", label, addedMsg)
+			} else {
+				ios.Printf("  + %s\n", label)
+			}
+		case model.DiffRemoved:
+			if verbose {
+				ios.Printf("  - %s (exists on device, not in backup)\n", label)
+			} else {
+				ios.Printf("  - %s\n", label)
+			}
+		case model.DiffChanged:
+			if verbose {
+				ios.Printf("  ~ %s (will be updated)\n", label)
+			} else {
+				ios.Printf("  ~ %s\n", label)
+			}
+		}
+	}
+	ios.Println()
+}
+
+// DisplayConfigDiffs prints configuration differences.
+// When verbose is true, adds descriptive context to each line.
+func DisplayConfigDiffs(ios *iostreams.IOStreams, diffs []model.ConfigDiff, verbose bool) {
+	displayDiffSection(ios, diffs, verbose, "Configuration", "will be added from backup",
+		func(d model.ConfigDiff) string { return d.Path },
+		func(d model.ConfigDiff) string { return d.DiffType })
+}
+
+// DisplayScriptDiffs prints script differences.
+// When verbose is true, adds descriptive context to each line.
+func DisplayScriptDiffs(ios *iostreams.IOStreams, diffs []model.ScriptDiff, verbose bool) {
+	displayDiffSection(ios, diffs, verbose, "Script", "will be created",
+		func(d model.ScriptDiff) string { return d.Name },
+		func(d model.ScriptDiff) string { return d.DiffType })
+}
+
+// DisplayScheduleDiffs prints schedule differences.
+// When verbose is true, adds descriptive context to each line.
+func DisplayScheduleDiffs(ios *iostreams.IOStreams, diffs []model.ScheduleDiff, verbose bool) {
+	displayDiffSection(ios, diffs, verbose, "Schedule", "will be created",
+		func(d model.ScheduleDiff) string { return d.Timespec },
+		func(d model.ScheduleDiff) string { return d.DiffType })
+}
+
+// DisplayWebhookDiffs prints webhook differences.
+// When verbose is true, adds descriptive context to each line.
+func DisplayWebhookDiffs(ios *iostreams.IOStreams, diffs []model.WebhookDiff, verbose bool) {
+	displayDiffSection(ios, diffs, verbose, "Webhook", "will be created",
+		func(d model.WebhookDiff) string {
+			if d.Name != "" {
+				return d.Name
+			}
+			return d.Event
+		},
+		func(d model.WebhookDiff) string { return d.DiffType })
+}
+
+// DisplayUpdateAvailable prints an update notification with current and available versions.
+func DisplayUpdateAvailable(ios *iostreams.IOStreams, currentVersion, availableVersion string) {
+	ios.Printf("\n")
+	ios.Warning("Update available: %s -> %s", currentVersion, availableVersion)
+	ios.Printf("  Run 'shelly update' to install the latest version\n")
+}
+
+// DisplayUpToDate prints a success message indicating the CLI is up to date.
+func DisplayUpToDate(ios *iostreams.IOStreams) {
+	ios.Printf("\n")
+	ios.Success("You are using the latest version")
+}
+
+// DisplayUpdateResult displays the result of an update check.
+// Logs any cache write errors via ios.DebugErr.
+func DisplayUpdateResult(ios *iostreams.IOStreams, currentVersion, latestVersion string, updateAvailable bool, cacheErr error) {
+	if updateAvailable {
+		DisplayUpdateAvailable(ios, currentVersion, latestVersion)
+	} else {
+		DisplayUpToDate(ios)
+	}
+	if cacheErr != nil {
+		ios.DebugErr("writing version cache", cacheErr)
+	}
+}
+
+// DisplayVersionInfo prints version information to the console.
+func DisplayVersionInfo(ios *iostreams.IOStreams, ver, commit, date, builtBy, goVer, osName, arch string) {
+	const unknownValue = "unknown"
+	ios.Printf("shelly version %s\n", ver)
+	if commit != "" && commit != unknownValue {
+		ios.Printf("  commit: %s\n", commit)
+	}
+	if date != "" && date != unknownValue {
+		ios.Printf("  built: %s\n", date)
+	}
+	if builtBy != "" && builtBy != unknownValue {
+		ios.Printf("  by: %s\n", builtBy)
+	}
+	ios.Printf("  go: %s\n", goVer)
+	ios.Printf("  os/arch: %s/%s\n", osName, arch)
+}
+
+// UpdateChecker is a function that checks for updates and returns the result.
+type UpdateChecker func(ctx context.Context) (*version.UpdateResult, error)
+
+// RunUpdateCheck runs an update check with spinner and displays results.
+func RunUpdateCheck(ctx context.Context, ios *iostreams.IOStreams, checker UpdateChecker) {
+	ios.StartProgress("Checking for updates...")
+	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	result, err := checker(checkCtx)
+	cancel()
+	ios.StopProgress()
+	if err != nil {
+		ios.DebugErr("checking for updates", err)
+	} else if !result.SkippedDevBuild {
+		DisplayUpdateResult(ios, result.CurrentVersion, result.LatestVersion, result.UpdateAvailable, result.CacheWriteErr)
+	}
 }

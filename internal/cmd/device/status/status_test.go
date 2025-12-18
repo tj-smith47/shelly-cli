@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -45,7 +46,7 @@ func TestNewCommand_RequiresArg(t *testing.T) {
 	}
 }
 
-func TestFormatValue(t *testing.T) {
+func TestFormatDisplayValue(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -54,7 +55,7 @@ func TestFormatValue(t *testing.T) {
 		want  string
 	}{
 		{"nil", nil, "null"},
-		{"string", "hello", "hello"},
+		{"string", "hello", `"hello"`},
 		{"int", 42, "42"},
 		{"bool", true, "true"},
 		{"map", map[string]any{"a": 1, "b": 2}, "{2 fields}"},
@@ -66,9 +67,9 @@ func TestFormatValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := formatValue(tt.input)
+			got := output.FormatDisplayValue(tt.input)
 			if got != tt.want {
-				t.Errorf("formatValue(%v) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("FormatDisplayValue(%v) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}

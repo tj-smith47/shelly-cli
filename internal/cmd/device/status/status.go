@@ -3,7 +3,6 @@ package status
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -60,22 +59,9 @@ func displayStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) {
 
 	table := output.NewTable("Component", "Value")
 	for key, value := range status.Status {
-		table.AddRow(key, formatValue(value))
+		table.AddRow(key, output.FormatDisplayValue(value))
 	}
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print device status table", err)
-	}
-}
-
-func formatValue(v any) string {
-	switch val := v.(type) {
-	case nil:
-		return "null"
-	case map[string]any:
-		return fmt.Sprintf("{%d fields}", len(val))
-	case []any:
-		return fmt.Sprintf("[%d items]", len(val))
-	default:
-		return fmt.Sprintf("%v", val)
 	}
 }

@@ -2,9 +2,6 @@
 package authstatus
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -75,7 +72,7 @@ func run(f *cmdutil.Factory) error {
 	// Show time until expiry
 	remaining := shelly.TimeUntilExpiry(cfg.Cloud.AccessToken)
 	if remaining > 0 {
-		ios.Printf("  Expiry: %s\n", formatDuration(remaining))
+		ios.Printf("  Expiry: %s\n", output.FormatDuration(remaining))
 	}
 
 	return nil
@@ -104,19 +101,4 @@ func getTokenStatus(token string) tokenStatusInfo {
 	return tokenStatusInfo{
 		display: output.RenderTokenValidity(true, false),
 	}
-}
-
-func formatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
-	}
-	days := int(d.Hours()) / 24
-	hours := int(d.Hours()) % 24
-	return fmt.Sprintf("%dd %dh", days, hours)
 }

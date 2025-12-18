@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // MigrationOptions configures migration between devices.
@@ -254,8 +255,8 @@ func (s *Service) MigrateFromBackup(ctx context.Context, backupData []byte, targ
 }
 
 // DiffBackups compares two backups and returns differences.
-func (s *Service) DiffBackups(backup1, backup2 *DeviceBackup) (*BackupDiff, error) {
-	diff := &BackupDiff{}
+func (s *Service) DiffBackups(backup1, backup2 *DeviceBackup) (*model.BackupDiff, error) {
+	diff := &model.BackupDiff{}
 
 	// Parse configs
 	var config1, config2 map[string]any
@@ -295,8 +296,8 @@ func (s *Service) DiffBackups(backup1, backup2 *DeviceBackup) (*BackupDiff, erro
 
 // Helper comparison functions for backup-to-backup comparisons
 
-func compareScripts2(scripts1, scripts2 []BackupScript) []ScriptDiff {
-	var diffs []ScriptDiff
+func compareScripts2(scripts1, scripts2 []BackupScript) []model.ScriptDiff {
+	var diffs []model.ScriptDiff
 
 	map1 := make(map[string]BackupScript)
 	for _, s := range scripts1 {
@@ -311,15 +312,15 @@ func compareScripts2(scripts1, scripts2 []BackupScript) []ScriptDiff {
 	// Check scripts in backup2
 	for name, script2 := range map2 {
 		if _, exists := map1[name]; !exists {
-			diffs = append(diffs, ScriptDiff{
+			diffs = append(diffs, model.ScriptDiff{
 				Name:     name,
-				DiffType: "added",
+				DiffType: model.DiffAdded,
 				Details:  "script in backup2 only",
 			})
 		} else {
-			diffs = append(diffs, ScriptDiff{
+			diffs = append(diffs, model.ScriptDiff{
 				Name:     name,
-				DiffType: "changed",
+				DiffType: model.DiffChanged,
 				Details:  fmt.Sprintf("enable: %v", script2.Enable),
 			})
 		}
@@ -328,9 +329,9 @@ func compareScripts2(scripts1, scripts2 []BackupScript) []ScriptDiff {
 	// Check for scripts in backup1 not in backup2
 	for name := range map1 {
 		if _, exists := map2[name]; !exists {
-			diffs = append(diffs, ScriptDiff{
+			diffs = append(diffs, model.ScriptDiff{
 				Name:     name,
-				DiffType: "removed",
+				DiffType: model.DiffRemoved,
 				Details:  "script in backup1 only",
 			})
 		}
@@ -339,8 +340,8 @@ func compareScripts2(scripts1, scripts2 []BackupScript) []ScriptDiff {
 	return diffs
 }
 
-func compareSchedules2(schedules1, schedules2 []BackupSchedule) []ScheduleDiff {
-	var diffs []ScheduleDiff
+func compareSchedules2(schedules1, schedules2 []BackupSchedule) []model.ScheduleDiff {
+	var diffs []model.ScheduleDiff
 
 	timespecs1 := make(map[string]bool)
 	for _, s := range schedules1 {
@@ -354,9 +355,9 @@ func compareSchedules2(schedules1, schedules2 []BackupSchedule) []ScheduleDiff {
 
 	for _, s := range schedules2 {
 		if !timespecs1[s.Timespec] {
-			diffs = append(diffs, ScheduleDiff{
+			diffs = append(diffs, model.ScheduleDiff{
 				Timespec: s.Timespec,
-				DiffType: "added",
+				DiffType: model.DiffAdded,
 				Details:  "schedule in backup2 only",
 			})
 		}
@@ -364,9 +365,9 @@ func compareSchedules2(schedules1, schedules2 []BackupSchedule) []ScheduleDiff {
 
 	for _, s := range schedules1 {
 		if !timespecs2[s.Timespec] {
-			diffs = append(diffs, ScheduleDiff{
+			diffs = append(diffs, model.ScheduleDiff{
 				Timespec: s.Timespec,
-				DiffType: "removed",
+				DiffType: model.DiffRemoved,
 				Details:  "schedule in backup1 only",
 			})
 		}
@@ -375,8 +376,8 @@ func compareSchedules2(schedules1, schedules2 []BackupSchedule) []ScheduleDiff {
 	return diffs
 }
 
-func compareWebhooks2(webhooks1, webhooks2 []WebhookInfo) []WebhookDiff {
-	var diffs []WebhookDiff
+func compareWebhooks2(webhooks1, webhooks2 []WebhookInfo) []model.WebhookDiff {
+	var diffs []model.WebhookDiff
 
 	map1 := make(map[string]WebhookInfo)
 	for _, w := range webhooks1 {
@@ -392,10 +393,10 @@ func compareWebhooks2(webhooks1, webhooks2 []WebhookInfo) []WebhookDiff {
 
 	for key, wh2 := range map2 {
 		if _, exists := map1[key]; !exists {
-			diffs = append(diffs, WebhookDiff{
+			diffs = append(diffs, model.WebhookDiff{
 				Event:    wh2.Event,
 				Name:     wh2.Name,
-				DiffType: "added",
+				DiffType: model.DiffAdded,
 				Details:  "webhook in backup2 only",
 			})
 		}
@@ -403,10 +404,10 @@ func compareWebhooks2(webhooks1, webhooks2 []WebhookInfo) []WebhookDiff {
 
 	for key, wh1 := range map1 {
 		if _, exists := map2[key]; !exists {
-			diffs = append(diffs, WebhookDiff{
+			diffs = append(diffs, model.WebhookDiff{
 				Event:    wh1.Event,
 				Name:     wh1.Name,
-				DiffType: "removed",
+				DiffType: model.DiffRemoved,
 				Details:  "webhook in backup1 only",
 			})
 		}

@@ -10,8 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -65,7 +65,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Compare template with device
-	var diffs []shelly.ConfigDiff
+	var diffs []model.ConfigDiff
 	err := cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
 		var compareErr error
 		diffs, compareErr = svc.CompareTemplate(ctx, opts.Device, tpl.Config)
@@ -84,7 +84,7 @@ func run(ctx context.Context, opts *Options) error {
 	return nil
 }
 
-func displayDiffs(opts *Options, diffs []shelly.ConfigDiff) {
+func displayDiffs(opts *Options, diffs []model.ConfigDiff) {
 	ios := opts.Factory.IOStreams()
 	highlight := theme.Highlight()
 
@@ -96,34 +96,13 @@ func displayDiffs(opts *Options, diffs []shelly.ConfigDiff) {
 	ios.Title("Configuration Differences")
 	ios.Printf("Template: %s  Device: %s\n\n", highlight.Render(opts.Template), highlight.Render(opts.Device))
 
-	table := output.NewTable("Key", "Type", "Device Value", "Template Value")
+	table := output.NewTable("Path", "Type", "Device Value", "Template Value")
 	for _, d := range diffs {
-		currentStr := formatValue(d.Current)
-		backupStr := formatValue(d.Backup)
-		table.AddRow(d.Key, d.DiffType, currentStr, backupStr)
+		table.AddRow(d.Path, d.DiffType, output.FormatDisplayValue(d.OldValue), output.FormatDisplayValue(d.NewValue))
 	}
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print diff table", err)
 	}
 
 	ios.Printf("\n%d difference(s) found\n", len(diffs))
-}
-
-func formatValue(v any) string {
-	if v == nil {
-		return "-"
-	}
-	switch val := v.(type) {
-	case map[string]any:
-		return fmt.Sprintf("{...%d keys}", len(val))
-	case []any:
-		return fmt.Sprintf("[...%d items]", len(val))
-	case string:
-		if len(val) > 30 {
-			return fmt.Sprintf("%q...", val[:27])
-		}
-		return fmt.Sprintf("%q", val)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
 }

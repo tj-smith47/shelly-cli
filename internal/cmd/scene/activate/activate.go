@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -74,11 +75,15 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 	if dryRun {
 		ios.Info("Dry run - would execute %d action(s):", len(scene.Actions))
 		for i, action := range scene.Actions {
+			params := output.FormatParamsInline(action.Params)
+			if params != "" {
+				params = theme.Dim().Render("{" + params + "}")
+			}
 			ios.Info("  %d. %s %s %s",
 				i+1,
 				theme.Bold().Render(action.Device),
 				theme.Highlight().Render(action.Method),
-				formatParams(action.Params),
+				params,
 			)
 		}
 		return nil
@@ -108,7 +113,11 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 		act := action // Capture for closure
 		lineID := fmt.Sprintf("%s:%s", act.Device, act.Method)
 		g.Go(func() error {
-			mw.UpdateLine(lineID, iostreams.StatusRunning, formatParams(act.Params))
+			params := output.FormatParamsInline(act.Params)
+			if params != "" {
+				params = theme.Dim().Render("{" + params + "}")
+			}
+			mw.UpdateLine(lineID, iostreams.StatusRunning, params)
 
 			// Per-action timeout
 			actionCtx, actionCancel := context.WithTimeout(ctx, timeout)
@@ -143,21 +152,4 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 
 	ios.Success("Scene %q activated (%d actions)", name, succeeded)
 	return nil
-}
-
-func formatParams(params map[string]any) string {
-	if len(params) == 0 {
-		return ""
-	}
-	result := "{"
-	first := true
-	for k, v := range params {
-		if !first {
-			result += ", "
-		}
-		result += fmt.Sprintf("%s=%v", k, v)
-		first = false
-	}
-	result += "}"
-	return theme.Dim().Render(result)
 }

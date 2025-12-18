@@ -9,8 +9,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -44,7 +45,7 @@ Use --raw to output only the value without formatting.`,
   # Output as JSON
   shelly kvs get living-room my_key -o json`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: completeDeviceThenKey(),
+		ValidArgsFunction: completion.DeviceThenNoComplete(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			opts.Key = args[1]
@@ -99,59 +100,7 @@ func displayResult(ios *iostreams.IOStreams, key string, result *shelly.KVSGetRe
 	label := theme.Highlight()
 
 	ios.Printf("%s: %s\n", label.Render("Key"), key)
-	ios.Printf("%s: %s\n", label.Render("Value"), formatValue(result.Value))
-	ios.Printf("%s: %s\n", label.Render("Type"), valueType(result.Value))
+	ios.Printf("%s: %s\n", label.Render("Value"), output.FormatJSONValue(result.Value))
+	ios.Printf("%s: %s\n", label.Render("Type"), output.ValueType(result.Value))
 	ios.Printf("%s: %s\n", label.Render("Etag"), result.Etag)
-}
-
-func formatValue(v any) string {
-	if v == nil {
-		return "null"
-	}
-	switch val := v.(type) {
-	case string:
-		return fmt.Sprintf("%q", val)
-	case bool:
-		return fmt.Sprintf("%t", val)
-	case float64:
-		if val == float64(int64(val)) {
-			return fmt.Sprintf("%.0f", val)
-		}
-		return fmt.Sprintf("%g", val)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
-}
-
-func valueType(v any) string {
-	if v == nil {
-		return "null"
-	}
-	switch v.(type) {
-	case string:
-		return "string"
-	case bool:
-		return "bool"
-	case float64:
-		return "number"
-	default:
-		return "unknown"
-	}
-}
-
-// completeDeviceThenKey provides completion for device and key arguments.
-func completeDeviceThenKey() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: complete device names
-			devices := config.ListDevices()
-			var completions []string
-			for name := range devices {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		// Second argument: key (no completion - would require device query)
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

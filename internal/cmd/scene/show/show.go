@@ -84,7 +84,7 @@ func printDetails(ios *iostreams.IOStreams, scene config.Scene) error {
 	for i, action := range scene.Actions {
 		params := "-"
 		if len(action.Params) > 0 {
-			params = formatParams(action.Params)
+			params = output.FormatParamsInline(action.Params)
 		}
 		table.AddRow(
 			theme.Dim().Render(fmt.Sprintf("%d", i+1)),
@@ -98,19 +98,4 @@ func printDetails(ios *iostreams.IOStreams, scene config.Scene) error {
 		ios.DebugErr("print scene actions table", err)
 	}
 	return nil
-}
-
-func formatParams(params map[string]any) string {
-	if len(params) == 0 {
-		return "-"
-	}
-	// Simple formatting for display
-	result := ""
-	for k, v := range params {
-		if result != "" {
-			result += ", "
-		}
-		result += fmt.Sprintf("%s=%v", k, v)
-	}
-	return result
 }

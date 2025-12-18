@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
-	"sort"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // NewCommand creates the config diff command.
@@ -64,8 +64,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		return fmt.Errorf("failed to get device configuration: %w", err)
 	}
 
-	// Compare configurations
-	diffs := compareConfigs("", deviceConfig, fileConfig)
+	// Compare configurations using shared comparison function
+	diffs := output.CompareConfigs(deviceConfig, fileConfig)
 
 	if len(diffs) == 0 {
 		ios.Success("Configurations are identical")
@@ -76,86 +76,16 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	ios.Printf("Comparing device %s with file %s\n\n", device, filePath)
 
 	for _, d := range diffs {
-		ios.Printf("%s\n", d)
+		switch d.DiffType {
+		case model.DiffAdded:
+			ios.Printf("  + %s: %v (in file only)\n", d.Path, output.FormatDisplayValue(d.NewValue))
+		case model.DiffRemoved:
+			ios.Printf("  - %s: %v (in device only)\n", d.Path, output.FormatDisplayValue(d.OldValue))
+		case model.DiffChanged:
+			ios.Printf("  ~ %s: %v -> %v\n", d.Path, output.FormatDisplayValue(d.OldValue), output.FormatDisplayValue(d.NewValue))
+		}
 	}
 
 	ios.Printf("\n%d difference(s) found\n", len(diffs))
 	return nil
-}
-
-// compareConfigs recursively compares two configuration maps.
-func compareConfigs(prefix string, device, file map[string]any) []string {
-	var diffs []string
-
-	// Get all keys from both maps
-	keys := make(map[string]bool)
-	for k := range device {
-		keys[k] = true
-	}
-	for k := range file {
-		keys[k] = true
-	}
-
-	// Sort keys for consistent output
-	sortedKeys := make([]string, 0, len(keys))
-	for k := range keys {
-		sortedKeys = append(sortedKeys, k)
-	}
-	sort.Strings(sortedKeys)
-
-	for _, key := range sortedKeys {
-		path := key
-		if prefix != "" {
-			path = prefix + "." + key
-		}
-
-		deviceVal, deviceHas := device[key]
-		fileVal, fileHas := file[key]
-
-		if !deviceHas {
-			diffs = append(diffs, fmt.Sprintf("  + %s: %v (in file only)", path, formatValue(fileVal)))
-			continue
-		}
-
-		if !fileHas {
-			diffs = append(diffs, fmt.Sprintf("  - %s: %v (in device only)", path, formatValue(deviceVal)))
-			continue
-		}
-
-		// Both have the key, compare values
-		deviceMap, deviceIsMap := deviceVal.(map[string]any)
-		fileMap, fileIsMap := fileVal.(map[string]any)
-
-		if deviceIsMap && fileIsMap {
-			// Recursively compare nested maps
-			nested := compareConfigs(path, deviceMap, fileMap)
-			diffs = append(diffs, nested...)
-		} else if !reflect.DeepEqual(deviceVal, fileVal) {
-			diffs = append(diffs, fmt.Sprintf("  ~ %s: %v -> %v", path, formatValue(deviceVal), formatValue(fileVal)))
-		}
-	}
-
-	return diffs
-}
-
-// formatValue formats a value for display.
-func formatValue(v any) string {
-	if v == nil {
-		return "<null>"
-	}
-	switch val := v.(type) {
-	case string:
-		if val == "" {
-			return `""`
-		}
-		return fmt.Sprintf("%q", val)
-	case map[string]any, []any:
-		data, err := json.Marshal(val)
-		if err != nil {
-			return fmt.Sprintf("%v", val)
-		}
-		return string(data)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
 }

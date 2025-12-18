@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -101,7 +102,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if opts.JSON {
-		return outputJSON(ios, devices)
+		return output.JSON(ios.Out, devices)
 	}
 
 	displayDevices(ios, devices, opts.Device)
@@ -184,15 +185,6 @@ func getDeviceConfig(ctx context.Context, conn *client.Client, id int) (name, ad
 		name = *cfg.Name
 	}
 	return name, cfg.Addr
-}
-
-func outputJSON(ios *iostreams.IOStreams, devices []BTHomeDeviceInfo) error {
-	output, err := json.MarshalIndent(devices, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to format JSON: %w", err)
-	}
-	ios.Println(string(output))
-	return nil
 }
 
 func displayDevices(ios *iostreams.IOStreams, devices []BTHomeDeviceInfo, gatewayDevice string) {

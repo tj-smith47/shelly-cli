@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/backup"
 
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
@@ -292,18 +293,18 @@ func TestRestoreResult_Fields(t *testing.T) {
 func TestBackupDiff_Fields(t *testing.T) {
 	t.Parallel()
 
-	diff := BackupDiff{
-		ConfigDiffs: []ConfigDiff{
-			{Key: "sys.device.name", DiffType: "changed", Current: "Old Name", Backup: "New Name"},
+	diff := model.BackupDiff{
+		ConfigDiffs: []model.ConfigDiff{
+			{Path: "sys.device.name", DiffType: model.DiffChanged, OldValue: "Old Name", NewValue: "New Name"},
 		},
-		ScriptDiffs: []ScriptDiff{
-			{Name: "script1", DiffType: "added", Details: "new script"},
+		ScriptDiffs: []model.ScriptDiff{
+			{Name: "script1", DiffType: model.DiffAdded, Details: "new script"},
 		},
-		ScheduleDiffs: []ScheduleDiff{
-			{Timespec: "0 0 * * *", DiffType: "removed", Details: "removed schedule"},
+		ScheduleDiffs: []model.ScheduleDiff{
+			{Timespec: "0 0 * * *", DiffType: model.DiffRemoved, Details: "removed schedule"},
 		},
-		WebhookDiffs: []WebhookDiff{
-			{Event: "switch.toggle", Name: "webhook1", DiffType: "changed", Details: "modified"},
+		WebhookDiffs: []model.WebhookDiff{
+			{Event: "switch.toggle", Name: "webhook1", DiffType: model.DiffChanged, Details: "modified"},
 		},
 	}
 

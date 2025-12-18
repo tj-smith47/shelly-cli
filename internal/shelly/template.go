@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // DeviceTemplate holds device information and configuration for templates.
@@ -76,8 +77,8 @@ func (s *Service) ApplyTemplate(ctx context.Context, identifier string, cfg map[
 }
 
 // CompareTemplate compares a template configuration with a device's current config.
-func (s *Service) CompareTemplate(ctx context.Context, identifier string, templateCfg map[string]any) ([]ConfigDiff, error) {
-	var diffs []ConfigDiff
+func (s *Service) CompareTemplate(ctx context.Context, identifier string, templateCfg map[string]any) ([]model.ConfigDiff, error) {
+	var diffs []model.ConfigDiff
 
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		current, err := conn.GetConfig(ctx)

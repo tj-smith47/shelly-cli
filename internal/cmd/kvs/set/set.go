@@ -8,7 +8,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -57,7 +58,7 @@ Limits:
   # Set a JSON object
   shelly kvs set living-room config '{"timeout":30}'`,
 		Args:              cobra.RangeArgs(2, 3),
-		ValidArgsFunction: completeDeviceThenKey(),
+		ValidArgsFunction: completion.DeviceThenNoComplete(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			opts.Key = args[1]
@@ -97,43 +98,7 @@ func run(ctx context.Context, opts *Options) error {
 		if err := svc.SetKVS(ctx, opts.Device, opts.Key, value); err != nil {
 			return err
 		}
-		ios.Success("Key %q set to %v", opts.Key, formatValue(value))
+		ios.Success("Key %q set to %v", opts.Key, output.FormatJSONValue(value))
 		return nil
 	})
-}
-
-func formatValue(v any) string {
-	if v == nil {
-		return "null"
-	}
-	switch val := v.(type) {
-	case string:
-		return fmt.Sprintf("%q", val)
-	case bool:
-		return fmt.Sprintf("%t", val)
-	case float64:
-		if val == float64(int64(val)) {
-			return fmt.Sprintf("%.0f", val)
-		}
-		return fmt.Sprintf("%g", val)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
-}
-
-// completeDeviceThenKey provides completion for device and key arguments.
-func completeDeviceThenKey() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: complete device names
-			devices := config.ListDevices()
-			var completions []string
-			for name := range devices {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		// Second and third arguments: key/value (no completion)
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // Options holds command options.
@@ -36,7 +36,7 @@ This operation is irreversible. Use --yes to skip the confirmation prompt.`,
   # Delete without confirmation
   shelly kvs delete living-room my_key --yes`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: completeDeviceThenKey(),
+		ValidArgsFunction: completion.DeviceThenNoComplete(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			opts.Key = args[1]
@@ -74,21 +74,4 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Success("Key %q deleted", opts.Key)
 		return nil
 	})
-}
-
-// completeDeviceThenKey provides completion for device and key arguments.
-func completeDeviceThenKey() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: complete device names
-			devices := config.ListDevices()
-			var completions []string
-			for name := range devices {
-				completions = append(completions, name)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		// Second argument: key (no completion - would require device query)
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }
