@@ -76,15 +76,14 @@ jobs:
             goarch: amd64
             cgo: 1
             artifact: shelly_linux_amd64
-          # Linux arm64 - cross-compile with CGO
-          - runner: ubuntu-latest
+          # Linux arm64 - native build on arm64 runner
+          - runner: ubuntu-24.04-arm64-2-core
             goos: linux
             goarch: arm64
             cgo: 1
-            cc: aarch64-linux-gnu-gcc
             artifact: shelly_linux_arm64
           # macOS amd64 - native with CGO for CoreBluetooth BLE
-          - runner: macos-13
+          - runner: macos-15-large
             goos: darwin
             goarch: amd64
             cgo: 1
@@ -119,12 +118,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libbluetooth-dev
-          # For arm64 cross-compilation
-          if [ "${{ matrix.goarch }}" = "arm64" ]; then
-            sudo dpkg --add-architecture arm64
-            sudo apt-get update
-            sudo apt-get install -y gcc-aarch64-linux-gnu libbluetooth-dev:arm64
-          fi
 
       - name: Build binary
         shell: bash
