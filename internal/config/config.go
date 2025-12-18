@@ -335,6 +335,15 @@ func Dir() (string, error) {
 	return filepath.Join(home, ".config", "shelly"), nil
 }
 
+// CacheDir returns the cache directory path.
+func CacheDir() (string, error) {
+	configDir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, "cache"), nil
+}
+
 // PluginsDir returns the plugins directory path.
 func PluginsDir() (string, error) {
 	configDir, err := Dir()

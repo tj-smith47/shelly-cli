@@ -165,15 +165,6 @@ func PrintTableTo(w io.Writer, headers []string, rows [][]string) error {
 	return t.PrintTo(w)
 }
 
-// KeyValueTable creates a table from key-value pairs.
-func KeyValueTable(pairs map[string]string) *Table {
-	t := NewTable("Key", "Value")
-	for k, v := range pairs {
-		t.AddRow(k, v)
-	}
-	return t
-}
-
 // Empty returns true if the table has no rows.
 func (t *Table) Empty() bool {
 	return len(t.rows) == 0

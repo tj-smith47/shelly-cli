@@ -158,20 +158,6 @@ func TestTable_RowCount(t *testing.T) {
 	}
 }
 
-func TestKeyValueTable(t *testing.T) {
-	t.Parallel()
-
-	pairs := map[string]string{
-		"key1": "value1",
-		"key2": "value2",
-	}
-
-	table := KeyValueTable(pairs)
-	if table.RowCount() != 2 {
-		t.Errorf("expected 2 rows, got %d", table.RowCount())
-	}
-}
-
 func TestPrintTableTo(t *testing.T) {
 	t.Parallel()
 

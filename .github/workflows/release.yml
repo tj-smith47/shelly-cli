@@ -297,7 +297,7 @@ jobs:
 
           ### Homebrew (macOS)
           ```bash
-          brew install tj-smith47/tap/shelly
+          brew install tj-smith47/tap/shelly-cli
           ```
 
           ### Go Install (All Platforms)
@@ -377,10 +377,11 @@ jobs:
           git clone "https://${HOMEBREW_TAP_TOKEN}@github.com/tj-smith47/homebrew-tap.git"
           cd homebrew-tap
 
-          # Create/update formula
+          # Create/update formula (shelly-cli installs binary as 'shelly')
           mkdir -p Formula
-          cat > Formula/shelly.rb << EOF
-          class Shelly < Formula
+          rm -f Formula/shelly.rb  # Remove old formula name if exists
+          cat > Formula/shelly-cli.rb << EOF
+          class ShellyCli < Formula
             desc "Command-line interface for Shelly smart home devices with full BLE support"
             homepage "https://github.com/tj-smith47/shelly-cli"
             license "Apache-2.0"
@@ -399,10 +400,16 @@ jobs:
             def install
               bin.install "shelly"
 
-              # Install completions
-              bash_completion.install "completions/shelly.bash" => "shelly"
-              zsh_completion.install "completions/shelly.zsh" => "_shelly"
-              fish_completion.install "completions/shelly.fish"
+              # Install completions if present
+              if File.exist?("completions/shelly.bash")
+                bash_completion.install "completions/shelly.bash" => "shelly"
+              end
+              if File.exist?("completions/shelly.zsh")
+                zsh_completion.install "completions/shelly.zsh" => "_shelly"
+              end
+              if File.exist?("completions/shelly.fish")
+                fish_completion.install "completions/shelly.fish"
+              end
             end
 
             test do
@@ -414,6 +421,6 @@ jobs:
           # Commit and push
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add Formula/shelly.rb
-          git commit -m "Update shelly to ${VERSION}" || echo "No changes to commit"
+          git add -A Formula/
+          git commit -m "Update shelly-cli to ${VERSION}" || echo "No changes to commit"
           git push

@@ -44,7 +44,7 @@ A powerful, intuitive command-line interface for managing Shelly smart home devi
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install tj-smith47/tap/shelly
+brew install tj-smith47/tap/shelly-cli
 ```
 
 ### Go Install
