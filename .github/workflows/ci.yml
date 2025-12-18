@@ -67,12 +67,18 @@ jobs:
           BADGE="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${COVERAGE}%\",\"color\":\"${COLOR}\"}"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git checkout --orphan badges-temp
-          git rm -rf . > /dev/null 2>&1 || true
+          # Fetch existing badges branch to preserve other badge files
+          git fetch origin badges:badges 2>/dev/null || true
+          if git show-ref --verify --quiet refs/heads/badges; then
+            git checkout badges
+          else
+            git checkout --orphan badges
+            git rm -rf . > /dev/null 2>&1 || true
+          fi
           echo "$BADGE" > coverage.json
           git add coverage.json
-          git commit -m "Update coverage to ${COVERAGE}%"
-          git push origin badges-temp:badges --force
+          git diff --cached --quiet || git commit -m "Update coverage to ${COVERAGE}%"
+          git push origin badges --force
 
   build:
     name: Build

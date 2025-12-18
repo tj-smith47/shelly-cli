@@ -65,9 +65,15 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git stash --include-untracked || true
-          git fetch origin badges:badges || git checkout --orphan badges-temp
-          git checkout badges || git checkout badges-temp
+          # Fetch existing badges branch to preserve other badge files
+          git fetch origin badges:badges 2>/dev/null || true
+          if git show-ref --verify --quiet refs/heads/badges; then
+            git checkout badges
+          else
+            git checkout --orphan badges
+            git rm -rf . > /dev/null 2>&1 || true
+          fi
           echo "$BADGE" > docs.json
           git add docs.json
-          git commit -m "Update docs badge" || true
-          git push origin HEAD:badges --force
+          git diff --cached --quiet || git commit -m "Update docs badge"
+          git push origin badges --force
