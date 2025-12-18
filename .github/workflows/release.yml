@@ -337,10 +337,17 @@ jobs:
           sed -i "s/TAG_PLACEHOLDER/$TAG/g" release_notes.md
           sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" release_notes.md
 
+          # Determine if this is a pre-release (contains -rc, -alpha, -beta)
+          PRERELEASE_FLAG=""
+          if [[ "$TAG" =~ -(rc|alpha|beta) ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
           # Create release
           gh release create "$TAG" \
             --title "shelly-cli $TAG" \
             --notes-file release_notes.md \
+            $PRERELEASE_FLAG \
             release/*
 
   # =============================================================================
