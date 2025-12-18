@@ -85,6 +85,6 @@ Use 'shelly completion install' to automatically install completions.
 * [shelly completion bash](shelly_completion_bash.md)	 - Generate bash completion script
 * [shelly completion fish](shelly_completion_fish.md)	 - Generate fish completion script
 * [shelly completion install](shelly_completion_install.md)	 - Install shell completions
-* [shelly completion powershell](shelly_completion_powershell.md)	 - Generate PowerShell completion script
+* [shelly completion powershell](shelly_completion_powershell.md)	 - Generate powershell completion script
 * [shelly completion zsh](shelly_completion_zsh.md)	 - Generate zsh completion script
 

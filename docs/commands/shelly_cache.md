@@ -11,6 +11,16 @@ The cache stores:
   - Firmware update information
   - Version check data
 
+### Examples
+
+```
+  # Show cache statistics
+  shelly cache show
+
+  # Clear the cache
+  shelly cache clear
+```
+
 ### Options
 
 ```
@@ -33,6 +43,6 @@ The cache stores:
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly cache clear](shelly_cache_clear.md)	 - Clear the cache
-* [shelly cache show](shelly_cache_show.md)	 - Show cache information
+* [shelly cache clear](shelly_cache_clear.md)	 - Clear the discovery cache
+* [shelly cache show](shelly_cache_show.md)	 - Show cache statistics
 

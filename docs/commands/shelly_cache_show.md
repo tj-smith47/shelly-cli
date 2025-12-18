@@ -1,10 +1,10 @@
 ## shelly cache show
 
-Show cache information
+Show cache statistics
 
 ### Synopsis
 
-Show the cache directory path and its contents.
+Display information about the discovery cache.
 
 ```
 shelly cache show [flags]
@@ -13,7 +13,7 @@ shelly cache show [flags]
 ### Examples
 
 ```
-  # Show cache info
+  # Show cache statistics
   shelly cache show
 ```
 

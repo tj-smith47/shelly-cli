@@ -1,6 +1,6 @@
 ## shelly completion powershell
 
-Generate PowerShell completion script
+Generate powershell completion script
 
 ### Synopsis
 

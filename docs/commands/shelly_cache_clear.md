@@ -1,10 +1,10 @@
 ## shelly cache clear
 
-Clear the cache
+Clear the discovery cache
 
 ### Synopsis
 
-Clear all cached data from the CLI cache directory.
+Clear all cached device discovery results.
 
 ```
 shelly cache clear [flags]
@@ -13,7 +13,7 @@ shelly cache clear [flags]
 ### Examples
 
 ```
-  # Clear all cached data
+  # Clear the discovery cache
   shelly cache clear
 ```
 
