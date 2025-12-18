@@ -1,4 +1,16 @@
-name: GoReleaser
+# =============================================================================
+# Release Workflow (Native CGO Builds)
+# =============================================================================
+# This workflow builds native binaries with CGO support for BLE on each platform.
+# It's a workaround until GoReleaser Pro is available for split/merge builds.
+#
+# When you get GoReleaser Pro:
+# 1. Disable this workflow (comment out the triggers)
+# 2. Enable goreleaser-pro.yml (uncomment the triggers)
+# 3. Add GORELEASER_KEY secret
+# =============================================================================
+
+name: Release
 
 on:
   # Triggered by AutoTag workflow completion
@@ -17,12 +29,79 @@ on:
 permissions:
   contents: write
   pull-requests: read
-  packages: write  # Required for ghcr.io
+  packages: write
+
+env:
+  GO_VERSION: "1.25.5"
 
 jobs:
-  goreleaser:
+  # =============================================================================
+  # Get tag name for all jobs
+  # =============================================================================
+  prepare:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      tag: ${{ steps.get-tag.outputs.tag }}
+      version: ${{ steps.get-tag.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag
+        id: get-tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG=$(git describe --tags --abbrev=0)
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+  # =============================================================================
+  # Build job - runs on native platform runners for CGO support
+  # =============================================================================
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux amd64 - native with CGO for BlueZ BLE
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            cgo: 1
+            artifact: shelly_linux_amd64
+          # Linux arm64 - cross-compile with CGO
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            cgo: 1
+            cc: aarch64-linux-gnu-gcc
+            artifact: shelly_linux_arm64
+          # macOS amd64 - native with CGO for CoreBluetooth BLE
+          - runner: macos-13
+            goos: darwin
+            goarch: amd64
+            cgo: 1
+            artifact: shelly_darwin_amd64
+          # macOS arm64 - native with CGO for CoreBluetooth BLE
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            cgo: 1
+            artifact: shelly_darwin_arm64
+          # Windows amd64 - WinRT BLE (no CGO needed)
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            cgo: 0
+            artifact: shelly_windows_amd64
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,8 +111,115 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Install Linux BLE dependencies
+        if: matrix.goos == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbluetooth-dev
+          # For arm64 cross-compilation
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            sudo dpkg --add-architecture arm64
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu libbluetooth-dev:arm64
+          fi
+
+      - name: Build binary
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: ${{ matrix.cgo }}
+          CC: ${{ matrix.cc }}
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          COMMIT="${{ github.sha }}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          LDFLAGS="-s -w"
+          LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/version.Version=${VERSION}"
+          LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/version.Commit=${COMMIT}"
+          LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/version.Date=${DATE}"
+          LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/version.BuiltBy=github-actions"
+
+          BINARY_NAME="shelly"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY_NAME="shelly.exe"
+          fi
+
+          go build -trimpath -ldflags "$LDFLAGS" -o "dist/${BINARY_NAME}" ./cmd/shelly
+
+      - name: Generate completions
+        shell: bash
+        run: |
+          mkdir -p dist/completions
+          BINARY="dist/shelly"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY="dist/shelly.exe"
+          fi
+          # Only generate if binary can run on this platform
+          if [ "${{ matrix.goos }}" = "$(echo ${{ runner.os }} | tr '[:upper:]' '[:lower:]')" ]; then
+            $BINARY completion bash > dist/completions/shelly.bash 2>/dev/null || true
+            $BINARY completion zsh > dist/completions/shelly.zsh 2>/dev/null || true
+            $BINARY completion fish > dist/completions/shelly.fish 2>/dev/null || true
+            $BINARY completion powershell > dist/completions/shelly.ps1 2>/dev/null || true
+          fi
+
+      - name: Create archive (Unix)
+        if: matrix.goos != 'windows'
+        run: |
+          cd dist
+          tar -czf "../${{ matrix.artifact }}.tar.gz" shelly completions/
+          cd ..
+          sha256sum "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
+
+      - name: Create archive (Windows)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path shelly.exe, completions -DestinationPath "../${{ matrix.artifact }}.zip"
+          cd ..
+          $hash = (Get-FileHash -Algorithm SHA256 "${{ matrix.artifact }}.zip").Hash.ToLower()
+          "$hash  ${{ matrix.artifact }}.zip" | Out-File -FilePath "${{ matrix.artifact }}.zip.sha256" -Encoding utf8
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.*
+          retention-days: 1
+
+  # =============================================================================
+  # Docker build job
+  # =============================================================================
+  docker:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Linux amd64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: shelly_linux_amd64
+          path: artifacts/
+
+      - name: Download Linux arm64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: shelly_linux_arm64
+          path: artifacts/
+
+      - name: Extract binaries
+        run: |
+          mkdir -p bin/linux/amd64 bin/linux/arm64
+          tar -xzf artifacts/shelly_linux_amd64.tar.gz -C bin/linux/amd64
+          tar -xzf artifacts/shelly_linux_arm64.tar.gz -C bin/linux/arm64
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -48,17 +234,185 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/tj-smith47/shelly-cli:${{ needs.prepare.outputs.version }}
+            ghcr.io/tj-smith47/shelly-cli:latest
+          labels: |
+            org.opencontainers.image.title=Shelly CLI
+            org.opencontainers.image.description=Command-line interface for Shelly smart home devices
+            org.opencontainers.image.url=https://github.com/tj-smith47/shelly-cli
+            org.opencontainers.image.source=https://github.com/tj-smith47/shelly-cli
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=Apache-2.0
+
+  # =============================================================================
+  # Release job - creates GitHub release with all artifacts
+  # =============================================================================
+  release:
+    needs: [prepare, build, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          # Move all archives and checksums to release folder
+          find artifacts -name "*.tar.gz" -exec mv {} release/ \;
+          find artifacts -name "*.zip" -exec mv {} release/ \;
+          find artifacts -name "*.sha256" -exec mv {} release/ \;
+          # Create combined checksums file
+          cd release
+          cat *.sha256 > checksums.txt
+          ls -la
+
+      - name: Create source archive
+        run: |
+          git archive --format=tar.gz --prefix=shelly-cli-${{ needs.prepare.outputs.version }}/ \
+            -o release/shelly_${{ needs.prepare.outputs.version }}_source.tar.gz HEAD
+
       - name: Get PR
         uses: 8BitJonny/gh-get-current-pr@3.0.0
         id: pr
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      - name: Create Release
         if: ${{ !contains(steps.pr.outputs.pr_title, '[skip') && !contains(steps.pr.outputs.pr_title, 'release]') }}
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          # Generate release notes
+          cat > release_notes.md << 'EOF'
+          ## Installation
+
+          ### Homebrew (macOS)
+          ```bash
+          brew install tj-smith47/tap/shelly
+          ```
+
+          ### Go Install (All Platforms)
+          ```bash
+          go install github.com/tj-smith47/shelly-cli/cmd/shelly@TAG_PLACEHOLDER
+          ```
+
+          ### Docker (Linux)
+          ```bash
+          docker pull ghcr.io/tj-smith47/shelly-cli:VERSION_PLACEHOLDER
+          docker run --rm ghcr.io/tj-smith47/shelly-cli:VERSION_PLACEHOLDER --help
+          ```
+
+          ### Download Binary
+          Download the appropriate binary for your platform from the assets below.
+
+          ## BLE Support
+
+          | Platform | BLE Discovery | BLE Provisioning |
+          |----------|---------------|------------------|
+          | Linux | ✅ Requires BlueZ | ✅ |
+          | macOS | ✅ Built-in | ✅ |
+          | Windows | ✅ Built-in | ✅ |
+
+          ## What's Changed
+          See the [CHANGELOG](https://github.com/tj-smith47/shelly-cli/blob/master/CHANGELOG.md) for details.
+          EOF
+
+          # Substitute variables
+          sed -i "s/TAG_PLACEHOLDER/$TAG/g" release_notes.md
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" release_notes.md
+
+          # Create release
+          gh release create "$TAG" \
+            --title "shelly-cli $TAG" \
+            --notes-file release_notes.md \
+            release/*
+
+  # =============================================================================
+  # Homebrew tap update
+  # =============================================================================
+  homebrew:
+    needs: [prepare, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS amd64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: shelly_darwin_amd64
+          path: artifacts/amd64/
+
+      - name: Download macOS arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: shelly_darwin_arm64
+          path: artifacts/arm64/
+
+      - name: Update Homebrew tap
+        env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          TAG="${{ needs.prepare.outputs.tag }}"
+
+          # Get checksums
+          AMD64_SHA256=$(cat artifacts/amd64/shelly_darwin_amd64.tar.gz.sha256 | awk '{print $1}')
+          ARM64_SHA256=$(cat artifacts/arm64/shelly_darwin_arm64.tar.gz.sha256 | awk '{print $1}')
+
+          # Clone homebrew-tap
+          git clone "https://${HOMEBREW_TAP_TOKEN}@github.com/tj-smith47/homebrew-tap.git"
+          cd homebrew-tap
+
+          # Create/update formula
+          mkdir -p Formula
+          cat > Formula/shelly.rb << EOF
+          class Shelly < Formula
+            desc "Command-line interface for Shelly smart home devices with full BLE support"
+            homepage "https://github.com/tj-smith47/shelly-cli"
+            license "Apache-2.0"
+            version "${VERSION}"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_arm64.tar.gz"
+                sha256 "${ARM64_SHA256}"
+              else
+                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_amd64.tar.gz"
+                sha256 "${AMD64_SHA256}"
+              end
+            end
+
+            def install
+              bin.install "shelly"
+
+              # Install completions
+              bash_completion.install "completions/shelly.bash" => "shelly"
+              zsh_completion.install "completions/shelly.zsh" => "_shelly"
+              fish_completion.install "completions/shelly.fish"
+            end
+
+            test do
+              system "#{bin}/shelly", "--version"
+            end
+          end
+          EOF
+
+          # Commit and push
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add Formula/shelly.rb
+          git commit -m "Update shelly to ${VERSION}" || echo "No changes to commit"
+          git push

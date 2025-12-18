@@ -1,0 +1,163 @@
+# =============================================================================
+# GoReleaser Pro Release Workflow (DISABLED - requires Pro license)
+# =============================================================================
+# This workflow uses GoReleaser's split/merge feature for multi-platform CGO builds.
+# Enable this when you have a GoReleaser Pro license.
+#
+# For now, use release-cgo.yml which handles CGO builds manually.
+# =============================================================================
+
+name: GoReleaser Pro
+
+on:
+  # DISABLED - uncomment when Pro license is available
+  # workflow_run:
+  #   workflows:
+  #     - "AutoTag"
+  #   branches:
+  #     - master
+  #   types:
+  #     - completed
+  # push:
+  #   tags:
+  #     - 'v*'
+  workflow_dispatch:  # Manual trigger only for testing
+
+permissions:
+  contents: write
+  pull-requests: read
+  packages: write
+
+jobs:
+  # =============================================================================
+  # Build job - runs on native platform runners for CGO support
+  # =============================================================================
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux amd64 - native with CGO for BlueZ BLE
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            cgo: 1
+          # Linux arm64 - cross-compile with CGO
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            cgo: 1
+            cc: aarch64-linux-gnu-gcc
+          # macOS amd64 - native with CGO for CoreBluetooth BLE
+          - runner: macos-13
+            goos: darwin
+            goarch: amd64
+            cgo: 1
+          # macOS arm64 - native with CGO for CoreBluetooth BLE
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            cgo: 1
+          # Windows amd64 - WinRT BLE (no CGO needed)
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            cgo: 0
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+          cache: true
+
+      - name: Install Linux BLE dependencies
+        if: matrix.goos == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbluetooth-dev
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            sudo dpkg --add-architecture arm64
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu libbluetooth-dev:arm64
+          fi
+
+      - name: Build with GoReleaser (split)
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser-pro
+          version: "~> v2"
+          args: release --split --clean
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: ${{ matrix.cgo }}
+          CC: ${{ matrix.cc }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+          retention-days: 1
+
+  # =============================================================================
+  # Release job - merges all platform builds and creates release
+  # =============================================================================
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+          cache: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist/
+
+      - name: Get PR
+        uses: 8BitJonny/gh-get-current-pr@3.0.0
+        id: pr
+
+      - name: Merge and release
+        uses: goreleaser/goreleaser-action@v6
+        if: ${{ !contains(steps.pr.outputs.pr_title, '[skip') && !contains(steps.pr.outputs.pr_title, 'release]') }}
+        with:
+          distribution: goreleaser-pro
+          version: "~> v2"
+          args: continue --merge
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

@@ -10,16 +10,19 @@ builds:
   - id: shelly
     main: ./cmd/shelly
     binary: shelly
-    env:
-      - CGO_ENABLED=0
+    # CGO_ENABLED is set per-platform in CI workflow for BLE support
+    # - Linux/macOS: CGO_ENABLED=1 (BlueZ/CoreBluetooth)
+    # - Windows: CGO_ENABLED=0 (WinRT BLE doesn't require CGO)
     goos:
       - linux
+      - darwin
       - windows
-      # darwin excluded: BLE support requires CGO (cbgo library)
-      # macOS users can build from source or use 'go install'
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64  # Skip Windows ARM64
     ldflags:
       - -s -w
       - -X github.com/tj-smith47/shelly-cli/internal/version.Version={{.Version}}
@@ -28,6 +31,14 @@ builds:
       - -X github.com/tj-smith47/shelly-cli/internal/version.BuiltBy=goreleaser
     flags:
       - -trimpath
+
+# =============================================================================
+# Split/Merge for multi-platform CGO builds (GoReleaser Pro feature)
+# =============================================================================
+# When using Pro, run with: goreleaser release --split on each platform runner
+# Then merge with: goreleaser continue --merge
+partial:
+  by: goos
 
 archives:
   - formats:
@@ -67,7 +78,12 @@ release:
   footer: |
     ## Installation
 
-    ### Go Install (All Platforms including macOS)
+    ### Homebrew (macOS)
+    ```bash
+    brew install tj-smith47/tap/shelly
+    ```
+
+    ### Go Install (All Platforms)
     ```bash
     go install github.com/tj-smith47/shelly-cli/cmd/shelly@v{{.Version}}
     ```
@@ -78,11 +94,16 @@ release:
     docker run --rm ghcr.io/tj-smith47/shelly-cli:{{.Version}} --help
     ```
 
-    ### Download Binary (Linux/Windows)
+    ### Download Binary
     Download the appropriate binary for your platform from the assets below.
 
-    > **Note:** macOS binaries are not provided due to BLE support requiring CGO.
-    > macOS users should use `go install` to build from source.
+    ## BLE Support
+
+    | Platform | BLE Discovery | BLE Provisioning |
+    |----------|---------------|------------------|
+    | Linux | ✅ Requires BlueZ | ✅ |
+    | macOS | ✅ Built-in | ✅ |
+    | Windows | ✅ Built-in | ✅ |
 
     ## What's Changed
     See the [CHANGELOG](https://github.com/tj-smith47/shelly-cli/blob/master/CHANGELOG.md) for details.
@@ -112,28 +133,23 @@ dockers_v2:
       org.opencontainers.image.version: "{{ .Version }}"
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.created: "{{ .Date }}"
-      org.opencontainers.image.licenses: "MIT"
+      org.opencontainers.image.licenses: "Apache-2.0"
 
 # =============================================================================
-# Homebrew Tap (disabled - macOS builds require CGO for BLE support)
+# Homebrew Tap - native macOS binaries with full BLE support
 # =============================================================================
-# Users should use: go install github.com/tj-smith47/shelly-cli/cmd/shelly@latest
-#
-# brews:
-#   - name: shelly
-#     repository:
-#       owner: tj-smith47
-#       name: homebrew-tap
-#       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-#     directory: Formula
-#     homepage: "https://github.com/tj-smith47/shelly-cli"
-#     description: "Command-line interface for Shelly smart home devices"
-#     license: "MIT"
-#     install: |
-#       bin.install "shelly"
-#       generate_completions_from_executable(bin/"shelly", "completion")
-#     test: |
-#       system "#{bin}/shelly", "--version"
-#     dependencies:
-#       - name: go
-#         type: build
+brews:
+  - name: shelly
+    repository:
+      owner: tj-smith47
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/tj-smith47/shelly-cli"
+    description: "Command-line interface for Shelly smart home devices with full BLE support"
+    license: "Apache-2.0"
+    install: |
+      bin.install "shelly"
+      generate_completions_from_executable(bin/"shelly", "completion")
+    test: |
+      system "#{bin}/shelly", "--version"

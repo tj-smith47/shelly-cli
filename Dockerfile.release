@@ -1,0 +1,22 @@
+# Shelly CLI Docker Image (Release)
+# Used by release workflow - expects platform-specific binary in bin/linux/{arch}/
+
+FROM alpine:3.21
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
+
+# Create non-root user for security
+RUN adduser -D -u 1000 shelly
+USER shelly
+
+# Copy pre-built binary (release workflow extracts to bin/linux/{arch}/)
+ARG TARGETARCH
+COPY bin/linux/${TARGETARCH}/shelly /usr/local/bin/shelly
+
+# Set up working directory
+WORKDIR /home/shelly
+
+# Default entrypoint
+ENTRYPOINT ["shelly"]
+CMD ["--help"]
