@@ -217,9 +217,10 @@ jobs:
 
       - name: Extract binaries
         run: |
-          mkdir -p bin/linux/amd64 bin/linux/arm64
-          tar -xzf artifacts/shelly_linux_amd64.tar.gz -C bin/linux/amd64
-          tar -xzf artifacts/shelly_linux_arm64.tar.gz -C bin/linux/arm64
+          # Extract to paths expected by Dockerfile (linux/amd64, linux/arm64)
+          mkdir -p linux/amd64 linux/arm64
+          tar -xzf artifacts/shelly_linux_amd64.tar.gz -C linux/amd64
+          tar -xzf artifacts/shelly_linux_arm64.tar.gz -C linux/arm64
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -238,7 +239,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.release
+          file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
