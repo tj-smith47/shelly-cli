@@ -76,14 +76,14 @@ jobs:
             goarch: amd64
             cgo: 1
             artifact: shelly_linux_amd64
-          # Linux arm64 - native build on arm64 runner
-          - runner: ubuntu-24.04-arm64-2-core
+          # Linux arm64 - native with CGO for BlueZ BLE
+          - runner: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
             cgo: 1
             artifact: shelly_linux_arm64
           # macOS amd64 - native with CGO for CoreBluetooth BLE
-          - runner: macos-15-large
+          - runner: macos-15-intel
             goos: darwin
             goarch: amd64
             cgo: 1

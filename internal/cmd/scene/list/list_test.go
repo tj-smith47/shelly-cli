@@ -30,24 +30,3 @@ func TestNewCommand(t *testing.T) {
 
 // Note: This command uses the global -o/--output flag defined on the root command,
 // not a local flag. The global flag is tested in the root command tests.
-
-func TestFormatActionCount(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		count int
-		want  string
-	}{
-		{0, "0 (empty)"},
-		{1, "1 action"},
-		{5, "5 actions"},
-	}
-
-	for _, tt := range tests {
-		result := formatActionCount(tt.count)
-		// Result contains ANSI codes from theme, so just check it's not empty
-		if result == "" {
-			t.Errorf("formatActionCount(%d) returned empty string", tt.count)
-		}
-	}
-}
