@@ -3,17 +3,12 @@ package list
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the schedule list command.
@@ -72,38 +67,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.ScheduleJob, error) {
 			return svc.ListSchedules(ctx, device)
 		},
-		displaySchedules)
-}
-
-func displaySchedules(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) {
-	table := output.NewTable("ID", "Enabled", "Timespec", "Calls")
-	for _, s := range schedules {
-		// Format calls summary
-		callsSummary := formatCallsSummary(s.Calls)
-
-		table.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), s.Timespec, callsSummary)
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-}
-
-func formatCallsSummary(calls []shelly.ScheduleCall) string {
-	if len(calls) == 0 {
-		return output.FormatPlaceholder("(none)")
-	}
-
-	if len(calls) == 1 {
-		call := calls[0]
-		if len(call.Params) == 0 {
-			return call.Method
-		}
-		params, err := json.Marshal(call.Params)
-		if err != nil {
-			return call.Method
-		}
-		return fmt.Sprintf("%s %s", call.Method, string(params))
-	}
-
-	return fmt.Sprintf("%d calls", len(calls))
+		cmdutil.DisplayScheduleList)
 }

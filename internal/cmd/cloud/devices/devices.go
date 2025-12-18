@@ -4,16 +4,12 @@ package devices
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the cloud devices command.
@@ -61,40 +57,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 			return fmt.Errorf("failed to get devices: %w", err)
 		}
 
-		displayDevices(ios, devices)
+		cmdutil.DisplayCloudDevices(ios, devices)
 		return nil
 	})
-}
-
-func displayDevices(ios *iostreams.IOStreams, devices []shelly.CloudDevice) {
-	if len(devices) == 0 {
-		ios.Info("No devices found in your Shelly Cloud account")
-		return
-	}
-
-	// Sort by ID for consistent display
-	sort.Slice(devices, func(i, j int) bool {
-		return devices[i].ID < devices[j].ID
-	})
-
-	table := output.NewTable("ID", "Model", "Gen", "Online")
-
-	for _, d := range devices {
-		model := d.Model
-		if model == "" {
-			model = output.FormatPlaceholder("unknown")
-		}
-
-		gen := output.FormatPlaceholder("-")
-		if d.Generation > 0 {
-			gen = fmt.Sprintf("%d", d.Generation)
-		}
-
-		table.AddRow(d.ID, model, gen, output.RenderYesNo(d.Online, output.CaseLower, theme.FalseError))
-	}
-
-	ios.Printf("Found %d device(s):\n\n", len(devices))
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
 }

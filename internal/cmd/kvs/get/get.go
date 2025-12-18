@@ -3,7 +3,6 @@ package get
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -11,9 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // Options holds command options.
@@ -72,35 +69,9 @@ func run(ctx context.Context, opts *Options) error {
 		},
 		func(ios *iostreams.IOStreams, result *shelly.KVSGetResult) {
 			if opts.Raw {
-				displayRaw(ios, result)
+				cmdutil.DisplayKVSRaw(ios, result)
 			} else {
-				displayResult(ios, opts.Key, result)
+				cmdutil.DisplayKVSResult(ios, opts.Key, result)
 			}
 		})
-}
-
-func displayRaw(ios *iostreams.IOStreams, result *shelly.KVSGetResult) {
-	switch v := result.Value.(type) {
-	case string:
-		ios.Println(v)
-	case nil:
-		ios.Println("null")
-	default:
-		// For other types (numbers, bools), use JSON encoding
-		data, err := json.Marshal(v)
-		if err != nil {
-			ios.Printf("%v\n", v)
-			return
-		}
-		ios.Println(string(data))
-	}
-}
-
-func displayResult(ios *iostreams.IOStreams, key string, result *shelly.KVSGetResult) {
-	label := theme.Highlight()
-
-	ios.Printf("%s: %s\n", label.Render("Key"), key)
-	ios.Printf("%s: %s\n", label.Render("Value"), output.FormatJSONValue(result.Value))
-	ios.Printf("%s: %s\n", label.Render("Type"), output.ValueType(result.Value))
-	ios.Printf("%s: %s\n", label.Render("Etag"), result.Etag)
 }

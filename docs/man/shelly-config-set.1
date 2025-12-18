@@ -2,18 +2,18 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-config-set - Set device configuration
+shelly-config-set - Set CLI configuration values
 
 
 .SH SYNOPSIS
-\fBshelly config set   =\&... [flags]\fP
+\fBshelly config set =\&... [flags]\fP
 
 
 .SH DESCRIPTION
-Set configuration values for a device component.
+Set configuration values in the Shelly CLI config file.
 
 .PP
-Specify key=value pairs to update. Only the specified keys will be modified.
+Use dot notation for nested values (e.g., "defaults.timeout=30s").
 
 
 .SH OPTIONS
@@ -56,14 +56,14 @@ Specify key=value pairs to update. Only the specified keys will be modified.
 
 .SH EXAMPLE
 .EX
-  # Set switch name
-  shelly config set living-room switch:0 name="Main Light"
+  # Set default timeout
+  shelly config set defaults.timeout=30s
+
+  # Set output format
+  shelly config set defaults.output=json
 
   # Set multiple values
-  shelly config set living-room switch:0 name="Light" initial_state=on
-
-  # Set light brightness default
-  shelly config set living-room light:0 default.brightness=50
+  shelly config set defaults.timeout=30s defaults.output=json
 .EE
 
 

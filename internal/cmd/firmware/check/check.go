@@ -11,10 +11,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 var allFlag bool
@@ -62,37 +60,7 @@ func run(f *cmdutil.Factory, ctx context.Context, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.FirmwareInfo, error) {
 			return svc.CheckFirmware(ctx, device)
 		},
-		displayFirmwareInfo)
-}
-
-func displayFirmwareInfo(ios *iostreams.IOStreams, info *shelly.FirmwareInfo) {
-	ios.Println(theme.Bold().Render("Firmware Information"))
-	ios.Println("")
-
-	// Device info
-	ios.Printf("  Device:     %s (%s)\n", info.DeviceID, info.DeviceModel)
-	ios.Printf("  Generation: Gen%d\n", info.Generation)
-	ios.Println("")
-
-	// Version info
-	ios.Printf("  Current:    %s\n", info.Current)
-
-	switch {
-	case info.HasUpdate:
-		ios.Printf("  Available:  %s %s\n",
-			info.Available,
-			output.RenderUpdateStatus(true))
-	case info.Available != "":
-		ios.Printf("  Available:  %s %s\n",
-			info.Available,
-			output.RenderUpdateStatus(false))
-	default:
-		ios.Printf("  Available:  %s\n", output.RenderUpdateStatus(false))
-	}
-
-	if info.Beta != "" {
-		ios.Printf("  Beta:       %s\n", info.Beta)
-	}
+		cmdutil.DisplayFirmwareInfo)
 }
 
 func runAll(f *cmdutil.Factory, ctx context.Context) error {

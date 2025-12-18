@@ -1,36 +1,36 @@
-## shelly export yaml
+## shelly device config reset
 
-Export device configuration as YAML
+Reset configuration to defaults
 
 ### Synopsis
 
-Export a device's configuration and status as YAML.
+Reset device or component configuration to factory defaults.
 
-If no file is specified, outputs to stdout.
-Use --full to include device status in addition to configuration.
+Without a component argument, shows available components that can be reset.
+With a component argument, resets that component's configuration.
+
+Note: This does not perform a full factory reset. For that, use:
+  shelly device factory-reset <device>
 
 ```
-shelly export yaml <device> [file] [flags]
+shelly device config reset <device> [component] [flags]
 ```
 
 ### Examples
 
 ```
-  # Export to stdout
-  shelly export yaml living-room
+  # Reset switch:0 to defaults
+  shelly config reset living-room switch:0
 
-  # Export to file
-  shelly export yaml living-room device.yaml
-
-  # Export with full status
-  shelly export yaml living-room --full
+  # Reset with confirmation skipped
+  shelly config reset living-room switch:0 --yes
 ```
 
 ### Options
 
 ```
-      --full   Include device status (not just config)
-  -h, --help   help for yaml
+  -h, --help   help for reset
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
@@ -48,5 +48,5 @@ shelly export yaml <device> [file] [flags]
 
 ### SEE ALSO
 
-* [shelly export](shelly_export.md)	 - Export device data in various formats
+* [shelly device config](shelly_device_config.md)	 - Manage device configuration
 

@@ -1,0 +1,17 @@
+# Prometheus configuration for Shelly exporter
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'shelly'
+    static_configs:
+      - targets: ['shelly-exporter:9090']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /metrics

@@ -1,40 +1,36 @@
-## shelly export json
+## shelly device config export
 
-Export device configuration as JSON
+Export device configuration to a file
 
 ### Synopsis
 
-Export a device's configuration and status as JSON.
+Export the complete device configuration to a file.
 
-If no file is specified, outputs to stdout.
-Use --full to include device status in addition to configuration.
+The configuration is saved in JSON format by default. Use --format=yaml
+for YAML output.
 
 ```
-shelly export json <device> [file] [flags]
+shelly device config export <device> <file> [flags]
 ```
 
 ### Examples
 
 ```
+  # Export to JSON file
+  shelly config export living-room config-backup.json
+
+  # Export to YAML file
+  shelly config export living-room config-backup.yaml --format=yaml
+
   # Export to stdout
-  shelly export json living-room
-
-  # Export to file
-  shelly export json living-room device.json
-
-  # Export with full status
-  shelly export json living-room --full
-
-  # Export compact (no pretty printing)
-  shelly export json living-room --no-pretty
+  shelly config export living-room -
 ```
 
 ### Options
 
 ```
-      --full     Include device status (not just config)
-  -h, --help     help for json
-      --pretty   Pretty print JSON output (default true)
+  -f, --format string   Output format (json, yaml) (default "json")
+  -h, --help            help for export
 ```
 
 ### Options inherited from parent commands
@@ -52,5 +48,5 @@ shelly export json <device> [file] [flags]
 
 ### SEE ALSO
 
-* [shelly export](shelly_export.md)	 - Export device data in various formats
+* [shelly device config](shelly_device_config.md)	 - Manage device configuration
 

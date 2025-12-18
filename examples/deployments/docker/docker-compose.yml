@@ -1,0 +1,70 @@
+# Shelly CLI Prometheus Exporter
+#
+# Configuration: Generate config with `shelly init` or place manually at ~/.config/shelly/config.yaml
+# Example configs: https://github.com/tj-smith47/shelly-cli/tree/master/examples/config
+
+services:
+  shelly-exporter:
+    image: ghcr.io/tj-smith47/shelly-cli:latest
+    container_name: shelly-exporter
+    command: ["metrics", "prometheus", "--port", "9090"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ${XDG_CONFIG_HOME:-$HOME/.config}/shelly:/root/.config/shelly:ro
+    restart: unless-stopped
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Prometheus to scrape metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - shelly-exporter
+    profiles:
+      - full
+
+  # Optional: Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    profiles:
+      - full
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

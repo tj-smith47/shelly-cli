@@ -2,36 +2,20 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-config-import - Import configuration from a file
+shelly-config-path - Show configuration file path
 
 
 .SH SYNOPSIS
-\fBshelly config import   [flags]\fP
+\fBshelly config path [flags]\fP
 
 
 .SH DESCRIPTION
-Import device configuration from a JSON or YAML file.
-
-.PP
-By default, only specified keys are updated (merge mode). Use --overwrite
-to replace the entire configuration.
+Display the path to the Shelly CLI configuration file.
 
 
 .SH OPTIONS
-\fB--dry-run\fP[=false]
-	Show what would be changed without applying
-
-.PP
 \fB-h\fP, \fB--help\fP[=false]
-	help for import
-
-.PP
-\fB--merge\fP[=true]
-	Merge with existing configuration (default)
-
-.PP
-\fB--overwrite\fP[=false]
-	Overwrite entire configuration
+	help for path
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -69,14 +53,11 @@ to replace the entire configuration.
 
 .SH EXAMPLE
 .EX
-  # Import configuration (merge mode)
-  shelly config import living-room config-backup.json
+  # Show config file path
+  shelly config path
 
-  # Dry run - show what would change without applying
-  shelly config import living-room config.json --dry-run
-
-  # Overwrite entire configuration
-  shelly config import living-room config.json --overwrite
+  # Open config directory in file manager
+  open $(shelly config path | xargs dirname)
 .EE
 
 

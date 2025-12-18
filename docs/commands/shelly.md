@@ -58,17 +58,16 @@ and controlling Shelly devices on your local network.
 * [shelly cert](shelly_cert.md)	 - Manage device TLS certificates
 * [shelly cloud](shelly_cloud.md)	 - Manage cloud connection and Shelly Cloud API
 * [shelly completion](shelly_completion.md)	 - Generate shell completion scripts
-* [shelly config](shelly_config.md)	 - Manage device configuration
+* [shelly config](shelly_config.md)	 - Manage CLI configuration
 * [shelly cover](shelly_cover.md)	 - Control cover/roller components
 * [shelly dash](shelly_dash.md)	 - Launch interactive TUI dashboard
 * [shelly debug](shelly_debug.md)	 - Debug and diagnostic commands
 * [shelly device](shelly_device.md)	 - Manage Shelly devices
-* [shelly diff](shelly_diff.md)	 - Compare device configurations
 * [shelly discover](shelly_discover.md)	 - Discover Shelly devices on the network
 * [shelly doctor](shelly_doctor.md)	 - Check system health and diagnose issues
 * [shelly energy](shelly_energy.md)	 - Energy monitoring operations (EM/EM1 components)
 * [shelly ethernet](shelly_ethernet.md)	 - Manage device Ethernet configuration
-* [shelly export](shelly_export.md)	 - Export device data in various formats
+* [shelly export](shelly_export.md)	 - Export fleet data for infrastructure tools
 * [shelly feedback](shelly_feedback.md)	 - Report issues or request features
 * [shelly firmware](shelly_firmware.md)	 - Manage device firmware
 * [shelly fleet](shelly_fleet.md)	 - Cloud-based fleet management

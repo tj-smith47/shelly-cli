@@ -2,32 +2,20 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-export-json - Export device configuration as JSON
+shelly-config-show - Display current CLI configuration
 
 
 .SH SYNOPSIS
-\fBshelly export json  [file] [flags]\fP
+\fBshelly config show [flags]\fP
 
 
 .SH DESCRIPTION
-Export a device's configuration and status as JSON.
-
-.PP
-If no file is specified, outputs to stdout.
-Use --full to include device status in addition to configuration.
+Display the complete Shelly CLI configuration file contents.
 
 
 .SH OPTIONS
-\fB--full\fP[=false]
-	Include device status (not just config)
-
-.PP
 \fB-h\fP, \fB--help\fP[=false]
-	help for json
-
-.PP
-\fB--pretty\fP[=true]
-	Pretty print JSON output
+	help for show
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -65,19 +53,13 @@ Use --full to include device status in addition to configuration.
 
 .SH EXAMPLE
 .EX
-  # Export to stdout
-  shelly export json living-room
+  # Show all configuration
+  shelly config show
 
-  # Export to file
-  shelly export json living-room device.json
-
-  # Export with full status
-  shelly export json living-room --full
-
-  # Export compact (no pretty printing)
-  shelly export json living-room --no-pretty
+  # Output as JSON
+  shelly config show -o json
 .EE
 
 
 .SH SEE ALSO
-\fBshelly-export(1)\fP
+\fBshelly-config(1)\fP

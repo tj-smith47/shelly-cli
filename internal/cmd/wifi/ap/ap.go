@@ -10,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -107,24 +106,5 @@ func listClients(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Serv
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WiFiAPClient, error) {
 			return svc.ListWiFiAPClients(ctx, device)
 		},
-		displayClients)
-}
-
-func displayClients(ios *iostreams.IOStreams, clients []shelly.WiFiAPClient) {
-	ios.Title("Connected Clients")
-	ios.Println()
-
-	table := output.NewTable("MAC Address", "IP Address")
-	for _, c := range clients {
-		ip := c.IP
-		if ip == "" {
-			ip = "<no IP>"
-		}
-		table.AddRow(c.MAC, ip)
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print wifi ap clients table", err)
-	}
-
-	ios.Printf("\n%d client(s) connected\n", len(clients))
+		cmdutil.DisplayWiFiAPClients)
 }

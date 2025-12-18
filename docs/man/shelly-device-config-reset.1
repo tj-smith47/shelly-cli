@@ -2,28 +2,32 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-export-yaml - Export device configuration as YAML
+shelly-device-config-reset - Reset configuration to defaults
 
 
 .SH SYNOPSIS
-\fBshelly export yaml  [file] [flags]\fP
+\fBshelly device config reset  [component] [flags]\fP
 
 
 .SH DESCRIPTION
-Export a device's configuration and status as YAML.
+Reset device or component configuration to factory defaults.
 
 .PP
-If no file is specified, outputs to stdout.
-Use --full to include device status in addition to configuration.
+Without a component argument, shows available components that can be reset.
+With a component argument, resets that component's configuration.
+
+.PP
+Note: This does not perform a full factory reset. For that, use:
+  shelly device factory-reset 
 
 
 .SH OPTIONS
-\fB--full\fP[=false]
-	Include device status (not just config)
+\fB-h\fP, \fB--help\fP[=false]
+	help for reset
 
 .PP
-\fB-h\fP, \fB--help\fP[=false]
-	help for yaml
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -61,16 +65,13 @@ Use --full to include device status in addition to configuration.
 
 .SH EXAMPLE
 .EX
-  # Export to stdout
-  shelly export yaml living-room
+  # Reset switch:0 to defaults
+  shelly config reset living-room switch:0
 
-  # Export to file
-  shelly export yaml living-room device.yaml
-
-  # Export with full status
-  shelly export yaml living-room --full
+  # Reset with confirmation skipped
+  shelly config reset living-room switch:0 --yes
 .EE
 
 
 .SH SEE ALSO
-\fBshelly-export(1)\fP
+\fBshelly-device-config(1)\fP

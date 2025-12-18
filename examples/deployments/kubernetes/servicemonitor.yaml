@@ -1,0 +1,22 @@
+# ServiceMonitor for Prometheus Operator
+# Only apply if you have Prometheus Operator installed
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: shelly-exporter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: shelly-exporter
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: shelly-exporter
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scrapeTimeout: 10s

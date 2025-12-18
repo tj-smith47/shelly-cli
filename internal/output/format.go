@@ -513,3 +513,22 @@ func FormatParamsTable(params map[string]any) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// Truncate truncates a string to maxLen characters, adding "..." if truncated.
+func Truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
+}
+
+// PadRight pads a string with spaces to reach the specified length.
+func PadRight(s string, length int) string {
+	if len(s) >= length {
+		return s
+	}
+	return s + strings.Repeat(" ", length-len(s))
+}

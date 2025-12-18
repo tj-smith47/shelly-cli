@@ -1,4 +1,4 @@
-## shelly diff
+## shelly device config diff
 
 Compare device configurations
 
@@ -7,40 +7,39 @@ Compare device configurations
 Compare configurations between two devices or a device and a backup file.
 
 This command shows differences in configuration between:
-  - Two live devices: shelly diff device1 device2
-  - Device and backup: shelly diff device backup.json
-  - Two backup files: shelly diff backup1.json backup2.json
+  - Two live devices: shelly device config diff device1 device2
+  - Device and backup: shelly device config diff device backup.json
+  - Two backup files: shelly device config diff backup1.json backup2.json
 
 Differences are shown with:
-  - Added values (only in target)
+  + Added values (only in target)
   - Removed values (only in source)
-  - Changed values (different between source and target)
+  ~ Changed values (different between source and target)
 
 ```
-shelly diff <source> <target> [flags]
+shelly device config diff <source> <target> [flags]
 ```
 
 ### Examples
 
 ```
   # Compare two devices
-  shelly diff kitchen-light bedroom-light
+  shelly device config diff kitchen-light bedroom-light
 
-  # Compare device with backup
-  shelly diff kitchen-light kitchen-backup.json
+  # Compare device with backup file
+  shelly device config diff living-room config-backup.json
 
-  # Show only differences (hide identical values)
-  shelly diff device1 device2 --only-diff
+  # Compare two backup files
+  shelly device config diff backup1.json backup2.json
 
   # JSON output
-  shelly diff device1 device2 --json
+  shelly device config diff device1 device2 -o json
 ```
 
 ### Options
 
 ```
-  -h, --help        help for diff
-      --only-diff   Show only differences
+  -h, --help   help for diff
 ```
 
 ### Options inherited from parent commands
@@ -58,5 +57,5 @@ shelly diff <source> <target> [flags]
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly device config](shelly_device_config.md)	 - Manage device configuration
 

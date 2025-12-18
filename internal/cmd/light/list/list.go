@@ -3,17 +3,13 @@ package list
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the light list command.
@@ -82,24 +78,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.LightInfo, error) {
 			return svc.LightList(ctx, device)
 		},
-		displayList)
-}
-
-func displayList(ios *iostreams.IOStreams, lights []shelly.LightInfo) {
-	t := output.NewTable("ID", "Name", "State", "Brightness", "Power")
-	for _, lt := range lights {
-		name := output.FormatComponentName(lt.Name, "light", lt.ID)
-		state := output.RenderOnOff(lt.Output, output.CaseUpper, theme.FalseError)
-
-		brightness := "-"
-		if lt.Brightness >= 0 {
-			brightness = fmt.Sprintf("%d%%", lt.Brightness)
-		}
-
-		power := output.FormatPowerTableValue(lt.Power)
-		t.AddRow(fmt.Sprintf("%d", lt.ID), name, state, brightness, power)
-	}
-	if err := t.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
+		cmdutil.DisplayLightList)
 }

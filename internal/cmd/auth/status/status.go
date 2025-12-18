@@ -8,8 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -49,12 +47,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.AuthStatus, error) {
 			return svc.GetAuthStatus(ctx, device)
 		},
-		displayStatus)
-}
-
-func displayStatus(ios *iostreams.IOStreams, status *shelly.AuthStatus) {
-	ios.Title("Authentication Status")
-	ios.Println()
-
-	ios.Printf("  Status: %s\n", output.RenderBoolState(status.Enabled, "Enabled", "Disabled"))
+		cmdutil.DisplayAuthStatus)
 }

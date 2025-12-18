@@ -2,11 +2,11 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-diff - Compare device configurations
+shelly-device-config-diff - Compare device configurations
 
 
 .SH SYNOPSIS
-\fBshelly diff   [flags]\fP
+\fBshelly device config diff   [flags]\fP
 
 
 .SH DESCRIPTION
@@ -14,24 +14,20 @@ Compare configurations between two devices or a device and a backup file.
 
 .PP
 This command shows differences in configuration between:
-  - Two live devices: shelly diff device1 device2
-  - Device and backup: shelly diff device backup.json
-  - Two backup files: shelly diff backup1.json backup2.json
+  - Two live devices: shelly device config diff device1 device2
+  - Device and backup: shelly device config diff device backup.json
+  - Two backup files: shelly device config diff backup1.json backup2.json
 
 .PP
 Differences are shown with:
-  - Added values (only in target)
+  + Added values (only in target)
   - Removed values (only in source)
-  - Changed values (different between source and target)
+  ~ Changed values (different between source and target)
 
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for diff
-
-.PP
-\fB--only-diff\fP[=false]
-	Show only differences
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -70,18 +66,18 @@ Differences are shown with:
 .SH EXAMPLE
 .EX
   # Compare two devices
-  shelly diff kitchen-light bedroom-light
+  shelly device config diff kitchen-light bedroom-light
 
-  # Compare device with backup
-  shelly diff kitchen-light kitchen-backup.json
+  # Compare device with backup file
+  shelly device config diff living-room config-backup.json
 
-  # Show only differences (hide identical values)
-  shelly diff device1 device2 --only-diff
+  # Compare two backup files
+  shelly device config diff backup1.json backup2.json
 
   # JSON output
-  shelly diff device1 device2 --json
+  shelly device config diff device1 device2 -o json
 .EE
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP
+\fBshelly-device-config(1)\fP

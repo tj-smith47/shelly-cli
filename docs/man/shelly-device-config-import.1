@@ -2,28 +2,36 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-config-reset - Reset CLI configuration to defaults
+shelly-device-config-import - Import configuration from a file
 
 
 .SH SYNOPSIS
-\fBshelly config reset [flags]\fP
+\fBshelly device config import   [flags]\fP
 
 
 .SH DESCRIPTION
-Reset the Shelly CLI configuration to default values.
+Import device configuration from a JSON or YAML file.
 
 .PP
-This clears all custom settings from the config file. Device registrations,
-aliases, and other data are preserved.
+By default, only specified keys are updated (merge mode). Use --overwrite
+to replace the entire configuration.
 
 
 .SH OPTIONS
-\fB-h\fP, \fB--help\fP[=false]
-	help for reset
+\fB--dry-run\fP[=false]
+	Show what would be changed without applying
 
 .PP
-\fB-y\fP, \fB--yes\fP[=false]
-	Skip confirmation prompt
+\fB-h\fP, \fB--help\fP[=false]
+	help for import
+
+.PP
+\fB--merge\fP[=true]
+	Merge with existing configuration (default)
+
+.PP
+\fB--overwrite\fP[=false]
+	Overwrite entire configuration
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -61,13 +69,16 @@ aliases, and other data are preserved.
 
 .SH EXAMPLE
 .EX
-  # Reset with confirmation
-  shelly config reset
+  # Import configuration (merge mode)
+  shelly config import living-room config-backup.json
 
-  # Reset without confirmation
-  shelly config reset --yes
+  # Dry run - show what would change without applying
+  shelly config import living-room config.json --dry-run
+
+  # Overwrite entire configuration
+  shelly config import living-room config.json --overwrite
 .EE
 
 
 .SH SEE ALSO
-\fBshelly-config(1)\fP
+\fBshelly-device-config(1)\fP

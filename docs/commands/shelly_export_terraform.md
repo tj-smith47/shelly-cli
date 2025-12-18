@@ -48,5 +48,5 @@ shelly export terraform <devices...> [file] [flags]
 
 ### SEE ALSO
 
-* [shelly export](shelly_export.md)	 - Export device data in various formats
+* [shelly export](shelly_export.md)	 - Export fleet data for infrastructure tools
 

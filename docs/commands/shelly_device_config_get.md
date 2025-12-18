@@ -1,29 +1,39 @@
-## shelly config get
+## shelly device config get
 
-Get a CLI configuration value
+Get device configuration
 
 ### Synopsis
 
-Get a configuration value from the Shelly CLI config file.
+Get configuration for a device or specific component.
 
-Use dot notation to access nested values (e.g., "defaults.timeout").
-Without a key, shows all configuration values.
+Without a component argument, returns the full device configuration.
+With a component argument (e.g., "switch:0", "sys", "wifi"), returns
+only that component's configuration.
 
 ```
-shelly config get [key] [flags]
+shelly device config get <device> [component] [flags]
 ```
 
 ### Examples
 
 ```
-  # Get all settings
-  shelly config get
+  # Get full device configuration
+  shelly config get living-room
 
-  # Get default timeout
-  shelly config get defaults.timeout
+  # Get switch:0 configuration
+  shelly config get living-room switch:0
+
+  # Get system configuration
+  shelly config get living-room sys
+
+  # Get WiFi configuration
+  shelly config get living-room wifi
 
   # Output as JSON
-  shelly config get -o json
+  shelly config get living-room -o json
+
+  # Output as YAML
+  shelly config get living-room -o yaml
 ```
 
 ### Options
@@ -47,5 +57,5 @@ shelly config get [key] [flags]
 
 ### SEE ALSO
 
-* [shelly config](shelly_config.md)	 - Manage CLI configuration
+* [shelly device config](shelly_device_config.md)	 - Manage device configuration
 

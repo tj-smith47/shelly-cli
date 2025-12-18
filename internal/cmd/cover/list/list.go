@@ -3,15 +3,12 @@ package list
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -78,24 +75,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.CoverInfo, error) {
 			return svc.CoverList(ctx, device)
 		},
-		displayList)
-}
-
-func displayList(ios *iostreams.IOStreams, covers []shelly.CoverInfo) {
-	t := output.NewTable("ID", "Name", "State", "Position", "Power")
-	for _, cover := range covers {
-		name := output.FormatComponentName(cover.Name, "cover", cover.ID)
-		state := output.RenderCoverState(cover.State)
-
-		position := "-"
-		if cover.Position >= 0 {
-			position = fmt.Sprintf("%d%%", cover.Position)
-		}
-
-		power := output.FormatPowerTableValue(cover.Power)
-		t.AddRow(fmt.Sprintf("%d", cover.ID), name, state, position, power)
-	}
-	if err := t.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
+		cmdutil.DisplayCoverList)
 }

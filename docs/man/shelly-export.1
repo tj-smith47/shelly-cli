@@ -2,7 +2,7 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-export - Export device data in various formats
+shelly-export - Export fleet data for infrastructure tools
 
 
 .SH SYNOPSIS
@@ -10,12 +10,15 @@ shelly-export - Export device data in various formats
 
 
 .SH DESCRIPTION
-Export device configuration and status data in various formats.
+Export device fleet data for infrastructure-as-code tools.
 
 .PP
-Supports exporting to JSON, YAML, CSV, Ansible inventory, and Terraform
-configuration formats. Useful for backup, documentation, and infrastructure
-as code workflows.
+Supports exporting to CSV, Ansible inventory, and Terraform configuration
+formats. Useful for documentation and fleet management workflows.
+
+.PP
+For single-device configuration export (JSON/YAML), use:
+  shelly device config export   [--format json|yaml]
 
 
 .SH OPTIONS
@@ -58,12 +61,6 @@ as code workflows.
 
 .SH EXAMPLE
 .EX
-  # Export device config as JSON
-  shelly export json living-room
-
-  # Export device config as YAML to file
-  shelly export yaml living-room device.yaml
-
   # Export device list as CSV
   shelly export csv living-room bedroom kitchen devices.csv
 
@@ -76,4 +73,4 @@ as code workflows.
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-export-ansible(1)\fP, \fBshelly-export-csv(1)\fP, \fBshelly-export-json(1)\fP, \fBshelly-export-terraform(1)\fP, \fBshelly-export-yaml(1)\fP
+\fBshelly(1)\fP, \fBshelly-export-ansible(1)\fP, \fBshelly-export-csv(1)\fP, \fBshelly-export-terraform(1)\fP

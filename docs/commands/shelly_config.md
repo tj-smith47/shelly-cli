@@ -1,37 +1,33 @@
 ## shelly config
 
-Manage device configuration
+Manage CLI configuration
 
 ### Synopsis
 
-Manage device configuration settings.
+Manage Shelly CLI configuration settings.
 
-Get, set, export, and import device configurations. Configuration includes
-component settings, system parameters, and feature configurations.
+Get, set, and edit CLI preferences like default timeout, output format,
+and theme settings.
+
+For device configuration, use: shelly device config <subcommand>
 
 ### Examples
 
 ```
-  # Get full device configuration
-  shelly config get living-room
+  # View all CLI settings
+  shelly config get
 
-  # Get specific component configuration
-  shelly config get living-room switch:0
+  # Get specific setting
+  shelly config get defaults.timeout
 
-  # Set configuration values
-  shelly config set living-room switch:0 name="Main Light"
+  # Set a value
+  shelly config set defaults.output=json
 
-  # Export configuration to file
-  shelly config export living-room config.json
+  # Open config in editor
+  shelly config edit
 
-  # Import configuration from file
-  shelly config import living-room config.json --dry-run
-
-  # Compare configuration with a file
-  shelly config diff living-room config.json
-
-  # Reset configuration to defaults
-  shelly config reset living-room switch:0
+  # Reset to defaults
+  shelly config reset
 ```
 
 ### Options
@@ -56,11 +52,10 @@ component settings, system parameters, and feature configurations.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly config diff](shelly_config_diff.md)	 - Compare device configuration with a file
 * [shelly config edit](shelly_config_edit.md)	 - Open CLI config in editor
-* [shelly config export](shelly_config_export.md)	 - Export device configuration to a file
-* [shelly config get](shelly_config_get.md)	 - Get device configuration
-* [shelly config import](shelly_config_import.md)	 - Import configuration from a file
-* [shelly config reset](shelly_config_reset.md)	 - Reset configuration to defaults
-* [shelly config set](shelly_config_set.md)	 - Set device configuration
+* [shelly config get](shelly_config_get.md)	 - Get a CLI configuration value
+* [shelly config path](shelly_config_path.md)	 - Show configuration file path
+* [shelly config reset](shelly_config_reset.md)	 - Reset CLI configuration to defaults
+* [shelly config set](shelly_config_set.md)	 - Set CLI configuration values
+* [shelly config show](shelly_config_show.md)	 - Display current CLI configuration
 

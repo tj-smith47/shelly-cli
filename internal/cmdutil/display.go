@@ -6,10 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -22,27 +24,30 @@ import (
 // DisplayPowerMetrics outputs power, voltage, and current with units.
 // Nil values are skipped.
 func DisplayPowerMetrics(ios *iostreams.IOStreams, power, voltage, current *float64) {
-	if power != nil {
-		ios.Printf("  Power:   %.1f W\n", *power)
-	}
-	if voltage != nil {
-		ios.Printf("  Voltage: %.1f V\n", *voltage)
-	}
-	if current != nil {
-		ios.Printf("  Current: %.3f A\n", *current)
-	}
+	displayPowerMetricsWithWidth(ios, power, voltage, current, 9)
 }
 
 // DisplayPowerMetricsWide outputs power metrics with wider alignment for cover status.
 func DisplayPowerMetricsWide(ios *iostreams.IOStreams, power, voltage, current *float64) {
+	displayPowerMetricsWithWidth(ios, power, voltage, current, 10)
+}
+
+func displayPowerMetricsWithWidth(ios *iostreams.IOStreams, power, voltage, current *float64, width int) {
 	if power != nil {
-		ios.Printf("  Power:    %.1f W\n", *power)
+		ios.Printf("  %-*s%.1f W\n", width, "Power:", *power)
 	}
 	if voltage != nil {
-		ios.Printf("  Voltage:  %.1f V\n", *voltage)
+		ios.Printf("  %-*s%.1f V\n", width, "Voltage:", *voltage)
 	}
 	if current != nil {
-		ios.Printf("  Current:  %.3f A\n", *current)
+		ios.Printf("  %-*s%.3f A\n", width, "Current:", *current)
+	}
+}
+
+// printTable prints a table to ios.Out with standard error handling.
+func printTable(ios *iostreams.IOStreams, table *output.Table) {
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
 	}
 }
 
@@ -54,18 +59,16 @@ func DisplayDiscoveredDevices(ios *iostreams.IOStreams, devices []discovery.Disc
 		ios.NoResults("devices")
 		return
 	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
+	printTable(ios, table)
 	ios.Count("device", len(devices))
 }
 
 // DisplayConfigTable prints a configuration map as formatted tables.
 // Each top-level key becomes a titled section with a settings table.
-func DisplayConfigTable(ios *iostreams.IOStreams, config any) error {
-	configMap, ok := config.(map[string]any)
+func DisplayConfigTable(ios *iostreams.IOStreams, configData any) error {
+	configMap, ok := configData.(map[string]any)
 	if !ok {
-		return output.PrintJSON(config)
+		return output.PrintJSON(configData)
 	}
 
 	for component, cfg := range configMap {
@@ -663,9 +666,7 @@ func DisplayRestoreResult(ios *iostreams.IOStreams, result *shelly.RestoreResult
 // DisplayBackupsTable prints a table of backup files.
 func DisplayBackupsTable(ios *iostreams.IOStreams, backups []model.BackupFileInfo) {
 	table := output.FormatBackupsTable(backups)
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
+	printTable(ios, table)
 }
 
 // DisplayBackupExportResults prints the results of a backup export operation.
@@ -956,4 +957,835 @@ func RunUpdateCheck(ctx context.Context, ios *iostreams.IOStreams, checker Updat
 	} else if !result.SkippedDevBuild {
 		DisplayUpdateResult(ios, result.CurrentVersion, result.LatestVersion, result.UpdateAvailable, result.CacheWriteErr)
 	}
+}
+
+// DisplayDashboard prints the energy dashboard with summary and device breakdown.
+func DisplayDashboard(ios *iostreams.IOStreams, data model.DashboardData) {
+	ios.Printf("%s\n", theme.Bold().Render("Energy Dashboard"))
+	ios.Printf("Timestamp: %s\n\n", data.Timestamp.Format(time.RFC3339))
+
+	ios.Printf("%s\n", theme.Bold().Render("Summary"))
+	ios.Printf("  Devices:     %d total (%d online, %d offline)\n",
+		data.DeviceCount, data.OnlineCount, data.OfflineCount)
+	ios.Printf("  Total Power: %s\n", theme.StyledPower(data.TotalPower))
+
+	if data.TotalEnergy > 0 {
+		ios.Printf("  Total Energy: %s\n", theme.StyledEnergy(data.TotalEnergy))
+	}
+
+	if data.EstimatedCost != nil {
+		ios.Printf("  Est. Cost:   %s %.2f/kWh = %s %.4f\n",
+			data.CostCurrency, data.CostPerKwh,
+			data.CostCurrency, *data.EstimatedCost)
+	}
+
+	ios.Printf("\n%s\n", theme.Bold().Render("Device Breakdown"))
+
+	table := output.NewTable("Device", "Status", "Power", "Components")
+	for _, dev := range data.Devices {
+		statusStr := theme.StatusOK().Render("online")
+		if !dev.Online {
+			statusStr = theme.StatusError().Render("offline")
+		}
+
+		powerStr := output.FormatPower(dev.TotalPower)
+		if !dev.Online {
+			powerStr = "-"
+		}
+
+		table.AddRow(dev.Device, statusStr, powerStr, formatComponentSummary(dev.Components))
+	}
+
+	printTable(ios, table)
+}
+
+func formatComponentSummary(components []model.ComponentPower) string {
+	if len(components) == 0 {
+		return "-"
+	}
+
+	counts := make(map[string]int)
+	for _, c := range components {
+		counts[c.Type]++
+	}
+
+	parts := make([]string, 0, len(counts))
+	for typ, count := range counts {
+		parts = append(parts, fmt.Sprintf("%d %s", count, typ))
+	}
+
+	return fmt.Sprintf("%d (%s)", len(components), joinStrings(parts, ", "))
+}
+
+func joinStrings(parts []string, sep string) string {
+	result := ""
+	for i, p := range parts {
+		if i > 0 {
+			result += sep
+		}
+		result += p
+	}
+	return result
+}
+
+// DisplayComparison prints energy comparison results with summary and bar chart.
+func DisplayComparison(ios *iostreams.IOStreams, data model.ComparisonData) {
+	ios.Printf("%s\n", theme.Bold().Render("Energy Comparison"))
+	ios.Printf("Period: %s\n", data.Period)
+	if !data.From.IsZero() {
+		ios.Printf("From:   %s\n", data.From.Format("2006-01-02 15:04:05"))
+	}
+	if !data.To.IsZero() {
+		ios.Printf("To:     %s\n", data.To.Format("2006-01-02 15:04:05"))
+	}
+	ios.Printf("\n")
+
+	ios.Printf("%s\n", theme.Bold().Render("Summary"))
+	ios.Printf("  Total Energy: %s\n", theme.StyledEnergy(data.TotalEnergy*1000))
+	ios.Printf("  Max Device:   %s\n", theme.StyledEnergy(data.MaxEnergy*1000))
+	ios.Printf("  Min Device:   %s\n", theme.StyledEnergy(data.MinEnergy*1000))
+	ios.Printf("\n")
+
+	// Sort by energy consumption (descending) for display
+	sorted := sortDevicesByEnergy(data.Devices)
+
+	ios.Printf("%s\n", theme.Bold().Render("Device Breakdown"))
+
+	table := output.NewTable("Rank", "Device", "Energy", "Avg Power", "Peak Power", "Share", "Status")
+	for i, dev := range sorted {
+		rank := fmt.Sprintf("#%d", i+1)
+
+		statusStr := theme.StatusOK().Render("ok")
+		if !dev.Online {
+			statusStr = theme.StatusError().Render("offline")
+		} else if dev.Error != "" {
+			statusStr = theme.StatusWarn().Render(output.Truncate(dev.Error, 15))
+		}
+
+		energyStr, avgStr, peakStr, shareStr := "-", "-", "-", "-"
+		if dev.Online {
+			energyStr = output.FormatEnergy(dev.Energy * 1000)
+			avgStr = output.FormatPower(dev.AvgPower)
+			peakStr = output.FormatPower(dev.PeakPower)
+			if dev.Percentage > 0 {
+				shareStr = fmt.Sprintf("%.1f%%", dev.Percentage)
+			}
+		}
+
+		table.AddRow(rank, dev.Device, energyStr, avgStr, peakStr, shareStr, statusStr)
+	}
+
+	printTable(ios, table)
+
+	ios.Printf("\n%s\n", theme.Bold().Render("Energy Distribution"))
+	displayBarChart(ios, sorted, data.MaxEnergy)
+}
+
+func sortDevicesByEnergy(devices []model.DeviceEnergy) []model.DeviceEnergy {
+	sorted := make([]model.DeviceEnergy, len(devices))
+	copy(sorted, devices)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Energy > sorted[j].Energy
+	})
+	return sorted
+}
+
+func displayBarChart(ios *iostreams.IOStreams, devices []model.DeviceEnergy, maxEnergy float64) {
+	if maxEnergy <= 0 {
+		return
+	}
+
+	maxNameLen := 0
+	for _, dev := range devices {
+		if len(dev.Device) > maxNameLen {
+			maxNameLen = len(dev.Device)
+		}
+	}
+
+	for _, dev := range devices {
+		if !dev.Online || dev.Energy <= 0 {
+			continue
+		}
+
+		name := output.PadRight(dev.Device, maxNameLen)
+		barLen := int((dev.Energy / maxEnergy) * 40)
+		if barLen < 1 {
+			barLen = 1
+		}
+
+		bar := repeatChar('█', barLen)
+		ios.Printf("  %s │ %s %.2f kWh\n", name, theme.Highlight().Render(bar), dev.Energy)
+	}
+}
+
+func repeatChar(c rune, n int) string {
+	result := make([]rune, n)
+	for i := range result {
+		result[i] = c
+	}
+	return string(result)
+}
+
+// DisplaySwitchStatus prints switch component status.
+func DisplaySwitchStatus(ios *iostreams.IOStreams, status *model.SwitchStatus) {
+	ios.Title("Switch %d Status", status.ID)
+	ios.Println()
+
+	ios.Printf("  State:   %s\n", output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseError))
+	DisplayPowerMetrics(ios, status.Power, status.Voltage, status.Current)
+	if status.Energy != nil {
+		ios.Printf("  Energy:  %.2f Wh\n", status.Energy.Total)
+	}
+}
+
+// DisplayLightStatus prints light component status.
+func DisplayLightStatus(ios *iostreams.IOStreams, status *model.LightStatus) {
+	ios.Title("Light %d Status", status.ID)
+	ios.Println()
+
+	ios.Printf("  State:      %s\n", output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseError))
+	if status.Brightness != nil {
+		ios.Printf("  Brightness: %d%%\n", *status.Brightness)
+	}
+	if status.Power != nil {
+		ios.Printf("  Power:      %.1f W\n", *status.Power)
+	}
+	if status.Voltage != nil {
+		ios.Printf("  Voltage:    %.1f V\n", *status.Voltage)
+	}
+	if status.Current != nil {
+		ios.Printf("  Current:    %.3f A\n", *status.Current)
+	}
+}
+
+// DisplayRGBStatus prints RGB component status.
+func DisplayRGBStatus(ios *iostreams.IOStreams, status *model.RGBStatus) {
+	ios.Title("RGB %d Status", status.ID)
+	ios.Println()
+
+	ios.Printf("  State:      %s\n", output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseError))
+	if status.RGB != nil {
+		ios.Printf("  Color:      R:%d G:%d B:%d\n",
+			status.RGB.Red, status.RGB.Green, status.RGB.Blue)
+	}
+	if status.Brightness != nil {
+		ios.Printf("  Brightness: %d%%\n", *status.Brightness)
+	}
+	if status.Power != nil {
+		ios.Printf("  Power:      %.1f W\n", *status.Power)
+	}
+	if status.Voltage != nil {
+		ios.Printf("  Voltage:    %.1f V\n", *status.Voltage)
+	}
+	if status.Current != nil {
+		ios.Printf("  Current:    %.3f A\n", *status.Current)
+	}
+}
+
+// DisplayCoverStatus prints cover component status.
+func DisplayCoverStatus(ios *iostreams.IOStreams, status *model.CoverStatus) {
+	ios.Title("Cover %d Status", status.ID)
+	ios.Println()
+
+	ios.Printf("  State:    %s\n", output.RenderCoverState(status.State))
+	if status.CurrentPosition != nil {
+		ios.Printf("  Position: %d%%\n", *status.CurrentPosition)
+	}
+	DisplayPowerMetricsWide(ios, status.Power, status.Voltage, status.Current)
+}
+
+// DisplayInputStatus prints input component status.
+func DisplayInputStatus(ios *iostreams.IOStreams, status *model.InputStatus) {
+	ios.Title("Input %d Status", status.ID)
+	ios.Println()
+
+	ios.Printf("  State: %s\n", output.RenderActive(status.State, output.CaseLower, theme.FalseError))
+	if status.Type != "" {
+		ios.Printf("  Type:  %s\n", status.Type)
+	}
+}
+
+// DisplaySwitchList prints a table of switches.
+func DisplaySwitchList(ios *iostreams.IOStreams, switches []shelly.SwitchInfo) {
+	t := output.NewTable("ID", "Name", "State", "Power")
+	for _, sw := range switches {
+		name := output.FormatComponentName(sw.Name, "switch", sw.ID)
+		state := output.RenderOnOff(sw.Output, output.CaseUpper, theme.FalseError)
+		power := output.FormatPowerTableValue(sw.Power)
+		t.AddRow(fmt.Sprintf("%d", sw.ID), name, state, power)
+	}
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+}
+
+// DisplayLightList prints a table of lights.
+func DisplayLightList(ios *iostreams.IOStreams, lights []shelly.LightInfo) {
+	t := output.NewTable("ID", "Name", "State", "Brightness", "Power")
+	for _, lt := range lights {
+		name := output.FormatComponentName(lt.Name, "light", lt.ID)
+		state := output.RenderOnOff(lt.Output, output.CaseUpper, theme.FalseError)
+
+		brightness := "-"
+		if lt.Brightness >= 0 {
+			brightness = fmt.Sprintf("%d%%", lt.Brightness)
+		}
+
+		power := output.FormatPowerTableValue(lt.Power)
+		t.AddRow(fmt.Sprintf("%d", lt.ID), name, state, brightness, power)
+	}
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+}
+
+// DisplayRGBList prints a table of RGB components.
+func DisplayRGBList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
+	t := output.NewTable("ID", "Name", "State", "Color", "Brightness", "Power")
+	for _, rgb := range rgbs {
+		name := output.FormatComponentName(rgb.Name, "rgb", rgb.ID)
+		state := output.RenderOnOff(rgb.Output, output.CaseUpper, theme.FalseError)
+		color := fmt.Sprintf("R:%d G:%d B:%d", rgb.Red, rgb.Green, rgb.Blue)
+
+		brightness := "-"
+		if rgb.Brightness >= 0 {
+			brightness = fmt.Sprintf("%d%%", rgb.Brightness)
+		}
+
+		power := output.FormatPowerTableValue(rgb.Power)
+		t.AddRow(fmt.Sprintf("%d", rgb.ID), name, state, color, brightness, power)
+	}
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+}
+
+// DisplayCoverList prints a table of covers.
+func DisplayCoverList(ios *iostreams.IOStreams, covers []shelly.CoverInfo) {
+	t := output.NewTable("ID", "Name", "State", "Position", "Power")
+	for _, cover := range covers {
+		name := output.FormatComponentName(cover.Name, "cover", cover.ID)
+		state := output.RenderCoverState(cover.State)
+
+		position := "-"
+		if cover.Position >= 0 {
+			position = fmt.Sprintf("%d%%", cover.Position)
+		}
+
+		power := output.FormatPowerTableValue(cover.Power)
+		t.AddRow(fmt.Sprintf("%d", cover.ID), name, state, position, power)
+	}
+	if err := t.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+}
+
+// DisplayInputList prints a table of inputs.
+func DisplayInputList(ios *iostreams.IOStreams, inputs []shelly.InputInfo) {
+	table := output.NewTable("ID", "Name", "Type", "State")
+
+	for _, input := range inputs {
+		name := input.Name
+		if name == "" {
+			name = theme.Dim().Render("-")
+		}
+
+		state := output.RenderActive(input.State, output.CaseLower, theme.FalseError)
+
+		table.AddRow(
+			fmt.Sprintf("%d", input.ID),
+			name,
+			input.Type,
+			state,
+		)
+	}
+
+	printTable(ios, table)
+	ios.Println()
+	ios.Count("input", len(inputs))
+}
+
+// DisplayDeviceStatus prints the device status information.
+func DisplayDeviceStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) {
+	ios.Info("Device: %s", theme.Bold().Render(status.Info.ID))
+	ios.Info("Model: %s (Gen%d)", status.Info.Model, status.Info.Generation)
+	ios.Info("Firmware: %s", status.Info.Firmware)
+	ios.Println()
+
+	table := output.NewTable("Component", "Value")
+	for key, value := range status.Status {
+		table.AddRow(key, output.FormatDisplayValue(value))
+	}
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print device status table", err)
+	}
+}
+
+// DisplayAuthStatus prints the authentication status.
+func DisplayAuthStatus(ios *iostreams.IOStreams, status *shelly.AuthStatus) {
+	ios.Title("Authentication Status")
+	ios.Println()
+
+	ios.Printf("  Status: %s\n", output.RenderBoolState(status.Enabled, "Enabled", "Disabled"))
+}
+
+// DisplayFirmwareStatus prints the firmware status.
+func DisplayFirmwareStatus(ios *iostreams.IOStreams, status *shelly.FirmwareStatus) {
+	ios.Println(theme.Bold().Render("Firmware Status"))
+	ios.Println("")
+
+	// Status
+	statusStr := status.Status
+	if statusStr == "" {
+		statusStr = "idle"
+	}
+	ios.Printf("  Status:      %s\n", statusStr)
+
+	// Update available
+	ios.Printf("  Update:      %s\n", output.RenderAvailableState(status.HasUpdate, "up to date"))
+	if status.HasUpdate && status.NewVersion != "" {
+		ios.Printf("  New Version: %s\n", status.NewVersion)
+	}
+
+	// Progress (if updating)
+	if status.Progress > 0 {
+		ios.Printf("  Progress:    %d%%\n", status.Progress)
+	}
+
+	// Rollback
+	ios.Printf("  Rollback:    %s\n", output.RenderAvailableState(status.CanRollback, "not available"))
+}
+
+// DisplayFirmwareInfo prints firmware check information.
+func DisplayFirmwareInfo(ios *iostreams.IOStreams, info *shelly.FirmwareInfo) {
+	ios.Println(theme.Bold().Render("Firmware Information"))
+	ios.Println("")
+
+	// Device info
+	ios.Printf("  Device:     %s (%s)\n", info.DeviceID, info.DeviceModel)
+	ios.Printf("  Generation: Gen%d\n", info.Generation)
+	ios.Println("")
+
+	// Version info
+	ios.Printf("  Current:    %s\n", info.Current)
+
+	switch {
+	case info.HasUpdate:
+		ios.Printf("  Available:  %s %s\n",
+			info.Available,
+			output.RenderUpdateStatus(true))
+	case info.Available != "":
+		ios.Printf("  Available:  %s %s\n",
+			info.Available,
+			output.RenderUpdateStatus(false))
+	default:
+		ios.Printf("  Available:  %s\n", output.RenderUpdateStatus(false))
+	}
+
+	if info.Beta != "" {
+		ios.Printf("  Beta:       %s\n", info.Beta)
+	}
+}
+
+// DisplayWiFiStatus prints WiFi status information.
+func DisplayWiFiStatus(ios *iostreams.IOStreams, status *shelly.WiFiStatus) {
+	ios.Title("WiFi Status")
+	ios.Println()
+
+	ios.Printf("  Status:      %s\n", status.Status)
+	ios.Printf("  SSID:        %s\n", valueOrEmpty(status.SSID))
+	ios.Printf("  IP Address:  %s\n", valueOrEmpty(status.StaIP))
+	ios.Printf("  Signal:      %d dBm\n", status.RSSI)
+	if status.APCount > 0 {
+		ios.Printf("  AP Clients:  %d\n", status.APCount)
+	}
+}
+
+func valueOrEmpty(s string) string {
+	if s == "" {
+		return "<not connected>"
+	}
+	return s
+}
+
+// DisplayWiFiAPClients prints a table of connected WiFi AP clients.
+func DisplayWiFiAPClients(ios *iostreams.IOStreams, clients []shelly.WiFiAPClient) {
+	ios.Title("Connected Clients")
+	ios.Println()
+
+	table := output.NewTable("MAC Address", "IP Address")
+	for _, c := range clients {
+		ip := c.IP
+		if ip == "" {
+			ip = "<no IP>"
+		}
+		table.AddRow(c.MAC, ip)
+	}
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print wifi ap clients table", err)
+	}
+
+	ios.Printf("\n%d client(s) connected\n", len(clients))
+}
+
+// DisplayWiFiScanResults prints a table of WiFi scan results.
+func DisplayWiFiScanResults(ios *iostreams.IOStreams, results []shelly.WiFiScanResult) {
+	ios.Title("Available WiFi Networks")
+	ios.Println()
+
+	table := output.NewTable("SSID", "Signal", "Channel", "Security")
+	for _, r := range results {
+		ssid := r.SSID
+		if ssid == "" {
+			ssid = "<hidden>"
+		}
+		signal := formatWiFiSignal(r.RSSI)
+		table.AddRow(ssid, signal, fmt.Sprintf("%d", r.Channel), r.Auth)
+	}
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print wifi scan table", err)
+	}
+
+	ios.Printf("\n%d network(s) found\n", len(results))
+}
+
+func formatWiFiSignal(rssi int) string {
+	bars := "▁▃▅▇"
+	var strength int
+	switch {
+	case rssi >= -50:
+		strength = 4
+	case rssi >= -60:
+		strength = 3
+	case rssi >= -70:
+		strength = 2
+	default:
+		strength = 1
+	}
+	return fmt.Sprintf("%s %d dBm", bars[:strength], rssi)
+}
+
+// DisplayEthernetStatus prints Ethernet status information.
+func DisplayEthernetStatus(ios *iostreams.IOStreams, status *shelly.EthernetStatus) {
+	ios.Title("Ethernet Status")
+	ios.Println()
+
+	if status.IP != "" {
+		ios.Printf("  Status:     Connected\n")
+		ios.Printf("  IP Address: %s\n", status.IP)
+	} else {
+		ios.Printf("  Status:     Not connected\n")
+	}
+}
+
+// DisplayMQTTStatus prints MQTT status information.
+func DisplayMQTTStatus(ios *iostreams.IOStreams, status *shelly.MQTTStatus) {
+	ios.Title("MQTT Status")
+	ios.Println()
+
+	ios.Printf("  Status: %s\n", output.RenderBoolState(status.Connected, "Connected", "Disconnected"))
+}
+
+// DisplayCloudConnectionStatus prints cloud connection status.
+func DisplayCloudConnectionStatus(ios *iostreams.IOStreams, status *shelly.CloudStatus) {
+	ios.Title("Cloud Status")
+	ios.Println()
+
+	ios.Printf("  Status: %s\n", output.RenderBoolState(status.Connected, "Connected", "Disconnected"))
+}
+
+// DisplayCloudDevice prints cloud device details.
+func DisplayCloudDevice(ios *iostreams.IOStreams, device *shelly.CloudDevice, showStatus bool) {
+	ios.Title("Cloud Device")
+	ios.Println()
+
+	ios.Printf("  ID:     %s\n", device.ID)
+
+	if device.Model != "" {
+		ios.Printf("  Model:  %s\n", device.Model)
+	}
+
+	if device.Generation > 0 {
+		ios.Printf("  Gen:    %d\n", device.Generation)
+	}
+
+	if device.MAC != "" {
+		ios.Printf("  MAC:    %s\n", device.MAC)
+	}
+
+	if device.FirmwareVersion != "" {
+		ios.Printf("  FW:     %s\n", device.FirmwareVersion)
+	}
+
+	ios.Printf("  Status: %s\n", output.RenderOnline(device.Online, output.CaseTitle))
+
+	// Show status JSON if requested and available
+	if showStatus && len(device.Status) > 0 {
+		ios.Println()
+		ios.Title("Device Status")
+		ios.Println()
+		printCloudJSON(ios, device.Status)
+	}
+
+	// Show settings if available
+	if showStatus && len(device.Settings) > 0 {
+		ios.Println()
+		ios.Title("Device Settings")
+		ios.Println()
+		printCloudJSON(ios, device.Settings)
+	}
+}
+
+func printCloudJSON(ios *iostreams.IOStreams, data json.RawMessage) {
+	var prettyJSON map[string]any
+	if err := json.Unmarshal(data, &prettyJSON); err != nil {
+		ios.Printf("  %s\n", string(data))
+		return
+	}
+
+	formatted, err := json.MarshalIndent(prettyJSON, "  ", "  ")
+	if err != nil {
+		ios.Printf("  %s\n", string(data))
+		return
+	}
+
+	ios.Printf("  %s\n", string(formatted))
+}
+
+// DisplayCloudDevices prints a table of cloud devices.
+func DisplayCloudDevices(ios *iostreams.IOStreams, devices []shelly.CloudDevice) {
+	if len(devices) == 0 {
+		ios.Info("No devices found in your Shelly Cloud account")
+		return
+	}
+
+	// Sort by ID for consistent display
+	sort.Slice(devices, func(i, j int) bool {
+		return devices[i].ID < devices[j].ID
+	})
+
+	table := output.NewTable("ID", "Model", "Gen", "Online")
+
+	for _, d := range devices {
+		devModel := d.Model
+		if devModel == "" {
+			devModel = output.FormatPlaceholder("unknown")
+		}
+
+		gen := output.FormatPlaceholder("-")
+		if d.Generation > 0 {
+			gen = fmt.Sprintf("%d", d.Generation)
+		}
+
+		table.AddRow(d.ID, devModel, gen, output.RenderYesNo(d.Online, output.CaseLower, theme.FalseError))
+	}
+
+	ios.Printf("Found %d device(s):\n\n", len(devices))
+	printTable(ios, table)
+}
+
+// DisplaySceneList prints a table of scenes.
+func DisplaySceneList(ios *iostreams.IOStreams, scenes []config.Scene) {
+	table := output.NewTable("Name", "Actions", "Description")
+	for _, scene := range scenes {
+		actions := output.FormatActionCount(len(scene.Actions))
+		description := scene.Description
+		if description == "" {
+			description = "-"
+		}
+		table.AddRow(scene.Name, actions, description)
+	}
+
+	printTable(ios, table)
+	ios.Println()
+	ios.Count("scene", len(scenes))
+}
+
+// DisplayAliasList prints a table of aliases.
+func DisplayAliasList(ios *iostreams.IOStreams, aliases []config.Alias) {
+	table := output.NewTable("Name", "Command", "Type")
+
+	for _, alias := range aliases {
+		aliasType := "command"
+		if alias.Shell {
+			aliasType = "shell"
+		}
+		table.AddRow(alias.Name, alias.Command, aliasType)
+	}
+
+	printTable(ios, table)
+	ios.Println()
+	ios.Count("alias", len(aliases))
+}
+
+// DisplayScriptList prints a table of scripts.
+func DisplayScriptList(ios *iostreams.IOStreams, scripts []shelly.ScriptInfo) {
+	table := output.NewTable("ID", "Name", "Enabled", "Running")
+	for _, s := range scripts {
+		name := s.Name
+		if name == "" {
+			name = output.FormatPlaceholder("(unnamed)")
+		}
+		table.AddRow(fmt.Sprintf("%d", s.ID), name, output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), output.RenderRunningState(s.Running))
+	}
+	printTable(ios, table)
+}
+
+// DisplayScheduleList prints a table of schedules.
+func DisplayScheduleList(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) {
+	table := output.NewTable("ID", "Enabled", "Timespec", "Calls")
+	for _, s := range schedules {
+		callsSummary := formatScheduleCallsSummary(s.Calls)
+		table.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), s.Timespec, callsSummary)
+	}
+	printTable(ios, table)
+}
+
+func formatScheduleCallsSummary(calls []shelly.ScheduleCall) string {
+	if len(calls) == 0 {
+		return output.FormatPlaceholder("(none)")
+	}
+
+	if len(calls) == 1 {
+		call := calls[0]
+		if len(call.Params) == 0 {
+			return call.Method
+		}
+		params, err := json.Marshal(call.Params)
+		if err != nil {
+			return call.Method
+		}
+		return fmt.Sprintf("%s %s", call.Method, string(params))
+	}
+
+	return fmt.Sprintf("%d calls", len(calls))
+}
+
+// DisplayWebhookList prints a table of webhooks.
+func DisplayWebhookList(ios *iostreams.IOStreams, webhooks []shelly.WebhookInfo) {
+	ios.Title("Webhooks")
+	ios.Println()
+
+	table := output.NewTable("ID", "Event", "URLs", "Enabled")
+	for _, w := range webhooks {
+		urls := joinStrings(w.URLs, ", ")
+		if len(urls) > 40 {
+			urls = urls[:37] + "..."
+		}
+		table.AddRow(fmt.Sprintf("%d", w.ID), w.Event, urls, output.RenderYesNo(w.Enable, output.CaseTitle, theme.FalseError))
+	}
+	printTable(ios, table)
+
+	ios.Printf("\n%d webhook(s) configured\n", len(webhooks))
+}
+
+// DisplayKVSRaw prints just the raw value from a KVS result.
+func DisplayKVSRaw(ios *iostreams.IOStreams, result *shelly.KVSGetResult) {
+	switch v := result.Value.(type) {
+	case string:
+		ios.Println(v)
+	case nil:
+		ios.Println("null")
+	default:
+		// For other types (numbers, bools), use JSON encoding
+		data, err := json.Marshal(v)
+		if err != nil {
+			ios.Printf("%v\n", v)
+			return
+		}
+		ios.Println(string(data))
+	}
+}
+
+// DisplayKVSResult prints a formatted KVS get result.
+func DisplayKVSResult(ios *iostreams.IOStreams, key string, result *shelly.KVSGetResult) {
+	label := theme.Highlight()
+	ios.Printf("%s: %s\n", label.Render("Key"), key)
+	ios.Printf("%s: %s\n", label.Render("Value"), output.FormatJSONValue(result.Value))
+	ios.Printf("%s: %s\n", label.Render("Type"), output.ValueType(result.Value))
+	ios.Printf("%s: %s\n", label.Render("Etag"), result.Etag)
+}
+
+// DisplayKVSKeys prints a table of KVS keys.
+func DisplayKVSKeys(ios *iostreams.IOStreams, result *shelly.KVSListResult) {
+	if len(result.Keys) == 0 {
+		ios.NoResults("No keys stored")
+		return
+	}
+
+	ios.Title("KVS Keys")
+	ios.Println()
+
+	table := output.NewTable("Key")
+	for _, key := range result.Keys {
+		table.AddRow(key)
+	}
+	printTable(ios, table)
+
+	ios.Printf("\n%d key(s), revision %d\n", len(result.Keys), result.Rev)
+}
+
+// DisplayKVSItems prints a table of KVS key-value pairs.
+func DisplayKVSItems(ios *iostreams.IOStreams, items []shelly.KVSItem) {
+	ios.Title("KVS Data")
+	ios.Println()
+
+	table := output.NewTable("Key", "Value", "Type")
+	for _, item := range items {
+		table.AddRow(item.Key, output.FormatDisplayValue(item.Value), output.ValueType(item.Value))
+	}
+	printTable(ios, table)
+
+	ios.Printf("\n%d key(s)\n", len(items))
+}
+
+// DisplayBLEDevices prints a table of BLE discovered devices.
+func DisplayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscoveredDevice) {
+	if len(devices) == 0 {
+		return
+	}
+
+	table := output.NewTable("Name", "Address", "Model", "RSSI", "Connectable", "BTHome")
+
+	for _, d := range devices {
+		name := d.LocalName
+		if name == "" {
+			name = d.ID
+		}
+
+		// Theme RSSI value (stronger is better)
+		rssiStr := fmt.Sprintf("%d dBm", d.RSSI)
+		switch {
+		case d.RSSI > -50:
+			rssiStr = theme.StatusOK().Render(rssiStr)
+		case d.RSSI > -70:
+			rssiStr = theme.StatusWarn().Render(rssiStr)
+		default:
+			rssiStr = theme.StatusError().Render(rssiStr)
+		}
+
+		// Connectable status
+		connStr := output.RenderYesNo(d.Connectable, output.CaseTitle, theme.FalseError)
+
+		// BTHome data indicator
+		btHomeStr := "-"
+		if d.BTHomeData != nil {
+			btHomeStr = theme.StatusInfo().Render("Yes")
+		}
+
+		table.AddRow(
+			name,
+			d.Address.String(),
+			d.Model,
+			rssiStr,
+			connStr,
+			btHomeStr,
+		)
+	}
+
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print BLE devices table", err)
+	}
+	ios.Println("")
+	ios.Count("BLE device", len(devices))
 }

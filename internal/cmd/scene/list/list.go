@@ -9,8 +9,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // NewCommand creates the scene list command.
@@ -28,28 +26,6 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 			})
 			return result
 		},
-		DisplayFunc: displayScenes,
+		DisplayFunc: cmdutil.DisplaySceneList,
 	})
-}
-
-func displayScenes(ios *iostreams.IOStreams, scenes []config.Scene) {
-	table := output.NewTable("Name", "Actions", "Description")
-	for _, scene := range scenes {
-		actions := formatActionCount(len(scene.Actions))
-		description := scene.Description
-		if description == "" {
-			description = "-"
-		}
-		table.AddRow(scene.Name, actions, description)
-	}
-
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-	ios.Println()
-	ios.Count("scene", len(scenes))
-}
-
-func formatActionCount(count int) string {
-	return output.FormatActionCount(count)
 }

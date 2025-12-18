@@ -3,16 +3,12 @@ package list
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the script list command.
@@ -68,19 +64,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.ScriptInfo, error) {
 			return svc.ListScripts(ctx, device)
 		},
-		displayScripts)
-}
-
-func displayScripts(ios *iostreams.IOStreams, scripts []shelly.ScriptInfo) {
-	table := output.NewTable("ID", "Name", "Enabled", "Running")
-	for _, s := range scripts {
-		name := s.Name
-		if name == "" {
-			name = output.FormatPlaceholder("(unnamed)")
-		}
-		table.AddRow(fmt.Sprintf("%d", s.ID), name, output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), output.RenderRunningState(s.Running))
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
+		cmdutil.DisplayScriptList)
 }

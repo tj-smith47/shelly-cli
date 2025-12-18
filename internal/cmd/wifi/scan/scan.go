@@ -3,15 +3,12 @@ package scan
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -64,41 +61,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 			})
 			return results, nil
 		},
-		displayResults)
-}
-
-func displayResults(ios *iostreams.IOStreams, results []shelly.WiFiScanResult) {
-	ios.Title("Available WiFi Networks")
-	ios.Println()
-
-	table := output.NewTable("SSID", "Signal", "Channel", "Security")
-	for _, r := range results {
-		ssid := r.SSID
-		if ssid == "" {
-			ssid = "<hidden>"
-		}
-		signal := formatSignal(r.RSSI)
-		table.AddRow(ssid, signal, fmt.Sprintf("%d", r.Channel), r.Auth)
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print wifi scan table", err)
-	}
-
-	ios.Printf("\n%d network(s) found\n", len(results))
-}
-
-func formatSignal(rssi int) string {
-	bars := "▁▃▅▇"
-	var strength int
-	switch {
-	case rssi >= -50:
-		strength = 4
-	case rssi >= -60:
-		strength = 3
-	case rssi >= -70:
-		strength = 2
-	default:
-		strength = 1
-	}
-	return fmt.Sprintf("%s %d dBm", bars[:strength], rssi)
+		cmdutil.DisplayWiFiScanResults)
 }

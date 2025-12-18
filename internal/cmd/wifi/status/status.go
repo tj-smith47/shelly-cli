@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -49,25 +48,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.WiFiStatus, error) {
 			return svc.GetWiFiStatus(ctx, device)
 		},
-		displayStatus)
-}
-
-func displayStatus(ios *iostreams.IOStreams, status *shelly.WiFiStatus) {
-	ios.Title("WiFi Status")
-	ios.Println()
-
-	ios.Printf("  Status:      %s\n", status.Status)
-	ios.Printf("  SSID:        %s\n", valueOrEmpty(status.SSID))
-	ios.Printf("  IP Address:  %s\n", valueOrEmpty(status.StaIP))
-	ios.Printf("  Signal:      %d dBm\n", status.RSSI)
-	if status.APCount > 0 {
-		ios.Printf("  AP Clients:  %d\n", status.APCount)
-	}
-}
-
-func valueOrEmpty(s string) string {
-	if s == "" {
-		return "<not connected>"
-	}
-	return s
+		cmdutil.DisplayWiFiStatus)
 }

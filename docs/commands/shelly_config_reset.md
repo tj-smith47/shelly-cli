@@ -1,29 +1,26 @@
 ## shelly config reset
 
-Reset configuration to defaults
+Reset CLI configuration to defaults
 
 ### Synopsis
 
-Reset device or component configuration to factory defaults.
+Reset the Shelly CLI configuration to default values.
 
-Without a component argument, shows available components that can be reset.
-With a component argument, resets that component's configuration.
-
-Note: This does not perform a full factory reset. For that, use:
-  shelly device factory-reset <device>
+This clears all custom settings from the config file. Device registrations,
+aliases, and other data are preserved.
 
 ```
-shelly config reset <device> [component] [flags]
+shelly config reset [flags]
 ```
 
 ### Examples
 
 ```
-  # Reset switch:0 to defaults
-  shelly config reset living-room switch:0
+  # Reset with confirmation
+  shelly config reset
 
-  # Reset with confirmation skipped
-  shelly config reset living-room switch:0 --yes
+  # Reset without confirmation
+  shelly config reset --yes
 ```
 
 ### Options
@@ -48,5 +45,5 @@ shelly config reset <device> [component] [flags]
 
 ### SEE ALSO
 
-* [shelly config](shelly_config.md)	 - Manage device configuration
+* [shelly config](shelly_config.md)	 - Manage CLI configuration
 

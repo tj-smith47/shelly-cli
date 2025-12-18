@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shelly-exporter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: shelly-exporter
+    app.kubernetes.io/component: exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shelly-exporter
+  template:
+    metadata:
+      labels:
+        app: shelly-exporter
+        app.kubernetes.io/name: shelly-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: shelly-exporter
+          image: ghcr.io/tj-smith47/shelly-cli:latest
+          args:
+            - metrics
+            - prometheus
+            - --port
+            - "9090"
+          ports:
+            - containerPort: 9090
+              name: metrics
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /root/.config/shelly
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: config
+          configMap:
+            name: shelly-config
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault

@@ -1,4 +1,4 @@
-## shelly config import
+## shelly device config import
 
 Import configuration from a file
 
@@ -10,7 +10,7 @@ By default, only specified keys are updated (merge mode). Use --overwrite
 to replace the entire configuration.
 
 ```
-shelly config import <device> <file> [flags]
+shelly device config import <device> <file> [flags]
 ```
 
 ### Examples
@@ -50,5 +50,5 @@ shelly config import <device> <file> [flags]
 
 ### SEE ALSO
 
-* [shelly config](shelly_config.md)	 - Manage device configuration
+* [shelly device config](shelly_device_config.md)	 - Manage device configuration
 

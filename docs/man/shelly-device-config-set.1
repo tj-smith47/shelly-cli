@@ -2,28 +2,23 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-config-reset - Reset CLI configuration to defaults
+shelly-device-config-set - Set device configuration
 
 
 .SH SYNOPSIS
-\fBshelly config reset [flags]\fP
+\fBshelly device config set   =\&... [flags]\fP
 
 
 .SH DESCRIPTION
-Reset the Shelly CLI configuration to default values.
+Set configuration values for a device component.
 
 .PP
-This clears all custom settings from the config file. Device registrations,
-aliases, and other data are preserved.
+Specify key=value pairs to update. Only the specified keys will be modified.
 
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
-	help for reset
-
-.PP
-\fB-y\fP, \fB--yes\fP[=false]
-	Skip confirmation prompt
+	help for set
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -61,13 +56,16 @@ aliases, and other data are preserved.
 
 .SH EXAMPLE
 .EX
-  # Reset with confirmation
-  shelly config reset
+  # Set switch name
+  shelly config set living-room switch:0 name="Main Light"
 
-  # Reset without confirmation
-  shelly config reset --yes
+  # Set multiple values
+  shelly config set living-room switch:0 name="Light" initial_state=on
+
+  # Set light brightness default
+  shelly config set living-room light:0 default.brightness=50
 .EE
 
 
 .SH SEE ALSO
-\fBshelly-config(1)\fP
+\fBshelly-device-config(1)\fP

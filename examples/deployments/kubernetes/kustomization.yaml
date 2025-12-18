@@ -1,0 +1,34 @@
+# Shelly CLI Kubernetes Deployment
+#
+# Usage as remote base:
+#   kustomize build "https://github.com/tj-smith47/shelly-cli//examples/deployments/kubernetes"
+#
+# Generate config with `shelly init` or see:
+#   https://github.com/tj-smith47/shelly-cli/tree/master/examples/config
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  # Uncomment if using Prometheus Operator
+  # - servicemonitor.yaml
+
+# ConfigMap from your local shelly config
+# Override this path in your overlay or set XDG_CONFIG_HOME
+configMapGenerator:
+  - name: shelly-config
+    files:
+      - config.yaml
+
+images:
+  - name: ghcr.io/tj-smith47/shelly-cli
+    newTag: latest

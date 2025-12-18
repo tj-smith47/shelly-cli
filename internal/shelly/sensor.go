@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // CollectSensorsByPrefix collects sensor data from a status map by component prefix.
@@ -34,4 +35,17 @@ func CollectSensorsByPrefix[T any](status map[string]json.RawMessage, prefix str
 // Use this when you don't have access to IOStreams or errors are expected.
 func CollectSensorsByPrefixSilent[T any](status map[string]json.RawMessage, prefix string) []T {
 	return CollectSensorsByPrefix[T](status, prefix, nil)
+}
+
+// CollectSensorData collects all sensor readings from a device status map.
+// It scans for temperature, humidity, flood, smoke, illuminance, and voltmeter components.
+func CollectSensorData(status map[string]json.RawMessage) *model.SensorData {
+	return &model.SensorData{
+		Temperature: CollectSensorsByPrefixSilent[model.TemperatureReading](status, "temperature:"),
+		Humidity:    CollectSensorsByPrefixSilent[model.HumidityReading](status, "humidity:"),
+		Flood:       CollectSensorsByPrefixSilent[model.AlarmSensorReading](status, "flood:"),
+		Smoke:       CollectSensorsByPrefixSilent[model.AlarmSensorReading](status, "smoke:"),
+		Illuminance: CollectSensorsByPrefixSilent[model.IlluminanceReading](status, "illuminance:"),
+		Voltmeter:   CollectSensorsByPrefixSilent[model.VoltmeterReading](status, "voltmeter:"),
+	}
 }

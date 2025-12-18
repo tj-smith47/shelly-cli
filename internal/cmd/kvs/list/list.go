@@ -8,8 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -97,7 +95,7 @@ func run(ctx context.Context, opts *Options) error {
 			func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.KVSItem, error) {
 				return svc.GetManyKVS(ctx, device, match)
 			},
-			displayItems)
+			cmdutil.DisplayKVSItems)
 	}
 
 	// Default: just list keys
@@ -106,40 +104,5 @@ func run(ctx context.Context, opts *Options) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.KVSListResult, error) {
 			return svc.ListKVS(ctx, device)
 		},
-		displayKeys)
-}
-
-func displayKeys(ios *iostreams.IOStreams, result *shelly.KVSListResult) {
-	if len(result.Keys) == 0 {
-		ios.NoResults("No keys stored")
-		return
-	}
-
-	ios.Title("KVS Keys")
-	ios.Println()
-
-	table := output.NewTable("Key")
-	for _, key := range result.Keys {
-		table.AddRow(key)
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-
-	ios.Printf("\n%d key(s), revision %d\n", len(result.Keys), result.Rev)
-}
-
-func displayItems(ios *iostreams.IOStreams, items []shelly.KVSItem) {
-	ios.Title("KVS Data")
-	ios.Println()
-
-	table := output.NewTable("Key", "Value", "Type")
-	for _, item := range items {
-		table.AddRow(item.Key, output.FormatDisplayValue(item.Value), output.ValueType(item.Value))
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-
-	ios.Printf("\n%d key(s)\n", len(items))
+		cmdutil.DisplayKVSKeys)
 }

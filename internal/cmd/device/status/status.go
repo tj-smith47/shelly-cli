@@ -8,10 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the device status command.
@@ -48,20 +45,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.DeviceStatus, error) {
 			return svc.DeviceStatus(ctx, device)
 		},
-		displayStatus)
-}
-
-func displayStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) {
-	ios.Info("Device: %s", theme.Bold().Render(status.Info.ID))
-	ios.Info("Model: %s (Gen%d)", status.Info.Model, status.Info.Generation)
-	ios.Info("Firmware: %s", status.Info.Firmware)
-	ios.Println()
-
-	table := output.NewTable("Component", "Value")
-	for key, value := range status.Status {
-		table.AddRow(key, output.FormatDisplayValue(value))
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print device status table", err)
-	}
+		cmdutil.DisplayDeviceStatus)
 }

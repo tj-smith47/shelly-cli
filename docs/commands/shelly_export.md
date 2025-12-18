@@ -1,24 +1,20 @@
 ## shelly export
 
-Export device data in various formats
+Export fleet data for infrastructure tools
 
 ### Synopsis
 
-Export device configuration and status data in various formats.
+Export device fleet data for infrastructure-as-code tools.
 
-Supports exporting to JSON, YAML, CSV, Ansible inventory, and Terraform
-configuration formats. Useful for backup, documentation, and infrastructure
-as code workflows.
+Supports exporting to CSV, Ansible inventory, and Terraform configuration
+formats. Useful for documentation and fleet management workflows.
+
+For single-device configuration export (JSON/YAML), use:
+  shelly device config export <device> <file> [--format json|yaml]
 
 ### Examples
 
 ```
-  # Export device config as JSON
-  shelly export json living-room
-
-  # Export device config as YAML to file
-  shelly export yaml living-room device.yaml
-
   # Export device list as CSV
   shelly export csv living-room bedroom kitchen devices.csv
 
@@ -53,7 +49,5 @@ as code workflows.
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
 * [shelly export ansible](shelly_export_ansible.md)	 - Export devices as Ansible inventory
 * [shelly export csv](shelly_export_csv.md)	 - Export device list as CSV
-* [shelly export json](shelly_export_json.md)	 - Export device configuration as JSON
 * [shelly export terraform](shelly_export_terraform.md)	 - Export devices as Terraform configuration
-* [shelly export yaml](shelly_export_yaml.md)	 - Export device configuration as YAML
 

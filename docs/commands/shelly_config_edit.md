@@ -49,5 +49,5 @@ shelly config edit [flags]
 
 ### SEE ALSO
 
-* [shelly config](shelly_config.md)	 - Manage device configuration
+* [shelly config](shelly_config.md)	 - Manage CLI configuration
 

@@ -1,36 +1,34 @@
-## shelly config export
+## shelly device config set
 
-Export device configuration to a file
+Set device configuration
 
 ### Synopsis
 
-Export the complete device configuration to a file.
+Set configuration values for a device component.
 
-The configuration is saved in JSON format by default. Use --format=yaml
-for YAML output.
+Specify key=value pairs to update. Only the specified keys will be modified.
 
 ```
-shelly config export <device> <file> [flags]
+shelly device config set <device> <component> <key>=<value>... [flags]
 ```
 
 ### Examples
 
 ```
-  # Export to JSON file
-  shelly config export living-room config-backup.json
+  # Set switch name
+  shelly config set living-room switch:0 name="Main Light"
 
-  # Export to YAML file
-  shelly config export living-room config-backup.yaml --format=yaml
+  # Set multiple values
+  shelly config set living-room switch:0 name="Light" initial_state=on
 
-  # Export to stdout
-  shelly config export living-room -
+  # Set light brightness default
+  shelly config set living-room light:0 default.brightness=50
 ```
 
 ### Options
 
 ```
-  -f, --format string   Output format (json, yaml) (default "json")
-  -h, --help            help for export
+  -h, --help   help for set
 ```
 
 ### Options inherited from parent commands
@@ -48,5 +46,5 @@ shelly config export <device> <file> [flags]
 
 ### SEE ALSO
 
-* [shelly config](shelly_config.md)	 - Manage device configuration
+* [shelly device config](shelly_device_config.md)	 - Manage device configuration
 

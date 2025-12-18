@@ -1,31 +1,29 @@
-## shelly config diff
+## shelly config path
 
-Compare device configuration with a file
+Show configuration file path
 
 ### Synopsis
 
-Compare the current device configuration with a saved configuration file.
-
-Shows differences between the device's current configuration and the file.
+Display the path to the Shelly CLI configuration file.
 
 ```
-shelly config diff <device> <file> [flags]
+shelly config path [flags]
 ```
 
 ### Examples
 
 ```
-  # Compare config with a backup file
-  shelly config diff living-room config-backup.json
+  # Show config file path
+  shelly config path
 
-  # Compare after making changes
-  shelly config diff office-switch original-config.json
+  # Open config directory in file manager
+  open $(shelly config path | xargs dirname)
 ```
 
 ### Options
 
 ```
-  -h, --help   help for diff
+  -h, --help   help for path
 ```
 
 ### Options inherited from parent commands
@@ -43,5 +41,5 @@ shelly config diff <device> <file> [flags]
 
 ### SEE ALSO
 
-* [shelly config](shelly_config.md)	 - Manage device configuration
+* [shelly config](shelly_config.md)	 - Manage CLI configuration
 

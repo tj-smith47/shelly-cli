@@ -1,28 +1,28 @@
 ## shelly config set
 
-Set device configuration
+Set CLI configuration values
 
 ### Synopsis
 
-Set configuration values for a device component.
+Set configuration values in the Shelly CLI config file.
 
-Specify key=value pairs to update. Only the specified keys will be modified.
+Use dot notation for nested values (e.g., "defaults.timeout=30s").
 
 ```
-shelly config set <device> <component> <key>=<value>... [flags]
+shelly config set <key>=<value>... [flags]
 ```
 
 ### Examples
 
 ```
-  # Set switch name
-  shelly config set living-room switch:0 name="Main Light"
+  # Set default timeout
+  shelly config set defaults.timeout=30s
+
+  # Set output format
+  shelly config set defaults.output=json
 
   # Set multiple values
-  shelly config set living-room switch:0 name="Light" initial_state=on
-
-  # Set light brightness default
-  shelly config set living-room light:0 default.brightness=50
+  shelly config set defaults.timeout=30s defaults.output=json
 ```
 
 ### Options
@@ -46,5 +46,5 @@ shelly config set <device> <component> <key>=<value>... [flags]
 
 ### SEE ALSO
 
-* [shelly config](shelly_config.md)	 - Manage device configuration
+* [shelly config](shelly_config.md)	 - Manage CLI configuration
 

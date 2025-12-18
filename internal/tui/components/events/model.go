@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -416,7 +417,7 @@ func (m Model) View() string {
 	var rows string
 	for _, e := range eventsToShow {
 		timeStr := m.styles.Time.Render(e.Timestamp.Format("15:04:05"))
-		deviceStr := m.styles.Device.Render(truncate(e.Device, 14))
+		deviceStr := m.styles.Device.Render(output.Truncate(e.Device, 14))
 
 		var compStr string
 		if e.Component != "" {
@@ -440,7 +441,7 @@ func (m Model) View() string {
 		}
 		typeStr := m.styles.Type.Inherit(typeStyle).Render(e.Type)
 
-		descStr := m.styles.Description.Render(truncate(e.Description, 40))
+		descStr := m.styles.Description.Render(output.Truncate(e.Description, 40))
 
 		row := fmt.Sprintf("%s %s %s %s %s",
 			timeStr,
@@ -461,17 +462,6 @@ func (m Model) View() string {
 
 	content := lipgloss.JoinVertical(lipgloss.Left, header, rows, footer)
 	return m.styles.Container.Width(m.width - 4).Render(content)
-}
-
-// truncate shortens a string to maxLen with ellipsis if needed.
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
 }
 
 // EventCount returns the number of events.

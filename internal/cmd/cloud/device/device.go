@@ -3,15 +3,12 @@ package device
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -65,64 +62,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceID string) error {
 			return fmt.Errorf("failed to get device: %w", err)
 		}
 
-		displayDevice(ios, device)
+		cmdutil.DisplayCloudDevice(ios, device, statusFlag)
 		return nil
 	})
-}
-
-func displayDevice(ios *iostreams.IOStreams, device *shelly.CloudDevice) {
-	ios.Title("Cloud Device")
-	ios.Println()
-
-	ios.Printf("  ID:     %s\n", device.ID)
-
-	if device.Model != "" {
-		ios.Printf("  Model:  %s\n", device.Model)
-	}
-
-	if device.Generation > 0 {
-		ios.Printf("  Gen:    %d\n", device.Generation)
-	}
-
-	if device.MAC != "" {
-		ios.Printf("  MAC:    %s\n", device.MAC)
-	}
-
-	if device.FirmwareVersion != "" {
-		ios.Printf("  FW:     %s\n", device.FirmwareVersion)
-	}
-
-	ios.Printf("  Status: %s\n", output.RenderOnline(device.Online, output.CaseTitle))
-
-	// Show status JSON if requested and available
-	if statusFlag && len(device.Status) > 0 {
-		ios.Println()
-		ios.Title("Device Status")
-		ios.Println()
-		printJSON(ios, device.Status)
-	}
-
-	// Show settings if available
-	if statusFlag && len(device.Settings) > 0 {
-		ios.Println()
-		ios.Title("Device Settings")
-		ios.Println()
-		printJSON(ios, device.Settings)
-	}
-}
-
-func printJSON(ios *iostreams.IOStreams, data json.RawMessage) {
-	var prettyJSON map[string]any
-	if err := json.Unmarshal(data, &prettyJSON); err != nil {
-		ios.Printf("  %s\n", string(data))
-		return
-	}
-
-	formatted, err := json.MarshalIndent(prettyJSON, "  ", "  ")
-	if err != nil {
-		ios.Printf("  %s\n", string(data))
-		return
-	}
-
-	ios.Printf("  %s\n", string(formatted))
 }

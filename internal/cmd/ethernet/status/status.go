@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -49,17 +48,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.EthernetStatus, error) {
 			return svc.GetEthernetStatus(ctx, device)
 		},
-		displayStatus)
-}
-
-func displayStatus(ios *iostreams.IOStreams, status *shelly.EthernetStatus) {
-	ios.Title("Ethernet Status")
-	ios.Println()
-
-	if status.IP != "" {
-		ios.Printf("  Status:     Connected\n")
-		ios.Printf("  IP Address: %s\n", status.IP)
-	} else {
-		ios.Printf("  Status:     Not connected\n")
-	}
+		cmdutil.DisplayEthernetStatus)
 }

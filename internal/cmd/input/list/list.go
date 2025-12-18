@@ -3,16 +3,12 @@ package list
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // NewCommand creates the input list command.
@@ -77,31 +73,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.InputInfo, error) {
 			return svc.InputList(ctx, device)
 		},
-		displayList)
-}
-
-func displayList(ios *iostreams.IOStreams, inputs []shelly.InputInfo) {
-	table := output.NewTable("ID", "Name", "Type", "State")
-
-	for _, input := range inputs {
-		name := input.Name
-		if name == "" {
-			name = theme.Dim().Render("-")
-		}
-
-		state := output.RenderActive(input.State, output.CaseLower, theme.FalseError)
-
-		table.AddRow(
-			fmt.Sprintf("%d", input.ID),
-			name,
-			input.Type,
-			state,
-		)
-	}
-
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-	ios.Println()
-	ios.Count("input", len(inputs))
+		cmdutil.DisplayInputList)
 }

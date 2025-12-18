@@ -12,9 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // DefaultTimeout is the default BLE discovery timeout.
@@ -114,7 +111,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 
 	// Get detailed BLE information
 	bleDevices := bleDiscoverer.GetDiscoveredDevices()
-	displayBLEDevices(ios, bleDevices)
+	cmdutil.DisplayBLEDevices(ios, bleDevices)
 
 	return nil
 }
@@ -140,55 +137,4 @@ func isBLENotSupportedError(err error) bool {
 		return errors.Is(bleErr.Err, discovery.ErrBLENotSupported)
 	}
 	return errors.Is(err, discovery.ErrBLENotSupported)
-}
-
-// displayBLEDevices prints a table of BLE discovered devices.
-func displayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscoveredDevice) {
-	if len(devices) == 0 {
-		return
-	}
-
-	table := output.NewTable("Name", "Address", "Model", "RSSI", "Connectable", "BTHome")
-
-	for _, d := range devices {
-		name := d.LocalName
-		if name == "" {
-			name = d.ID
-		}
-
-		// Theme RSSI value (stronger is better)
-		rssiStr := fmt.Sprintf("%d dBm", d.RSSI)
-		switch {
-		case d.RSSI > -50:
-			rssiStr = theme.StatusOK().Render(rssiStr)
-		case d.RSSI > -70:
-			rssiStr = theme.StatusWarn().Render(rssiStr)
-		default:
-			rssiStr = theme.StatusError().Render(rssiStr)
-		}
-
-		// Connectable status
-		connStr := output.RenderYesNo(d.Connectable, output.CaseTitle, theme.FalseError)
-
-		// BTHome data indicator
-		btHomeStr := "-"
-		if d.BTHomeData != nil {
-			btHomeStr = theme.StatusInfo().Render("Yes")
-		}
-
-		table.AddRow(
-			name,
-			d.Address.String(),
-			d.Model,
-			rssiStr,
-			connStr,
-			btHomeStr,
-		)
-	}
-
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print BLE devices table", err)
-	}
-	ios.Println("")
-	ios.Count("BLE device", len(devices))
 }

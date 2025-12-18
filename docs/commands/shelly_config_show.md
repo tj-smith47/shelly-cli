@@ -1,35 +1,29 @@
-## shelly config get
+## shelly config show
 
-Get a CLI configuration value
+Display current CLI configuration
 
 ### Synopsis
 
-Get a configuration value from the Shelly CLI config file.
-
-Use dot notation to access nested values (e.g., "defaults.timeout").
-Without a key, shows all configuration values.
+Display the complete Shelly CLI configuration file contents.
 
 ```
-shelly config get [key] [flags]
+shelly config show [flags]
 ```
 
 ### Examples
 
 ```
-  # Get all settings
-  shelly config get
-
-  # Get default timeout
-  shelly config get defaults.timeout
+  # Show all configuration
+  shelly config show
 
   # Output as JSON
-  shelly config get -o json
+  shelly config show -o json
 ```
 
 ### Options
 
 ```
-  -h, --help   help for get
+  -h, --help   help for show
 ```
 
 ### Options inherited from parent commands

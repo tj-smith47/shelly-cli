@@ -8,9 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -22,17 +20,6 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Fetcher: func(ctx context.Context, svc *shelly.Service, device string, id int) (*model.CoverStatus, error) {
 			return svc.CoverStatus(ctx, device, id)
 		},
-		Display: displayStatus,
+		Display: cmdutil.DisplayCoverStatus,
 	})
-}
-
-func displayStatus(ios *iostreams.IOStreams, status *model.CoverStatus) {
-	ios.Title("Cover %d Status", status.ID)
-	ios.Println()
-
-	ios.Printf("  State:    %s\n", output.RenderCoverState(status.State))
-	if status.CurrentPosition != nil {
-		ios.Printf("  Position: %d%%\n", *status.CurrentPosition)
-	}
-	cmdutil.DisplayPowerMetricsWide(ios, status.Power, status.Voltage, status.Current)
 }
