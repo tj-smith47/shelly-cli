@@ -564,6 +564,24 @@ func NameThenDevice() func(*cobra.Command, []string, string) ([]string, cobra.Sh
 	}
 }
 
+// SettingKeys returns a completion function for CLI setting keys.
+func SettingKeys() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return config.FilterSettingKeys(toComplete), cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// SettingKeysWithEquals returns a completion function for CLI setting keys with "=" suffix.
+func SettingKeysWithEquals() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		keys := config.FilterSettingKeys(toComplete)
+		for i, k := range keys {
+			keys[i] = k + "="
+		}
+		return keys, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // SaveDiscoveryCache saves discovered addresses to the cache file.
 // This should be called by the discover command after a successful scan.
 func SaveDiscoveryCache(addresses []string) error {

@@ -513,4 +513,3 @@ func FormatParamsTable(params map[string]any) string {
 	}
 	return strings.Join(lines, "\n")
 }
-

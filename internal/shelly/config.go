@@ -5,10 +5,15 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec // Required for Shelly digest auth (HA1 hash)
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // GetConfig returns the full device configuration.
@@ -23,6 +28,70 @@ func (s *Service) GetConfig(ctx context.Context, identifier string) (map[string]
 		return nil
 	})
 	return result, err
+}
+
+// LoadConfig loads a configuration from either a device or a file.
+// It auto-detects based on whether the source is a file path or device identifier.
+// Returns the config map and a display name for the source.
+func (s *Service) LoadConfig(ctx context.Context, source string) (cfg map[string]any, name string, err error) {
+	if IsConfigFile(source) {
+		return LoadConfigFromFile(source)
+	}
+	return s.loadConfigFromDevice(ctx, source)
+}
+
+// loadConfigFromDevice fetches configuration from a live device using raw RPC.
+func (s *Service) loadConfigFromDevice(ctx context.Context, device string) (cfg map[string]any, name string, err error) {
+	conn, err := s.Connect(ctx, device)
+	if err != nil {
+		return nil, "", err
+	}
+	defer iostreams.CloseWithDebug("closing config connection", conn)
+
+	rawResult, err := conn.Call(ctx, "Shelly.GetConfig", nil)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Convert to map
+	jsonBytes, err := json.Marshal(rawResult)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		return nil, "", fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	return result, device, nil
+}
+
+// LoadConfigFromFile reads and parses a JSON configuration file.
+func LoadConfigFromFile(filePath string) (cfg map[string]any, name string, err error) {
+	data, err := os.ReadFile(filePath) //nolint:gosec // User-provided file path is intentional
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, "", fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return config, filePath, nil
+}
+
+// IsConfigFile checks if the given path is a configuration file.
+// Returns true if the path has a config file extension or if the file exists.
+func IsConfigFile(path string) bool {
+	if strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
+		return true
+	}
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
 }
 
 // SetConfig updates device configuration.

@@ -10,8 +10,8 @@ const (
 
 // ConfigDiff represents a configuration difference between two sources.
 type ConfigDiff struct {
-	Path     string `json:"path"`               // Config path (dot notation)
-	DiffType string `json:"diff_type"`          // added, removed, changed
+	Path     string `json:"path"`                // Config path (dot notation)
+	DiffType string `json:"diff_type"`           // added, removed, changed
 	OldValue any    `json:"old_value,omitempty"` // Previous/source value
 	NewValue any    `json:"new_value,omitempty"` // New/target value
 }

@@ -1,16 +1,15 @@
-// Package config provides device configuration commands.
+// Package config provides CLI configuration management commands.
 package config
 
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmd/config/diff"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/edit"
-	configexport "github.com/tj-smith47/shelly-cli/internal/cmd/config/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/get"
-	configimport "github.com/tj-smith47/shelly-cli/internal/cmd/config/import"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/config/path"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/reset"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/set"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/config/show"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -19,40 +18,35 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "config",
 		Aliases: []string{"cfg"},
-		Short:   "Manage device configuration",
-		Long: `Manage device configuration settings.
+		Short:   "Manage CLI configuration",
+		Long: `Manage Shelly CLI configuration settings.
 
-Get, set, export, and import device configurations. Configuration includes
-component settings, system parameters, and feature configurations.`,
-		Example: `  # Get full device configuration
-  shelly config get living-room
+Get, set, and edit CLI preferences like default timeout, output format,
+and theme settings.
 
-  # Get specific component configuration
-  shelly config get living-room switch:0
+For device configuration, use: shelly device config <subcommand>`,
+		Example: `  # View all CLI settings
+  shelly config get
 
-  # Set configuration values
-  shelly config set living-room switch:0 name="Main Light"
+  # Get specific setting
+  shelly config get defaults.timeout
 
-  # Export configuration to file
-  shelly config export living-room config.json
+  # Set a value
+  shelly config set defaults.output=json
 
-  # Import configuration from file
-  shelly config import living-room config.json --dry-run
+  # Open config in editor
+  shelly config edit
 
-  # Compare configuration with a file
-  shelly config diff living-room config.json
-
-  # Reset configuration to defaults
-  shelly config reset living-room switch:0`,
+  # Reset to defaults
+  shelly config reset`,
 	}
 
-	cmd.AddCommand(get.NewCommand(f))
-	cmd.AddCommand(set.NewCommand(f))
-	cmd.AddCommand(diff.NewCommand(f))
-	cmd.AddCommand(configexport.NewCommand(f))
-	cmd.AddCommand(configimport.NewCommand(f))
-	cmd.AddCommand(reset.NewCommand(f))
 	cmd.AddCommand(edit.NewCommand(f))
+	cmd.AddCommand(get.NewCommand(f))
+	cmd.AddCommand(path.NewCommand(f))
+	cmd.AddCommand(reset.NewCommand(f))
+	cmd.AddCommand(set.NewCommand(f))
+	cmd.AddCommand(show.NewCommand(f))
 
 	return cmd
 }

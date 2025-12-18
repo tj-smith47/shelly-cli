@@ -279,6 +279,21 @@ var DefaultAliases = map[string]Alias{
 		Command: "schedule create --timespec \"$1\" $2",
 		Shell:   false,
 	},
+	"diff": {
+		Name:    "diff",
+		Command: "device config diff $@",
+		Shell:   false,
+	},
+	"export-json": {
+		Name:    "export-json",
+		Command: "device config export $1 $2 --format json",
+		Shell:   false,
+	},
+	"export-yaml": {
+		Name:    "export-yaml",
+		Command: "device config export $1 $2 --format yaml",
+		Shell:   false,
+	},
 }
 
 // Load reads configuration from file and environment.

@@ -35,7 +35,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/dash"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/debug"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/diff"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/doctor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/energy"
@@ -406,14 +405,13 @@ func init() {
 
 	// Troubleshooting commands - diagnostics and debugging
 	addCommandsToGroup(rootCmd, groupTroubleshooting,
-		interactive.NewCommand(f),
-		shellcmd.NewCommand(f),
+		audit.NewCommand(f),
+		benchmark.NewCommand(f),
 		debug.NewCommand(f),
 		doctor.NewCommand(f),
-		audit.NewCommand(f),
-		diff.NewCommand(f),
-		benchmark.NewCommand(f),
+		interactive.NewCommand(f),
 		mock.NewCommand(f),
+		shellcmd.NewCommand(f),
 	)
 
 	// Utility commands - CLI utilities

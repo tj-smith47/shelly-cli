@@ -855,6 +855,49 @@ func DisplayWebhookDiffs(ios *iostreams.IOStreams, diffs []model.WebhookDiff, ve
 		func(d model.WebhookDiff) string { return d.DiffType })
 }
 
+// DisplayConfigDiffsSummary prints configuration differences with grouped sections and summary.
+func DisplayConfigDiffsSummary(ios *iostreams.IOStreams, diffs []model.ConfigDiff) {
+	var added, removed, changed []model.ConfigDiff
+	for _, d := range diffs {
+		switch d.DiffType {
+		case model.DiffAdded:
+			added = append(added, d)
+		case model.DiffRemoved:
+			removed = append(removed, d)
+		case model.DiffChanged:
+			changed = append(changed, d)
+		}
+	}
+
+	if len(removed) > 0 {
+		ios.Println(output.RenderDiffRemoved())
+		for _, d := range removed {
+			ios.Printf("  - %s: %v\n", d.Path, output.FormatDisplayValue(d.OldValue))
+		}
+		ios.Println("")
+	}
+
+	if len(added) > 0 {
+		ios.Println(output.RenderDiffAdded())
+		for _, d := range added {
+			ios.Printf("  + %s: %v\n", d.Path, output.FormatDisplayValue(d.NewValue))
+		}
+		ios.Println("")
+	}
+
+	if len(changed) > 0 {
+		ios.Println(output.RenderDiffChanged())
+		for _, d := range changed {
+			ios.Printf("  ~ %s:\n", d.Path)
+			ios.Printf("    - %v\n", output.FormatDisplayValue(d.OldValue))
+			ios.Printf("    + %v\n", output.FormatDisplayValue(d.NewValue))
+		}
+		ios.Println("")
+	}
+
+	ios.Printf("Summary: %d added, %d removed, %d changed\n", len(added), len(removed), len(changed))
+}
+
 // DisplayUpdateAvailable prints an update notification with current and available versions.
 func DisplayUpdateAvailable(ios *iostreams.IOStreams, currentVersion, availableVersion string) {
 	ios.Printf("\n")

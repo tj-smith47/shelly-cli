@@ -6,9 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/export/ansible"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/export/csv"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/export/jsoncmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/export/terraform"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/export/yamlcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -17,19 +15,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "export",
 		Aliases: []string{"exp"},
-		Short:   "Export device data in various formats",
-		Long: `Export device configuration and status data in various formats.
+		Short:   "Export fleet data for infrastructure tools",
+		Long: `Export device fleet data for infrastructure-as-code tools.
 
-Supports exporting to JSON, YAML, CSV, Ansible inventory, and Terraform
-configuration formats. Useful for backup, documentation, and infrastructure
-as code workflows.`,
-		Example: `  # Export device config as JSON
-  shelly export json living-room
+Supports exporting to CSV, Ansible inventory, and Terraform configuration
+formats. Useful for documentation and fleet management workflows.
 
-  # Export device config as YAML to file
-  shelly export yaml living-room device.yaml
-
-  # Export device list as CSV
+For single-device configuration export (JSON/YAML), use:
+  shelly device config export <device> <file> [--format json|yaml]`,
+		Example: `  # Export device list as CSV
   shelly export csv living-room bedroom kitchen devices.csv
 
   # Export as Ansible inventory
@@ -39,10 +33,8 @@ as code workflows.`,
   shelly export terraform @all shelly.tf`,
 	}
 
-	cmd.AddCommand(jsoncmd.NewCommand(f))
-	cmd.AddCommand(yamlcmd.NewCommand(f))
-	cmd.AddCommand(csv.NewCommand(f))
 	cmd.AddCommand(ansible.NewCommand(f))
+	cmd.AddCommand(csv.NewCommand(f))
 	cmd.AddCommand(terraform.NewCommand(f))
 
 	return cmd

@@ -4,6 +4,7 @@ package device
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/device/config"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/factoryreset"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/info"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/list"
@@ -34,12 +35,13 @@ Registered devices can be referenced by name in other commands.`,
   shelly device reboot living-room`,
 	}
 
-	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(config.NewCommand(f))
+	cmd.AddCommand(factoryreset.NewCommand(f))
 	cmd.AddCommand(info.NewCommand(f))
-	cmd.AddCommand(status.NewCommand(f))
+	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(ping.NewCommand(f))
 	cmd.AddCommand(reboot.NewCommand(f))
-	cmd.AddCommand(factoryreset.NewCommand(f))
+	cmd.AddCommand(status.NewCommand(f))
 	cmd.AddCommand(ui.NewCommand(f))
 
 	return cmd
