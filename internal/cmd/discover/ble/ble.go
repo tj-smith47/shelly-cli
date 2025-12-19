@@ -3,15 +3,14 @@ package ble
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -73,7 +72,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	bleDiscoverer, err := discovery.NewBLEDiscoverer()
 	if err != nil {
 		ios.StopProgress()
-		if isBLENotSupportedError(err) {
+		if shelly.IsBLENotSupportedError(err) {
 			ios.Error("BLE discovery is not available on this system")
 			ios.Hint("Ensure you have a Bluetooth adapter and it is enabled")
 			ios.Hint("On Linux, you may need to run with elevated privileges")
@@ -115,27 +114,4 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	term.DisplayBLEDevices(ios, bleDevices)
 
 	return nil
-}
-
-// isBLENotSupportedError checks if the error is due to BLE not being supported.
-func isBLENotSupportedError(err error) bool {
-	if err == nil {
-		return false
-	}
-	// Check for the BLE not supported error
-	var bleErr *discovery.BLEError
-	if errors.As(err, &bleErr) {
-		// Check if this is the sentinel error or has similar message
-		if bleErr == discovery.ErrBLENotSupported {
-			return true
-		}
-		// Check if the error message indicates BLE is not supported
-		if strings.Contains(bleErr.Message, "not supported") ||
-			strings.Contains(bleErr.Message, "BLE not supported") {
-			return true
-		}
-		// Check if wrapped error is ErrBLENotSupported
-		return errors.Is(bleErr.Err, discovery.ErrBLENotSupported)
-	}
-	return errors.Is(err, discovery.ErrBLENotSupported)
 }
