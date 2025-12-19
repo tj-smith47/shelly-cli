@@ -4,7 +4,6 @@ package export
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // NewCommand creates the scene export command.
@@ -108,25 +108,10 @@ func run(f *cmdutil.Factory, name, file, format string) error {
 		return nil
 	}
 
-	if err := writeToFile(file, data); err != nil {
+	if err := output.WriteFile(file, data); err != nil {
 		return err
 	}
 
 	ios.Success("Exported scene %q to %s", name, file)
-	return nil
-}
-
-func writeToFile(file string, data []byte) error {
-	// Ensure parent directory exists
-	dir := filepath.Dir(file)
-	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0o750); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
-		}
-	}
-
-	if err := os.WriteFile(file, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
 	return nil
 }

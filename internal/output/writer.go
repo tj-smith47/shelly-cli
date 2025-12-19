@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -69,6 +70,23 @@ func ExportCSV(ios *iostreams.IOStreams, outputFile string, formatter func() ([]
 
 	if outputFile != "" {
 		ios.Success("Exported to %s (CSV)", outputFile)
+	}
+	return nil
+}
+
+// WriteFile writes data to a file, creating parent directories if needed.
+// Uses secure file permissions (0o600 for files, 0o750 for directories).
+func WriteFile(file string, data []byte) error {
+	// Ensure parent directory exists
+	dir := filepath.Dir(file)
+	if dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+	}
+
+	if err := os.WriteFile(file, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
 	}
 	return nil
 }
