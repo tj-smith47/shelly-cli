@@ -196,3 +196,41 @@ func DisplayCloudDevices(ios *iostreams.IOStreams, devices []shelly.CloudDevice)
 	ios.Printf("Found %d device(s):\n\n", len(devices))
 	printTable(ios, table)
 }
+
+// DisplayTLSConfig displays the TLS configuration and returns whether a custom CA is configured.
+func DisplayTLSConfig(ios *iostreams.IOStreams, config map[string]any) bool {
+	hasCustomCA := false
+
+	// Check MQTT TLS settings
+	if mqtt, ok := config["mqtt"].(map[string]any); ok {
+		ios.Printf("MQTT:\n")
+		if server, ok := mqtt["server"].(string); ok {
+			ios.Printf("  Server: %s\n", server)
+		}
+		if sslCA, ok := mqtt["ssl_ca"].(string); ok && sslCA != "" {
+			ios.Printf("  SSL CA: %s\n", sslCA)
+			hasCustomCA = true
+		} else {
+			ios.Printf("  SSL CA: (not configured)\n")
+		}
+	}
+
+	// Check cloud settings
+	if cloud, ok := config["cloud"].(map[string]any); ok {
+		ios.Printf("Cloud:\n")
+		if enabled, ok := cloud["enable"].(bool); ok {
+			ios.Printf("  Enabled: %t\n", enabled)
+		}
+	}
+
+	// Check WS (WebSocket) settings
+	if ws, ok := config["ws"].(map[string]any); ok {
+		ios.Printf("WebSocket:\n")
+		if sslCA, ok := ws["ssl_ca"].(string); ok && sslCA != "" {
+			ios.Printf("  SSL CA: %s\n", sslCA)
+			hasCustomCA = true
+		}
+	}
+
+	return hasCustomCA
+}
