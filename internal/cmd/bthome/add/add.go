@@ -9,8 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -70,49 +69,27 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	svc := opts.Factory.ShellyService()
+	ios := opts.Factory.IOStreams()
 
 	// If address provided, add device directly
 	if opts.Addr != "" {
-		return addDeviceDirectly(ctx, svc, opts)
+		result, err := svc.BTHomeAddDevice(ctx, opts.Device, opts.Addr, opts.Name)
+		if err != nil {
+			return err
+		}
+		term.DisplayBTHomeAddResult(ios, term.BTHomeAddResult{
+			Key:  result.Key,
+			Name: opts.Name,
+			Addr: opts.Addr,
+		})
+		return nil
 	}
 
-	// Otherwise start discovery scan
-	return startDiscovery(ctx, svc, opts)
-}
-
-func addDeviceDirectly(ctx context.Context, svc *shelly.Service, opts *Options) error {
-	ios := opts.Factory.IOStreams()
-
-	result, err := svc.BTHomeAddDevice(ctx, opts.Device, opts.Addr, opts.Name)
-	if err != nil {
-		return err
-	}
-
-	ios.Success("BTHome device added: %s", result.Key)
-	if opts.Name != "" {
-		ios.Info("Name: %s", opts.Name)
-	}
-	ios.Info("Address: %s", opts.Addr)
-
-	return nil
-}
-
-func startDiscovery(ctx context.Context, svc *shelly.Service, opts *Options) error {
-	ios := opts.Factory.IOStreams()
-
+	// Start discovery scan
 	if err := svc.BTHomeStartDiscovery(ctx, opts.Device, opts.Duration); err != nil {
 		return err
 	}
-
-	ios.Println(theme.Bold().Render("BTHome Device Discovery Started"))
-	ios.Println()
-	ios.Info("Scanning for %d seconds...", opts.Duration)
-	ios.Println()
-	ios.Info("Discovered devices will emit 'device_discovered' events.")
-	ios.Info("Monitor events with: shelly monitor events %s", opts.Device)
-	ios.Println()
-	ios.Info("When discovery completes, a 'discovery_done' event will be emitted.")
-	ios.Info("Then use 'shelly bthome add %s --addr <mac>' to add discovered devices.", opts.Device)
+	term.DisplayBTHomeDiscoveryStarted(ios, opts.Device, opts.Duration)
 
 	return nil
 }
