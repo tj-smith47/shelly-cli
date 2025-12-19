@@ -2,6 +2,7 @@
 package list
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -64,18 +65,11 @@ func displayTemplates(ios *iostreams.IOStreams, templates []templateInfo) {
 		if len(created) > 10 {
 			created = created[:10] // Just the date part
 		}
-		table.AddRow(t.Name, t.Model, genStr(t.Generation), source, created)
+		table.AddRow(t.Name, t.Model, fmt.Sprintf("Gen%d", t.Generation), source, created)
 	}
 
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
 	ios.Printf("\n%d template(s)\n", len(templates))
-}
-
-func genStr(gen int) string {
-	if gen == 1 {
-		return "Gen1"
-	}
-	return "Gen2+"
 }
