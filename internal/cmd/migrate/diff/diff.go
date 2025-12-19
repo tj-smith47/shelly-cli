@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -51,12 +52,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Compare with device
-	ios.StartProgress("Comparing configurations...")
-
 	svc := f.ShellyService()
-	d, err := svc.CompareBackup(ctx, device, backup)
-	ios.StopProgress()
-
+	var d *model.BackupDiff
+	err = cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
+		var cmpErr error
+		d, cmpErr = svc.CompareBackup(ctx, device, backup)
+		return cmpErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to compare: %w", err)
 	}

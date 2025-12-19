@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the device info command.
@@ -52,11 +53,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	svc := f.ShellyService()
 	ios := f.IOStreams()
 
-	ios.StartProgress("Getting device info...")
-
-	info, err := svc.DeviceInfo(ctx, device)
-	ios.StopProgress()
-
+	var info *shelly.DeviceInfo
+	err := cmdutil.RunWithSpinner(ctx, ios, "Getting device info...", func(ctx context.Context) error {
+		var err error
+		info, err = svc.DeviceInfo(ctx, device)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get device info: %w", err)
 	}

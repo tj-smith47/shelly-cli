@@ -60,63 +60,77 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		return fmt.Errorf("--client-key required with --client-cert")
 	}
 
-	ios.StartProgress("Installing certificate...")
+	// Read files outside the spinner (I/O can be done before spinner)
+	var caData, certData, keyData []byte
+	var err error
 
-	conn, err := svc.Connect(ctx, device)
-	if err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("connect: %w", err)
-	}
-	defer func() {
-		if err := conn.Close(); err != nil {
-			ios.DebugErr("close connection", err)
-		}
-	}()
-
-	// Install CA certificate if provided
 	if opts.CAFile != "" {
-		caData, err := os.ReadFile(opts.CAFile)
+		caData, err = os.ReadFile(opts.CAFile)
 		if err != nil {
-			ios.StopProgress()
 			return fmt.Errorf("read CA file: %w", err)
 		}
-
-		params := map[string]any{
-			"data": string(caData),
-		}
-
-		_, err = conn.Call(ctx, "Shelly.PutUserCA", params)
-		if err != nil {
-			ios.StopProgress()
-			return fmt.Errorf("install CA: %w", err)
-		}
-
-		ios.StopProgress()
-		ios.Success("Installed CA certificate on %s", device)
 	}
 
-	// Install client certificate if provided
 	if opts.ClientCert != "" {
-		certData, err := os.ReadFile(opts.ClientCert)
+		certData, err = os.ReadFile(opts.ClientCert)
 		if err != nil {
 			return fmt.Errorf("read client cert: %w", err)
 		}
-
-		keyData, err := os.ReadFile(opts.ClientKey)
+		keyData, err = os.ReadFile(opts.ClientKey)
 		if err != nil {
 			return fmt.Errorf("read client key: %w", err)
 		}
+	}
 
-		params := map[string]any{
-			"data": string(certData),
-			"key":  string(keyData),
+	installedCA := false
+	installedClient := false
+
+	err = cmdutil.RunWithSpinner(ctx, ios, "Installing certificate...", func(ctx context.Context) error {
+		conn, connErr := svc.Connect(ctx, device)
+		if connErr != nil {
+			return fmt.Errorf("connect: %w", connErr)
+		}
+		defer func() {
+			if closeErr := conn.Close(); closeErr != nil {
+				ios.DebugErr("close connection", closeErr)
+			}
+		}()
+
+		// Install CA certificate if provided
+		if opts.CAFile != "" {
+			params := map[string]any{
+				"data": string(caData),
+			}
+			_, callErr := conn.Call(ctx, "Shelly.PutUserCA", params)
+			if callErr != nil {
+				return fmt.Errorf("install CA: %w", callErr)
+			}
+			installedCA = true
 		}
 
-		_, err = conn.Call(ctx, "Shelly.PutTLSClientCert", params)
-		if err != nil {
-			return fmt.Errorf("install client cert: %w", err)
+		// Install client certificate if provided
+		if opts.ClientCert != "" {
+			params := map[string]any{
+				"data": string(certData),
+				"key":  string(keyData),
+			}
+			_, callErr := conn.Call(ctx, "Shelly.PutTLSClientCert", params)
+			if callErr != nil {
+				return fmt.Errorf("install client cert: %w", callErr)
+			}
+			installedClient = true
 		}
 
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if installedCA {
+		ios.Success("Installed CA certificate on %s", device)
+	}
+	if installedClient {
 		ios.Success("Installed client certificate on %s", device)
 	}
 

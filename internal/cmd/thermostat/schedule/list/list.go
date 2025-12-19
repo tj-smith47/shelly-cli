@@ -73,10 +73,12 @@ func run(ctx context.Context, opts *Options) error {
 	}
 	defer iostreams.CloseWithDebug("closing connection", conn)
 
-	ios.StartProgress("Getting schedules...")
-	result, err := conn.Call(ctx, "Schedule.List", nil)
-	ios.StopProgress()
-
+	var result any
+	err = cmdutil.RunWithSpinner(ctx, ios, "Getting schedules...", func(ctx context.Context) error {
+		var callErr error
+		result, callErr = conn.Call(ctx, "Schedule.List", nil)
+		return callErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to list schedules: %w", err)
 	}

@@ -74,21 +74,19 @@ func run(ctx context.Context, opts *Options) error {
 
 	thermostat := conn.Thermostat(opts.ID)
 
-	ios.StartProgress("Enabling thermostat...")
-	defer ios.StopProgress()
-
-	// Enable the thermostat
-	err = thermostat.Enable(ctx, true)
-	if err != nil {
-		return fmt.Errorf("failed to enable thermostat: %w", err)
-	}
-
-	// Set mode if specified
-	if opts.Mode != "" {
-		err = thermostat.SetMode(ctx, opts.Mode)
-		if err != nil {
-			return fmt.Errorf("failed to set thermostat mode: %w", err)
+	err = cmdutil.RunWithSpinner(ctx, ios, "Enabling thermostat...", func(ctx context.Context) error {
+		if enableErr := thermostat.Enable(ctx, true); enableErr != nil {
+			return fmt.Errorf("failed to enable thermostat: %w", enableErr)
 		}
+		if opts.Mode != "" {
+			if modeErr := thermostat.SetMode(ctx, opts.Mode); modeErr != nil {
+				return fmt.Errorf("failed to set thermostat mode: %w", modeErr)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	if opts.Mode != "" {

@@ -104,12 +104,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		return nil
 	}
 
-	ios.StartProgress("Restoring backup...")
-
 	svc := f.ShellyService()
-	result, err := svc.RestoreBackup(ctx, device, backup, opts)
-	ios.StopProgress()
-
+	var result *shelly.RestoreResult
+	err = cmdutil.RunWithSpinner(ctx, ios, "Restoring backup...", func(ctx context.Context) error {
+		var restoreErr error
+		result, restoreErr = svc.RestoreBackup(ctx, device, backup, opts)
+		return restoreErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to restore backup: %w", err)
 	}

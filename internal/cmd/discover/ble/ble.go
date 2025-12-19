@@ -67,11 +67,9 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	}
 
 	ios := f.IOStreams()
-	ios.StartProgress("Discovering devices via BLE...")
 
 	bleDiscoverer, err := discovery.NewBLEDiscoverer()
 	if err != nil {
-		ios.StopProgress()
 		if shelly.IsBLENotSupportedError(err) {
 			ios.Error("BLE discovery is not available on this system")
 			ios.Hint("Ensure you have a Bluetooth adapter and it is enabled")
@@ -81,8 +79,8 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 		return fmt.Errorf("failed to initialize BLE: %w", err)
 	}
 	defer func() {
-		if err := bleDiscoverer.Stop(); err != nil {
-			ios.DebugErr("stopping BLE discoverer", err)
+		if stopErr := bleDiscoverer.Stop(); stopErr != nil {
+			ios.DebugErr("stopping BLE discoverer", stopErr)
 		}
 	}()
 
@@ -92,12 +90,14 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 		bleDiscoverer.FilterPrefix = filterPrefix
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	devices, err := bleDiscoverer.DiscoverWithContext(ctx)
-	ios.StopProgress()
-
+	var devices []discovery.DiscoveredDevice
+	err = cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via BLE...", func(ctx context.Context) error {
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		var discoverErr error
+		devices, discoverErr = bleDiscoverer.DiscoverWithContext(ctx)
+		return discoverErr
+	})
 	if err != nil {
 		return fmt.Errorf("BLE discovery failed: %w", err)
 	}

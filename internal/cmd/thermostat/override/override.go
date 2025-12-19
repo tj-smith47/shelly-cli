@@ -82,10 +82,9 @@ func run(ctx context.Context, opts *Options) error {
 	thermostat := conn.Thermostat(opts.ID)
 
 	if opts.Cancel {
-		ios.StartProgress("Cancelling temperature override...")
-		err = thermostat.CancelOverride(ctx)
-		ios.StopProgress()
-
+		err = cmdutil.RunWithSpinner(ctx, ios, "Cancelling temperature override...", func(ctx context.Context) error {
+			return thermostat.CancelOverride(ctx)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to cancel override: %w", err)
 		}
@@ -98,10 +97,9 @@ func run(ctx context.Context, opts *Options) error {
 	// Activate override
 	durationSec := int(opts.Duration.Seconds())
 
-	ios.StartProgress("Activating temperature override...")
-	err = thermostat.Override(ctx, opts.Target, durationSec)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Activating temperature override...", func(ctx context.Context) error {
+		return thermostat.Override(ctx, opts.Target, durationSec)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to activate override: %w", err)
 	}

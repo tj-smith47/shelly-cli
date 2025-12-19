@@ -61,10 +61,10 @@ func run(ctx context.Context, opts *Options) error {
 		"enable": false,
 	}
 
-	ios.StartProgress("Disabling schedule...")
-	_, err = conn.Call(ctx, "Schedule.Update", params)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Disabling schedule...", func(ctx context.Context) error {
+		_, callErr := conn.Call(ctx, "Schedule.Update", params)
+		return callErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to disable schedule %d: %w", opts.ScheduleID, err)
 	}

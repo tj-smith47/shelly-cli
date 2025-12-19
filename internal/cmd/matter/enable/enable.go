@@ -55,10 +55,9 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	ios.StartProgress("Enabling Matter...")
-	err := svc.MatterEnable(ctx, opts.Device)
-	ios.StopProgress()
-
+	err := cmdutil.RunWithSpinner(ctx, ios, "Enabling Matter...", func(ctx context.Context) error {
+		return svc.MatterEnable(ctx, opts.Device)
+	})
 	if err != nil {
 		return err
 	}

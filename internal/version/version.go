@@ -67,3 +67,8 @@ func Long() string {
 func String() string {
 	return Short()
 }
+
+// IsDevelopment returns true if running a development build.
+func IsDevelopment() bool {
+	return Version == "" || Version == "dev"
+}

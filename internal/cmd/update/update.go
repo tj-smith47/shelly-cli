@@ -67,89 +67,40 @@ Use --version to install a specific version.`,
 func run(ctx context.Context, f *cmdutil.Factory, check bool, ver, channel string, rollback, yes, includePre bool) error {
 	ios := f.IOStreams()
 	ghClient := github.NewClient(ios)
-
 	currentVersion := version.Version
-	if currentVersion == "" || currentVersion == "dev" {
+
+	if version.IsDevelopment() {
 		ios.Warning("Development version detected, cannot determine update status")
 		if !check {
 			return fmt.Errorf("cannot update development version")
 		}
 	}
 
-	// Handle rollback
 	if rollback {
-		previousRelease, err := ghClient.FindPreviousRelease(ctx, currentVersion, includePre)
-		if err != nil {
-			return fmt.Errorf("no previous version available for rollback")
-		}
+		return ghClient.PerformRollback(ctx, ios, currentVersion, includePre, f.ConfirmAction, yes)
+	}
 
-		ios.Printf("Rolling back from %s to %s\n", currentVersion, previousRelease.Version())
-
-		confirm, err := f.ConfirmAction("Proceed with rollback?", yes)
-		if err != nil {
-			return fmt.Errorf("failed to read confirmation: %w", err)
-		}
-		if !confirm {
-			ios.Info("Rollback cancelled")
+	release, err := ghClient.GetTargetRelease(ctx, ver, includePre || channel == "beta")
+	if err != nil {
+		if errors.Is(err, github.ErrNoReleases) {
+			ios.Info("No releases found")
 			return nil
 		}
-
-		return ghClient.InstallRelease(ctx, ios, previousRelease)
+		return fmt.Errorf("failed to fetch release: %w", err)
 	}
 
-	// Get target release
-	var targetRelease *github.Release
-	var err error
-
-	if ver != "" {
-		targetRelease, err = ghClient.FetchSpecificVersion(ctx, ver)
-		if err != nil {
-			return fmt.Errorf("failed to fetch version %s: %w", ver, err)
-		}
-	} else {
-		targetRelease, err = ghClient.FetchLatestVersion(ctx, includePre || channel == "beta")
-		if err != nil {
-			if errors.Is(err, github.ErrNoReleases) {
-				ios.Info("No releases found")
-				return nil
-			}
-			return fmt.Errorf("failed to check for updates: %w", err)
-		}
-	}
-
-	availableVersion := targetRelease.Version()
-
-	// Compare versions
+	availableVersion := release.Version()
 	hasUpdate := github.IsNewerVersion(currentVersion, availableVersion)
 
 	if check {
-		term.DisplayUpdateStatus(ios, currentVersion, availableVersion, hasUpdate, targetRelease.HTMLURL)
+		term.DisplayUpdateStatus(ios, currentVersion, availableVersion, hasUpdate, release.HTMLURL)
 		return nil
 	}
 
-	// Check if update is needed
 	if !hasUpdate && ver == "" {
 		ios.Printf("Already at latest version (%s)\n", currentVersion)
 		return nil
 	}
 
-	// Show update info and confirm
-	ios.Printf("\nCurrent version: %s\n", currentVersion)
-	ios.Printf("Available version: %s\n", availableVersion)
-
-	if targetRelease.Body != "" {
-		ios.Printf("\nRelease notes:\n%s\n", output.FormatReleaseNotes(targetRelease.Body))
-	}
-
-	confirm, err := f.ConfirmAction("\nProceed with update?", yes)
-	if err != nil {
-		return fmt.Errorf("failed to read confirmation: %w", err)
-	}
-	if !confirm {
-		ios.Info("Update cancelled")
-		return fmt.Errorf("update cancelled by user")
-	}
-
-	// Perform update
-	return ghClient.InstallRelease(ctx, ios, targetRelease)
+	return ghClient.PerformUpdate(ctx, ios, release, currentVersion, output.FormatReleaseNotes(release.Body), f.ConfirmAction, yes)
 }

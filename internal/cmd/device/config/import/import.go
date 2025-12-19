@@ -76,11 +76,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 
 	if dryRunFlag {
 		// Get current config and show diff
-		ios.StartProgress("Getting current configuration...")
-
-		currentConfig, err := svc.GetConfig(ctx, device)
-		ios.StopProgress()
-
+		var currentConfig map[string]any
+		err = cmdutil.RunWithSpinner(ctx, ios, "Getting current configuration...", func(ctx context.Context) error {
+			var getErr error
+			currentConfig, getErr = svc.GetConfig(ctx, device)
+			return getErr
+		})
 		if err != nil {
 			return fmt.Errorf("failed to get current configuration: %w", err)
 		}
@@ -90,11 +91,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		return nil
 	}
 
-	ios.StartProgress("Importing configuration...")
-
-	err = svc.SetConfig(ctx, device, config)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Importing configuration...", func(ctx context.Context) error {
+		return svc.SetConfig(ctx, device, config)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to import configuration: %w", err)
 	}

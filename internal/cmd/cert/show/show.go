@@ -35,25 +35,27 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	ios.StartProgress("Fetching TLS configuration...")
-
-	conn, err := svc.Connect(ctx, device)
-	if err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("connect: %w", err)
-	}
-	defer func() {
-		if err := conn.Close(); err != nil {
-			ios.DebugErr("close connection", err)
+	var result any
+	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching TLS configuration...", func(ctx context.Context) error {
+		conn, connErr := svc.Connect(ctx, device)
+		if connErr != nil {
+			return fmt.Errorf("connect: %w", connErr)
 		}
-	}()
+		defer func() {
+			if closeErr := conn.Close(); closeErr != nil {
+				ios.DebugErr("close connection", closeErr)
+			}
+		}()
 
-	// Get full config to check TLS settings
-	result, err := conn.Call(ctx, "Shelly.GetConfig", nil)
-	ios.StopProgress()
-
+		var callErr error
+		result, callErr = conn.Call(ctx, "Shelly.GetConfig", nil)
+		if callErr != nil {
+			return fmt.Errorf("get config: %w", callErr)
+		}
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("get config: %w", err)
+		return err
 	}
 
 	config, ok := result.(map[string]any)

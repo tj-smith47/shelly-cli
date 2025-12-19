@@ -67,10 +67,9 @@ func run(ctx context.Context, opts *Options) error {
 
 	thermostat := conn.Thermostat(opts.ID)
 
-	ios.StartProgress("Starting valve calibration...")
-	err = thermostat.Calibrate(ctx)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Starting valve calibration...", func(ctx context.Context) error {
+		return thermostat.Calibrate(ctx)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to start calibration: %w", err)
 	}

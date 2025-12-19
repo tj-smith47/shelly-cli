@@ -83,11 +83,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		Password:      encryptFlag,
 	}
 
-	ios.StartProgress("Creating backup...")
-
-	backup, err := svc.CreateBackup(ctx, device, opts)
-	ios.StopProgress()
-
+	var backup *shelly.DeviceBackup
+	err := cmdutil.RunWithSpinner(ctx, ios, "Creating backup...", func(ctx context.Context) error {
+		var err error
+		backup, err = svc.CreateBackup(ctx, device, opts)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}

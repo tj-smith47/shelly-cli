@@ -57,11 +57,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 
 	if component == "" {
 		// Show available components
-		ios.StartProgress("Getting device components...")
-
-		config, err := svc.GetConfig(ctx, device)
-		ios.StopProgress()
-
+		var config map[string]any
+		err := cmdutil.RunWithSpinner(ctx, ios, "Getting device components...", func(ctx context.Context) error {
+			var getErr error
+			config, getErr = svc.GetConfig(ctx, device)
+			return getErr
+		})
 		if err != nil {
 			return fmt.Errorf("failed to get device configuration: %w", err)
 		}
@@ -89,12 +90,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 		return nil
 	}
 
-	ios.StartProgress("Resetting configuration...")
-
 	// Reset by setting config to empty/defaults
-	err = svc.SetComponentConfig(ctx, device, component, map[string]any{})
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Resetting configuration...", func(ctx context.Context) error {
+		return svc.SetComponentConfig(ctx, device, component, map[string]any{})
+	})
 	if err != nil {
 		return fmt.Errorf("failed to reset configuration: %w", err)
 	}

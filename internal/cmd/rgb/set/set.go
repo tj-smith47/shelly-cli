@@ -62,11 +62,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, rgbID, red, gre
 	svc := f.ShellyService()
 	ios := f.IOStreams()
 
-	ios.StartProgress("Setting RGB parameters...")
-
-	err := svc.RGBSet(ctx, device, rgbID, params)
-	ios.StopProgress()
-
+	err := cmdutil.RunWithSpinner(ctx, ios, "Setting RGB parameters...", func(ctx context.Context) error {
+		return svc.RGBSet(ctx, device, rgbID, params)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to set RGB parameters: %w", err)
 	}

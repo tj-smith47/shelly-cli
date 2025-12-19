@@ -53,8 +53,6 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, lightID, bright
 	svc := f.ShellyService()
 	ios := f.IOStreams()
 
-	ios.StartProgress("Setting light parameters...")
-
 	var brightnessPtr *int
 	if brightness >= 0 && brightness <= 100 {
 		brightnessPtr = &brightness
@@ -65,9 +63,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, lightID, bright
 		onPtr = &on
 	}
 
-	err := svc.LightSet(ctx, device, lightID, brightnessPtr, onPtr)
-	ios.StopProgress()
-
+	err := cmdutil.RunWithSpinner(ctx, ios, "Setting light parameters...", func(ctx context.Context) error {
+		return svc.LightSet(ctx, device, lightID, brightnessPtr, onPtr)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to set light parameters: %w", err)
 	}

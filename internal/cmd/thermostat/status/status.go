@@ -75,10 +75,12 @@ func run(ctx context.Context, opts *Options) error {
 
 	thermostat := conn.Thermostat(opts.ID)
 
-	ios.StartProgress("Getting thermostat status...")
-	status, err := thermostat.GetStatus(ctx)
-	ios.StopProgress()
-
+	var status *components.ThermostatStatus
+	err = cmdutil.RunWithSpinner(ctx, ios, "Getting thermostat status...", func(ctx context.Context) error {
+		var statusErr error
+		status, statusErr = thermostat.GetStatus(ctx)
+		return statusErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get thermostat status: %w", err)
 	}

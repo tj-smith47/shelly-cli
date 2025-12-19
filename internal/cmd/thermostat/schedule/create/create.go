@@ -131,10 +131,12 @@ func run(ctx context.Context, opts *Options) error {
 
 	params := shelly.BuildThermostatScheduleCall(schedParams)
 
-	ios.StartProgress("Creating schedule...")
-	result, err := conn.Call(ctx, "Schedule.Create", params)
-	ios.StopProgress()
-
+	var result any
+	err = cmdutil.RunWithSpinner(ctx, ios, "Creating schedule...", func(ctx context.Context) error {
+		var callErr error
+		result, callErr = conn.Call(ctx, "Schedule.Create", params)
+		return callErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create schedule: %w", err)
 	}

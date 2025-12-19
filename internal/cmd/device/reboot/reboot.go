@@ -59,11 +59,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, delay int, yes 
 
 	svc := f.ShellyService()
 
-	ios.StartProgress("Rebooting device...")
-
-	err = svc.DeviceReboot(ctx, device, delay)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Rebooting device...", func(ctx context.Context) error {
+		return svc.DeviceReboot(ctx, device, delay)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to reboot device: %w", err)
 	}

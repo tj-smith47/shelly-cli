@@ -119,10 +119,9 @@ func run(ctx context.Context, opts *Options) error {
 		changes = append(changes, "enabled: false")
 	}
 
-	ios.StartProgress("Updating thermostat configuration...")
-	err = thermostat.SetConfig(ctx, config)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Updating thermostat configuration...", func(ctx context.Context) error {
+		return thermostat.SetConfig(ctx, config)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to set thermostat config: %w", err)
 	}

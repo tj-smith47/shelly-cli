@@ -70,28 +70,6 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	ios.StartProgress("Getting device info...")
-
-	conn, err := svc.Connect(ctx, device)
-	if err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing qr connection", conn)
-
-	// Get device info
-	rawResult, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-	if err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("failed to get device info: %w", err)
-	}
-
-	jsonBytes, err := json.Marshal(rawResult)
-	if err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("failed to marshal device info: %w", err)
-	}
-
 	var deviceInfo struct {
 		ID   string `json:"id"`
 		MAC  string `json:"mac"`
@@ -99,20 +77,42 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		Ver  string `json:"ver"`
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(jsonBytes, &deviceInfo); err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("failed to parse device info: %w", err)
-	}
-
-	// Get WiFi config if requested
 	var wifiSSID string
-	if opts.WiFi {
-		if wifiResult, err := conn.Call(ctx, "WiFi.GetConfig", nil); err == nil {
-			wifiSSID = shelly.ExtractWiFiSSID(wifiResult)
-		}
-	}
 
-	ios.StopProgress()
+	err := cmdutil.RunWithSpinner(ctx, ios, "Getting device info...", func(ctx context.Context) error {
+		conn, connErr := svc.Connect(ctx, device)
+		if connErr != nil {
+			return fmt.Errorf("failed to connect to device: %w", connErr)
+		}
+		defer iostreams.CloseWithDebug("closing qr connection", conn)
+
+		// Get device info
+		rawResult, callErr := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+		if callErr != nil {
+			return fmt.Errorf("failed to get device info: %w", callErr)
+		}
+
+		jsonBytes, marshalErr := json.Marshal(rawResult)
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal device info: %w", marshalErr)
+		}
+
+		if unmarshalErr := json.Unmarshal(jsonBytes, &deviceInfo); unmarshalErr != nil {
+			return fmt.Errorf("failed to parse device info: %w", unmarshalErr)
+		}
+
+		// Get WiFi config if requested
+		if opts.WiFi {
+			if wifiResult, wifiErr := conn.Call(ctx, "WiFi.GetConfig", nil); wifiErr == nil {
+				wifiSSID = shelly.ExtractWiFiSSID(wifiResult)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
 	// Build QR info - use the device identifier (which may be IP or name)
 	// For the web URL, we use the device identifier since that's how we connected

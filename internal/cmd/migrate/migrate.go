@@ -78,14 +78,15 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	}
 
 	// Perform migration
-	ios.StartProgress("Migrating configuration...")
-
 	opts := shelly.RestoreOptions{
 		SkipNetwork: true, // Always skip network to prevent disconnection
 	}
-	result, err := svc.RestoreBackup(ctx, target, backup, opts)
-	ios.StopProgress()
-
+	var result *shelly.RestoreResult
+	err = cmdutil.RunWithSpinner(ctx, ios, "Migrating configuration...", func(ctx context.Context) error {
+		var restoreErr error
+		result, restoreErr = svc.RestoreBackup(ctx, target, backup, opts)
+		return restoreErr
+	})
 	if err != nil {
 		return fmt.Errorf("migration failed: %w", err)
 	}
@@ -124,9 +125,12 @@ func loadFromFile(source string) (*shelly.DeviceBackup, string, error) {
 }
 
 func loadFromDevice(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, source string) (*shelly.DeviceBackup, string, error) {
-	ios.StartProgress("Reading source device...")
-	backup, err := svc.CreateBackup(ctx, source, shelly.BackupOptions{})
-	ios.StopProgress()
+	var backup *shelly.DeviceBackup
+	err := cmdutil.RunWithSpinner(ctx, ios, "Reading source device...", func(ctx context.Context) error {
+		var createErr error
+		backup, createErr = svc.CreateBackup(ctx, source, shelly.BackupOptions{})
+		return createErr
+	})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read source device: %w", err)
 	}

@@ -62,10 +62,9 @@ func run(ctx context.Context, opts *Options) error {
 
 	thermostat := conn.Thermostat(opts.ID)
 
-	ios.StartProgress("Disabling thermostat...")
-	err = thermostat.Enable(ctx, false)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Disabling thermostat...", func(ctx context.Context) error {
+		return thermostat.Enable(ctx, false)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to disable thermostat: %w", err)
 	}

@@ -68,10 +68,10 @@ func run(ctx context.Context, opts *Options) error {
 	defer iostreams.CloseWithDebug("closing connection", conn)
 
 	if opts.All {
-		ios.StartProgress("Deleting all schedules...")
-		_, err = conn.Call(ctx, "Schedule.DeleteAll", nil)
-		ios.StopProgress()
-
+		err = cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
+			_, callErr := conn.Call(ctx, "Schedule.DeleteAll", nil)
+			return callErr
+		})
 		if err != nil {
 			return fmt.Errorf("failed to delete all schedules: %w", err)
 		}
@@ -84,10 +84,10 @@ func run(ctx context.Context, opts *Options) error {
 		"id": opts.ScheduleID,
 	}
 
-	ios.StartProgress("Deleting schedule...")
-	_, err = conn.Call(ctx, "Schedule.Delete", params)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Deleting schedule...", func(ctx context.Context) error {
+		_, callErr := conn.Call(ctx, "Schedule.Delete", params)
+		return callErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to delete schedule %d: %w", opts.ScheduleID, err)
 	}

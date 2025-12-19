@@ -47,6 +47,14 @@ func (c *Client) FetchLatestVersion(ctx context.Context, includePre bool) (*Rele
 	return &releases[0], nil
 }
 
+// GetTargetRelease fetches either a specific version or the latest release.
+func (c *Client) GetTargetRelease(ctx context.Context, ver string, includePre bool) (*Release, error) {
+	if ver != "" {
+		return c.FetchSpecificVersion(ctx, ver)
+	}
+	return c.FetchLatestVersion(ctx, includePre)
+}
+
 // FindPreviousRelease finds the release before the current version for rollback.
 func (c *Client) FindPreviousRelease(ctx context.Context, currentVersion string, includePre bool) (*Release, error) {
 	releases, err := c.ListReleases(ctx, DefaultOwner, DefaultRepo, includePre)

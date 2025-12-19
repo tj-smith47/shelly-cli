@@ -2,6 +2,7 @@
 package mdns
 
 import (
+	"context"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -58,8 +59,8 @@ Protocol, and Auth status.`,
   # Using aliases
   shelly discover zeroconf --timeout 20s
   shelly discover bonjour --register`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f, timeout, register, skipExisting)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return run(cmd.Context(), f, timeout, register, skipExisting)
 		},
 	}
 
@@ -70,14 +71,12 @@ Protocol, and Auth status.`,
 	return cmd
 }
 
-func run(f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool) error {
+func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool) error {
 	ios := f.IOStreams()
 
 	if timeout == 0 {
 		timeout = DefaultTimeout
 	}
-
-	ios.StartProgress("Discovering devices via mDNS...")
 
 	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
 	defer func() {
@@ -86,9 +85,12 @@ func run(f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool)
 		}
 	}()
 
-	devices, err := mdnsDiscoverer.Discover(timeout)
-	ios.StopProgress()
-
+	var devices []discovery.DiscoveredDevice
+	err := cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via mDNS...", func(ctx context.Context) error {
+		var discoverErr error
+		devices, discoverErr = mdnsDiscoverer.Discover(timeout)
+		return discoverErr
+	})
 	if err != nil {
 		return err
 	}

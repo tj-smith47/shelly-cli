@@ -77,9 +77,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	svc := f.ShellyService()
 
 	// Check for updates first
-	ios.StartProgress("Checking for updates...")
-	info, err := svc.CheckFirmware(ctx, device)
-	ios.StopProgress()
+	var info *shelly.FirmwareInfo
+	err := cmdutil.RunWithSpinner(ctx, ios, "Checking for updates...", func(ctx context.Context) error {
+		var checkErr error
+		info, checkErr = svc.CheckFirmware(ctx, device)
+		return checkErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to check for updates: %w", err)
 	}

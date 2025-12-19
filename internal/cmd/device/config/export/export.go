@@ -53,11 +53,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	svc := f.ShellyService()
 	ios := f.IOStreams()
 
-	ios.StartProgress("Getting configuration...")
-
-	config, err := svc.GetConfig(ctx, device)
-	ios.StopProgress()
-
+	var config map[string]any
+	err := cmdutil.RunWithSpinner(ctx, ios, "Getting configuration...", func(ctx context.Context) error {
+		var err error
+		config, err = svc.GetConfig(ctx, device)
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get configuration: %w", err)
 	}

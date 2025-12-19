@@ -60,11 +60,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyV
 		cfg[key] = value
 	}
 
-	ios.StartProgress("Setting configuration...")
-
-	err := svc.SetComponentConfig(ctx, device, component, cfg)
-	ios.StopProgress()
-
+	err := cmdutil.RunWithSpinner(ctx, ios, "Setting configuration...", func(ctx context.Context) error {
+		return svc.SetComponentConfig(ctx, device, component, cfg)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to set configuration: %w", err)
 	}

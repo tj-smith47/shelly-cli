@@ -76,8 +76,6 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, registe
 		timeout = shelly.DefaultTimeout
 	}
 
-	ios.StartProgress("Discovering devices via mDNS...")
-
 	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
 	defer func() {
 		if err := mdnsDiscoverer.Stop(); err != nil {
@@ -85,13 +83,14 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, registe
 		}
 	}()
 
-	// Create context with timeout for discovery
-	discoverCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	devices, err := mdnsDiscoverer.DiscoverWithContext(discoverCtx)
-	ios.StopProgress()
-
+	var devices []discovery.DiscoveredDevice
+	err := cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via mDNS...", func(ctx context.Context) error {
+		discoverCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		var discoverErr error
+		devices, discoverErr = mdnsDiscoverer.DiscoverWithContext(discoverCtx)
+		return discoverErr
+	})
 	if err != nil {
 		return err
 	}

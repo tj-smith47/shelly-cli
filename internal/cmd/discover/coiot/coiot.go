@@ -82,8 +82,6 @@ func run(ctx context.Context, opts *Options) error {
 		timeout = DefaultTimeout
 	}
 
-	ios.StartProgress("Discovering devices via CoIoT...")
-
 	coiotDiscoverer := discovery.NewCoIoTDiscoverer()
 	defer func() {
 		if err := coiotDiscoverer.Stop(); err != nil {
@@ -91,9 +89,12 @@ func run(ctx context.Context, opts *Options) error {
 		}
 	}()
 
-	devices, err := coiotDiscoverer.Discover(timeout)
-	ios.StopProgress()
-
+	var devices []discovery.DiscoveredDevice
+	err := cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via CoIoT...", func(ctx context.Context) error {
+		var discoverErr error
+		devices, discoverErr = coiotDiscoverer.Discover(timeout)
+		return discoverErr
+	})
 	if err != nil {
 		return err
 	}

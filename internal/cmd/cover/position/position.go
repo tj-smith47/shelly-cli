@@ -52,11 +52,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, coverID, positi
 	svc := f.ShellyService()
 	ios := f.IOStreams()
 
-	ios.StartProgress(fmt.Sprintf("Setting cover to %d%%...", position))
-
-	err := svc.CoverPosition(ctx, device, coverID, position)
-	ios.StopProgress()
-
+	err := cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Setting cover to %d%%...", position), func(ctx context.Context) error {
+		return svc.CoverPosition(ctx, device, coverID, position)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to set cover position: %w", err)
 	}

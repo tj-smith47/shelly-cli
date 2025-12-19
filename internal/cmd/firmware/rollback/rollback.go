@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 var yesFlag bool
@@ -45,9 +46,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	svc := f.ShellyService()
 
 	// Check rollback availability
-	ios.StartProgress("Checking rollback availability...")
-	status, err := svc.GetFirmwareStatus(ctx, device)
-	ios.StopProgress()
+	var status *shelly.FirmwareStatus
+	err := cmdutil.RunWithSpinner(ctx, ios, "Checking rollback availability...", func(ctx context.Context) error {
+		var statusErr error
+		status, statusErr = svc.GetFirmwareStatus(ctx, device)
+		return statusErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get firmware status: %w", err)
 	}

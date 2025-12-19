@@ -56,19 +56,23 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	ios.StartProgress("Fetching configurations...")
-	sourceConfig, sourceName, err := svc.LoadConfig(ctx, source)
+	var sourceConfig, targetConfig map[string]any
+	var sourceName, targetName string
+	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching configurations...", func(ctx context.Context) error {
+		var loadErr error
+		sourceConfig, sourceName, loadErr = svc.LoadConfig(ctx, source)
+		if loadErr != nil {
+			return fmt.Errorf("failed to get source config: %w", loadErr)
+		}
+		targetConfig, targetName, loadErr = svc.LoadConfig(ctx, target)
+		if loadErr != nil {
+			return fmt.Errorf("failed to get target config: %w", loadErr)
+		}
+		return nil
+	})
 	if err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("failed to get source config: %w", err)
+		return err
 	}
-
-	targetConfig, targetName, err := svc.LoadConfig(ctx, target)
-	if err != nil {
-		ios.StopProgress()
-		return fmt.Errorf("failed to get target config: %w", err)
-	}
-	ios.StopProgress()
 
 	diffs := output.CompareConfigs(sourceConfig, targetConfig)
 

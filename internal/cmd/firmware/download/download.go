@@ -64,9 +64,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	// Get firmware URL from device
-	ios.StartProgress("Getting firmware information...")
-	fwURL, err := svc.GetFirmwareURL(ctx, device, stage)
-	ios.StopProgress()
+	var fwURL string
+	err := cmdutil.RunWithSpinner(ctx, ios, "Getting firmware information...", func(ctx context.Context) error {
+		var urlErr error
+		fwURL, urlErr = svc.GetFirmwareURL(ctx, device, stage)
+		return urlErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to get firmware URL: %w", err)
 	}

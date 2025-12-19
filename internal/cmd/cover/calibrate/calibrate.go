@@ -47,11 +47,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, coverID int) er
 	svc := f.ShellyService()
 	ios := f.IOStreams()
 
-	ios.StartProgress("Starting calibration...")
-
-	err := svc.CoverCalibrate(ctx, device, coverID)
-	ios.StopProgress()
-
+	err := cmdutil.RunWithSpinner(ctx, ios, "Starting calibration...", func(ctx context.Context) error {
+		return svc.CoverCalibrate(ctx, device, coverID)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to start calibration: %w", err)
 	}

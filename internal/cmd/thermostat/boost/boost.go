@@ -78,10 +78,9 @@ func run(ctx context.Context, opts *Options) error {
 	thermostat := conn.Thermostat(opts.ID)
 
 	if opts.Cancel {
-		ios.StartProgress("Cancelling boost mode...")
-		err = thermostat.CancelBoost(ctx)
-		ios.StopProgress()
-
+		err = cmdutil.RunWithSpinner(ctx, ios, "Cancelling boost mode...", func(ctx context.Context) error {
+			return thermostat.CancelBoost(ctx)
+		})
 		if err != nil {
 			return fmt.Errorf("failed to cancel boost: %w", err)
 		}
@@ -93,10 +92,9 @@ func run(ctx context.Context, opts *Options) error {
 	// Activate boost
 	durationSec := int(opts.Duration.Seconds())
 
-	ios.StartProgress("Activating boost mode...")
-	err = thermostat.Boost(ctx, durationSec)
-	ios.StopProgress()
-
+	err = cmdutil.RunWithSpinner(ctx, ios, "Activating boost mode...", func(ctx context.Context) error {
+		return thermostat.Boost(ctx, durationSec)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to activate boost: %w", err)
 	}

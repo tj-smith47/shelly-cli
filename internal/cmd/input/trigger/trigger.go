@@ -61,11 +61,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, inputID int, ev
 	svc := f.ShellyService()
 	ios := f.IOStreams()
 
-	ios.StartProgress("Triggering input event...")
-
-	err := svc.InputTrigger(ctx, device, inputID, event)
-	ios.StopProgress()
-
+	err := cmdutil.RunWithSpinner(ctx, ios, "Triggering input event...", func(ctx context.Context) error {
+		return svc.InputTrigger(ctx, device, inputID, event)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to trigger input event: %w", err)
 	}
