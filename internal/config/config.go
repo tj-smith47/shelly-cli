@@ -162,18 +162,6 @@ type Template struct {
 	SourceDevice string         `mapstructure:"source_device,omitempty" json:"source_device,omitempty" yaml:"source_device,omitempty"`
 }
 
-// Alert represents a monitoring alert configuration.
-type Alert struct {
-	Name         string `mapstructure:"name" json:"name" yaml:"name"`
-	Description  string `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
-	Device       string `mapstructure:"device" json:"device" yaml:"device"`
-	Condition    string `mapstructure:"condition" json:"condition" yaml:"condition"` // e.g., "offline", "power>100", "temperature>30"
-	Action       string `mapstructure:"action" json:"action" yaml:"action"`          // e.g., "notify", "webhook:http://...", "command:..."
-	Enabled      bool   `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
-	SnoozedUntil string `mapstructure:"snoozed_until,omitempty" json:"snoozed_until,omitempty" yaml:"snoozed_until,omitempty"`
-	CreatedAt    string `mapstructure:"created_at" json:"created_at" yaml:"created_at"`
-}
-
 // PluginsConfig holds plugin system settings.
 type PluginsConfig struct {
 	Enabled bool     `mapstructure:"enabled"`
