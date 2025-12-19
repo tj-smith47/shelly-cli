@@ -71,7 +71,7 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
-func TestBuildParams(t *testing.T) {
+func TestBuildRGBSetParams(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -135,7 +135,7 @@ func TestBuildParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			params := buildParams(tt.red, tt.green, tt.blue, tt.brightness, tt.on)
+			params := shelly.BuildRGBSetParams(tt.red, tt.green, tt.blue, tt.brightness, tt.on)
 
 			checkPtr := func(name string, got *int, want bool) {
 				if want && got == nil {
@@ -164,11 +164,11 @@ func TestBuildParams(t *testing.T) {
 	}
 }
 
-func TestBuildParams_ValidRanges(t *testing.T) {
+func TestBuildRGBSetParams_ValidRanges(t *testing.T) {
 	t.Parallel()
 
 	// Test valid color range (0-255)
-	params := buildParams(0, 128, 255, 50, true)
+	params := shelly.BuildRGBSetParams(0, 128, 255, 50, true)
 	if params.Red == nil || *params.Red != 0 {
 		t.Error("Red 0 should be valid")
 	}
@@ -186,11 +186,11 @@ func TestBuildParams_ValidRanges(t *testing.T) {
 	}
 }
 
-func TestBuildParams_InvalidRanges(t *testing.T) {
+func TestBuildRGBSetParams_InvalidRanges(t *testing.T) {
 	t.Parallel()
 
 	// Test invalid color range
-	params := buildParams(256, -1, 300, 101, false)
+	params := shelly.BuildRGBSetParams(256, -1, 300, 101, false)
 	if params.Red != nil {
 		t.Error("Red 256 should be invalid")
 	}
@@ -209,4 +209,4 @@ func TestBuildParams_InvalidRanges(t *testing.T) {
 }
 
 // Verify RGBSetParams type is compatible.
-var _ shelly.RGBSetParams = buildParams(0, 0, 0, 0, false)
+var _ shelly.RGBSetParams = shelly.BuildRGBSetParams(0, 0, 0, 0, false)

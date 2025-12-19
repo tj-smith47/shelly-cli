@@ -31,6 +31,36 @@ type RGBSetParams struct {
 	On         *bool
 }
 
+// BuildRGBSetParams creates RGBSetParams from flag values.
+// Uses -1 as sentinel for "not set" for color/brightness values.
+// Only sets On if explicitly true.
+func BuildRGBSetParams(red, green, blue, brightness int, on bool) RGBSetParams {
+	params := RGBSetParams{}
+
+	// Color values are valid from 0-255, -1 means not set
+	if red >= 0 && red <= 255 {
+		params.Red = &red
+	}
+	if green >= 0 && green <= 255 {
+		params.Green = &green
+	}
+	if blue >= 0 && blue <= 255 {
+		params.Blue = &blue
+	}
+
+	// Brightness is valid from 0-100
+	if brightness >= 0 && brightness <= 100 {
+		params.Brightness = &brightness
+	}
+
+	// Only set on if explicitly requested
+	if on {
+		params.On = &on
+	}
+
+	return params
+}
+
 // RGBOn turns on an RGB component.
 // For Gen1 devices, this controls the color light.
 func (s *Service) RGBOn(ctx context.Context, identifier string, rgbID int) error {

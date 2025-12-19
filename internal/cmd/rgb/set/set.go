@@ -54,7 +54,7 @@ Values not specified will be left unchanged.`,
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device string, rgbID, red, green, blue, brightness int, on bool) error {
-	params := buildParams(red, green, blue, brightness, on)
+	params := shelly.BuildRGBSetParams(red, green, blue, brightness, on)
 
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
@@ -73,31 +73,4 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, rgbID, red, gre
 
 	ios.Success("RGB %d parameters set", rgbID)
 	return nil
-}
-
-func buildParams(red, green, blue, brightness int, on bool) shelly.RGBSetParams {
-	params := shelly.RGBSetParams{}
-
-	// Color values are valid from 0-255, -1 means not set
-	if red >= 0 && red <= 255 {
-		params.Red = &red
-	}
-	if green >= 0 && green <= 255 {
-		params.Green = &green
-	}
-	if blue >= 0 && blue <= 255 {
-		params.Blue = &blue
-	}
-
-	// Brightness is valid from 0-100
-	if brightness >= 0 && brightness <= 100 {
-		params.Brightness = &brightness
-	}
-
-	// Only set on if explicitly requested
-	if on {
-		params.On = &on
-	}
-
-	return params
 }
