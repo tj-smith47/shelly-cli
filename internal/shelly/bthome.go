@@ -219,3 +219,89 @@ func getBTHomeDeviceConfig(ctx context.Context, conn *client.Client, id int) (na
 	}
 	return name, cfg.Addr
 }
+
+// FetchBTHomeComponentStatus fetches the BTHome component status.
+func (s *Service) FetchBTHomeComponentStatus(ctx context.Context, identifier string) (model.BTHomeComponentStatus, error) {
+	var status model.BTHomeComponentStatus
+
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		result, err := conn.Call(ctx, "BTHome.GetStatus", nil)
+		if err != nil {
+			return fmt.Errorf("failed to get BTHome status: %w", err)
+		}
+
+		jsonBytes, err := json.Marshal(result)
+		if err != nil {
+			return fmt.Errorf("failed to marshal result: %w", err)
+		}
+		if err := json.Unmarshal(jsonBytes, &status); err != nil {
+			return fmt.Errorf("failed to parse status: %w", err)
+		}
+
+		return nil
+	})
+
+	return status, err
+}
+
+// FetchBTHomeDeviceStatus fetches detailed status for a specific BTHome device.
+func (s *Service) FetchBTHomeDeviceStatus(ctx context.Context, identifier string, id int) (model.BTHomeDeviceStatus, error) {
+	var status model.BTHomeDeviceStatus
+	params := map[string]any{"id": id}
+
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		var err error
+		status, err = getBTHomeDeviceStatusRPC(ctx, conn, params)
+		if err != nil {
+			return err
+		}
+
+		name, addr := getBTHomeDeviceConfig(ctx, conn, id)
+		status.Name = name
+		status.Addr = addr
+
+		status.KnownObjects = getBTHomeKnownObjectsRPC(ctx, conn, params)
+		return nil
+	})
+
+	return status, err
+}
+
+func getBTHomeDeviceStatusRPC(ctx context.Context, conn *client.Client, params map[string]any) (model.BTHomeDeviceStatus, error) {
+	var status model.BTHomeDeviceStatus
+
+	result, err := conn.Call(ctx, "BTHomeDevice.GetStatus", params)
+	if err != nil {
+		return status, fmt.Errorf("failed to get device status: %w", err)
+	}
+
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return status, fmt.Errorf("failed to marshal result: %w", err)
+	}
+	if err := json.Unmarshal(jsonBytes, &status); err != nil {
+		return status, fmt.Errorf("failed to parse status: %w", err)
+	}
+
+	return status, nil
+}
+
+func getBTHomeKnownObjectsRPC(ctx context.Context, conn *client.Client, params map[string]any) []model.BTHomeKnownObj {
+	objResult, err := conn.Call(ctx, "BTHomeDevice.GetKnownObjects", params)
+	if err != nil {
+		return nil
+	}
+
+	var objResp struct {
+		Objects []model.BTHomeKnownObj `json:"objects"`
+	}
+	objBytes, err := json.Marshal(objResult)
+	if err != nil {
+		return nil
+	}
+	if json.Unmarshal(objBytes, &objResp) != nil {
+		return nil
+	}
+
+	return objResp.Objects
+}
