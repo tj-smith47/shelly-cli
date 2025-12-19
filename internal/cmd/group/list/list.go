@@ -2,7 +2,6 @@
 package list
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -49,7 +48,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 func displayGroups(ios *iostreams.IOStreams, groups []GroupInfo) {
 	table := output.NewTable("Name", "Devices")
 	for _, g := range groups {
-		table.AddRow(g.Name, formatDeviceCount(g.DeviceCount))
+		table.AddRow(g.Name, output.FormatDeviceCount(g.DeviceCount))
 	}
 
 	if err := table.PrintTo(ios.Out); err != nil {
@@ -57,14 +56,4 @@ func displayGroups(ios *iostreams.IOStreams, groups []GroupInfo) {
 	}
 	ios.Println()
 	ios.Count("group", len(groups))
-}
-
-func formatDeviceCount(count int) string {
-	if count == 0 {
-		return "0 (empty)"
-	}
-	if count == 1 {
-		return "1 device"
-	}
-	return fmt.Sprintf("%d devices", count)
 }

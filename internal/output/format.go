@@ -316,6 +316,17 @@ func FormatActionCount(count int) string {
 	return theme.StatusOK().Render(fmt.Sprintf("%d actions", count))
 }
 
+// FormatDeviceCount returns a device count string with proper pluralization.
+func FormatDeviceCount(count int) string {
+	if count == 0 {
+		return "0 (empty)"
+	}
+	if count == 1 {
+		return "1 device"
+	}
+	return fmt.Sprintf("%d devices", count)
+}
+
 // FormatConfigValue converts any configuration value to a display string.
 // It handles nil, bool, float64, string, maps, and slices appropriately.
 func FormatConfigValue(v interface{}) string {
