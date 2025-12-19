@@ -1,9 +1,8 @@
-// Package schedule provides thermostat schedule management commands.
-package schedule
+// Package create provides the thermostat schedule create command.
+package create
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -12,24 +11,26 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-// CreateOptions holds create command options.
-type CreateOptions struct {
+// Options holds create command options.
+type Options struct {
 	Factory      *cmdutil.Factory
 	Device       string
 	ThermostatID int
 	Timespec     string
 	TargetC      float64
-	TargetCSet   bool // Tracks if --target was explicitly provided
+	TargetCSet   bool
 	Mode         string
 	Enable       bool
 	Disable      bool
 	Enabled      bool
 }
 
-func newCreateCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &CreateOptions{Factory: f, Enabled: true}
+// NewCommand creates the thermostat schedule create command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f, Enabled: true}
 
 	cmd := &cobra.Command{
 		Use:     "create <device>",
@@ -72,7 +73,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
 			opts.TargetCSet = cmd.Flags().Changed("target")
-			return runCreate(cmd.Context(), opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -92,11 +93,15 @@ Examples:
 	return cmd
 }
 
-func runCreate(ctx context.Context, opts *CreateOptions) error {
+func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	if err := validateCreateOptions(opts); err != nil {
+	if !opts.TargetCSet && opts.Mode == "" && !opts.Enable && !opts.Disable {
+		return fmt.Errorf("at least one of --target, --mode, --enable, or --disable must be specified")
+	}
+
+	if err := validate.Mode(opts.Mode, true); err != nil {
 		return err
 	}
 
@@ -106,7 +111,25 @@ func runCreate(ctx context.Context, opts *CreateOptions) error {
 	}
 	defer iostreams.CloseWithDebug("closing connection", conn)
 
-	params := buildScheduleParams(opts)
+	schedParams := shelly.ThermostatScheduleParams{
+		ThermostatID: opts.ThermostatID,
+		Timespec:     opts.Timespec,
+		Enabled:      opts.Enabled,
+		Mode:         opts.Mode,
+	}
+	if opts.TargetCSet {
+		schedParams.TargetC = &opts.TargetC
+	}
+	if opts.Enable {
+		t := true
+		schedParams.EnableState = &t
+	}
+	if opts.Disable {
+		f := false
+		schedParams.EnableState = &f
+	}
+
+	params := shelly.BuildThermostatScheduleCall(schedParams)
 
 	ios.StartProgress("Creating schedule...")
 	result, err := conn.Call(ctx, "Schedule.Create", params)
@@ -116,97 +139,20 @@ func runCreate(ctx context.Context, opts *CreateOptions) error {
 		return fmt.Errorf("failed to create schedule: %w", err)
 	}
 
-	scheduleID, err := parseCreateResponse(result)
+	resp, err := shelly.ParseScheduleCreateResponse(result)
 	if err != nil {
 		return err
 	}
 
-	displayCreateSuccess(ios, opts, scheduleID)
+	cmdutil.DisplayThermostatScheduleCreate(ios, cmdutil.ThermostatScheduleCreateDisplay{
+		Device:     opts.Device,
+		ScheduleID: resp.ID,
+		Timespec:   opts.Timespec,
+		TargetC:    schedParams.TargetC,
+		Mode:       opts.Mode,
+		Enable:     opts.Enable,
+		Disable:    opts.Disable,
+		Enabled:    opts.Enabled,
+	})
 	return nil
-}
-
-func validateCreateOptions(opts *CreateOptions) error {
-	if !opts.TargetCSet && opts.Mode == "" && !opts.Enable && !opts.Disable {
-		return fmt.Errorf("at least one of --target, --mode, --enable, or --disable must be specified")
-	}
-
-	if err := validate.Mode(opts.Mode, true); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func buildScheduleParams(opts *CreateOptions) map[string]any {
-	config := buildThermostatConfig(opts)
-
-	call := map[string]any{
-		"method": "Thermostat.SetConfig",
-		"params": map[string]any{
-			"id":     opts.ThermostatID,
-			"config": config,
-		},
-	}
-
-	return map[string]any{
-		"enable":   opts.Enabled,
-		"timespec": opts.Timespec,
-		"calls":    []any{call},
-	}
-}
-
-func buildThermostatConfig(opts *CreateOptions) map[string]any {
-	config := make(map[string]any)
-	if opts.TargetCSet {
-		config["target_C"] = opts.TargetC
-	}
-	if opts.Mode != "" {
-		config["thermostat_mode"] = opts.Mode
-	}
-	if opts.Enable {
-		config["enable"] = true
-	}
-	if opts.Disable {
-		config["enable"] = false
-	}
-	return config
-}
-
-func parseCreateResponse(result any) (int, error) {
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal result: %w", err)
-	}
-
-	var createResp struct {
-		ID  int `json:"id"`
-		Rev int `json:"rev"`
-	}
-	if err := json.Unmarshal(jsonBytes, &createResp); err != nil {
-		return 0, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	return createResp.ID, nil
-}
-
-func displayCreateSuccess(ios *iostreams.IOStreams, opts *CreateOptions, scheduleID int) {
-	ios.Success("Created schedule %d", scheduleID)
-	ios.Printf("  Timespec: %s\n", opts.Timespec)
-
-	if opts.TargetCSet {
-		ios.Printf("  Target: %.1f°C\n", opts.TargetC)
-	}
-	if opts.Mode != "" {
-		ios.Printf("  Mode: %s\n", opts.Mode)
-	}
-	if opts.Enable {
-		ios.Printf("  Action: enable thermostat\n")
-	}
-	if opts.Disable {
-		ios.Printf("  Action: disable thermostat\n")
-	}
-
-	if !opts.Enabled {
-		ios.Info("Schedule is disabled. Enable with: shelly thermostat schedule enable %s --id %d", opts.Device, scheduleID)
-	}
 }

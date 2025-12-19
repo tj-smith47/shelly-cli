@@ -1,5 +1,5 @@
-// Package schedule provides thermostat schedule management commands.
-package schedule
+// Package deletecmd provides the thermostat schedule delete command.
+package deletecmd
 
 import (
 	"context"
@@ -12,16 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
-// DeleteOptions holds delete command options.
-type DeleteOptions struct {
+// Options holds delete command options.
+type Options struct {
 	Factory    *cmdutil.Factory
 	Device     string
 	ScheduleID int
 	All        bool
 }
 
-func newDeleteCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &DeleteOptions{Factory: f}
+// NewCommand creates the thermostat schedule delete command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "delete <device>",
@@ -40,7 +41,7 @@ Use --all to delete all schedules (use with caution).`,
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
-			return runDelete(cmd.Context(), opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -52,11 +53,10 @@ Use --all to delete all schedules (use with caution).`,
 	return cmd
 }
 
-func runDelete(ctx context.Context, opts *DeleteOptions) error {
+func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	// Validate that either --id or --all is specified
 	if opts.ScheduleID == 0 && !opts.All {
 		return fmt.Errorf("either --id or --all must be specified")
 	}
@@ -80,7 +80,6 @@ func runDelete(ctx context.Context, opts *DeleteOptions) error {
 		return nil
 	}
 
-	// Delete specific schedule
 	params := map[string]any{
 		"id": opts.ScheduleID,
 	}

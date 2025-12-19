@@ -1,5 +1,5 @@
-// Package schedule provides thermostat schedule management commands.
-package schedule
+// Package enable provides the thermostat schedule enable command.
+package enable
 
 import (
 	"context"
@@ -12,15 +12,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
-// EnableOptions holds enable command options.
-type EnableOptions struct {
+// Options holds enable command options.
+type Options struct {
 	Factory    *cmdutil.Factory
 	Device     string
 	ScheduleID int
 }
 
-func newEnableCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &EnableOptions{Factory: f}
+// NewCommand creates the thermostat schedule enable command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "enable <device>",
@@ -33,7 +34,7 @@ func newEnableCommand(f *cmdutil.Factory) *cobra.Command {
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
-			return runEnable(cmd.Context(), opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -45,7 +46,7 @@ func newEnableCommand(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func runEnable(ctx context.Context, opts *EnableOptions) error {
+func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 

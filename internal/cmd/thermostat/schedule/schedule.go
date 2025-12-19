@@ -4,6 +4,11 @@ package schedule
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/schedule/create"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/schedule/deletecmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/schedule/disable"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/schedule/enable"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/schedule/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -43,11 +48,11 @@ Examples:
   shelly thermostat schedule delete gateway --id 1`,
 	}
 
-	cmd.AddCommand(newListCommand(f))
-	cmd.AddCommand(newCreateCommand(f))
-	cmd.AddCommand(newDeleteCommand(f))
-	cmd.AddCommand(newEnableCommand(f))
-	cmd.AddCommand(newDisableCommand(f))
+	cmd.AddCommand(list.NewCommand(f))
+	cmd.AddCommand(create.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
+	cmd.AddCommand(enable.NewCommand(f))
+	cmd.AddCommand(disable.NewCommand(f))
 
 	return cmd
 }

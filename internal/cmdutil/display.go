@@ -1789,3 +1789,84 @@ func DisplayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscover
 	ios.Println("")
 	ios.Count("BLE device", len(devices))
 }
+
+// DisplayThermostatSchedules displays thermostat schedules with optional details.
+func DisplayThermostatSchedules(ios *iostreams.IOStreams, schedules []shelly.ThermostatSchedule, device string, showAll bool) {
+	if len(schedules) == 0 {
+		if showAll {
+			ios.Info("No schedules found on %s", device)
+		} else {
+			ios.Info("No thermostat schedules found on %s", device)
+			ios.Info("Use --all to see all device schedules")
+		}
+		return
+	}
+
+	title := "Thermostat Schedules"
+	if showAll {
+		title = "All Schedules"
+	}
+	ios.Println(theme.Bold().Render(fmt.Sprintf("%s on %s:", title, device)))
+	ios.Println()
+
+	for _, sched := range schedules {
+		ios.Printf("  %s %d\n", theme.Highlight().Render("Schedule"), sched.ID)
+		ios.Printf("    Status:   %s\n", output.RenderEnabledState(sched.Enabled))
+		ios.Printf("    Timespec: %s\n", sched.Timespec)
+
+		if sched.ThermostatID > 0 {
+			ios.Printf("    Thermostat: %d\n", sched.ThermostatID)
+		}
+		if sched.TargetC != nil {
+			ios.Printf("    Target: %.1f°C\n", *sched.TargetC)
+		}
+		if sched.Mode != "" {
+			ios.Printf("    Mode: %s\n", sched.Mode)
+		}
+		if sched.Enable != nil {
+			enableStr := "disable"
+			if *sched.Enable {
+				enableStr = "enable"
+			}
+			ios.Printf("    Action: %s thermostat\n", enableStr)
+		}
+		ios.Println()
+	}
+
+	ios.Success("Found %d schedule(s)", len(schedules))
+}
+
+// ThermostatScheduleCreateDisplay contains display parameters for schedule creation success.
+type ThermostatScheduleCreateDisplay struct {
+	Device     string
+	ScheduleID int
+	Timespec   string
+	TargetC    *float64
+	Mode       string
+	Enable     bool
+	Disable    bool
+	Enabled    bool
+}
+
+// DisplayThermostatScheduleCreate displays the result of creating a thermostat schedule.
+func DisplayThermostatScheduleCreate(ios *iostreams.IOStreams, d ThermostatScheduleCreateDisplay) {
+	ios.Success("Created schedule %d", d.ScheduleID)
+	ios.Printf("  Timespec: %s\n", d.Timespec)
+
+	if d.TargetC != nil {
+		ios.Printf("  Target: %.1f°C\n", *d.TargetC)
+	}
+	if d.Mode != "" {
+		ios.Printf("  Mode: %s\n", d.Mode)
+	}
+	if d.Enable {
+		ios.Printf("  Action: enable thermostat\n")
+	}
+	if d.Disable {
+		ios.Printf("  Action: disable thermostat\n")
+	}
+
+	if !d.Enabled {
+		ios.Info("Schedule is disabled. Enable with: shelly thermostat schedule enable %s --id %d", d.Device, d.ScheduleID)
+	}
+}

@@ -1,5 +1,5 @@
-// Package schedule provides thermostat schedule management commands.
-package schedule
+// Package disable provides the thermostat schedule disable command.
+package disable
 
 import (
 	"context"
@@ -12,15 +12,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
-// DisableOptions holds disable command options.
-type DisableOptions struct {
+// Options holds disable command options.
+type Options struct {
 	Factory    *cmdutil.Factory
 	Device     string
 	ScheduleID int
 }
 
-func newDisableCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &DisableOptions{Factory: f}
+// NewCommand creates the thermostat schedule disable command.
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "disable <device>",
@@ -33,7 +34,7 @@ func newDisableCommand(f *cmdutil.Factory) *cobra.Command {
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Device = args[0]
-			return runDisable(cmd.Context(), opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -45,7 +46,7 @@ func newDisableCommand(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func runDisable(ctx context.Context, opts *DisableOptions) error {
+func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
