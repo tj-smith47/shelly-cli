@@ -8,6 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the cloud auth-status command.
@@ -60,12 +61,12 @@ func run(f *cmdutil.Factory) error {
 	}
 
 	// Check token validity and expiration
-	tokenStatus := getTokenStatus(cfg.Cloud.AccessToken)
-	ios.Printf("  Token:  %s\n", tokenStatus.display)
+	tokenStatus := term.GetTokenStatus(cfg.Cloud.AccessToken)
+	ios.Printf("  Token:  %s\n", tokenStatus.Display)
 
-	if tokenStatus.warning != "" {
+	if tokenStatus.Warning != "" {
 		ios.Println()
-		ios.Warning("%s", tokenStatus.warning)
+		ios.Warning("%s", tokenStatus.Warning)
 		return nil
 	}
 
@@ -76,29 +77,4 @@ func run(f *cmdutil.Factory) error {
 	}
 
 	return nil
-}
-
-type tokenStatusInfo struct {
-	display string
-	warning string
-}
-
-func getTokenStatus(token string) tokenStatusInfo {
-	if err := shelly.ValidateToken(token); err != nil {
-		return tokenStatusInfo{
-			display: output.RenderTokenValidity(false, false),
-			warning: "Token is invalid. Please run 'shelly cloud login' to re-authenticate.",
-		}
-	}
-
-	if shelly.IsTokenExpired(token) {
-		return tokenStatusInfo{
-			display: output.RenderTokenValidity(true, true),
-			warning: "Token has expired. Please run 'shelly cloud login' to re-authenticate.",
-		}
-	}
-
-	return tokenStatusInfo{
-		display: output.RenderTokenValidity(true, false),
-	}
 }

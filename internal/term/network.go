@@ -197,6 +197,33 @@ func DisplayCloudDevices(ios *iostreams.IOStreams, devices []shelly.CloudDevice)
 	printTable(ios, table)
 }
 
+// TokenStatusInfo holds display info for cloud token status.
+type TokenStatusInfo struct {
+	Display string
+	Warning string
+}
+
+// GetTokenStatus checks token validity and returns display info.
+func GetTokenStatus(token string) TokenStatusInfo {
+	if err := shelly.ValidateToken(token); err != nil {
+		return TokenStatusInfo{
+			Display: output.RenderTokenValidity(false, false),
+			Warning: "Token is invalid. Please run 'shelly cloud login' to re-authenticate.",
+		}
+	}
+
+	if shelly.IsTokenExpired(token) {
+		return TokenStatusInfo{
+			Display: output.RenderTokenValidity(true, true),
+			Warning: "Token has expired. Please run 'shelly cloud login' to re-authenticate.",
+		}
+	}
+
+	return TokenStatusInfo{
+		Display: output.RenderTokenValidity(true, false),
+	}
+}
+
 // DisplayTLSConfig displays the TLS configuration and returns whether a custom CA is configured.
 func DisplayTLSConfig(ios *iostreams.IOStreams, config map[string]any) bool {
 	hasCustomCA := false
