@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // NewCommand creates the config set command.
@@ -48,20 +49,20 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyV
 	ios := f.IOStreams()
 
 	// Parse key=value pairs
-	config := make(map[string]any)
+	cfg := make(map[string]any)
 	for _, kv := range keyValues {
 		parts := strings.SplitN(kv, "=", 2)
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid key=value format: %s", kv)
 		}
 		key := parts[0]
-		value := parseValue(parts[1])
-		config[key] = value
+		value := config.ParseValue(parts[1])
+		cfg[key] = value
 	}
 
 	ios.StartProgress("Setting configuration...")
 
-	err := svc.SetComponentConfig(ctx, device, component, config)
+	err := svc.SetComponentConfig(ctx, device, component, cfg)
 	ios.StopProgress()
 
 	if err != nil {
@@ -70,41 +71,4 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyV
 
 	ios.Success("Configuration updated for %s on %s", component, device)
 	return nil
-}
-
-// parseValue attempts to parse a string value into an appropriate type.
-func parseValue(s string) any {
-	// Remove surrounding quotes if present
-	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-
-	// Check for boolean
-	lower := strings.ToLower(s)
-	if lower == "true" || lower == "on" || lower == "yes" {
-		return true
-	}
-	if lower == "false" || lower == "off" || lower == "no" {
-		return false
-	}
-
-	// Check for null
-	if lower == "null" || lower == "nil" {
-		return nil
-	}
-
-	// Try to parse as integer
-	var i int64
-	if _, err := fmt.Sscanf(s, "%d", &i); err == nil {
-		return i
-	}
-
-	// Try to parse as float
-	var f float64
-	if _, err := fmt.Sscanf(s, "%f", &f); err == nil {
-		return f
-	}
-
-	// Return as string
-	return s
 }
