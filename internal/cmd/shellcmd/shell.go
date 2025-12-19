@@ -4,17 +4,16 @@ package shellcmd
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -71,13 +70,6 @@ For methods requiring parameters, provide JSON after the method name.`,
 	return cmd
 }
 
-// shellState holds the state of the device shell session.
-type shellState struct {
-	device string
-	conn   *client.Client
-	ios    *iostreams.IOStreams
-}
-
 // run executes the device shell.
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
@@ -98,14 +90,9 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Info("Type 'help' for commands, 'methods' to list RPC methods, 'exit' to quit")
 	ios.Println()
 
-	state := &shellState{
-		device: opts.Device,
-		conn:   conn,
-		ios:    ios,
-	}
-
+	session := term.NewShellSession(ios, conn, opts.Device)
 	scanner := bufio.NewScanner(os.Stdin)
-	prompt := fmt.Sprintf("%s> ", theme.Highlight().Render(opts.Device))
+	prompt := term.FormatShellPrompt(opts.Device)
 
 	for {
 		// Check context cancellation
@@ -135,197 +122,10 @@ func run(ctx context.Context, opts *Options) error {
 			continue
 		}
 
-		shouldExit := executeShellCommand(ctx, state, line)
+		shouldExit := session.ExecuteCommand(ctx, line)
 		if shouldExit {
 			ios.Println("Goodbye!")
 			return nil
 		}
 	}
-}
-
-// executeShellCommand handles a shell command.
-// Returns true if the shell should exit.
-func executeShellCommand(ctx context.Context, state *shellState, line string) bool {
-	ios := state.ios
-
-	// Split line into command and params
-	parts := strings.SplitN(line, " ", 2)
-	cmd := parts[0]
-	paramsStr := ""
-	if len(parts) > 1 {
-		paramsStr = strings.TrimSpace(parts[1])
-	}
-
-	// Handle built-in commands (case-insensitive)
-	switch strings.ToLower(cmd) {
-	case "exit", "quit", "q":
-		return true
-
-	case "help", "h", "?":
-		showShellHelp(ios)
-		return false
-
-	case "info":
-		showInfo(state)
-		return false
-
-	case "status":
-		showStatus(ctx, state)
-		return false
-
-	case "config":
-		showConfig(ctx, state)
-		return false
-
-	case "methods":
-		showMethods(ctx, state)
-		return false
-
-	case "components":
-		showComponents(ctx, state)
-		return false
-	}
-
-	// Otherwise, treat as RPC method call
-	executeRPCMethod(ctx, state, cmd, paramsStr)
-	return false
-}
-
-// showShellHelp displays available commands.
-func showShellHelp(ios *iostreams.IOStreams) {
-	ios.Println(theme.Bold().Render("Shell Commands:"))
-	ios.Println()
-	ios.Println("  " + theme.Highlight().Render("Built-in:"))
-	ios.Println("    help         Show this help")
-	ios.Println("    info         Device information")
-	ios.Println("    status       Device status (JSON)")
-	ios.Println("    config       Device configuration (JSON)")
-	ios.Println("    methods      List available RPC methods")
-	ios.Println("    components   List device components")
-	ios.Println("    exit         Close shell")
-	ios.Println()
-	ios.Println("  " + theme.Highlight().Render("RPC Methods:"))
-	ios.Println("    <Method.Name>               Call method without params")
-	ios.Println("    <Method.Name> {\"key\":val}   Call method with JSON params")
-	ios.Println()
-	ios.Println("  " + theme.Highlight().Render("Examples:"))
-	ios.Println("    Switch.GetStatus {\"id\":0}")
-	ios.Println("    Switch.Set {\"id\":0,\"on\":true}")
-	ios.Println("    Shelly.GetDeviceInfo")
-	ios.Println("    Script.List")
-}
-
-// showInfo displays device information.
-func showInfo(state *shellState) {
-	info := state.conn.Info()
-	state.ios.Println(theme.Bold().Render("Device Information:"))
-	state.ios.Println("  ID:         " + info.ID)
-	state.ios.Println("  Model:      " + info.Model)
-	state.ios.Println("  MAC:        " + info.MAC)
-	state.ios.Println("  App:        " + info.App)
-	state.ios.Println("  Firmware:   " + info.Firmware)
-	state.ios.Printf("  Generation: %d\n", info.Generation)
-	state.ios.Printf("  Auth:       %v\n", info.AuthEn)
-}
-
-// showStatus displays device status.
-func showStatus(ctx context.Context, state *shellState) {
-	status, err := state.conn.GetStatus(ctx)
-	if err != nil {
-		state.ios.Error("Failed to get status: %v", err)
-		return
-	}
-
-	jsonBytes, err := json.MarshalIndent(status, "", "  ")
-	if err != nil {
-		state.ios.Error("Failed to format status: %v", err)
-		return
-	}
-
-	state.ios.Println(string(jsonBytes))
-}
-
-// showConfig displays device configuration.
-func showConfig(ctx context.Context, state *shellState) {
-	cfg, err := state.conn.GetConfig(ctx)
-	if err != nil {
-		state.ios.Error("Failed to get config: %v", err)
-		return
-	}
-
-	jsonBytes, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		state.ios.Error("Failed to format config: %v", err)
-		return
-	}
-
-	state.ios.Println(string(jsonBytes))
-}
-
-// showMethods lists available RPC methods.
-func showMethods(ctx context.Context, state *shellState) {
-	result, err := state.conn.Call(ctx, "Shelly.ListMethods", nil)
-	if err != nil {
-		state.ios.Error("Failed to list methods: %v", err)
-		return
-	}
-
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		state.ios.Error("Failed to parse response: %v", err)
-		return
-	}
-
-	var resp struct {
-		Methods []string `json:"methods"`
-	}
-	if err := json.Unmarshal(jsonBytes, &resp); err != nil {
-		state.ios.Error("Failed to parse methods: %v", err)
-		return
-	}
-
-	state.ios.Println(theme.Bold().Render("Available RPC Methods:"))
-	for _, method := range resp.Methods {
-		state.ios.Println("  " + method)
-	}
-}
-
-// showComponents lists device components.
-func showComponents(ctx context.Context, state *shellState) {
-	comps, err := state.conn.ListComponents(ctx)
-	if err != nil {
-		state.ios.Error("Failed to list components: %v", err)
-		return
-	}
-
-	state.ios.Println(theme.Bold().Render("Device Components:"))
-	for _, comp := range comps {
-		state.ios.Printf("  %s:%d (%s)\n", comp.Type, comp.ID, comp.Key)
-	}
-}
-
-// executeRPCMethod executes an RPC method call.
-func executeRPCMethod(ctx context.Context, state *shellState, method, paramsStr string) {
-	var params map[string]any
-	if paramsStr != "" {
-		if err := json.Unmarshal([]byte(paramsStr), &params); err != nil {
-			state.ios.Error("Invalid JSON params: %v", err)
-			state.ios.Info("Usage: %s {\"key\": \"value\"}", method)
-			return
-		}
-	}
-
-	result, err := state.conn.Call(ctx, method, params)
-	if err != nil {
-		state.ios.Error("RPC error: %v", err)
-		return
-	}
-
-	jsonBytes, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		state.ios.Error("Failed to format response: %v", err)
-		return
-	}
-
-	state.ios.Println(string(jsonBytes))
 }
