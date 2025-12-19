@@ -74,3 +74,14 @@ func DisplayAliasList(ios *iostreams.IOStreams, aliases []config.Alias) {
 	ios.Println()
 	ios.Count("alias", len(aliases))
 }
+
+// DisplayResetableComponents lists available components that can be reset.
+func DisplayResetableComponents(ios *iostreams.IOStreams, device string, configKeys []string) {
+	ios.Title("Available components")
+	ios.Printf("Specify a component to reset its configuration:\n")
+	ios.Printf("\n")
+
+	for _, key := range configKeys {
+		ios.Printf("  shelly config reset %s %s\n", device, key)
+	}
+}

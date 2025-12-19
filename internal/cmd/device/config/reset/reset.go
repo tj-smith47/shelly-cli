@@ -4,11 +4,12 @@ package reset
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var yesFlag bool
@@ -48,11 +49,31 @@ Note: This does not perform a full factory reset. For that, use:
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, device, component string) error {
+	ctx, cancel := f.WithDefaultTimeout(ctx)
+	defer cancel()
+
+	svc := f.ShellyService()
 	ios := f.IOStreams()
 
 	if component == "" {
 		// Show available components
-		return showComponents(f, ctx, device)
+		ios.StartProgress("Getting device components...")
+
+		config, err := svc.GetConfig(ctx, device)
+		ios.StopProgress()
+
+		if err != nil {
+			return fmt.Errorf("failed to get device configuration: %w", err)
+		}
+
+		keys := make([]string, 0, len(config))
+		for key := range config {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		term.DisplayResetableComponents(ios, device, keys)
+		return nil
 	}
 
 	// Confirm reset
@@ -68,17 +89,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 		return nil
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
-	defer cancel()
-
-	svc := f.ShellyService()
-
 	ios.StartProgress("Resetting configuration...")
 
 	// Reset by setting config to empty/defaults
-	// Note: The actual reset behavior depends on the component type
-	// For now, we use a raw RPC call if available, or set to empty config
-	err = resetComponent(ctx, svc, device, component)
+	err = svc.SetComponentConfig(ctx, device, component, map[string]any{})
 	ios.StopProgress()
 
 	if err != nil {
@@ -87,39 +101,4 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 
 	ios.Success("Configuration reset for %s on %s", component, device)
 	return nil
-}
-
-// showComponents lists available components that can be reset.
-func showComponents(f *cmdutil.Factory, ctx context.Context, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
-	defer cancel()
-
-	svc := f.ShellyService()
-	ios := f.IOStreams()
-
-	ios.StartProgress("Getting device components...")
-
-	config, err := svc.GetConfig(ctx, device)
-	ios.StopProgress()
-
-	if err != nil {
-		return fmt.Errorf("failed to get device configuration: %w", err)
-	}
-
-	ios.Title("Available components")
-	ios.Printf("Specify a component to reset its configuration:\n")
-	ios.Printf("\n")
-
-	for key := range config {
-		ios.Printf("  shelly config reset %s %s\n", device, key)
-	}
-
-	return nil
-}
-
-// resetComponent resets a specific component's configuration.
-func resetComponent(ctx context.Context, svc *shelly.Service, device, component string) error {
-	// For most components, setting an empty config or specific defaults works
-	// This is a simplified implementation - some components may need special handling
-	return svc.SetComponentConfig(ctx, device, component, map[string]any{})
 }
