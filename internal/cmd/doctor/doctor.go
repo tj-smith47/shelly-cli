@@ -3,7 +3,6 @@ package doctor
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
@@ -76,7 +76,7 @@ Use --full for all checks including device connectivity tests.`,
 func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
 
-	printHeader(ios)
+	term.PrintDoctorHeader(ios)
 
 	issues := 0
 	warnings := 0
@@ -107,22 +107,9 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		issues += checkDeviceConnectivity(ctx, f)
 	}
 
-	printSummary(ios, issues, warnings)
+	term.PrintDoctorSummary(ios, issues, warnings)
 
 	return nil
-}
-
-func printHeader(ios *iostreams.IOStreams) {
-	ios.Println()
-	ios.Println(theme.Title().Render("Shelly CLI Doctor"))
-	ios.Println(theme.Dim().Render(strings.Repeat("━", 50)))
-	ios.Println()
-}
-
-// warnStdout prints a warning message to stdout (not stderr) for consistent diagnostic output ordering.
-func warnStdout(ios *iostreams.IOStreams, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	ios.Println(theme.StatusWarn().Render("⚠") + " " + msg)
 }
 
 //nolint:unparam // issues always 0 by design - version checks produce warnings, not issues
@@ -150,7 +137,7 @@ func checkCLIVersion(ios *iostreams.IOStreams) (issues, warnings int) {
 			current := strings.TrimPrefix(currentVersion, "v")
 			latest := strings.TrimPrefix(latestVersion, "v")
 			if latest > current {
-				warnStdout(ios, "  Update available: %s -> %s", currentVersion, latestVersion)
+				term.WarnStdout(ios, "  Update available: %s -> %s", currentVersion, latestVersion)
 				ios.Info("    Run 'shelly update' to upgrade")
 				ios.Println()
 				return 0, 1 // Warning, not issue
@@ -176,7 +163,7 @@ func checkConfig(ios *iostreams.IOStreams) int {
 
 	configPath := filepath.Join(home, ".config", "shelly", "config.yaml")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		warnStdout(ios, "  Config file: not found")
+		term.WarnStdout(ios, "  Config file: not found")
 		ios.Info("    Run 'shelly init' to create configuration")
 		issues++
 	} else {
@@ -200,7 +187,7 @@ func checkDevices(ios *iostreams.IOStreams) (issues, warnings int) {
 
 	devices := config.ListDevices()
 	if len(devices) == 0 {
-		warnStdout(ios, "  No devices registered")
+		term.WarnStdout(ios, "  No devices registered")
 		ios.Info("    Run 'shelly discover mdns --register' to find devices")
 		ios.Println()
 		return 0, 1
@@ -211,7 +198,7 @@ func checkDevices(ios *iostreams.IOStreams) (issues, warnings int) {
 	// Check for potential issues
 	for name, d := range devices {
 		if d.Address == "" {
-			warnStdout(ios, "    %s: missing address", name)
+			term.WarnStdout(ios, "    %s: missing address", name)
 			issues++
 		} else {
 			ios.Info("    %s @ %s", name, d.Address)
@@ -266,7 +253,7 @@ func checkNetwork(ctx context.Context, ios *iostreams.IOStreams) int {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			warnStdout(ios, "  %s: unreachable", ep.name)
+			term.WarnStdout(ios, "  %s: unreachable", ep.name)
 			issues++
 			continue
 		}
@@ -304,7 +291,7 @@ func checkDeviceConnectivity(ctx context.Context, f *cmdutil.Factory) int {
 		cancel()
 
 		if err != nil {
-			warnStdout(ios, "  %s (%s): offline or unreachable", name, d.Address)
+			term.WarnStdout(ios, "  %s (%s): offline or unreachable", name, d.Address)
 			issues++
 		} else {
 			online++
@@ -317,33 +304,9 @@ func checkDeviceConnectivity(ctx context.Context, f *cmdutil.Factory) int {
 		ios.Success("  %d/%d device(s) online", online, len(devices))
 	}
 	if issues > 0 {
-		warnStdout(ios, "  %d device(s) unreachable", issues)
+		term.WarnStdout(ios, "  %d device(s) unreachable", issues)
 	}
 
 	ios.Println()
 	return issues
-}
-
-func printSummary(ios *iostreams.IOStreams, issues, warnings int) {
-	ios.Println(theme.Dim().Render(strings.Repeat("━", 50)))
-
-	switch {
-	case issues == 0 && warnings == 0:
-		ios.Success("No issues found. Your Shelly CLI setup looks healthy!")
-	case issues == 0:
-		ios.Success("No critical issues found.")
-		if warnings > 0 {
-			ios.Info("%d warning(s) - see above for details", warnings)
-		}
-	default:
-		warnStdout(ios, "%d issue(s) found - see above for details", issues)
-		if warnings > 0 {
-			ios.Info("%d additional warning(s)", warnings)
-		}
-	}
-
-	ios.Println()
-	ios.Println(fmt.Sprintf("Run %s for all diagnostics including device tests.",
-		theme.Code().Render("shelly doctor --full")))
-	ios.Println()
 }
