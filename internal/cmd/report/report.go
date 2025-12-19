@@ -177,8 +177,6 @@ func runDevicesReport(ctx context.Context, f *cmdutil.Factory, opts *Options) er
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	ios.StartProgress("Generating device report...")
-
 	report := DeviceReport{
 		Timestamp:  time.Now(),
 		ReportType: "devices",
@@ -188,46 +186,50 @@ func runDevicesReport(ctx context.Context, f *cmdutil.Factory, opts *Options) er
 
 	var online, offline int
 
-	for name, deviceCfg := range cfg.Devices {
-		info := DeviceInfo{
-			Name:   name,
-			IP:     deviceCfg.Address,
-			Online: false,
-		}
+	err = cmdutil.RunWithSpinner(ctx, ios, "Generating device report...", func(ctx context.Context) error {
+		for name, deviceCfg := range cfg.Devices {
+			info := DeviceInfo{
+				Name:   name,
+				IP:     deviceCfg.Address,
+				Online: false,
+			}
 
-		// Try to get device info
-		conn, err := svc.Connect(ctx, name)
-		if err != nil {
+			// Try to get device info
+			conn, connErr := svc.Connect(ctx, name)
+			if connErr != nil {
+				report.Devices = append(report.Devices, info)
+				offline++
+				continue
+			}
+
+			rawResult, callErr := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+			iostreams.CloseWithDebug("closing device report connection", conn)
+
+			if callErr != nil {
+				report.Devices = append(report.Devices, info)
+				offline++
+				continue
+			}
+
+			if deviceInfo, ok := parseDeviceInfo(rawResult); ok {
+				info.Online = true
+				info.Model = deviceInfo.App
+				info.Firmware = deviceInfo.Ver
+				info.MAC = deviceInfo.MAC
+				online++
+			}
+
+			if !info.Online {
+				offline++
+			}
+
 			report.Devices = append(report.Devices, info)
-			offline++
-			continue
 		}
-
-		rawResult, callErr := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-		iostreams.CloseWithDebug("closing device report connection", conn)
-
-		if callErr != nil {
-			report.Devices = append(report.Devices, info)
-			offline++
-			continue
-		}
-
-		if deviceInfo, ok := parseDeviceInfo(rawResult); ok {
-			info.Online = true
-			info.Model = deviceInfo.App
-			info.Firmware = deviceInfo.Ver
-			info.MAC = deviceInfo.MAC
-			online++
-		}
-
-		if !info.Online {
-			offline++
-		}
-
-		report.Devices = append(report.Devices, info)
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-
-	ios.StopProgress()
 
 	report.Summary["total"] = len(report.Devices)
 	report.Summary["online"] = online
@@ -244,8 +246,6 @@ func runEnergyReport(ctx context.Context, f *cmdutil.Factory, opts *Options) err
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	ios.StartProgress("Generating energy report...")
-
 	report := DeviceReport{
 		Timestamp:  time.Now(),
 		ReportType: "energy",
@@ -256,26 +256,30 @@ func runEnergyReport(ctx context.Context, f *cmdutil.Factory, opts *Options) err
 	var totalPower float64
 	var devicesWithEnergy int
 
-	for name := range cfg.Devices {
-		conn, err := svc.Connect(ctx, name)
-		if err != nil {
-			continue
-		}
+	err = cmdutil.RunWithSpinner(ctx, ios, "Generating energy report...", func(ctx context.Context) error {
+		for name := range cfg.Devices {
+			conn, connErr := svc.Connect(ctx, name)
+			if connErr != nil {
+				continue
+			}
 
-		rawStatus, err := conn.Call(ctx, "Shelly.GetStatus", nil)
-		iostreams.CloseWithDebug("closing energy report connection", conn)
+			rawStatus, callErr := conn.Call(ctx, "Shelly.GetStatus", nil)
+			iostreams.CloseWithDebug("closing energy report connection", conn)
 
-		if err != nil {
-			continue
-		}
+			if callErr != nil {
+				continue
+			}
 
-		if power, ok := extractPower(rawStatus); ok {
-			totalPower += power
-			devicesWithEnergy++
+			if power, ok := extractPower(rawStatus); ok {
+				totalPower += power
+				devicesWithEnergy++
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-
-	ios.StopProgress()
 
 	report.Summary["total_power_w"] = totalPower
 	report.Summary["devices_reporting"] = devicesWithEnergy
@@ -291,8 +295,6 @@ func runAuditReport(ctx context.Context, f *cmdutil.Factory, opts *Options) erro
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	ios.StartProgress("Generating security audit report...")
-
 	report := DeviceReport{
 		Timestamp:  time.Now(),
 		ReportType: "audit",
@@ -302,26 +304,30 @@ func runAuditReport(ctx context.Context, f *cmdutil.Factory, opts *Options) erro
 
 	var authEnabled, cloudEnabled, outdated int
 
-	for name := range cfg.Devices {
-		conn, err := svc.Connect(ctx, name)
-		if err != nil {
-			continue
-		}
+	err = cmdutil.RunWithSpinner(ctx, ios, "Generating security audit report...", func(ctx context.Context) error {
+		for name := range cfg.Devices {
+			conn, connErr := svc.Connect(ctx, name)
+			if connErr != nil {
+				continue
+			}
 
-		rawDeviceInfo, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-		if err == nil && extractAuthEnabled(rawDeviceInfo) {
-			authEnabled++
-		}
+			rawDeviceInfo, infoErr := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+			if infoErr == nil && extractAuthEnabled(rawDeviceInfo) {
+				authEnabled++
+			}
 
-		rawCloudStatus, err := conn.Call(ctx, "Cloud.GetStatus", nil)
-		if err == nil && extractCloudConnected(rawCloudStatus) {
-			cloudEnabled++
-		}
+			rawCloudStatus, cloudErr := conn.Call(ctx, "Cloud.GetStatus", nil)
+			if cloudErr == nil && extractCloudConnected(rawCloudStatus) {
+				cloudEnabled++
+			}
 
-		iostreams.CloseWithDebug("closing audit report connection", conn)
+			iostreams.CloseWithDebug("closing audit report connection", conn)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
-
-	ios.StopProgress()
 
 	report.Summary["devices_scanned"] = len(cfg.Devices)
 	report.Summary["auth_enabled"] = authEnabled

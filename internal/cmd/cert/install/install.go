@@ -48,39 +48,60 @@ as well as client certificates for mutual TLS authentication.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+// certData holds the certificate data to install.
+type certData struct {
+	caData   []byte
+	certData []byte
+	keyData  []byte
+}
 
+func (opts *Options) validate() error {
 	if opts.CAFile == "" && opts.ClientCert == "" {
 		return fmt.Errorf("specify --ca or --client-cert")
 	}
-
 	if opts.ClientCert != "" && opts.ClientKey == "" {
 		return fmt.Errorf("--client-key required with --client-cert")
 	}
+	return nil
+}
 
-	// Read files outside the spinner (I/O can be done before spinner)
-	var caData, certData, keyData []byte
+func (opts *Options) loadCertData() (*certData, error) {
+	data := &certData{}
 	var err error
 
 	if opts.CAFile != "" {
-		caData, err = os.ReadFile(opts.CAFile)
+		data.caData, err = os.ReadFile(opts.CAFile) //nolint:gosec // G304: CAFile is user-provided CLI argument
 		if err != nil {
-			return fmt.Errorf("read CA file: %w", err)
+			return nil, fmt.Errorf("read CA file: %w", err)
 		}
 	}
 
 	if opts.ClientCert != "" {
-		certData, err = os.ReadFile(opts.ClientCert)
+		data.certData, err = os.ReadFile(opts.ClientCert) //nolint:gosec // G304: ClientCert is user-provided CLI argument
 		if err != nil {
-			return fmt.Errorf("read client cert: %w", err)
+			return nil, fmt.Errorf("read client cert: %w", err)
 		}
-		keyData, err = os.ReadFile(opts.ClientKey)
+		data.keyData, err = os.ReadFile(opts.ClientKey) //nolint:gosec // G304: ClientKey is user-provided CLI argument
 		if err != nil {
-			return fmt.Errorf("read client key: %w", err)
+			return nil, fmt.Errorf("read client key: %w", err)
 		}
 	}
+
+	return data, nil
+}
+
+func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
+	if err := opts.validate(); err != nil {
+		return err
+	}
+
+	data, err := opts.loadCertData()
+	if err != nil {
+		return err
+	}
+
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
 	installedCA := false
 	installedClient := false
@@ -96,26 +117,16 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 			}
 		}()
 
-		// Install CA certificate if provided
-		if opts.CAFile != "" {
-			params := map[string]any{
-				"data": string(caData),
-			}
-			_, callErr := conn.Call(ctx, "Shelly.PutUserCA", params)
-			if callErr != nil {
+		if len(data.caData) > 0 {
+			if _, callErr := conn.Call(ctx, "Shelly.PutUserCA", map[string]any{"data": string(data.caData)}); callErr != nil {
 				return fmt.Errorf("install CA: %w", callErr)
 			}
 			installedCA = true
 		}
 
-		// Install client certificate if provided
-		if opts.ClientCert != "" {
-			params := map[string]any{
-				"data": string(certData),
-				"key":  string(keyData),
-			}
-			_, callErr := conn.Call(ctx, "Shelly.PutTLSClientCert", params)
-			if callErr != nil {
+		if len(data.certData) > 0 {
+			params := map[string]any{"data": string(data.certData), "key": string(data.keyData)}
+			if _, callErr := conn.Call(ctx, "Shelly.PutTLSClientCert", params); callErr != nil {
 				return fmt.Errorf("install client cert: %w", callErr)
 			}
 			installedClient = true

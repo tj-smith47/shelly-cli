@@ -147,17 +147,18 @@ func installFromGitHub(ctx context.Context, ios *iostreams.IOStreams, source str
 		binaryName = plugins.PluginPrefix + repo
 	}
 
-	ios.StartProgress(fmt.Sprintf("Fetching latest release from %s/%s...", owner, repo))
-
 	client := github.NewClient(ios)
 
-	release, err := client.GetLatestRelease(ctx, owner, repo)
+	var release *github.Release
+	err = cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Fetching latest release from %s/%s...", owner, repo), func(ctx context.Context) error {
+		var fetchErr error
+		release, fetchErr = client.GetLatestRelease(ctx, owner, repo)
+		return fetchErr
+	})
 	if err != nil {
-		ios.StopProgress()
 		return nil, err
 	}
 
-	ios.StopProgress()
 	ios.Info("Found release: %s", release.TagName)
 
 	// Find the appropriate binary for this platform
@@ -166,15 +167,16 @@ func installFromGitHub(ctx context.Context, ios *iostreams.IOStreams, source str
 		return nil, err
 	}
 
-	ios.StartProgress(fmt.Sprintf("Downloading %s...", asset.Name))
-
-	binaryPath, cleanup, err := client.DownloadAndExtract(ctx, asset, binaryName)
+	var binaryPath string
+	var cleanup func()
+	err = cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Downloading %s...", asset.Name), func(ctx context.Context) error {
+		var downloadErr error
+		binaryPath, cleanup, downloadErr = client.DownloadAndExtract(ctx, asset, binaryName)
+		return downloadErr
+	})
 	if err != nil {
-		ios.StopProgress()
 		return nil, err
 	}
-
-	ios.StopProgress()
 
 	// Build source info with repo string (e.g., "owner/repo")
 	repoStr := owner + "/" + repo
@@ -201,55 +203,49 @@ func downloadFromURL(ctx context.Context, ios *iostreams.IOStreams, downloadURL 
 		}
 	}
 
-	ios.StartProgress("Downloading extension...")
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, http.NoBody)
-	if err != nil {
-		cleanup()
-		ios.StopProgress()
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", "shelly-cli")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		cleanup()
-		ios.StopProgress()
-		return nil, fmt.Errorf("failed to download: %w", err)
-	}
-	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil {
-			ios.DebugErr("closing response body", cerr)
+	err = cmdutil.RunWithSpinner(ctx, ios, "Downloading extension...", func(ctx context.Context) error {
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, http.NoBody)
+		if reqErr != nil {
+			return fmt.Errorf("failed to create request: %w", reqErr)
 		}
-	}()
 
-	if resp.StatusCode != http.StatusOK {
-		cleanup()
-		ios.StopProgress()
-		return nil, fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
-	}
+		req.Header.Set("User-Agent", "shelly-cli")
 
-	_, err = io.Copy(tmpFile, resp.Body)
-	if cerr := tmpFile.Close(); cerr != nil && err == nil {
-		err = cerr
-	}
+		client := &http.Client{}
+		resp, doErr := client.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("failed to download: %w", doErr)
+		}
+		defer func() {
+			if cerr := resp.Body.Close(); cerr != nil {
+				ios.DebugErr("closing response body", cerr)
+			}
+		}()
 
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
+		}
+
+		_, copyErr := io.Copy(tmpFile, resp.Body)
+		if cerr := tmpFile.Close(); cerr != nil && copyErr == nil {
+			copyErr = cerr
+		}
+
+		if copyErr != nil {
+			return fmt.Errorf("failed to write file: %w", copyErr)
+		}
+
+		// Make executable - extensions must be executable binaries
+		if chmodErr := os.Chmod(tmpPath, 0o755); chmodErr != nil { //nolint:gosec // G302: extensions require executable permissions
+			return fmt.Errorf("failed to make executable: %w", chmodErr)
+		}
+
+		return nil
+	})
 	if err != nil {
 		cleanup()
-		ios.StopProgress()
-		return nil, fmt.Errorf("failed to write file: %w", err)
+		return nil, err
 	}
-
-	// Make executable - extensions must be executable binaries
-	if err := os.Chmod(tmpPath, 0o755); err != nil { //nolint:gosec // G302: extensions require executable permissions
-		cleanup()
-		ios.StopProgress()
-		return nil, fmt.Errorf("failed to make executable: %w", err)
-	}
-
-	ios.StopProgress()
 
 	return &installResult{
 		localPath: tmpPath,

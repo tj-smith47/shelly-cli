@@ -74,10 +74,6 @@ func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
 		return fmt.Errorf("integrator credentials required")
 	}
 
-	ios.StartProgress("Connecting to Shelly Cloud...")
-
-	ios.StopProgress()
-
 	// Note: This is a placeholder implementation
 	// Full implementation requires integrator package integration
 	switch {
