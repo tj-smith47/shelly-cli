@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
@@ -109,7 +110,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Filter and enhance with Gen1 info if requested
 	if opts.Gen1Only || opts.Verbose {
-		devices = filterAndEnhanceGen1(ctx, devices, opts.Gen1Only)
+		devices = shelly.FilterGen1Devices(ctx, devices, opts.Gen1Only)
 	}
 
 	if len(devices) == 0 {
@@ -143,33 +144,9 @@ func run(ctx context.Context, opts *Options) error {
 	return nil
 }
 
-// filterAndEnhanceGen1 filters for Gen1 devices and optionally enhances with extra info.
-func filterAndEnhanceGen1(ctx context.Context, devices []discovery.DiscoveredDevice, filterOnly bool) []discovery.DiscoveredDevice {
-	var filtered []discovery.DiscoveredDevice
-
-	for _, d := range devices {
-		// Detect device generation
-		result, err := client.DetectGeneration(ctx, d.Address.String(), nil)
-		if err != nil {
-			// Can't detect, include if not filtering
-			if !filterOnly {
-				filtered = append(filtered, d)
-			}
-			continue
-		}
-
-		if result.IsGen1() {
-			filtered = append(filtered, d)
-		} else if !filterOnly {
-			// Include non-Gen1 if not filtering
-			filtered = append(filtered, d)
-		}
-	}
-
-	return filtered
-}
-
 // displayGen1Details shows detailed Gen1-specific information.
+// NOTE: This function mixes RPC calls with display logic and should be refactored
+// into separate fetch and display functions in a future cleanup.
 func displayGen1Details(ctx context.Context, ios *iostreams.IOStreams, devices []discovery.DiscoveredDevice) {
 	ios.Println(theme.Bold().Render(fmt.Sprintf("Found %d device(s):", len(devices))))
 	ios.Println()
