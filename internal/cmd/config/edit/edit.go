@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // NewCommand creates the config edit command.
@@ -57,7 +58,7 @@ func run(ctx context.Context, f *cmdutil.Factory) error {
 	}
 
 	// Find editor
-	editor := getEditor()
+	editor := utils.GetEditor()
 	if editor == "" {
 		return fmt.Errorf("no editor found. Set $EDITOR or $VISUAL environment variable")
 	}
@@ -83,27 +84,4 @@ func run(ctx context.Context, f *cmdutil.Factory) error {
 	}
 
 	return nil
-}
-
-func getEditor() string {
-	// Check EDITOR first
-	if editor := os.Getenv("EDITOR"); editor != "" {
-		return editor
-	}
-
-	// Then VISUAL
-	if visual := os.Getenv("VISUAL"); visual != "" {
-		return visual
-	}
-
-	// Platform defaults
-	// Try common editors in order
-	editors := []string{"nano", "vim", "vi"}
-	for _, e := range editors {
-		if path, err := exec.LookPath(e); err == nil {
-			return path
-		}
-	}
-
-	return ""
 }
