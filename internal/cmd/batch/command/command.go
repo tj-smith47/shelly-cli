@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -79,7 +80,7 @@ the device name and either the response or error message.`,
 			// Parse params if provided
 			var params map[string]any
 			deviceArgs := args[1:]
-			if len(args) > 1 && isJSON(args[1]) {
+			if len(args) > 1 && utils.IsJSONObject(args[1]) {
 				if err := json.Unmarshal([]byte(args[1]), &params); err != nil {
 					return fmt.Errorf("invalid JSON params: %w", err)
 				}
@@ -103,18 +104,6 @@ the device name and either the response or error message.`,
 	return cmd
 }
 
-// isJSON returns true if the string looks like a JSON object.
-func isJSON(s string) bool {
-	return s != "" && s[0] == '{'
-}
-
-// Result holds the result of a batch RPC operation.
-type Result struct {
-	Device   string `json:"device" yaml:"device"`
-	Response any    `json:"response,omitempty" yaml:"response,omitempty"`
-	Error    string `json:"error,omitempty" yaml:"error,omitempty"`
-}
-
 func run(ctx context.Context, f *cmdutil.Factory, targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
@@ -128,7 +117,7 @@ func run(ctx context.Context, f *cmdutil.Factory, targets []string, method strin
 	}
 
 	// Results are collected by index to maintain order
-	results := make([]Result, len(targets))
+	results := make([]model.BatchRPCResult, len(targets))
 
 	// Create parent context with overall timeout
 	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(targets)))
@@ -148,7 +137,7 @@ func run(ctx context.Context, f *cmdutil.Factory, targets []string, method strin
 			defer deviceCancel()
 
 			resp, err := svc.RawRPC(deviceCtx, device, method, params)
-			result := Result{Device: device}
+			result := model.BatchRPCResult{Device: device}
 			if err != nil {
 				result.Error = err.Error()
 				mw.UpdateLine(device, iostreams.StatusError, err.Error())

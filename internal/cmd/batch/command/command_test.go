@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -79,7 +80,7 @@ func TestNewCommand_Flags(t *testing.T) {
 	}
 }
 
-func TestIsJSON(t *testing.T) {
+func TestIsJSONObject(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -96,9 +97,9 @@ func TestIsJSON(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := isJSON(tt.input)
+		got := utils.IsJSONObject(tt.input)
 		if got != tt.want {
-			t.Errorf("isJSON(%q) = %v, want %v", tt.input, got, tt.want)
+			t.Errorf("IsJSONObject(%q) = %v, want %v", tt.input, got, tt.want)
 		}
 	}
 }

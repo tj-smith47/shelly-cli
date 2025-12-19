@@ -64,6 +64,12 @@ func ResolveBatchTargets(groupName string, all bool, args []string) ([]string, e
 	return nil, fmt.Errorf("specify devices, --group, --all, or pipe device names via stdin")
 }
 
+// IsJSONObject returns true if the string looks like a JSON object (starts with '{').
+// Used for batch command argument parsing to distinguish JSON params from device names.
+func IsJSONObject(s string) bool {
+	return s != "" && s[0] == '{'
+}
+
 // readDevicesFromStdin reads device names from stdin (one per line or space-separated).
 func readDevicesFromStdin() ([]string, error) {
 	var targets []string
