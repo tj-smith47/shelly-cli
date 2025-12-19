@@ -1,4 +1,4 @@
-## shelly interactive
+## shelly repl
 
 Launch interactive REPL
 
@@ -25,17 +25,17 @@ Available commands in REPL:
 You can also run any shelly subcommand by typing it directly.
 
 ```
-shelly interactive [flags]
+shelly repl [flags]
 ```
 
 ### Examples
 
 ```
-  # Start interactive mode
-  shelly interactive
+  # Start REPL mode
+  shelly repl
 
   # Start with a default device
-  shelly interactive --device living-room
+  shelly repl --device living-room
 
   # Example session:
   > devices
@@ -49,7 +49,7 @@ shelly interactive [flags]
 
 ```
   -d, --device string   Default device to connect to
-  -h, --help            help for interactive
+  -h, --help            help for repl
       --no-prompt       Disable interactive prompt (for scripting)
 ```
 

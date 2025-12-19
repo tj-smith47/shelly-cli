@@ -46,7 +46,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/group"
 	initcmd "github.com/tj-smith47/shelly-cli/internal/cmd/init"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/interactive"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/repl"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/light"
 	logcmd "github.com/tj-smith47/shelly-cli/internal/cmd/log"
@@ -409,7 +409,7 @@ func init() {
 		benchmark.NewCommand(f),
 		debug.NewCommand(f),
 		doctor.NewCommand(f),
-		interactive.NewCommand(f),
+		repl.NewCommand(f),
 		mock.NewCommand(f),
 		shellcmd.NewCommand(f),
 	)

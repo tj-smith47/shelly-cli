@@ -2,11 +2,11 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-interactive - Launch interactive REPL
+shelly-repl - Launch interactive REPL
 
 
 .SH SYNOPSIS
-\fBshelly interactive [flags]\fP
+\fBshelly repl [flags]\fP
 
 
 .SH DESCRIPTION
@@ -40,7 +40,7 @@ You can also run any shelly subcommand by typing it directly.
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
-	help for interactive
+	help for repl
 
 .PP
 \fB--no-prompt\fP[=false]
@@ -82,11 +82,11 @@ You can also run any shelly subcommand by typing it directly.
 
 .SH EXAMPLE
 .EX
-  # Start interactive mode
-  shelly interactive
+  # Start REPL mode
+  shelly repl
 
   # Start with a default device
-  shelly interactive --device living-room
+  shelly repl --device living-room
 
   # Example session:
   > devices

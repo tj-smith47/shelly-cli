@@ -9,6 +9,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+// Action constants for device control.
+const (
+	ActionOn     = "on"
+	ActionOff    = "off"
+	ActionToggle = "toggle"
+)
+
 // QuickResult holds the result of a quick operation.
 type QuickResult struct {
 	// Count is the number of components affected.
@@ -172,6 +179,113 @@ func selectComponents(controllable []model.Component, all bool) []model.Componen
 		return controllable[:1]
 	}
 	return controllable
+}
+
+// ComponentControlResult holds the result of controlling a single component.
+type ComponentControlResult struct {
+	Type    model.ComponentType
+	ID      int
+	Success bool
+	Err     error
+}
+
+// ControlAllComponents performs an action on all controllable components.
+// Returns detailed results for each component.
+func (s *Service) ControlAllComponents(ctx context.Context, device, action string) ([]ComponentControlResult, error) {
+	var results []ComponentControlResult
+
+	err := s.WithConnection(ctx, device, func(conn *client.Client) error {
+		comps, err := conn.ListComponents(ctx)
+		if err != nil {
+			return err
+		}
+
+		for _, comp := range comps {
+			if !isControllable(comp.Type) {
+				continue
+			}
+
+			var opErr error
+			switch comp.Type {
+			case model.ComponentSwitch:
+				opErr = controlSwitchAction(ctx, conn, comp.ID, action)
+			case model.ComponentLight:
+				opErr = controlLightAction(ctx, conn, comp.ID, action)
+			case model.ComponentRGB:
+				opErr = controlRGBAction(ctx, conn, comp.ID, action)
+			case model.ComponentCover:
+				opErr = controlCoverAction(ctx, conn, comp.ID, action)
+			default:
+				continue // Skip non-controllable components
+			}
+
+			results = append(results, ComponentControlResult{
+				Type:    comp.Type,
+				ID:      comp.ID,
+				Success: opErr == nil,
+				Err:     opErr,
+			})
+		}
+
+		return nil
+	})
+
+	return results, err
+}
+
+func controlSwitchAction(ctx context.Context, c *client.Client, id int, action string) error {
+	switch action {
+	case ActionOn:
+		return c.Switch(id).On(ctx)
+	case ActionOff:
+		return c.Switch(id).Off(ctx)
+	case ActionToggle:
+		_, err := c.Switch(id).Toggle(ctx)
+		return err
+	default:
+		return nil
+	}
+}
+
+func controlLightAction(ctx context.Context, c *client.Client, id int, action string) error {
+	switch action {
+	case ActionOn:
+		return c.Light(id).On(ctx)
+	case ActionOff:
+		return c.Light(id).Off(ctx)
+	case ActionToggle:
+		_, err := c.Light(id).Toggle(ctx)
+		return err
+	default:
+		return nil
+	}
+}
+
+func controlRGBAction(ctx context.Context, c *client.Client, id int, action string) error {
+	switch action {
+	case ActionOn:
+		return c.RGB(id).On(ctx)
+	case ActionOff:
+		return c.RGB(id).Off(ctx)
+	case ActionToggle:
+		_, err := c.RGB(id).Toggle(ctx)
+		return err
+	default:
+		return nil
+	}
+}
+
+func controlCoverAction(ctx context.Context, c *client.Client, id int, action string) error {
+	switch action {
+	case ActionOn:
+		return c.Cover(id).Open(ctx, nil)
+	case ActionOff:
+		return c.Cover(id).Close(ctx, nil)
+	case ActionToggle:
+		return c.Cover(id).Stop(ctx)
+	default:
+		return nil
+	}
 }
 
 // toggleCover toggles a cover based on its current state.

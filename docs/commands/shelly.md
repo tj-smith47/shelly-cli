@@ -74,7 +74,6 @@ and controlling Shelly devices on your local network.
 * [shelly group](shelly_group.md)	 - Manage device groups
 * [shelly init](shelly_init.md)	 - Initialize shelly CLI for first-time use
 * [shelly input](shelly_input.md)	 - Manage input components
-* [shelly interactive](shelly_interactive.md)	 - Launch interactive REPL
 * [shelly kvs](shelly_kvs.md)	 - Manage device key-value storage
 * [shelly light](shelly_light.md)	 - Control light components
 * [shelly log](shelly_log.md)	 - Manage CLI logs
@@ -94,6 +93,7 @@ and controlling Shelly devices on your local network.
 * [shelly provision](shelly_provision.md)	 - Provision device settings
 * [shelly qr](shelly_qr.md)	 - Generate device QR code information
 * [shelly reboot](shelly_reboot.md)	 - Reboot a device
+* [shelly repl](shelly_repl.md)	 - Launch interactive REPL
 * [shelly report](shelly_report.md)	 - Generate reports
 * [shelly reset](shelly_reset.md)	 - Factory reset a device
 * [shelly rgb](shelly_rgb.md)	 - Control RGB light components
