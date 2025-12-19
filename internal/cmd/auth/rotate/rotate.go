@@ -3,19 +3,13 @@ package rotate
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-)
-
-const (
-	defaultPasswordLength = 16
-	passwordCharset       = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds the command options.
@@ -31,7 +25,7 @@ type Options struct {
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		User:   "admin",
-		Length: defaultPasswordLength,
+		Length: shelly.DefaultPasswordLength,
 	}
 
 	cmd := &cobra.Command{
@@ -67,7 +61,7 @@ For security best practices:
 
 	cmd.Flags().StringVar(&opts.User, "user", "admin", "Username for authentication")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "New password (or use --generate)")
-	cmd.Flags().IntVar(&opts.Length, "length", defaultPasswordLength, "Generated password length")
+	cmd.Flags().IntVar(&opts.Length, "length", shelly.DefaultPasswordLength, "Generated password length")
 	cmd.Flags().BoolVar(&opts.Generate, "generate", false, "Generate a random password")
 	cmd.Flags().BoolVar(&opts.ShowSecret, "show", false, "Show the new password in output")
 
@@ -82,7 +76,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	password := opts.Password
 	if opts.Generate {
 		var err error
-		password, err = generatePassword(opts.Length)
+		password, err = shelly.GeneratePassword(opts.Length)
 		if err != nil {
 			return fmt.Errorf("failed to generate password: %w", err)
 		}
@@ -116,23 +110,4 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 
 		return nil
 	})
-}
-
-func generatePassword(length int) (string, error) {
-	if length < 8 {
-		length = 8
-	}
-
-	result := make([]byte, length)
-	charsetLen := big.NewInt(int64(len(passwordCharset)))
-
-	for i := range length {
-		n, err := rand.Int(rand.Reader, charsetLen)
-		if err != nil {
-			return "", err
-		}
-		result[i] = passwordCharset[n.Int64()]
-	}
-
-	return string(result), nil
 }
