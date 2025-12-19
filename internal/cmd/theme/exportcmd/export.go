@@ -75,20 +75,20 @@ func run(f *cmdutil.Factory, file string) error {
 	export := ThemeExport{
 		Name: current.ID,
 		RenderedColors: RenderedColors{
-			Foreground:  colorToHex(theme.Fg()),
-			Background:  colorToHex(theme.Bg()),
-			Green:       colorToHex(theme.Green()),
-			Red:         colorToHex(theme.Red()),
-			Yellow:      colorToHex(theme.Yellow()),
-			Blue:        colorToHex(theme.Blue()),
-			Cyan:        colorToHex(theme.Cyan()),
-			Purple:      colorToHex(theme.Purple()),
-			BrightBlack: colorToHex(theme.BrightBlack()),
+			Foreground:  theme.ColorToHex(theme.Fg()),
+			Background:  theme.ColorToHex(theme.Bg()),
+			Green:       theme.ColorToHex(theme.Green()),
+			Red:         theme.ColorToHex(theme.Red()),
+			Yellow:      theme.ColorToHex(theme.Yellow()),
+			Blue:        theme.ColorToHex(theme.Blue()),
+			Cyan:        theme.ColorToHex(theme.Cyan()),
+			Purple:      theme.ColorToHex(theme.Purple()),
+			BrightBlack: theme.ColorToHex(theme.BrightBlack()),
 		},
 	}
 
 	// Include custom color overrides if any are set
-	export.ColorOverrides = buildColorOverrides(theme.GetCustomColors())
+	export.ColorOverrides = theme.BuildColorOverrides(theme.GetCustomColors())
 
 	// Marshal to YAML
 	data, err := yaml.Marshal(export)
@@ -107,42 +107,4 @@ func run(f *cmdutil.Factory, file string) error {
 	}
 
 	return nil
-}
-
-// colorToHex converts a color.Color to a hex string.
-func colorToHex(c interface{ RGBA() (r, g, b, a uint32) }) string {
-	if c == nil {
-		return ""
-	}
-	r, g, b, _ := c.RGBA()
-	return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
-}
-
-// buildColorOverrides creates a map of custom color overrides from CustomColors.
-func buildColorOverrides(custom *theme.CustomColors) map[string]string {
-	if custom == nil {
-		return nil
-	}
-
-	colors := make(map[string]string)
-	addIfSet := func(key, value string) {
-		if value != "" {
-			colors[key] = value
-		}
-	}
-
-	addIfSet("foreground", custom.Foreground)
-	addIfSet("background", custom.Background)
-	addIfSet("green", custom.Green)
-	addIfSet("red", custom.Red)
-	addIfSet("yellow", custom.Yellow)
-	addIfSet("blue", custom.Blue)
-	addIfSet("cyan", custom.Cyan)
-	addIfSet("purple", custom.Purple)
-	addIfSet("bright_black", custom.BrightBlack)
-
-	if len(colors) == 0 {
-		return nil
-	}
-	return colors
 }

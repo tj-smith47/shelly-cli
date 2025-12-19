@@ -584,3 +584,41 @@ func intToStr(n int) string {
 	}
 	return s
 }
+
+// ColorToHex converts a color.Color to a hex string.
+func ColorToHex(c interface{ RGBA() (r, g, b, a uint32) }) string {
+	if c == nil {
+		return ""
+	}
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
+}
+
+// BuildColorOverrides creates a map of custom color overrides from CustomColors.
+func BuildColorOverrides(custom *CustomColors) map[string]string {
+	if custom == nil {
+		return nil
+	}
+
+	colors := make(map[string]string)
+	addIfSet := func(key, value string) {
+		if value != "" {
+			colors[key] = value
+		}
+	}
+
+	addIfSet("foreground", custom.Foreground)
+	addIfSet("background", custom.Background)
+	addIfSet("green", custom.Green)
+	addIfSet("red", custom.Red)
+	addIfSet("yellow", custom.Yellow)
+	addIfSet("blue", custom.Blue)
+	addIfSet("cyan", custom.Cyan)
+	addIfSet("purple", custom.Purple)
+	addIfSet("bright_black", custom.BrightBlack)
+
+	if len(colors) == 0 {
+		return nil
+	}
+	return colors
+}
