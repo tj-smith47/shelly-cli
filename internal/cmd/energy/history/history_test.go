@@ -2,9 +2,6 @@ package history
 
 import (
 	"testing"
-	"time"
-
-	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -103,51 +100,6 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 }
 
-// Note: Tests for CalculateTimeRange and ParseTime are now in internal/shelly/energy_test.go
-// since these functions were extracted to the service layer for DRY compliance.
-
-func TestCalculateTotalEnergy(t *testing.T) {
-	t.Parallel()
-
-	blocks := []components.EMDataBlock{
-		{
-			TS:     time.Now().Unix(),
-			Period: 60, // 1 minute
-			Values: []components.EMDataValues{
-				{TotalActivePower: 1000}, // 1000W for 60 seconds
-				{TotalActivePower: 2000}, // 2000W for 60 seconds
-			},
-		},
-	}
-
-	// Expected: (1000W * 60s + 2000W * 60s) / 3600 / 1000 = 0.05 kWh
-	expected := 0.05
-	result := calculateTotalEnergy(blocks)
-
-	if result != expected {
-		t.Errorf("calculateTotalEnergy() = %.3f kWh, want %.3f kWh", result, expected)
-	}
-}
-
-func TestCalculateTotalEnergyEM1(t *testing.T) {
-	t.Parallel()
-
-	blocks := []components.EM1DataBlock{
-		{
-			TS:     time.Now().Unix(),
-			Period: 60, // 1 minute
-			Values: []components.EM1DataValues{
-				{ActivePower: 500},  // 500W for 60 seconds
-				{ActivePower: 1500}, // 1500W for 60 seconds
-			},
-		},
-	}
-
-	// Expected: (500W * 60s + 1500W * 60s) / 3600 / 1000 = 0.0333... kWh
-	expected := 0.03333333333333333
-	result := calculateTotalEnergyEM1(blocks)
-
-	if result != expected {
-		t.Errorf("calculateTotalEnergyEM1() = %.10f kWh, want %.10f kWh", result, expected)
-	}
-}
+// Note: Tests for CalculateTimeRange, ParseTime, CalculateEMMetrics, and CalculateEM1Metrics
+// are now in internal/shelly/energy_test.go since these functions were extracted to the
+// service layer for DRY compliance.

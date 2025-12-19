@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -160,7 +159,7 @@ func showEMDataHistory(ctx context.Context, ios *iostreams.IOStreams, svc *shell
 
 	// Calculate total energy consumption if possible
 	if count > 0 {
-		totalEnergy := calculateTotalEnergy(data.Data)
+		totalEnergy, _, _, _ := shelly.CalculateEMMetrics(data)
 		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
 	}
 
@@ -227,35 +226,9 @@ func showEM1DataHistory(ctx context.Context, ios *iostreams.IOStreams, svc *shel
 
 	// Calculate total energy consumption if possible
 	if count > 0 {
-		totalEnergy := calculateTotalEnergyEM1(data.Data)
+		totalEnergy, _, _, _ := shelly.CalculateEM1Metrics(data)
 		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
 	}
 
 	return nil
-}
-
-func calculateTotalEnergy(blocks []components.EMDataBlock) float64 {
-	var totalWh float64
-	for _, block := range blocks {
-		for _, values := range block.Values {
-			// Energy = Power (W) * Time (s) / 3600 = Wh
-			energyWh := values.TotalActivePower * float64(block.Period) / 3600.0
-			totalWh += energyWh
-		}
-	}
-	// Convert Wh to kWh
-	return totalWh / 1000.0
-}
-
-func calculateTotalEnergyEM1(blocks []components.EM1DataBlock) float64 {
-	var totalWh float64
-	for _, block := range blocks {
-		for _, values := range block.Values {
-			// Energy = Power (W) * Time (s) / 3600 = Wh
-			energyWh := values.ActivePower * float64(block.Period) / 3600.0
-			totalWh += energyWh
-		}
-	}
-	// Convert Wh to kWh
-	return totalWh / 1000.0
 }
