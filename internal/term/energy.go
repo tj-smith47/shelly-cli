@@ -145,3 +145,92 @@ func displayEM1MetricsSummary(ios *iostreams.IOStreams, data *components.EM1Data
 		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
 	}
 }
+
+// DisplayEMStatus shows 3-phase energy monitor status.
+func DisplayEMStatus(ios *iostreams.IOStreams, status *shelly.EMStatus) {
+	if output.WantsStructured() {
+		if err := output.FormatOutput(ios.Out, status); err != nil {
+			ios.DebugErr("format output", err)
+		}
+		return
+	}
+
+	// Human-readable format
+	ios.Printf("Energy Monitor (EM) #%d\n\n", status.ID)
+
+	ios.Printf("Phase A:\n")
+	ios.Printf("  Voltage:        %.2f V\n", status.AVoltage)
+	ios.Printf("  Current:        %.2f A\n", status.ACurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.AActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.AApparentPower)
+	if status.APowerFactor != nil {
+		ios.Printf("  Power Factor:   %.3f\n", *status.APowerFactor)
+	}
+	if status.AFreq != nil {
+		ios.Printf("  Frequency:      %.2f Hz\n", *status.AFreq)
+	}
+
+	ios.Printf("\nPhase B:\n")
+	ios.Printf("  Voltage:        %.2f V\n", status.BVoltage)
+	ios.Printf("  Current:        %.2f A\n", status.BCurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.BActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.BApparentPower)
+	if status.BPowerFactor != nil {
+		ios.Printf("  Power Factor:   %.3f\n", *status.BPowerFactor)
+	}
+	if status.BFreq != nil {
+		ios.Printf("  Frequency:      %.2f Hz\n", *status.BFreq)
+	}
+
+	ios.Printf("\nPhase C:\n")
+	ios.Printf("  Voltage:        %.2f V\n", status.CVoltage)
+	ios.Printf("  Current:        %.2f A\n", status.CCurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.CActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.CApparentPower)
+	if status.CPowerFactor != nil {
+		ios.Printf("  Power Factor:   %.3f\n", *status.CPowerFactor)
+	}
+	if status.CFreq != nil {
+		ios.Printf("  Frequency:      %.2f Hz\n", *status.CFreq)
+	}
+
+	ios.Printf("\nTotals:\n")
+	ios.Printf("  Current:        %.2f A\n", status.TotalCurrent)
+	ios.Printf("  Active Power:   %.2f W\n", status.TotalActivePower)
+	ios.Printf("  Apparent Power: %.2f VA\n", status.TotalAprtPower)
+
+	if status.NCurrent != nil {
+		ios.Printf("\nNeutral Current: %.2f A\n", *status.NCurrent)
+	}
+
+	if len(status.Errors) > 0 {
+		ios.Printf("\nErrors: %v\n", status.Errors)
+	}
+}
+
+// DisplayEM1Status shows single-phase energy monitor status.
+func DisplayEM1Status(ios *iostreams.IOStreams, status *shelly.EM1Status) {
+	if output.WantsStructured() {
+		if err := output.FormatOutput(ios.Out, status); err != nil {
+			ios.DebugErr("format output", err)
+		}
+		return
+	}
+
+	// Human-readable format
+	ios.Printf("Energy Monitor (EM1) #%d\n\n", status.ID)
+	ios.Printf("Voltage:        %.2f V\n", status.Voltage)
+	ios.Printf("Current:        %.2f A\n", status.Current)
+	ios.Printf("Active Power:   %.2f W\n", status.ActPower)
+	ios.Printf("Apparent Power: %.2f VA\n", status.AprtPower)
+	if status.PF != nil {
+		ios.Printf("Power Factor:   %.3f\n", *status.PF)
+	}
+	if status.Freq != nil {
+		ios.Printf("Frequency:      %.2f Hz\n", *status.Freq)
+	}
+
+	if len(status.Errors) > 0 {
+		ios.Printf("\nErrors: %v\n", status.Errors)
+	}
+}
