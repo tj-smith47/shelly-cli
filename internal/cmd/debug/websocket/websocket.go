@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -81,7 +82,7 @@ func run(ctx context.Context, opts *Options) error {
 			ios.Println()
 			tryFallbackWsConfig(ctx, conn, ios)
 		} else {
-			printJSONResult(ios, "WebSocket Config:", result)
+			term.PrintJSONResult(ios, "WebSocket Config:", result)
 		}
 
 		// Get WebSocket status
@@ -89,7 +90,7 @@ func run(ctx context.Context, opts *Options) error {
 		if statusErr != nil {
 			ios.Debug("Ws.GetStatus failed: %v", statusErr)
 		} else {
-			printJSONResult(ios, "WebSocket Status:", statusResult)
+			term.PrintJSONResult(ios, "WebSocket Status:", statusResult)
 		}
 
 		return nil
@@ -106,6 +107,8 @@ func run(ctx context.Context, opts *Options) error {
 }
 
 // tryFallbackWsConfig attempts to get WebSocket config from Sys.GetConfig.
+// This helper is kept in cmd/ because it tightly couples RPC call logic with display output
+// in a command-specific fallback path.
 func tryFallbackWsConfig(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) {
 	sysResult, sysErr := conn.Call(ctx, "Sys.GetConfig", nil)
 	if sysErr != nil {
@@ -133,17 +136,5 @@ func tryFallbackWsConfig(ctx context.Context, conn *client.Client, ios *iostream
 	for k, v := range ws {
 		ios.Printf("    %s: %v\n", k, v)
 	}
-	ios.Println()
-}
-
-// printJSONResult prints a JSON result with a header.
-func printJSONResult(ios *iostreams.IOStreams, header string, result any) {
-	jsonBytes, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		ios.DebugErr("failed to marshal result", err)
-		return
-	}
-	ios.Println("  " + theme.Highlight().Render(header))
-	ios.Println(string(jsonBytes))
 	ios.Println()
 }
