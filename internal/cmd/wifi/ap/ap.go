@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -65,7 +64,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 
 	// If --clients flag, list connected clients
 	if clientsFlag {
-		return listClients(ctx, ios, svc, device)
+		return cmdutil.RunList(ctx, ios, svc, device,
+			"Getting connected clients...",
+			"No clients connected to access point",
+			func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WiFiAPClient, error) {
+				return svc.ListWiFiAPClients(ctx, device)
+			},
+			term.DisplayWiFiAPClients)
 	}
 
 	// Determine enable state
@@ -98,14 +103,4 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		}
 		return nil
 	})
-}
-
-func listClients(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string) error {
-	return cmdutil.RunList(ctx, ios, svc, device,
-		"Getting connected clients...",
-		"No clients connected to access point",
-		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WiFiAPClient, error) {
-			return svc.ListWiFiAPClients(ctx, device)
-		},
-		term.DisplayWiFiAPClients)
 }
