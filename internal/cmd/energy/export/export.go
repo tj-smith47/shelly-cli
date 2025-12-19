@@ -4,13 +4,10 @@ package export
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
@@ -103,15 +100,18 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	// Export based on type and format
 	switch componentType {
 	case shelly.ComponentTypeEM:
-		return exportEMData(ctx, ios, svc, device, id, startTS, endTS, format, outputFile)
+		return exportEMData(ctx, f, device, id, startTS, endTS, format, outputFile)
 	case shelly.ComponentTypeEM1:
-		return exportEM1Data(ctx, ios, svc, device, id, startTS, endTS, format, outputFile)
+		return exportEM1Data(ctx, f, device, id, startTS, endTS, format, outputFile)
 	default:
 		return fmt.Errorf("no energy data components found")
 	}
 }
 
-func exportEMData(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int, startTS, endTS *int64, format, outputFile string) error {
+func exportEMData(ctx context.Context, f *cmdutil.Factory, device string, id int, startTS, endTS *int64, format, outputFile string) error {
+	ios := f.IOStreams()
+	svc := f.ShellyService()
+
 	// Fetch data
 	data, err := svc.GetEMDataHistory(ctx, device, id, startTS, endTS)
 	if err != nil {
@@ -121,19 +121,22 @@ func exportEMData(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Ser
 	// Export based on format
 	switch format {
 	case formatCSV:
-		return exportCSV(ios, outputFile, func() ([]byte, error) {
+		return output.ExportCSV(ios, outputFile, func() ([]byte, error) {
 			return shellyexport.FormatEMDataCSV(data)
 		})
 	case formatJSON:
-		return exportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
+		return output.ExportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
 	case formatYAML:
-		return exportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
+		return output.ExportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
 	default:
 		return fmt.Errorf("unsupported format: %s", format)
 	}
 }
 
-func exportEM1Data(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int, startTS, endTS *int64, format, outputFile string) error {
+func exportEM1Data(ctx context.Context, f *cmdutil.Factory, device string, id int, startTS, endTS *int64, format, outputFile string) error {
+	ios := f.IOStreams()
+	svc := f.ShellyService()
+
 	// Fetch data
 	data, err := svc.GetEM1DataHistory(ctx, device, id, startTS, endTS)
 	if err != nil {
@@ -143,72 +146,14 @@ func exportEM1Data(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 	// Export based on format
 	switch format {
 	case formatCSV:
-		return exportCSV(ios, outputFile, func() ([]byte, error) {
+		return output.ExportCSV(ios, outputFile, func() ([]byte, error) {
 			return shellyexport.FormatEM1DataCSV(data)
 		})
 	case formatJSON:
-		return exportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
+		return output.ExportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
 	case formatYAML:
-		return exportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
+		return output.ExportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
 	default:
 		return fmt.Errorf("unsupported format: %s", format)
 	}
-}
-
-func exportCSV(ios *iostreams.IOStreams, outputFile string, formatter func() ([]byte, error)) error {
-	csvData, err := formatter()
-	if err != nil {
-		return err
-	}
-
-	writer, closer, err := getWriter(ios, outputFile)
-	if err != nil {
-		return err
-	}
-	defer closer()
-
-	if _, err := writer.Write(csvData); err != nil {
-		return fmt.Errorf("failed to write CSV data: %w", err)
-	}
-
-	if outputFile != "" {
-		ios.Success("Exported to %s (CSV)", outputFile)
-	}
-	return nil
-}
-
-func exportToFile(ios *iostreams.IOStreams, data any, outputFile string, format output.Format, formatName string) error {
-	writer, closer, err := getWriter(ios, outputFile)
-	if err != nil {
-		return err
-	}
-	defer closer()
-
-	formatter := output.NewFormatter(format)
-	if err := formatter.Format(writer, data); err != nil {
-		return fmt.Errorf("failed to encode %s: %w", formatName, err)
-	}
-
-	if outputFile != "" {
-		ios.Success("Exported to %s (%s)", outputFile, formatName)
-	}
-	return nil
-}
-
-func getWriter(ios *iostreams.IOStreams, outputFile string) (io.Writer, func(), error) {
-	if outputFile == "" {
-		return ios.Out, func() {}, nil
-	}
-
-	//nolint:gosec // G304: User-provided file path is expected for CLI export functionality
-	file, err := os.Create(outputFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create output file: %w", err)
-	}
-
-	return file, func() {
-		if err := file.Close(); err != nil {
-			ios.DebugErr("close output file", err)
-		}
-	}, nil
 }
