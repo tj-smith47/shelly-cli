@@ -8,15 +8,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
-)
-
-const (
-	formatCSV  = "csv"
-	formatJSON = "json"
-	formatYAML = "yaml"
 )
 
 // NewCommand creates the energy export command.
@@ -65,7 +58,7 @@ measurements for the specified time range.`,
 	}
 
 	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
-	cmd.Flags().StringVarP(&format, "format", "f", formatCSV, "Output format (csv, json, yaml)")
+	cmd.Flags().StringVarP(&format, "format", "f", shellyexport.FormatCSV, "Output format (csv, json, yaml)")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file (default: stdout)")
 	cmd.Flags().StringVarP(&period, "period", "p", "", "Time period (hour, day, week, month)")
 	cmd.Flags().StringVar(&from, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
@@ -79,7 +72,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	svc := f.ShellyService()
 
 	// Validate format
-	if format != formatCSV && format != formatJSON && format != formatYAML {
+	if format != shellyexport.FormatCSV && format != shellyexport.FormatJSON && format != shellyexport.FormatYAML {
 		return fmt.Errorf("invalid format: %s (use: csv, json, yaml)", format)
 	}
 
@@ -100,60 +93,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	// Export based on type and format
 	switch componentType {
 	case shelly.ComponentTypeEM:
-		return exportEMData(ctx, f, device, id, startTS, endTS, format, outputFile)
+		return shellyexport.EMData(ctx, ios, svc.GetEMDataHistory, device, id, startTS, endTS, format, outputFile)
 	case shelly.ComponentTypeEM1:
-		return exportEM1Data(ctx, f, device, id, startTS, endTS, format, outputFile)
+		return shellyexport.EM1Data(ctx, ios, svc.GetEM1DataHistory, device, id, startTS, endTS, format, outputFile)
 	default:
 		return fmt.Errorf("no energy data components found")
-	}
-}
-
-func exportEMData(ctx context.Context, f *cmdutil.Factory, device string, id int, startTS, endTS *int64, format, outputFile string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	// Fetch data
-	data, err := svc.GetEMDataHistory(ctx, device, id, startTS, endTS)
-	if err != nil {
-		return fmt.Errorf("failed to get EMData: %w", err)
-	}
-
-	// Export based on format
-	switch format {
-	case formatCSV:
-		return output.ExportCSV(ios, outputFile, func() ([]byte, error) {
-			return shellyexport.FormatEMDataCSV(data)
-		})
-	case formatJSON:
-		return output.ExportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
-	case formatYAML:
-		return output.ExportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
-	default:
-		return fmt.Errorf("unsupported format: %s", format)
-	}
-}
-
-func exportEM1Data(ctx context.Context, f *cmdutil.Factory, device string, id int, startTS, endTS *int64, format, outputFile string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	// Fetch data
-	data, err := svc.GetEM1DataHistory(ctx, device, id, startTS, endTS)
-	if err != nil {
-		return fmt.Errorf("failed to get EM1Data: %w", err)
-	}
-
-	// Export based on format
-	switch format {
-	case formatCSV:
-		return output.ExportCSV(ios, outputFile, func() ([]byte, error) {
-			return shellyexport.FormatEM1DataCSV(data)
-		})
-	case formatJSON:
-		return output.ExportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
-	case formatYAML:
-		return output.ExportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
-	default:
-		return fmt.Errorf("unsupported format: %s", format)
 	}
 }

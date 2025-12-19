@@ -3,12 +3,14 @@ package export
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
@@ -156,5 +158,60 @@ func formatEM1DataRow(timestamp string, v components.EM1DataValues) []string {
 		output.FormatFloatPtr(v.Freq),
 		output.FormatFloatPtr(v.ActEnergy),
 		output.FormatFloatPtr(v.ActRetEnergy),
+	}
+}
+
+// EnergyExportFormat constants for output format types.
+const (
+	FormatCSV  = "csv"
+	FormatJSON = "json"
+	FormatYAML = "yaml"
+)
+
+// EMDataFetcher retrieves EM data history for a device.
+type EMDataFetcher func(ctx context.Context, device string, id int, startTS, endTS *int64) (*components.EMDataGetDataResult, error)
+
+// EM1DataFetcher retrieves EM1 data history for a device.
+type EM1DataFetcher func(ctx context.Context, device string, id int, startTS, endTS *int64) (*components.EM1DataGetDataResult, error)
+
+// EMData fetches and exports EMData in the specified format.
+func EMData(ctx context.Context, ios *iostreams.IOStreams, fetcher EMDataFetcher, device string, id int, startTS, endTS *int64, format, outputFile string) error {
+	data, err := fetcher(ctx, device, id, startTS, endTS)
+	if err != nil {
+		return fmt.Errorf("failed to get EMData: %w", err)
+	}
+
+	switch format {
+	case FormatCSV:
+		return output.ExportCSV(ios, outputFile, func() ([]byte, error) {
+			return FormatEMDataCSV(data)
+		})
+	case FormatJSON:
+		return output.ExportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
+	case FormatYAML:
+		return output.ExportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
+// EM1Data fetches and exports EM1Data in the specified format.
+func EM1Data(ctx context.Context, ios *iostreams.IOStreams, fetcher EM1DataFetcher, device string, id int, startTS, endTS *int64, format, outputFile string) error {
+	data, err := fetcher(ctx, device, id, startTS, endTS)
+	if err != nil {
+		return fmt.Errorf("failed to get EM1Data: %w", err)
+	}
+
+	switch format {
+	case FormatCSV:
+		return output.ExportCSV(ios, outputFile, func() ([]byte, error) {
+			return FormatEM1DataCSV(data)
+		})
+	case FormatJSON:
+		return output.ExportToFile(ios, data, outputFile, output.FormatJSON, "JSON")
+	case FormatYAML:
+		return output.ExportToFile(ios, data, outputFile, output.FormatYAML, "YAML")
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
 	}
 }

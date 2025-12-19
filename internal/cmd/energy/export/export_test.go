@@ -5,6 +5,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -50,7 +51,7 @@ func TestNewCommand_Flags(t *testing.T) {
 		defValue  string
 	}{
 		{name: "type", shorthand: "", defValue: shelly.ComponentTypeAuto},
-		{name: "format", shorthand: "f", defValue: formatCSV},
+		{name: "format", shorthand: "f", defValue: shellyexport.FormatCSV},
 		{name: "output", shorthand: "o", defValue: ""},
 		{name: "period", shorthand: "p", defValue: ""},
 		{name: "from", shorthand: "", defValue: ""},
