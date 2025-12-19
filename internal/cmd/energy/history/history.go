@@ -4,14 +4,12 @@ package history
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the energy history command.
@@ -92,143 +90,20 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 
 	switch componentType {
 	case shelly.ComponentTypeEM:
-		return showEMDataHistory(ctx, ios, svc, device, id, startTS, endTS, limit)
+		data, err := svc.GetEMDataHistory(ctx, device, id, startTS, endTS)
+		if err != nil {
+			return fmt.Errorf("failed to get EMData history: %w", err)
+		}
+		term.DisplayEMDataHistory(ios, data, id, startTS, endTS, limit)
+		return nil
 	case shelly.ComponentTypeEM1:
-		return showEM1DataHistory(ctx, ios, svc, device, id, startTS, endTS, limit)
+		data, err := svc.GetEM1DataHistory(ctx, device, id, startTS, endTS)
+		if err != nil {
+			return fmt.Errorf("failed to get EM1Data history: %w", err)
+		}
+		term.DisplayEM1DataHistory(ios, data, id, startTS, endTS, limit)
+		return nil
 	default:
 		return fmt.Errorf("no energy data components found (device may not support historical data storage)")
 	}
-}
-
-func showEMDataHistory(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int, startTS, endTS *int64, limit int) error {
-	data, err := svc.GetEMDataHistory(ctx, device, id, startTS, endTS)
-	if err != nil {
-		return fmt.Errorf("failed to get EMData history: %w", err)
-	}
-
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, data)
-	}
-
-	// Human-readable format
-	ios.Printf("Energy History (EM) #%d\n", id)
-	if startTS != nil {
-		ios.Printf("From: %s\n", time.Unix(*startTS, 0).Format(time.RFC3339))
-	}
-	if endTS != nil {
-		ios.Printf("To:   %s\n", time.Unix(*endTS, 0).Format(time.RFC3339))
-	}
-	ios.Printf("\n")
-
-	totalRecords := 0
-	for _, block := range data.Data {
-		totalRecords += len(block.Values)
-	}
-
-	if totalRecords == 0 {
-		ios.Warning("No data available for the specified time range")
-		return nil
-	}
-
-	ios.Printf("Total data points: %d\n", totalRecords)
-	ios.Printf("Data blocks: %d\n\n", len(data.Data))
-
-	count := 0
-	for _, block := range data.Data {
-		blockTime := time.Unix(block.TS, 0)
-		for i, values := range block.Values {
-			if limit > 0 && count >= limit {
-				ios.Printf("\n(showing first %d of %d records, use --limit to see more)\n", limit, totalRecords)
-				return nil
-			}
-
-			recordTime := blockTime.Add(time.Duration(i*block.Period) * time.Second)
-			ios.Printf("[%s] Total: %.2fW (A: %.2fW, B: %.2fW, C: %.2fW) | Voltage: A=%.1fV B=%.1fV C=%.1fV\n",
-				recordTime.Format("2006-01-02 15:04:05"),
-				values.TotalActivePower,
-				values.AActivePower,
-				values.BActivePower,
-				values.CActivePower,
-				values.AVoltage,
-				values.BVoltage,
-				values.CVoltage,
-			)
-			count++
-		}
-	}
-
-	// Calculate total energy consumption if possible
-	if count > 0 {
-		totalEnergy, _, _, _ := shelly.CalculateEMMetrics(data)
-		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
-	}
-
-	return nil
-}
-
-func showEM1DataHistory(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int, startTS, endTS *int64, limit int) error {
-	data, err := svc.GetEM1DataHistory(ctx, device, id, startTS, endTS)
-	if err != nil {
-		return fmt.Errorf("failed to get EM1Data history: %w", err)
-	}
-
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, data)
-	}
-
-	// Human-readable format
-	ios.Printf("Energy History (EM1) #%d\n", id)
-	if startTS != nil {
-		ios.Printf("From: %s\n", time.Unix(*startTS, 0).Format(time.RFC3339))
-	}
-	if endTS != nil {
-		ios.Printf("To:   %s\n", time.Unix(*endTS, 0).Format(time.RFC3339))
-	}
-	ios.Printf("\n")
-
-	totalRecords := 0
-	for _, block := range data.Data {
-		totalRecords += len(block.Values)
-	}
-
-	if totalRecords == 0 {
-		ios.Warning("No data available for the specified time range")
-		return nil
-	}
-
-	ios.Printf("Total data points: %d\n", totalRecords)
-	ios.Printf("Data blocks: %d\n\n", len(data.Data))
-
-	count := 0
-	for _, block := range data.Data {
-		blockTime := time.Unix(block.TS, 0)
-		for i, values := range block.Values {
-			if limit > 0 && count >= limit {
-				ios.Printf("\n(showing first %d of %d records, use --limit to see more)\n", limit, totalRecords)
-				return nil
-			}
-
-			recordTime := blockTime.Add(time.Duration(i*block.Period) * time.Second)
-			pf := ""
-			if values.PowerFactor != nil {
-				pf = fmt.Sprintf(" | PF: %.3f", *values.PowerFactor)
-			}
-			ios.Printf("[%s] Power: %.2fW | Voltage: %.1fV | Current: %.2fA%s\n",
-				recordTime.Format("2006-01-02 15:04:05"),
-				values.ActivePower,
-				values.Voltage,
-				values.Current,
-				pf,
-			)
-			count++
-		}
-	}
-
-	// Calculate total energy consumption if possible
-	if count > 0 {
-		totalEnergy, _, _, _ := shelly.CalculateEM1Metrics(data)
-		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
-	}
-
-	return nil
 }
