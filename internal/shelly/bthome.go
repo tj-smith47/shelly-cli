@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // BTHomeDeviceStatus represents BTHome device status from Shelly.GetStatus.
@@ -138,4 +139,83 @@ func (s *Service) BTHomeRemoveDevice(ctx context.Context, identifier string, dev
 		}
 		return nil
 	})
+}
+
+// FetchBTHomeDevices fetches all BTHome devices from a gateway with their config.
+func (s *Service) FetchBTHomeDevices(ctx context.Context, identifier string, ios *iostreams.IOStreams) ([]model.BTHomeDeviceInfo, error) {
+	var devices []model.BTHomeDeviceInfo
+
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		status, err := getBTHomeDeviceStatus(ctx, conn)
+		if err != nil {
+			return err
+		}
+
+		deviceStatuses := CollectBTHomeDevices(status, ios)
+		devices = enrichBTHomeDevices(ctx, conn, deviceStatuses)
+		return nil
+	})
+
+	return devices, err
+}
+
+func getBTHomeDeviceStatus(ctx context.Context, conn *client.Client) (map[string]json.RawMessage, error) {
+	result, err := conn.Call(ctx, "Shelly.GetStatus", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %w", err)
+	}
+
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	var status map[string]json.RawMessage
+	if err := json.Unmarshal(jsonBytes, &status); err != nil {
+		return nil, fmt.Errorf("failed to parse status: %w", err)
+	}
+
+	return status, nil
+}
+
+func enrichBTHomeDevices(ctx context.Context, conn *client.Client, deviceStatuses []BTHomeDeviceStatus) []model.BTHomeDeviceInfo {
+	devices := make([]model.BTHomeDeviceInfo, 0, len(deviceStatuses))
+
+	for _, devStatus := range deviceStatuses {
+		name, addr := getBTHomeDeviceConfig(ctx, conn, devStatus.ID)
+		devices = append(devices, model.BTHomeDeviceInfo{
+			ID:         devStatus.ID,
+			Name:       name,
+			Addr:       addr,
+			RSSI:       devStatus.RSSI,
+			Battery:    devStatus.Battery,
+			LastUpdate: devStatus.LastUpdate,
+		})
+	}
+
+	return devices
+}
+
+func getBTHomeDeviceConfig(ctx context.Context, conn *client.Client, id int) (name, addr string) {
+	configResult, err := conn.Call(ctx, "BTHomeDevice.GetConfig", map[string]any{"id": id})
+	if err != nil {
+		return "", ""
+	}
+
+	var cfg struct {
+		Name *string `json:"name"`
+		Addr string  `json:"addr"`
+	}
+	cfgBytes, err := json.Marshal(configResult)
+	if err != nil {
+		return "", ""
+	}
+	if json.Unmarshal(cfgBytes, &cfg) != nil {
+		return "", ""
+	}
+
+	if cfg.Name != nil {
+		name = *cfg.Name
+	}
+	return name, cfg.Addr
 }

@@ -3,18 +3,13 @@ package list
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -79,16 +74,6 @@ structured output suitable for scripting.`,
 	return cmd
 }
 
-// BTHomeDeviceInfo holds information about a BTHome device.
-type BTHomeDeviceInfo struct {
-	ID         int     `json:"id"`
-	Name       string  `json:"name,omitempty"`
-	Addr       string  `json:"addr"`
-	RSSI       *int    `json:"rssi,omitempty"`
-	Battery    *int    `json:"battery,omitempty"`
-	LastUpdate float64 `json:"last_update,omitempty"`
-}
-
 func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
@@ -96,7 +81,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	devices, err := fetchDevices(ctx, svc, opts.Device, ios)
+	devices, err := svc.FetchBTHomeDevices(ctx, opts.Device, ios)
 	if err != nil {
 		return err
 	}
@@ -105,119 +90,6 @@ func run(ctx context.Context, opts *Options) error {
 		return output.JSON(ios.Out, devices)
 	}
 
-	displayDevices(ios, devices, opts.Device)
+	term.DisplayBTHomeDevices(ios, devices, opts.Device)
 	return nil
-}
-
-func fetchDevices(ctx context.Context, svc *shelly.Service, device string, ios *iostreams.IOStreams) ([]BTHomeDeviceInfo, error) {
-	var devices []BTHomeDeviceInfo
-
-	err := svc.WithConnection(ctx, device, func(conn *client.Client) error {
-		status, err := getDeviceStatus(ctx, conn)
-		if err != nil {
-			return err
-		}
-
-		deviceStatuses := shelly.CollectBTHomeDevices(status, ios)
-		devices = enrichDevices(ctx, conn, deviceStatuses)
-		return nil
-	})
-
-	return devices, err
-}
-
-func getDeviceStatus(ctx context.Context, conn *client.Client) (map[string]json.RawMessage, error) {
-	result, err := conn.Call(ctx, "Shelly.GetStatus", nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get status: %w", err)
-	}
-
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal result: %w", err)
-	}
-
-	var status map[string]json.RawMessage
-	if err := json.Unmarshal(jsonBytes, &status); err != nil {
-		return nil, fmt.Errorf("failed to parse status: %w", err)
-	}
-
-	return status, nil
-}
-
-func enrichDevices(ctx context.Context, conn *client.Client, deviceStatuses []shelly.BTHomeDeviceStatus) []BTHomeDeviceInfo {
-	devices := make([]BTHomeDeviceInfo, 0, len(deviceStatuses))
-
-	for _, devStatus := range deviceStatuses {
-		name, addr := getDeviceConfig(ctx, conn, devStatus.ID)
-		devices = append(devices, BTHomeDeviceInfo{
-			ID:         devStatus.ID,
-			Name:       name,
-			Addr:       addr,
-			RSSI:       devStatus.RSSI,
-			Battery:    devStatus.Battery,
-			LastUpdate: devStatus.LastUpdate,
-		})
-	}
-
-	return devices
-}
-
-func getDeviceConfig(ctx context.Context, conn *client.Client, id int) (name, addr string) {
-	configResult, err := conn.Call(ctx, "BTHomeDevice.GetConfig", map[string]any{"id": id})
-	if err != nil {
-		return "", ""
-	}
-
-	var cfg struct {
-		Name *string `json:"name"`
-		Addr string  `json:"addr"`
-	}
-	cfgBytes, err := json.Marshal(configResult)
-	if err != nil {
-		return "", ""
-	}
-	if json.Unmarshal(cfgBytes, &cfg) != nil {
-		return "", ""
-	}
-
-	if cfg.Name != nil {
-		name = *cfg.Name
-	}
-	return name, cfg.Addr
-}
-
-func displayDevices(ios *iostreams.IOStreams, devices []BTHomeDeviceInfo, gatewayDevice string) {
-	if len(devices) == 0 {
-		ios.Info("No BTHome devices found.")
-		ios.Info("Use 'shelly bthome add %s' to discover new devices.", gatewayDevice)
-		return
-	}
-
-	ios.Println(theme.Bold().Render(fmt.Sprintf("BTHome Devices (%d):", len(devices))))
-	ios.Println()
-
-	for _, dev := range devices {
-		displayDevice(ios, dev)
-	}
-}
-
-func displayDevice(ios *iostreams.IOStreams, dev BTHomeDeviceInfo) {
-	name := dev.Name
-	if name == "" {
-		name = fmt.Sprintf("Device %d", dev.ID)
-	}
-
-	ios.Printf("  %s\n", theme.Highlight().Render(name))
-	ios.Printf("    ID: %d\n", dev.ID)
-	if dev.Addr != "" {
-		ios.Printf("    Address: %s\n", dev.Addr)
-	}
-	if dev.RSSI != nil {
-		ios.Printf("    RSSI: %d dBm\n", *dev.RSSI)
-	}
-	if dev.Battery != nil {
-		ios.Printf("    Battery: %d%%\n", *dev.Battery)
-	}
-	ios.Println()
 }
