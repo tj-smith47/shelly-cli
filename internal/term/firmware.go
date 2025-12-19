@@ -64,3 +64,40 @@ func DisplayFirmwareInfo(ios *iostreams.IOStreams, info *shelly.FirmwareInfo) {
 		ios.Printf("  Beta:       %s\n", info.Beta)
 	}
 }
+
+// DisplayFirmwareCheckAll displays the results of checking firmware on all devices.
+func DisplayFirmwareCheckAll(ios *iostreams.IOStreams, results []shelly.FirmwareCheckResult) {
+	table := output.NewTable("Device", "Current", "Available", "Status")
+	updatesAvailable := 0
+
+	for _, r := range results {
+		var status, current, available string
+		if r.Err != nil {
+			status = output.RenderErrorState()
+			current = output.LabelPlaceholder
+			available = r.Err.Error()
+		} else {
+			current = r.Info.Current
+			if r.Info.HasUpdate {
+				status = output.RenderBoolState(true, "update available", "")
+				available = r.Info.Available
+				updatesAvailable++
+			} else {
+				status = output.FormatPlaceholder("up to date")
+				available = output.LabelPlaceholder
+			}
+		}
+		table.AddRow(r.Name, current, available, status)
+	}
+
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+
+	ios.Println("")
+	if updatesAvailable > 0 {
+		ios.Success("%d device(s) have updates available", updatesAvailable)
+	} else {
+		ios.Info("All devices are up to date")
+	}
+}

@@ -4,14 +4,11 @@ package check
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -72,80 +69,20 @@ func runAll(f *cmdutil.Factory, ctx context.Context) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	devices := cfg.Devices
-	if len(devices) == 0 {
+	if len(cfg.Devices) == 0 {
 		ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
 		return nil
 	}
 
+	// Get device names
+	deviceNames := make([]string, 0, len(cfg.Devices))
+	for name := range cfg.Devices {
+		deviceNames = append(deviceNames, name)
+	}
+
 	svc := f.ShellyService()
-
-	type result struct {
-		name string
-		info *shelly.FirmwareInfo
-		err  error
-	}
-
-	var (
-		results []result
-		mu      sync.Mutex
-	)
-
-	ios.StartProgress("Checking firmware on all devices...")
-
-	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(5) // Limit concurrent checks
-
-	for name := range devices {
-		deviceName := name
-		g.Go(func() error {
-			info, checkErr := svc.CheckFirmware(gctx, deviceName)
-			mu.Lock()
-			results = append(results, result{name: deviceName, info: info, err: checkErr})
-			mu.Unlock()
-			return nil // Don't fail the whole group on individual errors
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		ios.DebugErr("errgroup wait", err)
-	}
-	ios.StopProgress()
-
-	// Build table
-	table := output.NewTable("Device", "Current", "Available", "Status")
-	updatesAvailable := 0
-
-	for _, r := range results {
-		var status, current, available string
-		if r.err != nil {
-			status = output.RenderErrorState()
-			current = output.LabelPlaceholder
-			available = r.err.Error()
-		} else {
-			current = r.info.Current
-			if r.info.HasUpdate {
-				status = output.RenderBoolState(true, "update available", "")
-				available = r.info.Available
-				updatesAvailable++
-			} else {
-				status = output.FormatPlaceholder("up to date")
-				available = output.LabelPlaceholder
-			}
-		}
-		table.AddRow(r.name, current, available, status)
-	}
-
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-
-	ios.Println("")
-	if updatesAvailable > 0 {
-		ios.Success("%d device(s) have updates available", updatesAvailable)
-	} else {
-		ios.Info("All devices are up to date")
-	}
+	results := svc.CheckFirmwareAll(ctx, ios, deviceNames)
+	term.DisplayFirmwareCheckAll(ios, results)
 
 	return nil
 }

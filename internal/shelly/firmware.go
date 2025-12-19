@@ -3,10 +3,13 @@ package shelly
 
 import (
 	"context"
+	"sync"
 
 	"github.com/tj-smith47/shelly-go/firmware"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // FirmwareInfo contains firmware update information.
@@ -127,4 +130,42 @@ func (s *Service) GetFirmwareURL(ctx context.Context, identifier, stage string) 
 		return nil
 	})
 	return result, err
+}
+
+// FirmwareCheckResult holds the result of a firmware check for a single device.
+type FirmwareCheckResult struct {
+	Name string
+	Info *FirmwareInfo
+	Err  error
+}
+
+// CheckFirmwareAll checks firmware on multiple devices concurrently.
+func (s *Service) CheckFirmwareAll(ctx context.Context, ios *iostreams.IOStreams, devices []string) []FirmwareCheckResult {
+	var (
+		results []FirmwareCheckResult
+		mu      sync.Mutex
+	)
+
+	ios.StartProgress("Checking firmware on all devices...")
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(5) // Limit concurrent checks
+
+	for _, name := range devices {
+		deviceName := name
+		g.Go(func() error {
+			info, checkErr := s.CheckFirmware(gctx, deviceName)
+			mu.Lock()
+			results = append(results, FirmwareCheckResult{Name: deviceName, Info: info, Err: checkErr})
+			mu.Unlock()
+			return nil // Don't fail the whole group on individual errors
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		ios.DebugErr("errgroup wait", err)
+	}
+	ios.StopProgress()
+
+	return results
 }
