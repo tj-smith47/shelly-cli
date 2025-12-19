@@ -20,6 +20,39 @@ const (
 	ComponentTypeEM1  = "em1"
 )
 
+// DetectEnergyComponentByID auto-detects the energy component type by checking
+// which component list contains the given ID. Returns ComponentTypeAuto if no match found.
+func (s *Service) DetectEnergyComponentByID(ctx context.Context, ios *iostreams.IOStreams, device string, id int) string {
+	emIDs, err := s.ListEMComponents(ctx, device)
+	ios.DebugErr("list EM components", err)
+	em1IDs, err := s.ListEM1Components(ctx, device)
+	ios.DebugErr("list EM1 components", err)
+
+	// Check if ID matches EM component
+	for _, emID := range emIDs {
+		if emID == id {
+			return ComponentTypeEM
+		}
+	}
+
+	// Check if ID matches EM1 component
+	for _, em1ID := range em1IDs {
+		if em1ID == id {
+			return ComponentTypeEM1
+		}
+	}
+
+	// Default to first available type
+	if len(emIDs) > 0 {
+		return ComponentTypeEM
+	}
+	if len(em1IDs) > 0 {
+		return ComponentTypeEM1
+	}
+
+	return ComponentTypeAuto
+}
+
 // DetectEnergyComponentType auto-detects whether a device uses EM or EM1 data components.
 // It probes the device for EMData and EM1Data records and returns the appropriate type.
 // Returns an error if no energy data components are found.

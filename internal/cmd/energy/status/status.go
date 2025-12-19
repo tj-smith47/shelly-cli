@@ -13,44 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-const (
-	typeAuto = "auto"
-	typeEM   = "em"
-	typeEM1  = "em1"
-)
-
-// detectEnergyComponentType auto-detects the energy component type.
-func detectEnergyComponentType(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int) string {
-	emIDs, err := svc.ListEMComponents(ctx, device)
-	ios.DebugErr("list EM components", err)
-	em1IDs, err := svc.ListEM1Components(ctx, device)
-	ios.DebugErr("list EM1 components", err)
-
-	// Check if ID matches EM component
-	for _, emID := range emIDs {
-		if emID == id {
-			return typeEM
-		}
-	}
-
-	// Check if ID matches EM1 component
-	for _, em1ID := range em1IDs {
-		if em1ID == id {
-			return typeEM1
-		}
-	}
-
-	// Default to first available type
-	if len(emIDs) > 0 {
-		return typeEM
-	}
-	if len(em1IDs) > 0 {
-		return typeEM1
-	}
-
-	return typeAuto
-}
-
 // NewCommand creates the energy status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
@@ -91,7 +53,7 @@ per-phase data and totals.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", typeAuto, "Component type (auto, em, em1)")
+	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
 
 	return cmd
 }
@@ -101,14 +63,14 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	svc := f.ShellyService()
 
 	// Auto-detect type if not specified
-	if componentType == typeAuto {
-		componentType = detectEnergyComponentType(ctx, ios, svc, device, id)
+	if componentType == shelly.ComponentTypeAuto {
+		componentType = svc.DetectEnergyComponentByID(ctx, ios, device, id)
 	}
 
 	switch componentType {
-	case typeEM:
+	case shelly.ComponentTypeEM:
 		return showEMStatus(ctx, ios, svc, device, id)
-	case typeEM1:
+	case shelly.ComponentTypeEM1:
 		return showEM1Status(ctx, ios, svc, device, id)
 	default:
 		return fmt.Errorf("no energy monitoring components found")
