@@ -50,7 +50,7 @@ Available discovery methods:
   # Scan a subnet
   shelly find scan 192.168.1.0/24`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runDiscover(cmd.Context(), f, timeout, register, skipExisting)
+			return run(cmd.Context(), f, timeout, register, skipExisting)
 		},
 	}
 
@@ -68,8 +68,8 @@ Available discovery methods:
 	return cmd
 }
 
-// runDiscover runs mDNS discovery as the default discovery method.
-func runDiscover(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool) error {
+// run runs mDNS discovery as the default discovery method.
+func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool) error {
 	ios := f.IOStreams()
 
 	if timeout == 0 {
