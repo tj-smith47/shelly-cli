@@ -169,3 +169,121 @@ func (s *Service) CheckFirmwareAll(ctx context.Context, ios *iostreams.IOStreams
 
 	return results
 }
+
+// DeviceUpdateStatus holds the status of a device for update operations.
+type DeviceUpdateStatus struct {
+	Name      string
+	Info      *FirmwareInfo
+	HasUpdate bool
+}
+
+// CheckDevicesForUpdates checks multiple devices for firmware updates and returns those needing updates.
+// The staged parameter controls what percentage of devices with updates to return (for staged rollouts).
+func (s *Service) CheckDevicesForUpdates(ctx context.Context, ios *iostreams.IOStreams, devices []string, staged int) []DeviceUpdateStatus {
+	ios.StartProgress("Checking devices for updates...")
+
+	var (
+		statuses []DeviceUpdateStatus
+		mu       sync.Mutex
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(5)
+
+	for _, name := range devices {
+		deviceName := name
+		g.Go(func() error {
+			info, checkErr := s.CheckFirmware(gctx, deviceName)
+			hasUpdate := checkErr == nil && info != nil && info.HasUpdate
+			mu.Lock()
+			statuses = append(statuses, DeviceUpdateStatus{
+				Name:      deviceName,
+				Info:      info,
+				HasUpdate: hasUpdate,
+			})
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		ios.DebugErr("errgroup wait", err)
+	}
+	ios.StopProgress()
+
+	// Filter devices with updates and apply staged percentage
+	var toUpdate []DeviceUpdateStatus
+	for _, s := range statuses {
+		if s.HasUpdate {
+			toUpdate = append(toUpdate, s)
+		}
+	}
+
+	// Apply staged percentage
+	targetCount := len(toUpdate) * staged / 100
+	if targetCount == 0 && staged > 0 && len(toUpdate) > 0 {
+		targetCount = 1
+	}
+	if targetCount < len(toUpdate) {
+		toUpdate = toUpdate[:targetCount]
+	}
+
+	return toUpdate
+}
+
+// UpdateOpts contains options for firmware update operations.
+type UpdateOpts struct {
+	Beta        bool
+	CustomURL   string
+	Parallelism int
+}
+
+// UpdateResult holds the result of a single device update.
+type UpdateResult struct {
+	Name    string
+	Success bool
+	Err     error
+}
+
+// UpdateDevices performs firmware updates on multiple devices concurrently.
+func (s *Service) UpdateDevices(ctx context.Context, ios *iostreams.IOStreams, devices []DeviceUpdateStatus, opts UpdateOpts) []UpdateResult {
+	ios.StartProgress("Updating devices...")
+
+	var (
+		results []UpdateResult
+		mu      sync.Mutex
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(opts.Parallelism)
+
+	for _, status := range devices {
+		dev := status
+		g.Go(func() error {
+			var updateErr error
+			switch {
+			case opts.CustomURL != "":
+				updateErr = s.UpdateFirmwareFromURL(gctx, dev.Name, opts.CustomURL)
+			case opts.Beta:
+				updateErr = s.UpdateFirmwareBeta(gctx, dev.Name)
+			default:
+				updateErr = s.UpdateFirmwareStable(gctx, dev.Name)
+			}
+			mu.Lock()
+			results = append(results, UpdateResult{
+				Name:    dev.Name,
+				Success: updateErr == nil,
+				Err:     updateErr,
+			})
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		ios.DebugErr("errgroup wait", err)
+	}
+	ios.StopProgress()
+
+	return results
+}
