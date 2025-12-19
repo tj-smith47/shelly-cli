@@ -9,6 +9,30 @@ import (
 	"github.com/tj-smith47/shelly-go/gen2/components"
 )
 
+// ValidThermostatModes contains the valid thermostat operating modes.
+var ValidThermostatModes = map[string]bool{
+	"heat": true,
+	"cool": true,
+	"auto": true,
+}
+
+// ValidateThermostatMode validates that a thermostat mode is one of: heat, cool, auto.
+// If allowEmpty is true, an empty string is also valid (used when mode is optional).
+func ValidateThermostatMode(mode string, allowEmpty bool) error {
+	if mode == "" {
+		if allowEmpty {
+			return nil
+		}
+		return fmt.Errorf("mode is required, must be one of: heat, cool, auto")
+	}
+
+	if !ValidThermostatModes[mode] {
+		return fmt.Errorf("invalid mode %q, must be one of: heat, cool, auto", mode)
+	}
+
+	return nil
+}
+
 // ThermostatSchedule represents a schedule targeting a thermostat.
 type ThermostatSchedule struct {
 	ID           int      `json:"id"`

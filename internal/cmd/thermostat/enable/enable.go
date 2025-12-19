@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -62,7 +62,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	// Validate mode if provided
-	if err := validate.Mode(opts.Mode, true); err != nil {
+	if err := shelly.ValidateThermostatMode(opts.Mode, true); err != nil {
 		return err
 	}
 
