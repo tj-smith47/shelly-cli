@@ -3,28 +3,21 @@ package health
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds the command options.
 type Options struct {
 	Threshold time.Duration
-}
-
-// DeviceHealth represents health metrics for a device.
-type DeviceHealth struct {
-	DeviceID      string `json:"device_id"`
-	Online        bool   `json:"online"`
-	LastSeen      string `json:"last_seen"`
-	OnlineCount   int    `json:"online_count"`
-	OfflineCount  int    `json:"offline_count"`
-	ActivityCount int    `json:"activity_count"`
-	Status        string `json:"status"` // healthy, warning, unhealthy
 }
 
 // NewCommand creates the fleet health command.
@@ -40,7 +33,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Check the health status of devices in your fleet.
 
 Reports devices that haven't been seen recently or have frequent
-online/offline transitions indicating connectivity issues.`,
+online/offline transitions indicating connectivity issues.
+
+Requires an active fleet connection. Run 'shelly fleet connect' first.`,
 		Example: `  # Check device health
   shelly fleet health
 
@@ -48,7 +43,7 @@ online/offline transitions indicating connectivity issues.`,
   shelly fleet health --threshold 30m
 
   # JSON output
-  shelly fleet health --json`,
+  shelly fleet health -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), f, opts)
@@ -60,51 +55,65 @@ online/offline transitions indicating connectivity issues.`,
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, _ *Options) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
 
-	// Placeholder health data
-	devices := []DeviceHealth{
-		{DeviceID: "demo-device-1", Online: true, LastSeen: "2s ago", OnlineCount: 100, OfflineCount: 2, ActivityCount: 500, Status: "healthy"},
-		{DeviceID: "demo-device-2", Online: true, LastSeen: "5s ago", OnlineCount: 95, OfflineCount: 5, ActivityCount: 450, Status: "healthy"},
-		{DeviceID: "demo-device-3", Online: false, LastSeen: "2h ago", OnlineCount: 50, OfflineCount: 50, ActivityCount: 100, Status: "unhealthy"},
+	// Get credentials
+	integratorTag := os.Getenv("SHELLY_INTEGRATOR_TAG")
+	integratorToken := os.Getenv("SHELLY_INTEGRATOR_TOKEN")
+
+	cfg, cfgErr := f.Config()
+	if cfgErr != nil {
+		ios.DebugErr("load config", cfgErr)
 	}
+	if cfg != nil {
+		if integratorTag == "" {
+			integratorTag = cfg.Integrator.Tag
+		}
+		if integratorToken == "" {
+			integratorToken = cfg.Integrator.Token
+		}
+	}
+
+	if integratorTag == "" || integratorToken == "" {
+		return fmt.Errorf("integrator credentials required. Run 'shelly fleet connect' first")
+	}
+
+	// Create client and authenticate
+	client := integrator.New(integratorTag, integratorToken)
+	if err := client.Authenticate(ctx); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Create fleet manager and connect
+	fm := integrator.NewFleetManager(client)
+
+	ios.Info("Connecting to fleet...")
+	errors := fm.ConnectAll(ctx, nil)
+	if len(errors) > 0 {
+		for host, err := range errors {
+			ios.Warning("Failed to connect to %s: %v", host, err)
+		}
+	}
+
+	// Get health data from health monitor
+	healthMonitor := fm.HealthMonitor()
+	healthData := healthMonitor.ListDeviceHealth()
 
 	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, devices)
+		return output.FormatOutput(ios.Out, healthData)
 	}
 
-	var healthy, warning, unhealthy int
-	for _, d := range devices {
-		switch d.Status {
-		case "healthy":
-			healthy++
-		case "warning":
-			warning++
-		case "unhealthy":
-			unhealthy++
-		}
+	if len(healthData) == 0 {
+		ios.Warning("No health data available")
+		ios.Info("Device health is tracked over time. Try again after devices have been connected.")
+		return nil
 	}
 
 	ios.Success("Fleet Health Report")
-	ios.Println("")
-	ios.Printf("Summary: %d healthy, %d warning, %d unhealthy\n", healthy, warning, unhealthy)
-	ios.Println("")
+	ios.Println()
 
-	for _, d := range devices {
-		var statusIcon string
-		switch d.Status {
-		case "healthy":
-			statusIcon = "✓"
-		case "warning":
-			statusIcon = "!"
-		case "unhealthy":
-			statusIcon = "✗"
-		}
-
-		ios.Printf("%s %s (%s)\n", statusIcon, d.DeviceID, d.Status)
-		ios.Printf("   Online: %t | Last seen: %s | Activity: %d\n", d.Online, d.LastSeen, d.ActivityCount)
-	}
+	term.DisplayFleetHealth(ios, healthData, opts.Threshold)
 
 	return nil
 }

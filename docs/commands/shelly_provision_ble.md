@@ -1,17 +1,20 @@
 ## shelly provision ble
 
-BLE-based provisioning (not yet implemented)
+Provision a device via Bluetooth Low Energy
 
 ### Synopsis
 
-Provision a device using Bluetooth Low Energy (BLE).
+Provision a Shelly device using Bluetooth Low Energy (BLE).
 
-This command is intended for provisioning devices in AP mode that are not yet
-connected to your network. BLE provisioning requires Bluetooth hardware support.
+This command allows you to configure WiFi credentials and other settings
+on a new device without connecting to its AP network first.
 
-NOTE: This feature is not yet implemented. For now, connect to the device's AP
-network and use 'shelly provision wifi' with the device's AP IP address (usually
-192.168.33.1).
+BLE provisioning requires:
+- Bluetooth hardware support on your computer
+- The device to be in BLE advertising mode (typically when unconfigured)
+- The device's BLE address (usually shown as ShellyXXX-YYYYYYYY)
+
+Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.
 
 ```
 shelly provision ble <device-address> [flags]
@@ -20,18 +23,29 @@ shelly provision ble <device-address> [flags]
 ### Examples
 
 ```
-  # BLE provisioning (future)
-  shelly provision ble ShellyPlus1-ABCD1234
+  # Provision WiFi via BLE
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret"
 
-  # Current workaround: connect to device AP and use wifi provisioning
-  # 1. Connect your computer to "ShellyPlus1-ABCD1234" WiFi network
-  # 2. Run: shelly provision wifi 192.168.33.1
+  # Set device name during provisioning
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --name "Living Room Switch"
+
+  # Configure with timezone
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --timezone "America/New_York"
+
+  # Disable cloud during provisioning
+  shelly provision ble ShellyPlus1-ABCD1234 --ssid "MyNetwork" --password "secret" --no-cloud
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ble
+      --cloud             Enable Shelly Cloud
+  -h, --help              help for ble
+      --name string       Device name to set
+      --no-cloud          Disable Shelly Cloud
+      --password string   WiFi password
+      --ssid string       WiFi network name (required)
+      --timezone string   Timezone (e.g., America/New_York)
 ```
 
 ### Options inherited from parent commands

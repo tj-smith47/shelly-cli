@@ -9,6 +9,8 @@ Check the health status of devices in your fleet.
 Reports devices that haven't been seen recently or have frequent
 online/offline transitions indicating connectivity issues.
 
+Requires an active fleet connection. Run 'shelly fleet connect' first.
+
 ```
 shelly fleet health [flags]
 ```
@@ -23,7 +25,7 @@ shelly fleet health [flags]
   shelly fleet health --threshold 30m
 
   # JSON output
-  shelly fleet health --json
+  shelly fleet health -o json
 ```
 
 ### Options

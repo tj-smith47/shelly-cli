@@ -17,16 +17,24 @@ This simulates the event that would trigger the action URL, causing
 the device to make the configured HTTP request.
 
 .PP
-Note: This feature is currently in development.
+Gen1 devices trigger actions based on actual state changes. This command
+will temporarily change the device state to trigger the action callback.
 
 .PP
-For Gen2 devices, actions are triggered differently - use the device's
-built-in test functionality via the web interface.
+For output actions (out_on_url, out_off_url), the device relay will be toggled.
+For button actions, the physical button press must be used.
+
+.PP
+Gen2+ devices use webhooks. See 'shelly webhook test'.
 
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for test
+
+.PP
+\fB--index\fP=0
+	Action index (for multi-channel devices)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -64,12 +72,14 @@ built-in test functionality via the web interface.
 
 .SH EXAMPLE
 .EX
-  # Test output on action
+  # Test output on action (turns relay on, triggering out_on_url)
   shelly action test living-room out_on_url
 
-  # For Gen1 devices, triggering actions typically requires
-  # actually changing the device state:
-  shelly switch on living-room  # triggers out_on_url
+  # Test output off action
+  shelly action test living-room out_off_url
+
+  # Test action on specific relay
+  shelly action test relay out_on_url --index 1
 .EE
 
 

@@ -9,30 +9,36 @@ Test (trigger) an action on a Gen1 Shelly device.
 This simulates the event that would trigger the action URL, causing
 the device to make the configured HTTP request.
 
-Note: This feature is currently in development.
+Gen1 devices trigger actions based on actual state changes. This command
+will temporarily change the device state to trigger the action callback.
 
-For Gen2 devices, actions are triggered differently - use the device's
-built-in test functionality via the web interface.
+For output actions (out_on_url, out_off_url), the device relay will be toggled.
+For button actions, the physical button press must be used.
+
+Gen2+ devices use webhooks. See 'shelly webhook test'.
 
 ```
-shelly action test <device> <action> [flags]
+shelly action test <device> <event> [flags]
 ```
 
 ### Examples
 
 ```
-  # Test output on action
+  # Test output on action (turns relay on, triggering out_on_url)
   shelly action test living-room out_on_url
 
-  # For Gen1 devices, triggering actions typically requires
-  # actually changing the device state:
-  shelly switch on living-room  # triggers out_on_url
+  # Test output off action
+  shelly action test living-room out_off_url
+
+  # Test action on specific relay
+  shelly action test relay out_on_url --index 1
 ```
 
 ### Options
 
 ```
-  -h, --help   help for test
+  -h, --help        help for test
+      --index int   Action index (for multi-channel devices)
 ```
 
 ### Options inherited from parent commands

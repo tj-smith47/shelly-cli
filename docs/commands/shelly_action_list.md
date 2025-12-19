@@ -6,14 +6,13 @@ List action URLs for a Gen1 device
 
 List all configured action URLs for a Gen1 Shelly device.
 
-Gen1 devices use HTTP-based settings for action URLs. This command shows
-all configured actions and their target URLs.
+Gen1 devices support various action types that trigger HTTP callbacks:
+  - out_on_url, out_off_url: Output state change actions
+  - btn_on_url, btn_off_url: Button toggle actions
+  - longpush_url, shortpush_url: Button press duration actions
+  - roller_open_url, roller_close_url, roller_stop_url: Roller actions
 
-Note: This feature is currently in development. Gen1 device support requires
-direct HTTP communication rather than the RPC protocol used by Gen2 devices.
-
-Workaround: Access the device's web interface at http://<device-ip>/settings
-to view and configure action URLs.
+Gen2+ devices use webhooks instead. See 'shelly webhook list'.
 
 ```
 shelly action list <device> [flags]
@@ -25,8 +24,8 @@ shelly action list <device> [flags]
   # List actions for a device
   shelly action list living-room
 
-  # Workaround: use curl to get settings
-  curl http://192.168.1.100/settings | jq '.actions'
+  # JSON output
+  shelly action list living-room -o json
 ```
 
 ### Options

@@ -100,7 +100,7 @@ internal/
 │
 ├── config/             # Configuration management
 │   ├── config.go       # Config struct, Load(), Save()
-│   ├── manager.go      # Manager (916 lines) - config mutations
+│   ├── manager.go      # Manager - config mutations
 │   ├── devices.go      # Device registry
 │   ├── aliases.go      # Alias management
 │   ├── scenes.go       # Scene management, ParseSceneFile()
@@ -203,7 +203,7 @@ internal/
 │   ├── bthome.go       # BTHome operations
 │   ├── lora.go         # LoRa operations
 │   ├── matter.go       # Matter operations
-│   └── migrate.go      # Migration operations
+│   ├── migrate.go      # Migration operations
 │   │
 │   └── export/         # Export format builders
 │       ├── ansible.go    # BuildAnsibleInventory(), AnsibleInventory
@@ -213,20 +213,34 @@ internal/
 │
 ├── term/               # Terminal presentation (composed displays)
 │   ├── term.go         # Package doc, shared helpers (printTable, formatTemp)
+│   ├── action.go       # DisplayActions - Gen1 action URL display
+│   ├── alert.go        # DisplayAlerts*, DisplayAlertStatus
+│   ├── audit.go        # DisplayAuditResults
+│   ├── automation.go   # DisplayScript*, DisplaySchedule*, DisplayWebhook*
+│   ├── backup.go       # DisplayBackupSummary, DisplayRestorePreview, etc.
+│   ├── benchmark.go    # DisplayBenchmarkResults
+│   ├── ble.go          # DisplayBLEProvisionResult
+│   ├── bthome.go       # DisplayBTHomeDevices*, DisplayBTHomeSensor*
+│   ├── component.go    # DisplaySwitch*, DisplayLight*, DisplayCover*, DisplayInput*
+│   ├── config.go       # DisplayConfigTable, DisplaySceneList, DisplayAliasList
+│   ├── debug.go        # PrintJSONResult, DisplayWebSocketEvent
+│   ├── device.go       # DisplayDeviceStatus, DisplayAllSnapshots
+│   ├── diff.go         # DisplayConfigDiffs, DisplayScriptDiffs, etc.
+│   ├── discovery.go    # DisplayDiscoveredDevices, DisplayBLEDevices
+│   ├── doctor.go       # DisplayDoctorResults, DisplayCheckResult*
+│   ├── energy.go       # DisplayEnergyStatus, DisplayEnergyHistory
+│   ├── event.go        # DisplayEvent, OutputEventJSON
+│   ├── firmware.go     # DisplayFirmwareStatus, DisplayFirmwareInfo
+│   ├── fleet.go        # DisplayFleetStatus, DisplayFleetHealth, DisplayFleetStats
+│   ├── kvs.go          # DisplayKVS*
+│   ├── network.go      # DisplayWiFi*, DisplayEthernet*, DisplayMQTT*, DisplayCloud*
 │   ├── power.go        # DisplayPowerMetrics, DisplayDashboard, DisplayComparison
+│   ├── repl.go         # REPL session display and command handling
+│   ├── scene.go        # DisplaySceneDetails
+│   ├── script.go       # DisplayScriptStatus, DisplayScriptCode
 │   ├── sensor.go       # Generic sensor displays (partial application pattern)
 │   │                   #   DisplayTemperature*, DisplayHumidity*, etc.
-│   ├── component.go    # DisplaySwitch*, DisplayLight*, DisplayCover*, DisplayInput*
-│   ├── device.go       # DisplayDeviceStatus, DisplayAllSnapshots
-│   ├── backup.go       # DisplayBackupSummary, DisplayRestorePreview, etc.
-│   ├── network.go      # DisplayWiFi*, DisplayEthernet*, DisplayMQTT*, DisplayCloud*
-│   ├── firmware.go     # DisplayFirmwareStatus, DisplayFirmwareInfo
-│   ├── automation.go   # DisplayScript*, DisplaySchedule*, DisplayWebhook*
-│   ├── config.go       # DisplayConfigTable, DisplaySceneList, DisplayAliasList
-│   ├── kvs.go          # DisplayKVS*
-│   ├── discovery.go    # DisplayDiscoveredDevices, DisplayBLEDevices
-│   ├── diff.go         # DisplayConfigDiffs, DisplayScriptDiffs, etc.
-│   ├── event.go        # DisplayEvent, OutputEventJSON
+│   ├── shell.go        # Shell session display and command handling
 │   └── version.go      # DisplayVersionInfo, DisplayUpdateAvailable, RunUpdateCheck
 │
 ├── testutil/           # Testing utilities
@@ -425,18 +439,13 @@ Commands in `cmd/` should contain **ONLY**:
 1. `NewCommand(f *cmdutil.Factory) *cobra.Command` - constructor
 2. `run(ctx, f, ...)` - execution logic (simple orchestration)
 
-**Move these OUT of cmd/:**
-- Display functions → `term/`
-- Format functions → `output/`
-- Data collection → `shelly/`
-- Type definitions → `model/`
-- Shared logic → `utils/` or `cmdutil/`
+**Move ALL other private functions OUT of cmd/ using the above decision tree**
 
 ---
 
 ## See Also
 
+- [configuration.md](configuration.md) - Configuration management
 - [development.md](development.md) - Coding patterns and standards
 - [testing.md](testing.md) - Testing strategy
 - [plugins.md](plugins.md) - Plugin system
-- [configuration.md](configuration.md) - Configuration management

@@ -12,6 +12,9 @@ shelly-fleet-stats - View fleet statistics
 .SH DESCRIPTION
 View aggregate statistics for your device fleet.
 
+.PP
+Requires an active fleet connection. Run 'shelly fleet connect' first.
+
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
@@ -57,7 +60,7 @@ View aggregate statistics for your device fleet.
   shelly fleet stats
 
   # JSON output
-  shelly fleet stats --json
+  shelly fleet stats -o json
 .EE
 
 

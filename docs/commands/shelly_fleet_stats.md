@@ -6,6 +6,8 @@ View fleet statistics
 
 View aggregate statistics for your device fleet.
 
+Requires an active fleet connection. Run 'shelly fleet connect' first.
+
 ```
 shelly fleet stats [flags]
 ```
@@ -17,7 +19,7 @@ shelly fleet stats [flags]
   shelly fleet stats
 
   # JSON output
-  shelly fleet stats --json
+  shelly fleet stats -o json
 ```
 
 ### Options

@@ -6,19 +6,19 @@ Set an action URL for a Gen1 device
 
 Set an action URL for a Gen1 Shelly device.
 
-Gen1 devices support various action types:
-  - btn_on_url, btn_off_url: Button toggle actions
-  - out_on_url, out_off_url: Output state change actions
-  - roller_open_url, roller_close_url, roller_stop_url: Roller actions
-  - longpush_url, shortpush_url: Button press duration actions
+Gen1 devices support various action event types:
+  Output events:    out_on_url, out_off_url
+  Button events:    btn1_on_url, btn1_off_url, btn2_on_url, btn2_off_url
+  Input events:     input_on_url, input_off_url
+  Push events:      longpush_url, shortpush_url, double_shortpush_url, triple_shortpush_url
+  Roller events:    roller_open_url, roller_close_url, roller_stop_url
+  Sensor events:    motion_url, no_motion_url, flood_detected_url, etc.
+  System events:    overpower_url, overvoltage_url, overtemperature_url
 
-Note: This feature is currently in development.
-
-Workaround: Use curl to set action URLs directly:
-  curl "http://<device-ip>/settings?<action>=<url>"
+Gen2+ devices use webhooks instead. See 'shelly webhook create'.
 
 ```
-shelly action set <device> <action> <url> [flags]
+shelly action set <device> <event> <url> [flags]
 ```
 
 ### Examples
@@ -27,14 +27,23 @@ shelly action set <device> <action> <url> [flags]
   # Set output on action
   shelly action set living-room out_on_url "http://homeserver/api/light-on"
 
-  # Workaround: use curl
-  curl "http://192.168.1.100/settings?out_on_url=http%3A%2F%2Fhomeserver%2Fapi%2Flight-on"
+  # Set button long press action
+  shelly action set switch longpush_url "http://homeserver/api/dim-lights"
+
+  # Set action at a specific index (for multi-channel devices)
+  shelly action set relay out_on_url "http://server/trigger" --index 1
+
+  # Set action but leave it disabled
+  shelly action set switch out_on_url "http://server/test" --disabled
 ```
 
 ### Options
 
 ```
-  -h, --help   help for set
+      --disabled    Disable the action (same as --enabled=false)
+      --enabled     Enable the action (default true)
+  -h, --help        help for set
+      --index int   Action index (for multi-channel devices)
 ```
 
 ### Options inherited from parent commands

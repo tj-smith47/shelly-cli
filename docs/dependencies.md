@@ -16,6 +16,7 @@ require (
     github.com/AlecAivazis/survey/v2        // Interactive prompts
     github.com/briandowns/spinner           // Progress spinners
     github.com/olekukonko/tablewriter       // Table output (non-TUI)
+    github.com/skip2/go-qrcode              // QR code generation (ASCII terminal output)
     golang.org/x/sync/errgroup              // Concurrent operations
     gopkg.in/yaml.v3                        // YAML support
 )

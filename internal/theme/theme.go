@@ -138,6 +138,27 @@ func ApplyConfig(name string, colors map[string]string, filePath string) error {
 	return nil
 }
 
+// SaveTheme saves the theme name to configuration file.
+func SaveTheme(themeName string) error {
+	viper.Set("theme", themeName)
+
+	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		// Create default config path
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		configDir := filepath.Join(home, ".config", "shelly")
+		if err := os.MkdirAll(configDir, 0o700); err != nil {
+			return err
+		}
+		configFile = filepath.Join(configDir, "config.yaml")
+	}
+
+	return viper.WriteConfigAs(configFile)
+}
+
 // applyFromFile loads and applies theme configuration from a file.
 func applyFromFile(filePath string) error {
 	expanded := expandPath(filePath)

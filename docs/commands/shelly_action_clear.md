@@ -9,13 +9,18 @@ Clear (remove) an action URL for a Gen1 Shelly device.
 This removes the configured URL for the specified action, disabling the
 HTTP callback for that event.
 
-Note: This feature is currently in development.
+Gen1 devices support various action event types:
+  Output events:    out_on_url, out_off_url
+  Button events:    btn1_on_url, btn1_off_url, btn2_on_url, btn2_off_url
+  Input events:     input_on_url, input_off_url
+  Push events:      longpush_url, shortpush_url, double_shortpush_url, triple_shortpush_url
+  Roller events:    roller_open_url, roller_close_url, roller_stop_url
+  Sensor events:    motion_url, no_motion_url, flood_detected_url, etc.
 
-Workaround: Use curl to clear action URLs directly:
-  curl "http://<device-ip>/settings?<action>="
+Gen2+ devices use webhooks instead. See 'shelly webhook delete'.
 
 ```
-shelly action clear <device> <action> [flags]
+shelly action clear <device> <event> [flags]
 ```
 
 ### Examples
@@ -24,14 +29,18 @@ shelly action clear <device> <action> [flags]
   # Clear output on action
   shelly action clear living-room out_on_url
 
-  # Workaround: use curl
-  curl "http://192.168.1.100/settings?out_on_url="
+  # Clear button long press action
+  shelly action clear switch longpush_url
+
+  # Clear action at a specific index
+  shelly action clear relay out_on_url --index 1
 ```
 
 ### Options
 
 ```
-  -h, --help   help for clear
+  -h, --help        help for clear
+      --index int   Action index (for multi-channel devices)
 ```
 
 ### Options inherited from parent commands

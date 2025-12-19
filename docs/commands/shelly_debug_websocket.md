@@ -1,17 +1,16 @@
 ## shelly debug websocket
 
-Debug WebSocket connection
+Debug WebSocket connection and stream events
 
 ### Synopsis
 
-Debug WebSocket connection to a Shelly device.
+Debug WebSocket connection and stream real-time events from a Shelly device.
 
-This command shows WebSocket configuration and attempts to verify
-connectivity. Gen2+ devices support WebSocket for real-time event
-notifications.
+This command connects to a Gen2+ device via WebSocket and streams all
+notifications (state changes, sensor updates, button presses, etc.) in real-time.
 
-Note: Full WebSocket event streaming requires the shelly-go WebSocket
-transport which is not yet integrated into the CLI.
+Gen2+ devices support WebSocket at ws://<device>/rpc for bidirectional
+communication and event notifications.
 
 ```
 shelly debug websocket <device> [flags]
@@ -20,18 +19,25 @@ shelly debug websocket <device> [flags]
 ### Examples
 
 ```
-  # Check WebSocket configuration
+  # Stream events for 30 seconds (default)
   shelly debug websocket living-room
 
-  # Monitor for a specific duration (placeholder)
-  shelly debug websocket living-room --duration 30s
+  # Stream events for 5 minutes
+  shelly debug websocket living-room --duration 5m
+
+  # Stream events indefinitely (until Ctrl+C)
+  shelly debug websocket living-room --duration 0
+
+  # Raw JSON output
+  shelly debug websocket living-room --raw
 ```
 
 ### Options
 
 ```
-      --duration duration   Monitoring duration (not yet implemented) (default 10s)
+      --duration duration   Monitoring duration (0 for indefinite) (default 30s)
   -h, --help                help for websocket
+      --raw                 Output raw JSON events
 ```
 
 ### Options inherited from parent commands

@@ -6,11 +6,8 @@ Get device debug log (Gen1)
 
 Get the debug log from a Gen1 Shelly device.
 
-Note: This command only works with Gen1 devices. Gen2+ devices use a
-different logging mechanism via RPC.
-
-For Gen2+ devices, use:
-  shelly debug rpc <device> Sys.GetStatus
+This command only works with Gen1 devices. Gen2+ devices use a
+different logging mechanism via WebSocket or RPC.
 
 Gen1 debug logs can help diagnose connectivity issues, action URL problems,
 and other device behavior.

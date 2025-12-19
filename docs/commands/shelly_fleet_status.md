@@ -9,6 +9,8 @@ View the status of all devices in your fleet.
 Shows online/offline status and last seen time for each device
 connected through Shelly Cloud.
 
+Requires an active fleet connection. Run 'shelly fleet connect' first.
+
 ```
 shelly fleet status [flags]
 ```
@@ -26,7 +28,7 @@ shelly fleet status [flags]
   shelly fleet status --offline
 
   # JSON output
-  shelly fleet status --json
+  shelly fleet status -o json
 ```
 
 ### Options

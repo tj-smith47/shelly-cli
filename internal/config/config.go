@@ -37,6 +37,9 @@ type Config struct {
 	// Cloud settings
 	Cloud CloudConfig `mapstructure:"cloud"`
 
+	// Integrator settings
+	Integrator IntegratorConfig `mapstructure:"integrator"`
+
 	// Device registry
 	Devices map[string]model.Device `mapstructure:"devices"`
 
@@ -121,6 +124,12 @@ type CloudConfig struct {
 	AccessToken  string `mapstructure:"access_token"`
 	RefreshToken string `mapstructure:"refresh_token"`
 	ServerURL    string `mapstructure:"server_url"`
+}
+
+// IntegratorConfig holds Shelly Integrator API settings.
+type IntegratorConfig struct {
+	Tag   string `mapstructure:"tag"`
+	Token string `mapstructure:"token"`
 }
 
 // Alias represents a command alias.

@@ -3,26 +3,21 @@ package status
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds the command options.
 type Options struct {
 	Online  bool
 	Offline bool
-}
-
-// DeviceStatus represents a device in the fleet.
-type DeviceStatus struct {
-	DeviceID string `json:"device_id"`
-	Name     string `json:"name,omitempty"`
-	Host     string `json:"host"`
-	Online   bool   `json:"online"`
-	LastSeen string `json:"last_seen,omitempty"`
 }
 
 // NewCommand creates the fleet status command.
@@ -36,7 +31,9 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `View the status of all devices in your fleet.
 
 Shows online/offline status and last seen time for each device
-connected through Shelly Cloud.`,
+connected through Shelly Cloud.
+
+Requires an active fleet connection. Run 'shelly fleet connect' first.`,
 		Example: `  # View all device status
   shelly fleet status
 
@@ -47,7 +44,7 @@ connected through Shelly Cloud.`,
   shelly fleet status --offline
 
   # JSON output
-  shelly fleet status --json`,
+  shelly fleet status -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), f, opts)
@@ -60,48 +57,79 @@ connected through Shelly Cloud.`,
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
 
-	// Placeholder status data
-	devices := []DeviceStatus{
-		{DeviceID: "demo-device-1", Name: "Living Room", Host: "shelly-13-eu.shelly.cloud", Online: true, LastSeen: "2s ago"},
-		{DeviceID: "demo-device-2", Name: "Kitchen", Host: "shelly-13-eu.shelly.cloud", Online: true, LastSeen: "5s ago"},
-		{DeviceID: "demo-device-3", Name: "Bedroom", Host: "shelly-13-eu.shelly.cloud", Online: false, LastSeen: "2h ago"},
+	// Get credentials
+	integratorTag := os.Getenv("SHELLY_INTEGRATOR_TAG")
+	integratorToken := os.Getenv("SHELLY_INTEGRATOR_TOKEN")
+
+	cfg, cfgErr := f.Config()
+	if cfgErr != nil {
+		ios.DebugErr("load config", cfgErr)
+	}
+	if cfg != nil {
+		if integratorTag == "" {
+			integratorTag = cfg.Integrator.Tag
+		}
+		if integratorToken == "" {
+			integratorToken = cfg.Integrator.Token
+		}
 	}
 
+	if integratorTag == "" || integratorToken == "" {
+		return fmt.Errorf("integrator credentials required. Run 'shelly fleet connect' first")
+	}
+
+	// Create client and authenticate
+	client := integrator.New(integratorTag, integratorToken)
+	if err := client.Authenticate(ctx); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Create fleet manager and connect
+	fm := integrator.NewFleetManager(client)
+
+	// Connect to all hosts
+	ios.Info("Connecting to fleet...")
+	errors := fm.ConnectAll(ctx, nil)
+	if len(errors) > 0 {
+		for host, err := range errors {
+			ios.Warning("Failed to connect to %s: %v", host, err)
+		}
+	}
+
+	// Get device statuses
+	statuses := fm.ListDeviceStatuses()
+
 	// Filter devices
-	filtered := make([]DeviceStatus, 0, len(devices))
-	for _, d := range devices {
-		if opts.Online && !d.Online {
-			continue
+	if opts.Online || opts.Offline {
+		filtered := make([]*integrator.DeviceStatus, 0, len(statuses))
+		for _, s := range statuses {
+			if opts.Online && !s.Online {
+				continue
+			}
+			if opts.Offline && s.Online {
+				continue
+			}
+			filtered = append(filtered, s)
 		}
-		if opts.Offline && d.Online {
-			continue
-		}
-		filtered = append(filtered, d)
+		statuses = filtered
 	}
 
 	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, filtered)
+		return output.FormatOutput(ios.Out, statuses)
 	}
 
-	if len(filtered) == 0 {
+	if len(statuses) == 0 {
 		ios.Warning("No devices found matching criteria")
 		return nil
 	}
 
-	ios.Success("Fleet Status (%d devices)", len(filtered))
-	ios.Println("")
+	ios.Success("Fleet Status (%d devices)", len(statuses))
+	ios.Println()
 
-	for _, d := range filtered {
-		status := "●"
-		if !d.Online {
-			status = "○"
-		}
-		ios.Printf("%s %s (%s)\n", status, d.Name, d.DeviceID)
-		ios.Printf("   Host: %s | Last seen: %s\n", d.Host, d.LastSeen)
-	}
+	term.DisplayFleetStatus(ios, statuses)
 
 	return nil
 }

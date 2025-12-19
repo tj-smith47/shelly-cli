@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
@@ -15,6 +16,12 @@ import (
 type Options struct {
 	Host   string
 	Region string
+}
+
+// Cloud hosts by region.
+var cloudHosts = map[string][]string{
+	"eu": {"shelly-13-eu.shelly.cloud", "shelly-14-eu.shelly.cloud"},
+	"us": {"shelly-15-us.shelly.cloud", "shelly-16-us.shelly.cloud"},
 }
 
 // NewCommand creates the fleet connect command.
@@ -53,20 +60,36 @@ to a specific cloud host.`,
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
 
-	// Check for credentials
+	// Get credentials from environment or config
 	integratorTag := os.Getenv("SHELLY_INTEGRATOR_TAG")
 	integratorToken := os.Getenv("SHELLY_INTEGRATOR_TOKEN")
 
+	// Try config if not in environment
+	if integratorTag == "" || integratorToken == "" {
+		cfg, cfgErr := f.Config()
+		if cfgErr != nil {
+			ios.DebugErr("load config", cfgErr)
+		}
+		if cfg != nil {
+			if integratorTag == "" {
+				integratorTag = cfg.Integrator.Tag
+			}
+			if integratorToken == "" {
+				integratorToken = cfg.Integrator.Token
+			}
+		}
+	}
+
 	if integratorTag == "" || integratorToken == "" {
 		ios.Warning("Integrator credentials not configured")
-		ios.Println("")
+		ios.Println()
 		ios.Info("Set the following environment variables:")
-		ios.Printf("  SHELLY_INTEGRATOR_TAG=your-integrator-tag\n")
-		ios.Printf("  SHELLY_INTEGRATOR_TOKEN=your-integrator-token\n")
-		ios.Println("")
+		ios.Printf("  export SHELLY_INTEGRATOR_TAG=your-integrator-tag\n")
+		ios.Printf("  export SHELLY_INTEGRATOR_TOKEN=your-integrator-token\n")
+		ios.Println()
 		ios.Info("Or add to config file (~/.config/shelly/config.yaml):")
 		ios.Printf("  integrator:\n")
 		ios.Printf("    tag: your-integrator-tag\n")
@@ -74,19 +97,62 @@ func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
 		return fmt.Errorf("integrator credentials required")
 	}
 
-	// Note: This is a placeholder implementation
-	// Full implementation requires integrator package integration
-	switch {
-	case opts.Host != "":
-		ios.Success("Connected to host: %s", opts.Host)
-	case opts.Region != "":
-		ios.Success("Connected to %s region", opts.Region)
-	default:
-		ios.Success("Connected to all regions")
+	// Create integrator client
+	client := integrator.New(integratorTag, integratorToken)
+
+	// Authenticate first
+	ios.Info("Authenticating with Shelly Cloud...")
+	if err := client.Authenticate(ctx); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	ios.Println("")
-	ios.Info("Fleet management ready. Use 'shelly fleet status' to view devices.")
+	// Create fleet manager
+	fm := integrator.NewFleetManager(client)
+
+	// Determine hosts to connect to
+	var hosts []string
+	switch {
+	case opts.Host != "":
+		hosts = []string{opts.Host}
+	case opts.Region != "":
+		regionHosts, ok := cloudHosts[opts.Region]
+		if !ok {
+			return fmt.Errorf("unknown region: %s (valid: eu, us)", opts.Region)
+		}
+		hosts = regionHosts
+	default:
+		// Connect to all regions
+		for _, h := range cloudHosts {
+			hosts = append(hosts, h...)
+		}
+	}
+
+	// Connect to hosts
+	connectOpts := &integrator.ConnectOptions{}
+	var successCount, failCount int
+
+	for _, host := range hosts {
+		ios.Info("Connecting to %s...", host)
+		if _, err := fm.Connect(ctx, host, connectOpts); err != nil {
+			ios.Warning("  Failed: %v", err)
+			failCount++
+		} else {
+			ios.Success("  Connected")
+			successCount++
+		}
+	}
+
+	ios.Println()
+	if successCount > 0 {
+		ios.Success("Connected to %d host(s)", successCount)
+		if failCount > 0 {
+			ios.Warning("%d host(s) failed to connect", failCount)
+		}
+		ios.Println()
+		ios.Info("Fleet management ready. Use 'shelly fleet status' to view devices.")
+	} else {
+		return fmt.Errorf("failed to connect to any hosts")
+	}
 
 	return nil
 }

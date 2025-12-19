@@ -12,26 +12,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
-// ThemeExport represents an exported theme configuration.
-type ThemeExport struct {
-	Name           string            `yaml:"name" json:"name"`
-	ColorOverrides map[string]string `yaml:"color_overrides,omitempty" json:"color_overrides,omitempty"`
-	RenderedColors RenderedColors    `yaml:"rendered_colors" json:"rendered_colors"`
-}
-
-// RenderedColors represents the actual color values being used (base + overrides).
-type RenderedColors struct {
-	Foreground  string `yaml:"foreground" json:"foreground"`
-	Background  string `yaml:"background" json:"background"`
-	Green       string `yaml:"green" json:"green"`
-	Red         string `yaml:"red" json:"red"`
-	Yellow      string `yaml:"yellow" json:"yellow"`
-	Blue        string `yaml:"blue" json:"blue"`
-	Cyan        string `yaml:"cyan" json:"cyan"`
-	Purple      string `yaml:"purple" json:"purple"`
-	BrightBlack string `yaml:"bright_black" json:"bright_black"`
-}
-
 // NewCommand creates the theme export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
@@ -72,9 +52,9 @@ func run(f *cmdutil.Factory, file string) error {
 	}
 
 	// Build export data
-	export := ThemeExport{
+	export := theme.Export{
 		Name: current.ID,
-		RenderedColors: RenderedColors{
+		RenderedColors: theme.RenderedColors{
 			Foreground:  theme.ColorToHex(theme.Fg()),
 			Background:  theme.ColorToHex(theme.Bg()),
 			Green:       theme.ColorToHex(theme.Green()),

@@ -45,7 +45,7 @@ and BLE-based provisioning for devices in AP mode.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly provision ble](shelly_provision_ble.md)	 - BLE-based provisioning (not yet implemented)
+* [shelly provision ble](shelly_provision_ble.md)	 - Provision a device via Bluetooth Low Energy
 * [shelly provision bulk](shelly_provision_bulk.md)	 - Bulk provision from config file
 * [shelly provision wifi](shelly_provision_wifi.md)	 - Interactive WiFi provisioning
 

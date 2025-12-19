@@ -31,3 +31,59 @@ func PrintJSONResult(ios *iostreams.IOStreams, header string, result any) {
 	ios.Println(string(jsonBytes))
 	ios.Println()
 }
+
+// DisplayWebSocketEvent displays a WebSocket notification event.
+func DisplayWebSocketEvent(ios *iostreams.IOStreams, timestamp string, data []byte) {
+	// Parse the notification to extract method
+	var notif struct {
+		Method string          `json:"method"`
+		Params json.RawMessage `json:"params,omitempty"`
+		Src    string          `json:"src,omitempty"`
+	}
+
+	if err := json.Unmarshal(data, &notif); err != nil {
+		// If we can't parse, just show raw data
+		ios.Printf("[%s] %s\n", timestamp, string(data))
+		return
+	}
+
+	// Format the event nicely
+	methodStyle := theme.Highlight().Render(notif.Method)
+	ios.Printf("[%s] %s", timestamp, methodStyle)
+
+	if notif.Src != "" {
+		ios.Printf(" from %s", notif.Src)
+	}
+	ios.Println()
+
+	// Pretty print params if present
+	if len(notif.Params) > 0 && string(notif.Params) != "null" {
+		var params any
+		if err := json.Unmarshal(notif.Params, &params); err == nil {
+			prettyParams, prettyErr := json.MarshalIndent(params, "  ", "  ")
+			if prettyErr != nil {
+				ios.DebugErr("marshal params", prettyErr)
+			} else {
+				ios.Printf("  %s\n", string(prettyParams))
+			}
+		}
+	}
+}
+
+// DisplayWebSocketConnectionState displays a WebSocket connection state change.
+func DisplayWebSocketConnectionState(ios *iostreams.IOStreams, state string) {
+	switch state {
+	case "Connected":
+		ios.Success("WebSocket connected")
+	case "Disconnected":
+		ios.Warning("WebSocket disconnected")
+	case "Reconnecting":
+		ios.Info("WebSocket reconnecting...")
+	case "Connecting":
+		ios.Info("WebSocket connecting...")
+	case "Closed":
+		ios.Info("WebSocket closed")
+	default:
+		ios.Info("WebSocket state: %s", state)
+	}
+}

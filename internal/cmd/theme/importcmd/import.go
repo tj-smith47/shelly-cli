@@ -9,21 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
-
-// ThemeImport represents an imported theme configuration.
-// Supports both the old format (id only) and new format (name + colors).
-type ThemeImport struct {
-	// New format fields
-	Name   string            `yaml:"name" json:"name,omitempty"`
-	Colors map[string]string `yaml:"colors" json:"colors,omitempty"`
-
-	// Old format fields (backwards compatible)
-	ID          string `yaml:"id" json:"id,omitempty"`
-	DisplayName string `yaml:"display_name,omitempty" json:"display_name,omitempty"`
-}
 
 // NewCommand creates the theme import command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
@@ -62,7 +50,7 @@ func run(f *cmdutil.Factory, file string, apply bool) error {
 	}
 
 	// Parse the theme
-	var imported ThemeImport
+	var imported theme.Import
 	if err := yaml.Unmarshal(data, &imported); err != nil {
 		return fmt.Errorf("failed to parse theme file: %w", err)
 	}
@@ -88,33 +76,9 @@ func run(f *cmdutil.Factory, file string, apply bool) error {
 	}
 
 	if apply {
-		return applyImportedTheme(ios, themeName, imported.Colors)
+		return term.ApplyImportedTheme(ios, themeName, imported.Colors)
 	}
 
-	displayValidationResult(ios, themeName, imported.Colors)
+	term.DisplayValidationResult(ios, themeName, imported.Colors)
 	return nil
-}
-
-func applyImportedTheme(ios *iostreams.IOStreams, themeName string, colors map[string]string) error {
-	if err := theme.ApplyConfig(themeName, colors, ""); err != nil {
-		return fmt.Errorf("failed to apply theme: %w", err)
-	}
-
-	if len(colors) > 0 {
-		ios.Success("Theme '%s' with %d color overrides imported and applied", themeName, len(colors))
-	} else {
-		ios.Success("Theme '%s' imported and applied", themeName)
-	}
-	return nil
-}
-
-func displayValidationResult(ios *iostreams.IOStreams, themeName string, colors map[string]string) {
-	ios.Success("Theme file validated successfully")
-	if themeName != "" {
-		ios.Info("Base theme: %s", themeName)
-	}
-	if len(colors) > 0 {
-		ios.Info("Color overrides: %d", len(colors))
-	}
-	ios.Info("Use --apply to apply the theme")
 }

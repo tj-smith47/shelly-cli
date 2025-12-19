@@ -3,11 +3,8 @@ package set
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -58,7 +55,7 @@ func run(f *cmdutil.Factory, themeName string, save bool) error {
 
 	// Save to config if requested
 	if save {
-		if err := saveThemeToConfig(themeName); err != nil {
+		if err := theme.SaveTheme(themeName); err != nil {
 			return fmt.Errorf("failed to save theme to config: %w", err)
 		}
 		ios.Success("Theme set to '%s' and saved to config", themeName)
@@ -67,24 +64,4 @@ func run(f *cmdutil.Factory, themeName string, save bool) error {
 	}
 
 	return nil
-}
-
-func saveThemeToConfig(themeName string) error {
-	viper.Set("theme", themeName)
-
-	configFile := viper.ConfigFileUsed()
-	if configFile == "" {
-		// Create default config path
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		configDir := filepath.Join(home, ".config", "shelly")
-		if err := os.MkdirAll(configDir, 0o700); err != nil {
-			return err
-		}
-		configFile = filepath.Join(configDir, "config.yaml")
-	}
-
-	return viper.WriteConfigAs(configFile)
 }

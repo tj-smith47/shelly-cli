@@ -57,5 +57,5 @@ WARNING: Some debug commands may affect device behavior. Use with caution.
 * [shelly debug log](shelly_debug_log.md)	 - Get device debug log (Gen1)
 * [shelly debug methods](shelly_debug_methods.md)	 - List available RPC methods
 * [shelly debug rpc](shelly_debug_rpc.md)	 - Execute a raw RPC call
-* [shelly debug websocket](shelly_debug_websocket.md)	 - Debug WebSocket connection
+* [shelly debug websocket](shelly_debug_websocket.md)	 - Debug WebSocket connection and stream events
 
