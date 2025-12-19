@@ -564,3 +564,13 @@ func RenderProgressBar(value, maxVal int) string {
 	}
 	return theme.Dim().Render("[") + bar + theme.Dim().Render("]")
 }
+
+// EscapeWiFiQR escapes special characters in WiFi QR content.
+// Escapes: backslash, semicolon, comma, colon.
+func EscapeWiFiQR(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, ";", "\\;")
+	s = strings.ReplaceAll(s, ",", "\\,")
+	s = strings.ReplaceAll(s, ":", "\\:")
+	return s
+}

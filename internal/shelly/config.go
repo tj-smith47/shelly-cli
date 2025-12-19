@@ -670,3 +670,20 @@ func calculateHA1(user, realm, password string) string {
 	hash := md5.Sum([]byte(data)) //nolint:gosec // Required by Shelly digest auth protocol
 	return hex.EncodeToString(hash[:])
 }
+
+// ExtractWiFiSSID extracts the station SSID from a raw WiFi.GetConfig result.
+func ExtractWiFiSSID(rawResult any) string {
+	wifiBytes, err := json.Marshal(rawResult)
+	if err != nil {
+		return ""
+	}
+	var wifiConfig struct {
+		Sta struct {
+			SSID string `json:"ssid"`
+		} `json:"sta"`
+	}
+	if err := json.Unmarshal(wifiBytes, &wifiConfig); err != nil {
+		return ""
+	}
+	return wifiConfig.Sta.SSID
+}

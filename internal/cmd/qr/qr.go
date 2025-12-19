@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds the command options.
@@ -29,23 +29,6 @@ type DeviceQRInfo struct {
 	WebURL    string `json:"web_url"`
 	WiFiSSID  string `json:"wifi_ssid,omitempty"`
 	QRContent string `json:"qr_content"`
-}
-
-// extractWiFiSSID extracts the station SSID from WiFi config.
-func extractWiFiSSID(rawResult any) string {
-	wifiBytes, err := json.Marshal(rawResult)
-	if err != nil {
-		return ""
-	}
-	var wifiConfig struct {
-		Sta struct {
-			SSID string `json:"ssid"`
-		} `json:"sta"`
-	}
-	if err := json.Unmarshal(wifiBytes, &wifiConfig); err != nil {
-		return ""
-	}
-	return wifiConfig.Sta.SSID
 }
 
 // NewCommand creates the qr command.
@@ -125,7 +108,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	var wifiSSID string
 	if opts.WiFi {
 		if wifiResult, err := conn.Call(ctx, "WiFi.GetConfig", nil); err == nil {
-			wifiSSID = extractWiFiSSID(wifiResult)
+			wifiSSID = shelly.ExtractWiFiSSID(wifiResult)
 		}
 	}
 
@@ -139,7 +122,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	if opts.WiFi && wifiSSID != "" {
 		// WiFi QR format: WIFI:S:<SSID>;T:<TYPE>;P:<PASSWORD>;;
 		// Since we don't have the password, just show the SSID
-		qrContent = fmt.Sprintf("WIFI:S:%s;T:WPA;;", escapeWiFiQR(wifiSSID))
+		qrContent = fmt.Sprintf("WIFI:S:%s;T:WPA;;", output.EscapeWiFiQR(wifiSSID))
 	}
 
 	info := DeviceQRInfo{
@@ -184,14 +167,4 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	ios.Info("Or use any online QR generator with the above content.")
 
 	return nil
-}
-
-// escapeWiFiQR escapes special characters in WiFi QR content.
-func escapeWiFiQR(s string) string {
-	// Escape special characters for WiFi QR format
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, ";", "\\;")
-	s = strings.ReplaceAll(s, ",", "\\,")
-	s = strings.ReplaceAll(s, ":", "\\:")
-	return s
 }
