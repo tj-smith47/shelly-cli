@@ -129,7 +129,7 @@ func displayTemperature(ios *iostreams.IOStreams, status *components.ThermostatS
 func displayValve(ios *iostreams.IOStreams, status *components.ThermostatStatus) {
 	ios.Println("  " + theme.Highlight().Render("Valve:"))
 	if status.Pos != nil {
-		posBar := renderProgressBar(*status.Pos, 100)
+		posBar := output.RenderProgressBar(*status.Pos, 100)
 		ios.Printf("    Position: %s %d%%\n", posBar, *status.Pos)
 	}
 	if status.Output != nil {
@@ -178,22 +178,4 @@ func displayFlagsAndErrors(ios *iostreams.IOStreams, status *components.Thermost
 		}
 		ios.Println()
 	}
-}
-
-func renderProgressBar(value, maxVal int) string {
-	const barWidth = 20
-	filled := (value * barWidth) / maxVal
-	if filled > barWidth {
-		filled = barWidth
-	}
-	bar := ""
-	for range barWidth {
-		if filled > 0 {
-			bar += "█"
-			filled--
-		} else {
-			bar += "░"
-		}
-	}
-	return theme.Dim().Render("[") + bar + theme.Dim().Render("]")
 }

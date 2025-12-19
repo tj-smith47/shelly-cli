@@ -532,3 +532,24 @@ func PadRight(s string, length int) string {
 	}
 	return s + strings.Repeat(" ", length-len(s))
 }
+
+// RenderProgressBar renders a text-based progress bar.
+// value is the current value, maxVal is the maximum value.
+// The bar width is fixed at 20 characters.
+func RenderProgressBar(value, maxVal int) string {
+	const barWidth = 20
+	filled := (value * barWidth) / maxVal
+	if filled > barWidth {
+		filled = barWidth
+	}
+	bar := ""
+	for range barWidth {
+		if filled > 0 {
+			bar += "█"
+			filled--
+		} else {
+			bar += "░"
+		}
+	}
+	return theme.Dim().Render("[") + bar + theme.Dim().Render("]")
+}
