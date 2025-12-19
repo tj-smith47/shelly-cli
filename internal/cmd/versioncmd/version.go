@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/github"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
@@ -66,12 +67,12 @@ func run(ctx context.Context, f *cmdutil.Factory, short, jsonOut, checkUpdate bo
 		return nil
 	}
 
-	cmdutil.DisplayVersionInfo(ios, info.Version, info.Commit, info.Date, info.BuiltBy, info.GoVersion, info.OS, info.Arch)
+	term.DisplayVersionInfo(ios, info.Version, info.Commit, info.Date, info.BuiltBy, info.GoVersion, info.OS, info.Arch)
 
 	if checkUpdate {
-		cmdutil.RunUpdateCheck(ctx, ios, checker)
+		term.RunUpdateCheck(ctx, ios, checker)
 	} else if cached := version.ReadCachedVersion(); cached != "" && github.IsNewerVersion(info.Version, cached) {
-		cmdutil.DisplayUpdateAvailable(ios, info.Version, cached)
+		term.DisplayUpdateAvailable(ios, info.Version, cached)
 	}
 	return nil
 }

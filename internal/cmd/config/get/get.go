@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the config get command.
@@ -48,7 +49,7 @@ func run(f *cmdutil.Factory, args []string) error {
 		if output.WantsStructured() {
 			return output.FormatOutput(ios.Out, settings)
 		}
-		return cmdutil.DisplayConfigTable(ios, settings)
+		return term.DisplayConfigTable(ios, settings)
 	}
 
 	key := args[0]

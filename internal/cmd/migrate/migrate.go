@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var (
@@ -171,10 +172,10 @@ func showDryRunPreview(ctx context.Context, svc *shelly.Service, ios *iostreams.
 
 func printDiff(ios *iostreams.IOStreams, d *model.BackupDiff) {
 	// Use consolidated display functions with verbose=false for concise output
-	cmdutil.DisplayConfigDiffs(ios, d.ConfigDiffs, false)
-	cmdutil.DisplayScriptDiffs(ios, d.ScriptDiffs, false)
-	cmdutil.DisplayScheduleDiffs(ios, d.ScheduleDiffs, false)
-	cmdutil.DisplayWebhookDiffs(ios, d.WebhookDiffs, false)
+	term.DisplayConfigDiffs(ios, d.ConfigDiffs, false)
+	term.DisplayScriptDiffs(ios, d.ScriptDiffs, false)
+	term.DisplayScheduleDiffs(ios, d.ScheduleDiffs, false)
+	term.DisplayWebhookDiffs(ios, d.WebhookDiffs, false)
 }
 
 func printResult(ios *iostreams.IOStreams, result *shelly.RestoreResult) {

@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var intervalFlag time.Duration
@@ -68,7 +69,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	// Initial fetch
 	svc.FetchAllSnapshots(ctx, deviceAddrs, snapshots, &mu)
 	mu.Lock()
-	cmdutil.DisplayAllSnapshots(ios, snapshots)
+	term.DisplayAllSnapshots(ios, snapshots)
 	mu.Unlock()
 
 	// Monitoring loop
@@ -82,7 +83,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 		case <-ticker.C:
 			svc.FetchAllSnapshots(ctx, deviceAddrs, snapshots, &mu)
 			mu.Lock()
-			cmdutil.DisplayAllSnapshots(ios, snapshots)
+			term.DisplayAllSnapshots(ios, snapshots)
 			mu.Unlock()
 		}
 	}

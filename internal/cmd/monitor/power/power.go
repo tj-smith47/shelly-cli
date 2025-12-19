@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var (
@@ -63,7 +64,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 
 	var lastSnapshot *shelly.MonitoringSnapshot
 	return svc.MonitorDevice(ctx, device, opts, func(snapshot shelly.MonitoringSnapshot) error {
-		cmdutil.DisplayPowerSnapshot(ios, &snapshot, lastSnapshot)
+		term.DisplayPowerSnapshot(ios, &snapshot, lastSnapshot)
 		lastSnapshot = &snapshot
 		return nil
 	})

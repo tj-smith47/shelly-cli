@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var allFlag bool
@@ -60,7 +61,7 @@ func run(f *cmdutil.Factory, ctx context.Context, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.FirmwareInfo, error) {
 			return svc.CheckFirmware(ctx, device)
 		},
-		cmdutil.DisplayFirmwareInfo)
+		term.DisplayFirmwareInfo)
 }
 
 func runAll(f *cmdutil.Factory, ctx context.Context) error {

@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // SensorListDisplay is a function that displays a sensor list in human-readable format.
@@ -146,7 +147,7 @@ func buildSensorListDisplay[T any](opts SensorOpts[T]) cmdutil.ListDisplay[T] {
 	if opts.AlarmSensorTitle != "" {
 		return func(ios *iostreams.IOStreams, sensors []T) {
 			if alarmSensors, ok := any(sensors).([]model.AlarmSensorReading); ok {
-				cmdutil.DisplayAlarmSensorList(ios, alarmSensors, opts.AlarmSensorTitle, opts.AlarmMessage)
+				term.DisplayAlarmSensorList(ios, alarmSensors, opts.AlarmSensorTitle, opts.AlarmMessage)
 			}
 		}
 	}
@@ -228,7 +229,7 @@ func buildSensorStatusDisplay[T any](opts SensorOpts[T], sensorID int) cmdutil.S
 	if opts.AlarmSensorTitle != "" {
 		return func(ios *iostreams.IOStreams, status T) {
 			if alarmStatus, ok := any(status).(model.AlarmSensorReading); ok {
-				cmdutil.DisplayAlarmSensorStatus(ios, alarmStatus, sensorID, opts.AlarmSensorTitle, opts.AlarmMessage)
+				term.DisplayAlarmSensorStatus(ios, alarmStatus, sensorID, opts.AlarmSensorTitle, opts.AlarmMessage)
 			}
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // DefaultTimeout is the default BLE discovery timeout.
@@ -111,7 +112,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 
 	// Get detailed BLE information
 	bleDevices := bleDiscoverer.GetDiscoveredDevices()
-	cmdutil.DisplayBLEDevices(ios, bleDevices)
+	term.DisplayBLEDevices(ios, bleDevices)
 
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -69,9 +70,9 @@ func run(ctx context.Context, opts *Options) error {
 		},
 		func(ios *iostreams.IOStreams, result *shelly.KVSGetResult) {
 			if opts.Raw {
-				cmdutil.DisplayKVSRaw(ios, result)
+				term.DisplayKVSRaw(ios, result)
 			} else {
-				cmdutil.DisplayKVSResult(ios, opts.Key, result)
+				term.DisplayKVSResult(ios, opts.Key, result)
 			}
 		})
 }

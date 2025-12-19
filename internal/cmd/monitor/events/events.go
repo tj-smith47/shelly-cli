@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var filterFlag string
@@ -62,8 +63,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		}
 
 		if jsonOutput {
-			return cmdutil.OutputEventJSON(ios, event)
+			return term.OutputEventJSON(ios, event)
 		}
-		return cmdutil.DisplayEvent(ios, event)
+		return term.DisplayEvent(ios, event)
 	})
 }

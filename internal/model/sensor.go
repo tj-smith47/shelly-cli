@@ -1,13 +1,19 @@
 // Package model defines core domain types for the Shelly CLI.
 package model
 
+// Sensor is the base interface for all sensor types.
+// Used with Go generics for type-safe, DRY display functions.
+type Sensor interface {
+	GetID() int
+	GetErrors() []string
+}
+
 // AlarmSensor defines the interface for alarm-type sensors (smoke, flood).
 // Used with Go generics for type-safe, DRY display functions.
 type AlarmSensor interface {
-	GetID() int
+	Sensor
 	IsAlarm() bool
 	IsMuted() bool
-	GetErrors() []string
 }
 
 // AlarmSensorReading represents a sensor with alarm and mute state (flood, smoke).
@@ -38,12 +44,24 @@ type TemperatureReading struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
+// GetID implements Sensor.
+func (t TemperatureReading) GetID() int { return t.ID }
+
+// GetErrors implements Sensor.
+func (t TemperatureReading) GetErrors() []string { return t.Errors }
+
 // HumidityReading represents a humidity sensor reading.
 type HumidityReading struct {
 	ID     int      `json:"id"`
 	RH     *float64 `json:"rh"`
 	Errors []string `json:"errors,omitempty"`
 }
+
+// GetID implements Sensor.
+func (h HumidityReading) GetID() int { return h.ID }
+
+// GetErrors implements Sensor.
+func (h HumidityReading) GetErrors() []string { return h.Errors }
 
 // IlluminanceReading represents an illuminance sensor reading.
 type IlluminanceReading struct {
@@ -52,12 +70,24 @@ type IlluminanceReading struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
+// GetID implements Sensor.
+func (i IlluminanceReading) GetID() int { return i.ID }
+
+// GetErrors implements Sensor.
+func (i IlluminanceReading) GetErrors() []string { return i.Errors }
+
 // VoltmeterReading represents a voltmeter sensor reading.
 type VoltmeterReading struct {
 	ID      int      `json:"id"`
 	Voltage *float64 `json:"voltage"`
 	Errors  []string `json:"errors,omitempty"`
 }
+
+// GetID implements Sensor.
+func (v VoltmeterReading) GetID() int { return v.ID }
+
+// GetErrors implements Sensor.
+func (v VoltmeterReading) GetErrors() []string { return v.Errors }
 
 // DevicePowerReading represents a device power (battery) sensor reading.
 type DevicePowerReading struct {
@@ -66,6 +96,12 @@ type DevicePowerReading struct {
 	External DevicePowerExternalStatus `json:"external"`
 	Errors   []string                  `json:"errors,omitempty"`
 }
+
+// GetID implements Sensor.
+func (d DevicePowerReading) GetID() int { return d.ID }
+
+// GetErrors implements Sensor.
+func (d DevicePowerReading) GetErrors() []string { return d.Errors }
 
 // DevicePowerBatteryStatus represents battery information.
 type DevicePowerBatteryStatus struct {

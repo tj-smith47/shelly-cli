@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the auth status command.
@@ -47,5 +48,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.AuthStatus, error) {
 			return svc.GetAuthStatus(ctx, device)
 		},
-		cmdutil.DisplayAuthStatus)
+		term.DisplayAuthStatus)
 }

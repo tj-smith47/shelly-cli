@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var (
@@ -106,5 +107,5 @@ func listClients(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Serv
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WiFiAPClient, error) {
 			return svc.ListWiFiAPClients(ctx, device)
 		},
-		cmdutil.DisplayWiFiAPClients)
+		term.DisplayWiFiAPClients)
 }

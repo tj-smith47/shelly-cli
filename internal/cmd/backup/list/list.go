@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the backup list command.
@@ -102,6 +103,6 @@ func run(f *cmdutil.Factory, dir string) error {
 	}
 
 	// Default table output
-	cmdutil.DisplayBackupsTable(ios, backups)
+	term.DisplayBackupsTable(ios, backups)
 	return nil
 }

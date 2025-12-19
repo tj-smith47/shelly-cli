@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the migrate diff command.
@@ -73,10 +74,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Print differences using consolidated display helpers
-	cmdutil.DisplayConfigDiffs(ios, d.ConfigDiffs, true)
-	cmdutil.DisplayScriptDiffs(ios, d.ScriptDiffs, true)
-	cmdutil.DisplayScheduleDiffs(ios, d.ScheduleDiffs, true)
-	cmdutil.DisplayWebhookDiffs(ios, d.WebhookDiffs, true)
+	term.DisplayConfigDiffs(ios, d.ConfigDiffs, true)
+	term.DisplayScriptDiffs(ios, d.ScriptDiffs, true)
+	term.DisplayScheduleDiffs(ios, d.ScheduleDiffs, true)
+	term.DisplayWebhookDiffs(ios, d.WebhookDiffs, true)
 
 	return nil
 }

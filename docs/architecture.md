@@ -9,7 +9,7 @@ This document defines **where code belongs** in the shelly-cli codebase. For **h
 | I need to... | Put it in... |
 |--------------|--------------|
 | Define a cobra command | `cmd/<domain>/<action>/<action>.go` |
-| Print formatted output to terminal | `cmdutil/display.go` |
+| Print formatted output to terminal | `term/` |
 | Format data to string (no I/O) | `output/` |
 | Implement device operations | `shelly/` |
 | Export data to external format | `shelly/export/` |
@@ -79,12 +79,6 @@ internal/
 │   │                   #   RunWithSpinner(), RunBatch()
 │   │                   #   RunStatus[T](), RunList[T]()
 │   │                   #   PrintResult[T](), PrintListResult[T]()
-│   │
-│   ├── display.go      # IOStreams printers (call output/ formatters)
-│   │                   #   DisplayPowerMetrics(), DisplayDiscoveredDevices()
-│   │                   #   DisplayTemperature*(), DisplayHumidity*()
-│   │                   #   DisplayBackupSummary(), DisplayRestorePreview()
-│   │                   #   DisplayPowerSnapshot(), DisplayAllSnapshots()
 │   │
 │   ├── flags.go        # Flag helpers
 │   │                   #   AddComponentIDFlag(), AddBatchFlags()
@@ -217,6 +211,24 @@ internal/
 │       ├── backup.go     # BackupExporter, ScanBackupFiles(), WriteBackupFile()
 │       └── energy.go     # FormatEMDataCSV(), FormatEM1DataCSV()
 │
+├── term/               # Terminal presentation (composed displays)
+│   ├── term.go         # Package doc, shared helpers (printTable, formatTemp)
+│   ├── power.go        # DisplayPowerMetrics, DisplayDashboard, DisplayComparison
+│   ├── sensor.go       # Generic sensor displays (partial application pattern)
+│   │                   #   DisplayTemperature*, DisplayHumidity*, etc.
+│   ├── component.go    # DisplaySwitch*, DisplayLight*, DisplayCover*, DisplayInput*
+│   ├── device.go       # DisplayDeviceStatus, DisplayAllSnapshots
+│   ├── backup.go       # DisplayBackupSummary, DisplayRestorePreview, etc.
+│   ├── network.go      # DisplayWiFi*, DisplayEthernet*, DisplayMQTT*, DisplayCloud*
+│   ├── firmware.go     # DisplayFirmwareStatus, DisplayFirmwareInfo
+│   ├── automation.go   # DisplayScript*, DisplaySchedule*, DisplayWebhook*
+│   ├── config.go       # DisplayConfigTable, DisplaySceneList, DisplayAliasList
+│   ├── kvs.go          # DisplayKVS*
+│   ├── discovery.go    # DisplayDiscoveredDevices, DisplayBLEDevices
+│   ├── diff.go         # DisplayConfigDiffs, DisplayScriptDiffs, etc.
+│   ├── event.go        # DisplayEvent, OutputEventJSON
+│   └── version.go      # DisplayVersionInfo, DisplayUpdateAvailable, RunUpdateCheck
+│
 ├── testutil/           # Testing utilities
 │   ├── testutil.go     # Test helpers
 │   ├── mock_client.go  # MockClient for testing
@@ -262,8 +274,8 @@ Is it a cobra command definition?
 │
 └── No → Does it write to IOStreams?
     │
-    ├── Yes → cmdutil/display.go
-    │         (wraps output/ formatters with printing)
+    ├── Yes → term/
+    │         (composed display functions wrapping output/)
     │
     └── No → Is it a pure formatter (data → string)?
         │
@@ -298,12 +310,12 @@ Is it a cobra command definition?
 
 ### Display vs Format
 
-The separation between `output/` and `cmdutil/display.go`:
+The separation between `output/` and `term/`:
 
 | Package | Signature | Purpose |
 |---------|-----------|---------|
 | `output/` | `FormatX(data) → string` | Pure formatter, no I/O |
-| `cmdutil/` | `DisplayX(ios, data)` | Prints to terminal |
+| `term/` | `DisplayX(ios, data)` | Prints to terminal |
 
 **Example:**
 
@@ -313,7 +325,7 @@ func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *Table {
     // Returns table data structure
 }
 
-// cmdutil/display.go - IOStreams printer
+// term/discovery.go - IOStreams printer
 func DisplayDiscoveredDevices(ios *iostreams.IOStreams, devices []discovery.DiscoveredDevice) {
     table := output.FormatDiscoveredDevices(devices)
     if table == nil {
@@ -414,7 +426,7 @@ Commands in `cmd/` should contain **ONLY**:
 2. `run(ctx, f, ...)` - execution logic (simple orchestration)
 
 **Move these OUT of cmd/:**
-- Display functions → `cmdutil/display.go`
+- Display functions → `term/`
 - Format functions → `output/`
 - Data collection → `shelly/`
 - Type definitions → `model/`

@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the humidity command group.
@@ -25,7 +26,7 @@ Humidity sensors (DHT22, HTU21D, or similar) provide relative humidity readings.
   shelly sensor humidity status living-room`,
 		Prefix:        "humidity:",
 		StatusMethod:  "Humidity.GetStatus",
-		DisplayList:   cmdutil.DisplayHumidityList,
-		DisplayStatus: cmdutil.DisplayHumidityStatus,
+		DisplayList:   term.DisplayHumidityList,
+		DisplayStatus: term.DisplayHumidityStatus,
 	})
 }

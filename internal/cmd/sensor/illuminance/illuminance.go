@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the illuminance command group.
@@ -26,7 +27,7 @@ useful for automation based on ambient light conditions.`,
   shelly sensor illuminance status living-room`,
 		Prefix:        "illuminance:",
 		StatusMethod:  "Illuminance.GetStatus",
-		DisplayList:   cmdutil.DisplayIlluminanceList,
-		DisplayStatus: cmdutil.DisplayIlluminanceStatus,
+		DisplayList:   term.DisplayIlluminanceList,
+		DisplayStatus: term.DisplayIlluminanceStatus,
 	})
 }

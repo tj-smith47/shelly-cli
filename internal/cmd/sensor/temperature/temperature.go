@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the temperature command group.
@@ -26,7 +27,7 @@ Readings are provided in both Celsius and Fahrenheit.`,
   shelly sensor temperature status living-room`,
 		Prefix:        "temperature:",
 		StatusMethod:  "Temperature.GetStatus",
-		DisplayList:   cmdutil.DisplayTemperatureList,
-		DisplayStatus: cmdutil.DisplayTemperatureStatus,
+		DisplayList:   term.DisplayTemperatureList,
+		DisplayStatus: term.DisplayTemperatureStatus,
 	})
 }

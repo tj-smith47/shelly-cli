@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the config get command.
@@ -87,5 +88,5 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 		return output.PrintYAML(result)
 	}
 
-	return cmdutil.DisplayConfigTable(ios, result)
+	return term.DisplayConfigTable(ios, result)
 }

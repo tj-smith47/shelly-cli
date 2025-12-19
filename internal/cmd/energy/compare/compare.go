@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the energy compare command.
@@ -96,5 +97,5 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, period, from
 		}
 	}
 
-	return cmdutil.PrintResult(ios, comparison, cmdutil.DisplayComparison)
+	return cmdutil.PrintResult(ios, comparison, term.DisplayComparison)
 }

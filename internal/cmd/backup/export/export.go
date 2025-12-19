@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var (
@@ -82,7 +83,7 @@ func run(ctx context.Context, f *cmdutil.Factory, dir string) error {
 	}
 
 	results := exporter.ExportAll(ctx, cfg.Devices, opts)
-	cmdutil.DisplayBackupExportResults(ios, results)
+	term.DisplayBackupExportResults(ios, results)
 
 	ios.Println()
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the device config diff command.
@@ -81,6 +82,6 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 		return nil
 	}
 
-	cmdutil.DisplayConfigDiffsSummary(ios, diffs)
+	term.DisplayConfigDiffsSummary(ios, diffs)
 	return nil
 }

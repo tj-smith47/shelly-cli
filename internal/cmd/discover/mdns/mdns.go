@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
@@ -97,7 +98,7 @@ func run(f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool)
 		return nil
 	}
 
-	cmdutil.DisplayDiscoveredDevices(ios, devices)
+	term.DisplayDiscoveredDevices(ios, devices)
 
 	// Save discovered addresses to completion cache
 	addresses := make([]string, 0, len(devices))

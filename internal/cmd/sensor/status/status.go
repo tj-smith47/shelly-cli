@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -95,6 +96,6 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	cmdutil.DisplayAllSensorData(ios, data, opts.Device)
+	term.DisplayAllSensorData(ios, data, opts.Device)
 	return nil
 }

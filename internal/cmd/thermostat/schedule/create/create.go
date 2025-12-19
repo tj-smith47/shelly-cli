@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds create command options.
@@ -144,7 +145,7 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	cmdutil.DisplayThermostatScheduleCreate(ios, cmdutil.ThermostatScheduleCreateDisplay{
+	term.DisplayThermostatScheduleCreate(ios, term.ThermostatScheduleCreateDisplay{
 		Device:     opts.Device,
 		ScheduleID: resp.ID,
 		Timespec:   opts.Timespec,

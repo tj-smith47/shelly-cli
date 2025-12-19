@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var (
@@ -99,7 +100,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	if dryRunFlag {
 		ios.Title("Dry run - Restore preview")
 		ios.Println()
-		cmdutil.DisplayRestorePreview(ios, backup, opts)
+		term.DisplayRestorePreview(ios, backup, opts)
 		return nil
 	}
 
@@ -115,7 +116,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 
 	// Print results
 	ios.Success("Backup restored to %s", device)
-	cmdutil.DisplayRestoreResult(ios, result)
+	term.DisplayRestoreResult(ios, result)
 
 	return nil
 }

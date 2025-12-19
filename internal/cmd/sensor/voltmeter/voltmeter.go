@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the voltmeter command group.
@@ -26,7 +27,7 @@ power supplies, batteries, or other voltage sources.`,
   shelly sensor voltmeter status device1`,
 		Prefix:        "voltmeter:",
 		StatusMethod:  "Voltmeter.GetStatus",
-		DisplayList:   cmdutil.DisplayVoltmeterList,
-		DisplayStatus: cmdutil.DisplayVoltmeterStatus,
+		DisplayList:   term.DisplayVoltmeterList,
+		DisplayStatus: term.DisplayVoltmeterStatus,
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var statusFlag bool
@@ -62,7 +63,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceID string) error {
 			return fmt.Errorf("failed to get device: %w", err)
 		}
 
-		cmdutil.DisplayCloudDevice(ios, device, statusFlag)
+		term.DisplayCloudDevice(ios, device, statusFlag)
 		return nil
 	})
 }

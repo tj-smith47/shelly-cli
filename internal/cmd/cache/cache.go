@@ -4,7 +4,7 @@ package cache
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmd/cache/clear"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/cache/clearcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/cache/show"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
@@ -28,7 +28,7 @@ The cache stores:
   shelly cache clear`,
 	}
 
-	cmd.AddCommand(clear.NewCommand(f))
+	cmd.AddCommand(clearcmd.NewCommand(f))
 	cmd.AddCommand(show.NewCommand(f))
 
 	return cmd

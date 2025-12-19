@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -119,7 +120,7 @@ func run(ctx context.Context, opts *Options) error {
 	if opts.Verbose {
 		displayGen1Details(ctx, ios, devices)
 	} else {
-		cmdutil.DisplayDiscoveredDevices(ios, devices)
+		term.DisplayDiscoveredDevices(ios, devices)
 	}
 
 	// Save discovered addresses to completion cache

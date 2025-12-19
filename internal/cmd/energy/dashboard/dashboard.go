@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the energy dashboard command.
@@ -93,5 +94,5 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, costPerKwh f
 		dashboard.EstimatedCost = &cost
 	}
 
-	return cmdutil.PrintResult(ios, dashboard, cmdutil.DisplayDashboard)
+	return cmdutil.PrintResult(ios, dashboard, term.DisplayDashboard)
 }

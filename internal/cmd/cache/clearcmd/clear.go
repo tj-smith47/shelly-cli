@@ -1,5 +1,5 @@
-// Package clear provides the cache clear command.
-package clear
+// Package clearcmd provides the cache clear command.
+package clearcmd
 
 import (
 	"context"

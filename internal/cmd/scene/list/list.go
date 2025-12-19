@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the scene list command.
@@ -26,6 +27,6 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 			})
 			return result
 		},
-		DisplayFunc: cmdutil.DisplaySceneList,
+		DisplayFunc: term.DisplaySceneList,
 	})
 }

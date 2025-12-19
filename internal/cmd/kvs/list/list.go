@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -95,7 +96,7 @@ func run(ctx context.Context, opts *Options) error {
 			func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.KVSItem, error) {
 				return svc.GetManyKVS(ctx, device, match)
 			},
-			cmdutil.DisplayKVSItems)
+			term.DisplayKVSItems)
 	}
 
 	// Default: just list keys
@@ -104,5 +105,5 @@ func run(ctx context.Context, opts *Options) error {
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.KVSListResult, error) {
 			return svc.ListKVS(ctx, device)
 		},
-		cmdutil.DisplayKVSKeys)
+		term.DisplayKVSKeys)
 }

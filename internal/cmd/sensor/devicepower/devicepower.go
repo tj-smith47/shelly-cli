@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the devicepower command group.
@@ -26,7 +27,7 @@ battery-powered Shelly devices (Plus HT, H&T, etc.).`,
   shelly sensor devicepower status sensor1`,
 		Prefix:        "devicepower:",
 		StatusMethod:  "DevicePower.GetStatus",
-		DisplayList:   cmdutil.DisplayDevicePowerList,
-		DisplayStatus: cmdutil.DisplayDevicePowerStatus,
+		DisplayList:   term.DisplayDevicePowerList,
+		DisplayStatus: term.DisplayDevicePowerStatus,
 	})
 }

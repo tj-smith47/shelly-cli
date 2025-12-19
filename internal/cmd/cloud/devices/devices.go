@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the cloud devices command.
@@ -57,7 +58,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 			return fmt.Errorf("failed to get devices: %w", err)
 		}
 
-		cmdutil.DisplayCloudDevices(ios, devices)
+		term.DisplayCloudDevices(ios, devices)
 		return nil
 	})
 }

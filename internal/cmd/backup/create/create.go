@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var (
@@ -105,7 +106,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 			return fmt.Errorf("failed to write backup file: %w", err)
 		}
 		ios.Success("Backup created: %s", filePath)
-		cmdutil.DisplayBackupSummary(ios, backup)
+		term.DisplayBackupSummary(ios, backup)
 	}
 
 	return nil
