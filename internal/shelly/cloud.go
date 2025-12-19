@@ -4,6 +4,8 @@ package shelly
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/tj-smith47/shelly-go/cloud"
@@ -229,4 +231,34 @@ func TimeUntilExpiry(tokenString string) time.Duration {
 // HashPassword returns the SHA1 hash of a password for cloud auth.
 func HashPassword(password string) string {
 	return cloud.HashPassword(password)
+}
+
+// BuildCloudWebSocketURL builds the WebSocket URL for cloud events.
+func BuildCloudWebSocketURL(serverURL, token string) (string, error) {
+	if serverURL == "" {
+		// Try to extract from token
+		parsedToken, err := ParseToken(token)
+		if err != nil {
+			return "", fmt.Errorf("no server URL and failed to parse token: %w", err)
+		}
+		serverURL = parsedToken.UserAPIURL
+	}
+
+	if serverURL == "" {
+		return "", fmt.Errorf("no server URL available")
+	}
+
+	// Parse to get hostname
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid server URL: %w", err)
+	}
+
+	hostname := u.Hostname()
+	if hostname == "" {
+		hostname = serverURL
+	}
+
+	// Build WebSocket URL: wss://{host}:6113/shelly/wss/hk_sock?t={token}
+	return fmt.Sprintf("wss://%s:6113/shelly/wss/hk_sock?t=%s", hostname, url.QueryEscape(token)), nil
 }

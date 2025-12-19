@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -100,7 +99,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	}
 
 	// Get WebSocket URL
-	wsURL, err := buildWebSocketURL(cfg.Cloud.ServerURL, cfg.Cloud.AccessToken)
+	wsURL, err := shelly.BuildCloudWebSocketURL(cfg.Cloud.ServerURL, cfg.Cloud.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to build WebSocket URL: %w", err)
 	}
@@ -143,35 +142,6 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 
 	// Read loop
 	return readEvents(ctx, ios, conn)
-}
-
-func buildWebSocketURL(serverURL, token string) (string, error) {
-	if serverURL == "" {
-		// Try to extract from token
-		parsedToken, err := shelly.ParseToken(token)
-		if err != nil {
-			return "", fmt.Errorf("no server URL and failed to parse token: %w", err)
-		}
-		serverURL = parsedToken.UserAPIURL
-	}
-
-	if serverURL == "" {
-		return "", fmt.Errorf("no server URL available")
-	}
-
-	// Parse to get hostname
-	u, err := url.Parse(serverURL)
-	if err != nil {
-		return "", fmt.Errorf("invalid server URL: %w", err)
-	}
-
-	hostname := u.Hostname()
-	if hostname == "" {
-		hostname = serverURL
-	}
-
-	// Build WebSocket URL: wss://{host}:6113/shelly/wss/hk_sock?t={token}
-	return fmt.Sprintf("wss://%s:6113/shelly/wss/hk_sock?t=%s", hostname, url.QueryEscape(token)), nil
 }
 
 func readEvents(ctx context.Context, ios *iostreams.IOStreams, conn *websocket.Conn) error {
