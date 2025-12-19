@@ -4,6 +4,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // displayDiffSection is a generic helper for printing diff sections.
@@ -123,4 +124,16 @@ func DisplayConfigDiffsSummary(ios *iostreams.IOStreams, diffs []model.ConfigDif
 	}
 
 	ios.Printf("Summary: %d added, %d removed, %d changed\n", len(added), len(removed), len(changed))
+}
+
+// DisplayConfigMapDiff displays the differences between current and incoming config maps.
+func DisplayConfigMapDiff(ios *iostreams.IOStreams, current, incoming map[string]any) {
+	for key, incomingVal := range incoming {
+		currentVal, exists := current[key]
+		if !exists {
+			ios.Printf("  + %s: %v (new)\n", key, output.FormatDisplayValue(incomingVal))
+		} else if !utils.DeepEqualJSON(currentVal, incomingVal) {
+			ios.Printf("  ~ %s: %v -> %v\n", key, output.FormatDisplayValue(currentVal), output.FormatDisplayValue(incomingVal))
+		}
+	}
 }

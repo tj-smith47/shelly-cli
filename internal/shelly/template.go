@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DeviceTemplate holds device information and configuration for templates.
@@ -147,7 +148,7 @@ func compareForApply(current, template map[string]any) []string {
 			continue
 		}
 
-		if !deepEqualJSON(currentVal, templateVal) {
+		if !utils.DeepEqualJSON(currentVal, templateVal) {
 			changes = append(changes, fmt.Sprintf("~ %s: %v -> %v", key, summarizeValue(currentVal), summarizeValue(templateVal)))
 		}
 	}

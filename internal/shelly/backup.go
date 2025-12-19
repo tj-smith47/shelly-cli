@@ -2,7 +2,6 @@
 package shelly
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DeviceBackup wraps the shelly-go backup.Backup for backward compatibility.
@@ -378,7 +378,7 @@ func compareConfigs(current, bkup map[string]any) []model.ConfigDiff {
 				NewValue: backupVal,
 				DiffType: model.DiffAdded,
 			})
-		} else if !deepEqualJSON(currentVal, backupVal) {
+		} else if !utils.DeepEqualJSON(currentVal, backupVal) {
 			diffs = append(diffs, model.ConfigDiff{
 				Path:     key,
 				OldValue: currentVal,
@@ -521,19 +521,6 @@ func compareWebhooks(current, bkup []WebhookInfo) []model.WebhookDiff {
 	}
 
 	return diffs
-}
-
-// deepEqualJSON compares two values for equality using JSON serialization.
-func deepEqualJSON(a, b any) bool {
-	aJSON, err := json.Marshal(a)
-	if err != nil {
-		return false
-	}
-	bJSON, err := json.Marshal(b)
-	if err != nil {
-		return false
-	}
-	return bytes.Equal(aJSON, bJSON)
 }
 
 // SaveBackupToFile saves backup data to a file.

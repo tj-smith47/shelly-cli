@@ -3,7 +3,6 @@
 package configimport
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,8 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var (
@@ -88,7 +86,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		}
 
 		ios.Title("Dry run - changes that would be applied")
-		showDiff(ios, currentConfig, config)
+		term.DisplayConfigMapDiff(ios, currentConfig, config)
 		return nil
 	}
 
@@ -103,26 +101,4 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 
 	ios.Success("Configuration imported to %s", device)
 	return nil
-}
-
-// showDiff displays the differences between current and incoming config.
-func showDiff(ios *iostreams.IOStreams, current, incoming map[string]any) {
-	for key, incomingVal := range incoming {
-		currentVal, exists := current[key]
-		if !exists {
-			ios.Printf("  + %s: %v (new)\n", key, output.FormatDisplayValue(incomingVal))
-		} else if !deepEqual(currentVal, incomingVal) {
-			ios.Printf("  ~ %s: %v -> %v\n", key, output.FormatDisplayValue(currentVal), output.FormatDisplayValue(incomingVal))
-		}
-	}
-}
-
-// deepEqual compares two values for equality.
-func deepEqual(a, b any) bool {
-	aJSON, aErr := json.Marshal(a)
-	bJSON, bErr := json.Marshal(b)
-	if aErr != nil || bErr != nil {
-		return false
-	}
-	return bytes.Equal(aJSON, bJSON)
 }
