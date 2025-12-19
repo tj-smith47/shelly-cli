@@ -35,8 +35,6 @@ var ReservedCommands = map[string]bool{
 	"off":        true,
 	"toggle":     true,
 	"status":     true,
-	"reboot":     true,
-	"reset":      true,
 }
 
 // ValidateAliasName checks if an alias name is valid.

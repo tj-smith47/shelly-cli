@@ -60,14 +60,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/on"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/party"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/ping"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/plugin"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/qr"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/rebootcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/report"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/resetcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
@@ -336,9 +333,6 @@ func init() {
 		off.NewCommand(f),
 		togglecmd.NewCommand(f),
 		statuscmd.NewCommand(f),
-		rebootcmd.NewCommand(f),
-		resetcmd.NewCommand(f),
-		ping.NewCommand(f),
 		qr.NewCommand(f),
 		sleep.NewCommand(f),
 		wake.NewCommand(f),

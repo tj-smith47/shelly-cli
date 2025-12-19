@@ -87,15 +87,12 @@ and controlling Shelly devices on your local network.
 * [shelly off](shelly_off.md)	 - Turn off a device (auto-detects type)
 * [shelly on](shelly_on.md)	 - Turn on a device (auto-detects type)
 * [shelly party](shelly_party.md)	 - Party mode - flash lights!
-* [shelly ping](shelly_ping.md)	 - Test device connectivity
 * [shelly plugin](shelly_plugin.md)	 - Manage CLI plugins
 * [shelly power](shelly_power.md)	 - Power meter operations (PM/PM1 components)
 * [shelly provision](shelly_provision.md)	 - Provision device settings
 * [shelly qr](shelly_qr.md)	 - Generate device QR code information
-* [shelly reboot](shelly_reboot.md)	 - Reboot a device
 * [shelly repl](shelly_repl.md)	 - Launch interactive REPL
 * [shelly report](shelly_report.md)	 - Generate reports
-* [shelly reset](shelly_reset.md)	 - Factory reset a device
 * [shelly rgb](shelly_rgb.md)	 - Control RGB light components
 * [shelly scene](shelly_scene.md)	 - Manage device scenes
 * [shelly schedule](shelly_schedule.md)	 - Manage device schedules

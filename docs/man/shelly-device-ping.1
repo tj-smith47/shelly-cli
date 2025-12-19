@@ -16,10 +16,21 @@ Check if a device is reachable and responding.
 The ping command attempts to connect to the device and retrieve its info.
 This is useful for verifying network connectivity and device availability.
 
+.PP
+Use -c to send multiple pings and show statistics.
+
 
 .SH OPTIONS
+\fB-c\fP, \fB--count\fP=1
+	Number of pings to send
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for ping
+
+.PP
+\fB--timeout\fP=5s
+	Timeout for each ping
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -63,8 +74,11 @@ This is useful for verifying network connectivity and device availability.
   # Ping by IP address
   shelly device ping 192.168.1.100
 
-  # Short form
-  shelly dev ping office-switch
+  # Ping multiple times with statistics
+  shelly device ping kitchen -c 5
+
+  # Ping with custom timeout
+  shelly device ping slow-device --timeout 10s
 .EE
 
 

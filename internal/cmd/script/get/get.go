@@ -10,10 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 var statusFlag bool
@@ -62,7 +59,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 			if err != nil {
 				return fmt.Errorf("failed to get script status: %w", err)
 			}
-			displayStatus(ios, status)
+			term.DisplayScriptStatus(ios, status)
 			return nil
 		})
 	}
@@ -72,37 +69,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 		if err != nil {
 			return fmt.Errorf("failed to get script code: %w", err)
 		}
-		displayCode(ios, code)
+		term.DisplayScriptCode(ios, code)
 		return nil
 	})
-}
-
-func displayStatus(ios *iostreams.IOStreams, status *shelly.ScriptStatus) {
-	ios.Println(theme.Bold().Render("Script Status"))
-	ios.Println("")
-
-	ios.Printf("  ID:      %d\n", status.ID)
-	ios.Printf("  Status:  %s\n", output.RenderRunningState(status.Running))
-	ios.Println("")
-
-	ios.Println(theme.Bold().Render("Memory"))
-	ios.Printf("  Usage:   %d bytes\n", status.MemUsage)
-	ios.Printf("  Peak:    %d bytes\n", status.MemPeak)
-	ios.Printf("  Free:    %d bytes\n", status.MemFree)
-
-	if len(status.Errors) > 0 {
-		ios.Println("")
-		ios.Println(theme.StatusError().Render("Errors:"))
-		for _, e := range status.Errors {
-			ios.Printf("  - %s\n", e)
-		}
-	}
-}
-
-func displayCode(ios *iostreams.IOStreams, code string) {
-	if code == "" {
-		ios.Info("Script has no code")
-		return
-	}
-	ios.Println(code)
 }

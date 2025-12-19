@@ -12,57 +12,109 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds command options.
+type Options struct {
+	Count   int
+	Timeout time.Duration
+}
+
 // NewCommand creates the device ping command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Count:   1,
+		Timeout: 5 * time.Second,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "ping <device>",
-		Aliases: []string{"check", "test"},
+		Aliases: []string{"check", "test", "p"},
 		Short:   "Check device connectivity",
 		Long: `Check if a device is reachable and responding.
 
 The ping command attempts to connect to the device and retrieve its info.
-This is useful for verifying network connectivity and device availability.`,
+This is useful for verifying network connectivity and device availability.
+
+Use -c to send multiple pings and show statistics.`,
 		Example: `  # Ping a registered device
   shelly device ping living-room
 
   # Ping by IP address
   shelly device ping 192.168.1.100
 
-  # Short form
-  shelly dev ping office-switch`,
+  # Ping multiple times with statistics
+  shelly device ping kitchen -c 5
+
+  # Ping with custom timeout
+  shelly device ping slow-device --timeout 10s`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			return run(cmd.Context(), f, args[0], opts)
 		},
 	}
+
+	cmd.Flags().IntVarP(&opts.Count, "count", "c", 1, "Number of pings to send")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 5*time.Second, "Timeout for each ping")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
 	ios := f.IOStreams()
-
-	ctx, cancel := f.WithDefaultTimeout(ctx)
-	defer cancel()
-
 	svc := f.ShellyService()
 
-	start := time.Now()
-	ios.StartProgress("Pinging device...")
+	ios.Info("PING %s", device)
 
-	info, err := svc.DevicePing(ctx, device)
-	elapsed := time.Since(start)
-	ios.StopProgress()
+	var totalTime time.Duration
+	successCount := 0
 
-	if err != nil {
-		ios.Error("Device %s is not reachable", device)
-		return fmt.Errorf("ping failed: %w", err)
+	for i := range opts.Count {
+		pingCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+
+		start := time.Now()
+		info, err := svc.DevicePing(pingCtx, device)
+		elapsed := time.Since(start)
+		cancel()
+
+		if err != nil {
+			ios.Printf("Request %d: timeout or error - %v\n", i+1, err)
+		} else {
+			successCount++
+			totalTime += elapsed
+			if opts.Count == 1 {
+				// Single ping - show device info
+				ios.Success("Reply from %s: time=%v", device, elapsed.Round(time.Millisecond))
+				ios.Info("  Model: %s (Gen%d)", info.Model, info.Generation)
+				ios.Info("  App: %s", info.App)
+				ios.Info("  Firmware: %s", info.Firmware)
+				ios.Info("  MAC: %s", info.MAC)
+			} else {
+				// Multiple pings - show sequence number
+				ios.Success("Reply from %s: seq=%d time=%v", device, i+1, elapsed.Round(time.Millisecond))
+			}
+		}
+
+		// Small delay between pings (but not after last one)
+		if i < opts.Count-1 && opts.Count > 1 {
+			time.Sleep(500 * time.Millisecond)
+		}
 	}
 
-	ios.Success("Device %s is online", info.ID)
-	ios.Info("  Model: %s (Gen%d)", info.Model, info.Generation)
-	ios.Info("  Response time: %v", elapsed.Round(time.Millisecond))
+	// Show statistics for multiple pings
+	if opts.Count > 1 {
+		ios.Println("")
+		ios.Printf("--- %s ping statistics ---\n", device)
+		ios.Printf("%d packets transmitted, %d received, %.0f%% packet loss\n",
+			opts.Count, successCount, float64(opts.Count-successCount)/float64(opts.Count)*100)
+		if successCount > 0 {
+			avgTime := totalTime / time.Duration(successCount)
+			ios.Printf("rtt avg = %v\n", avgTime.Round(time.Millisecond))
+		}
+	}
+
+	if successCount == 0 {
+		return fmt.Errorf("device %s is unreachable", device)
+	}
 
 	return nil
 }

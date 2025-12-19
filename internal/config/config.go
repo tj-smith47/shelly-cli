@@ -282,6 +282,21 @@ var DefaultAliases = map[string]Alias{
 		Command: "device config export $1 $2 --format yaml",
 		Shell:   false,
 	},
+	"ping": {
+		Name:    "ping",
+		Command: "device ping $@",
+		Shell:   false,
+	},
+	"reboot": {
+		Name:    "reboot",
+		Command: "device reboot $@",
+		Shell:   false,
+	},
+	"reset": {
+		Name:    "reset",
+		Command: "device factory-reset $@",
+		Shell:   false,
+	},
 }
 
 // Load reads configuration from file and environment.
