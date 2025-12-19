@@ -87,7 +87,7 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 
 	if subnet == "" {
 		var err error
-		subnet, err = detectSubnet()
+		subnet, err = utils.DetectSubnet()
 		if err != nil {
 			return fmt.Errorf("failed to detect subnet: %w", err)
 		}
@@ -157,24 +157,4 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 	}
 
 	return nil
-}
-
-func detectSubnet() (string, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "", err
-	}
-
-	for _, addr := range addrs {
-		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
-			if ipNet.IP.To4() != nil {
-				// Return the network address with mask
-				network := ipNet.IP.Mask(ipNet.Mask)
-				ones, _ := ipNet.Mask.Size()
-				return fmt.Sprintf("%s/%d", network, ones), nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("no suitable network interface found")
 }
