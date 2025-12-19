@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -144,7 +145,7 @@ func scanAndSelect(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 	// Build selection options
 	options := make([]string, len(networks))
 	for i, n := range networks {
-		signal := signalStrength(n.RSSI)
+		signal := output.FormatWiFiSignalStrength(n.RSSI)
 		options[i] = fmt.Sprintf("%s (%s, ch %d)", n.SSID, signal, n.Channel)
 	}
 
@@ -161,17 +162,4 @@ func scanAndSelect(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 	}
 
 	return "", fmt.Errorf("selected network not found")
-}
-
-func signalStrength(rssi int) string {
-	switch {
-	case rssi >= -50:
-		return "excellent"
-	case rssi >= -60:
-		return "good"
-	case rssi >= -70:
-		return "fair"
-	default:
-		return "weak"
-	}
 }

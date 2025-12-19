@@ -574,3 +574,17 @@ func EscapeWiFiQR(s string) string {
 	s = strings.ReplaceAll(s, ":", "\\:")
 	return s
 }
+
+// FormatWiFiSignalStrength converts RSSI value to human-readable signal strength.
+func FormatWiFiSignalStrength(rssi int) string {
+	switch {
+	case rssi >= -50:
+		return "excellent"
+	case rssi >= -60:
+		return "good"
+	case rssi >= -70:
+		return "fair"
+	default:
+		return "weak"
+	}
+}
