@@ -177,8 +177,9 @@ func (f *TextFormatter) Format(w io.Writer, data any) error {
 	}
 }
 
-// TableFormatter formats output as a table.
-// This is a placeholder - the actual implementation is in table.go.
+// TableFormatter formats output as a table using reflection.
+// For slices of structs, it creates a table with struct field names as headers.
+// For other types, it falls back to text format.
 type TableFormatter struct{}
 
 // NewTableFormatter creates a new table formatter.
@@ -188,9 +189,17 @@ func NewTableFormatter() *TableFormatter {
 
 // Format outputs data as a table.
 func (f *TableFormatter) Format(w io.Writer, data any) error {
-	// For non-tabular data, fall back to text format
-	// Actual table formatting is done via the Table type in table.go
-	return NewTextFormatter().Format(w, data)
+	table := f.buildTable(data)
+	if table == nil {
+		return NewTextFormatter().Format(w, data)
+	}
+	return table.PrintTo(w)
+}
+
+// buildTable attempts to build a table from structured data.
+// Returns nil if the data cannot be represented as a table.
+func (f *TableFormatter) buildTable(data any) *Table {
+	return buildTableFromData(data)
 }
 
 // ParseFormat parses a format string into a Format.

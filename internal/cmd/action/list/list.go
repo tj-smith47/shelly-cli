@@ -2,10 +2,17 @@
 package list
 
 import (
-	"github.com/spf13/cobra"
+	"context"
+	"fmt"
 
+	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/gen1"
+
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the action list command.
@@ -16,34 +23,60 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Short:   "List action URLs for a Gen1 device",
 		Long: `List all configured action URLs for a Gen1 Shelly device.
 
-Gen1 devices use HTTP-based settings for action URLs. This command shows
-all configured actions and their target URLs.
+Gen1 devices support various action types that trigger HTTP callbacks:
+  - out_on_url, out_off_url: Output state change actions
+  - btn_on_url, btn_off_url: Button toggle actions
+  - longpush_url, shortpush_url: Button press duration actions
+  - roller_open_url, roller_close_url, roller_stop_url: Roller actions
 
-Note: This feature is currently in development. Gen1 device support requires
-direct HTTP communication rather than the RPC protocol used by Gen2 devices.
-
-Workaround: Access the device's web interface at http://<device-ip>/settings
-to view and configure action URLs.`,
+Gen2+ devices use webhooks instead. See 'shelly webhook list'.`,
 		Example: `  # List actions for a device
   shelly action list living-room
 
-  # Workaround: use curl to get settings
-  curl http://192.168.1.100/settings | jq '.actions'`,
+  # JSON output
+  shelly action list living-room -o json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ios := f.IOStreams()
-			ios.Warning("Gen1 action URL management is not yet fully implemented.")
-			ios.Println()
-			ios.Info("Gen1 devices use a different API than Gen2 devices.")
-			ios.Info("To view action URLs, access the device's web interface:")
-			ios.Info("  http://<device-ip>/settings")
-			ios.Println()
-			ios.Info("Or use curl:")
-			ios.Info("  curl http://<device-ip>/settings | jq '.actions'")
-			return nil
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
 	return cmd
+}
+
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+	ctx, cancel := f.WithDefaultTimeout(ctx)
+	defer cancel()
+
+	ios := f.IOStreams()
+	svc := f.ShellyService()
+
+	isGen1, _, err := svc.IsGen1Device(ctx, device)
+	if err != nil {
+		return fmt.Errorf("failed to connect to %s: %w", device, err)
+	}
+
+	if !isGen1 {
+		ios.Warning("Device %s is not a Gen1 device", device)
+		ios.Info("Gen2+ devices use webhooks. Try: shelly webhook list %s", device)
+		return fmt.Errorf("action URLs only available for Gen1 devices")
+	}
+
+	var actions *gen1.ActionSettings
+	err = svc.WithGen1Connection(ctx, device, func(conn *client.Gen1Client) error {
+		var getErr error
+		actions, getErr = conn.GetActions(ctx)
+		return getErr
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get actions: %w", err)
+	}
+
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, actions)
+	}
+
+	term.DisplayGen1Actions(ios, actions)
+	return nil
 }

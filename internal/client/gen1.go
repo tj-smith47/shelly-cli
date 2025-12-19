@@ -89,6 +89,31 @@ func (c *Gen1Client) GetSettings(ctx context.Context) (*gen1.Settings, error) {
 	return c.device.GetSettings(ctx)
 }
 
+// GetDebugLog returns the device debug log.
+func (c *Gen1Client) GetDebugLog(ctx context.Context) (string, error) {
+	return c.device.GetDebugLog(ctx)
+}
+
+// GetActions returns all configured action URLs.
+func (c *Gen1Client) GetActions(ctx context.Context) (*gen1.ActionSettings, error) {
+	return c.device.GetActions(ctx)
+}
+
+// SetAction configures an action URL for a specific event.
+func (c *Gen1Client) SetAction(ctx context.Context, index int, event gen1.ActionEvent, urls []string, enabled bool) error {
+	return c.device.SetAction(ctx, index, event, urls, enabled)
+}
+
+// SetActionURL is a convenience method to set a single action URL.
+func (c *Gen1Client) SetActionURL(ctx context.Context, index int, event gen1.ActionEvent, url string, enabled bool) error {
+	return c.device.SetActionURL(ctx, index, event, url, enabled)
+}
+
+// ClearAction disables and clears an action.
+func (c *Gen1Client) ClearAction(ctx context.Context, index int, event gen1.ActionEvent) error {
+	return c.device.ClearAction(ctx, index, event)
+}
+
 // Reboot reboots the device.
 func (c *Gen1Client) Reboot(ctx context.Context) error {
 	return c.device.Reboot(ctx)

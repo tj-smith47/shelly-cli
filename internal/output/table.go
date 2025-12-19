@@ -4,6 +4,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -173,4 +174,190 @@ func (t *Table) Empty() bool {
 // RowCount returns the number of rows in the table.
 func (t *Table) RowCount() int {
 	return len(t.rows)
+}
+
+// buildTableFromData uses reflection to build a table from structured data.
+// Supports slices/arrays of structs. Returns nil for unsupported types.
+func buildTableFromData(data any) *Table {
+	v := reflect.ValueOf(data)
+
+	// Dereference pointers
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+
+	// Must be a slice or array
+	if v.Kind() != reflect.Slice && v.Kind() != reflect.Array {
+		return nil
+	}
+
+	if v.Len() == 0 {
+		return nil
+	}
+
+	// Get the element type
+	elemType := v.Type().Elem()
+	for elemType.Kind() == reflect.Ptr {
+		elemType = elemType.Elem()
+	}
+
+	// Must be a struct
+	if elemType.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// Build headers from struct fields
+	headers := buildHeadersFromType(elemType)
+	if len(headers) == 0 {
+		return nil
+	}
+
+	table := NewTable(headers...)
+
+	// Build rows from slice elements
+	for i := range v.Len() {
+		elem := v.Index(i)
+		for elem.Kind() == reflect.Ptr {
+			if elem.IsNil() {
+				continue
+			}
+			elem = elem.Elem()
+		}
+		row := buildRowFromStruct(elem, elemType)
+		table.AddRow(row...)
+	}
+
+	return table
+}
+
+// buildHeadersFromType extracts column headers from struct field names/tags.
+func buildHeadersFromType(t reflect.Type) []string {
+	headers := make([]string, 0, t.NumField())
+	for i := range t.NumField() {
+		field := t.Field(i)
+
+		// Skip unexported fields
+		if !field.IsExported() {
+			continue
+		}
+
+		// Skip fields with json:"-"
+		jsonTag := field.Tag.Get("json")
+		if jsonTag == "-" {
+			continue
+		}
+
+		// Use json tag name if available, otherwise field name
+		name := field.Name
+		if jsonTag != "" {
+			parts := strings.Split(jsonTag, ",")
+			if parts[0] != "" {
+				name = parts[0]
+			}
+		}
+
+		headers = append(headers, name)
+	}
+	return headers
+}
+
+// buildRowFromStruct extracts cell values from a struct.
+func buildRowFromStruct(v reflect.Value, t reflect.Type) []string {
+	cells := make([]string, 0, t.NumField())
+	for i := range t.NumField() {
+		field := t.Field(i)
+
+		// Skip unexported fields
+		if !field.IsExported() {
+			continue
+		}
+
+		// Skip fields with json:"-"
+		jsonTag := field.Tag.Get("json")
+		if jsonTag == "-" {
+			continue
+		}
+
+		fieldVal := v.Field(i)
+		cells = append(cells, formatFieldValue(fieldVal))
+	}
+	return cells
+}
+
+// formatFieldValue converts a reflect.Value to a string for table display.
+func formatFieldValue(v reflect.Value) string {
+	// Handle pointers
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return LabelPlaceholder
+		}
+		v = v.Elem()
+	}
+
+	return formatByKind(v)
+}
+
+// formatByKind formats a value based on its reflect.Kind.
+func formatByKind(v reflect.Value) string {
+	switch v.Kind() {
+	case reflect.String:
+		return formatString(v.String())
+	case reflect.Bool:
+		return formatBool(v.Bool())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return fmt.Sprintf("%d", v.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return fmt.Sprintf("%d", v.Uint())
+	case reflect.Float32, reflect.Float64:
+		return fmt.Sprintf("%.2f", v.Float())
+	case reflect.Slice, reflect.Array:
+		return formatCollection(v.Len(), "items")
+	case reflect.Map:
+		return formatCollection(v.Len(), "keys")
+	case reflect.Struct:
+		return formatStruct(v)
+	default:
+		return formatDefault(v)
+	}
+}
+
+func formatString(s string) string {
+	if s == "" {
+		return LabelPlaceholder
+	}
+	return s
+}
+
+func formatBool(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+func formatCollection(length int, label string) string {
+	if length == 0 {
+		return LabelPlaceholder
+	}
+	return fmt.Sprintf("[%d %s]", length, label)
+}
+
+func formatStruct(v reflect.Value) string {
+	if v.CanInterface() {
+		if stringer, ok := v.Interface().(fmt.Stringer); ok {
+			return stringer.String()
+		}
+		return fmt.Sprintf("%+v", v.Interface())
+	}
+	return LabelPlaceholder
+}
+
+func formatDefault(v reflect.Value) string {
+	if v.CanInterface() {
+		return fmt.Sprintf("%v", v.Interface())
+	}
+	return LabelPlaceholder
 }

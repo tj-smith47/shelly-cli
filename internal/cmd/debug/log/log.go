@@ -7,31 +7,21 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
-// Options holds command options.
-type Options struct {
-	Factory *cmdutil.Factory
-	Device  string
-}
-
 // NewCommand creates the debug log command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{Factory: f}
-
 	cmd := &cobra.Command{
 		Use:     "log <device>",
 		Aliases: []string{"logs", "debug-log"},
 		Short:   "Get device debug log (Gen1)",
 		Long: `Get the debug log from a Gen1 Shelly device.
 
-Note: This command only works with Gen1 devices. Gen2+ devices use a
-different logging mechanism via RPC.
-
-For Gen2+ devices, use:
-  shelly debug rpc <device> Sys.GetStatus
+This command only works with Gen1 devices. Gen2+ devices use a
+different logging mechanism via WebSocket or RPC.
 
 Gen1 debug logs can help diagnose connectivity issues, action URL problems,
 and other device behavior.`,
@@ -43,52 +33,49 @@ and other device behavior.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Device = args[0]
-			return run(cmd.Context(), opts)
+			return run(cmd.Context(), f, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, opts *Options) error {
-	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := opts.Factory.IOStreams()
+	ios := f.IOStreams()
+	svc := f.ShellyService()
 
-	// Gen1 debug log is not yet implemented in shelly-go
-	// This is a placeholder that documents the workaround
-	ios.Warning("Gen1 debug log retrieval is not yet implemented.")
-	ios.Println()
-	ios.Info("For Gen1 devices, access the debug log via HTTP:")
-	ios.Info("  curl http://<device-ip>/debug/log")
-	ios.Println()
-	ios.Info("For Gen2+ devices, use the RPC interface:")
-	ios.Info("  shelly debug rpc %s Sys.GetStatus", opts.Device)
-	ios.Info("  shelly debug rpc %s Shelly.GetStatus", opts.Device)
-
-	// Try to get basic info to verify connection
-	svc := opts.Factory.ShellyService()
-	info, err := svc.DeviceInfo(ctx, opts.Device)
+	// Check if device is Gen1
+	isGen1, _, err := svc.IsGen1Device(ctx, device)
 	if err != nil {
-		ios.Debug("could not connect to device: %v", err)
-		return fmt.Errorf("could not connect to %s: %w", opts.Device, err)
+		return fmt.Errorf("failed to connect to %s: %w", device, err)
 	}
 
-	ios.Println()
-	ios.Info("Device %s is a Gen%d device (%s)", opts.Device, info.Generation, info.Model)
-
-	if info.Generation == 1 {
-		// Get the resolved address for the curl hint
-		if deviceCfg, ok := opts.Factory.ResolveDevice(opts.Device); ok && deviceCfg.Address != "" {
-			ios.Info("Try: curl http://%s/debug/log", deviceCfg.Address)
-		} else {
-			ios.Info("Try: curl http://<device-ip>/debug/log")
-		}
-	} else {
-		ios.Info("Try: shelly debug rpc %s Sys.GetStatus", opts.Device)
+	if !isGen1 {
+		ios.Warning("Device %s is not a Gen1 device", device)
+		ios.Info("Gen2+ devices use WebSocket/RPC for logging.")
+		ios.Info("Try: shelly debug rpc %s Sys.GetStatus", device)
+		return fmt.Errorf("debug log only available for Gen1 devices")
 	}
 
+	// Get debug log from Gen1 device
+	var logContent string
+	err = svc.WithGen1Connection(ctx, device, func(conn *client.Gen1Client) error {
+		var getErr error
+		logContent, getErr = conn.GetDebugLog(ctx)
+		return getErr
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get debug log: %w", err)
+	}
+
+	if logContent == "" {
+		ios.Info("Debug log is empty")
+		return nil
+	}
+
+	ios.Println(logContent)
 	return nil
 }
