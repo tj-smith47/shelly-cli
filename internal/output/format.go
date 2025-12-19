@@ -588,3 +588,24 @@ func FormatWiFiSignalStrength(rssi int) string {
 		return "weak"
 	}
 }
+
+// FormatReleaseNotes formats release notes for display.
+// Truncates to maxLen characters and indents each line.
+func FormatReleaseNotes(body string) string {
+	const maxLen = 500
+	if len(body) > maxLen {
+		body = body[:maxLen] + "..."
+	}
+
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		lines[i] = "  " + line
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// FormatDeviceGeneration returns a formatted generation string.
+func FormatDeviceGeneration(gen int) string {
+	return fmt.Sprintf("Gen%d", gen)
+}

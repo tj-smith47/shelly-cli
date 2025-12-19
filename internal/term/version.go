@@ -66,3 +66,16 @@ func RunUpdateCheck(ctx context.Context, ios *iostreams.IOStreams, checker Updat
 		DisplayUpdateResult(ios, result.CurrentVersion, result.LatestVersion, result.UpdateAvailable, result.CacheWriteErr)
 	}
 }
+
+// DisplayUpdateStatus shows the update check status with optional release URL.
+func DisplayUpdateStatus(ios *iostreams.IOStreams, currentVersion, availableVersion string, hasUpdate bool, releaseURL string) {
+	if hasUpdate {
+		ios.Printf("Update available: %s -> %s\n", currentVersion, availableVersion)
+		ios.Printf("  Run 'shelly update' to install\n")
+		if releaseURL != "" {
+			ios.Printf("  Release page: %s\n", releaseURL)
+		}
+	} else {
+		ios.Printf("Already at latest version (%s)\n", currentVersion)
+	}
+}
