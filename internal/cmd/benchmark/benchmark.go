@@ -4,41 +4,22 @@ package benchmark
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // Options holds the command options.
 type Options struct {
 	Iterations int
 	Warmup     int
-}
-
-// Result holds benchmark results.
-type Result struct {
-	Device      string       `json:"device"`
-	Iterations  int          `json:"iterations"`
-	PingLatency LatencyStats `json:"ping_latency"`
-	RPCLatency  LatencyStats `json:"rpc_latency"`
-	Summary     string       `json:"summary"`
-	Timestamp   time.Time    `json:"timestamp"`
-}
-
-// LatencyStats holds latency statistics.
-type LatencyStats struct {
-	Min    time.Duration `json:"min"`
-	Max    time.Duration `json:"max"`
-	Avg    time.Duration `json:"avg"`
-	P50    time.Duration `json:"p50"`
-	P95    time.Duration `json:"p95"`
-	P99    time.Duration `json:"p99"`
-	Errors int           `json:"errors"`
 }
 
 // NewCommand creates the benchmark command.
@@ -146,16 +127,16 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	}
 
 	// Calculate statistics
-	rpcStats := calculateStats(rpcLatencies, rpcErrors)
-	pingStats := calculateStats(pingLatencies, pingErrors)
+	rpcStats := utils.CalculateLatencyStats(rpcLatencies, rpcErrors)
+	pingStats := utils.CalculateLatencyStats(pingLatencies, pingErrors)
 
 	// Build result
-	result := Result{
+	result := model.BenchmarkResult{
 		Device:      device,
 		Iterations:  opts.Iterations,
 		PingLatency: pingStats,
 		RPCLatency:  rpcStats,
-		Summary:     getSummary(rpcStats),
+		Summary:     output.FormatBenchmarkSummary(rpcStats),
 		Timestamp:   time.Now(),
 	}
 
@@ -173,81 +154,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	ios.Println("")
 
 	ios.Printf("RPC Latency:\n")
-	displayStats(ios, rpcStats)
+	term.DisplayLatencyStats(ios, rpcStats)
 
 	ios.Printf("\nPing Latency:\n")
-	displayStats(ios, pingStats)
+	term.DisplayLatencyStats(ios, pingStats)
 
 	ios.Printf("\nSummary: %s\n", result.Summary)
 
 	return nil
-}
-
-func calculateStats(latencies []time.Duration, errors int) LatencyStats {
-	if len(latencies) == 0 {
-		return LatencyStats{Errors: errors}
-	}
-
-	// Sort for percentiles
-	sorted := make([]time.Duration, len(latencies))
-	copy(sorted, latencies)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i] < sorted[j]
-	})
-
-	// Calculate statistics
-	var sum time.Duration
-	for _, d := range sorted {
-		sum += d
-	}
-
-	return LatencyStats{
-		Min:    sorted[0],
-		Max:    sorted[len(sorted)-1],
-		Avg:    sum / time.Duration(len(sorted)),
-		P50:    percentile(sorted, 50),
-		P95:    percentile(sorted, 95),
-		P99:    percentile(sorted, 99),
-		Errors: errors,
-	}
-}
-
-func percentile(sorted []time.Duration, p int) time.Duration {
-	if len(sorted) == 0 {
-		return 0
-	}
-	idx := (p * len(sorted)) / 100
-	if idx >= len(sorted) {
-		idx = len(sorted) - 1
-	}
-	return sorted[idx]
-}
-
-func getSummary(stats LatencyStats) string {
-	avgMs := float64(stats.Avg.Microseconds()) / 1000
-
-	switch {
-	case avgMs < 50:
-		return "Excellent - Very fast response times"
-	case avgMs < 100:
-		return "Good - Normal response times"
-	case avgMs < 200:
-		return "Fair - Slightly elevated latency"
-	case avgMs < 500:
-		return "Poor - High latency, check network"
-	default:
-		return "Critical - Very high latency, network issues likely"
-	}
-}
-
-func displayStats(ios *iostreams.IOStreams, stats LatencyStats) {
-	ios.Printf("  Min: %v\n", stats.Min)
-	ios.Printf("  Max: %v\n", stats.Max)
-	ios.Printf("  Avg: %v\n", stats.Avg)
-	ios.Printf("  P50: %v\n", stats.P50)
-	ios.Printf("  P95: %v\n", stats.P95)
-	ios.Printf("  P99: %v\n", stats.P99)
-	if stats.Errors > 0 {
-		ios.Printf("  Errors: %d\n", stats.Errors)
-	}
 }
