@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -270,7 +271,7 @@ func runPush(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		deviceName := file.Name()[:len(file.Name())-5] // Remove .json
 
 		// Filter by specified devices
-		if len(opts.Devices) > 0 && !contains(opts.Devices, deviceName) {
+		if len(opts.Devices) > 0 && !slices.Contains(opts.Devices, deviceName) {
 			skipped++
 			continue
 		}
@@ -324,13 +325,4 @@ func getSyncDir() (string, error) {
 	}
 
 	return syncDir, nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
