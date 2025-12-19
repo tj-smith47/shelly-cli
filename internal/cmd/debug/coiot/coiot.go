@@ -11,7 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -124,7 +124,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	if coiot, ok := coiotStatus["coiot"].(map[string]any); ok {
 		ios.Println("  " + theme.Highlight().Render("CoIoT:"))
-		printMapSection(ios, coiot, "    ")
+		term.PrintMapSection(ios, coiot, "    ")
 	} else {
 		ios.Println("  " + theme.Dim().Render("CoIoT: not configured or not available"))
 	}
@@ -132,7 +132,7 @@ func run(ctx context.Context, opts *Options) error {
 	if device, ok := coiotStatus["device"].(map[string]any); ok {
 		ios.Println()
 		ios.Println("  " + theme.Highlight().Render("Device:"))
-		printMapSection(ios, device, "    ")
+		term.PrintMapSection(ios, device, "    ")
 	}
 
 	ios.Println()
@@ -140,17 +140,4 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Info("Gen2+ devices may have limited CoIoT support.")
 
 	return nil
-}
-
-// printMapSection prints a map section with indentation.
-func printMapSection(ios *iostreams.IOStreams, m map[string]any, indent string) {
-	for k, v := range m {
-		switch val := v.(type) {
-		case map[string]any:
-			ios.Println(indent + k + ":")
-			printMapSection(ios, val, indent+"  ")
-		default:
-			ios.Printf("%s%s: %v\n", indent, k, v)
-		}
-	}
 }
