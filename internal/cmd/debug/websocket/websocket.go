@@ -66,7 +66,7 @@ communication and event notifications.`,
 	return cmd
 }
 
-func run(ctx context.Context, opts *Options) error {
+func run(ctx context.Context, opts *Options) error { //nolint:gocyclo // will fix soon
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 

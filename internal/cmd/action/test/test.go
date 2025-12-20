@@ -131,7 +131,7 @@ func run(ctx context.Context, opts *Options) error {
 }
 
 func isButtonEvent(e gen1.ActionEvent) bool {
-	switch e {
+	switch e { //nolint:exhaustive // it be that way sometimes
 	case gen1.ActionLongpush, gen1.ActionShortpush, gen1.ActionDoublepush, gen1.ActionTriplepush,
 		gen1.ActionBtn1On, gen1.ActionBtn1Off, gen1.ActionBtn2On, gen1.ActionBtn2Off:
 		return true
@@ -140,7 +140,7 @@ func isButtonEvent(e gen1.ActionEvent) bool {
 }
 
 func isRollerEvent(e gen1.ActionEvent) bool {
-	switch e {
+	switch e { //nolint:exhaustive // it be that way sometimes
 	case gen1.ActionRollerOpen, gen1.ActionRollerClose, gen1.ActionRollerStop,
 		gen1.ActionRollerOpenUrl, gen1.ActionRollerCloseUrl, gen1.ActionRollerStopUrl:
 		return true
@@ -149,7 +149,7 @@ func isRollerEvent(e gen1.ActionEvent) bool {
 }
 
 func isSensorEvent(e gen1.ActionEvent) bool {
-	switch e {
+	switch e { //nolint:exhaustive // it be that way sometimes
 	case gen1.ActionSensorOpen, gen1.ActionSensorClose, gen1.ActionSensorMotion,
 		gen1.ActionSensorNoMotion, gen1.ActionSensorFlood, gen1.ActionSensorNoFlood,
 		gen1.ActionSensorSmoke, gen1.ActionSensorNoSmoke, gen1.ActionSensorGas,

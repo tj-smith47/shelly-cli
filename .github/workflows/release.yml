@@ -24,7 +24,7 @@ on:
   # Also triggered by manual tag push (for RC releases)
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -370,8 +370,10 @@ jobs:
           TAG="${{ needs.prepare.outputs.tag }}"
 
           # Get checksums
-          AMD64_SHA256=$(cat artifacts/amd64/shelly_darwin_amd64.tar.gz.sha256 | awk '{print $1}')
-          ARM64_SHA256=$(cat artifacts/arm64/shelly_darwin_arm64.tar.gz.sha256 | awk '{print $1}')
+          MACOS_AMD64_SHA256=$(cat artifacts/amd64/shelly_darwin_amd64.tar.gz.sha256 | awk '{print $1}')
+          MACOS_ARM64_SHA256=$(cat artifacts/arm64/shelly_darwin_arm64.tar.gz.sha256 | awk '{print $1}')
+          LINUX_AMD64_SHA256=$(cat artifacts/amd64/shelly_linux_amd64.tar.gz.sha256 | awk '{print $1}')
+          LINUX_ARM64_SHA256=$(cat artifacts/arm64/shelly_linux_arm64.tar.gz.sha256 | awk '{print $1}')
 
           # Clone homebrew-tap
           git clone "https://${HOMEBREW_TAP_TOKEN}@github.com/tj-smith47/homebrew-tap.git"
@@ -387,13 +389,21 @@ jobs:
             license "Apache-2.0"
             version "${VERSION}"
 
-            on_macos do
-              if Hardware::CPU.arm?
-                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_arm64.tar.gz"
-                sha256 "${ARM64_SHA256}"
-              else
+            if OS.mac?
+              if Hardware::CPU.intel?
                 url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_amd64.tar.gz"
-                sha256 "${AMD64_SHA256}"
+                sha256 "${MACOS_AMD64_SHA256}"
+              elsif Hardware::CPU.arm?
+                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_amd64.tar.gz"
+                sha256 "${MACOS_AMD64_SHA256}"
+              end
+            elsif OS.linux?
+              if Hardware::CPU.intel?
+                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_linux_amd64.tar.gz"
+                sha256 "${LINUX_AMD64_SHA256}"
+              elsif Hardware::CPU.arm?
+                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_linux_amd64.tar.gz"
+                sha256 "${LINUX_AMD64_SHA256}"
               end
             end
 

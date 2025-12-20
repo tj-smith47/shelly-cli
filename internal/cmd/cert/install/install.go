@@ -70,18 +70,18 @@ func (opts *Options) loadCertData() (*certData, error) {
 	var err error
 
 	if opts.CAFile != "" {
-		data.caData, err = os.ReadFile(opts.CAFile) //nolint:gosec // G304: CAFile is user-provided CLI argument
+		data.caData, err = os.ReadFile(opts.CAFile)
 		if err != nil {
 			return nil, fmt.Errorf("read CA file: %w", err)
 		}
 	}
 
 	if opts.ClientCert != "" {
-		data.certData, err = os.ReadFile(opts.ClientCert) //nolint:gosec // G304: ClientCert is user-provided CLI argument
+		data.certData, err = os.ReadFile(opts.ClientCert)
 		if err != nil {
 			return nil, fmt.Errorf("read client cert: %w", err)
 		}
-		data.keyData, err = os.ReadFile(opts.ClientKey) //nolint:gosec // G304: ClientKey is user-provided CLI argument
+		data.keyData, err = os.ReadFile(opts.ClientKey)
 		if err != nil {
 			return nil, fmt.Errorf("read client key: %w", err)
 		}

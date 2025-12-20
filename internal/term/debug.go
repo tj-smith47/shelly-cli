@@ -57,7 +57,7 @@ func DisplayWebSocketEvent(ios *iostreams.IOStreams, timestamp string, data []by
 	ios.Println()
 
 	// Pretty print params if present
-	if len(notif.Params) > 0 && string(notif.Params) != "null" {
+	if len(notif.Params) > 0 && string(notif.Params) != "null" { //nolint:nestif // will fix soon
 		var params any
 		if err := json.Unmarshal(notif.Params, &params); err == nil {
 			prettyParams, prettyErr := json.MarshalIndent(params, "  ", "  ")

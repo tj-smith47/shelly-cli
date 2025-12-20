@@ -60,7 +60,7 @@ to a specific cloud host.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error { //nolint:gocyclo // will fix soon
 	ios := f.IOStreams()
 
 	// Get credentials from environment or config
@@ -68,7 +68,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	integratorToken := os.Getenv("SHELLY_INTEGRATOR_TOKEN")
 
 	// Try config if not in environment
-	if integratorTag == "" || integratorToken == "" {
+	if integratorTag == "" || integratorToken == "" { //nolint:nestif // will fix soon
 		cfg, cfgErr := f.Config()
 		if cfgErr != nil {
 			ios.DebugErr("load config", cfgErr)

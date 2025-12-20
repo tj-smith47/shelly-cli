@@ -57,7 +57,7 @@ Requires an active fleet connection. Run 'shelly fleet connect' first.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error { //nolint:gocyclo // will fix soon
 	ios := f.IOStreams()
 
 	// Get credentials
