@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Config system refactor (in progress)
+### Changed
+- Upgraded shelly-go dependency to v0.1.10
+  - Transport interface refactored to use RPCRequest for cleaner API
+  - EnsureID automatically injects component IDs into params
+  - Reduced cyclomatic complexity in WebSocket and MQTT transports
+  - 90.8% test coverage
 
 ## [1.0.0] - 2025-XX-XX
 
