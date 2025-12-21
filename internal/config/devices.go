@@ -3,32 +3,70 @@ package config
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+// nonAlphanumericRegex matches any character that isn't alphanumeric or dash.
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-z0-9-]+`)
+
+// NormalizeDeviceName converts a device name to a normalized key.
+// Examples: "Master Bathroom" becomes "master-bathroom",
+// "Living Room Light" becomes "living-room-light".
+func NormalizeDeviceName(name string) string {
+	// Lowercase
+	normalized := strings.ToLower(name)
+	// Replace spaces and underscores with dashes
+	normalized = strings.ReplaceAll(normalized, " ", "-")
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	// Remove any remaining invalid characters
+	normalized = nonAlphanumericRegex.ReplaceAllString(normalized, "")
+	// Collapse multiple dashes
+	for strings.Contains(normalized, "--") {
+		normalized = strings.ReplaceAll(normalized, "--", "-")
+	}
+	// Trim leading/trailing dashes
+	normalized = strings.Trim(normalized, "-")
+	return normalized
+}
+
 // ValidateDeviceName checks if a device name is valid.
+// Names can contain spaces (will be normalized to dashes for storage).
 func ValidateDeviceName(name string) error {
 	if name == "" {
 		return fmt.Errorf("device name cannot be empty")
 	}
 
-	if strings.ContainsAny(name, " \t\n/\\:") {
-		return fmt.Errorf("device name contains invalid characters")
+	// Only reject truly problematic characters for file paths/URLs
+	if strings.ContainsAny(name, "/\\:") {
+		return fmt.Errorf("device name cannot contain path separators or colons")
+	}
+
+	// Check that normalized name isn't empty
+	if NormalizeDeviceName(name) == "" {
+		return fmt.Errorf("device name must contain at least one alphanumeric character")
 	}
 
 	return nil
 }
 
 // ValidateGroupName checks if a group name is valid.
+// Names can contain spaces (will be normalized to dashes for storage).
 func ValidateGroupName(name string) error {
 	if name == "" {
 		return fmt.Errorf("group name cannot be empty")
 	}
 
-	if strings.ContainsAny(name, " \t\n/\\:") {
-		return fmt.Errorf("group name contains invalid characters")
+	// Only reject truly problematic characters
+	if strings.ContainsAny(name, "/\\:") {
+		return fmt.Errorf("group name cannot contain path separators or colons")
+	}
+
+	// Check that normalized name isn't empty
+	if NormalizeDeviceName(name) == "" {
+		return fmt.Errorf("group name must contain at least one alphanumeric character")
 	}
 
 	return nil

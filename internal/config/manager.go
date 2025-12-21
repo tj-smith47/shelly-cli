@@ -164,6 +164,8 @@ func (m *Manager) Path() string {
 // =============================================================================
 
 // RegisterDevice adds a device to the registry.
+// The name is normalized for use as a key (e.g., "Master Bathroom" → "master-bathroom")
+// but the original display name is preserved in the Device struct.
 func (m *Manager) RegisterDevice(name, address string, generation int, deviceType, deviceModel string, auth *model.Auth) error {
 	if err := ValidateDeviceName(name); err != nil {
 		return err
@@ -172,8 +174,9 @@ func (m *Manager) RegisterDevice(name, address string, generation int, deviceTyp
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.config.Devices[name] = model.Device{
-		Name:       name,
+	key := NormalizeDeviceName(name)
+	m.config.Devices[key] = model.Device{
+		Name:       name, // Preserve original display name
 		Address:    address,
 		Generation: generation,
 		Type:       deviceType,
@@ -184,20 +187,26 @@ func (m *Manager) RegisterDevice(name, address string, generation int, deviceTyp
 }
 
 // UnregisterDevice removes a device from the registry.
+// Accepts both display name ("Master Bathroom") and normalized key ("master-bathroom").
 func (m *Manager) UnregisterDevice(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, ok := m.config.Devices[name]; !ok {
-		return fmt.Errorf("device %q not found", name)
+	// Try exact match first, then normalized
+	key := name
+	if _, ok := m.config.Devices[key]; !ok {
+		key = NormalizeDeviceName(name)
+		if _, ok := m.config.Devices[key]; !ok {
+			return fmt.Errorf("device %q not found", name)
+		}
 	}
-	delete(m.config.Devices, name)
+	delete(m.config.Devices, key)
 
-	// Also remove from any groups
+	// Also remove from any groups (check both forms)
 	for groupName, group := range m.config.Groups {
 		newDevices := make([]string, 0, len(group.Devices))
 		for _, d := range group.Devices {
-			if d != name {
+			if d != key && d != name {
 				newDevices = append(newDevices, d)
 			}
 		}
@@ -211,11 +220,20 @@ func (m *Manager) UnregisterDevice(name string) error {
 }
 
 // GetDevice returns a device by name.
+// Accepts both display name ("Master Bathroom") and normalized key ("master-bathroom").
 func (m *Manager) GetDevice(name string) (model.Device, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	dev, ok := m.config.Devices[name]
-	return dev, ok
+
+	// Try exact match first
+	if dev, ok := m.config.Devices[name]; ok {
+		return dev, true
+	}
+	// Try normalized key
+	if dev, ok := m.config.Devices[NormalizeDeviceName(name)]; ok {
+		return dev, true
+	}
+	return model.Device{}, false
 }
 
 // ListDevices returns all registered devices.
@@ -231,6 +249,7 @@ func (m *Manager) ListDevices() map[string]model.Device {
 }
 
 // RenameDevice renames a device.
+// Accepts both display name and normalized key for oldName.
 func (m *Manager) RenameDevice(oldName, newName string) error {
 	if err := ValidateDeviceName(newName); err != nil {
 		return err
@@ -239,25 +258,32 @@ func (m *Manager) RenameDevice(oldName, newName string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	device, ok := m.config.Devices[oldName]
+	// Find old device (try exact match first, then normalized)
+	oldKey := oldName
+	device, ok := m.config.Devices[oldKey]
 	if !ok {
-		return fmt.Errorf("device %q not found", oldName)
+		oldKey = NormalizeDeviceName(oldName)
+		device, ok = m.config.Devices[oldKey]
+		if !ok {
+			return fmt.Errorf("device %q not found", oldName)
+		}
 	}
 
-	if _, exists := m.config.Devices[newName]; exists {
+	newKey := NormalizeDeviceName(newName)
+	if _, exists := m.config.Devices[newKey]; exists && newKey != oldKey {
 		return fmt.Errorf("device %q already exists", newName)
 	}
 
-	// Update device
+	// Update device with new display name
 	device.Name = newName
-	delete(m.config.Devices, oldName)
-	m.config.Devices[newName] = device
+	delete(m.config.Devices, oldKey)
+	m.config.Devices[newKey] = device
 
 	// Update group references
 	for groupName, group := range m.config.Groups {
 		for i, d := range group.Devices {
-			if d == oldName {
-				group.Devices[i] = newName
+			if d == oldKey {
+				group.Devices[i] = newKey
 				m.config.Groups[groupName] = group
 				break
 			}
@@ -282,20 +308,27 @@ func (m *Manager) ResolveDevice(identifier string) (model.Device, error) {
 }
 
 // SetDeviceAuth sets authentication credentials for a device.
+// Accepts both display name and normalized key.
 func (m *Manager) SetDeviceAuth(deviceName, username, password string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	dev, ok := m.config.Devices[deviceName]
+	// Try exact match first, then normalized
+	key := deviceName
+	dev, ok := m.config.Devices[key]
 	if !ok {
-		return fmt.Errorf("device %q not found", deviceName)
+		key = NormalizeDeviceName(deviceName)
+		dev, ok = m.config.Devices[key]
+		if !ok {
+			return fmt.Errorf("device %q not found", deviceName)
+		}
 	}
 
 	dev.Auth = &model.Auth{
 		Username: username,
 		Password: password,
 	}
-	m.config.Devices[deviceName] = dev
+	m.config.Devices[key] = dev
 	return m.saveWithoutLock()
 }
 
