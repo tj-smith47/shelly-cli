@@ -354,13 +354,25 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: shelly_darwin_amd64
-          path: artifacts/amd64/
+          path: artifacts/darwin_amd64/
 
       - name: Download macOS arm64 artifact
         uses: actions/download-artifact@v4
         with:
           name: shelly_darwin_arm64
-          path: artifacts/arm64/
+          path: artifacts/darwin_arm64/
+
+      - name: Download Linux amd64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: shelly_linux_amd64
+          path: artifacts/linux_amd64/
+
+      - name: Download Linux arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: shelly_linux_arm64
+          path: artifacts/linux_arm64/
 
       - name: Update Homebrew tap
         env:
@@ -369,11 +381,11 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}"
           TAG="${{ needs.prepare.outputs.tag }}"
 
-          # Get checksums
-          MACOS_AMD64_SHA256=$(cat artifacts/amd64/shelly_darwin_amd64.tar.gz.sha256 | awk '{print $1}')
-          MACOS_ARM64_SHA256=$(cat artifacts/arm64/shelly_darwin_arm64.tar.gz.sha256 | awk '{print $1}')
-          LINUX_AMD64_SHA256=$(cat artifacts/amd64/shelly_linux_amd64.tar.gz.sha256 | awk '{print $1}')
-          LINUX_ARM64_SHA256=$(cat artifacts/arm64/shelly_linux_arm64.tar.gz.sha256 | awk '{print $1}')
+          # Get checksums from each artifact directory
+          MACOS_AMD64_SHA256=$(cat artifacts/darwin_amd64/shelly_darwin_amd64.tar.gz.sha256 | awk '{print $1}')
+          MACOS_ARM64_SHA256=$(cat artifacts/darwin_arm64/shelly_darwin_arm64.tar.gz.sha256 | awk '{print $1}')
+          LINUX_AMD64_SHA256=$(cat artifacts/linux_amd64/shelly_linux_amd64.tar.gz.sha256 | awk '{print $1}')
+          LINUX_ARM64_SHA256=$(cat artifacts/linux_arm64/shelly_linux_arm64.tar.gz.sha256 | awk '{print $1}')
 
           # Clone homebrew-tap
           git clone "https://${HOMEBREW_TAP_TOKEN}@github.com/tj-smith47/homebrew-tap.git"
@@ -394,16 +406,16 @@ jobs:
                 url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_amd64.tar.gz"
                 sha256 "${MACOS_AMD64_SHA256}"
               elsif Hardware::CPU.arm?
-                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_amd64.tar.gz"
-                sha256 "${MACOS_AMD64_SHA256}"
+                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_darwin_arm64.tar.gz"
+                sha256 "${MACOS_ARM64_SHA256}"
               end
             elsif OS.linux?
               if Hardware::CPU.intel?
                 url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_linux_amd64.tar.gz"
                 sha256 "${LINUX_AMD64_SHA256}"
               elsif Hardware::CPU.arm?
-                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_linux_amd64.tar.gz"
-                sha256 "${LINUX_AMD64_SHA256}"
+                url "https://github.com/tj-smith47/shelly-cli/releases/download/${TAG}/shelly_linux_arm64.tar.gz"
+                sha256 "${LINUX_ARM64_SHA256}"
               end
             end
 
