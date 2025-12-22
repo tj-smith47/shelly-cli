@@ -173,9 +173,10 @@ func (s *IOStreams) SetQuiet(quiet bool) {
 	s.quiet = quiet
 }
 
-// IsPlainMode returns true if plain mode is enabled (--plain, non-TTY, or no color).
+// IsPlainMode returns true if plain mode is explicitly enabled via --plain flag.
+// Non-TTY output uses no-color style (ASCII borders) instead of plain (tab-separated).
 func (s *IOStreams) IsPlainMode() bool {
-	return s.plainMode || !s.IsStdoutTTY() || !s.ColorEnabled()
+	return s.plainMode
 }
 
 // SetPlainMode sets the plain mode state.

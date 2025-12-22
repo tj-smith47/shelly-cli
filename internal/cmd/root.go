@@ -302,6 +302,7 @@ func init() {
 	rootCmd.PersistentFlags().String("config", "", "Config file (default $HOME/.config/shelly/config.yaml)")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().Bool("plain", false, "Disable borders and colors (machine-readable output)")
+	rootCmd.PersistentFlags().Bool("no-headers", false, "Hide table headers in output")
 	rootCmd.PersistentFlags().Bool("log-json", false, "Output logs in JSON format")
 	rootCmd.PersistentFlags().String("log-categories", "", "Filter logs by category (comma-separated: network,api,device,config,auth,plugin)")
 
@@ -312,6 +313,7 @@ func init() {
 	must(viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet")))
 	must(viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color")))
 	must(viper.BindPFlag("plain", rootCmd.PersistentFlags().Lookup("plain")))
+	must(viper.BindPFlag("no-headers", rootCmd.PersistentFlags().Lookup("no-headers")))
 	must(viper.BindPFlag("log.json", rootCmd.PersistentFlags().Lookup("log-json")))
 	must(viper.BindPFlag("log.categories", rootCmd.PersistentFlags().Lookup("log-categories")))
 

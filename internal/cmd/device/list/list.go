@@ -2,6 +2,7 @@
 package list
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -123,19 +124,16 @@ func run(f *cmdutil.Factory, generation int, deviceType string) error {
 	}
 
 	// Table output
-	table := output.NewTable("Name", "Address", "Type", "Model", "Generation", "Auth")
-	table.SetStyle(output.GetTableStyle(ios))
-	for _, dev := range filtered {
+	table := output.NewStyledTable(ios, "#", "Name", "Address", "Type", "Model", "Generation", "Auth")
+	for i, dev := range filtered {
 		gen := output.RenderGeneration(dev.Generation)
 		auth := output.RenderAuthRequired(dev.Auth)
-		table.AddRow(dev.Name, dev.Address, dev.Type, dev.Model, gen, auth)
+		table.AddRow(fmt.Sprintf("%d", i+1), dev.Name, dev.Address, dev.Type, dev.Model, gen, auth)
 	}
 
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
-	ios.Println()
-	ios.Count("device", len(filtered))
 
 	return nil
 }

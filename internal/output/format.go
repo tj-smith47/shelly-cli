@@ -2,6 +2,7 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,11 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
@@ -107,43 +113,69 @@ func NewFormatter(format Format) Formatter {
 	}
 }
 
-// JSONFormatter formats output as JSON.
+// JSONFormatter formats output as JSON with optional syntax highlighting.
 type JSONFormatter struct {
-	Indent bool
+	Indent    bool
+	Highlight bool // Enable syntax highlighting (disabled in --no-color/--plain)
 }
 
-// NewJSONFormatter creates a new JSON formatter.
+// NewJSONFormatter creates a new JSON formatter with syntax highlighting.
 func NewJSONFormatter() *JSONFormatter {
-	return &JSONFormatter{Indent: true}
+	return &JSONFormatter{
+		Indent:    true,
+		Highlight: shouldHighlight(),
+	}
 }
 
-// Format outputs data as JSON.
+// Format outputs data as JSON with optional syntax highlighting.
 func (f *JSONFormatter) Format(w io.Writer, data any) error {
-	encoder := json.NewEncoder(w)
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
 	if f.Indent {
 		encoder.SetIndent("", "  ")
 	}
-	return encoder.Encode(data)
+	if err := encoder.Encode(data); err != nil {
+		return err
+	}
+
+	output := buf.String()
+	if f.Highlight {
+		output = highlightCode(output, "json")
+	}
+	_, err := io.WriteString(w, output)
+	return err
 }
 
-// YAMLFormatter formats output as YAML.
-type YAMLFormatter struct{}
+// YAMLFormatter formats output as YAML with optional syntax highlighting.
+type YAMLFormatter struct {
+	Highlight bool // Enable syntax highlighting (disabled in --no-color/--plain)
+}
 
-// NewYAMLFormatter creates a new YAML formatter.
+// NewYAMLFormatter creates a new YAML formatter with syntax highlighting.
 func NewYAMLFormatter() *YAMLFormatter {
-	return &YAMLFormatter{}
+	return &YAMLFormatter{
+		Highlight: shouldHighlight(),
+	}
 }
 
-// Format outputs data as YAML.
-func (f *YAMLFormatter) Format(w io.Writer, data any) (err error) {
-	encoder := yaml.NewEncoder(w)
+// Format outputs data as YAML with optional syntax highlighting.
+func (f *YAMLFormatter) Format(w io.Writer, data any) error {
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
 	encoder.SetIndent(2)
-	defer func() {
-		if cerr := encoder.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-	}()
-	return encoder.Encode(data)
+	if err := encoder.Encode(data); err != nil {
+		return err
+	}
+	if err := encoder.Close(); err != nil {
+		return err
+	}
+
+	output := buf.String()
+	if f.Highlight {
+		output = highlightCode(output, "yaml")
+	}
+	_, err := io.WriteString(w, output)
+	return err
 }
 
 // TextFormatter formats output as plain text.
@@ -401,17 +433,17 @@ func FormatFloatPtr(f *float64) string {
 }
 
 // FormatSize formats a byte count as a human-readable string.
-func FormatSize(bytes int64) string {
+func FormatSize(size int64) string {
 	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
+	if size < unit {
+		return fmt.Sprintf("%d B", size)
 	}
 	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
+	for n := size / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++
 	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
 // ValueTruncateTable is the default truncation length for table display.
@@ -617,4 +649,93 @@ func FormatReleaseNotes(body string) string {
 // FormatDeviceGeneration returns a formatted generation string.
 func FormatDeviceGeneration(gen int) string {
 	return fmt.Sprintf("Gen%d", gen)
+}
+
+// shouldHighlight returns true if syntax highlighting should be enabled.
+// Returns false for --no-color, --plain, non-TTY output, or test environments.
+func shouldHighlight() bool {
+	// Require stdout to be a TTY (disables in tests and pipes)
+	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+		return false
+	}
+	// Disabled for --plain or --no-color
+	if viper.GetBool("plain") || viper.GetBool("no-color") {
+		return false
+	}
+	// Check NO_COLOR environment variable
+	if _, ok := os.LookupEnv("NO_COLOR"); ok {
+		return false
+	}
+	// Check SHELLY_NO_COLOR environment variable
+	if _, ok := os.LookupEnv("SHELLY_NO_COLOR"); ok {
+		return false
+	}
+	// Check TERM=dumb
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+	return true
+}
+
+// highlightCode applies syntax highlighting to code using chroma.
+// Falls back to plain text if highlighting fails.
+func highlightCode(code, language string) string {
+	lexer := lexers.Get(language)
+	if lexer == nil {
+		return code
+	}
+	lexer = chroma.Coalesce(lexer)
+
+	// Use a theme that works well with the current terminal theme
+	style := getChromaStyle()
+
+	// Use terminal256 formatter for broad compatibility
+	formatter := formatters.Get("terminal256")
+	if formatter == nil {
+		formatter = formatters.Fallback
+	}
+
+	iterator, err := lexer.Tokenise(nil, code)
+	if err != nil {
+		return code
+	}
+
+	var buf bytes.Buffer
+	if err := formatter.Format(&buf, style, iterator); err != nil {
+		return code
+	}
+
+	return buf.String()
+}
+
+// getChromaStyle returns a chroma style that matches the current theme.
+func getChromaStyle() *chroma.Style {
+	// Try to match the current theme name to a chroma style
+	currentTheme := viper.GetString("theme.name")
+	if currentTheme == "" {
+		currentTheme = "dracula"
+	}
+
+	// Map theme names to chroma styles
+	styleMap := map[string]string{
+		"dracula":      "dracula",
+		"nord":         "nord",
+		"gruvbox":      "gruvbox",
+		"gruvbox-dark": "gruvbox",
+		"tokyo-night":  "tokyonight-night",
+		"catppuccin":   "catppuccin-mocha",
+	}
+
+	if chromaStyle, ok := styleMap[strings.ToLower(currentTheme)]; ok {
+		if style := styles.Get(chromaStyle); style != nil {
+			return style
+		}
+	}
+
+	// Default to dracula which works well on dark terminals
+	if style := styles.Get("dracula"); style != nil {
+		return style
+	}
+
+	return styles.Fallback
 }

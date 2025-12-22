@@ -86,6 +86,8 @@ func TestJSONFormatter(t *testing.T) {
 	var buf bytes.Buffer
 
 	f := NewJSONFormatter()
+	// Disable highlighting for tests to get predictable output
+	f.Highlight = false
 	err := f.Format(&buf, data)
 	if err != nil {
 		t.Fatalf("Format() error: %v", err)
@@ -93,10 +95,10 @@ func TestJSONFormatter(t *testing.T) {
 
 	output := buf.String()
 	if !strings.Contains(output, `"key"`) {
-		t.Error("expected JSON output to contain key")
+		t.Errorf("expected JSON output to contain key, got: %q", output)
 	}
 	if !strings.Contains(output, `"value"`) {
-		t.Error("expected JSON output to contain value")
+		t.Errorf("expected JSON output to contain value, got: %q", output)
 	}
 }
 
@@ -107,6 +109,8 @@ func TestYAMLFormatter(t *testing.T) {
 	var buf bytes.Buffer
 
 	f := NewYAMLFormatter()
+	// Disable highlighting for tests to get predictable output
+	f.Highlight = false
 	err := f.Format(&buf, data)
 	if err != nil {
 		t.Fatalf("Format() error: %v", err)
@@ -114,10 +118,10 @@ func TestYAMLFormatter(t *testing.T) {
 
 	output := buf.String()
 	if !strings.Contains(output, "key:") {
-		t.Error("expected YAML output to contain key:")
+		t.Errorf("expected YAML output to contain key:, got: %q", output)
 	}
 	if !strings.Contains(output, "value") {
-		t.Error("expected YAML output to contain value")
+		t.Errorf("expected YAML output to contain value, got: %q", output)
 	}
 }
 

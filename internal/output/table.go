@@ -9,6 +9,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -38,21 +39,24 @@ var borderStyles = map[TableBorderStyle]lipgloss.Border{
 
 // Table represents a formatted table.
 type Table struct {
-	headers []string
-	rows    [][]string
-	style   TableStyle
+	headers     []string
+	rows        [][]string
+	style       TableStyle
+	hideHeaders bool // Hide header row entirely (for --no-headers)
 }
 
 // TableStyle defines the visual style for a table.
 type TableStyle struct {
-	Header      lipgloss.Style
-	Cell        lipgloss.Style
-	AltCell     lipgloss.Style   // Alternating row color
-	PrimaryCell lipgloss.Style   // First column styling (e.g., Name column)
-	Border      lipgloss.Style   // Border character styling
-	BorderStyle TableBorderStyle // Border style (rounded, square, etc.)
-	Padding     int
-	ShowBorder  bool
+	Header           lipgloss.Style
+	Cell             lipgloss.Style
+	AltCell          lipgloss.Style   // Alternating row color
+	PrimaryCell      lipgloss.Style   // First column styling (e.g., Name column)
+	Border           lipgloss.Style   // Border character styling
+	BorderStyle      TableBorderStyle // Border style (rounded, square, etc.)
+	Padding          int
+	ShowBorder       bool
+	UppercaseHeaders bool // Make headers ALL CAPS
+	PlainMode        bool // True for --plain: no borders, tab-separated
 }
 
 // NewTable creates a new table with the given headers.
@@ -70,45 +74,91 @@ func NewTable(headers ...string) *Table {
 func DefaultTableStyle() TableStyle {
 	colors := theme.GetSemanticColors()
 	return TableStyle{
-		Header:      lipgloss.NewStyle().Bold(true).Foreground(colors.TableHeader),
-		Cell:        lipgloss.NewStyle().Foreground(colors.TableCell),
-		AltCell:     lipgloss.NewStyle().Foreground(colors.TableAltCell),
-		PrimaryCell: lipgloss.NewStyle().Foreground(colors.Primary),
-		Border:      lipgloss.NewStyle().Foreground(colors.TableBorder),
-		BorderStyle: BorderRounded,
-		Padding:     1,
-		ShowBorder:  true,
+		Header:           lipgloss.NewStyle().Bold(true).Foreground(colors.TableHeader),
+		Cell:             lipgloss.NewStyle().Foreground(colors.TableCell),
+		AltCell:          lipgloss.NewStyle().Foreground(colors.TableAltCell),
+		PrimaryCell:      lipgloss.NewStyle().Foreground(colors.Primary),
+		Border:           lipgloss.NewStyle().Foreground(colors.TableBorder),
+		BorderStyle:      BorderRounded,
+		Padding:          1,
+		ShowBorder:       true,
+		UppercaseHeaders: true, // Table headers are ALL CAPS by default
+		PlainMode:        false,
 	}
 }
 
-// PlainTableStyle returns a table style for plain (non-TTY or --plain) output.
-// Uses ASCII borders with no colors for machine-readable output.
+// NoColorTableStyle returns a table style for --no-color output.
+// Uses ASCII borders (|-+) with no ANSI codes (no colors, no bold).
+func NoColorTableStyle() TableStyle {
+	return TableStyle{
+		Header:           lipgloss.NewStyle(),
+		Cell:             lipgloss.NewStyle(),
+		AltCell:          lipgloss.NewStyle(),
+		PrimaryCell:      lipgloss.NewStyle(),
+		Border:           lipgloss.NewStyle(),
+		BorderStyle:      BorderASCII,
+		Padding:          1,
+		ShowBorder:       true,
+		UppercaseHeaders: true,
+		PlainMode:        false,
+	}
+}
+
+// PlainTableStyle returns a table style for --plain output.
+// No borders, tab-separated values for machine-readable/scriptable output.
 func PlainTableStyle() TableStyle {
 	return TableStyle{
-		Header:      lipgloss.NewStyle(),
-		Cell:        lipgloss.NewStyle(),
-		AltCell:     lipgloss.NewStyle(),
-		PrimaryCell: lipgloss.NewStyle(),
-		Border:      lipgloss.NewStyle(),
-		BorderStyle: BorderASCII,
-		Padding:     1,
-		ShowBorder:  true,
+		Header:           lipgloss.NewStyle(),
+		Cell:             lipgloss.NewStyle(),
+		AltCell:          lipgloss.NewStyle(),
+		PrimaryCell:      lipgloss.NewStyle(),
+		Border:           lipgloss.NewStyle(),
+		BorderStyle:      BorderNone,
+		Padding:          0,
+		ShowBorder:       false,
+		UppercaseHeaders: true,
+		PlainMode:        true, // Enables tab-separated output
 	}
 }
 
-// GetTableStyle returns the appropriate table style based on plain mode.
-// Returns PlainTableStyle() if ios.IsPlainMode() is true, otherwise DefaultTableStyle().
-func GetTableStyle(ios PlainModeChecker) TableStyle {
-	if ios != nil && ios.IsPlainMode() {
+// GetTableStyle returns the appropriate table style based on output mode.
+// Priority: --plain > --no-color > default (with colors).
+func GetTableStyle(ios ModeChecker) TableStyle {
+	if ios == nil {
+		return DefaultTableStyle()
+	}
+	// --plain: aligned columns, no borders
+	if ios.IsPlainMode() {
 		return PlainTableStyle()
+	}
+	// --no-color or non-TTY: ASCII borders, no colors
+	if !ios.ColorEnabled() {
+		return NoColorTableStyle()
 	}
 	return DefaultTableStyle()
 }
 
-// PlainModeChecker is an interface for checking plain mode.
+// ShouldHideHeaders returns true if --no-headers flag is set.
+func ShouldHideHeaders() bool {
+	return viper.GetBool("no-headers")
+}
+
+// NewStyledTable creates a table with style and headers settings from flags.
+// This is a convenience function that applies GetTableStyle and --no-headers.
+func NewStyledTable(ios ModeChecker, headers ...string) *Table {
+	t := NewTable(headers...)
+	t.SetStyle(GetTableStyle(ios))
+	if ShouldHideHeaders() {
+		t.HideHeaders()
+	}
+	return t
+}
+
+// ModeChecker is an interface for checking output mode and color state.
 // This allows decoupling from the iostreams package.
-type PlainModeChecker interface {
+type ModeChecker interface {
 	IsPlainMode() bool
+	ColorEnabled() bool
 }
 
 // SetStyle sets a custom table style.
@@ -127,6 +177,12 @@ func (t *Table) SetBorderStyle(style TableBorderStyle) *Table {
 func (t *Table) HideBorders() *Table {
 	t.style.ShowBorder = false
 	t.style.BorderStyle = BorderNone
+	return t
+}
+
+// HideHeaders hides the header row (for --no-headers flag).
+func (t *Table) HideHeaders() *Table {
+	t.hideHeaders = true
 	return t
 }
 
@@ -157,6 +213,14 @@ func (t *Table) Render() string {
 		return ""
 	}
 
+	// Plain mode: tab-separated values, no borders
+	if t.style.PlainMode {
+		return t.renderPlain()
+	}
+
+	// Prepare headers (uppercase if configured)
+	headers := t.prepareHeaders()
+
 	// Get the appropriate border style
 	border := borderStyles[t.style.BorderStyle]
 	if !t.style.ShowBorder {
@@ -179,11 +243,84 @@ func (t *Table) Render() string {
 				return t.style.Cell.Padding(0, t.style.Padding)
 			}
 			return t.style.AltCell.Padding(0, t.style.Padding)
-		}).
-		Headers(t.headers...).
-		Rows(t.rows...)
+		})
+
+	// Add headers unless hidden
+	if !t.hideHeaders {
+		tbl = tbl.Headers(headers...)
+	}
+
+	tbl = tbl.Rows(t.rows...)
 
 	return tbl.Render()
+}
+
+// prepareHeaders returns headers, uppercased if configured.
+func (t *Table) prepareHeaders() []string {
+	if !t.style.UppercaseHeaders {
+		return t.headers
+	}
+	headers := make([]string, len(t.headers))
+	for i, h := range t.headers {
+		headers[i] = strings.ToUpper(h)
+	}
+	return headers
+}
+
+// renderPlain renders the table with aligned columns but no borders for --plain mode.
+func (t *Table) renderPlain() string {
+	headers := t.prepareHeaders()
+
+	// Calculate column widths
+	widths := make([]int, len(headers))
+	for i, h := range headers {
+		widths[i] = len(h)
+	}
+	for _, row := range t.rows {
+		for i, cell := range row {
+			if i < len(widths) && len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
+	}
+
+	var sb strings.Builder
+
+	// Headers (unless hidden)
+	if !t.hideHeaders {
+		for i, h := range headers {
+			if i > 0 {
+				sb.WriteString("  ") // Column separator
+			}
+			sb.WriteString(padRight(h, widths[i]))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Rows
+	for _, row := range t.rows {
+		for i := range widths {
+			if i > 0 {
+				sb.WriteString("  ") // Column separator
+			}
+			cell := ""
+			if i < len(row) {
+				cell = row[i]
+			}
+			sb.WriteString(padRight(cell, widths[i]))
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+// padRight pads a string with spaces to reach the specified width.
+func padRight(s string, width int) string {
+	if len(s) >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-len(s))
 }
 
 // Print prints the table to stdout.

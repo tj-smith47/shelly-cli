@@ -48,12 +48,12 @@ func TestTable_PrintTo(t *testing.T) {
 
 	output := buf.String()
 
-	// Check headers present
-	if !strings.Contains(output, "Device") {
-		t.Error("expected output to contain 'Device'")
+	// Check headers present (uppercase by default)
+	if !strings.Contains(output, "DEVICE") {
+		t.Error("expected output to contain 'DEVICE'")
 	}
-	if !strings.Contains(output, "Status") {
-		t.Error("expected output to contain 'Status'")
+	if !strings.Contains(output, "STATUS") {
+		t.Error("expected output to contain 'STATUS'")
 	}
 
 	// Check data present
@@ -112,8 +112,9 @@ func TestTable_Render(t *testing.T) {
 	if rendered == "" {
 		t.Error("Render() returned empty string")
 	}
-	if !strings.Contains(rendered, "Col1") {
-		t.Error("Render() should contain header")
+	// Headers are uppercase by default
+	if !strings.Contains(rendered, "COL1") {
+		t.Error("Render() should contain uppercase header")
 	}
 }
 
@@ -197,11 +198,31 @@ func TestPlainTableStyle(t *testing.T) {
 	t.Parallel()
 
 	style := PlainTableStyle()
+	// Plain mode uses no borders for tab-separated output
+	if style.BorderStyle != BorderNone {
+		t.Error("PlainTableStyle should use no borders")
+	}
+	if style.ShowBorder {
+		t.Error("PlainTableStyle should have ShowBorder disabled")
+	}
+	if !style.PlainMode {
+		t.Error("PlainTableStyle should have PlainMode enabled")
+	}
+}
+
+func TestNoColorTableStyle(t *testing.T) {
+	t.Parallel()
+
+	style := NoColorTableStyle()
+	// No-color mode uses ASCII borders
 	if style.BorderStyle != BorderASCII {
-		t.Error("PlainTableStyle should use ASCII borders")
+		t.Error("NoColorTableStyle should use ASCII borders")
 	}
 	if !style.ShowBorder {
-		t.Error("PlainTableStyle should have ShowBorder enabled")
+		t.Error("NoColorTableStyle should have ShowBorder enabled")
+	}
+	if style.PlainMode {
+		t.Error("NoColorTableStyle should not have PlainMode enabled")
 	}
 }
 
@@ -226,13 +247,18 @@ func TestHideBorders(t *testing.T) {
 	}
 }
 
-// mockPlainModeChecker implements PlainModeChecker for testing.
-type mockPlainModeChecker struct {
-	plain bool
+// mockModeChecker implements ModeChecker for testing.
+type mockModeChecker struct {
+	plain        bool
+	colorEnabled bool
 }
 
-func (m *mockPlainModeChecker) IsPlainMode() bool {
+func (m *mockModeChecker) IsPlainMode() bool {
 	return m.plain
+}
+
+func (m *mockModeChecker) ColorEnabled() bool {
+	return m.colorEnabled
 }
 
 func TestGetTableStyle(t *testing.T) {
@@ -246,21 +272,33 @@ func TestGetTableStyle(t *testing.T) {
 		}
 	})
 
-	t.Run("plain mode returns plain style", func(t *testing.T) {
+	t.Run("plain mode returns plain style with no borders", func(t *testing.T) {
 		t.Parallel()
-		checker := &mockPlainModeChecker{plain: true}
+		checker := &mockModeChecker{plain: true, colorEnabled: true}
 		style := GetTableStyle(checker)
-		if style.BorderStyle != BorderASCII {
-			t.Error("plain mode should return plain style with ASCII borders")
+		if style.BorderStyle != BorderNone {
+			t.Error("plain mode should return plain style with no borders")
+		}
+		if !style.PlainMode {
+			t.Error("plain mode should have PlainMode=true for tab-separated output")
 		}
 	})
 
-	t.Run("non-plain mode returns default style", func(t *testing.T) {
+	t.Run("no-color mode returns ASCII borders", func(t *testing.T) {
 		t.Parallel()
-		checker := &mockPlainModeChecker{plain: false}
+		checker := &mockModeChecker{plain: false, colorEnabled: false}
+		style := GetTableStyle(checker)
+		if style.BorderStyle != BorderASCII {
+			t.Error("no-color mode should return ASCII borders")
+		}
+	})
+
+	t.Run("color enabled returns default style", func(t *testing.T) {
+		t.Parallel()
+		checker := &mockModeChecker{plain: false, colorEnabled: true}
 		style := GetTableStyle(checker)
 		if style.BorderStyle != BorderRounded {
-			t.Error("non-plain mode should return default style with rounded borders")
+			t.Error("color mode should return default style with rounded borders")
 		}
 	})
 }

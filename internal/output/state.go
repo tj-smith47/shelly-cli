@@ -3,9 +3,42 @@ package output
 
 import (
 	"fmt"
+	"os"
+
+	"github.com/mattn/go-isatty"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
+
+// colorEnabled returns true if colored output should be used.
+// Returns false for --no-color, --plain, NO_COLOR env, or non-TTY.
+func colorEnabled() bool {
+	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+		return false
+	}
+	if viper.GetBool("plain") || viper.GetBool("no-color") {
+		return false
+	}
+	if _, ok := os.LookupEnv("NO_COLOR"); ok {
+		return false
+	}
+	if _, ok := os.LookupEnv("SHELLY_NO_COLOR"); ok {
+		return false
+	}
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+	return true
+}
+
+// renderStyled applies a theme style if color is enabled, otherwise returns plain text.
+func renderStyled(style theme.StyleFunc, text string) string {
+	if colorEnabled() {
+		return style(text)
+	}
+	return text
+}
 
 // Case defines text casing for boolean labels.
 type Case int
@@ -111,6 +144,7 @@ const (
 // =============================================================================
 
 // RenderOnOff returns a themed on/off string with configurable case and false style.
+// Respects --no-color, --plain, and NO_COLOR environment variable.
 func RenderOnOff(on bool, c Case, fs theme.FalseStyle) string {
 	var trueLabel, falseLabel string
 	switch c {
@@ -120,6 +154,12 @@ func RenderOnOff(on bool, c Case, fs theme.FalseStyle) string {
 		trueLabel, falseLabel = LabelOnTitle, LabelOffTitle
 	default:
 		trueLabel, falseLabel = LabelOnLower, LabelOffLower
+	}
+	if !colorEnabled() {
+		if on {
+			return trueLabel
+		}
+		return falseLabel
 	}
 	if on {
 		return theme.StatusOK().Render(trueLabel)
@@ -144,6 +184,7 @@ func RenderYesNo(value bool, c Case, fs theme.FalseStyle) string {
 
 // RenderOnline returns a themed online/offline string with configurable case.
 // Uses dedicated Online/Offline semantic colors for device state consistency.
+// Respects --no-color, --plain, and NO_COLOR environment variable.
 func RenderOnline(online bool, c Case) string {
 	var trueLabel, falseLabel string
 	switch c {
@@ -151,6 +192,12 @@ func RenderOnline(online bool, c Case) string {
 		trueLabel, falseLabel = LabelOnlineTitle, LabelOfflineTitle
 	default:
 		trueLabel, falseLabel = LabelOnlineLower, LabelOfflineLower
+	}
+	if !colorEnabled() {
+		if online {
+			return trueLabel
+		}
+		return falseLabel
 	}
 	if online {
 		return theme.StatusOnline().Render(trueLabel)
@@ -330,11 +377,18 @@ func RenderDiffChanged() string {
 }
 
 // RenderAuthRequired returns themed "Yes" (warning) or "No" (ok) for auth status.
+// Respects --no-color, --plain, and NO_COLOR environment variable.
 func RenderAuthRequired(required bool) string {
 	if required {
-		return theme.StatusWarn().Render(LabelYesTitle)
+		if colorEnabled() {
+			return theme.StatusWarn().Render(LabelYesTitle)
+		}
+		return LabelYesTitle
 	}
-	return theme.StatusOK().Render(LabelNoTitle)
+	if colorEnabled() {
+		return theme.StatusOK().Render(LabelNoTitle)
+	}
+	return LabelNoTitle
 }
 
 // RenderGeneration returns generation string (e.g., "Gen2") or "unknown".
