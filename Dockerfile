@@ -1,10 +1,8 @@
-# Shelly CLI Docker Image
-# Used by GoReleaser dockers_v2 - expects platform-specific binary
-
 FROM alpine:3.21
+# Labels set via CI
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata;
 
 # Create non-root user for security
 RUN adduser -D -u 1000 shelly
@@ -20,5 +18,3 @@ WORKDIR /home/shelly
 # Default entrypoint
 ENTRYPOINT ["shelly"]
 CMD ["--help"]
-
-# Labels set via goreleaser
