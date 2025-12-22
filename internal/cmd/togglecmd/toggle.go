@@ -13,9 +13,9 @@ import (
 
 // Options holds command options.
 type Options struct {
-	Device  string
-	All     bool
-	Factory *cmdutil.Factory
+	Device      string
+	ComponentID int // -1 means all components
+	Factory     *cmdutil.Factory
 }
 
 // NewCommand creates the toggle command.
@@ -31,12 +31,13 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Works with switches, lights, covers, and RGB devices. For covers,
 this toggles between open and close based on current state.
 
-Use --all to toggle all controllable components on the device.`,
-		Example: `  # Toggle a switch or light
+By default, toggles all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).`,
+		Example: `  # Toggle all components on a device
   shelly toggle living-room
 
-  # Toggle all components on a device
-  shelly toggle living-room --all
+  # Toggle specific switch (for multi-switch devices)
+  shelly toggle dual-switch --id 1
 
   # Toggle a cover
   shelly toggle bedroom-blinds`,
@@ -48,7 +49,7 @@ Use --all to toggle all controllable components on the device.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Toggle all controllable components")
+	cmd.Flags().IntVar(&opts.ComponentID, "id", -1, "Component ID to control (omit to control all)")
 
 	return cmd
 }
@@ -61,10 +62,16 @@ func run(ctx context.Context, opts *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
+	// Convert -1 (default) to nil (all components), otherwise pass the ID
+	var componentID *int
+	if opts.ComponentID >= 0 {
+		componentID = &opts.ComponentID
+	}
+
 	var result *shelly.QuickResult
 	err := cmdutil.RunWithSpinner(ctx, ios, "Toggling...", func(ctx context.Context) error {
 		var opErr error
-		result, opErr = svc.QuickToggle(ctx, opts.Device, opts.All)
+		result, opErr = svc.QuickToggle(ctx, opts.Device, componentID)
 		return opErr
 	})
 	if err != nil {

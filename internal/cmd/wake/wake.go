@@ -76,7 +76,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	ios.Info("Turning on %s...", device)
 
 	// Try QuickOn first (works for most devices)
-	result, err := svc.QuickOn(ctx, device, false)
+	result, err := svc.QuickOn(ctx, device, nil)
 	if err != nil {
 		return fmt.Errorf("failed to turn on device: %w", err)
 	}

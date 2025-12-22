@@ -146,7 +146,7 @@ func execute() int {
 
 	// Handle shell aliases by executing in shell
 	if isShell {
-		return executeShellAlias(expandedArgs)
+		return executeShellAlias(ctx, expandedArgs)
 	}
 
 	// Set the expanded args for cobra to process
@@ -250,7 +250,7 @@ func expandAlias(args []string) (expandedArgs []string, isShell bool) {
 }
 
 // executeShellAlias runs a shell alias command.
-func executeShellAlias(args []string) int {
+func executeShellAlias(ctx context.Context, args []string) int {
 	if len(args) == 0 {
 		return 0
 	}
@@ -262,7 +262,7 @@ func executeShellAlias(args []string) int {
 	}
 
 	//nolint:gosec // G204: args are from user-defined aliases in their own config
-	cmd := exec.CommandContext(context.Background(), shell, "-c", args[0])
+	cmd := exec.CommandContext(ctx, shell, "-c", args[0])
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

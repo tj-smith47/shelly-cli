@@ -62,7 +62,7 @@ func run(f *cmdutil.Factory, filename string) error {
 
 	if filename == "" {
 		// Print YAML to stdout
-		fmt.Print(output)
+		ios.Printf("%s", output)
 	} else {
 		ios.Success("Exported %d alias(es) to %s", len(aliases), filename)
 	}

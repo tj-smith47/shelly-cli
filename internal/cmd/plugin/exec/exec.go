@@ -2,6 +2,8 @@
 package exec
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -27,14 +29,14 @@ or when you want to explicitly invoke an extension.`,
 		Args:               cobra.MinimumNArgs(1),
 		ValidArgsFunction:  completion.ExtensionNames(),
 		DisableFlagParsing: true, // Pass all args to the extension
-		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0], args[1:])
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(cmd.Context(), f, args[0], args[1:])
 		},
 	}
 
 	return cmd
 }
 
-func run(_ *cmdutil.Factory, name string, args []string) error {
-	return plugins.RunPlugin(name, args)
+func run(ctx context.Context, _ *cmdutil.Factory, name string, args []string) error {
+	return plugins.RunPlugin(ctx, name, args)
 }

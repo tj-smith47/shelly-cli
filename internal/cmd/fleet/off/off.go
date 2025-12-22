@@ -3,10 +3,13 @@ package off
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds the command options.
@@ -26,7 +29,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Turn off devices through Shelly Cloud.
 
 Uses cloud WebSocket connections to send commands, allowing control
-of devices even when not on the same local network.`,
+of devices even when not on the same local network.
+
+Requires integrator credentials configured via environment variables or config:
+  SHELLY_INTEGRATOR_TAG - Your integrator tag
+  SHELLY_INTEGRATOR_TOKEN - Your integrator token`,
 		Example: `  # Turn off specific device
   shelly fleet off device-id
 
@@ -46,31 +53,56 @@ of devices even when not on the same local network.`,
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, devices []string, opts *Options) error {
+func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Options) error {
 	ios := f.IOStreams()
 
-	if opts.All {
-		ios.Info("Turning off all relay devices...")
-		ios.Success("All relay devices turned off")
-		return nil
-	}
-
-	if opts.Group != "" {
-		ios.Info("Turning off devices in group: %s", opts.Group)
-		ios.Success("Group '%s' devices turned off", opts.Group)
-		return nil
-	}
-
-	if len(devices) == 0 {
+	// Validate arguments
+	if !opts.All && opts.Group == "" && len(devices) == 0 {
 		ios.Warning("Specify devices, --group, or --all")
-		return nil
+		return fmt.Errorf("no devices specified")
 	}
 
-	ios.Info("Turning off %d device(s)...", len(devices))
-	for _, device := range devices {
-		ios.Printf("  %s: turned off\n", device)
+	// Get credentials and connect
+	cfg, cfgErr := f.Config()
+	if cfgErr != nil {
+		ios.DebugErr("load config", cfgErr)
 	}
-	ios.Success("Done")
 
-	return nil
+	creds, err := shelly.GetIntegratorCredentials(ios, cfg)
+	if err != nil {
+		return err
+	}
+
+	conn, err := shelly.ConnectFleet(ctx, ios, creds)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	// Execute the command
+	results := executeOff(ctx, conn.Manager, devices, opts)
+
+	// Report results
+	return shelly.ReportBatchResults(ios, results, "turned off")
+}
+
+func executeOff(ctx context.Context, fm *integrator.FleetManager, devices []string, opts *Options) []integrator.BatchResult {
+	switch {
+	case opts.All:
+		return fm.AllRelaysOff(ctx)
+
+	case opts.Group != "":
+		return fm.GroupRelaysOff(ctx, opts.Group)
+
+	default:
+		commands := make([]integrator.BatchCommand, len(devices))
+		for i, deviceID := range devices {
+			commands[i] = integrator.BatchCommand{
+				DeviceID: deviceID,
+				Action:   "relay",
+				Params:   map[string]any{"id": 0, "turn": "off"},
+			}
+		}
+		return fm.SendBatchCommands(ctx, commands)
+	}
 }

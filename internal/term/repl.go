@@ -3,8 +3,13 @@ package term
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
 	"strings"
+
+	"github.com/chzyer/readline"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -328,4 +333,76 @@ func (s *REPLSession) resolveDevice(args []string) string {
 		return args[0]
 	}
 	return s.ActiveDevice
+}
+
+// RunREPLLoop runs the REPL loop with readline support.
+// Returns nil on clean exit, error on failure.
+func (s *REPLSession) RunREPLLoop(ctx context.Context) error {
+	// Set up readline with history
+	historyFile := ""
+	configDir, err := config.Dir()
+	if err == nil {
+		historyFile = filepath.Join(configDir, "repl_history")
+	}
+
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          FormatREPLPrompt(s.ActiveDevice),
+		HistoryFile:     historyFile,
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize readline: %w", err)
+	}
+	defer func() {
+		if closeErr := rl.Close(); closeErr != nil {
+			s.IOS.DebugErr("failed to close readline", closeErr)
+		}
+	}()
+
+	for {
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			s.IOS.Println("\nSession terminated")
+			return nil
+		default:
+		}
+
+		// Update prompt with current device
+		rl.SetPrompt(FormatREPLPrompt(s.ActiveDevice))
+
+		// Read input with readline
+		line, err := rl.Readline()
+		if err != nil {
+			if errors.Is(err, readline.ErrInterrupt) {
+				continue // Ctrl+C, just show new prompt
+			}
+			if errors.Is(err, io.EOF) {
+				s.IOS.Println("\nGoodbye!")
+				return nil
+			}
+			return err
+		}
+
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Parse and execute command
+		parts := strings.Fields(line)
+		if len(parts) == 0 {
+			continue
+		}
+
+		cmd := strings.ToLower(parts[0])
+		args := parts[1:]
+
+		shouldExit := s.ExecuteCommand(ctx, cmd, args)
+		if shouldExit {
+			s.IOS.Println("Goodbye!")
+			return nil
+		}
+	}
 }

@@ -6,6 +6,14 @@ Disconnect from Shelly Cloud hosts
 
 Disconnect from all connected Shelly Cloud hosts.
 
+This command closes any active WebSocket connections to Shelly Cloud hosts.
+Note: In CLI mode, connections are typically ephemeral per command. This
+command is useful for explicitly verifying connectivity and cleanup.
+
+Requires integrator credentials configured via environment variables or config:
+  SHELLY_INTEGRATOR_TAG - Your integrator tag
+  SHELLY_INTEGRATOR_TOKEN - Your integrator token
+
 ```
 shelly fleet disconnect [flags]
 ```

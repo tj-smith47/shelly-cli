@@ -86,13 +86,15 @@ func (s *SwitchComponent) GetConfig(ctx context.Context) (*model.SwitchConfig, e
 
 // On turns the switch on.
 func (s *SwitchComponent) On(ctx context.Context) error {
-	_, err := s.sw.Set(ctx, &components.SwitchSetParams{On: true})
+	on := true
+	_, err := s.sw.Set(ctx, &components.SwitchSetParams{On: &on})
 	return err
 }
 
 // Off turns the switch off.
 func (s *SwitchComponent) Off(ctx context.Context) error {
-	_, err := s.sw.Set(ctx, &components.SwitchSetParams{On: false})
+	off := false
+	_, err := s.sw.Set(ctx, &components.SwitchSetParams{On: &off})
 	return err
 }
 
@@ -111,6 +113,6 @@ func (s *SwitchComponent) Toggle(ctx context.Context) (*model.SwitchStatus, erro
 
 // Set sets the switch to the specified state.
 func (s *SwitchComponent) Set(ctx context.Context, on bool) error {
-	_, err := s.sw.Set(ctx, &components.SwitchSetParams{On: on})
+	_, err := s.sw.Set(ctx, &components.SwitchSetParams{On: &on})
 	return err
 }

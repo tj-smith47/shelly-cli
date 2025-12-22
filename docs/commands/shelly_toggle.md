@@ -9,7 +9,8 @@ Toggle a device by automatically detecting its type.
 Works with switches, lights, covers, and RGB devices. For covers,
 this toggles between open and close based on current state.
 
-Use --all to toggle all controllable components on the device.
+By default, toggles all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).
 
 ```
 shelly toggle <device> [flags]
@@ -18,11 +19,11 @@ shelly toggle <device> [flags]
 ### Examples
 
 ```
-  # Toggle a switch or light
+  # Toggle all components on a device
   shelly toggle living-room
 
-  # Toggle all components on a device
-  shelly toggle living-room --all
+  # Toggle specific switch (for multi-switch devices)
+  shelly toggle dual-switch --id 1
 
   # Toggle a cover
   shelly toggle bedroom-blinds
@@ -31,8 +32,8 @@ shelly toggle <device> [flags]
 ### Options
 
 ```
-  -a, --all    Toggle all controllable components
-  -h, --help   help for toggle
+  -h, --help     help for toggle
+      --id int   Component ID to control (omit to control all) (default -1)
 ```
 
 ### Options inherited from parent commands

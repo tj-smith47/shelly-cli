@@ -17,16 +17,17 @@ Works with switches, lights, covers, and RGB devices. For covers,
 this toggles between open and close based on current state.
 
 .PP
-Use --all to toggle all controllable components on the device.
+By default, toggles all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).
 
 
 .SH OPTIONS
-\fB-a\fP, \fB--all\fP[=false]
-	Toggle all controllable components
-
-.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for toggle
+
+.PP
+\fB--id\fP=-1
+	Component ID to control (omit to control all)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -64,11 +65,11 @@ Use --all to toggle all controllable components on the device.
 
 .SH EXAMPLE
 .EX
-  # Toggle a switch or light
+  # Toggle all components on a device
   shelly toggle living-room
 
-  # Toggle all components on a device
-  shelly toggle living-room --all
+  # Toggle specific switch (for multi-switch devices)
+  shelly toggle dual-switch --id 1
 
   # Toggle a cover
   shelly toggle bedroom-blinds

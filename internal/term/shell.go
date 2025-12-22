@@ -3,10 +3,16 @@ package term
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
 	"strings"
 
+	"github.com/chzyer/readline"
+
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -215,4 +221,64 @@ func (s *ShellSession) executeRPC(ctx context.Context, method, paramsStr string)
 	}
 
 	s.IOS.Println(string(jsonBytes))
+}
+
+// RunShellLoop runs the shell loop with readline support.
+// Returns nil on clean exit, error on failure.
+func (s *ShellSession) RunShellLoop(ctx context.Context) error {
+	// Set up readline with history
+	historyFile := ""
+	configDir, err := config.Dir()
+	if err == nil {
+		historyFile = filepath.Join(configDir, "shell_history")
+	}
+
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          FormatShellPrompt(s.Device),
+		HistoryFile:     historyFile,
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize readline: %w", err)
+	}
+	defer func() {
+		if closeErr := rl.Close(); closeErr != nil {
+			s.IOS.DebugErr("failed to close readline", closeErr)
+		}
+	}()
+
+	for {
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			s.IOS.Println("\nSession terminated")
+			return nil
+		default:
+		}
+
+		// Read input with readline
+		line, err := rl.Readline()
+		if err != nil {
+			if errors.Is(err, readline.ErrInterrupt) {
+				continue // Ctrl+C, just show new prompt
+			}
+			if errors.Is(err, io.EOF) {
+				s.IOS.Println("\nGoodbye!")
+				return nil
+			}
+			return err
+		}
+
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		shouldExit := s.ExecuteCommand(ctx, line)
+		if shouldExit {
+			s.IOS.Println("Goodbye!")
+			return nil
+		}
+	}
 }

@@ -2,6 +2,7 @@
 package plugins
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -144,6 +145,8 @@ func (r *Registry) List() ([]Plugin, error) {
 
 	result := make([]Plugin, 0, len(entries))
 	loader := &Loader{paths: []string{r.pluginsDir}}
+	// Use background context for list; cancellation happens via timeout in getPluginVersion
+	ctx := context.Background()
 
 	for _, entry := range entries {
 		name := entry.Name()
@@ -172,7 +175,7 @@ func (r *Registry) List() ([]Plugin, error) {
 		result = append(result, Plugin{
 			Name:    pluginName,
 			Path:    fullPath,
-			Version: getPluginVersion(fullPath),
+			Version: getPluginVersion(ctx, fullPath),
 		})
 	}
 

@@ -46,7 +46,9 @@ func (s *Service) AuditDevice(ctx context.Context, identifier string) *model.Aud
 
 	// Check cloud status
 	cloudStatus, err := s.GetCloudStatus(ctx, identifier)
-	if err == nil {
+	if err != nil {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("Could not check cloud status: %v", err))
+	} else {
 		result.CloudAudit = &model.CloudAudit{
 			Connected: cloudStatus.Connected,
 		}
@@ -62,7 +64,9 @@ func (s *Service) AuditDevice(ctx context.Context, identifier string) *model.Aud
 
 	// Check firmware
 	fwInfo, err := s.CheckFirmware(ctx, identifier)
-	if err == nil {
+	if err != nil {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("Could not check firmware: %v", err))
+	} else {
 		result.FWAudit = &model.FirmwareAudit{
 			Current:   fwInfo.Current,
 			Available: fwInfo.Available,

@@ -116,11 +116,13 @@ func (l *Loader) Discover() ([]Plugin, error) {
 	}
 
 	// Try to get versions for plugins without manifests concurrently
+	// Use background context for discovery; cancellation happens via timeout
+	ctx := context.Background()
 	var wg sync.WaitGroup
 	for i := range plugins {
 		if plugins[i].Version == "" && plugins[i].Manifest == nil {
 			wg.Go(func() {
-				plugins[i].Version = getPluginVersion(plugins[i].Path)
+				plugins[i].Version = getPluginVersion(ctx, plugins[i].Path)
 			})
 		}
 	}
@@ -189,6 +191,8 @@ func (l *Loader) Find(name string) (*Plugin, error) {
 
 func (l *Loader) findByName(name string) *Plugin {
 	pluginName := strings.TrimPrefix(name, PluginPrefix)
+	// Use background context for find; cancellation happens via timeout in getPluginVersion
+	ctx := context.Background()
 
 	for _, dir := range l.paths {
 		// First, check for new format (directory)
@@ -205,7 +209,7 @@ func (l *Loader) findByName(name string) *Plugin {
 			return &Plugin{
 				Name:    pluginName,
 				Path:    path,
-				Version: getPluginVersion(path),
+				Version: getPluginVersion(ctx, path),
 			}
 		}
 
@@ -215,7 +219,7 @@ func (l *Loader) findByName(name string) *Plugin {
 			return &Plugin{
 				Name:    pluginName,
 				Path:    pathExe,
-				Version: getPluginVersion(pathExe),
+				Version: getPluginVersion(ctx, pathExe),
 			}
 		}
 	}
@@ -239,8 +243,10 @@ func isExecutable(path string) bool {
 }
 
 // getPluginVersion attempts to get the version of a plugin by running it with --version.
-func getPluginVersion(path string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// Uses a 5 second timeout on top of any parent context deadline.
+func getPluginVersion(ctx context.Context, path string) string {
+	// Create a timeout context derived from parent
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, path, "--version")

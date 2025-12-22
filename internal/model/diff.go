@@ -44,6 +44,7 @@ type BackupDiff struct {
 	ScriptDiffs   []ScriptDiff   `json:"script_diffs,omitempty"`
 	ScheduleDiffs []ScheduleDiff `json:"schedule_diffs,omitempty"`
 	WebhookDiffs  []WebhookDiff  `json:"webhook_diffs,omitempty"`
+	Warnings      []string       `json:"warnings,omitempty"` // Errors encountered during comparison
 }
 
 // HasDifferences returns true if there are any differences.

@@ -23,9 +23,9 @@ type QuickResult struct {
 }
 
 // QuickOn turns on controllable components on a device.
-// If all is true, turns on all controllable components.
-// If all is false, turns on only the first controllable component.
-func (s *Service) QuickOn(ctx context.Context, device string, all bool) (*QuickResult, error) {
+// If componentID is nil, turns on all controllable components.
+// If componentID is set, turns on only that specific component.
+func (s *Service) QuickOn(ctx context.Context, device string, componentID *int) (*QuickResult, error) {
 	result := &QuickResult{}
 
 	err := s.WithConnection(ctx, device, func(conn *client.Client) error {
@@ -34,7 +34,10 @@ func (s *Service) QuickOn(ctx context.Context, device string, all bool) (*QuickR
 			return err
 		}
 
-		toControl := selectComponents(controllable, all)
+		toControl := selectComponents(controllable, componentID)
+		if len(toControl) == 0 && componentID != nil {
+			return fmt.Errorf("component ID %d not found on device", *componentID)
+		}
 
 		for _, comp := range toControl {
 			var opErr error
@@ -63,9 +66,9 @@ func (s *Service) QuickOn(ctx context.Context, device string, all bool) (*QuickR
 }
 
 // QuickOff turns off controllable components on a device.
-// If all is true, turns off all controllable components.
-// If all is false, turns off only the first controllable component.
-func (s *Service) QuickOff(ctx context.Context, device string, all bool) (*QuickResult, error) {
+// If componentID is nil, turns off all controllable components.
+// If componentID is set, turns off only that specific component.
+func (s *Service) QuickOff(ctx context.Context, device string, componentID *int) (*QuickResult, error) {
 	result := &QuickResult{}
 
 	err := s.WithConnection(ctx, device, func(conn *client.Client) error {
@@ -74,7 +77,10 @@ func (s *Service) QuickOff(ctx context.Context, device string, all bool) (*Quick
 			return err
 		}
 
-		toControl := selectComponents(controllable, all)
+		toControl := selectComponents(controllable, componentID)
+		if len(toControl) == 0 && componentID != nil {
+			return fmt.Errorf("component ID %d not found on device", *componentID)
+		}
 
 		for _, comp := range toControl {
 			var opErr error
@@ -103,9 +109,9 @@ func (s *Service) QuickOff(ctx context.Context, device string, all bool) (*Quick
 }
 
 // QuickToggle toggles controllable components on a device.
-// If all is true, toggles all controllable components.
-// If all is false, toggles only the first controllable component.
-func (s *Service) QuickToggle(ctx context.Context, device string, all bool) (*QuickResult, error) {
+// If componentID is nil, toggles all controllable components.
+// If componentID is set, toggles only that specific component.
+func (s *Service) QuickToggle(ctx context.Context, device string, componentID *int) (*QuickResult, error) {
 	result := &QuickResult{}
 
 	err := s.WithConnection(ctx, device, func(conn *client.Client) error {
@@ -114,7 +120,10 @@ func (s *Service) QuickToggle(ctx context.Context, device string, all bool) (*Qu
 			return err
 		}
 
-		toControl := selectComponents(controllable, all)
+		toControl := selectComponents(controllable, componentID)
+		if len(toControl) == 0 && componentID != nil {
+			return fmt.Errorf("component ID %d not found on device", *componentID)
+		}
 
 		for _, comp := range toControl {
 			var opErr error
@@ -173,12 +182,19 @@ func isControllable(t model.ComponentType) bool {
 	}
 }
 
-// selectComponents selects which components to control based on the all flag.
-func selectComponents(controllable []model.Component, all bool) []model.Component {
-	if !all && len(controllable) > 1 {
-		return controllable[:1]
+// selectComponents selects which components to control.
+// If componentID is nil, returns all controllable components.
+// If componentID is set, returns only the component with that ID.
+func selectComponents(controllable []model.Component, componentID *int) []model.Component {
+	if componentID == nil {
+		return controllable
 	}
-	return controllable
+	for _, comp := range controllable {
+		if comp.ID == *componentID {
+			return []model.Component{comp}
+		}
+	}
+	return nil
 }
 
 // ComponentControlResult holds the result of controlling a single component.

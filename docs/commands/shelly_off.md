@@ -9,7 +9,8 @@ Turn off a device by automatically detecting its type.
 Works with switches, lights, covers, and RGB devices. For covers,
 this closes them. For switches/lights/RGB, this turns them off.
 
-Use --all to turn off all controllable components on the device.
+By default, turns off all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).
 
 ```
 shelly off <device> [flags]
@@ -18,11 +19,11 @@ shelly off <device> [flags]
 ### Examples
 
 ```
-  # Turn off a switch or light
+  # Turn off all components on a device
   shelly off living-room
 
-  # Turn off all components on a device
-  shelly off living-room --all
+  # Turn off specific switch (for multi-switch devices)
+  shelly off dual-switch --id 1
 
   # Close a cover
   shelly off bedroom-blinds
@@ -31,8 +32,8 @@ shelly off <device> [flags]
 ### Options
 
 ```
-  -a, --all    Turn off all controllable components
-  -h, --help   help for off
+  -h, --help     help for off
+      --id int   Component ID to control (omit to control all) (default -1)
 ```
 
 ### Options inherited from parent commands

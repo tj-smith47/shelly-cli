@@ -4,12 +4,14 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/tj-smith47/shelly-go/gen2"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 	"github.com/tj-smith47/shelly-go/rpc"
 	"github.com/tj-smith47/shelly-go/transport"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -53,6 +55,10 @@ func Connect(ctx context.Context, device model.Device) (*Client, error) {
 	info, err := gen2Device.GetDeviceInfo(ctx)
 	if err != nil {
 		iostreams.CloseWithDebug("closing device after connection failure", gen2Device)
+		// Distinguish between auth errors and connection errors
+		if errors.Is(err, types.ErrAuth) {
+			return nil, fmt.Errorf("%w: %w", model.ErrAuthRequired, err)
+		}
 		return nil, fmt.Errorf("%w: %w", model.ErrConnectionFailed, err)
 	}
 

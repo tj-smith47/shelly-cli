@@ -22,22 +22,24 @@ A powerful, intuitive command-line interface for managing Shelly smart home devi
 
 ## Features
 
-- **Full Shelly API Coverage** - Control all Gen1, Gen2, Gen3, and Gen4 devices
-- **TUI Dashboard** - Interactive terminal dashboard inspired by k9s and gh-dash
-- **Device Discovery** - Automatic discovery via mDNS, BLE, and CoIoT
-- **Batch Operations** - Control multiple devices simultaneously
-- **Scene Management** - Create and activate scenes across devices
-- **Firmware Management** - Check, update, and manage firmware versions
-- **Script Management** - Upload, edit, and manage device scripts (Gen2+)
-- **Schedule Management** - Create and manage on-device schedules
-- **Backup & Restore** - Full device configuration backup and restore
-- **Plugin System** - Extend functionality with custom plugins (gh-style)
-- **Alias System** - Create shortcuts for common commands
-- **Theme Support** - 280+ built-in themes via bubbletint
-- **Shell Completions** - Bash, Zsh, Fish, and PowerShell
-- **Multiple Output Formats** - JSON, YAML, table, and CSV output
-- **Energy Monitoring** - Track power consumption and energy usage
-- **Smart Home Protocols** - BTHome, Zigbee, Matter, and LoRa support
+- **🎯 Full Shelly API Coverage** - Control all Gen1, Gen2, Gen3, and Gen4 devices
+- **📊 TUI Dashboard** - Interactive terminal dashboard inspired by k9s and gh-dash
+- **🔍 Device Discovery** - Automatic discovery via mDNS, BLE, and CoIoT
+- **⚡ Batch Operations** - Control multiple devices simultaneously
+- **🎬 Scene Management** - Create and activate scenes across devices
+- **🔧 Firmware Management** - Check, update, and manage firmware versions
+- **📜 Script Management** - Upload, edit, and manage device scripts (Gen2+)
+- **⏰ Schedule Management** - Create and manage on-device schedules
+- **💾 Backup & Restore** - Full device configuration backup and restore
+- **🔌 Plugin System** - Extend functionality with custom plugins (gh-style)
+- **🏷️ Alias System** - Create shortcuts for common commands
+- **🎨 Theme Support** - 280+ built-in themes via bubbletint
+- **🐚 Shell Completions** - Bash, Zsh, Fish, and PowerShell
+- **📤 Multiple Output Formats** - JSON, YAML, table, and CSV output
+- **⚡ Energy Monitoring** - Track power consumption and energy usage
+- **🏠 Smart Home Protocols** - BTHome, Zigbee, Matter, and LoRa support
+
+> **Built different:** gh-style architecture with factory pattern DI, 280+ themes, extensible plugin system, and comprehensive device coverage across all Shelly generations.
 
 ## Installation
 
@@ -104,7 +106,8 @@ shelly firmware update living-room
 
 ## Command Overview
 
-### Quick Commands
+<details>
+<summary>⚡ Quick Commands</summary>
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -115,7 +118,10 @@ shelly firmware update living-room
 | `reboot` | Reboot device | `shelly reboot kitchen` |
 | `reset` | Factory reset (with confirmation) | `shelly reset kitchen --yes` |
 
-### Device Control
+</details>
+
+<details>
+<summary>🎮 Device Control</summary>
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -128,7 +134,10 @@ shelly firmware update living-room
 | `scene` | Manage scenes | `shelly scene activate movie-night` |
 | `batch` | Batch device operations | `shelly batch on all-lights` |
 
-### Device Management
+</details>
+
+<details>
+<summary>📦 Device Management</summary>
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -140,7 +149,10 @@ shelly firmware update living-room
 | `schedule` | Manage schedules | `shelly schedule list kitchen` |
 | `script` | Manage device scripts | `shelly script list kitchen` |
 
-### Configuration
+</details>
+
+<details>
+<summary>⚙️ Configuration</summary>
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -152,7 +164,10 @@ shelly firmware update living-room
 | `webhook` | Manage webhooks | `shelly webhook list kitchen` |
 | `kvs` | Key-value storage | `shelly kvs list kitchen` |
 
-### Smart Home Protocols
+</details>
+
+<details>
+<summary>🏠 Smart Home Protocols</summary>
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -161,7 +176,10 @@ shelly firmware update living-room
 | `matter` | Matter protocol | `shelly matter status kitchen` |
 | `lora` | LoRa add-on | `shelly lora status kitchen` |
 
-### Monitoring
+</details>
+
+<details>
+<summary>📈 Monitoring</summary>
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -172,7 +190,10 @@ shelly firmware update living-room
 | `metrics` | Export metrics | `shelly metrics prometheus` |
 | `sensor` | Sensor readings | `shelly sensor status kitchen` |
 
-### Utility
+</details>
+
+<details>
+<summary>🛠️ Utility</summary>
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -183,6 +204,8 @@ shelly firmware update living-room
 | `firmware` | Firmware management | `shelly firmware check kitchen` |
 | `export` | Export data | `shelly export csv --all` |
 | `debug` | Debug commands | `shelly debug rpc kitchen Shelly.GetInfo` |
+
+</details>
 
 ## Configuration
 

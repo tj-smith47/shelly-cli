@@ -22,11 +22,16 @@ const (
 
 // DetectEnergyComponentByID auto-detects the energy component type by checking
 // which component list contains the given ID. Returns ComponentTypeAuto if no match found.
+// If detection fails, a warning is logged via ios.
 func (s *Service) DetectEnergyComponentByID(ctx context.Context, ios *iostreams.IOStreams, device string, id int) string {
-	emIDs, err := s.ListEMComponents(ctx, device)
-	ios.DebugErr("list EM components", err)
-	em1IDs, err := s.ListEM1Components(ctx, device)
-	ios.DebugErr("list EM1 components", err)
+	emIDs, emErr := s.ListEMComponents(ctx, device)
+	if emErr != nil {
+		ios.DebugErr("list EM components", emErr)
+	}
+	em1IDs, em1Err := s.ListEM1Components(ctx, device)
+	if em1Err != nil {
+		ios.DebugErr("list EM1 components", em1Err)
+	}
 
 	// Check if ID matches EM component
 	for _, emID := range emIDs {
@@ -48,6 +53,11 @@ func (s *Service) DetectEnergyComponentByID(ctx context.Context, ios *iostreams.
 	}
 	if len(em1IDs) > 0 {
 		return ComponentTypeEM1
+	}
+
+	// Detection failed - warn if both list operations returned errors
+	if emErr != nil && em1Err != nil {
+		ios.Warning("Could not detect energy component type: device may be offline or have no energy monitoring")
 	}
 
 	return ComponentTypeAuto

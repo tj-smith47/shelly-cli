@@ -76,7 +76,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	ios.Info("Turning off %s...", device)
 
 	// Try QuickOff first (works for most devices)
-	result, err := svc.QuickOff(ctx, device, false)
+	result, err := svc.QuickOff(ctx, device, nil)
 	if err != nil {
 		return fmt.Errorf("failed to turn off device: %w", err)
 	}

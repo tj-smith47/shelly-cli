@@ -2,11 +2,8 @@
 package shellcmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -37,7 +34,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 This provides direct access to execute RPC commands on the device.
 It maintains a persistent connection and allows you to explore the
-device's capabilities interactively.
+device's capabilities interactively. Supports readline-style line
+editing (arrow keys, Ctrl+A/E, etc.) with command history.
 
 Available commands:
   help           Show available commands
@@ -45,11 +43,15 @@ Available commands:
   status         Show device status
   config         Show device configuration
   methods        List available RPC methods
+  components     List device components
   <method>       Execute RPC method (e.g., Switch.GetStatus, Shelly.GetConfig)
   exit           Close shell
 
 RPC methods can be called directly by typing the method name.
-For methods requiring parameters, provide JSON after the method name.`,
+For methods requiring parameters, provide JSON after the method name.
+
+For multi-switch devices, use the RPC methods with component ID to
+control specific switches.`,
 		Example: `  # Open shell for a device
   shelly shell living-room
 
@@ -58,7 +60,12 @@ For methods requiring parameters, provide JSON after the method name.`,
   shell> methods
   shell> Switch.GetStatus {"id":0}
   shell> Shelly.GetConfig
-  shell> exit`,
+  shell> exit
+
+  # Control specific switch on multi-switch device:
+  shell> Switch.Set {"id":1,"on":true}
+  shell> Switch.Toggle {"id":0}
+  shell> Switch.GetStatus {"id":1}`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -91,41 +98,6 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Println()
 
 	session := term.NewShellSession(ios, conn, opts.Device)
-	scanner := bufio.NewScanner(os.Stdin)
-	prompt := term.FormatShellPrompt(opts.Device)
 
-	for {
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			ios.Println("\nSession terminated")
-			return nil
-		default:
-		}
-
-		// Print prompt
-		if _, err := fmt.Fprint(ios.Out, prompt); err != nil {
-			ios.DebugErr("failed to print prompt", err)
-		}
-
-		// Read input
-		if !scanner.Scan() {
-			if err := scanner.Err(); err != nil {
-				return fmt.Errorf("error reading input: %w", err)
-			}
-			ios.Println("\nGoodbye!")
-			return nil
-		}
-
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		shouldExit := session.ExecuteCommand(ctx, line)
-		if shouldExit {
-			ios.Println("Goodbye!")
-			return nil
-		}
-	}
+	return session.RunShellLoop(ctx)
 }

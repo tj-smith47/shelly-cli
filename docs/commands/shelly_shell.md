@@ -8,7 +8,8 @@ Open an interactive shell for a specific Shelly device.
 
 This provides direct access to execute RPC commands on the device.
 It maintains a persistent connection and allows you to explore the
-device's capabilities interactively.
+device's capabilities interactively. Supports readline-style line
+editing (arrow keys, Ctrl+A/E, etc.) with command history.
 
 Available commands:
   help           Show available commands
@@ -16,11 +17,15 @@ Available commands:
   status         Show device status
   config         Show device configuration
   methods        List available RPC methods
+  components     List device components
   <method>       Execute RPC method (e.g., Switch.GetStatus, Shelly.GetConfig)
   exit           Close shell
 
 RPC methods can be called directly by typing the method name.
 For methods requiring parameters, provide JSON after the method name.
+
+For multi-switch devices, use the RPC methods with component ID to
+control specific switches.
 
 ```
 shelly shell <device> [flags]
@@ -38,6 +43,11 @@ shelly shell <device> [flags]
   shell> Switch.GetStatus {"id":0}
   shell> Shelly.GetConfig
   shell> exit
+
+  # Control specific switch on multi-switch device:
+  shell> Switch.Set {"id":1,"on":true}
+  shell> Switch.Toggle {"id":0}
+  shell> Switch.GetStatus {"id":1}
 ```
 
 ### Options

@@ -274,7 +274,9 @@ func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBa
 	// Get current scripts
 	if deviceBackup.Scripts != nil {
 		currentScripts, err := s.ListScripts(ctx, identifier)
-		if err == nil {
+		if err != nil {
+			diff.Warnings = append(diff.Warnings, fmt.Sprintf("could not compare scripts: %v", err))
+		} else {
 			backupScripts := convertBackupScripts(deviceBackup.Scripts)
 			diff.ScriptDiffs = compareScripts(currentScripts, backupScripts)
 		}
@@ -283,7 +285,9 @@ func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBa
 	// Get current schedules
 	if deviceBackup.Schedules != nil {
 		currentSchedules, err := s.ListSchedules(ctx, identifier)
-		if err == nil {
+		if err != nil {
+			diff.Warnings = append(diff.Warnings, fmt.Sprintf("could not compare schedules: %v", err))
+		} else {
 			backupSchedules := convertBackupSchedules(deviceBackup.Schedules)
 			diff.ScheduleDiffs = compareSchedules(currentSchedules, backupSchedules)
 		}
@@ -292,7 +296,9 @@ func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBa
 	// Get current webhooks
 	if deviceBackup.Webhooks != nil {
 		currentWebhooks, err := s.ListWebhooks(ctx, identifier)
-		if err == nil {
+		if err != nil {
+			diff.Warnings = append(diff.Warnings, fmt.Sprintf("could not compare webhooks: %v", err))
+		} else {
 			backupWebhooks := convertBackupWebhooks(deviceBackup.Webhooks)
 			diff.WebhookDiffs = compareWebhooks(currentWebhooks, backupWebhooks)
 		}

@@ -17,16 +17,17 @@ Works with switches, lights, covers, and RGB devices. For covers,
 this opens them. For switches/lights/RGB, this turns them on.
 
 .PP
-Use --all to turn on all controllable components on the device.
+By default, turns on all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).
 
 
 .SH OPTIONS
-\fB-a\fP, \fB--all\fP[=false]
-	Turn on all controllable components
-
-.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for on
+
+.PP
+\fB--id\fP=-1
+	Component ID to control (omit to control all)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -64,11 +65,11 @@ Use --all to turn on all controllable components on the device.
 
 .SH EXAMPLE
 .EX
-  # Turn on a switch or light
+  # Turn on all components on a device
   shelly on living-room
 
-  # Turn on all components on a device
-  shelly on living-room --all
+  # Turn on specific switch (for multi-switch devices)
+  shelly on dual-switch --id 1
 
   # Open a cover
   shelly on bedroom-blinds

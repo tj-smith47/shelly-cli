@@ -9,6 +9,10 @@ Turn on devices through Shelly Cloud.
 Uses cloud WebSocket connections to send commands, allowing control
 of devices even when not on the same local network.
 
+Requires integrator credentials configured via environment variables or config:
+  SHELLY_INTEGRATOR_TAG - Your integrator tag
+  SHELLY_INTEGRATOR_TOKEN - Your integrator token
+
 ```
 shelly fleet on [device...] [flags]
 ```

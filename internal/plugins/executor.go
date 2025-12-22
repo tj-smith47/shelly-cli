@@ -91,15 +91,19 @@ func (e *Executor) buildEnvironment() []string {
 	env = append(env, "SHELLY_API_MODE="+cfg.APIMode, "SHELLY_THEME="+cfg.GetThemeConfig().Name)
 
 	// SHELLY_DEVICES_JSON: JSON of registered devices
-	if devicesJSON, err := json.Marshal(cfg.Devices); err == nil {
+	devicesJSON, err := json.Marshal(cfg.Devices)
+	if err != nil {
+		// Log warning but continue - plugins can still work without device list
+		fmt.Fprintf(os.Stderr, "Warning: failed to marshal devices for plugin: %v\n", err)
+	} else {
 		env = append(env, "SHELLY_DEVICES_JSON="+string(devicesJSON))
 	}
 
 	return env
 }
 
-// RunPlugin is a convenience function to find and execute a plugin.
-func RunPlugin(name string, args []string) error {
+// RunPlugin is a convenience function to find and execute a plugin with context.
+func RunPlugin(ctx context.Context, name string, args []string) error {
 	loader := NewLoader()
 	plugin, err := loader.Find(name)
 	if err != nil {
@@ -110,5 +114,5 @@ func RunPlugin(name string, args []string) error {
 	}
 
 	executor := NewExecutor()
-	return executor.Execute(plugin, args)
+	return executor.ExecuteContext(ctx, plugin, args)
 }

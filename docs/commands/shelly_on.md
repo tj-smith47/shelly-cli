@@ -9,7 +9,8 @@ Turn on a device by automatically detecting its type.
 Works with switches, lights, covers, and RGB devices. For covers,
 this opens them. For switches/lights/RGB, this turns them on.
 
-Use --all to turn on all controllable components on the device.
+By default, turns on all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).
 
 ```
 shelly on <device> [flags]
@@ -18,11 +19,11 @@ shelly on <device> [flags]
 ### Examples
 
 ```
-  # Turn on a switch or light
+  # Turn on all components on a device
   shelly on living-room
 
-  # Turn on all components on a device
-  shelly on living-room --all
+  # Turn on specific switch (for multi-switch devices)
+  shelly on dual-switch --id 1
 
   # Open a cover
   shelly on bedroom-blinds
@@ -31,8 +32,8 @@ shelly on <device> [flags]
 ### Options
 
 ```
-  -a, --all    Turn on all controllable components
-  -h, --help   help for on
+  -h, --help     help for on
+      --id int   Component ID to control (omit to control all) (default -1)
 ```
 
 ### Options inherited from parent commands

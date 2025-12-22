@@ -13,9 +13,9 @@ import (
 
 // Options holds command options.
 type Options struct {
-	Device  string
-	All     bool
-	Factory *cmdutil.Factory
+	Device      string
+	ComponentID int // -1 means all components
+	Factory     *cmdutil.Factory
 }
 
 // NewCommand creates the on command.
@@ -31,12 +31,13 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Works with switches, lights, covers, and RGB devices. For covers,
 this opens them. For switches/lights/RGB, this turns them on.
 
-Use --all to turn on all controllable components on the device.`,
-		Example: `  # Turn on a switch or light
+By default, turns on all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).`,
+		Example: `  # Turn on all components on a device
   shelly on living-room
 
-  # Turn on all components on a device
-  shelly on living-room --all
+  # Turn on specific switch (for multi-switch devices)
+  shelly on dual-switch --id 1
 
   # Open a cover
   shelly on bedroom-blinds`,
@@ -48,7 +49,7 @@ Use --all to turn on all controllable components on the device.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Turn on all controllable components")
+	cmd.Flags().IntVar(&opts.ComponentID, "id", -1, "Component ID to control (omit to control all)")
 
 	return cmd
 }
@@ -61,10 +62,16 @@ func run(ctx context.Context, opts *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
+	// Convert -1 (default) to nil (all components), otherwise pass the ID
+	var componentID *int
+	if opts.ComponentID >= 0 {
+		componentID = &opts.ComponentID
+	}
+
 	var result *shelly.QuickResult
 	err := cmdutil.RunWithSpinner(ctx, ios, "Turning on...", func(ctx context.Context) error {
 		var opErr error
-		result, opErr = svc.QuickOn(ctx, opts.Device, opts.All)
+		result, opErr = svc.QuickOn(ctx, opts.Device, componentID)
 		return opErr
 	})
 	if err != nil {

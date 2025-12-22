@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // NewCommand creates the fleet disconnect command.
@@ -15,7 +16,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Use:     "disconnect",
 		Aliases: []string{"logout", "close"},
 		Short:   "Disconnect from Shelly Cloud hosts",
-		Long:    `Disconnect from all connected Shelly Cloud hosts.`,
+		Long: `Disconnect from all connected Shelly Cloud hosts.
+
+This command closes any active WebSocket connections to Shelly Cloud hosts.
+Note: In CLI mode, connections are typically ephemeral per command. This
+command is useful for explicitly verifying connectivity and cleanup.
+
+Requires integrator credentials configured via environment variables or config:
+  SHELLY_INTEGRATOR_TAG - Your integrator tag
+  SHELLY_INTEGRATOR_TOKEN - Your integrator token`,
 		Example: `  # Disconnect from all hosts
   shelly fleet disconnect`,
 		Args: cobra.NoArgs,
@@ -27,11 +36,38 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory) error {
+func run(ctx context.Context, f *cmdutil.Factory) error {
 	ios := f.IOStreams()
 
+	// Get credentials
+	cfg, cfgErr := f.Config()
+	if cfgErr != nil {
+		ios.DebugErr("load config", cfgErr)
+	}
+
+	creds, err := shelly.GetIntegratorCredentials(ios, cfg)
+	if err != nil {
+		return err
+	}
+
+	// Connect so we can disconnect
+	conn, err := shelly.ConnectFleet(ctx, ios, creds)
+	if err != nil {
+		return err
+	}
+
+	// Get stats before disconnect
+	stats := conn.Manager.GetStats()
+
+	// Disconnect from all hosts
 	ios.Info("Disconnecting from Shelly Cloud...")
-	ios.Success("Disconnected from all hosts")
+	conn.Close()
+
+	if stats.TotalConnections > 0 {
+		ios.Success("Disconnected from %d host(s)", stats.TotalConnections)
+	} else {
+		ios.Info("No active connections to disconnect")
+	}
 
 	return nil
 }

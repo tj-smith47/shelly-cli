@@ -86,7 +86,7 @@ func tryGen2Detection(ctx context.Context, client *http.Client, baseURL string, 
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+		return nil, httpStatusError(resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -155,7 +155,7 @@ func tryGen1Detection(ctx context.Context, client *http.Client, baseURL string, 
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+		return nil, httpStatusError(resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -191,6 +191,24 @@ func tryGen1Detection(ctx context.Context, client *http.Client, baseURL string, 
 		Firmware:   info.FW,
 		AuthEn:     info.Auth,
 	}, nil
+}
+
+// httpStatusError returns a user-friendly error for common HTTP status codes.
+func httpStatusError(statusCode int) error {
+	switch statusCode {
+	case http.StatusUnauthorized:
+		return fmt.Errorf("authentication required (HTTP 401)")
+	case http.StatusForbidden:
+		return fmt.Errorf("access denied (HTTP 403)")
+	case http.StatusNotFound:
+		return fmt.Errorf("device not found or endpoint not available (HTTP 404)")
+	case http.StatusServiceUnavailable:
+		return fmt.Errorf("device busy or unavailable (HTTP 503)")
+	case http.StatusGatewayTimeout:
+		return fmt.Errorf("device timeout (HTTP 504)")
+	default:
+		return fmt.Errorf("unexpected HTTP status: %d", statusCode)
+	}
 }
 
 // firstNonEmpty returns the first non-empty string.

@@ -161,7 +161,11 @@ main "$@"
 		return fmt.Errorf("failed to write script: %w", err)
 	}
 
-	// Create README
+	return createReadme(dir, extName, name)
+}
+
+// createReadme creates a README.md for the extension.
+func createReadme(dir, extName, name string) error {
 	readme := fmt.Sprintf(`# %s
 
 A custom extension for Shelly CLI.
@@ -312,7 +316,7 @@ clean:
 		return fmt.Errorf("failed to write Makefile: %w", err)
 	}
 
-	return createBashExtension(dir, extName, name) // Also create README
+	return createReadme(dir, extName, name)
 }
 
 func createPythonExtension(dir, extName, name string) error {
@@ -396,5 +400,5 @@ if __name__ == "__main__":
 		return fmt.Errorf("failed to write script: %w", err)
 	}
 
-	return createBashExtension(dir, extName, name) // Also create README (overwrites bash script)
+	return createReadme(dir, extName, name)
 }

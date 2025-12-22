@@ -17,16 +17,17 @@ Works with switches, lights, covers, and RGB devices. For covers,
 this closes them. For switches/lights/RGB, this turns them off.
 
 .PP
-Use --all to turn off all controllable components on the device.
+By default, turns off all controllable components on the device.
+Use --id to target a specific component (e.g., for multi-switch devices).
 
 
 .SH OPTIONS
-\fB-a\fP, \fB--all\fP[=false]
-	Turn off all controllable components
-
-.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for off
+
+.PP
+\fB--id\fP=-1
+	Component ID to control (omit to control all)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -64,11 +65,11 @@ Use --all to turn off all controllable components on the device.
 
 .SH EXAMPLE
 .EX
-  # Turn off a switch or light
+  # Turn off all components on a device
   shelly off living-room
 
-  # Turn off all components on a device
-  shelly off living-room --all
+  # Turn off specific switch (for multi-switch devices)
+  shelly off dual-switch --id 1
 
   # Close a cover
   shelly off bedroom-blinds
