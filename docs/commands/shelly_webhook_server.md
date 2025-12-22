@@ -48,6 +48,7 @@ shelly webhook server [flags]
       --config string           Config file (default $HOME/.config/shelly/config.yaml)
       --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
       --no-color                Disable colored output
+      --no-headers              Hide table headers in output
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output

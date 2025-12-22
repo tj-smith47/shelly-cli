@@ -50,6 +50,7 @@ shelly energy export <device> [id] [flags]
       --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
+      --no-headers              Hide table headers in output
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --template string         Go template string for output (use with -o template)
