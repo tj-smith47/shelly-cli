@@ -8,9 +8,33 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
+
+// TableBorderStyle defines the border style for tables.
+type TableBorderStyle int
+
+// TableBorderStyle constants define available border styles.
+const (
+	BorderNone    TableBorderStyle = iota // No visible borders
+	BorderRounded                         // Modern rounded corners (default for TTY)
+	BorderSquare                          // Square corners
+	BorderDouble                          // Double-line borders
+	BorderHeavy                           // Heavy/bold borders
+	BorderASCII                           // ASCII-only for --plain mode
+)
+
+// borderStyles maps border style constants to lipgloss border definitions.
+var borderStyles = map[TableBorderStyle]lipgloss.Border{
+	BorderNone:    lipgloss.HiddenBorder(),
+	BorderRounded: lipgloss.RoundedBorder(),
+	BorderSquare:  lipgloss.NormalBorder(),
+	BorderDouble:  lipgloss.DoubleBorder(),
+	BorderHeavy:   lipgloss.BlockBorder(),
+	BorderASCII:   lipgloss.ASCIIBorder(),
+}
 
 // Table represents a formatted table.
 type Table struct {
@@ -21,12 +45,14 @@ type Table struct {
 
 // TableStyle defines the visual style for a table.
 type TableStyle struct {
-	Header     lipgloss.Style
-	Cell       lipgloss.Style
-	AltCell    lipgloss.Style // Alternating row color
-	Border     lipgloss.Style
-	Padding    int
-	ShowBorder bool
+	Header      lipgloss.Style
+	Cell        lipgloss.Style
+	AltCell     lipgloss.Style   // Alternating row color
+	PrimaryCell lipgloss.Style   // First column styling (e.g., Name column)
+	Border      lipgloss.Style   // Border character styling
+	BorderStyle TableBorderStyle // Border style (rounded, square, etc.)
+	Padding     int
+	ShowBorder  bool
 }
 
 // NewTable creates a new table with the given headers.
@@ -39,20 +65,68 @@ func NewTable(headers ...string) *Table {
 }
 
 // DefaultTableStyle returns the default table style using the current theme.
+// Uses rounded borders with themed colors for modern terminal appearance.
+// Dracula-inspired: Purple borders, Cyan headers, Pink for primary column,
+// Orange/Yellow alternating rows.
 func DefaultTableStyle() TableStyle {
 	return TableStyle{
-		Header:     lipgloss.NewStyle().Bold(true).Foreground(theme.Fg()),
-		Cell:       lipgloss.NewStyle().Foreground(theme.Fg()),
-		AltCell:    lipgloss.NewStyle().Foreground(theme.BrightBlack()),
-		Border:     lipgloss.NewStyle().Foreground(theme.BrightBlack()),
-		Padding:    2,
-		ShowBorder: false,
+		Header:      lipgloss.NewStyle().Bold(true).Foreground(theme.Cyan()),
+		Cell:        lipgloss.NewStyle().Foreground(theme.Yellow()),
+		AltCell:     lipgloss.NewStyle().Foreground(theme.Orange()),
+		PrimaryCell: lipgloss.NewStyle().Foreground(theme.Pink()),
+		Border:      lipgloss.NewStyle().Foreground(theme.Purple()),
+		BorderStyle: BorderRounded,
+		Padding:     1,
+		ShowBorder:  true,
 	}
+}
+
+// PlainTableStyle returns a table style for plain (non-TTY or --plain) output.
+// Uses ASCII borders with no colors for machine-readable output.
+func PlainTableStyle() TableStyle {
+	return TableStyle{
+		Header:      lipgloss.NewStyle(),
+		Cell:        lipgloss.NewStyle(),
+		AltCell:     lipgloss.NewStyle(),
+		PrimaryCell: lipgloss.NewStyle(),
+		Border:      lipgloss.NewStyle(),
+		BorderStyle: BorderASCII,
+		Padding:     1,
+		ShowBorder:  true,
+	}
+}
+
+// GetTableStyle returns the appropriate table style based on plain mode.
+// Returns PlainTableStyle() if ios.IsPlainMode() is true, otherwise DefaultTableStyle().
+func GetTableStyle(ios PlainModeChecker) TableStyle {
+	if ios != nil && ios.IsPlainMode() {
+		return PlainTableStyle()
+	}
+	return DefaultTableStyle()
+}
+
+// PlainModeChecker is an interface for checking plain mode.
+// This allows decoupling from the iostreams package.
+type PlainModeChecker interface {
+	IsPlainMode() bool
 }
 
 // SetStyle sets a custom table style.
 func (t *Table) SetStyle(style TableStyle) *Table {
 	t.style = style
+	return t
+}
+
+// SetBorderStyle sets the border style for the table.
+func (t *Table) SetBorderStyle(style TableBorderStyle) *Table {
+	t.style.BorderStyle = style
+	return t
+}
+
+// HideBorders hides all table borders.
+func (t *Table) HideBorders() *Table {
+	t.style.ShowBorder = false
+	t.style.BorderStyle = BorderNone
 	return t
 }
 
@@ -77,70 +151,39 @@ func (t *Table) AddRows(rows [][]string) *Table {
 	return t
 }
 
-// Render renders the table to a string.
+// Render renders the table to a string using lipgloss table.
 func (t *Table) Render() string {
 	if len(t.headers) == 0 {
 		return ""
 	}
 
-	// Calculate column widths
-	widths := make([]int, len(t.headers))
-	for i, h := range t.headers {
-		widths[i] = len(h)
+	// Get the appropriate border style
+	border := borderStyles[t.style.BorderStyle]
+	if !t.style.ShowBorder {
+		border = lipgloss.HiddenBorder()
 	}
-	for _, row := range t.rows {
-		for i, cell := range row {
-			if i < len(widths) && len(cell) > widths[i] {
-				widths[i] = len(cell)
+
+	// Build lipgloss table with styling
+	tbl := table.New().
+		Border(border).
+		BorderStyle(t.style.Border).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return t.style.Header.Padding(0, t.style.Padding)
 			}
-		}
-	}
-
-	var sb strings.Builder
-
-	// Render header
-	headerCells := make([]string, len(t.headers))
-	for i, h := range t.headers {
-		headerCells[i] = t.style.Header.
-			Width(widths[i] + t.style.Padding).
-			Render(h)
-	}
-	sb.WriteString(strings.Join(headerCells, ""))
-	sb.WriteString("\n")
-
-	// Render separator
-	if t.style.ShowBorder {
-		for i, w := range widths {
-			sb.WriteString(t.style.Border.Render(strings.Repeat("─", w+t.style.Padding)))
-			if i < len(widths)-1 {
-				sb.WriteString(t.style.Border.Render("┼"))
+			// First column (Name) gets primary styling
+			if col == 0 {
+				return t.style.PrimaryCell.Padding(0, t.style.Padding)
 			}
-		}
-		sb.WriteString("\n")
-	}
-
-	// Render rows
-	for rowIdx, row := range t.rows {
-		style := t.style.Cell
-		if rowIdx%2 == 1 {
-			style = t.style.AltCell
-		}
-
-		rowCells := make([]string, len(t.headers))
-		for i := range t.headers {
-			cell := ""
-			if i < len(row) {
-				cell = row[i]
+			if row%2 == 0 {
+				return t.style.Cell.Padding(0, t.style.Padding)
 			}
-			rowCells[i] = style.
-				Width(widths[i] + t.style.Padding).
-				Render(cell)
-		}
-		sb.WriteString(strings.Join(rowCells, ""))
-		sb.WriteString("\n")
-	}
+			return t.style.AltCell.Padding(0, t.style.Padding)
+		}).
+		Headers(t.headers...).
+		Rows(t.rows...)
 
-	return sb.String()
+	return tbl.Render()
 }
 
 // Print prints the table to stdout.
@@ -215,7 +258,7 @@ func buildTableFromData(data any) *Table {
 		return nil
 	}
 
-	table := NewTable(headers...)
+	tbl := NewTable(headers...)
 
 	// Build rows from slice elements
 	for i := range v.Len() {
@@ -227,10 +270,10 @@ func buildTableFromData(data any) *Table {
 			elem = elem.Elem()
 		}
 		row := buildRowFromStruct(elem, elemType)
-		table.AddRow(row...)
+		tbl.AddRow(row...)
 	}
 
-	return table
+	return tbl
 }
 
 // buildHeadersFromType extracts column headers from struct field names/tags.

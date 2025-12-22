@@ -386,3 +386,84 @@ func TestSystem_ColorForced_SHELLY_FORCE_COLOR(t *testing.T) {
 		t.Error("Color should be enabled when SHELLY_FORCE_COLOR is set")
 	}
 }
+
+func TestIOStreams_PlainMode(t *testing.T) {
+	t.Parallel()
+
+	ios := iostreams.Test(nil, nil, nil)
+
+	// Test streams are non-TTY, so IsPlainMode returns true by default
+	// because IsPlainMode checks: plainMode || !IsStdoutTTY() || !ColorEnabled()
+	if !ios.IsPlainMode() {
+		t.Error("Test streams should be in plain mode by default (non-TTY)")
+	}
+
+	// Test SetPlainMode
+	ios.SetPlainMode(true)
+	if !ios.IsPlainMode() {
+		t.Error("SetPlainMode(true) should result in IsPlainMode() returning true")
+	}
+
+	// After setting plain to false, IsPlainMode should still be true
+	// because test streams are non-TTY
+	ios.SetPlainMode(false)
+	if !ios.IsPlainMode() {
+		t.Error("IsPlainMode() should still be true for non-TTY streams")
+	}
+}
+
+func TestIOStreams_IsPlainMode_Conditions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		plainMode    bool
+		stdoutTTY    bool
+		colorEnabled bool
+		want         bool
+	}{
+		{
+			name:         "plain mode explicitly set",
+			plainMode:    true,
+			stdoutTTY:    true,
+			colorEnabled: true,
+			want:         true,
+		},
+		{
+			name:         "non-TTY stdout",
+			plainMode:    false,
+			stdoutTTY:    false,
+			colorEnabled: true,
+			want:         true,
+		},
+		{
+			name:         "color disabled",
+			plainMode:    false,
+			stdoutTTY:    true,
+			colorEnabled: false,
+			want:         true,
+		},
+		{
+			name:         "all conditions false - TTY with color",
+			plainMode:    false,
+			stdoutTTY:    true,
+			colorEnabled: true,
+			want:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ios := iostreams.Test(nil, nil, nil)
+			ios.SetPlainMode(tt.plainMode)
+			ios.SetStdoutTTY(tt.stdoutTTY)
+			ios.SetColorEnabled(tt.colorEnabled)
+
+			if got := ios.IsPlainMode(); got != tt.want {
+				t.Errorf("IsPlainMode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

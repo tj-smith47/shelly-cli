@@ -90,6 +90,7 @@ shelly init [flags]
       --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
       --log-json                Output logs in JSON format
   -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)

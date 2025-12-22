@@ -305,6 +305,8 @@ var (
 	draculaBlue      = &tint.Color{R: 98, G: 114, B: 164, A: 255}
 	draculaCyan      = &tint.Color{R: 139, G: 233, B: 253, A: 255}
 	draculaPurple    = &tint.Color{R: 189, G: 147, B: 249, A: 255}
+	draculaPink      = &tint.Color{R: 255, G: 121, B: 198, A: 255}
+	draculaOrange    = &tint.Color{R: 255, G: 184, B: 108, A: 255}
 	draculaBrightBlk = &tint.Color{R: 98, G: 114, B: 164, A: 255}
 )
 
@@ -401,20 +403,33 @@ func Cyan() color.Color {
 
 // Purple returns the current theme purple color.
 // Custom overrides take precedence over the base theme.
+// Note: bubbletint's Dracula theme incorrectly defines Purple as #ff79c6 (pink),
+// so we always use draculaPurple (#bd93f9) for consistency with the actual Dracula palette.
 func Purple() color.Color {
 	if c := getCustomColor("purple"); c != nil {
 		return c
 	}
-	t := Current()
-	if t == nil {
-		return draculaPurple
-	}
-	return defaultColor(t.Purple, draculaPurple)
+	// Always use draculaPurple because bubbletint's Dracula has incorrect Purple value
+	return draculaPurple
 }
 
 // Magenta is an alias for Purple for compatibility.
 func Magenta() color.Color {
 	return Purple()
+}
+
+// Pink returns the current theme pink color (Dracula's bright magenta).
+// Falls back to Dracula pink (#ff79c6) if not available in theme.
+func Pink() color.Color {
+	// Pink is Dracula-specific (#ff79c6) - not a standard terminal color
+	// Always return the Dracula pink constant
+	return draculaPink
+}
+
+// Orange returns the Dracula orange color (#ffb86c).
+// Orange is Dracula-specific and not a standard terminal color.
+func Orange() color.Color {
+	return draculaOrange
 }
 
 // BrightBlack returns the current theme bright black (gray) color.

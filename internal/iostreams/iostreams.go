@@ -56,6 +56,9 @@ type IOStreams struct {
 
 	// Quiet mode - suppress non-essential output
 	quiet bool
+
+	// Plain mode - machine-readable output without borders/colors
+	plainMode bool
 }
 
 // System creates IOStreams connected to stdin/stdout/stderr.
@@ -81,6 +84,9 @@ func System() *IOStreams {
 	// Check quiet mode from viper
 	ios.quiet = viper.GetBool("quiet")
 
+	// Check plain mode from viper
+	ios.plainMode = viper.GetBool("plain")
+
 	return ios
 }
 
@@ -98,8 +104,12 @@ func Test(in io.Reader, out, errOut io.Writer) *IOStreams {
 	}
 }
 
-// isColorDisabled checks environment variables for color disable flags.
+// isColorDisabled checks flags and environment variables for color disable settings.
 func isColorDisabled() bool {
+	// Check --no-color or --plain flags via viper
+	if viper.GetBool("no-color") || viper.GetBool("plain") {
+		return true
+	}
 	// Check NO_COLOR (https://no-color.org/)
 	if _, ok := os.LookupEnv("NO_COLOR"); ok {
 		return true
@@ -161,6 +171,16 @@ func (s *IOStreams) IsQuiet() bool {
 // SetQuiet sets the quiet mode.
 func (s *IOStreams) SetQuiet(quiet bool) {
 	s.quiet = quiet
+}
+
+// IsPlainMode returns true if plain mode is enabled (--plain, non-TTY, or no color).
+func (s *IOStreams) IsPlainMode() bool {
+	return s.plainMode || !s.IsStdoutTTY() || !s.ColorEnabled()
+}
+
+// SetPlainMode sets the plain mode state.
+func (s *IOStreams) SetPlainMode(plain bool) {
+	s.plainMode = plain
 }
 
 // SetStdinTTY sets the stdin TTY state (for testing).

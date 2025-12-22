@@ -337,10 +337,11 @@ func RenderAuthRequired(required bool) string {
 	return theme.StatusOK().Render(LabelNoTitle)
 }
 
-// RenderGeneration returns themed generation string (e.g., "Gen2") or dimmed "unknown".
+// RenderGeneration returns generation string (e.g., "Gen2") or "unknown".
+// Returns plain text to allow table styling to take effect.
 func RenderGeneration(gen int) string {
 	if gen == 0 {
-		return theme.Dim().Render("unknown")
+		return "unknown"
 	}
-	return theme.Bold().Render(fmt.Sprintf("Gen%d", gen))
+	return fmt.Sprintf("Gen%d", gen)
 }

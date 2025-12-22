@@ -170,3 +170,97 @@ func TestPrintTableTo(t *testing.T) {
 		t.Error("PrintTableTo() produced no output")
 	}
 }
+
+func TestTableBorderStyles(t *testing.T) {
+	t.Parallel()
+
+	styles := []TableBorderStyle{
+		BorderNone, BorderRounded, BorderSquare,
+		BorderDouble, BorderHeavy, BorderASCII,
+	}
+
+	for _, bs := range styles {
+		table := NewTable("Header")
+		style := DefaultTableStyle()
+		style.BorderStyle = bs
+		table.SetStyle(style)
+		table.AddRow("Value")
+
+		rendered := table.Render()
+		if rendered == "" {
+			t.Errorf("BorderStyle %v produced empty output", bs)
+		}
+	}
+}
+
+func TestPlainTableStyle(t *testing.T) {
+	t.Parallel()
+
+	style := PlainTableStyle()
+	if style.BorderStyle != BorderASCII {
+		t.Error("PlainTableStyle should use ASCII borders")
+	}
+	if !style.ShowBorder {
+		t.Error("PlainTableStyle should have ShowBorder enabled")
+	}
+}
+
+func TestSetBorderStyle(t *testing.T) {
+	t.Parallel()
+
+	table := NewTable("A").SetBorderStyle(BorderDouble)
+	if table.style.BorderStyle != BorderDouble {
+		t.Error("SetBorderStyle did not update style")
+	}
+}
+
+func TestHideBorders(t *testing.T) {
+	t.Parallel()
+
+	table := NewTable("A").HideBorders()
+	if table.style.ShowBorder {
+		t.Error("HideBorders should set ShowBorder to false")
+	}
+	if table.style.BorderStyle != BorderNone {
+		t.Error("HideBorders should set BorderStyle to BorderNone")
+	}
+}
+
+// mockPlainModeChecker implements PlainModeChecker for testing.
+type mockPlainModeChecker struct {
+	plain bool
+}
+
+func (m *mockPlainModeChecker) IsPlainMode() bool {
+	return m.plain
+}
+
+func TestGetTableStyle(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil returns default", func(t *testing.T) {
+		t.Parallel()
+		style := GetTableStyle(nil)
+		if style.BorderStyle != BorderRounded {
+			t.Error("nil checker should return default style with rounded borders")
+		}
+	})
+
+	t.Run("plain mode returns plain style", func(t *testing.T) {
+		t.Parallel()
+		checker := &mockPlainModeChecker{plain: true}
+		style := GetTableStyle(checker)
+		if style.BorderStyle != BorderASCII {
+			t.Error("plain mode should return plain style with ASCII borders")
+		}
+	})
+
+	t.Run("non-plain mode returns default style", func(t *testing.T) {
+		t.Parallel()
+		checker := &mockPlainModeChecker{plain: false}
+		style := GetTableStyle(checker)
+		if style.BorderStyle != BorderRounded {
+			t.Error("non-plain mode should return default style with rounded borders")
+		}
+	})
+}

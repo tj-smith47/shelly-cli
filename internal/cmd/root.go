@@ -301,6 +301,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
 	rootCmd.PersistentFlags().String("config", "", "Config file (default $HOME/.config/shelly/config.yaml)")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output")
+	rootCmd.PersistentFlags().Bool("plain", false, "Disable borders and colors (machine-readable output)")
 	rootCmd.PersistentFlags().Bool("log-json", false, "Output logs in JSON format")
 	rootCmd.PersistentFlags().String("log-categories", "", "Filter logs by category (comma-separated: network,api,device,config,auth,plugin)")
 
@@ -310,6 +311,7 @@ func init() {
 	must(viper.BindPFlag("verbosity", rootCmd.PersistentFlags().Lookup("verbose")))
 	must(viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet")))
 	must(viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color")))
+	must(viper.BindPFlag("plain", rootCmd.PersistentFlags().Lookup("plain")))
 	must(viper.BindPFlag("log.json", rootCmd.PersistentFlags().Lookup("log-json")))
 	must(viper.BindPFlag("log.categories", rootCmd.PersistentFlags().Lookup("log-categories")))
 
@@ -493,10 +495,10 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 }
 
 // shouldDisableColor checks if color output should be disabled.
-// Returns true if --no-color flag is set, or NO_COLOR or SHELLY_NO_COLOR env vars are set.
+// Returns true if --no-color or --plain flag is set, or NO_COLOR or SHELLY_NO_COLOR env vars are set.
 func shouldDisableColor() bool {
-	// Check if flag was explicitly set
-	if viper.GetBool("no-color") {
+	// Check if --no-color or --plain flag was explicitly set
+	if viper.GetBool("no-color") || viper.GetBool("plain") {
 		return true
 	}
 

@@ -32,6 +32,9 @@ func DisplayConfigTable(ios *iostreams.IOStreams, configData any) error {
 			continue
 		}
 
+		if ios.IsPlainMode() {
+			table.SetStyle(output.PlainTableStyle())
+		}
 		if err := table.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print config table", err)
 		}

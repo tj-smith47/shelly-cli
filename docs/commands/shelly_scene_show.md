@@ -40,6 +40,7 @@ shelly scene show <name> [flags]
       --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
+      --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)

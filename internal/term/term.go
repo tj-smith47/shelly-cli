@@ -9,9 +9,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
-// printTable prints a table to ios.Out with standard error handling.
-func printTable(ios *iostreams.IOStreams, table *output.Table) {
-	if err := table.PrintTo(ios.Out); err != nil {
+// printTable prints a table to ios.Out with appropriate styling.
+func printTable(ios *iostreams.IOStreams, tbl *output.Table) {
+	// Apply plain style if needed
+	if ios.IsPlainMode() {
+		tbl.SetStyle(output.PlainTableStyle())
+	}
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
 }

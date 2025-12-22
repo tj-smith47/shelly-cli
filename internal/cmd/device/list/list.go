@@ -124,6 +124,7 @@ func run(f *cmdutil.Factory, generation int, deviceType string) error {
 
 	// Table output
 	table := output.NewTable("Name", "Address", "Type", "Model", "Generation", "Auth")
+	table.SetStyle(output.GetTableStyle(ios))
 	for _, dev := range filtered {
 		gen := output.RenderGeneration(dev.Generation)
 		auth := output.RenderAuthRequired(dev.Auth)
