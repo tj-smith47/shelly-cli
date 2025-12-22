@@ -58,11 +58,14 @@ deps:
 	@go mod download
 	@go mod tidy
 
-## docs: Generate command documentation
+## docs: Generate command documentation and man pages
 docs:
 	@echo "Generating documentation..."
 	@go run ./cmd/docgen ./docs/commands
 	@echo "Documentation generated in docs/commands/"
+	@echo "Generating man pages..."
+	@go run ./cmd/mangen ./docs/man
+	@echo "Man pages generated in docs/man/"
 
 ## fmt: Format code
 fmt:
