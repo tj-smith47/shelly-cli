@@ -155,49 +155,66 @@ func DisplayEMStatus(ios *iostreams.IOStreams, status *shelly.EMStatus) {
 		return
 	}
 
-	// Human-readable format
+	// Human-readable format with bordered table
 	ios.Printf("Energy Monitor (EM) #%d\n\n", status.ID)
 
-	ios.Printf("Phase A:\n")
-	ios.Printf("  Voltage:        %.2f V\n", status.AVoltage)
-	ios.Printf("  Current:        %.2f A\n", status.ACurrent)
-	ios.Printf("  Active Power:   %.2f W\n", status.AActivePower)
-	ios.Printf("  Apparent Power: %.2f VA\n", status.AApparentPower)
-	if status.APowerFactor != nil {
-		ios.Printf("  Power Factor:   %.3f\n", *status.APowerFactor)
-	}
-	if status.AFreq != nil {
-		ios.Printf("  Frequency:      %.2f Hz\n", *status.AFreq)
-	}
+	t := output.NewTable("Metric", "Phase A", "Phase B", "Phase C", "Total")
 
-	ios.Printf("\nPhase B:\n")
-	ios.Printf("  Voltage:        %.2f V\n", status.BVoltage)
-	ios.Printf("  Current:        %.2f A\n", status.BCurrent)
-	ios.Printf("  Active Power:   %.2f W\n", status.BActivePower)
-	ios.Printf("  Apparent Power: %.2f VA\n", status.BApparentPower)
+	// Voltage row
+	t.AddRow("Voltage",
+		fmt.Sprintf("%.2f V", status.AVoltage),
+		fmt.Sprintf("%.2f V", status.BVoltage),
+		fmt.Sprintf("%.2f V", status.CVoltage),
+		"-")
+
+	// Current row
+	t.AddRow("Current",
+		fmt.Sprintf("%.2f A", status.ACurrent),
+		fmt.Sprintf("%.2f A", status.BCurrent),
+		fmt.Sprintf("%.2f A", status.CCurrent),
+		fmt.Sprintf("%.2f A", status.TotalCurrent))
+
+	// Active Power row
+	t.AddRow("Active Power",
+		fmt.Sprintf("%.2f W", status.AActivePower),
+		fmt.Sprintf("%.2f W", status.BActivePower),
+		fmt.Sprintf("%.2f W", status.CActivePower),
+		fmt.Sprintf("%.2f W", status.TotalActivePower))
+
+	// Apparent Power row
+	t.AddRow("Apparent Power",
+		fmt.Sprintf("%.2f VA", status.AApparentPower),
+		fmt.Sprintf("%.2f VA", status.BApparentPower),
+		fmt.Sprintf("%.2f VA", status.CApparentPower),
+		fmt.Sprintf("%.2f VA", status.TotalAprtPower))
+
+	// Power Factor row (optional)
+	aPF, bPF, cPF := "-", "-", "-"
+	if status.APowerFactor != nil {
+		aPF = fmt.Sprintf("%.3f", *status.APowerFactor)
+	}
 	if status.BPowerFactor != nil {
-		ios.Printf("  Power Factor:   %.3f\n", *status.BPowerFactor)
+		bPF = fmt.Sprintf("%.3f", *status.BPowerFactor)
+	}
+	if status.CPowerFactor != nil {
+		cPF = fmt.Sprintf("%.3f", *status.CPowerFactor)
+	}
+	t.AddRow("Power Factor", aPF, bPF, cPF, "-")
+
+	// Frequency row (optional)
+	aFreq, bFreq, cFreq := "-", "-", "-"
+	if status.AFreq != nil {
+		aFreq = fmt.Sprintf("%.2f Hz", *status.AFreq)
 	}
 	if status.BFreq != nil {
-		ios.Printf("  Frequency:      %.2f Hz\n", *status.BFreq)
-	}
-
-	ios.Printf("\nPhase C:\n")
-	ios.Printf("  Voltage:        %.2f V\n", status.CVoltage)
-	ios.Printf("  Current:        %.2f A\n", status.CCurrent)
-	ios.Printf("  Active Power:   %.2f W\n", status.CActivePower)
-	ios.Printf("  Apparent Power: %.2f VA\n", status.CApparentPower)
-	if status.CPowerFactor != nil {
-		ios.Printf("  Power Factor:   %.3f\n", *status.CPowerFactor)
+		bFreq = fmt.Sprintf("%.2f Hz", *status.BFreq)
 	}
 	if status.CFreq != nil {
-		ios.Printf("  Frequency:      %.2f Hz\n", *status.CFreq)
+		cFreq = fmt.Sprintf("%.2f Hz", *status.CFreq)
 	}
+	t.AddRow("Frequency", aFreq, bFreq, cFreq, "-")
 
-	ios.Printf("\nTotals:\n")
-	ios.Printf("  Current:        %.2f A\n", status.TotalCurrent)
-	ios.Printf("  Active Power:   %.2f W\n", status.TotalActivePower)
-	ios.Printf("  Apparent Power: %.2f VA\n", status.TotalAprtPower)
+	printTable(ios, t)
 
 	if status.NCurrent != nil {
 		ios.Printf("\nNeutral Current: %.2f A\n", *status.NCurrent)
@@ -217,18 +234,22 @@ func DisplayEM1Status(ios *iostreams.IOStreams, status *shelly.EM1Status) {
 		return
 	}
 
-	// Human-readable format
+	// Human-readable format with bordered table
 	ios.Printf("Energy Monitor (EM1) #%d\n\n", status.ID)
-	ios.Printf("Voltage:        %.2f V\n", status.Voltage)
-	ios.Printf("Current:        %.2f A\n", status.Current)
-	ios.Printf("Active Power:   %.2f W\n", status.ActPower)
-	ios.Printf("Apparent Power: %.2f VA\n", status.AprtPower)
+
+	t := output.NewTable("Metric", "Value")
+	t.AddRow("Voltage", fmt.Sprintf("%.2f V", status.Voltage))
+	t.AddRow("Current", fmt.Sprintf("%.2f A", status.Current))
+	t.AddRow("Active Power", fmt.Sprintf("%.2f W", status.ActPower))
+	t.AddRow("Apparent Power", fmt.Sprintf("%.2f VA", status.AprtPower))
 	if status.PF != nil {
-		ios.Printf("Power Factor:   %.3f\n", *status.PF)
+		t.AddRow("Power Factor", fmt.Sprintf("%.3f", *status.PF))
 	}
 	if status.Freq != nil {
-		ios.Printf("Frequency:      %.2f Hz\n", *status.Freq)
+		t.AddRow("Frequency", fmt.Sprintf("%.2f Hz", *status.Freq))
 	}
+
+	printTable(ios, t)
 
 	if len(status.Errors) > 0 {
 		ios.Printf("\nErrors: %v\n", status.Errors)

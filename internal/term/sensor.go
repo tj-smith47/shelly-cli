@@ -28,14 +28,15 @@ type SensorOpts[T model.Sensor] struct {
 
 // DisplaySensorList displays a list of sensors using generic options.
 func DisplaySensorList[T model.Sensor](ios *iostreams.IOStreams, sensors []T, opts SensorOpts[T]) {
-	ios.Println(theme.Bold().Render(opts.Title + ":"))
-	ios.Println()
+	t := output.NewTable("ID", "Reading")
 	for _, s := range sensors {
-		ios.Printf("  Sensor %d:\n", s.GetID())
 		if formatted := opts.Format(s, false); formatted != "" {
-			ios.Printf("    %s\n", formatted)
+			t.AddRow(fmt.Sprintf("%d", s.GetID()), formatted)
 		}
 	}
+	ios.Println(theme.Bold().Render(opts.Title + ":"))
+	ios.Println()
+	printTable(ios, t)
 }
 
 // DisplaySensorStatus displays a single sensor status using generic options.
@@ -44,9 +45,11 @@ func DisplaySensorStatus[T model.Sensor](ios *iostreams.IOStreams, status T, id 
 	ios.Println()
 	if !opts.HasValue(status) {
 		ios.Warning("%s", opts.NoValueMsg)
-	} else {
-		ios.Printf("  %s\n", opts.Format(status, true))
+		return
 	}
+	t := output.NewTable("Metric", "Value")
+	t.AddRow("Reading", opts.Format(status, true))
+	printTable(ios, t)
 	displaySensorErrors(ios, status.GetErrors())
 }
 
@@ -230,21 +233,25 @@ func DisplayAlarmSensors(ios *iostreams.IOStreams, sensors []model.AlarmSensorRe
 
 // DisplayAlarmSensorList displays a list of alarm-type sensors using Go generics.
 func DisplayAlarmSensorList[T model.AlarmSensor](ios *iostreams.IOStreams, sensors []T, sensorName, alarmMsg string) {
-	ios.Println(theme.Bold().Render(sensorName + " Sensors:"))
-	ios.Println()
+	t := output.NewTable("ID", "Status", "Muted")
 	for _, s := range sensors {
 		status := output.RenderAlarmState(s.IsAlarm(), alarmMsg)
-		muteStr := output.RenderMuteAnnotation(s.IsMuted())
-		ios.Printf("  Sensor %d: %s%s\n", s.GetID(), status, muteStr)
+		muted := output.RenderMuteState(s.IsMuted())
+		t.AddRow(fmt.Sprintf("%d", s.GetID()), status, muted)
 	}
+	ios.Println(theme.Bold().Render(sensorName + " Sensors:"))
+	ios.Println()
+	printTable(ios, t)
 }
 
 // DisplayAlarmSensorStatus displays a single alarm-type sensor status using Go generics.
 func DisplayAlarmSensorStatus[T model.AlarmSensor](ios *iostreams.IOStreams, status T, id int, sensorName, alarmMsg string) {
 	ios.Println(theme.Bold().Render(fmt.Sprintf("%s Sensor %d:", sensorName, id)))
 	ios.Println()
-	ios.Printf("  Status: %s\n", output.RenderAlarmState(status.IsAlarm(), alarmMsg))
-	ios.Printf("  Mute: %s\n", output.RenderMuteState(status.IsMuted()))
+	t := output.NewTable("Metric", "Value")
+	t.AddRow("Status", output.RenderAlarmState(status.IsAlarm(), alarmMsg))
+	t.AddRow("Muted", output.RenderMuteState(status.IsMuted()))
+	printTable(ios, t)
 	displaySensorErrors(ios, status.GetErrors())
 }
 
