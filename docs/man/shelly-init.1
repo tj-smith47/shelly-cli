@@ -71,8 +71,8 @@ Use --check to verify your current setup without making changes.
 	Enable device discovery (opt-in in non-interactive mode)
 
 .PP
-\fB--discover-modes\fP="mdns"
-	Discovery modes: mdns,coiot,http,ble,all (comma-separated)
+\fB--discover-modes\fP="http"
+	Discovery modes: http,mdns,coiot,ble,all (comma-separated)
 
 .PP
 \fB--discover-timeout\fP=15s
@@ -153,7 +153,7 @@ Use --check to verify your current setup without making changes.
   shelly init --devices-json '{"name":"kitchen","address":"192.168.1.100"}'
 
   # Headless: with discovery and completions
-  shelly init --discover --discover-modes mdns,http --completions bash,zsh
+  shelly init --discover --discover-modes http,mdns --completions bash,zsh
 
   # Headless: full CI/CD setup
   shelly init \\

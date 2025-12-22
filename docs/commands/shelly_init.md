@@ -48,7 +48,7 @@ shelly init [flags]
   shelly init --devices-json '{"name":"kitchen","address":"192.168.1.100"}'
 
   # Headless: with discovery and completions
-  shelly init --discover --discover-modes mdns,http --completions bash,zsh
+  shelly init --discover --discover-modes http,mdns --completions bash,zsh
 
   # Headless: full CI/CD setup
   shelly init \
@@ -73,7 +73,7 @@ shelly init [flags]
       --device stringArray          Device spec: name=ip[:user:pass] (repeatable)
       --devices-json stringArray    JSON device(s): file path, array, or single object (repeatable)
       --discover                    Enable device discovery (opt-in in non-interactive mode)
-      --discover-modes string       Discovery modes: mdns,coiot,http,ble,all (comma-separated) (default "mdns")
+      --discover-modes string       Discovery modes: http,mdns,coiot,ble,all (comma-separated) (default "http")
       --discover-timeout duration   Discovery timeout (default 15s)
       --force                       Overwrite existing configuration
   -h, --help                        help for init

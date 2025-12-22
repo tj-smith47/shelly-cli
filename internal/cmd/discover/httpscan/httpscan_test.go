@@ -1,5 +1,5 @@
-// Package scan provides subnet scanning discovery command.
-package scan
+// Package httpscan provides HTTP subnet scanning discovery command.
+package httpscan
 
 import (
 	"testing"
@@ -15,8 +15,8 @@ func TestNewCommand(t *testing.T) {
 		t.Fatal("NewCommand(cmdutil.NewFactory()) returned nil")
 	}
 
-	if cmd.Use != "scan [subnet]" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "scan [subnet]")
+	if cmd.Use != "http [subnet]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "http [subnet]")
 	}
 
 	if cmd.Short == "" {

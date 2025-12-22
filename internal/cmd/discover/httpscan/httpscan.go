@@ -1,5 +1,5 @@
-// Package scan provides subnet scanning discovery command.
-package scan
+// Package httpscan provides HTTP subnet scanning discovery command.
+package httpscan
 
 import (
 	"context"
@@ -20,17 +20,17 @@ import (
 // DefaultTimeout is the default scan timeout.
 const DefaultTimeout = 2 * time.Minute
 
-// NewCommand creates the discover scan command.
+// NewCommand creates the discover http command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var register bool
 	var skipExisting bool
 	var timeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "scan [subnet]",
-		Aliases: []string{"search", "probe"},
-		Short:   "Scan subnet for devices",
-		Long: `Scan a network subnet for Shelly devices by probing HTTP endpoints.
+		Use:     "http [subnet]",
+		Aliases: []string{"scan", "search", "probe"},
+		Short:   "Discover devices via HTTP subnet scanning",
+		Long: `Discover Shelly devices by probing HTTP endpoints on a subnet.
 
 If no subnet is provided, attempts to detect the local network.
 This method is slower than mDNS or CoIoT but works when multicast
@@ -46,25 +46,25 @@ devices that are already in your registry.
 Output is formatted as a table showing: ID, Address, Model, Generation,
 Protocol, and Auth status.`,
 		Example: `  # Scan default network (auto-detect)
-  shelly discover scan
+  shelly discover http
 
   # Scan specific subnet
-  shelly discover scan 192.168.1.0/24
+  shelly discover http 192.168.1.0/24
 
   # Scan a /16 network (large, use longer timeout)
-  shelly discover scan 10.0.0.0/16 --timeout 30m
+  shelly discover http 10.0.0.0/16 --timeout 30m
 
   # Auto-register discovered devices
-  shelly discover scan --register
+  shelly discover http --register
 
-  # Scan with custom timeout
+  # Using 'scan' alias
   shelly discover scan --timeout 5m
 
   # Force re-register all discovered devices
-  shelly discover scan --register --skip-existing=false
+  shelly discover http --register --skip-existing=false
 
   # Combine flags for initial network setup
-  shelly discover scan 192.168.1.0/24 --register --timeout 10m`,
+  shelly discover http 192.168.1.0/24 --register --timeout 10m`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			subnet := ""

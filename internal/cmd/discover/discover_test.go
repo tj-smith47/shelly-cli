@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -35,7 +34,7 @@ func TestNewCommand(t *testing.T) {
 		"mdns":          false,
 		"ble":           false,
 		"coiot":         false,
-		"scan [subnet]": false,
+		"http [subnet]": false,
 	}
 
 	for _, sub := range subcommands {
@@ -62,8 +61,8 @@ func TestNewCommand_Flags(t *testing.T) {
 		t.Error("timeout flag not found")
 	case timeout.Shorthand != "t":
 		t.Errorf("timeout shorthand = %q, want %q", timeout.Shorthand, "t")
-	case timeout.DefValue != "10s":
-		t.Errorf("timeout default = %q, want %q", timeout.DefValue, "10s")
+	case timeout.DefValue != "2m0s":
+		t.Errorf("timeout default = %q, want %q", timeout.DefValue, "2m0s")
 	}
 
 	// Test register flag exists
@@ -83,11 +82,11 @@ func TestNewCommand_Flags(t *testing.T) {
 	}
 }
 
-func TestDefaultTimeout(t *testing.T) {
+func TestDefaultScanTimeout(t *testing.T) {
 	t.Parallel()
-	expected := 10 * time.Second
-	if shelly.DefaultTimeout != expected {
-		t.Errorf("shelly.DefaultTimeout = %v, want %v", shelly.DefaultTimeout, expected)
+	expected := 2 * time.Minute
+	if DefaultScanTimeout != expected {
+		t.Errorf("DefaultScanTimeout = %v, want %v", DefaultScanTimeout, expected)
 	}
 }
 

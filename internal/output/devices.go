@@ -48,7 +48,7 @@ func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *Table {
 		return nil
 	}
 
-	table := NewTable("ID", "Address", "Model", "Generation", "Protocol", "Auth")
+	table := NewTable("Name", "ID", "Address", "Model", "Generation", "Protocol", "Auth")
 
 	for _, d := range devices {
 		gen := fmt.Sprintf("Gen%d", d.Generation)
@@ -59,7 +59,14 @@ func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *Table {
 			auth = theme.StatusWarn().Render("Yes")
 		}
 
+		// Use Name, fallback to ID if empty
+		name := d.Name
+		if name == "" {
+			name = d.ID
+		}
+
 		table.AddRow(
+			name,
 			d.ID,
 			d.Address.String(),
 			d.Model,

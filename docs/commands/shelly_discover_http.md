@@ -1,10 +1,10 @@
-## shelly discover scan
+## shelly discover http
 
-Scan subnet for devices
+Discover devices via HTTP subnet scanning
 
 ### Synopsis
 
-Scan a network subnet for Shelly devices by probing HTTP endpoints.
+Discover Shelly devices by probing HTTP endpoints on a subnet.
 
 If no subnet is provided, attempts to detect the local network.
 This method is slower than mDNS or CoIoT but works when multicast
@@ -21,38 +21,38 @@ Output is formatted as a table showing: ID, Address, Model, Generation,
 Protocol, and Auth status.
 
 ```
-shelly discover scan [subnet] [flags]
+shelly discover http [subnet] [flags]
 ```
 
 ### Examples
 
 ```
   # Scan default network (auto-detect)
-  shelly discover scan
+  shelly discover http
 
   # Scan specific subnet
-  shelly discover scan 192.168.1.0/24
+  shelly discover http 192.168.1.0/24
 
   # Scan a /16 network (large, use longer timeout)
-  shelly discover scan 10.0.0.0/16 --timeout 30m
+  shelly discover http 10.0.0.0/16 --timeout 30m
 
   # Auto-register discovered devices
-  shelly discover scan --register
+  shelly discover http --register
 
-  # Scan with custom timeout
+  # Using 'scan' alias
   shelly discover scan --timeout 5m
 
   # Force re-register all discovered devices
-  shelly discover scan --register --skip-existing=false
+  shelly discover http --register --skip-existing=false
 
   # Combine flags for initial network setup
-  shelly discover scan 192.168.1.0/24 --register --timeout 10m
+  shelly discover http 192.168.1.0/24 --register --timeout 10m
 ```
 
 ### Options
 
 ```
-  -h, --help               help for scan
+  -h, --help               help for http
       --register           Automatically register discovered devices
       --skip-existing      Skip devices already registered (default true)
   -t, --timeout duration   Scan timeout (default 2m0s)

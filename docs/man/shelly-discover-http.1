@@ -2,15 +2,15 @@
 .TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-discover-scan - Scan subnet for devices
+shelly-discover-http - Discover devices via HTTP subnet scanning
 
 
 .SH SYNOPSIS
-\fBshelly discover scan [subnet] [flags]\fP
+\fBshelly discover http [subnet] [flags]\fP
 
 
 .SH DESCRIPTION
-Scan a network subnet for Shelly devices by probing HTTP endpoints.
+Discover Shelly devices by probing HTTP endpoints on a subnet.
 
 .PP
 If no subnet is provided, attempts to detect the local network.
@@ -33,7 +33,7 @@ Protocol, and Auth status.
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
-	help for scan
+	help for http
 
 .PP
 \fB--register\fP[=false]
@@ -84,25 +84,25 @@ Protocol, and Auth status.
 .SH EXAMPLE
 .EX
   # Scan default network (auto-detect)
-  shelly discover scan
+  shelly discover http
 
   # Scan specific subnet
-  shelly discover scan 192.168.1.0/24
+  shelly discover http 192.168.1.0/24
 
   # Scan a /16 network (large, use longer timeout)
-  shelly discover scan 10.0.0.0/16 --timeout 30m
+  shelly discover http 10.0.0.0/16 --timeout 30m
 
   # Auto-register discovered devices
-  shelly discover scan --register
+  shelly discover http --register
 
-  # Scan with custom timeout
+  # Using 'scan' alias
   shelly discover scan --timeout 5m
 
   # Force re-register all discovered devices
-  shelly discover scan --register --skip-existing=false
+  shelly discover http --register --skip-existing=false
 
   # Combine flags for initial network setup
-  shelly discover scan 192.168.1.0/24 --register --timeout 10m
+  shelly discover http 192.168.1.0/24 --register --timeout 10m
 .EE
 
 

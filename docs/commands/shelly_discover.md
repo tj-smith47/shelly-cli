@@ -6,11 +6,14 @@ Discover Shelly devices on the network
 
 Discover Shelly devices using various protocols.
 
-Available discovery methods:
+By default, uses HTTP subnet scanning which works reliably even when
+multicast is blocked. Automatically detects the local subnet.
+
+Available discovery methods (--method):
+  http   - HTTP subnet scanning (default, works everywhere)
   mdns   - mDNS/Zeroconf discovery (Gen2+ devices)
   ble    - Bluetooth Low Energy discovery (provisioning mode)
   coiot  - CoIoT/CoAP discovery (Gen1 devices)
-  scan   - HTTP subnet scanning (all devices)
 
 ```
 shelly discover [flags]
@@ -19,26 +22,31 @@ shelly discover [flags]
 ### Examples
 
 ```
-  # Discover all devices using mDNS (default)
+  # Discover devices via HTTP scan (default, auto-detects subnet)
   shelly discover
 
-  # Discover using mDNS only
-  shelly disc mdns
+  # Specify subnet for HTTP scan
+  shelly discover --subnet 192.168.1.0/24
 
-  # Discover BLE devices in provisioning mode
-  shelly discover ble
+  # Use mDNS instead of HTTP scan
+  shelly discover --method mdns
 
-  # Scan a subnet
-  shelly find scan 192.168.1.0/24
+  # Use BLE discovery
+  shelly discover --method ble
+
+  # Auto-register discovered devices
+  shelly discover --register
 ```
 
 ### Options
 
 ```
   -h, --help               help for discover
+  -m, --method string      Discovery method: http, mdns, ble, coiot (default "http")
       --register           Auto-register discovered devices
       --skip-existing      Skip devices already registered (default true)
-  -t, --timeout duration   Discovery timeout (default 10s)
+      --subnet string      Subnet to scan (auto-detected if not specified)
+  -t, --timeout duration   Discovery timeout (default 2m0s)
 ```
 
 ### Options inherited from parent commands
@@ -59,6 +67,6 @@ shelly discover [flags]
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
 * [shelly discover ble](shelly_discover_ble.md)	 - Discover devices using Bluetooth Low Energy
 * [shelly discover coiot](shelly_discover_coiot.md)	 - Discover devices via CoIoT
+* [shelly discover http](shelly_discover_http.md)	 - Discover devices via HTTP subnet scanning
 * [shelly discover mdns](shelly_discover_mdns.md)	 - Discover devices using mDNS/Zeroconf
-* [shelly discover scan](shelly_discover_scan.md)	 - Scan subnet for devices
 

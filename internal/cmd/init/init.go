@@ -54,7 +54,7 @@ Use --check to verify your current setup without making changes.`,
   shelly init --devices-json '{"name":"kitchen","address":"192.168.1.100"}'
 
   # Headless: with discovery and completions
-  shelly init --discover --discover-modes mdns,http --completions bash,zsh
+  shelly init --discover --discover-modes http,mdns --completions bash,zsh
 
   # Headless: full CI/CD setup
   shelly init \
@@ -77,7 +77,7 @@ Use --check to verify your current setup without making changes.`,
 	// Discovery flags
 	cmd.Flags().BoolVar(&opts.Discover, "discover", false, "Enable device discovery (opt-in in non-interactive mode)")
 	cmd.Flags().DurationVar(&opts.DiscoverTimeout, "discover-timeout", 15*time.Second, "Discovery timeout")
-	cmd.Flags().StringVar(&opts.DiscoverModes, "discover-modes", "mdns", "Discovery modes: mdns,coiot,http,ble,all (comma-separated)")
+	cmd.Flags().StringVar(&opts.DiscoverModes, "discover-modes", "http", "Discovery modes: http,mdns,coiot,ble,all (comma-separated)")
 	cmd.Flags().StringVar(&opts.Network, "network", "", "Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)")
 
 	// Completion flags

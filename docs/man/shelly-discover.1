@@ -13,16 +13,24 @@ shelly-discover - Discover Shelly devices on the network
 Discover Shelly devices using various protocols.
 
 .PP
-Available discovery methods:
+By default, uses HTTP subnet scanning which works reliably even when
+multicast is blocked. Automatically detects the local subnet.
+
+.PP
+Available discovery methods (--method):
+  http   - HTTP subnet scanning (default, works everywhere)
   mdns   - mDNS/Zeroconf discovery (Gen2+ devices)
   ble    - Bluetooth Low Energy discovery (provisioning mode)
   coiot  - CoIoT/CoAP discovery (Gen1 devices)
-  scan   - HTTP subnet scanning (all devices)
 
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
 	help for discover
+
+.PP
+\fB-m\fP, \fB--method\fP="http"
+	Discovery method: http, mdns, ble, coiot
 
 .PP
 \fB--register\fP[=false]
@@ -33,7 +41,11 @@ Available discovery methods:
 	Skip devices already registered
 
 .PP
-\fB-t\fP, \fB--timeout\fP=10s
+\fB--subnet\fP=""
+	Subnet to scan (auto-detected if not specified)
+
+.PP
+\fB-t\fP, \fB--timeout\fP=2m0s
 	Discovery timeout
 
 
@@ -72,19 +84,22 @@ Available discovery methods:
 
 .SH EXAMPLE
 .EX
-  # Discover all devices using mDNS (default)
+  # Discover devices via HTTP scan (default, auto-detects subnet)
   shelly discover
 
-  # Discover using mDNS only
-  shelly disc mdns
+  # Specify subnet for HTTP scan
+  shelly discover --subnet 192.168.1.0/24
 
-  # Discover BLE devices in provisioning mode
-  shelly discover ble
+  # Use mDNS instead of HTTP scan
+  shelly discover --method mdns
 
-  # Scan a subnet
-  shelly find scan 192.168.1.0/24
+  # Use BLE discovery
+  shelly discover --method ble
+
+  # Auto-register discovered devices
+  shelly discover --register
 .EE
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-discover-ble(1)\fP, \fBshelly-discover-coiot(1)\fP, \fBshelly-discover-mdns(1)\fP, \fBshelly-discover-scan(1)\fP
+\fBshelly(1)\fP, \fBshelly-discover-ble(1)\fP, \fBshelly-discover-coiot(1)\fP, \fBshelly-discover-http(1)\fP, \fBshelly-discover-mdns(1)\fP
