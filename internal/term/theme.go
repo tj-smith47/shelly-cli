@@ -9,7 +9,7 @@ import (
 
 // ApplyImportedTheme applies an imported theme and displays success message.
 func ApplyImportedTheme(ios *iostreams.IOStreams, themeName string, colors map[string]string) error {
-	if err := theme.ApplyConfig(themeName, colors, ""); err != nil {
+	if err := theme.ApplyConfig(themeName, colors, nil, ""); err != nil {
 		return fmt.Errorf("failed to apply theme: %w", err)
 	}
 

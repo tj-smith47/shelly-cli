@@ -103,44 +103,46 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for events.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.BrightBlack()).
+			BorderForeground(colors.TableBorder).
 			Padding(1, 2),
 		Header: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Cyan()).
+			Foreground(colors.Highlight).
 			MarginBottom(1),
 		Event: lipgloss.NewStyle().
 			MarginBottom(0),
 		Time: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Width(10),
 		Device: lipgloss.NewStyle().
-			Foreground(theme.Cyan()).
+			Foreground(colors.Highlight).
 			Bold(true).
 			Width(16),
 		Component: lipgloss.NewStyle().
-			Foreground(theme.Purple()).
+			Foreground(colors.Primary).
 			Width(12),
 		Type: lipgloss.NewStyle().
 			Width(14),
 		Description: lipgloss.NewStyle().
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		Info: lipgloss.NewStyle().
-			Foreground(theme.Blue()),
+			Foreground(colors.Secondary),
 		Warning: lipgloss.NewStyle().
-			Foreground(theme.Yellow()),
+			Foreground(colors.Warning),
 		Error: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Error),
 		Connected: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Online),
 		Disconnected: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Offline),
 		Footer: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Italic(true),
 	}
 }
@@ -171,6 +173,7 @@ func (m Model) Init() tea.Cmd {
 }
 
 // subscribeToAllDevices creates WebSocket subscriptions for all registered devices.
+// Note: Gen1 devices are skipped as they don't support WebSocket events.
 func (m Model) subscribeToAllDevices() tea.Cmd {
 	return func() tea.Msg {
 		deviceMap := config.ListDevices()
@@ -180,6 +183,10 @@ func (m Model) subscribeToAllDevices() tea.Cmd {
 
 		var events []Event
 		for _, d := range deviceMap {
+			// Skip Gen1 devices - they don't support WebSocket events
+			if d.Generation == 1 {
+				continue
+			}
 			// Start subscription in background
 			go m.subscribeToDevice(d)
 			// Add connection event

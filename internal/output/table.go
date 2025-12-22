@@ -64,17 +64,17 @@ func NewTable(headers ...string) *Table {
 	}
 }
 
-// DefaultTableStyle returns the default table style using the current theme.
+// DefaultTableStyle returns the default table style using semantic colors.
 // Uses rounded borders with themed colors for modern terminal appearance.
-// Dracula-inspired: Purple borders, Cyan headers, Pink for primary column,
-// Orange/Yellow alternating rows.
+// Colors are drawn from the semantic theme system for consistency.
 func DefaultTableStyle() TableStyle {
+	colors := theme.GetSemanticColors()
 	return TableStyle{
-		Header:      lipgloss.NewStyle().Bold(true).Foreground(theme.Cyan()),
-		Cell:        lipgloss.NewStyle().Foreground(theme.Yellow()),
-		AltCell:     lipgloss.NewStyle().Foreground(theme.Orange()),
-		PrimaryCell: lipgloss.NewStyle().Foreground(theme.Pink()),
-		Border:      lipgloss.NewStyle().Foreground(theme.Purple()),
+		Header:      lipgloss.NewStyle().Bold(true).Foreground(colors.TableHeader),
+		Cell:        lipgloss.NewStyle().Foreground(colors.TableCell),
+		AltCell:     lipgloss.NewStyle().Foreground(colors.TableAltCell),
+		PrimaryCell: lipgloss.NewStyle().Foreground(colors.Primary),
+		Border:      lipgloss.NewStyle().Foreground(colors.TableBorder),
 		BorderStyle: BorderRounded,
 		Padding:     1,
 		ShowBorder:  true,

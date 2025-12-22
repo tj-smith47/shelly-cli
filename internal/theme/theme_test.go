@@ -219,7 +219,7 @@ func TestApplyConfig(t *testing.T) {
 
 	t.Run("set_theme_by_name", func(t *testing.T) {
 		ClearCustomColors()
-		err := ApplyConfig("nord", nil, "")
+		err := ApplyConfig("nord", nil, nil, "")
 		if err != nil {
 			t.Errorf("ApplyConfig with valid theme failed: %v", err)
 		}
@@ -229,7 +229,7 @@ func TestApplyConfig(t *testing.T) {
 	})
 
 	t.Run("invalid_theme", func(t *testing.T) {
-		err := ApplyConfig("nonexistent_theme_xyz", nil, "")
+		err := ApplyConfig("nonexistent_theme_xyz", nil, nil, "")
 		if err == nil {
 			t.Error("expected error for invalid theme name")
 		}
@@ -241,7 +241,7 @@ func TestApplyConfig(t *testing.T) {
 			"green": "#00ff00",
 			"red":   "#ff0000",
 		}
-		err := ApplyConfig("", colors, "")
+		err := ApplyConfig("", colors, nil, "")
 		if err != nil {
 			t.Errorf("ApplyConfig with colors failed: %v", err)
 		}
@@ -258,7 +258,7 @@ func TestApplyConfig(t *testing.T) {
 	})
 
 	t.Run("invalid_file", func(t *testing.T) {
-		err := ApplyConfig("", nil, "/nonexistent/path/theme.yaml")
+		err := ApplyConfig("", nil, nil, "/nonexistent/path/theme.yaml")
 		if err == nil {
 			t.Error("expected error for nonexistent file")
 		}

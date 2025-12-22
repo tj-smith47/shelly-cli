@@ -143,7 +143,7 @@ func RenderYesNo(value bool, c Case, fs theme.FalseStyle) string {
 }
 
 // RenderOnline returns a themed online/offline string with configurable case.
-// Always uses FalseError style since offline is typically a problem.
+// Uses dedicated Online/Offline semantic colors for device state consistency.
 func RenderOnline(online bool, c Case) string {
 	var trueLabel, falseLabel string
 	switch c {
@@ -153,9 +153,9 @@ func RenderOnline(online bool, c Case) string {
 		trueLabel, falseLabel = LabelOnlineLower, LabelOfflineLower
 	}
 	if online {
-		return theme.StatusOK().Render(trueLabel)
+		return theme.StatusOnline().Render(trueLabel)
 	}
-	return theme.StatusError().Render(falseLabel)
+	return theme.StatusOffline().Render(falseLabel)
 }
 
 // RenderActive returns a themed active/inactive string with configurable case and false style.

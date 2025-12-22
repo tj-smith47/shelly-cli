@@ -26,23 +26,25 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for tabs.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(theme.BrightBlack()).
+			BorderForeground(colors.TableBorder).
 			BorderBottom(true).
 			Padding(0, 1),
 		Active: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Cyan()).
-			Background(theme.BrightBlack()).
+			Foreground(colors.Highlight).
+			Background(colors.AltBackground).
 			Padding(0, 2),
 		Inactive: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Padding(0, 2),
 		Separator: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 	}
 }
 

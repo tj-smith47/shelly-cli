@@ -49,6 +49,34 @@ theme: dracula
 #     cyan: "#8be9fd"
 #     purple: "#bd93f9"
 #     bright_black: "#6272a4"
+#
+# Semantic color overrides - customize meaning-based colors:
+# theme:
+#   name: dracula
+#   semantic:
+#     # UI colors
+#     primary: "#ff79c6"       # Pink instead of purple for main actions
+#     secondary: "#6272a4"     # Supporting elements
+#     highlight: "#ffb86c"     # Orange for emphasis
+#     muted: "#6272a4"         # Less important content
+#
+#     # Feedback colors
+#     success: "#50fa7b"       # Green for success
+#     warning: "#f1fa8c"       # Yellow for warnings
+#     error: "#ff5555"         # Red for errors
+#     info: "#8be9fd"          # Cyan for info
+#
+#     # Device state colors
+#     online: "#50fa7b"        # Green when online
+#     offline: "#ff5555"       # Red when offline
+#     updating: "#f1fa8c"      # Yellow while updating
+#     idle: "#6272a4"          # Gray when idle
+#
+#     # Table styling colors
+#     table_header: "#8be9fd"  # Cyan headers
+#     table_cell: "#f1fa8c"    # Yellow cells
+#     table_alt_cell: "#ffb86c" # Orange alternating cells
+#     table_border: "#bd93f9"  # Purple borders
 
 # API mode: local (direct device access), cloud (via Shelly Cloud), auto
 api_mode: local

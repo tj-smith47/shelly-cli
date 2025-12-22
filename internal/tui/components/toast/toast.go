@@ -61,7 +61,9 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for toasts.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	baseStyle := lipgloss.NewStyle().
 		Padding(0, 2).
 		MarginBottom(1).
@@ -72,17 +74,17 @@ func DefaultStyles() Styles {
 			Align(lipgloss.Right).
 			Padding(1),
 		Info: baseStyle.
-			Foreground(theme.Fg()).
-			Background(theme.Blue()),
+			Foreground(colors.Text).
+			Background(colors.Info),
 		Success: baseStyle.
-			Foreground(theme.Bg()).
-			Background(theme.Green()),
+			Foreground(colors.Background).
+			Background(colors.Success),
 		Warning: baseStyle.
-			Foreground(theme.Bg()).
-			Background(theme.Yellow()),
+			Foreground(colors.Background).
+			Background(colors.Warning),
 		Error: baseStyle.
-			Foreground(theme.Fg()).
-			Background(theme.Red()),
+			Foreground(colors.Text).
+			Background(colors.Error),
 	}
 }
 

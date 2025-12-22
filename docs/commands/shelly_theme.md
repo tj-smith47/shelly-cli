@@ -69,5 +69,6 @@ Popular themes include:
 * [shelly theme next](shelly_theme_next.md)	 - Cycle to next theme
 * [shelly theme prev](shelly_theme_prev.md)	 - Cycle to previous theme
 * [shelly theme preview](shelly_theme_preview.md)	 - Preview a theme
+* [shelly theme semantic](shelly_theme_semantic.md)	 - Show semantic color mappings
 * [shelly theme set](shelly_theme_set.md)	 - Set the current theme
 

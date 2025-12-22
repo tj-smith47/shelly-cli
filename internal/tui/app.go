@@ -121,7 +121,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Apply TUI-specific theme if configured (completely replaces main theme).
 	if cfg != nil {
 		if tc := cfg.GetTUIThemeConfig(); tc != nil {
-			if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.File); err != nil {
+			if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic, tc.File); err != nil {
 				f.IOStreams().DebugErr("tui theme", err)
 			}
 		}

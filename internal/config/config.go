@@ -11,14 +11,16 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // ThemeConfig supports both string and block theme configuration formats.
 // It allows users to specify just a theme name, or customize with color overrides.
 type ThemeConfig struct {
-	Name   string            `mapstructure:"name" json:"name,omitempty" yaml:"name,omitempty"`
-	Colors map[string]string `mapstructure:"colors" json:"colors,omitempty" yaml:"colors,omitempty"`
-	File   string            `mapstructure:"file" json:"file,omitempty" yaml:"file,omitempty"`
+	Name     string                   `mapstructure:"name" json:"name,omitempty" yaml:"name,omitempty"`
+	Colors   map[string]string        `mapstructure:"colors" json:"colors,omitempty" yaml:"colors,omitempty"`
+	Semantic *theme.SemanticOverrides `mapstructure:"semantic" json:"semantic,omitempty" yaml:"semantic,omitempty"`
+	File     string                   `mapstructure:"file" json:"file,omitempty" yaml:"file,omitempty"`
 }
 
 // Config holds all CLI configuration.

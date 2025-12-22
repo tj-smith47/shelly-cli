@@ -280,6 +280,73 @@ export NO_COLOR=1
 shelly device list
 ```
 
+## Semantic Colors
+
+The theme system includes semantic color roles that provide consistent meaning across the entire CLI. These colors are automatically mapped from the selected theme but can be overridden in your config.
+
+### Available Semantic Colors
+
+| Role | Purpose | Default Mapping |
+|------|---------|-----------------|
+| `primary` | Main actions, highlights | Purple |
+| `secondary` | Supporting UI elements | Blue |
+| `highlight` | Emphasis, selection | Cyan |
+| `muted` | Disabled, less important | Gray (bright_black) |
+| `text` | Primary text | Foreground |
+| `alt_text` | Secondary text | Gray (bright_black) |
+| `success` | Successful operations | Green |
+| `warning` | Warnings, cautions | Yellow |
+| `error` | Errors, failures | Red |
+| `info` | Informational messages | Cyan |
+| `background` | Main background | Background |
+| `alt_background` | Alternate background | Gray (bright_black) |
+| `online` | Device online status | Green |
+| `offline` | Device offline status | Red |
+| `updating` | Device updating | Yellow |
+| `idle` | Device idle/inactive | Gray |
+| `table_header` | Table headers | Cyan |
+| `table_cell` | Table cells | Yellow |
+| `table_alt_cell` | Alternating table cells | Orange |
+| `table_border` | Table borders | Purple |
+
+### Viewing Current Semantic Colors
+
+Use the `theme semantic` command to see how colors are mapped:
+
+```bash
+shelly theme semantic
+```
+
+This displays a color swatch for each semantic role.
+
+### Overriding Semantic Colors
+
+Add a `semantic` section to your config to customize specific colors:
+
+```yaml
+# ~/.config/shelly/config.yaml
+theme:
+  name: dracula
+  semantic:
+    primary: "#ff79c6"      # Use pink instead of purple
+    success: "#8be9fd"      # Use cyan instead of green
+    table_header: "#ffb86c" # Orange table headers
+```
+
+Only the colors you specify are overridden; the rest use the theme defaults.
+
+### Theme-Specific Mappings
+
+Popular themes have curated semantic mappings that match their aesthetic:
+
+- **Dracula**: Purple primary, pink accents, classic Dracula palette
+- **Nord**: Frost cyan primary, aurora colors for feedback
+- **Tokyo Night**: Blue primary, soft pastels throughout
+- **Gruvbox**: Gold primary, warm earthy tones
+- **Catppuccin**: Mauve primary, soothing pastel colors
+
+Other themes use a generic mapping that reads colors directly from the theme palette.
+
 ## Theme API (For Developers)
 
 The theme package provides these functions:
@@ -287,21 +354,45 @@ The theme package provides these functions:
 ```go
 import "github.com/tj-smith47/shelly-cli/internal/theme"
 
-// Get colors
+// Get raw colors (color.Color)
 theme.Fg()      // Foreground color
 theme.Bg()      // Background color
-theme.Green()   // Success/ok color
-theme.Red()     // Error color
-theme.Yellow()  // Warning color
-theme.Blue()    // Info color
-theme.Cyan()    // Highlight color
-theme.Purple()  // Accent color
+theme.Green()   // Green color
+theme.Red()     // Red color
+theme.Yellow()  // Yellow color
+theme.Blue()    // Blue color
+theme.Cyan()    // Cyan color
+theme.Purple()  // Purple color
 
-// Get styles (lipgloss.Style)
-theme.StatusOK()      // For success status
-theme.StatusWarn()    // For warnings
-theme.StatusError()   // For errors
-theme.StatusInfo()    // For information
+// Get semantic colors (preferred for consistent theming)
+colors := theme.GetSemanticColors()
+colors.Primary      // Main action color
+colors.Success      // Success/ok operations
+colors.Error        // Error/failure operations
+colors.Warning      // Warning messages
+colors.Online       // Device online state
+colors.Offline      // Device offline state
+colors.TableHeader  // Table header color
+colors.TableCell    // Table cell color
+
+// Semantic styles (lipgloss.Style) - use these for consistency
+theme.SemanticPrimary()    // Primary actions
+theme.SemanticSuccess()    // Success feedback
+theme.SemanticError()      // Error feedback
+theme.SemanticWarning()    // Warning feedback
+theme.SemanticInfo()       // Informational
+theme.SemanticOnline()     // Device online
+theme.SemanticOffline()    // Device offline
+
+// Legacy status styles (now use semantic colors internally)
+theme.StatusOK()      // For success status (uses Success semantic)
+theme.StatusWarn()    // For warnings (uses Warning semantic)
+theme.StatusError()   // For errors (uses Error semantic)
+theme.StatusInfo()    // For information (uses Info semantic)
+theme.StatusOnline()  // For device online (uses Online semantic)
+theme.StatusOffline() // For device offline (uses Offline semantic)
+
+// Other styles
 theme.Bold()          // Bold text
 theme.Dim()           // Dimmed text
 theme.Title()         // For titles

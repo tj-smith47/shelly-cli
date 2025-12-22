@@ -37,19 +37,21 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for the search component.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
 			Padding(0, 1).
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.BrightBlack()),
+			BorderForeground(colors.TableBorder),
 		Label: lipgloss.NewStyle().
-			Foreground(theme.Cyan()).
+			Foreground(colors.Highlight).
 			Bold(true),
 		Input: lipgloss.NewStyle().
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		InputFocus: lipgloss.NewStyle().
-			Foreground(theme.Yellow()).
+			Foreground(colors.Warning).
 			Bold(true),
 	}
 }
@@ -61,14 +63,15 @@ func New() Model {
 	ti.CharLimit = 50
 	ti.SetWidth(30)
 
-	// Configure styles
+	// Configure styles using semantic colors
+	colors := theme.GetSemanticColors()
 	styles := textinput.DefaultStyles(true) // dark mode
-	styles.Focused.Prompt = styles.Focused.Prompt.Foreground(theme.Cyan())
-	styles.Focused.Text = styles.Focused.Text.Foreground(theme.Fg())
-	styles.Focused.Placeholder = styles.Focused.Placeholder.Foreground(theme.BrightBlack())
-	styles.Blurred.Prompt = styles.Blurred.Prompt.Foreground(theme.Cyan())
-	styles.Blurred.Text = styles.Blurred.Text.Foreground(theme.Fg())
-	styles.Blurred.Placeholder = styles.Blurred.Placeholder.Foreground(theme.BrightBlack())
+	styles.Focused.Prompt = styles.Focused.Prompt.Foreground(colors.Highlight)
+	styles.Focused.Text = styles.Focused.Text.Foreground(colors.Text)
+	styles.Focused.Placeholder = styles.Focused.Placeholder.Foreground(colors.Muted)
+	styles.Blurred.Prompt = styles.Blurred.Prompt.Foreground(colors.Highlight)
+	styles.Blurred.Text = styles.Blurred.Text.Foreground(colors.Text)
+	styles.Blurred.Placeholder = styles.Blurred.Placeholder.Foreground(colors.Muted)
 	ti.SetStyles(styles)
 
 	return Model{

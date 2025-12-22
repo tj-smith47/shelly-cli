@@ -100,57 +100,59 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for energy.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.BrightBlack()).
+			BorderForeground(colors.TableBorder).
 			Padding(1, 2),
 		Header: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Cyan()).
+			Foreground(colors.Highlight).
 			MarginBottom(1),
 		Card: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.BrightBlack()).
+			BorderForeground(colors.TableBorder).
 			Padding(0, 1).
 			MarginRight(1).
 			MarginBottom(1),
 		CardTitle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		Value: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Yellow()),
+			Foreground(colors.Warning),
 		Unit: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 		Label: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 		Positive: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Success),
 		Negative: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Error),
 		TotalHeader: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Purple()),
+			Foreground(colors.Primary),
 		TotalValue: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Cyan()),
+			Foreground(colors.Highlight),
 		DeviceName: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Fg()).
+			Foreground(colors.Text).
 			Width(18),
 		DeviceAddress: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Italic(true),
 		OnlineIcon: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Online),
 		OfflineIcon: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Offline),
 		Separator: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 		Footer: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Italic(true),
 	}
 }

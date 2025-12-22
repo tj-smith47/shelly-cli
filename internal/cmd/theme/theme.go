@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/next"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/prev"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/preview"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/semantic"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
@@ -61,6 +62,7 @@ Popular themes include:
 	cmd.AddCommand(prev.NewCommand(f))
 	cmd.AddCommand(exportcmd.NewCommand(f))
 	cmd.AddCommand(importcmd.NewCommand(f))
+	cmd.AddCommand(semantic.NewCommand(f))
 
 	return cmd
 }

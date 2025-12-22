@@ -74,8 +74,14 @@ func Current() *tint.Tint {
 }
 
 // SetTheme sets the current theme by name.
+// Also updates the semantic color mapping for the theme.
 func SetTheme(name string) bool {
-	return tint.SetTintID(name)
+	if !tint.SetTintID(name) {
+		return false
+	}
+	// Apply semantic color mapping for this theme
+	setSemanticColors(GetThemeMapping(name))
+	return true
 }
 
 // SetThemeFromConfig sets the theme from viper configuration.
@@ -111,13 +117,17 @@ func PrevTheme() {
 // Custom Theme Configuration
 // =============================================================================
 
-// ApplyConfig applies a theme configuration with optional color overrides.
+// ApplyConfig applies a theme configuration with optional color and semantic overrides.
 // It supports setting a base theme by name, loading from file, or applying color overrides.
-func ApplyConfig(name string, colors map[string]string, filePath string) error {
+func ApplyConfig(name string, colors map[string]string, semantics *SemanticOverrides, filePath string) error {
 	// Load external file if specified
 	if filePath != "" {
 		if err := applyFromFile(filePath); err != nil {
 			return err
+		}
+		// Apply semantic overrides on top of file config
+		if semantics != nil {
+			ApplySemanticOverrides(semantics)
 		}
 		return nil
 	}
@@ -133,6 +143,11 @@ func ApplyConfig(name string, colors map[string]string, filePath string) error {
 	if len(colors) > 0 {
 		cc := parseColorsMap(colors)
 		SetCustomColors(cc)
+	}
+
+	// Apply semantic overrides if specified
+	if semantics != nil {
+		ApplySemanticOverrides(semantics)
 	}
 
 	return nil
@@ -450,73 +465,81 @@ func BrightBlack() color.Color {
 // =============================================================================
 
 // StatusOK returns a style for success/ok status.
+// Uses the semantic Success color for consistent theming.
 func StatusOK() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Green())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Success)
 }
 
 // StatusWarn returns a style for warning status.
+// Uses the semantic Warning color for consistent theming.
 func StatusWarn() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Yellow())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Warning)
 }
 
 // StatusError returns a style for error status.
+// Uses the semantic Error color for consistent theming.
 func StatusError() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Red())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Error)
 }
 
 // StatusInfo returns a style for info status.
+// Uses the semantic Info color for consistent theming.
 func StatusInfo() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Blue())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Info)
 }
 
 // StatusOnline returns a style for online status.
+// Uses the semantic Online color for consistent theming.
 func StatusOnline() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Green())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Online)
 }
 
 // StatusOffline returns a style for offline status.
+// Uses the semantic Offline color for consistent theming.
 func StatusOffline() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Red())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Offline)
 }
 
 // StatusUpdating returns a style for updating status.
+// Uses the semantic Updating color for consistent theming.
 func StatusUpdating() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Yellow())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Updating)
 }
 
-// Bold returns a bold style with the theme foreground.
+// Bold returns a bold style with the semantic text color.
 func Bold() lipgloss.Style {
-	return lipgloss.NewStyle().Bold(true).Foreground(Fg())
+	return lipgloss.NewStyle().Bold(true).Foreground(GetSemanticColors().Text)
 }
 
-// Dim returns a dimmed style.
+// Dim returns a dimmed style using the semantic muted color.
 func Dim() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(BrightBlack())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Muted)
 }
 
-// Highlight returns a highlighted style.
+// Highlight returns a highlighted style using the semantic highlight color.
 func Highlight() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Cyan())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Highlight)
 }
 
-// Title returns a style for titles.
+// Title returns a style for titles using the semantic highlight color (cyan).
+// The Shelly logo is blue, so we use cyan to complement it.
 func Title() lipgloss.Style {
-	return lipgloss.NewStyle().Bold(true).Foreground(Purple())
+	return lipgloss.NewStyle().Bold(true).Foreground(GetSemanticColors().Highlight)
 }
 
-// Subtitle returns a style for subtitles.
+// Subtitle returns a style for subtitles using the semantic alt text color.
 func Subtitle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(BrightBlack())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().AltText)
 }
 
-// Link returns a style for links/URLs.
+// Link returns a style for links/URLs using the semantic secondary color.
 func Link() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Blue()).Underline(true)
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Secondary).Underline(true)
 }
 
-// Code returns a style for code/commands.
+// Code returns a style for code/commands using the semantic success color.
 func Code() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(Green())
+	return lipgloss.NewStyle().Foreground(GetSemanticColors().Success)
 }
 
 // =============================================================================

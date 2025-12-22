@@ -97,45 +97,47 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for the monitor.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.BrightBlack()).
+			BorderForeground(colors.TableBorder).
 			Padding(1, 2),
 		Header: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Cyan()).
+			Foreground(colors.Highlight).
 			MarginBottom(1),
 		Row: lipgloss.NewStyle().
 			MarginBottom(1),
 		OnlineIcon: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Online),
 		OfflineIcon: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Offline),
 		DeviceName: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		Address: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Italic(true),
 		Power: lipgloss.NewStyle().
-			Foreground(theme.Yellow()).
+			Foreground(colors.Warning).
 			Bold(true),
 		Voltage: lipgloss.NewStyle().
-			Foreground(theme.Cyan()),
+			Foreground(colors.Highlight),
 		Current: lipgloss.NewStyle().
-			Foreground(theme.Purple()),
+			Foreground(colors.Primary),
 		Label: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Width(8),
 		Value: lipgloss.NewStyle().
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		LastUpdated: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Italic(true),
 		Separator: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 	}
 }
 

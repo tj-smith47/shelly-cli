@@ -47,7 +47,9 @@ type Styles struct {
 }
 
 // DefaultStyles returns theme-aware styles for the TUI.
+// Uses semantic colors for consistent theming across the application.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		// Layout
 		App:    lipgloss.NewStyle(),
@@ -57,69 +59,69 @@ func DefaultStyles() Styles {
 		// Status bar
 		StatusBar: lipgloss.NewStyle().
 			Padding(0, 1).
-			Background(theme.BrightBlack()),
+			Background(colors.AltBackground),
 		StatusNormal: lipgloss.NewStyle().
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		StatusSuccess: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Success),
 		StatusError: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Error),
 		StatusWarn: lipgloss.NewStyle().
-			Foreground(theme.Yellow()),
+			Foreground(colors.Warning),
 
 		// Table
 		TableHeader: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Cyan()).
+			Foreground(colors.TableHeader).
 			Padding(0, 1),
 		TableRow: lipgloss.NewStyle().
-			Foreground(theme.Fg()).
+			Foreground(colors.TableCell).
 			Padding(0, 1),
 		TableRowAlt: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.TableAltCell).
 			Padding(0, 1),
 		TableRowFocused: lipgloss.NewStyle().
-			Foreground(theme.Fg()).
-			Background(theme.BrightBlack()).
+			Foreground(colors.Text).
+			Background(colors.AltBackground).
 			Padding(0, 1),
 
 		// Tabs
 		TabActive: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Cyan()).
+			Foreground(colors.Highlight).
 			Border(lipgloss.NormalBorder(), false, false, true, false).
-			BorderForeground(theme.Cyan()).
+			BorderForeground(colors.Highlight).
 			Padding(0, 2),
 		TabInactive: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Padding(0, 2),
 
 		// Help
 		HelpKey: lipgloss.NewStyle().
-			Foreground(theme.Cyan()),
+			Foreground(colors.Secondary),
 		HelpDesc: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 
 		// Device states
 		DeviceOnline: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Online),
 		DeviceOffline: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Offline),
 		SwitchOn: lipgloss.NewStyle().
-			Foreground(theme.Green()).
+			Foreground(colors.Online).
 			Bold(true),
 		SwitchOff: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 
 		// Misc
 		Title: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(theme.Magenta()),
+			Foreground(colors.Primary),
 		Border: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.BrightBlack()),
+			BorderForeground(colors.TableBorder),
 		Spinner: lipgloss.NewStyle().
-			Foreground(theme.Cyan()),
+			Foreground(colors.Info),
 	}
 }
 

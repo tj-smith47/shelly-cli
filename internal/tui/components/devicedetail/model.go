@@ -62,34 +62,36 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for the device detail component.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.Cyan()).
+			BorderForeground(colors.Highlight).
 			Padding(1, 2),
 		Title: lipgloss.NewStyle().
-			Foreground(theme.Cyan()).
+			Foreground(colors.Highlight).
 			Bold(true).
 			Underline(true).
 			MarginBottom(1),
 		Section: lipgloss.NewStyle().
-			Foreground(theme.Yellow()).
+			Foreground(colors.Warning).
 			Bold(true).
 			MarginTop(1),
 		Label: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()).
+			Foreground(colors.Muted).
 			Width(15),
 		Value: lipgloss.NewStyle().
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		Online: lipgloss.NewStyle().
-			Foreground(theme.Green()).
+			Foreground(colors.Online).
 			Bold(true),
 		Offline: lipgloss.NewStyle().
-			Foreground(theme.Red()).
+			Foreground(colors.Offline).
 			Bold(true),
 		Error: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Error),
 	}
 }
 

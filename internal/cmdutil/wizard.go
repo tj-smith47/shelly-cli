@@ -356,7 +356,7 @@ func stepConfiguration(ios *iostreams.IOStreams, opts *InitOptions) error {
 
 	cfg := config.Get()
 	cfg.Output = outputFormat
-	cfg.Theme = themeName
+	cfg.Theme = config.ThemeConfig{Name: themeName}
 	cfg.Color = colorEnabled
 	cfg.APIMode = apiMode
 
@@ -370,7 +370,7 @@ func stepConfiguration(ios *iostreams.IOStreams, opts *InitOptions) error {
 	}
 
 	viper.Set("output", outputFormat)
-	viper.Set("theme", themeName)
+	viper.Set("theme", map[string]any{"name": themeName})
 	viper.Set("color", colorEnabled)
 	viper.Set("api_mode", apiMode)
 	if len(cfg.Aliases) > 0 {

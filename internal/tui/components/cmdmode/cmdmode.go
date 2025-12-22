@@ -56,19 +56,21 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for the command mode.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
 			Padding(0, 1).
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.Purple()),
+			BorderForeground(colors.Primary),
 		Prompt: lipgloss.NewStyle().
-			Foreground(theme.Purple()).
+			Foreground(colors.Primary).
 			Bold(true),
 		Input: lipgloss.NewStyle().
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		Error: lipgloss.NewStyle().
-			Foreground(theme.Red()).
+			Foreground(colors.Error).
 			Bold(true),
 	}
 }
@@ -80,14 +82,15 @@ func New() Model {
 	ti.CharLimit = 100
 	ti.SetWidth(40)
 
-	// Configure styles
+	// Configure styles using semantic colors
+	colors := theme.GetSemanticColors()
 	styles := textinput.DefaultStyles(true) // dark mode
-	styles.Focused.Prompt = styles.Focused.Prompt.Foreground(theme.Purple())
-	styles.Focused.Text = styles.Focused.Text.Foreground(theme.Fg())
-	styles.Focused.Placeholder = styles.Focused.Placeholder.Foreground(theme.BrightBlack())
-	styles.Blurred.Prompt = styles.Blurred.Prompt.Foreground(theme.Purple())
-	styles.Blurred.Text = styles.Blurred.Text.Foreground(theme.Fg())
-	styles.Blurred.Placeholder = styles.Blurred.Placeholder.Foreground(theme.BrightBlack())
+	styles.Focused.Prompt = styles.Focused.Prompt.Foreground(colors.Primary)
+	styles.Focused.Text = styles.Focused.Text.Foreground(colors.Text)
+	styles.Focused.Placeholder = styles.Focused.Placeholder.Foreground(colors.Muted)
+	styles.Blurred.Prompt = styles.Blurred.Prompt.Foreground(colors.Primary)
+	styles.Blurred.Text = styles.Blurred.Text.Foreground(colors.Text)
+	styles.Blurred.Placeholder = styles.Blurred.Placeholder.Foreground(colors.Muted)
 	ti.SetStyles(styles)
 
 	return Model{

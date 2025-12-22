@@ -87,19 +87,21 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for the device list.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Table: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(theme.BrightBlack()),
+			BorderForeground(colors.TableBorder),
 		Online: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Online),
 		Offline: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Offline),
 		StatusOK: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Success),
 		StatusError: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Error),
 	}
 }
 
@@ -124,16 +126,17 @@ func New(deps Deps) Model {
 		table.WithHeight(10),
 	)
 
+	colors := theme.GetSemanticColors()
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(theme.BrightBlack()).
+		BorderForeground(colors.TableBorder).
 		BorderBottom(true).
 		Bold(true).
-		Foreground(theme.Cyan())
+		Foreground(colors.TableHeader)
 	s.Selected = s.Selected.
-		Foreground(theme.Fg()).
-		Background(theme.BrightBlack()).
+		Foreground(colors.Text).
+		Background(colors.AltBackground).
 		Bold(true)
 	t.SetStyles(s)
 

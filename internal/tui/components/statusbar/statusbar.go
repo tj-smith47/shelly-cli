@@ -52,27 +52,29 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for the status bar.
+// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
 	return Styles{
 		Bar: lipgloss.NewStyle().
-			Background(theme.BrightBlack()).
+			Background(colors.AltBackground).
 			Padding(0, 1),
 		Left: lipgloss.NewStyle().
 			Align(lipgloss.Left),
 		Right: lipgloss.NewStyle().
 			Align(lipgloss.Right),
 		Normal: lipgloss.NewStyle().
-			Foreground(theme.Fg()),
+			Foreground(colors.Text),
 		Success: lipgloss.NewStyle().
-			Foreground(theme.Green()),
+			Foreground(colors.Success),
 		Error: lipgloss.NewStyle().
-			Foreground(theme.Red()),
+			Foreground(colors.Error),
 		Warning: lipgloss.NewStyle().
-			Foreground(theme.Yellow()),
+			Foreground(colors.Warning),
 		Version: lipgloss.NewStyle().
-			Foreground(theme.BrightBlack()),
+			Foreground(colors.Muted),
 		Time: lipgloss.NewStyle().
-			Foreground(theme.Cyan()),
+			Foreground(colors.Info),
 	}
 }
 
