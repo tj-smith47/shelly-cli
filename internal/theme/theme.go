@@ -73,6 +73,15 @@ func Current() *tint.Tint {
 	return tint.DefaultRegistry.Current()
 }
 
+// CurrentThemeName returns the name of the current theme.
+func CurrentThemeName() string {
+	t := Current()
+	if t == nil {
+		return DefaultTheme
+	}
+	return t.ID
+}
+
 // SetTheme sets the current theme by name.
 // Also updates the semantic color mapping for the theme.
 func SetTheme(name string) bool {

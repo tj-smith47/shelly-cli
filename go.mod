@@ -7,8 +7,11 @@ require (
 	charm.land/bubbletea/v2 v2.0.0-rc.2
 	charm.land/lipgloss/v2 v2.0.0-beta.3.0.20251106192539-4b304240aab7
 	github.com/AlecAivazis/survey/v2 v2.3.7
+	github.com/alecthomas/chroma/v2 v2.21.1
 	github.com/briandowns/spinner v1.23.2
 	github.com/charmbracelet/colorprofile v0.3.3
+	github.com/charmbracelet/x/ansi v0.11.3
+	github.com/chzyer/readline v1.5.1
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/lrstanley/bubbletint/v2 v2.0.0-alpha.10
@@ -22,15 +25,12 @@ require (
 )
 
 require (
-	github.com/alecthomas/chroma/v2 v2.21.1 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20251116181749-377898bcce38 // indirect
-	github.com/charmbracelet/x/ansi v0.11.1 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
-	github.com/chzyer/readline v1.5.1 // indirect
-	github.com/clipperhouse/displaywidth v0.5.0 // indirect
+	github.com/clipperhouse/displaywidth v0.6.1 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect

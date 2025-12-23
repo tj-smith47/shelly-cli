@@ -16,6 +16,7 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -568,21 +569,25 @@ func FormatParamsTable(params map[string]any) string {
 
 // Truncate truncates a string to maxLen characters, adding "..." if truncated.
 func Truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	// Use ansi.StringWidth for proper visual width calculation
+	width := ansi.StringWidth(s)
+	if width <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
-		return s[:maxLen]
+		return ansi.Truncate(s, maxLen, "")
 	}
-	return s[:maxLen-3] + "..."
+	return ansi.Truncate(s, maxLen, "...")
 }
 
-// PadRight pads a string with spaces to reach the specified length.
-func PadRight(s string, length int) string {
-	if len(s) >= length {
+// PadRight pads a string with spaces to reach the specified visual width.
+// Uses ansi.StringWidth for proper calculation with ANSI escape codes.
+func PadRight(s string, width int) string {
+	sWidth := ansi.StringWidth(s)
+	if sWidth >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", length-len(s))
+	return s + strings.Repeat(" ", width-sWidth)
 }
 
 // RenderProgressBar renders a text-based progress bar.

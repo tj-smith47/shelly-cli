@@ -82,6 +82,8 @@ type Model struct {
 	height       int
 	styles       Styles
 	scrollOffset int
+	cursor       int
+	paused       bool
 }
 
 // Styles for the events component.
@@ -89,6 +91,7 @@ type Styles struct {
 	Container    lipgloss.Style
 	Header       lipgloss.Style
 	Event        lipgloss.Style
+	SelectedRow  lipgloss.Style
 	Time         lipgloss.Style
 	Device       lipgloss.Style
 	Component    lipgloss.Style
@@ -117,6 +120,9 @@ func DefaultStyles() Styles {
 			MarginBottom(1),
 		Event: lipgloss.NewStyle().
 			MarginBottom(0),
+		SelectedRow: lipgloss.NewStyle().
+			Background(colors.AltBackground).
+			Bold(true),
 		Time: lipgloss.NewStyle().
 			Foreground(colors.Muted).
 			Width(10),
@@ -265,8 +271,10 @@ func (m Model) subscribeToDevice(device model.Device) {
 	}
 }
 
-// addEvent adds an event to the model in a thread-safe manner.
 func (m Model) addEvent(e Event) {
+	if m.paused {
+		return
+	}
 	m.state.mu.Lock()
 	defer m.state.mu.Unlock()
 	m.state.events = append([]Event{e}, m.state.events...)
@@ -311,45 +319,135 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case SubscriptionStatusMsg:
-		m.state.mu.Lock()
-		m.state.connStatus[msg.Device] = msg.Connected
-		m.state.mu.Unlock()
-		if msg.Error != nil {
-			m.addEvent(Event{
-				Timestamp:   time.Now(),
-				Device:      msg.Device,
-				Type:        "error",
-				Description: msg.Error.Error(),
-			})
-		}
-		return m, nil
+		return m.handleSubscriptionStatus(msg), nil
 
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "j", "down":
-			if m.scrollOffset < m.eventCount()-1 {
-				m.scrollOffset++
-			}
-		case "k", "up":
-			if m.scrollOffset > 0 {
-				m.scrollOffset--
-			}
-		case "g":
-			m.scrollOffset = 0
-		case "G":
-			if m.eventCount() > 0 {
-				maxOffset := m.eventCount() - m.visibleRows()
-				if maxOffset > 0 {
-					m.scrollOffset = maxOffset
-				}
-			}
-		case "c":
-			m.Clear()
-			m.scrollOffset = 0
-		}
+		return m.handleKeyPress(msg), nil
 	}
 
 	return m, nil
+}
+
+// handleSubscriptionStatus handles WebSocket subscription status updates.
+func (m Model) handleSubscriptionStatus(msg SubscriptionStatusMsg) Model {
+	m.state.mu.Lock()
+	m.state.connStatus[msg.Device] = msg.Connected
+	m.state.mu.Unlock()
+
+	if msg.Error != nil {
+		m.addEvent(Event{
+			Timestamp:   time.Now(),
+			Device:      msg.Device,
+			Type:        "error",
+			Description: msg.Error.Error(),
+		})
+	}
+	return m
+}
+
+// handleKeyPress handles keyboard input for scrolling and clearing.
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
+	switch msg.String() {
+	case "j", "down":
+		m = m.cursorDown()
+	case "k", "up":
+		m = m.cursorUp()
+	case "pgdown", "ctrl+d":
+		m = m.pageDown()
+	case "pgup", "ctrl+u":
+		m = m.pageUp()
+	case "g":
+		m.cursor = 0
+		m.scrollOffset = 0
+	case "G":
+		m = m.cursorToBottom()
+	case "c":
+		m.Clear()
+		m.cursor = 0
+		m.scrollOffset = 0
+	case "p":
+		m = m.togglePause()
+	}
+	return m
+}
+
+func (m Model) cursorDown() Model {
+	count := m.eventCount()
+	if count == 0 {
+		return m
+	}
+	if m.cursor < count-1 {
+		m.cursor++
+	}
+	visibleRows := m.visibleRows()
+	if m.cursor >= m.scrollOffset+visibleRows {
+		m.scrollOffset = m.cursor - visibleRows + 1
+	}
+	return m
+}
+
+func (m Model) cursorUp() Model {
+	if m.cursor > 0 {
+		m.cursor--
+	}
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	return m
+}
+
+func (m Model) cursorToBottom() Model {
+	count := m.eventCount()
+	if count > 0 {
+		m.cursor = count - 1
+		visibleRows := m.visibleRows()
+		maxOffset := count - visibleRows
+		if maxOffset < 0 {
+			maxOffset = 0
+		}
+		m.scrollOffset = maxOffset
+	}
+	return m
+}
+
+func (m Model) pageDown() Model {
+	count := m.eventCount()
+	if count == 0 {
+		return m
+	}
+	visibleRows := m.visibleRows()
+	m.cursor += visibleRows
+	if m.cursor >= count {
+		m.cursor = count - 1
+	}
+	if m.cursor >= m.scrollOffset+visibleRows {
+		m.scrollOffset = m.cursor - visibleRows + 1
+	}
+	maxOffset := count - visibleRows
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.scrollOffset > maxOffset {
+		m.scrollOffset = maxOffset
+	}
+	return m
+}
+
+func (m Model) pageUp() Model {
+	visibleRows := m.visibleRows()
+	m.cursor -= visibleRows
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	return m
+}
+
+func (m Model) togglePause() Model {
+	m.paused = !m.paused
+	return m
 }
 
 // eventCount returns the number of events (thread-safe).
@@ -409,7 +507,12 @@ func (m Model) View() string {
 		statusStr += "  " + m.styles.Disconnected.Render(fmt.Sprintf("○ %d disconnected", disconnected))
 	}
 
-	header := m.styles.Header.Render("Event Stream") + "  " + statusStr
+	pauseStr := ""
+	if m.paused {
+		pauseStr = "  " + m.styles.Warning.Render("[PAUSED]")
+	}
+
+	header := m.styles.Header.Render("Event Stream") + "  " + statusStr + pauseStr
 
 	// Calculate visible events
 	visibleRows := m.visibleRows()
@@ -421,21 +524,38 @@ func (m Model) View() string {
 
 	eventsToShow := events[startIdx:endIdx]
 
-	var rows string
-	for _, e := range eventsToShow {
-		timeStr := m.styles.Time.Render(e.Timestamp.Format("15:04:05"))
-		deviceStr := m.styles.Device.Render(output.Truncate(e.Device, 14))
+	// Column widths for fixed-width layout
+	const (
+		colTime   = 10 // HH:MM:SS + space
+		colDevice = 16
+		colComp   = 12
+		colType   = 14
+	)
 
-		var compStr string
+	var rows string
+	for i, e := range eventsToShow {
+		actualIdx := startIdx + i
+		isSelected := actualIdx == m.cursor
+
+		// Build each column with fixed width and proper padding
+		timeVal := e.Timestamp.Format("15:04:05")
+		timeStr := m.styles.Time.Render(output.PadRight(timeVal, colTime))
+
+		deviceVal := output.Truncate(e.Device, colDevice-2)
+		deviceStr := m.styles.Device.Render(output.PadRight(deviceVal, colDevice))
+
+		var compVal string
 		if e.Component != "" {
 			if e.ComponentID > 0 {
-				compStr = m.styles.Component.Render(fmt.Sprintf("%s:%d", e.Component, e.ComponentID))
+				compVal = fmt.Sprintf("%s:%d", e.Component, e.ComponentID)
 			} else {
-				compStr = m.styles.Component.Render(e.Component)
+				compVal = e.Component
 			}
 		} else {
-			compStr = m.styles.Component.Render("-")
+			compVal = "-"
 		}
+		compVal = output.Truncate(compVal, colComp-2)
+		compStr := m.styles.Component.Render(output.PadRight(compVal, colComp))
 
 		var typeStyle lipgloss.Style
 		switch e.Type {
@@ -446,18 +566,18 @@ func (m Model) View() string {
 		default:
 			typeStyle = m.styles.Info
 		}
-		typeStr := m.styles.Type.Inherit(typeStyle).Render(e.Type)
+		typeVal := output.Truncate(e.Type, colType-2)
+		typeStr := m.styles.Type.Inherit(typeStyle).Render(output.PadRight(typeVal, colType))
 
 		descStr := m.styles.Description.Render(output.Truncate(e.Description, 40))
 
-		row := fmt.Sprintf("%s %s %s %s %s",
-			timeStr,
-			deviceStr,
-			compStr,
-			typeStr,
-			descStr,
-		)
-		rows += m.styles.Event.Render(row) + "\n"
+		row := timeStr + deviceStr + compStr + typeStr + descStr
+
+		if isSelected {
+			rows += m.styles.SelectedRow.Render(row) + "\n"
+		} else {
+			rows += m.styles.Event.Render(row) + "\n"
+		}
 	}
 
 	// Footer with scroll info
@@ -465,7 +585,7 @@ func (m Model) View() string {
 	if len(events) > visibleRows {
 		scrollInfo = fmt.Sprintf(" [%d-%d of %d]", startIdx+1, endIdx, len(events))
 	}
-	footer := m.styles.Footer.Render(fmt.Sprintf("j/k: scroll  g/G: top/bottom  c: clear%s", scrollInfo))
+	footer := m.styles.Footer.Render(fmt.Sprintf("j/k: scroll  PgUp/PgDn: page  g/G: top/bottom  p: pause  c: clear%s", scrollInfo))
 
 	content := lipgloss.JoinVertical(lipgloss.Left, header, rows, footer)
 	return m.styles.Container.Width(m.width - 4).Render(content)

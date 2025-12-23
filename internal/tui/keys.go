@@ -89,7 +89,7 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("enter", "select"),
 		),
 		Escape: key.NewBinding(
-			key.WithKeys("esc"),
+			key.WithKeys("esc", "ctrl+["),
 			key.WithHelp("esc", "back"),
 		),
 		Refresh: key.NewBinding(
@@ -137,11 +137,11 @@ func DefaultKeyMap() KeyMap {
 
 		// View switching
 		Tab: key.NewBinding(
-			key.WithKeys("tab"),
+			key.WithKeys("tab", "alt+]"),
 			key.WithHelp("tab", "next view"),
 		),
 		ShiftTab: key.NewBinding(
-			key.WithKeys("shift+tab"),
+			key.WithKeys("shift+tab", "alt+["),
 			key.WithHelp("shift+tab", "prev view"),
 		),
 		View1: key.NewBinding(

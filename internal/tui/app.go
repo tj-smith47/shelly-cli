@@ -2,26 +2,28 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"image/color"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/branding"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicedetail"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicelist"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/energy"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/events"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/help"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/search"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/tabs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 )
 
 // DeviceActionMsg reports the result of a device action.
@@ -31,35 +33,23 @@ type DeviceActionMsg struct {
 	Err    error
 }
 
-// ViewMode represents the current view in the TUI.
-type ViewMode int
-
+// UI constants.
 const (
-	// ViewDevices shows the device list.
-	ViewDevices ViewMode = iota
-	// ViewMonitor shows real-time monitoring.
-	ViewMonitor
-	// ViewEvents shows the event stream.
-	ViewEvents
-	// ViewEnergy shows energy dashboard.
-	ViewEnergy
+	selectedPrefix   = "▶ "
+	unselectedPrefix = "  "
 )
 
-// String returns the display name of the view.
-func (v ViewMode) String() string {
-	switch v {
-	case ViewDevices:
-		return "Devices"
-	case ViewMonitor:
-		return "Monitor"
-	case ViewEvents:
-		return "Events"
-	case ViewEnergy:
-		return "Energy"
-	default:
-		return "Unknown"
-	}
-}
+// PanelFocus tracks which panel is focused.
+type PanelFocus int
+
+const (
+	// PanelDeviceList is the device list column.
+	PanelDeviceList PanelFocus = iota
+	// PanelDetail is the device info column.
+	PanelDetail
+	// PanelEndpoints means endpoint is selected, JSON overlay visible.
+	PanelEndpoints
+)
 
 // Model is the main TUI application model.
 type Model struct {
@@ -70,27 +60,29 @@ type Model struct {
 	keys    KeyMap
 	styles  Styles
 
+	// Shared device cache
+	cache *cache.Cache
+
 	// State
-	currentView ViewMode
-	ready       bool
-	quitting    bool
+	ready           bool
+	quitting        bool
+	cursor          int        // Selected device index
+	componentCursor int        // Selected component within device (-1 = all)
+	filter          string     // Device name filter
+	focusedPanel    PanelFocus // Which panel is currently focused
+	endpointCursor  int        // Selected endpoint in JSON panel
 
 	// Dimensions
 	width  int
 	height int
 
 	// Components
-	deviceList   devicelist.Model
-	monitor      monitor.Model
-	events       events.Model
-	energy       energy.Model
-	statusBar    statusbar.Model
-	tabs         tabs.Model
-	search       search.Model
-	cmdMode      cmdmode.Model
-	help         help.Model
-	deviceDetail devicedetail.Model
-	toast        toast.Model
+	statusBar statusbar.Model
+	search    search.Model
+	cmdMode   cmdmode.Model
+	help      help.Model
+	toast     toast.Model
+	events    events.Model // Event stream component
 
 	// Settings
 	refreshInterval time.Duration
@@ -99,7 +91,6 @@ type Model struct {
 // Options configures the TUI.
 type Options struct {
 	RefreshInterval time.Duration
-	InitialView     ViewMode
 	Filter          string
 }
 
@@ -107,7 +98,6 @@ type Options struct {
 func DefaultOptions() Options {
 	return Options{
 		RefreshInterval: 5 * time.Second,
-		InitialView:     ViewDevices,
 	}
 }
 
@@ -118,7 +108,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		cfg = nil
 	}
 
-	// Apply TUI-specific theme if configured (completely replaces main theme).
+	// Apply TUI-specific theme if configured
 	if cfg != nil {
 		if tc := cfg.GetTUIThemeConfig(); tc != nil {
 			if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic, tc.File); err != nil {
@@ -127,146 +117,113 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		}
 	}
 
-	tabNames := []string{"Devices", "Monitor", "Events", "Energy"}
-	svc := f.ShellyService()
-	ios := f.IOStreams()
+	// Create shared cache
+	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams(), opts.RefreshInterval)
 
 	// Create search component with initial filter
 	searchModel := search.NewWithFilter(opts.Filter)
 
+	// Create events component for real-time event stream
+	eventsModel := events.New(events.Deps{
+		Ctx: ctx,
+		Svc: f.ShellyService(),
+		IOS: f.IOStreams(),
+	})
+
 	// Load keybindings from config or use defaults
-	keys := KeyMapFromConfig(cfg)
+	keymap := KeyMapFromConfig(cfg)
 
 	return Model{
 		ctx:             ctx,
 		factory:         f,
 		cfg:             cfg,
-		keys:            keys,
+		keys:            keymap,
 		styles:          DefaultStyles(),
-		currentView:     opts.InitialView,
+		cache:           deviceCache,
 		refreshInterval: opts.RefreshInterval,
-		deviceList: devicelist.New(devicelist.Deps{
-			Ctx:             ctx,
-			Svc:             svc,
-			IOS:             ios,
-			RefreshInterval: opts.RefreshInterval,
-		}),
-		monitor: monitor.New(monitor.Deps{
-			Ctx:             ctx,
-			Svc:             svc,
-			IOS:             ios,
-			RefreshInterval: opts.RefreshInterval,
-		}),
-		events: events.New(events.Deps{
-			Ctx: ctx,
-			Svc: svc,
-			IOS: ios,
-		}),
-		energy: energy.New(energy.Deps{
-			Ctx:             ctx,
-			Svc:             svc,
-			IOS:             ios,
-			RefreshInterval: opts.RefreshInterval,
-		}),
-		statusBar: statusbar.New(),
-		tabs:      tabs.New(tabNames, int(opts.InitialView)),
-		search:    searchModel,
-		cmdMode:   cmdmode.New(),
-		help:      help.New(),
-		deviceDetail: devicedetail.New(devicedetail.Deps{
-			Ctx: ctx,
-			Svc: svc,
-		}),
-		toast: toast.New(),
+		filter:          opts.Filter,
+		componentCursor: -1, // -1 means "all components"
+		focusedPanel:    PanelDeviceList,
+		statusBar:       statusbar.New(),
+		search:          searchModel,
+		cmdMode:         cmdmode.New(),
+		help:            help.New(),
+		toast:           toast.New(),
+		events:          eventsModel,
 	}
 }
 
 // Init initializes the TUI and returns the first command to run.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		m.deviceList.Init(),
-		m.monitor.Init(),
-		m.events.Init(),
-		m.energy.Init(),
+		m.cache.Init(),
 		m.statusBar.Init(),
 		m.toast.Init(),
+		m.events.Init(),
 	)
 }
 
 // Update handles messages and returns the updated model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		return m.handleWindowSize(msg)
-
-	case DeviceActionMsg:
-		return m.handleDeviceAction(msg)
-
-	case search.FilterChangedMsg:
-		m.deviceList = m.deviceList.SetFilter(msg.Filter)
-		return m, nil
-
-	case search.ClosedMsg:
-		// Search was closed, nothing special to do
-		return m, nil
-
-	case devicedetail.Msg:
-		var cmd tea.Cmd
-		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
-		return m, cmd
-
-	case devicedetail.ClosedMsg:
-		// Device detail was closed, nothing special to do
-		return m, nil
-
-	case cmdmode.CommandMsg:
-		return m.handleCommand(msg)
-
-	case cmdmode.ErrorMsg:
-		return m, toast.Error(msg.Message)
-
-	case cmdmode.ClosedMsg:
-		// Command mode was closed without executing
-		return m, nil
-
-	case tea.KeyPressMsg:
-		if newModel, cmd, handled := m.handleKeyPressMsg(msg); handled {
-			return newModel, cmd
-		}
+	// Handle specific message types first
+	if newModel, cmd, handled := m.handleSpecificMsg(msg); handled {
+		return newModel, cmd
 	}
 
-	// Forward to active component
-	var componentCmd tea.Cmd
-	m, componentCmd = m.updateActiveComponent(msg)
-	if componentCmd != nil {
-		cmds = append(cmds, componentCmd)
-	}
-
-	// Update status bar
-	var statusCmd tea.Cmd
-	m.statusBar, statusCmd = m.statusBar.Update(msg)
-	cmds = append(cmds, statusCmd)
-
-	// Update toast notifications
-	var toastCmd tea.Cmd
-	m.toast, toastCmd = m.toast.Update(msg)
-	cmds = append(cmds, toastCmd)
-
-	return m, tea.Batch(cmds...)
+	// Forward and update components
+	newModel, cmds := m.updateComponents(msg)
+	return newModel, tea.Batch(cmds...)
 }
 
-// handleKeyPressMsg handles keyboard input, routing to overlays or main handlers.
-func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	// If device detail is visible, forward all keys to it
-	if m.deviceDetail.Visible() {
-		var cmd tea.Cmd
-		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
+// handleSpecificMsg handles specific message types that return early.
+func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		return m.handleWindowSize(msg), nil, true
+	case DeviceActionMsg:
+		newModel, cmd := m.handleDeviceAction(msg)
+		return newModel, cmd, true
+	case cache.DeviceUpdateMsg, cache.AllDevicesLoadedMsg, cache.RefreshTickMsg:
+		cmd := m.cache.Update(msg)
 		return m, cmd, true
+	case events.EventMsg, events.SubscriptionStatusMsg:
+		var cmd tea.Cmd
+		m.events, cmd = m.events.Update(msg)
+		return m, cmd, true
+	case search.FilterChangedMsg:
+		m.filter = msg.Filter
+		m.cursor = 0
+		return m, nil, true
+	case search.ClosedMsg, cmdmode.ClosedMsg:
+		return m, nil, true
+	case cmdmode.CommandMsg:
+		newModel, cmd := m.handleCommand(msg)
+		return newModel, cmd, true
+	case cmdmode.ErrorMsg:
+		return m, statusbar.SetMessage(msg.Message, statusbar.MessageError), true
+	case tea.KeyPressMsg:
+		return m.handleKeyPressMsg(msg)
 	}
+	return m, nil, false
+}
 
-	// If help is visible, close on dismiss keys or forward for scrolling
+// updateComponents forwards messages to components and collects commands.
+func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
+	var cmds []tea.Cmd
+
+	// Update status bar, toast, and events
+	var statusCmd, toastCmd, eventsCmd tea.Cmd
+	m.statusBar, statusCmd = m.statusBar.Update(msg)
+	m.toast, toastCmd = m.toast.Update(msg)
+	m.events, eventsCmd = m.events.Update(msg)
+	cmds = append(cmds, statusCmd, toastCmd, eventsCmd)
+
+	return m, cmds
+}
+
+// handleKeyPressMsg handles keyboard input.
+func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	// If help is visible, close on dismiss keys
 	if m.help.Visible() {
 		if key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Escape) || key.Matches(msg, m.keys.Quit) {
 			m.help = m.help.Hide()
@@ -295,27 +252,236 @@ func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool)
 }
 
 // handleWindowSize handles window resize events.
-func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleWindowSize(msg tea.WindowSizeMsg) Model {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.ready = true
 
-	headerHeight := 3 // tabs + border
-	footerHeight := 2 // status bar + border
-	contentHeight := m.height - headerHeight - footerHeight
-
-	m.deviceList = m.deviceList.SetSize(m.width, contentHeight)
-	m.monitor = m.monitor.SetSize(m.width, contentHeight)
-	m.events = m.events.SetSize(m.width, contentHeight)
-	m.energy = m.energy.SetSize(m.width, contentHeight)
 	m.statusBar = m.statusBar.SetWidth(m.width)
 	m.search = m.search.SetWidth(m.width)
 	m.cmdMode = m.cmdMode.SetWidth(m.width)
 	m.toast = m.toast.SetSize(m.width, m.height)
-	return m, nil
+	m.help = m.help.SetSize(m.width, m.height)
+
+	// Calculate panel sizes for events
+	panelHeight := (m.height - branding.BannerHeight() - 3) / 2
+	panelWidth := m.width / 2
+	m.events = m.events.SetSize(panelWidth, panelHeight)
+
+	return m
 }
 
-// handleDeviceActionKey handles device action key presses (t/o/O/R).
+// handleDeviceAction handles device action results.
+func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
+	var statusCmd tea.Cmd
+	if msg.Err != nil {
+		statusCmd = statusbar.SetMessage(
+			msg.Device+": "+msg.Action+" failed - "+msg.Err.Error(),
+			statusbar.MessageError,
+		)
+	} else {
+		statusCmd = statusbar.SetMessage(
+			msg.Device+": "+msg.Action+" success",
+			statusbar.MessageSuccess,
+		)
+	}
+	return m, statusCmd
+}
+
+// handleCommand handles command mode commands.
+func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
+	switch msg.Command {
+	case cmdmode.CmdQuit:
+		m.quitting = true
+		return m, tea.Quit
+
+	case cmdmode.CmdDevice, cmdmode.CmdFilter:
+		m.filter = msg.Args
+		m.cursor = 0
+		if msg.Args == "" {
+			return m, statusbar.SetMessage("Filter cleared", statusbar.MessageSuccess)
+		}
+		return m, statusbar.SetMessage("Filter: "+msg.Args, statusbar.MessageSuccess)
+
+	case cmdmode.CmdTheme:
+		if !theme.SetTheme(msg.Args) {
+			return m, statusbar.SetMessage("Invalid theme: "+msg.Args, statusbar.MessageError)
+		}
+		m.styles = DefaultStyles()
+		return m, statusbar.SetMessage("Theme: "+msg.Args, statusbar.MessageSuccess)
+
+	case cmdmode.CmdView:
+		// Views are collapsed - just acknowledge command
+		return m, statusbar.SetMessage("Single unified view", statusbar.MessageSuccess)
+
+	case cmdmode.CmdHelp:
+		m.help = m.help.SetSize(m.width, m.height)
+		m.help = m.help.SetContext(keys.ContextDevices)
+		m.help = m.help.Toggle()
+		return m, nil
+
+	case cmdmode.CmdToggle:
+		if cmd := m.executeDeviceAction("toggle"); cmd != nil {
+			return m, cmd
+		}
+		return m, statusbar.SetMessage("No device selected or device offline", statusbar.MessageError)
+
+	default:
+		return m, statusbar.SetMessage("Unknown command", statusbar.MessageError)
+	}
+}
+
+// getFilteredDevices returns devices matching the current filter.
+func (m Model) getFilteredDevices() []*cache.DeviceData {
+	all := m.cache.GetAllDevices()
+	if m.filter == "" {
+		return all
+	}
+
+	filterLower := strings.ToLower(m.filter)
+	filtered := make([]*cache.DeviceData, 0, len(all))
+	for _, d := range all {
+		if strings.Contains(strings.ToLower(d.Device.Name), filterLower) ||
+			strings.Contains(strings.ToLower(d.Device.Type), filterLower) ||
+			strings.Contains(d.Device.Address, filterLower) {
+			filtered = append(filtered, d)
+		}
+	}
+	return filtered
+}
+
+// handleKeyPress handles global key presses.
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	// Global actions
+	if newModel, cmd, handled := m.handleGlobalKeys(msg); handled {
+		return newModel, cmd, true
+	}
+
+	// Panel switching with Tab/Shift+Tab
+	if newModel, handled := m.handlePanelSwitch(msg); handled {
+		return newModel, nil, true
+	}
+
+	// Navigation (based on focused panel)
+	if newModel, handled := m.handleNavigation(msg); handled {
+		return newModel, nil, true
+	}
+
+	// Device actions
+	if newModel, cmd, handled := m.handleDeviceActionKey(msg); handled {
+		return newModel, cmd, true
+	}
+
+	return m, nil, false
+}
+
+// handlePanelSwitch handles Tab/Shift+Tab for switching panels.
+func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, bool) {
+	switch msg.String() {
+	case "tab":
+		// Cycle through panels: DeviceList -> Detail -> Endpoints -> DeviceList
+		switch m.focusedPanel {
+		case PanelDeviceList:
+			m.focusedPanel = PanelDetail
+		case PanelDetail:
+			m.focusedPanel = PanelEndpoints
+		case PanelEndpoints:
+			m.focusedPanel = PanelDeviceList
+		}
+		return m, true
+	case "shift+tab":
+		// Reverse cycle
+		switch m.focusedPanel {
+		case PanelDeviceList:
+			m.focusedPanel = PanelEndpoints
+		case PanelDetail:
+			m.focusedPanel = PanelDeviceList
+		case PanelEndpoints:
+			m.focusedPanel = PanelDetail
+		}
+		return m, true
+	}
+	return m, false
+}
+
+// handleGlobalKeys handles quit, help, filter, command, and escape keys.
+func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	switch {
+	case key.Matches(msg, m.keys.ForceQuit), key.Matches(msg, m.keys.Quit):
+		m.quitting = true
+		return m, tea.Quit, true
+	case key.Matches(msg, m.keys.Help):
+		m.help = m.help.SetSize(m.width, m.height)
+		m.help = m.help.SetContext(keys.ContextDevices)
+		m.help = m.help.Toggle()
+		return m, nil, true
+	case key.Matches(msg, m.keys.Filter):
+		var cmd tea.Cmd
+		m.search, cmd = m.search.Activate()
+		return m, cmd, true
+	case key.Matches(msg, m.keys.Command):
+		var cmd tea.Cmd
+		m.cmdMode, cmd = m.cmdMode.Activate()
+		return m, cmd, true
+	case key.Matches(msg, m.keys.Escape):
+		if m.filter != "" {
+			m.filter = ""
+			m.cursor = 0
+			return m, nil, true
+		}
+	}
+	return m, nil, false
+}
+
+// handleNavigation handles j/k/g/G/h/l navigation keys.
+func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, bool) {
+	devices := m.getFilteredDevices()
+	deviceCount := len(devices)
+
+	switch msg.String() {
+	case "j", "down":
+		if m.cursor < deviceCount-1 {
+			m.cursor++
+			m.componentCursor = -1 // Reset component selection when changing device
+		}
+		return m, true
+	case "k", "up":
+		if m.cursor > 0 {
+			m.cursor--
+			m.componentCursor = -1 // Reset component selection when changing device
+		}
+		return m, true
+	case "g":
+		m.cursor = 0
+		m.componentCursor = -1
+		return m, true
+	case "G":
+		if deviceCount > 0 {
+			m.cursor = deviceCount - 1
+			m.componentCursor = -1
+		}
+		return m, true
+	case "h", "left":
+		// Navigate to previous component or back to "all"
+		if m.componentCursor > -1 {
+			m.componentCursor--
+		}
+		return m, true
+	case "l", "right":
+		// Navigate to next component
+		if m.cursor < deviceCount && m.cursor >= 0 {
+			d := devices[m.cursor]
+			maxComponent := len(d.Switches) - 1
+			if m.componentCursor < maxComponent {
+				m.componentCursor++
+			}
+		}
+		return m, true
+	}
+	return m, false
+}
+
+// handleDeviceActionKey handles device action key presses.
 func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	var action string
 	switch {
@@ -337,274 +503,52 @@ func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 	return m, nil, false
 }
 
-// handleDeviceAction handles device action results and updates the status bar and toast.
-func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
-	var statusCmd, toastCmd tea.Cmd
-	if msg.Err != nil {
-		statusCmd = statusbar.SetMessage(
-			msg.Device+": "+msg.Action+" failed - "+msg.Err.Error(),
-			statusbar.MessageError,
-		)
-		toastCmd = toast.Error(msg.Device + ": " + msg.Action + " failed")
-	} else {
-		statusCmd = statusbar.SetMessage(
-			msg.Device+": "+msg.Action+" success",
-			statusbar.MessageSuccess,
-		)
-		toastCmd = toast.Success(msg.Device + ": " + msg.Action + " success")
-	}
-
-	// Also refresh the current view to show updated state
-	refreshCmd := m.refreshCurrentView()
-
-	return m, tea.Batch(statusCmd, toastCmd, refreshCmd)
-}
-
-// handleCommand handles command mode commands.
-func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
-	switch msg.Command {
-	case cmdmode.CmdQuit:
-		m.quitting = true
-		return m, tea.Quit
-
-	case cmdmode.CmdDevice:
-		// Jump to device by name - set filter and switch to devices view
-		m.deviceList = m.deviceList.SetFilter(msg.Args)
-		m.currentView = ViewDevices
-		m.tabs = m.tabs.SetActive(int(m.currentView))
-		return m, tea.Batch(
-			toast.Success("Filter set: "+msg.Args),
-			m.refreshCurrentView(),
-		)
-
-	case cmdmode.CmdFilter:
-		// Set filter on device list
-		m.deviceList = m.deviceList.SetFilter(msg.Args)
-		m.currentView = ViewDevices
-		m.tabs = m.tabs.SetActive(int(m.currentView))
-		if msg.Args == "" {
-			return m, toast.Success("Filter cleared")
-		}
-		return m, toast.Success("Filter: " + msg.Args)
-
-	case cmdmode.CmdTheme:
-		// Set theme at runtime
-		if !theme.SetTheme(msg.Args) {
-			return m, toast.Error("Invalid theme: " + msg.Args)
-		}
-		// Refresh styles
-		m.styles = DefaultStyles()
-		return m, toast.Success("Theme: " + msg.Args)
-
-	case cmdmode.CmdView:
-		// Switch to a specific view
-		newView := m.parseView(msg.Args)
-		if newView < 0 {
-			return m, toast.Error("Unknown view: " + msg.Args)
-		}
-		m.currentView = ViewMode(newView)
-		m.tabs = m.tabs.SetActive(int(m.currentView))
-		return m, nil
-
-	case cmdmode.CmdHelp:
-		m.help = m.help.SetSize(m.width, m.height)
-		m.help = m.help.SetContext(m.currentHelpContext())
-		m.help = m.help.Toggle()
-		return m, nil
-
-	case cmdmode.CmdToggle:
-		// Toggle the selected device
-		if cmd := m.executeDeviceAction("toggle"); cmd != nil {
-			return m, cmd
-		}
-		return m, toast.Error("No device selected or device offline")
-
-	default:
-		return m, toast.Error("Unknown command")
-	}
-}
-
-// parseView parses a view name to a ViewMode index.
-func (m Model) parseView(name string) int {
-	switch name {
-	case "devices", "device", "dev", "d", "1":
-		return int(ViewDevices)
-	case "monitor", "mon", "m", "2":
-		return int(ViewMonitor)
-	case "events", "event", "e", "3":
-		return int(ViewEvents)
-	case "energy", "power", "p", "4":
-		return int(ViewEnergy)
-	default:
-		return -1
-	}
-}
-
-// handleKeyPress handles global key presses and returns whether it was handled.
-func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	switch {
-	case key.Matches(msg, m.keys.ForceQuit):
-		m.quitting = true
-		return m, tea.Quit, true
-
-	case key.Matches(msg, m.keys.Quit):
-		m.quitting = true
-		return m, tea.Quit, true
-
-	case key.Matches(msg, m.keys.Help):
-		m.help = m.help.SetSize(m.width, m.height)
-		m.help = m.help.SetContext(m.currentHelpContext())
-		m.help = m.help.Toggle()
-		return m, nil, true
-
-	case key.Matches(msg, m.keys.Escape):
-		// Escape does nothing when no overlay is open
-		return m, nil, false
-
-	case key.Matches(msg, m.keys.Refresh):
-		return m, m.refreshCurrentView(), true
-
-	case key.Matches(msg, m.keys.Enter):
-		// Show device detail in Devices or Monitor view
-		if m.currentView == ViewDevices || m.currentView == ViewMonitor {
-			if selected := m.deviceList.SelectedDevice(); selected != nil {
-				var cmd tea.Cmd
-				m.deviceDetail = m.deviceDetail.SetSize(m.width, m.height)
-				m.deviceDetail, cmd = m.deviceDetail.Show(selected.Device)
-				return m, cmd, true
-			}
-		}
-
-	case key.Matches(msg, m.keys.Filter):
-		// Only allow filter in Devices view
-		if m.currentView == ViewDevices {
-			var cmd tea.Cmd
-			m.search, cmd = m.search.Activate()
-			return m, cmd, true
-		}
-
-	case key.Matches(msg, m.keys.Command):
-		var cmd tea.Cmd
-		m.cmdMode, cmd = m.cmdMode.Activate()
-		return m, cmd, true
-	}
-
-	// Handle device actions (extracted for complexity)
-	if newModel, cmd, handled := m.handleDeviceActionKey(msg); handled {
-		return newModel, cmd, true
-	}
-
-	// Handle view switching
-	if newView, ok := m.handleViewSwitch(msg); ok {
-		m.currentView = newView
-		m.tabs = m.tabs.SetActive(int(m.currentView))
-		return m, nil, true
-	}
-
-	return m, nil, false
-}
-
-// handleViewSwitch checks if the key switches views and returns the new view.
-func (m Model) handleViewSwitch(msg tea.KeyPressMsg) (ViewMode, bool) {
-	switch {
-	case key.Matches(msg, m.keys.Tab):
-		return (m.currentView + 1) % 4, true
-	case key.Matches(msg, m.keys.ShiftTab):
-		return (m.currentView + 3) % 4, true
-	case key.Matches(msg, m.keys.View1):
-		return ViewDevices, true
-	case key.Matches(msg, m.keys.View2):
-		return ViewMonitor, true
-	case key.Matches(msg, m.keys.View3):
-		return ViewEvents, true
-	case key.Matches(msg, m.keys.View4):
-		return ViewEnergy, true
-	default:
-		return m.currentView, false
-	}
-}
-
-// updateActiveComponent forwards messages to the active component.
-func (m Model) updateActiveComponent(msg tea.Msg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	switch m.currentView {
-	case ViewDevices:
-		m.deviceList, cmd = m.deviceList.Update(msg)
-	case ViewMonitor:
-		m.monitor, cmd = m.monitor.Update(msg)
-	case ViewEvents:
-		m.events, cmd = m.events.Update(msg)
-	case ViewEnergy:
-		m.energy, cmd = m.energy.Update(msg)
-	}
-	return m, cmd
-}
-
 // executeDeviceAction executes a device action on the selected device.
 func (m Model) executeDeviceAction(action string) tea.Cmd {
-	// Only allow device actions in Devices or Monitor view
-	if m.currentView != ViewDevices && m.currentView != ViewMonitor {
+	devices := m.getFilteredDevices()
+	if m.cursor >= len(devices) {
 		return nil
 	}
 
-	// Get selected device
-	selected := m.deviceList.SelectedDevice()
-	if selected == nil || !selected.Online {
+	selected := devices[m.cursor]
+	if !selected.Online {
 		return nil
 	}
 
 	device := selected.Device
 	svc := m.factory.ShellyService()
+	componentID := m.componentCursor // -1 means all, >=0 means specific component
 
 	return func() tea.Msg {
 		var err error
+		var compIDPtr *int
+		if componentID >= 0 {
+			compIDPtr = &componentID
+		}
+
 		switch action {
 		case "toggle":
-			_, err = svc.SwitchToggle(m.ctx, device.Address, 0)
+			// QuickToggle handles all controllable components (switch, light, rgb, cover)
+			_, err = svc.QuickToggle(m.ctx, device.Address, compIDPtr)
 		case "on":
-			err = svc.SwitchOn(m.ctx, device.Address, 0)
+			_, err = svc.QuickOn(m.ctx, device.Address, compIDPtr)
 		case "off":
-			err = svc.SwitchOff(m.ctx, device.Address, 0)
+			_, err = svc.QuickOff(m.ctx, device.Address, compIDPtr)
 		case "reboot":
 			err = svc.DeviceReboot(m.ctx, device.Address, 0)
 		}
+
+		// Build action description
+		actionDesc := action
+		if componentID >= 0 {
+			actionDesc = fmt.Sprintf("%s (component %d)", action, componentID)
+		}
+
 		return DeviceActionMsg{
 			Device: device.Name,
-			Action: action,
+			Action: actionDesc,
 			Err:    err,
 		}
-	}
-}
-
-// currentHelpContext returns the help context for the current view.
-func (m Model) currentHelpContext() help.ViewContext {
-	switch m.currentView {
-	case ViewDevices:
-		return help.ContextDevices
-	case ViewMonitor:
-		return help.ContextMonitor
-	case ViewEvents:
-		return help.ContextEvents
-	case ViewEnergy:
-		return help.ContextEnergy
-	default:
-		return help.ContextDevices
-	}
-}
-
-// refreshCurrentView returns a command to refresh the current view's data.
-func (m Model) refreshCurrentView() tea.Cmd {
-	switch m.currentView {
-	case ViewDevices:
-		return m.deviceList.Refresh()
-	case ViewMonitor:
-		return m.monitor.Refresh()
-	case ViewEvents:
-		return nil // Events are real-time, no manual refresh
-	case ViewEnergy:
-		return m.energy.Refresh()
-	default:
-		return nil
 	}
 }
 
@@ -620,8 +564,8 @@ func (m Model) View() tea.View {
 		return v
 	}
 
-	// Header (tabs)
-	header := m.tabs.View()
+	// Header with metadata on left, banner on right
+	headerBanner := m.renderHeader()
 
 	// Input bar (search or command mode)
 	var inputBar string
@@ -631,24 +575,21 @@ func (m Model) View() tea.View {
 		inputBar = m.cmdMode.View()
 	}
 
-	// Content based on current view
-	var content string
-	switch m.currentView {
-	case ViewDevices:
-		content = m.deviceList.View()
-	case ViewMonitor:
-		content = m.monitor.View()
-	case ViewEvents:
-		content = m.events.View()
-	case ViewEnergy:
-		content = m.energy.View()
+	// Calculate content area
+	bannerHeight := branding.BannerHeight()
+	footerHeight := 2
+	inputHeight := 0
+	if inputBar != "" {
+		inputHeight = 1
 	}
+	contentHeight := m.height - bannerHeight - footerHeight - inputHeight
 
-	// Overlays (help or device detail)
+	// Multi-panel layout: 4 panels
+	content := m.renderMultiPanelLayout(contentHeight)
+
+	// Help overlay - overlay on content when visible
 	if m.help.Visible() {
-		content = m.help.View()
-	} else if m.deviceDetail.Visible() {
-		content = m.deviceDetail.View()
+		content = m.renderWithHelpOverlay(content, contentHeight)
 	}
 
 	// Footer (status bar)
@@ -658,20 +599,15 @@ func (m Model) View() tea.View {
 	var result string
 	if inputBar != "" {
 		result = lipgloss.JoinVertical(lipgloss.Left,
-			header,
-			inputBar,
-			content,
-			footer,
+			headerBanner, inputBar, content, footer,
 		)
 	} else {
 		result = lipgloss.JoinVertical(lipgloss.Left,
-			header,
-			content,
-			footer,
+			headerBanner, content, footer,
 		)
 	}
 
-	// Add toast overlay if there are toasts
+	// Add toast overlay (now a no-op)
 	if m.toast.HasToasts() {
 		result = m.toast.Overlay(result)
 	}
@@ -682,6 +618,519 @@ func (m Model) View() tea.View {
 	return v
 }
 
+// renderMultiPanelLayout renders 3 vertical columns like superfile.
+func (m Model) renderMultiPanelLayout(height int) string {
+	colors := theme.GetSemanticColors()
+	devices := m.getFilteredDevices()
+
+	// Calculate column widths: 20% events, 40% list, 40% info
+	col1Width := m.width * 20 / 100
+	col2Width := m.width * 40 / 100
+	col3Width := m.width - col1Width - col2Width - 2 // -2 for gaps
+
+	if col1Width < 15 {
+		col1Width = 15
+	}
+
+	// Get focused panel border color
+	focusBorder := colors.Highlight
+	unfocusBorder := colors.TableBorder
+
+	// Column 1: Events panel (ORANGE border, full height)
+	eventsCol := m.renderEventsColumn(col1Width, height)
+
+	// Column 2: Device List
+	listBorder := unfocusBorder
+	if m.focusedPanel == PanelDeviceList {
+		listBorder = focusBorder
+	}
+	listCol := m.renderDeviceListColumn(devices, col2Width, height, listBorder)
+
+	// Column 3: Device Info OR JSON overlay
+	var infoCol string
+	if m.focusedPanel == PanelEndpoints {
+		// JSON overlay mode
+		infoCol = m.renderJSONOverlay(devices, col3Width, height)
+	} else {
+		// Normal device info
+		infoBorder := unfocusBorder
+		if m.focusedPanel == PanelDetail {
+			infoBorder = focusBorder
+		}
+		infoCol = m.renderDeviceInfoColumn(devices, col3Width, height, infoBorder)
+	}
+
+	// Join columns horizontally
+	return lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", listCol, " ", infoCol)
+}
+
+// renderEventsColumn renders the events column with ORANGE border, full height.
+func (m Model) renderEventsColumn(width, height int) string {
+	colors := theme.GetSemanticColors()
+
+	// ORANGE border for events column
+	orangeBorder := theme.Orange()
+
+	colStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(orangeBorder).
+		Width(width - 2).
+		Height(height - 2)
+
+	var content strings.Builder
+	titleStyle := lipgloss.NewStyle().Foreground(orangeBorder).Bold(true)
+	content.WriteString(titleStyle.Render(" Events") + "\n")
+
+	eventCount := m.events.EventCount()
+	countStyle := lipgloss.NewStyle().Foreground(theme.Green())
+	content.WriteString(countStyle.Render(fmt.Sprintf(" %d total", eventCount)) + "\n\n")
+
+	// Get events from the component's internal state
+	eventsView := m.events.View()
+	if eventsView == "" {
+		content.WriteString(lipgloss.NewStyle().Foreground(colors.Muted).Italic(true).Render(" Waiting..."))
+	} else {
+		m.writeEventLines(&content, eventsView, width, height)
+	}
+
+	return colStyle.Render(content.String())
+}
+
+func (m Model) writeEventLines(content *strings.Builder, eventsView string, width, height int) {
+	lines := strings.Split(eventsView, "\n")
+	maxLines := max(height-6, 3)
+	for i, line := range lines {
+		if i >= maxLines {
+			break
+		}
+		if len(line) > width-6 {
+			line = line[:width-9] + "..."
+		}
+		content.WriteString(line + "\n")
+	}
+}
+
+// renderDeviceListColumn renders just the device list.
+func (m Model) renderDeviceListColumn(devices []*cache.DeviceData, width, height int, borderColor color.Color) string {
+	colors := theme.GetSemanticColors()
+
+	colStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Width(width - 2).
+		Height(height - 2)
+
+	var content strings.Builder
+	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
+	content.WriteString(titleStyle.Render(fmt.Sprintf(" Devices (%d)", len(devices))) + "\n\n")
+
+	if len(devices) == 0 {
+		if m.cache.IsLoading() {
+			content.WriteString(lipgloss.NewStyle().Foreground(theme.Cyan()).Render(" Loading..."))
+		} else {
+			content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render(" No devices"))
+		}
+		return colStyle.Render(content.String())
+	}
+
+	// Ensure cursor is valid
+	if m.cursor >= len(devices) {
+		m.cursor = len(devices) - 1
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+
+	// Show device list
+	visibleItems := height - 5
+	if visibleItems < 1 {
+		visibleItems = 1
+	}
+
+	scrollOffset := 0
+	if m.cursor >= visibleItems {
+		scrollOffset = m.cursor - visibleItems + 1
+	}
+
+	endIdx := min(scrollOffset+visibleItems, len(devices))
+	for i := scrollOffset; i < endIdx; i++ {
+		d := devices[i]
+		selected := i == m.cursor
+		prefix := unselectedPrefix
+		if selected {
+			prefix = selectedPrefix
+		}
+
+		status := lipgloss.NewStyle().Foreground(colors.Offline).Render("○")
+		if !d.Fetched {
+			status = lipgloss.NewStyle().Foreground(theme.Yellow()).Render("◐")
+		} else if d.Online {
+			status = lipgloss.NewStyle().Foreground(theme.Green()).Render("●")
+		}
+
+		name := d.Device.Name
+		maxLen := width - 10
+		if len(name) > maxLen && maxLen > 3 {
+			name = name[:maxLen-3] + "..."
+		}
+
+		line := fmt.Sprintf("%s%s %s", prefix, status, name)
+		if selected {
+			content.WriteString(lipgloss.NewStyle().
+				Background(colors.AltBackground).
+				Foreground(theme.Pink()).
+				Bold(true).
+				Render(line) + "\n")
+		} else {
+			content.WriteString(lipgloss.NewStyle().Foreground(colors.Text).Render(line) + "\n")
+		}
+	}
+
+	if len(devices) > visibleItems {
+		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).
+			Render(fmt.Sprintf("\n [%d/%d]", m.cursor+1, len(devices))))
+	}
+
+	return colStyle.Render(content.String())
+}
+
+// renderDeviceInfoColumn renders device info, power metrics, and endpoints.
+func (m Model) renderDeviceInfoColumn(devices []*cache.DeviceData, width, height int, borderColor color.Color) string {
+	colors := theme.GetSemanticColors()
+
+	colStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Width(width - 2).
+		Height(height - 2)
+
+	var content strings.Builder
+	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
+	content.WriteString(titleStyle.Render(" Device Info") + "\n\n")
+
+	if len(devices) == 0 || m.cursor >= len(devices) {
+		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render(" Select a device"))
+		return colStyle.Render(content.String())
+	}
+
+	d := devices[m.cursor]
+	labelStyle := lipgloss.NewStyle().Foreground(theme.Purple())
+	valueStyle := lipgloss.NewStyle().Foreground(theme.Cyan()).Bold(true)
+
+	if !d.Fetched {
+		content.WriteString(lipgloss.NewStyle().Foreground(theme.Yellow()).Render(" Connecting..."))
+		return colStyle.Render(content.String())
+	}
+
+	if !d.Online {
+		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render(" ✗ Offline"))
+		return colStyle.Render(content.String())
+	}
+
+	// Device info
+	if d.Info != nil {
+		modelName := m.factory.ShellyService().ModelDisplayName(d.Info.Model)
+		content.WriteString(labelStyle.Render(" Model:    ") + valueStyle.Render(modelName) + "\n")
+		content.WriteString(labelStyle.Render(" Firmware: ") + valueStyle.Render(d.Info.Firmware) + "\n")
+		content.WriteString(labelStyle.Render(" MAC:      ") + valueStyle.Render(d.Info.MAC) + "\n")
+	}
+	content.WriteString(labelStyle.Render(" Address:  ") + valueStyle.Render(d.Device.Address) + "\n")
+
+	// Power metrics (if available)
+	writePowerMetrics(&content, d, titleStyle, labelStyle, valueStyle)
+
+	// Switch states
+	if len(d.Switches) > 0 {
+		content.WriteString("\n" + titleStyle.Render(" Components") + "\n")
+		for i, sw := range d.Switches {
+			state := lipgloss.NewStyle().Foreground(colors.Offline).Render("OFF")
+			if sw.On {
+				state = lipgloss.NewStyle().Foreground(theme.Green()).Bold(true).Render("ON")
+			}
+			prefix := "  "
+			if i == m.componentCursor {
+				prefix = "▶ "
+			}
+			content.WriteString(fmt.Sprintf("%sSwitch %d: %s\n", prefix, sw.ID, state))
+		}
+		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
+			Render("  h/l: select, t: toggle") + "\n")
+	}
+
+	// Endpoints section
+	content.WriteString("\n" + titleStyle.Render(" Endpoints") + "\n")
+	methods := m.getDeviceMethods(d)
+	methodStyle := lipgloss.NewStyle().Foreground(theme.Cyan())
+
+	maxMethods := height - 20
+	if maxMethods < 3 {
+		maxMethods = 3
+	}
+
+	for i, method := range methods {
+		if i >= maxMethods {
+			content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).
+				Render(fmt.Sprintf("  +%d more\n", len(methods)-maxMethods)))
+			break
+		}
+		prefix := "  "
+		if i == m.endpointCursor && m.focusedPanel == PanelDetail {
+			prefix = "▶ "
+		}
+		content.WriteString(prefix + methodStyle.Render(method) + "\n")
+	}
+	content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
+		Render("  Enter: view JSON") + "\n")
+
+	return colStyle.Render(content.String())
+}
+
+// renderJSONOverlay renders the JSON pop-over that covers the device info column.
+func (m Model) renderJSONOverlay(devices []*cache.DeviceData, width, height int) string {
+	colors := theme.GetSemanticColors()
+
+	// Use pink border for JSON overlay to make it pop
+	colStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(theme.Pink()).
+		Width(width - 2).
+		Height(height - 2)
+
+	var content strings.Builder
+	titleStyle := lipgloss.NewStyle().Foreground(theme.Pink()).Bold(true)
+	content.WriteString(titleStyle.Render(" JSON Response") + "\n")
+	content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
+		Render(" Esc: close | j/k: scroll") + "\n\n")
+
+	if len(devices) == 0 || m.cursor >= len(devices) {
+		return colStyle.Render(content.String())
+	}
+
+	d := devices[m.cursor]
+	if !d.Online {
+		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render(" Device offline"))
+		return colStyle.Render(content.String())
+	}
+
+	jsonStyle := lipgloss.NewStyle().Foreground(theme.Green())
+	labelStyle := lipgloss.NewStyle().Foreground(theme.Cyan()).Bold(true)
+
+	// Show device info as JSON
+	if d.Info != nil {
+		content.WriteString(labelStyle.Render("DeviceInfo:") + "\n")
+		jsonData := map[string]any{
+			"id":       d.Info.ID,
+			"model":    d.Info.Model,
+			"firmware": d.Info.Firmware,
+			"mac":      d.Info.MAC,
+		}
+		if jsonBytes, err := json.MarshalIndent(jsonData, "", "  "); err == nil {
+			for _, line := range strings.Split(string(jsonBytes), "\n") {
+				content.WriteString(jsonStyle.Render(line) + "\n")
+			}
+		}
+	}
+
+	// Show switch states as JSON
+	if len(d.Switches) > 0 {
+		content.WriteString("\n" + labelStyle.Render("SwitchStatus:") + "\n")
+		switchData := make([]map[string]any, len(d.Switches))
+		for i, sw := range d.Switches {
+			switchData[i] = map[string]any{"id": sw.ID, "output": sw.On}
+		}
+		if jsonBytes, err := json.MarshalIndent(switchData, "", "  "); err == nil {
+			for _, line := range strings.Split(string(jsonBytes), "\n") {
+				content.WriteString(jsonStyle.Render(line) + "\n")
+			}
+		}
+	}
+
+	// Show power metrics as JSON
+	writePowerMetricsJSON(&content, d, labelStyle, jsonStyle)
+
+	return colStyle.Render(content.String())
+}
+
+func (m Model) renderHeader() string {
+	colors := theme.GetSemanticColors()
+
+	// Banner on the right - using Cyan (bright blue in Dracula theme)
+	// theme.Blue() is actually the muted comment color, Cyan is the vibrant blue
+	bannerStyle := lipgloss.NewStyle().
+		Foreground(theme.Cyan()).
+		Bold(true)
+	bannerLines := branding.BannerLines()
+	bannerWidth := branding.BannerWidth()
+
+	// Calculate left panel width (what's left after banner)
+	leftWidth := m.width - bannerWidth - 4
+	if leftWidth < 20 {
+		leftWidth = 20
+	}
+
+	// Build metadata lines to fill the banner height
+	online := m.cache.OnlineCount()
+	total := m.cache.DeviceCount()
+	offline := total - online
+	totalPower := m.cache.TotalPower()
+
+	onlineStyle := lipgloss.NewStyle().Foreground(colors.Online).Bold(true)
+	offlineStyle := lipgloss.NewStyle().Foreground(colors.Offline)
+	powerStyle := lipgloss.NewStyle().Foreground(colors.Warning).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(colors.Muted)
+	valueStyle := lipgloss.NewStyle().Foreground(colors.Text).Bold(true)
+	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
+
+	// Create metadata lines to match banner height
+	metaLines := make([]string, len(bannerLines))
+
+	// Line 0: Title
+	metaLines[0] = titleStyle.Render("Shelly Dashboard")
+
+	// Line 1: Empty for spacing
+	metaLines[1] = ""
+
+	// Line 2: Device counts
+	if m.cache.IsLoading() {
+		fetched := m.cache.FetchedCount()
+		metaLines[2] = labelStyle.Render("Devices: ") + fmt.Sprintf("Loading... %d/%d", fetched, total)
+	} else {
+		metaLines[2] = labelStyle.Render("Devices: ") +
+			onlineStyle.Render(fmt.Sprintf("%d online", online))
+		if offline > 0 {
+			metaLines[2] += labelStyle.Render(" / ") + offlineStyle.Render(fmt.Sprintf("%d offline", offline))
+		}
+	}
+
+	// Line 3: Power consumption
+	if totalPower != 0 {
+		powerStr := fmt.Sprintf("%.1fW", totalPower)
+		if totalPower >= 1000 || totalPower <= -1000 {
+			powerStr = fmt.Sprintf("%.2fkW", totalPower/1000)
+		}
+		metaLines[3] = labelStyle.Render("Power:   ") + powerStyle.Render(powerStr)
+	} else {
+		metaLines[3] = labelStyle.Render("Power:   ") + valueStyle.Render("--")
+	}
+
+	// Line 4: Current filter
+	if m.filter != "" {
+		filterStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Italic(true)
+		metaLines[4] = labelStyle.Render("Filter:  ") + filterStyle.Render(m.filter)
+	} else {
+		metaLines[4] = ""
+	}
+
+	// Line 5: Theme
+	themeName := theme.CurrentThemeName()
+	if themeName != "" && len(metaLines) > 5 {
+		themeStyle := lipgloss.NewStyle().Foreground(colors.Secondary)
+		metaLines[5] = labelStyle.Render("Theme:   ") + themeStyle.Render(themeName)
+	}
+
+	// Fill remaining lines if banner is taller
+	for i := 6; i < len(metaLines); i++ {
+		metaLines[i] = ""
+	}
+
+	// Join metadata and banner side by side
+	var result strings.Builder
+	for i, bannerLine := range bannerLines {
+		// Left side: metadata with fixed width
+		metaLine := ""
+		if i < len(metaLines) {
+			metaLine = metaLines[i]
+		}
+		leftPart := lipgloss.NewStyle().Width(leftWidth).Render(metaLine)
+
+		// Right side: banner line
+		rightPart := bannerStyle.Render(bannerLine)
+
+		result.WriteString(leftPart)
+		result.WriteString(rightPart)
+		if i < len(bannerLines)-1 {
+			result.WriteString("\n")
+		}
+	}
+
+	return result.String()
+}
+
+// renderWithHelpOverlay renders main content stacked with help popup at bottom.
+func (m Model) renderWithHelpOverlay(content string, contentHeight int) string {
+	helpView := m.help.View()
+	if helpView == "" {
+		return content
+	}
+
+	// Get help popup height
+	helpHeight := m.help.ViewHeight()
+
+	// Reduce main content height to make room for help
+	reducedHeight := contentHeight - helpHeight
+	if reducedHeight < 5 {
+		reducedHeight = 5
+	}
+
+	// Re-render main content at reduced height with multi-panel layout
+	mainContent := m.renderMultiPanelLayout(reducedHeight)
+
+	// Stack main content above help popup
+	return lipgloss.JoinVertical(lipgloss.Left, mainContent, helpView)
+}
+
+func formatEnergy(wh float64) string {
+	if wh >= 1000000 {
+		return fmt.Sprintf("%.2f MWh", wh/1000000)
+	}
+	if wh >= 1000 {
+		return fmt.Sprintf("%.2f kWh", wh/1000)
+	}
+	return fmt.Sprintf("%.1f Wh", wh)
+}
+
+func writePowerMetrics(content *strings.Builder, d *cache.DeviceData, titleStyle, labelStyle, valueStyle lipgloss.Style) {
+	if d.Power == 0 && d.Voltage == 0 {
+		return
+	}
+	content.WriteString("\n" + titleStyle.Render(" Power Metrics") + "\n")
+	powerStyle := lipgloss.NewStyle().Foreground(theme.Orange()).Bold(true)
+	if d.Power != 0 {
+		content.WriteString(labelStyle.Render(" Power:   ") + powerStyle.Render(fmt.Sprintf("%.1fW", d.Power)) + "\n")
+	}
+	if d.Voltage != 0 {
+		content.WriteString(labelStyle.Render(" Voltage: ") + valueStyle.Render(fmt.Sprintf("%.1fV", d.Voltage)) + "\n")
+	}
+	if d.Current != 0 {
+		content.WriteString(labelStyle.Render(" Current: ") + valueStyle.Render(fmt.Sprintf("%.2fA", d.Current)) + "\n")
+	}
+	if d.TotalEnergy != 0 {
+		content.WriteString(labelStyle.Render(" Total:   ") + valueStyle.Render(formatEnergy(d.TotalEnergy)) + "\n")
+	}
+}
+
+func writePowerMetricsJSON(content *strings.Builder, d *cache.DeviceData, labelStyle, jsonStyle lipgloss.Style) {
+	if d.Power == 0 && d.Voltage == 0 {
+		return
+	}
+	content.WriteString("\n" + labelStyle.Render("PowerMetrics:") + "\n")
+	powerData := map[string]any{}
+	if d.Power != 0 {
+		powerData["power"] = d.Power
+	}
+	if d.Voltage != 0 {
+		powerData["voltage"] = d.Voltage
+	}
+	if d.Current != 0 {
+		powerData["current"] = d.Current
+	}
+	if jsonBytes, err := json.MarshalIndent(powerData, "", "  "); err == nil {
+		for _, line := range strings.Split(string(jsonBytes), "\n") {
+			content.WriteString(jsonStyle.Render(line) + "\n")
+		}
+	}
+}
+
 // Run starts the TUI application.
 func Run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
 	m := New(ctx, f, opts)
@@ -690,4 +1139,31 @@ func Run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
 	)
 	_, err := p.Run()
 	return err
+}
+
+func (m Model) getDeviceMethods(d *cache.DeviceData) []string {
+	if d == nil || !d.Online {
+		return nil
+	}
+	if d.Device.Generation == 1 {
+		return []string{
+			"Shelly.GetInfo",
+			"Shelly.GetStatus",
+			"Relay.GetStatus",
+			"Meter.GetInfo",
+		}
+	}
+	return []string{
+		"Shelly.GetDeviceInfo",
+		"Shelly.GetStatus",
+		"Shelly.GetConfig",
+		"Switch.GetStatus",
+		"Switch.GetConfig",
+		"PM.GetStatus",
+		"EM.GetStatus",
+		"Sys.GetStatus",
+		"Wifi.GetStatus",
+		"Cloud.GetStatus",
+		"Script.List",
+	}
 }

@@ -49,7 +49,7 @@ func MappingFromTheme() SemanticColors {
 		TableHeader:   Cyan(),
 		TableCell:     Yellow(),
 		TableAltCell:  Orange(),
-		TableBorder:   Purple(),
+		TableBorder:   Pink(), // Pink border
 	}
 }
 
@@ -75,7 +75,7 @@ func DraculaSemanticMapping() SemanticColors {
 		TableHeader:   lipgloss.Color("#8be9fd"), // Cyan
 		TableCell:     lipgloss.Color("#f1fa8c"), // Yellow
 		TableAltCell:  lipgloss.Color("#ffb86c"), // Orange
-		TableBorder:   lipgloss.Color("#bd93f9"), // Purple
+		TableBorder:   lipgloss.Color("#ff79c6"), // Pink
 	}
 }
 

@@ -1,4 +1,4 @@
-.PHONY: audit build check clean completions deps docs fmt generate help install lint manpages push release-local test test-coverage
+.PHONY: audit build build-test check clean completions deps docs fmt generate help install lint manpages push release-local test test-coverage
 
 # Build variables
 BINARY_NAME := shelly
@@ -23,6 +23,10 @@ audit:
 build:
 	@echo "Building $(BINARY_NAME)..."
 	@go build -ldflags "$(LDFLAGS)" -trimpath -o bin/$(BINARY_NAME) ./cmd/shelly
+
+
+build-test:
+	@go build -o /tmp/shelly-test ./cmd/shelly
 
 ## check: Run all checks (format, lint, then compliance audit)
 check:

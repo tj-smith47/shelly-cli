@@ -3,6 +3,8 @@ package help
 import (
 	"strings"
 	"testing"
+
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 )
 
 func TestNew(t *testing.T) {
@@ -11,6 +13,9 @@ func TestNew(t *testing.T) {
 
 	if m.Visible() {
 		t.Error("expected help to be hidden on creation")
+	}
+	if m.keyMap == nil {
+		t.Error("expected keyMap to be initialized")
 	}
 }
 
@@ -21,6 +26,9 @@ func TestShow(t *testing.T) {
 
 	if !m.Visible() {
 		t.Error("expected help to be visible after Show()")
+	}
+	if m.scrollOffset != 0 {
+		t.Error("expected scrollOffset to be reset on Show()")
 	}
 }
 
@@ -53,10 +61,10 @@ func TestToggle(t *testing.T) {
 func TestSetContext(t *testing.T) {
 	t.Parallel()
 	m := New()
-	m = m.SetContext(ContextMonitor)
+	m = m.SetContext(keys.ContextDevices)
 
-	if m.context != ContextMonitor {
-		t.Errorf("expected context ContextMonitor, got %v", m.context)
+	if m.context != keys.ContextDevices {
+		t.Errorf("expected context ContextDevices, got %v", m.context)
 	}
 }
 
@@ -73,6 +81,17 @@ func TestSetSize(t *testing.T) {
 	}
 }
 
+func TestSetKeyMap(t *testing.T) {
+	t.Parallel()
+	m := New()
+	km := keys.NewContextMap()
+	m = m.SetKeyMap(km)
+
+	if m.keyMap != km {
+		t.Error("expected keyMap to be set")
+	}
+}
+
 func TestViewWhenHidden(t *testing.T) {
 	t.Parallel()
 	m := New()
@@ -86,7 +105,8 @@ func TestViewWhenHidden(t *testing.T) {
 func TestViewWhenVisible(t *testing.T) {
 	t.Parallel()
 	m := New()
-	m = m.SetSize(80, 40)
+	m = m.SetSize(120, 60)
+	m = m.SetContext(keys.ContextDevices)
 	m = m.Show()
 
 	view := m.View()
@@ -94,66 +114,44 @@ func TestViewWhenVisible(t *testing.T) {
 		t.Error("expected non-empty view when visible")
 	}
 
-	// Check for expected content (with ANSI-safe checks)
-	// The styled output contains escape codes, so we check common words
+	// Check for expected content
+	if !strings.Contains(view, "Help") {
+		t.Error("expected view to contain 'Help'")
+	}
+}
+
+func TestViewCompact(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(120, 40)
+
+	view := m.ViewCompact()
+	if view == "" {
+		t.Error("expected non-empty compact view")
+	}
+
+	// Check for expected keybindings
 	expectedStrings := []string{
-		"Navigation",
-		"Actions",
-		"General",
+		"j/k",
+		"toggle",
+		"quit",
 	}
 
 	for _, expected := range expectedStrings {
 		if !strings.Contains(view, expected) {
-			t.Errorf("expected view to contain %q", expected)
+			t.Errorf("expected compact view to contain %q", expected)
 		}
 	}
 }
 
-func TestContextSpecificHelp(t *testing.T) {
+func TestViewHeight(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		context  ViewContext
-		expected string
-	}{
-		{ContextDevices, "Devices View"},
-		{ContextMonitor, "Monitor View"},
-		{ContextEvents, "Events View"},
-		{ContextEnergy, "Energy View"},
-	}
+	m := New()
+	m = m.SetSize(80, 40)
 
-	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			t.Parallel()
-			m := New()
-			m = m.SetSize(80, 40)
-			m = m.SetContext(tt.context)
-			m = m.Show()
-
-			view := m.View()
-			if !strings.Contains(view, tt.expected) {
-				t.Errorf("expected view to contain %q for context %v", tt.expected, tt.context)
-			}
-		})
-	}
-}
-
-func TestDeviceControlOnlyInDevicesAndMonitor(t *testing.T) {
-	t.Parallel()
-	deviceControlKeys := []string{"toggle", "turn on", "turn off"}
-
-	// Device control should appear in Devices and Monitor views
-	for _, ctx := range []ViewContext{ContextDevices, ContextMonitor} {
-		m := New()
-		m = m.SetSize(80, 40)
-		m = m.SetContext(ctx)
-		m = m.Show()
-
-		view := m.View()
-		for _, key := range deviceControlKeys {
-			if !strings.Contains(strings.ToLower(view), key) {
-				t.Errorf("expected device control key %q in context %v", key, ctx)
-			}
-		}
+	height := m.ViewHeight()
+	if height != 2 {
+		t.Errorf("expected ViewHeight 2, got %d", height)
 	}
 }
 
@@ -174,5 +172,91 @@ func TestFullHelp(t *testing.T) {
 
 	if len(bindings) == 0 {
 		t.Error("expected non-empty FullHelp bindings")
+	}
+}
+
+func TestGetContextBindings(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetContext(keys.ContextDevices)
+
+	sections := m.getContextBindings()
+	if len(sections) == 0 {
+		t.Error("expected non-empty bindings")
+	}
+
+	// Should have device-specific and global sections
+	hasDevices := false
+	hasGlobal := false
+	for _, s := range sections {
+		if s.Name == "Devices" {
+			hasDevices = true
+		}
+		if s.Name == "Global" {
+			hasGlobal = true
+		}
+	}
+
+	if !hasDevices {
+		t.Error("expected Devices section")
+	}
+	if !hasGlobal {
+		t.Error("expected Global section")
+	}
+}
+
+func TestFormatBindings(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	bindings := []keys.KeyBinding{
+		{Key: "q", Action: keys.ActionQuit, Desc: "Quit"},
+		{Key: "?", Action: keys.ActionHelp, Desc: "Show help"},
+	}
+
+	formatted := m.formatBindings(bindings)
+	if formatted == "" {
+		t.Error("expected non-empty formatted bindings")
+	}
+
+	if !strings.Contains(formatted, "Quit") {
+		t.Error("expected formatted output to contain 'Quit'")
+	}
+}
+
+func TestSortBindings(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	bindings := []keys.KeyBinding{
+		{Key: "z", Action: keys.ActionQuit, Desc: "Quit"},
+		{Key: "a", Action: keys.ActionHelp, Desc: "Help"},
+		{Key: "m", Action: keys.ActionToggle, Desc: "Toggle"},
+	}
+
+	sorted := m.sortBindings(bindings)
+	if sorted[0].Key != "a" {
+		t.Errorf("expected first key to be 'a', got %q", sorted[0].Key)
+	}
+	if sorted[2].Key != "z" {
+		t.Errorf("expected last key to be 'z', got %q", sorted[2].Key)
+	}
+}
+
+func TestBindingSection(t *testing.T) {
+	t.Parallel()
+
+	section := BindingSection{
+		Name: "Test",
+		Bindings: []keys.KeyBinding{
+			{Key: "q", Action: keys.ActionQuit, Desc: "Quit"},
+		},
+	}
+
+	if section.Name != "Test" {
+		t.Errorf("expected Name 'Test', got %q", section.Name)
+	}
+	if len(section.Bindings) != 1 {
+		t.Errorf("expected 1 binding, got %d", len(section.Bindings))
 	}
 }

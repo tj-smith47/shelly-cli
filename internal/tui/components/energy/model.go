@@ -76,6 +76,7 @@ type Model struct {
 	styles          Styles
 	refreshInterval time.Duration
 	scrollOffset    int
+	cursor          int // Currently selected row
 }
 
 // Styles for the energy component.
@@ -95,8 +96,10 @@ type Styles struct {
 	DeviceAddress lipgloss.Style
 	OnlineIcon    lipgloss.Style
 	OfflineIcon   lipgloss.Style
+	UpdatingIcon  lipgloss.Style
 	Separator     lipgloss.Style
 	Footer        lipgloss.Style
+	SelectedRow   lipgloss.Style
 }
 
 // DefaultStyles returns default styles for energy.
@@ -149,11 +152,17 @@ func DefaultStyles() Styles {
 			Foreground(colors.Online),
 		OfflineIcon: lipgloss.NewStyle().
 			Foreground(colors.Offline),
+		UpdatingIcon: lipgloss.NewStyle().
+			Foreground(colors.Updating),
 		Separator: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		Footer: lipgloss.NewStyle().
 			Foreground(colors.Muted).
 			Italic(true),
+		SelectedRow: lipgloss.NewStyle().
+			Background(colors.AltBackground).
+			Foreground(colors.Highlight).
+			Bold(true),
 	}
 }
 
@@ -202,8 +211,12 @@ func (m Model) fetchEnergy() tea.Cmd {
 			return UpdateMsg{Devices: nil}
 		}
 
+		// Add timeout to prevent slow/offline devices from blocking UI
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
 		// Use errgroup for concurrent fetching
-		g, ctx := errgroup.WithContext(m.ctx)
+		g, gctx := errgroup.WithContext(ctx)
 		g.SetLimit(10)
 
 		results := make(chan DeviceEnergy, len(deviceMap))
@@ -211,7 +224,7 @@ func (m Model) fetchEnergy() tea.Cmd {
 		for _, d := range deviceMap {
 			device := d
 			g.Go(func() error {
-				energy := m.fetchDeviceEnergy(ctx, device)
+				energy := m.fetchDeviceEnergy(gctx, device)
 				results <- energy
 				return nil
 			})
@@ -246,6 +259,10 @@ func (m Model) fetchDeviceEnergy(ctx context.Context, device model.Device) Devic
 		Type:    device.Type,
 		Online:  false,
 	}
+
+	// Per-device timeout to prevent single slow device from blocking others
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
 	snapshot, err := m.svc.GetMonitoringSnapshot(ctx, device.Address)
 	if err != nil {
@@ -334,30 +351,99 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		)
 
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "j", "down":
-			maxScroll := len(m.devices) - m.visibleDevices()
-			if maxScroll < 0 {
-				maxScroll = 0
-			}
-			if m.scrollOffset < maxScroll {
-				m.scrollOffset++
-			}
-		case "k", "up":
-			if m.scrollOffset > 0 {
-				m.scrollOffset--
-			}
-		case "g":
-			m.scrollOffset = 0
-		case "G":
-			maxScroll := len(m.devices) - m.visibleDevices()
-			if maxScroll > 0 {
-				m.scrollOffset = maxScroll
-			}
-		}
+		m = m.handleKeyPress(msg)
 	}
 
 	return m, nil
+}
+
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
+	switch msg.String() {
+	case "j", "down":
+		m = m.cursorDown()
+	case "k", "up":
+		m = m.cursorUp()
+	case "g":
+		m.cursor = 0
+		m.scrollOffset = 0
+	case "G":
+		m = m.cursorToEnd()
+	case "pgdown", "ctrl+d":
+		m = m.pageDown()
+	case "pgup", "ctrl+u":
+		m = m.pageUp()
+	}
+	return m
+}
+
+func (m Model) cursorDown() Model {
+	if m.cursor < len(m.devices)-1 {
+		m.cursor++
+		visibleDevices := m.visibleDevices()
+		if m.cursor >= m.scrollOffset+visibleDevices {
+			m.scrollOffset = m.cursor - visibleDevices + 1
+		}
+	}
+	return m
+}
+
+func (m Model) cursorUp() Model {
+	if m.cursor > 0 {
+		m.cursor--
+		if m.cursor < m.scrollOffset {
+			m.scrollOffset = m.cursor
+		}
+	}
+	return m
+}
+
+func (m Model) cursorToEnd() Model {
+	if len(m.devices) > 0 {
+		m.cursor = len(m.devices) - 1
+		maxOffset := len(m.devices) - m.visibleDevices()
+		if maxOffset < 0 {
+			maxOffset = 0
+		}
+		m.scrollOffset = maxOffset
+	}
+	return m
+}
+
+func (m Model) pageDown() Model {
+	if len(m.devices) == 0 {
+		return m
+	}
+	visibleDevices := m.visibleDevices()
+	m.cursor += visibleDevices
+	if m.cursor >= len(m.devices) {
+		m.cursor = len(m.devices) - 1
+	}
+	if m.cursor >= m.scrollOffset+visibleDevices {
+		m.scrollOffset = m.cursor - visibleDevices + 1
+	}
+	maxOffset := len(m.devices) - visibleDevices
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.scrollOffset > maxOffset {
+		m.scrollOffset = maxOffset
+	}
+	return m
+}
+
+func (m Model) pageUp() Model {
+	if len(m.devices) == 0 {
+		return m
+	}
+	visibleDevices := m.visibleDevices()
+	m.cursor -= visibleDevices
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	return m
 }
 
 // visibleDevices calculates how many device rows can be displayed.
@@ -379,11 +465,12 @@ func (m Model) SetSize(width, height int) Model {
 // View renders the energy dashboard.
 func (m Model) View() string {
 	if m.loading {
+		loadingText := m.styles.UpdatingIcon.Render("◐ ") + "Fetching energy data..."
 		return m.styles.Container.
 			Width(m.width-4).
 			Height(m.height).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render("Fetching energy data...")
+			Render(loadingText)
 	}
 
 	if m.err != nil {
@@ -434,7 +521,8 @@ func (m Model) View() string {
 	var deviceRows string
 	for i := startIdx; i < endIdx; i++ {
 		d := m.devices[i]
-		deviceRows += m.renderDeviceRow(d)
+		isSelected := i == m.cursor
+		deviceRows += m.renderDeviceRow(d, isSelected)
 		if i < endIdx-1 {
 			deviceRows += m.styles.Separator.Render("─────────────────────────────────────────────────") + "\n"
 		}
@@ -465,40 +553,65 @@ func (m Model) renderSummaryCard(label, value string) string {
 	return m.styles.Card.Width(22).Render(content)
 }
 
-func (m Model) renderDeviceRow(d DeviceEnergy) string {
+func (m Model) renderDeviceRow(d DeviceEnergy, isSelected bool) string {
+	line1 := m.renderDeviceHeader(d, isSelected)
+	line2 := m.renderDeviceMetrics(d)
+	return m.applyRowStyle(line1, line2, isSelected)
+}
+
+// renderDeviceHeader renders the first line with status icon and device info.
+func (m Model) renderDeviceHeader(d DeviceEnergy, isSelected bool) string {
+	selIndicator := "  "
+	if isSelected {
+		selIndicator = "▶ "
+	}
+
 	statusIcon := m.styles.OfflineIcon.Render("○")
 	if d.Online {
 		statusIcon = m.styles.OnlineIcon.Render("●")
 	}
 
-	// First line: status, name, address
-	line1 := fmt.Sprintf("%s %s  %s",
+	return fmt.Sprintf("%s%s %s  %s",
+		selIndicator,
 		statusIcon,
 		m.styles.DeviceName.Render(d.Name),
 		m.styles.DeviceAddress.Render(d.Address),
 	)
+}
 
+// renderDeviceMetrics renders the second line with power metrics or error.
+func (m Model) renderDeviceMetrics(d DeviceEnergy) string {
 	if !d.Online {
-		errMsg := "unreachable"
-		if d.Error != nil {
-			errMsg = d.Error.Error()
-			if len(errMsg) > 40 {
-				errMsg = errMsg[:40] + "..."
-			}
-		}
-		line2 := "  " + theme.StatusError().Render(errMsg)
-		return line1 + "\n" + line2 + "\n"
+		return "    " + theme.StatusError().Render(m.formatError(d.Error))
 	}
 
-	// Second line: power metrics
-	metrics := []string{}
+	metrics := m.buildMetricsList(d)
+	if len(metrics) == 0 {
+		return "    " + m.styles.Label.Render("no power data")
+	}
+	return "    " + m.joinMetrics(metrics)
+}
 
-	// Power with color based on consumption/generation
-	powerStr := m.formatPower(d.Power)
+// formatError formats an error message, truncating if necessary.
+func (m Model) formatError(err error) string {
+	if err == nil {
+		return "unreachable"
+	}
+	errMsg := err.Error()
+	if len(errMsg) > 40 {
+		return errMsg[:40] + "..."
+	}
+	return errMsg
+}
+
+// buildMetricsList builds the list of metric strings for a device.
+func (m Model) buildMetricsList(d DeviceEnergy) []string {
+	var metrics []string
+
 	if d.Power < 0 {
-		metrics = append(metrics, m.styles.Positive.Render(powerStr+" (generating)"))
+		metrics = append(metrics, m.styles.Positive.Render(m.formatPower(d.Power)+" (generating)"))
 	} else if d.Power > 0 {
-		metrics = append(metrics, m.styles.Value.Render(powerStr))
+		metrics = append(metrics, m.styles.Value.Render(m.formatPower(d.Power)))
 	}
 
 	if d.Voltage > 0 {
@@ -511,19 +624,28 @@ func (m Model) renderDeviceRow(d DeviceEnergy) string {
 		metrics = append(metrics, m.styles.Label.Render("Total: ")+m.styles.Value.Render(m.formatEnergy(d.TotalEnergy)))
 	}
 
-	line2 := "  "
-	if len(metrics) > 0 {
-		for i, metric := range metrics {
-			if i > 0 {
-				line2 += m.styles.Separator.Render(" │ ")
-			}
-			line2 += metric
-		}
-	} else {
-		line2 += m.styles.Label.Render("no power data")
-	}
+	return metrics
+}
 
-	return line1 + "\n" + line2 + "\n"
+// joinMetrics joins metrics with separators.
+func (m Model) joinMetrics(metrics []string) string {
+	result := ""
+	for i, metric := range metrics {
+		if i > 0 {
+			result += m.styles.Separator.Render(" │ ")
+		}
+		result += metric
+	}
+	return result
+}
+
+// applyRowStyle applies the appropriate style to the row content.
+func (m Model) applyRowStyle(line1, line2 string, isSelected bool) string {
+	content := line1 + "\n" + line2
+	if isSelected {
+		return m.styles.SelectedRow.Render(content) + "\n"
+	}
+	return content + "\n"
 }
 
 func (m Model) formatPower(watts float64) string {
@@ -557,4 +679,20 @@ func (m Model) TotalPower() float64 {
 // DeviceCount returns the number of devices.
 func (m Model) DeviceCount() int {
 	return len(m.devices)
+}
+
+// SelectedDevice returns the currently selected device, if any.
+func (m Model) SelectedDevice() *DeviceEnergy {
+	if len(m.devices) == 0 {
+		return nil
+	}
+	if m.cursor < 0 || m.cursor >= len(m.devices) {
+		return nil
+	}
+	return &m.devices[m.cursor]
+}
+
+// Cursor returns the current cursor position.
+func (m Model) Cursor() int {
+	return m.cursor
 }

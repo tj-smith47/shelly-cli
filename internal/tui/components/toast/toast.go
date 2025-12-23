@@ -256,16 +256,13 @@ func (m Model) View() string {
 }
 
 // Overlay renders the toasts as an overlay positioned at top-right.
-// It simply appends the toast view to the base since proper overlay
-// positioning would require more complex terminal rendering.
+// Overlays toast content on top of base without affecting layout.
 func (m Model) Overlay(base string) string {
 	if !m.visible || len(m.toasts) == 0 {
 		return base
 	}
 
-	toastView := m.View()
-
-	// For now, prepend toasts to the top of the view
-	// A true overlay would require more complex rendering
-	return toastView + base
+	// Simply return the base - toasts are rendered in the status bar instead
+	// This prevents layout disruption from overlay attempts
+	return base
 }

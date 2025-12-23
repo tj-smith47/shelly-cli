@@ -54,7 +54,6 @@ func run(cmd *cobra.Command, f *cmdutil.Factory, refresh int, filter string) err
 
 	opts := tui.Options{
 		RefreshInterval: time.Duration(refresh) * time.Second,
-		InitialView:     tui.ViewDevices,
 		Filter:          filter,
 	}
 

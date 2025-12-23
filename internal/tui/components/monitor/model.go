@@ -76,24 +76,27 @@ type Model struct {
 	styles          Styles
 	refreshInterval time.Duration
 	scrollOffset    int
+	cursor          int // Currently selected row
 }
 
 // Styles for the monitor component.
 type Styles struct {
-	Container   lipgloss.Style
-	Header      lipgloss.Style
-	Row         lipgloss.Style
-	OnlineIcon  lipgloss.Style
-	OfflineIcon lipgloss.Style
-	DeviceName  lipgloss.Style
-	Address     lipgloss.Style
-	Power       lipgloss.Style
-	Voltage     lipgloss.Style
-	Current     lipgloss.Style
-	Label       lipgloss.Style
-	Value       lipgloss.Style
-	LastUpdated lipgloss.Style
-	Separator   lipgloss.Style
+	Container    lipgloss.Style
+	Header       lipgloss.Style
+	Row          lipgloss.Style
+	SelectedRow  lipgloss.Style
+	OnlineIcon   lipgloss.Style
+	OfflineIcon  lipgloss.Style
+	UpdatingIcon lipgloss.Style
+	DeviceName   lipgloss.Style
+	Address      lipgloss.Style
+	Power        lipgloss.Style
+	Voltage      lipgloss.Style
+	Current      lipgloss.Style
+	Label        lipgloss.Style
+	Value        lipgloss.Style
+	LastUpdated  lipgloss.Style
+	Separator    lipgloss.Style
 }
 
 // DefaultStyles returns default styles for the monitor.
@@ -111,10 +114,17 @@ func DefaultStyles() Styles {
 			MarginBottom(1),
 		Row: lipgloss.NewStyle().
 			MarginBottom(1),
+		SelectedRow: lipgloss.NewStyle().
+			Background(colors.AltBackground).
+			Foreground(colors.Highlight).
+			Bold(true).
+			MarginBottom(1),
 		OnlineIcon: lipgloss.NewStyle().
 			Foreground(colors.Online),
 		OfflineIcon: lipgloss.NewStyle().
 			Foreground(colors.Offline),
+		UpdatingIcon: lipgloss.NewStyle().
+			Foreground(colors.Updating),
 		DeviceName: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Text),
@@ -186,8 +196,12 @@ func (m Model) fetchStatuses() tea.Cmd {
 			return StatusUpdateMsg{Statuses: nil}
 		}
 
+		// Add timeout to prevent slow/offline devices from blocking UI
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
 		// Use errgroup for concurrent status fetching
-		g, ctx := errgroup.WithContext(m.ctx)
+		g, gctx := errgroup.WithContext(ctx)
 		g.SetLimit(10)
 
 		results := make(chan DeviceStatus, len(deviceMap))
@@ -195,7 +209,7 @@ func (m Model) fetchStatuses() tea.Cmd {
 		for _, d := range deviceMap {
 			device := d
 			g.Go(func() error {
-				status := m.checkDeviceStatus(ctx, device)
+				status := m.checkDeviceStatus(gctx, device)
 				results <- status
 				return nil
 			})
@@ -231,6 +245,10 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 		Online:    false,
 		UpdatedAt: time.Now(),
 	}
+
+	// Per-device timeout to prevent single slow device from blocking others
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
 	snapshot, err := m.svc.GetMonitoringSnapshot(ctx, device.Address)
 	if err != nil {
@@ -316,25 +334,99 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		)
 
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "j", "down":
-			if m.scrollOffset < len(m.statuses)-1 {
-				m.scrollOffset++
-			}
-		case "k", "up":
-			if m.scrollOffset > 0 {
-				m.scrollOffset--
-			}
-		case "g":
-			m.scrollOffset = 0
-		case "G":
-			if len(m.statuses) > 0 {
-				m.scrollOffset = len(m.statuses) - 1
-			}
-		}
+		m = m.handleKeyPress(msg)
 	}
 
 	return m, nil
+}
+
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
+	switch msg.String() {
+	case "j", "down":
+		m = m.cursorDown()
+	case "k", "up":
+		m = m.cursorUp()
+	case "g":
+		m.cursor = 0
+		m.scrollOffset = 0
+	case "G":
+		m = m.cursorToEnd()
+	case "pgdown", "ctrl+d":
+		m = m.pageDown()
+	case "pgup", "ctrl+u":
+		m = m.pageUp()
+	}
+	return m
+}
+
+func (m Model) cursorDown() Model {
+	if m.cursor < len(m.statuses)-1 {
+		m.cursor++
+		visibleRows := m.visibleRows()
+		if m.cursor >= m.scrollOffset+visibleRows {
+			m.scrollOffset = m.cursor - visibleRows + 1
+		}
+	}
+	return m
+}
+
+func (m Model) cursorUp() Model {
+	if m.cursor > 0 {
+		m.cursor--
+		if m.cursor < m.scrollOffset {
+			m.scrollOffset = m.cursor
+		}
+	}
+	return m
+}
+
+func (m Model) cursorToEnd() Model {
+	if len(m.statuses) > 0 {
+		m.cursor = len(m.statuses) - 1
+		maxOffset := len(m.statuses) - m.visibleRows()
+		if maxOffset < 0 {
+			maxOffset = 0
+		}
+		m.scrollOffset = maxOffset
+	}
+	return m
+}
+
+func (m Model) pageDown() Model {
+	if len(m.statuses) == 0 {
+		return m
+	}
+	visibleRows := m.visibleRows()
+	m.cursor += visibleRows
+	if m.cursor >= len(m.statuses) {
+		m.cursor = len(m.statuses) - 1
+	}
+	if m.cursor >= m.scrollOffset+visibleRows {
+		m.scrollOffset = m.cursor - visibleRows + 1
+	}
+	maxOffset := len(m.statuses) - visibleRows
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.scrollOffset > maxOffset {
+		m.scrollOffset = maxOffset
+	}
+	return m
+}
+
+func (m Model) pageUp() Model {
+	if len(m.statuses) == 0 {
+		return m
+	}
+	visibleRows := m.visibleRows()
+	m.cursor -= visibleRows
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	return m
 }
 
 // SetSize sets the component size.
@@ -344,14 +436,31 @@ func (m Model) SetSize(width, height int) Model {
 	return m
 }
 
+// visibleRows calculates how many device rows can be displayed.
+// Each device card takes 3 lines (2 content + margin) + 1 separator = 4 lines total.
+func (m Model) visibleRows() int {
+	// Account for: header (2), footer (2), container padding (2) = 6 lines overhead
+	availableHeight := m.height - 6
+	// Each card: 2 lines content + 1 margin + 1 separator = 4 lines
+	// Last card has no separator, so for N cards: 4N - 1 lines
+	// Solving for N: N = (availableHeight + 1) / 4
+	rowHeight := 4
+	visibleRows := (availableHeight + 1) / rowHeight
+	if visibleRows < 1 {
+		return 1
+	}
+	return visibleRows
+}
+
 // View renders the monitor.
 func (m Model) View() string {
 	if m.loading {
+		loadingText := m.styles.UpdatingIcon.Render("◐ ") + "Fetching device statuses..."
 		return m.styles.Container.
 			Width(m.width-4).
 			Height(m.height).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render("Fetching device statuses...")
+			Render(loadingText)
 	}
 
 	if m.err != nil {
@@ -372,12 +481,7 @@ func (m Model) View() string {
 	header := m.styles.Header.Render("Real-Time Device Monitor")
 
 	// Calculate visible rows
-	availableHeight := m.height - 6
-	rowHeight := 3
-	visibleRows := availableHeight / rowHeight
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
+	visibleRows := m.visibleRows()
 
 	// Apply scroll offset
 	startIdx := m.scrollOffset
@@ -389,7 +493,8 @@ func (m Model) View() string {
 	var rows string
 	for i := startIdx; i < endIdx; i++ {
 		s := m.statuses[i]
-		rows += m.renderDeviceCard(s)
+		isSelected := i == m.cursor
+		rows += m.renderDeviceCard(s, isSelected)
 		if i < endIdx-1 {
 			rows += m.styles.Separator.Render("─────────────────────────────────────────") + "\n"
 		}
@@ -412,14 +517,27 @@ func (m Model) View() string {
 }
 
 // renderDeviceCard renders a single device status card.
-func (m Model) renderDeviceCard(s DeviceStatus) string {
+func (m Model) renderDeviceCard(s DeviceStatus, isSelected bool) string {
+	// Choose row style based on selection
+	rowStyle := m.styles.Row
+	if isSelected {
+		rowStyle = m.styles.SelectedRow
+	}
+
+	// Selection indicator
+	selIndicator := "  "
+	if isSelected {
+		selIndicator = "▶ "
+	}
+
 	statusIcon := m.styles.OfflineIcon.Render("○")
 	if s.Online {
 		statusIcon = m.styles.OnlineIcon.Render("●")
 	}
 
-	// First line: icon, name, address, type
-	line1 := fmt.Sprintf("%s %s  %s  %s",
+	// First line: selection indicator, icon, name, address, type
+	line1 := fmt.Sprintf("%s%s %s  %s  %s",
+		selIndicator,
 		statusIcon,
 		m.styles.DeviceName.Render(s.Name),
 		m.styles.Address.Render(s.Address),
@@ -434,8 +552,8 @@ func (m Model) renderDeviceCard(s DeviceStatus) string {
 				errMsg = errMsg[:40] + "..."
 			}
 		}
-		line2 := "  " + theme.StatusError().Render(errMsg)
-		return m.styles.Row.Render(line1+"\n"+line2) + "\n"
+		line2 := "    " + theme.StatusError().Render(errMsg)
+		return rowStyle.Render(line1+"\n"+line2) + "\n"
 	}
 
 	// Second line: metrics
@@ -454,7 +572,7 @@ func (m Model) renderDeviceCard(s DeviceStatus) string {
 		metrics = append(metrics, m.styles.Value.Render(fmt.Sprintf("%.1fHz", s.Frequency)))
 	}
 
-	line2 := "  "
+	line2 := "    "
 	if len(metrics) > 0 {
 		for i, metric := range metrics {
 			if i > 0 {
@@ -466,7 +584,7 @@ func (m Model) renderDeviceCard(s DeviceStatus) string {
 		line2 += m.styles.LastUpdated.Render("no power data")
 	}
 
-	return m.styles.Row.Render(line1+"\n"+line2) + "\n"
+	return rowStyle.Render(line1+"\n"+line2) + "\n"
 }
 
 // StatusCount returns the count of online/offline devices.
@@ -479,4 +597,20 @@ func (m Model) StatusCount() (online, offline int) {
 		}
 	}
 	return online, offline
+}
+
+// SelectedDevice returns the currently selected device, if any.
+func (m Model) SelectedDevice() *DeviceStatus {
+	if len(m.statuses) == 0 {
+		return nil
+	}
+	if m.cursor < 0 || m.cursor >= len(m.statuses) {
+		return nil
+	}
+	return &m.statuses[m.cursor]
+}
+
+// Cursor returns the current cursor position.
+func (m Model) Cursor() int {
+	return m.cursor
 }
