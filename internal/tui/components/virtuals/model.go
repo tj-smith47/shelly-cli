@@ -1,0 +1,570 @@
+// Package virtuals provides TUI components for managing virtual components.
+package virtuals
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+)
+
+// Virtual represents a virtual component on a device.
+type Virtual struct {
+	Key       string
+	Type      shelly.VirtualComponentType
+	ID        int
+	Name      string
+	BoolValue *bool
+	NumValue  *float64
+	StrValue  *string
+	Options   []string
+	Min       *float64
+	Max       *float64
+	Unit      *string
+}
+
+// Deps holds the dependencies for the virtuals component.
+type Deps struct {
+	Ctx context.Context
+	Svc *shelly.Service
+}
+
+// Validate ensures all required dependencies are set.
+func (d Deps) Validate() error {
+	if d.Ctx == nil {
+		return fmt.Errorf("context is required")
+	}
+	if d.Svc == nil {
+		return fmt.Errorf("service is required")
+	}
+	return nil
+}
+
+// LoadedMsg signals that virtual components were loaded.
+type LoadedMsg struct {
+	Virtuals []Virtual
+	Err      error
+}
+
+// ActionMsg signals a virtual component action result.
+type ActionMsg struct {
+	Action string // "toggle", "set", "trigger", "delete"
+	Key    string
+	Err    error
+}
+
+// Model displays virtual components for a device.
+type Model struct {
+	ctx      context.Context
+	svc      *shelly.Service
+	device   string
+	virtuals []Virtual
+	cursor   int
+	scroll   int
+	loading  bool
+	err      error
+	width    int
+	height   int
+	focused  bool
+	styles   Styles
+}
+
+// Styles holds styles for the virtual components list.
+type Styles struct {
+	TypeBoolean lipgloss.Style
+	TypeNumber  lipgloss.Style
+	TypeText    lipgloss.Style
+	TypeEnum    lipgloss.Style
+	TypeButton  lipgloss.Style
+	TypeGroup   lipgloss.Style
+	Value       lipgloss.Style
+	Name        lipgloss.Style
+	Selected    lipgloss.Style
+	Error       lipgloss.Style
+	Muted       lipgloss.Style
+}
+
+// DefaultStyles returns the default styles for the virtual components list.
+func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
+	return Styles{
+		TypeBoolean: lipgloss.NewStyle().
+			Foreground(colors.Online),
+		TypeNumber: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		TypeText: lipgloss.NewStyle().
+			Foreground(colors.Info),
+		TypeEnum: lipgloss.NewStyle().
+			Foreground(colors.Highlight),
+		TypeButton: lipgloss.NewStyle().
+			Foreground(colors.Error),
+		TypeGroup: lipgloss.NewStyle().
+			Foreground(colors.Muted),
+		Value: lipgloss.NewStyle().
+			Foreground(colors.Text),
+		Name: lipgloss.NewStyle().
+			Foreground(colors.Text).
+			Bold(true),
+		Selected: lipgloss.NewStyle().
+			Background(colors.AltBackground).
+			Foreground(colors.Highlight).
+			Bold(true),
+		Error: lipgloss.NewStyle().
+			Foreground(colors.Error),
+		Muted: lipgloss.NewStyle().
+			Foreground(colors.Muted),
+	}
+}
+
+// New creates a new virtuals model.
+func New(deps Deps) Model {
+	if err := deps.Validate(); err != nil {
+		panic(fmt.Sprintf("virtuals: invalid deps: %v", err))
+	}
+
+	return Model{
+		ctx:     deps.Ctx,
+		svc:     deps.Svc,
+		loading: false,
+		styles:  DefaultStyles(),
+	}
+}
+
+// Init returns the initial command.
+func (m Model) Init() tea.Cmd {
+	return nil
+}
+
+// SetDevice sets the device to list virtual components for and triggers a fetch.
+func (m Model) SetDevice(device string) (Model, tea.Cmd) {
+	m.device = device
+	m.virtuals = nil
+	m.cursor = 0
+	m.scroll = 0
+	m.err = nil
+
+	if device == "" {
+		return m, nil
+	}
+
+	m.loading = true
+	return m, m.fetchVirtuals()
+}
+
+// fetchVirtuals creates a command to fetch virtual components from the device.
+func (m Model) fetchVirtuals() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer cancel()
+
+		components, err := m.svc.ListVirtualComponents(ctx, m.device)
+		if err != nil {
+			return LoadedMsg{Err: err}
+		}
+
+		result := make([]Virtual, len(components))
+		for i, c := range components {
+			result[i] = Virtual{
+				Key:       c.Key,
+				Type:      c.Type,
+				ID:        c.ID,
+				Name:      c.Name,
+				BoolValue: c.BoolValue,
+				NumValue:  c.NumValue,
+				StrValue:  c.StrValue,
+				Options:   c.Options,
+				Min:       c.Min,
+				Max:       c.Max,
+				Unit:      c.Unit,
+			}
+		}
+
+		return LoadedMsg{Virtuals: result}
+	}
+}
+
+// SetSize sets the component dimensions.
+func (m Model) SetSize(width, height int) Model {
+	m.width = width
+	m.height = height
+	return m
+}
+
+// SetFocused sets the focus state.
+func (m Model) SetFocused(focused bool) Model {
+	m.focused = focused
+	return m
+}
+
+// Update handles messages.
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case LoadedMsg:
+		m.loading = false
+		if msg.Err != nil {
+			m.err = msg.Err
+			return m, nil
+		}
+		m.virtuals = msg.Virtuals
+		m.cursor = 0
+		m.scroll = 0
+		return m, nil
+
+	case ActionMsg:
+		if msg.Err != nil {
+			m.err = msg.Err
+			return m, nil
+		}
+		m.loading = true
+		return m, m.fetchVirtuals()
+
+	case tea.KeyPressMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleKey(msg)
+	}
+
+	return m, nil
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "j", "down":
+		m = m.cursorDown()
+	case "k", "up":
+		m = m.cursorUp()
+	case "g":
+		m.cursor = 0
+		m.scroll = 0
+	case "G":
+		m = m.cursorToEnd()
+	case "t", "enter":
+		return m, m.toggleOrTrigger()
+	case "h", "left":
+		return m, m.adjustValue(-1)
+	case "l", "right":
+		return m, m.adjustValue(1)
+	case "d":
+		return m, m.deleteVirtual()
+	case "r":
+		m.loading = true
+		return m, m.fetchVirtuals()
+	}
+
+	return m, nil
+}
+
+func (m Model) cursorDown() Model {
+	if m.cursor < len(m.virtuals)-1 {
+		m.cursor++
+		m = m.ensureVisible()
+	}
+	return m
+}
+
+func (m Model) cursorUp() Model {
+	if m.cursor > 0 {
+		m.cursor--
+		m = m.ensureVisible()
+	}
+	return m
+}
+
+func (m Model) cursorToEnd() Model {
+	if len(m.virtuals) > 0 {
+		m.cursor = len(m.virtuals) - 1
+		m = m.ensureVisible()
+	}
+	return m
+}
+
+func (m Model) ensureVisible() Model {
+	visible := m.visibleRows()
+	if m.cursor < m.scroll {
+		m.scroll = m.cursor
+	} else if m.cursor >= m.scroll+visible {
+		m.scroll = m.cursor - visible + 1
+	}
+	return m
+}
+
+func (m Model) visibleRows() int {
+	rows := m.height - 4
+	if rows < 1 {
+		return 1
+	}
+	return rows
+}
+
+func (m Model) toggleOrTrigger() tea.Cmd {
+	if len(m.virtuals) == 0 || m.cursor >= len(m.virtuals) {
+		return nil
+	}
+	v := m.virtuals[m.cursor]
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer cancel()
+
+		var err error
+		action := "toggle"
+
+		switch v.Type {
+		case shelly.VirtualBoolean:
+			err = m.svc.ToggleVirtualBoolean(ctx, m.device, v.ID)
+		case shelly.VirtualButton:
+			err = m.svc.TriggerVirtualButton(ctx, m.device, v.ID)
+			action = "trigger"
+		default:
+			return nil // No action for other types via toggle
+		}
+
+		return ActionMsg{Action: action, Key: v.Key, Err: err}
+	}
+}
+
+func (m Model) adjustValue(delta int) tea.Cmd {
+	if len(m.virtuals) == 0 || m.cursor >= len(m.virtuals) {
+		return nil
+	}
+	v := m.virtuals[m.cursor]
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer cancel()
+
+		var err error
+		switch v.Type {
+		case shelly.VirtualNumber:
+			if v.NumValue != nil {
+				newVal := *v.NumValue + float64(delta)
+				if v.Min != nil && newVal < *v.Min {
+					newVal = *v.Min
+				}
+				if v.Max != nil && newVal > *v.Max {
+					newVal = *v.Max
+				}
+				err = m.svc.SetVirtualNumber(ctx, m.device, v.ID, newVal)
+			}
+		case shelly.VirtualEnum:
+			if len(v.Options) > 0 && v.StrValue != nil {
+				idx := findIndex(v.Options, *v.StrValue)
+				if idx >= 0 {
+					newIdx := (idx + delta + len(v.Options)) % len(v.Options)
+					err = m.svc.SetVirtualEnum(ctx, m.device, v.ID, v.Options[newIdx])
+				}
+			}
+		default:
+			return nil
+		}
+
+		return ActionMsg{Action: "set", Key: v.Key, Err: err}
+	}
+}
+
+func findIndex(slice []string, val string) int {
+	for i, s := range slice {
+		if s == val {
+			return i
+		}
+	}
+	return -1
+}
+
+func (m Model) deleteVirtual() tea.Cmd {
+	if len(m.virtuals) == 0 || m.cursor >= len(m.virtuals) {
+		return nil
+	}
+	v := m.virtuals[m.cursor]
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer cancel()
+
+		err := m.svc.DeleteVirtualComponent(ctx, m.device, v.Key)
+		return ActionMsg{Action: "delete", Key: v.Key, Err: err}
+	}
+}
+
+// View renders the virtual components list.
+func (m Model) View() string {
+	r := rendering.New(m.width, m.height).
+		SetTitle("Virtual Components").
+		SetFocused(m.focused)
+
+	if m.device == "" {
+		r.SetContent(m.styles.Muted.Render("No device selected"))
+		return r.Render()
+	}
+
+	if m.loading {
+		r.SetContent(m.styles.Muted.Render("Loading virtual components..."))
+		return r.Render()
+	}
+
+	if m.err != nil {
+		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		return r.Render()
+	}
+
+	if len(m.virtuals) == 0 {
+		r.SetContent(m.styles.Muted.Render("No virtual components"))
+		return r.Render()
+	}
+
+	var content strings.Builder
+	visible := m.visibleRows()
+	endIdx := m.scroll + visible
+	if endIdx > len(m.virtuals) {
+		endIdx = len(m.virtuals)
+	}
+
+	for i := m.scroll; i < endIdx; i++ {
+		v := m.virtuals[i]
+		isSelected := i == m.cursor
+
+		line := m.renderVirtualLine(v, isSelected)
+		content.WriteString(line)
+		if i < endIdx-1 {
+			content.WriteString("\n")
+		}
+	}
+
+	if len(m.virtuals) > visible {
+		content.WriteString(m.styles.Muted.Render(
+			fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(m.virtuals)),
+		))
+	}
+
+	r.SetContent(content.String())
+	return r.Render()
+}
+
+func (m Model) renderVirtualLine(v Virtual, isSelected bool) string {
+	// Type indicator
+	var typeStr string
+	switch v.Type {
+	case shelly.VirtualBoolean:
+		typeStr = m.styles.TypeBoolean.Render("BOOL")
+	case shelly.VirtualNumber:
+		typeStr = m.styles.TypeNumber.Render("NUM ")
+	case shelly.VirtualText:
+		typeStr = m.styles.TypeText.Render("TEXT")
+	case shelly.VirtualEnum:
+		typeStr = m.styles.TypeEnum.Render("ENUM")
+	case shelly.VirtualButton:
+		typeStr = m.styles.TypeButton.Render("BTN ")
+	case shelly.VirtualGroup:
+		typeStr = m.styles.TypeGroup.Render("GRP ")
+	default:
+		typeStr = m.styles.Muted.Render("??? ")
+	}
+
+	// Selection indicator
+	selector := "  "
+	if isSelected {
+		selector = "▶ "
+	}
+
+	// Name or ID
+	name := v.Name
+	if name == "" {
+		name = fmt.Sprintf("#%d", v.ID)
+	}
+	if len(name) > 15 {
+		name = name[:12] + "..."
+	}
+	nameStr := m.styles.Name.Render(fmt.Sprintf("%-15s", name))
+
+	// Value display
+	valueStr := m.formatValue(v)
+
+	line := fmt.Sprintf("%s%s %s %s", selector, typeStr, nameStr, valueStr)
+
+	if isSelected {
+		return m.styles.Selected.Render(line)
+	}
+	return line
+}
+
+func (m Model) formatValue(v Virtual) string {
+	switch v.Type {
+	case shelly.VirtualBoolean:
+		if v.BoolValue != nil {
+			if *v.BoolValue {
+				return m.styles.TypeBoolean.Render("ON")
+			}
+			return m.styles.Muted.Render("OFF")
+		}
+	case shelly.VirtualNumber:
+		if v.NumValue != nil {
+			val := fmt.Sprintf("%.1f", *v.NumValue)
+			if v.Unit != nil {
+				val += *v.Unit
+			}
+			return m.styles.Value.Render(val)
+		}
+	case shelly.VirtualText:
+		if v.StrValue != nil {
+			text := *v.StrValue
+			if len(text) > 20 {
+				text = text[:17] + "..."
+			}
+			return m.styles.Value.Render(fmt.Sprintf("%q", text))
+		}
+	case shelly.VirtualEnum:
+		if v.StrValue != nil {
+			return m.styles.Value.Render(*v.StrValue)
+		}
+	case shelly.VirtualButton:
+		return m.styles.Muted.Render("[Press]")
+	case shelly.VirtualGroup:
+		return m.styles.Muted.Render("(group)")
+	}
+	return m.styles.Muted.Render("-")
+}
+
+// SelectedVirtual returns the currently selected virtual component, if any.
+func (m Model) SelectedVirtual() *Virtual {
+	if len(m.virtuals) == 0 || m.cursor >= len(m.virtuals) {
+		return nil
+	}
+	return &m.virtuals[m.cursor]
+}
+
+// VirtualCount returns the number of virtual components.
+func (m Model) VirtualCount() int {
+	return len(m.virtuals)
+}
+
+// Device returns the current device address.
+func (m Model) Device() string {
+	return m.device
+}
+
+// Loading returns whether the component is loading.
+func (m Model) Loading() bool {
+	return m.loading
+}
+
+// Error returns any error that occurred.
+func (m Model) Error() error {
+	return m.err
+}
+
+// Refresh triggers a refresh of the virtual components list.
+func (m Model) Refresh() (Model, tea.Cmd) {
+	if m.device == "" {
+		return m, nil
+	}
+	m.loading = true
+	return m, m.fetchVirtuals()
+}
