@@ -44,6 +44,7 @@ jobs:
     outputs:
       tag: ${{ steps.get-tag.outputs.tag }}
       version: ${{ steps.get-tag.outputs.version }}
+      should_run: ${{ steps.get-tag.outputs.should_run }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,19 +54,30 @@ jobs:
       - name: Get tag
         id: get-tag
         run: |
+          should_run=true
           if [ "${{ github.event_name }}" = "push" ]; then
             TAG="${{ github.ref_name }}"
           else
-            TAG=$(git describe --tags --abbrev=0)
+            # For workflow_run events, check if a tag exists at HEAD
+            # (AutoTag skips if commit has #none)
+            if ! git tag --points-at HEAD | grep -q .; then
+              echo "No tag at HEAD - AutoTag likely skipped (commit has #none)"
+              should_run=false
+              TAG=""
+            else
+              TAG=$(git describe --tags --abbrev=0)
+            fi
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "should_run=${should_run}" >> $GITHUB_OUTPUT
 
   # =============================================================================
   # Build job - runs on native platform runners for CGO support
   # =============================================================================
   build:
     needs: prepare
+    if: ${{ needs.prepare.outputs.should_run == 'true' }}
     strategy:
       fail-fast: false
       matrix:
