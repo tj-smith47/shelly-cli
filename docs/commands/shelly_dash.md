@@ -9,18 +9,14 @@ Launch the interactive TUI dashboard for managing Shelly devices.
 The dashboard provides real-time monitoring, device control, and energy
 tracking in a full-screen terminal interface.
 
-Views:
-  1 - Devices   List and manage registered devices
-  2 - Monitor   Real-time device status monitoring
-  3 - Events    Device event stream
-  4 - Energy    Power consumption and energy dashboard
-
 Navigation:
   j/k or arrows  Navigate up/down
-  tab            Switch between views
-  1-4            Jump to specific view
-  enter          Select/toggle device
-  r              Refresh data
+  h/l            Select component within device
+  t              Toggle device/component
+  o/O            Turn on/off
+  R              Reboot device
+  /              Filter devices
+  :              Command mode
   ?              Show keyboard shortcuts
   q              Quit
 
@@ -37,9 +33,6 @@ shelly dash [flags]
   # Launch with 10 second refresh interval
   shelly dash --refresh 10
 
-  # Start in monitor view
-  shelly dash --view monitor
-
   # Start with a device filter
   shelly dash --filter kitchen
 ```
@@ -50,7 +43,6 @@ shelly dash [flags]
       --filter string   Filter devices by name pattern
   -h, --help            help for dash
       --refresh int     Data refresh interval in seconds (default 5)
-      --view string     Initial view (devices, monitor, events, energy) (default "devices")
 ```
 
 ### Options inherited from parent commands
@@ -73,5 +65,4 @@ shelly dash [flags]
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
 * [shelly dash devices](shelly_dash_devices.md)	 - Launch dashboard in devices view
 * [shelly dash events](shelly_dash_events.md)	 - Launch dashboard in events view
-* [shelly dash monitor](shelly_dash_monitor.md)	 - Launch dashboard in monitor view
 

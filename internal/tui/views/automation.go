@@ -47,6 +47,12 @@ const (
 // TabAutomation is the automation tab ID.
 const TabAutomation tabs.TabID = 10
 
+// Key string constants for key handling.
+const (
+	keyTab      = "tab"
+	keyShiftTab = "shift+tab"
+)
+
 // AutomationDeps holds dependencies for the automation view.
 type AutomationDeps struct {
 	Ctx context.Context
@@ -226,9 +232,9 @@ func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 
 func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) {
 	switch msg.String() {
-	case "tab":
+	case keyTab:
 		a.focusNext()
-	case "shift+tab":
+	case keyShiftTab:
 		a.focusPrev()
 	case "1":
 		a.focusedPanel = PanelScripts

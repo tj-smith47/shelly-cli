@@ -134,7 +134,9 @@ func run(f *cmdutil.Factory, generation int, deviceType string) error {
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
-	fmt.Fprintln(ios.Out)
+	if _, err := fmt.Fprintln(ios.Out); err != nil {
+		ios.DebugErr("print newline", err)
+	}
 
 	return nil
 }

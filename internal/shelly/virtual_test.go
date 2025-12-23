@@ -89,7 +89,7 @@ func TestParseVirtualComponent_ValidBoolean(t *testing.T) {
 
 func TestParseVirtualComponent_ValidNumber(t *testing.T) {
 	t.Parallel()
-	min := 0.0
+	minVal := 0.0
 	maxVal := 100.0
 	comp := componentInfo{
 		Key:    "number:201",
@@ -107,8 +107,8 @@ func TestParseVirtualComponent_ValidNumber(t *testing.T) {
 	if vc.ID != 201 {
 		t.Errorf("ID = %d, want 201", vc.ID)
 	}
-	if vc.Min == nil || *vc.Min != min {
-		t.Errorf("Min = %v, want %v", vc.Min, min)
+	if vc.Min == nil || *vc.Min != minVal {
+		t.Errorf("Min = %v, want %v", vc.Min, minVal)
 	}
 	if vc.Max == nil || *vc.Max != maxVal {
 		t.Errorf("Max = %v, want %v", vc.Max, maxVal)
@@ -222,7 +222,7 @@ func TestVirtualComponent_Fields(t *testing.T) {
 	boolVal := true
 	numVal := 42.0
 	strVal := "test"
-	min := 0.0
+	minVal := 0.0
 	maxVal := 100.0
 	unit := "°C"
 
@@ -236,7 +236,7 @@ func TestVirtualComponent_Fields(t *testing.T) {
 		NumValue:  &numVal,
 		StrValue:  &strVal,
 		Options:   []string{"a", "b"},
-		Min:       &min,
+		Min:       &minVal,
 		Max:       &maxVal,
 		Unit:      &unit,
 	}

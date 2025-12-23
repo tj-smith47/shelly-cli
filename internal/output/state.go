@@ -32,14 +32,6 @@ func colorEnabled() bool {
 	return true
 }
 
-// renderStyled applies a theme style if color is enabled, otherwise returns plain text.
-func renderStyled(style theme.StyleFunc, text string) string {
-	if colorEnabled() {
-		return style(text)
-	}
-	return text
-}
-
 // Case defines text casing for boolean labels.
 type Case int
 
