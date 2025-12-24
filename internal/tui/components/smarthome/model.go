@@ -1,0 +1,506 @@
+// Package smarthome provides TUI components for managing smart home protocol settings.
+// This includes Matter, Zigbee, and LoRa configuration.
+package smarthome
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+)
+
+// Deps holds the dependencies for the SmartHome component.
+type Deps struct {
+	Ctx context.Context
+	Svc *shelly.Service
+}
+
+// Validate ensures all required dependencies are set.
+func (d Deps) Validate() error {
+	if d.Ctx == nil {
+		return fmt.Errorf("context is required")
+	}
+	if d.Svc == nil {
+		return fmt.Errorf("service is required")
+	}
+	return nil
+}
+
+// Protocol identifies which protocol section is focused.
+type Protocol int
+
+// Protocol constants.
+const (
+	ProtocolMatter Protocol = iota // Matter protocol section
+	ProtocolZigbee                 // Zigbee protocol section
+	ProtocolLoRa                   // LoRa protocol section
+)
+
+// StatusLoadedMsg signals that smart home statuses were loaded.
+type StatusLoadedMsg struct {
+	Matter *shelly.TUIMatterStatus
+	Zigbee *shelly.TUIZigbeeStatus
+	LoRa   *shelly.TUILoRaStatus
+	Err    error
+}
+
+// Model displays smart home protocol settings for a device.
+type Model struct {
+	ctx            context.Context
+	svc            *shelly.Service
+	device         string
+	matter         *shelly.TUIMatterStatus
+	zigbee         *shelly.TUIZigbeeStatus
+	lora           *shelly.TUILoRaStatus
+	activeProtocol Protocol
+	loading        bool
+	err            error
+	width          int
+	height         int
+	focused        bool
+	styles         Styles
+}
+
+// Styles holds styles for the SmartHome component.
+type Styles struct {
+	Enabled   lipgloss.Style
+	Disabled  lipgloss.Style
+	Label     lipgloss.Style
+	Value     lipgloss.Style
+	Highlight lipgloss.Style
+	Error     lipgloss.Style
+	Muted     lipgloss.Style
+	Section   lipgloss.Style
+	Active    lipgloss.Style
+	Warning   lipgloss.Style
+}
+
+// DefaultStyles returns the default styles for the SmartHome component.
+func DefaultStyles() Styles {
+	colors := theme.GetSemanticColors()
+	return Styles{
+		Enabled: lipgloss.NewStyle().
+			Foreground(colors.Online),
+		Disabled: lipgloss.NewStyle().
+			Foreground(colors.Offline),
+		Label: lipgloss.NewStyle().
+			Foreground(colors.Muted),
+		Value: lipgloss.NewStyle().
+			Foreground(colors.Text),
+		Highlight: lipgloss.NewStyle().
+			Foreground(colors.Highlight).
+			Bold(true),
+		Error: lipgloss.NewStyle().
+			Foreground(colors.Error),
+		Muted: lipgloss.NewStyle().
+			Foreground(colors.Muted),
+		Section: lipgloss.NewStyle().
+			Foreground(colors.Highlight).
+			Bold(true),
+		Active: lipgloss.NewStyle().
+			Background(colors.AltBackground).
+			Foreground(colors.Highlight).
+			Bold(true),
+		Warning: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+	}
+}
+
+// New creates a new SmartHome model.
+func New(deps Deps) Model {
+	if err := deps.Validate(); err != nil {
+		panic(fmt.Sprintf("smarthome: invalid deps: %v", err))
+	}
+
+	return Model{
+		ctx:    deps.Ctx,
+		svc:    deps.Svc,
+		styles: DefaultStyles(),
+	}
+}
+
+// Init returns the initial command.
+func (m Model) Init() tea.Cmd {
+	return nil
+}
+
+// SetDevice sets the device to display smart home settings for and triggers a fetch.
+func (m Model) SetDevice(device string) (Model, tea.Cmd) {
+	m.device = device
+	m.matter = nil
+	m.zigbee = nil
+	m.lora = nil
+	m.activeProtocol = ProtocolMatter
+	m.err = nil
+
+	if device == "" {
+		return m, nil
+	}
+
+	m.loading = true
+	return m, m.fetchStatus()
+}
+
+func (m Model) fetchStatus() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		var msg StatusLoadedMsg
+		msg.Matter = m.fetchMatter(ctx)
+		msg.Zigbee = m.fetchZigbee(ctx)
+		msg.LoRa = m.fetchLoRa(ctx)
+
+		// If we got nothing at all, set an error
+		if msg.Matter == nil && msg.Zigbee == nil && msg.LoRa == nil {
+			msg.Err = fmt.Errorf("no smart home protocols available")
+		}
+
+		return msg
+	}
+}
+
+func (m Model) fetchMatter(ctx context.Context) *shelly.TUIMatterStatus {
+	status, err := m.svc.GetTUIMatterStatus(ctx, m.device)
+	if err != nil {
+		return nil
+	}
+	return status
+}
+
+func (m Model) fetchZigbee(ctx context.Context) *shelly.TUIZigbeeStatus {
+	status, err := m.svc.GetTUIZigbeeStatus(ctx, m.device)
+	if err != nil {
+		return nil
+	}
+	return status
+}
+
+func (m Model) fetchLoRa(ctx context.Context) *shelly.TUILoRaStatus {
+	status, err := m.svc.GetTUILoRaStatus(ctx, m.device)
+	if err != nil {
+		return nil
+	}
+	return status
+}
+
+// SetSize sets the component dimensions.
+func (m Model) SetSize(width, height int) Model {
+	m.width = width
+	m.height = height
+	return m
+}
+
+// SetFocused sets the focus state.
+func (m Model) SetFocused(focused bool) Model {
+	m.focused = focused
+	return m
+}
+
+// Update handles messages.
+func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case StatusLoadedMsg:
+		m.loading = false
+		if msg.Err != nil {
+			m.err = msg.Err
+			return m, nil
+		}
+		m.matter = msg.Matter
+		m.zigbee = msg.Zigbee
+		m.lora = msg.LoRa
+		return m, nil
+
+	case tea.KeyPressMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleKey(msg)
+	}
+
+	return m, nil
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "j", "down":
+		m = m.nextProtocol()
+	case "k", "up":
+		m = m.prevProtocol()
+	case "r":
+		if !m.loading && m.device != "" {
+			m.loading = true
+			return m, m.fetchStatus()
+		}
+	case "1":
+		m.activeProtocol = ProtocolMatter
+	case "2":
+		m.activeProtocol = ProtocolZigbee
+	case "3":
+		m.activeProtocol = ProtocolLoRa
+	}
+
+	return m, nil
+}
+
+func (m Model) nextProtocol() Model {
+	switch m.activeProtocol {
+	case ProtocolMatter:
+		m.activeProtocol = ProtocolZigbee
+	case ProtocolZigbee:
+		m.activeProtocol = ProtocolLoRa
+	case ProtocolLoRa:
+		m.activeProtocol = ProtocolMatter
+	}
+	return m
+}
+
+func (m Model) prevProtocol() Model {
+	switch m.activeProtocol {
+	case ProtocolMatter:
+		m.activeProtocol = ProtocolLoRa
+	case ProtocolZigbee:
+		m.activeProtocol = ProtocolMatter
+	case ProtocolLoRa:
+		m.activeProtocol = ProtocolZigbee
+	}
+	return m
+}
+
+// View renders the SmartHome component.
+func (m Model) View() string {
+	r := rendering.New(m.width, m.height).
+		SetTitle("Smart Home").
+		SetFocused(m.focused)
+
+	if m.device == "" {
+		r.SetContent(m.styles.Muted.Render("No device selected"))
+		return r.Render()
+	}
+
+	if m.loading {
+		r.SetContent(m.styles.Muted.Render("Loading smart home protocols..."))
+		return r.Render()
+	}
+
+	if m.err != nil {
+		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		return r.Render()
+	}
+
+	var content strings.Builder
+
+	// Matter Section
+	content.WriteString(m.renderMatter())
+	content.WriteString("\n\n")
+
+	// Zigbee Section
+	content.WriteString(m.renderZigbee())
+	content.WriteString("\n\n")
+
+	// LoRa Section
+	content.WriteString(m.renderLoRa())
+
+	// Help text
+	content.WriteString("\n\n")
+	content.WriteString(m.styles.Muted.Render("1-3: select | j/k: navigate | r: refresh"))
+
+	r.SetContent(content.String())
+	return r.Render()
+}
+
+func (m Model) renderMatter() string {
+	var content strings.Builder
+
+	// Section header
+	header := "Matter"
+	if m.activeProtocol == ProtocolMatter {
+		header = "▶ " + header
+		content.WriteString(m.styles.Active.Render(header))
+	} else {
+		header = "  " + header
+		content.WriteString(m.styles.Section.Render(header))
+	}
+	content.WriteString("\n")
+
+	if m.matter == nil {
+		content.WriteString(m.styles.Muted.Render("    Not supported (Gen4+ only)"))
+		return content.String()
+	}
+
+	// Enabled status
+	if m.matter.Enabled {
+		content.WriteString("    " + m.styles.Enabled.Render("● Enabled") + "\n")
+	} else {
+		content.WriteString("    " + m.styles.Disabled.Render("○ Disabled") + "\n")
+		return content.String()
+	}
+
+	// Commissionable status
+	content.WriteString("    " + m.styles.Label.Render("Commission: "))
+	if m.matter.Commissionable {
+		content.WriteString(m.styles.Warning.Render("Ready to pair"))
+	} else {
+		content.WriteString(m.styles.Muted.Render("Already paired"))
+	}
+	content.WriteString("\n")
+
+	// Fabrics count
+	content.WriteString("    " + m.styles.Label.Render("Fabrics:    "))
+	content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", m.matter.FabricsCount)))
+
+	return content.String()
+}
+
+func (m Model) renderZigbee() string {
+	var content strings.Builder
+
+	// Section header
+	header := "Zigbee"
+	if m.activeProtocol == ProtocolZigbee {
+		header = "▶ " + header
+		content.WriteString(m.styles.Active.Render(header))
+	} else {
+		header = "  " + header
+		content.WriteString(m.styles.Section.Render(header))
+	}
+	content.WriteString("\n")
+
+	if m.zigbee == nil {
+		content.WriteString(m.styles.Muted.Render("    Not supported"))
+		return content.String()
+	}
+
+	// Enabled status
+	if m.zigbee.Enabled {
+		content.WriteString("    " + m.styles.Enabled.Render("● Enabled") + "\n")
+	} else {
+		content.WriteString("    " + m.styles.Disabled.Render("○ Disabled") + "\n")
+		return content.String()
+	}
+
+	// Network state
+	content.WriteString("    " + m.styles.Label.Render("State:   "))
+	switch m.zigbee.NetworkState {
+	case "joined":
+		content.WriteString(m.styles.Enabled.Render("Joined"))
+	case "steering":
+		content.WriteString(m.styles.Warning.Render("Searching..."))
+	case "ready":
+		content.WriteString(m.styles.Muted.Render("Ready"))
+	default:
+		content.WriteString(m.styles.Muted.Render(m.zigbee.NetworkState))
+	}
+	content.WriteString("\n")
+
+	// Channel and PAN ID
+	if m.zigbee.NetworkState == "joined" {
+		content.WriteString("    " + m.styles.Label.Render("Channel: "))
+		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", m.zigbee.Channel)))
+		content.WriteString("\n")
+
+		content.WriteString("    " + m.styles.Label.Render("PAN ID:  "))
+		content.WriteString(m.styles.Value.Render(fmt.Sprintf("0x%04X", m.zigbee.PANID)))
+	}
+
+	return content.String()
+}
+
+func (m Model) renderLoRa() string {
+	var content strings.Builder
+
+	// Section header
+	header := "LoRa"
+	if m.activeProtocol == ProtocolLoRa {
+		header = "▶ " + header
+		content.WriteString(m.styles.Active.Render(header))
+	} else {
+		header = "  " + header
+		content.WriteString(m.styles.Section.Render(header))
+	}
+	content.WriteString("\n")
+
+	if m.lora == nil {
+		content.WriteString(m.styles.Muted.Render("    Not supported (add-on required)"))
+		return content.String()
+	}
+
+	// Enabled status
+	if m.lora.Enabled {
+		content.WriteString("    " + m.styles.Enabled.Render("● Enabled") + "\n")
+	} else {
+		content.WriteString("    " + m.styles.Disabled.Render("○ Disabled") + "\n")
+		return content.String()
+	}
+
+	// Frequency
+	content.WriteString("    " + m.styles.Label.Render("Freq:   "))
+	freqMHz := float64(m.lora.Frequency) / 1000000
+	content.WriteString(m.styles.Value.Render(fmt.Sprintf("%.2f MHz", freqMHz)))
+	content.WriteString("\n")
+
+	// TX Power
+	content.WriteString("    " + m.styles.Label.Render("Power:  "))
+	content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d dBm", m.lora.TxPower)))
+
+	// Last RSSI/SNR if available
+	if m.lora.RSSI != 0 {
+		content.WriteString("\n    " + m.styles.Label.Render("Last RSSI: "))
+		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d dBm", m.lora.RSSI)))
+		content.WriteString(" | SNR: ")
+		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%.1f dB", m.lora.SNR)))
+	}
+
+	return content.String()
+}
+
+// Matter returns the current Matter status.
+func (m Model) Matter() *shelly.TUIMatterStatus {
+	return m.matter
+}
+
+// Zigbee returns the current Zigbee status.
+func (m Model) Zigbee() *shelly.TUIZigbeeStatus {
+	return m.zigbee
+}
+
+// LoRa returns the current LoRa status.
+func (m Model) LoRa() *shelly.TUILoRaStatus {
+	return m.lora
+}
+
+// Device returns the current device address.
+func (m Model) Device() string {
+	return m.device
+}
+
+// Loading returns whether the component is loading.
+func (m Model) Loading() bool {
+	return m.loading
+}
+
+// Error returns any error that occurred.
+func (m Model) Error() error {
+	return m.err
+}
+
+// ActiveProtocol returns the currently selected protocol.
+func (m Model) ActiveProtocol() Protocol {
+	return m.activeProtocol
+}
+
+// Refresh triggers a refresh of the smart home data.
+func (m Model) Refresh() (Model, tea.Cmd) {
+	if m.device == "" {
+		return m, nil
+	}
+	m.loading = true
+	return m, m.fetchStatus()
+}

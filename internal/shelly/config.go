@@ -671,6 +671,441 @@ func calculateHA1(user, realm, password string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// ModbusStatus holds Modbus status information.
+type ModbusStatus struct {
+	Enabled bool `json:"enabled"`
+}
+
+// GetModbusStatus returns the Modbus status.
+func (s *Service) GetModbusStatus(ctx context.Context, identifier string) (*ModbusStatus, error) {
+	var result *ModbusStatus
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		modbus := components.NewModbus(conn.RPCClient())
+		status, err := modbus.GetStatus(ctx)
+		if err != nil {
+			return err
+		}
+		result = &ModbusStatus{
+			Enabled: status.Enabled,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// GetModbusConfig returns the Modbus configuration.
+func (s *Service) GetModbusConfig(ctx context.Context, identifier string) (map[string]any, error) {
+	var result map[string]any
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		modbus := components.NewModbus(conn.RPCClient())
+		config, err := modbus.GetConfig(ctx)
+		if err != nil {
+			return err
+		}
+		result = map[string]any{
+			"enable": config.Enable,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// SetModbusConfig updates the Modbus configuration.
+func (s *Service) SetModbusConfig(ctx context.Context, identifier string, enable bool) error {
+	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		modbus := components.NewModbus(conn.RPCClient())
+		return modbus.SetConfig(ctx, &components.ModbusConfig{
+			Enable: enable,
+		})
+	})
+}
+
+// BLEConfig holds BLE configuration.
+type BLEConfig struct {
+	Enable       bool `json:"enable"`
+	RPCEnabled   bool `json:"rpc_enabled"`
+	ObserverMode bool `json:"observer_mode"`
+}
+
+// GetBLEConfig returns the BLE configuration.
+func (s *Service) GetBLEConfig(ctx context.Context, identifier string) (*BLEConfig, error) {
+	var result *BLEConfig
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		ble := components.NewBLE(conn.RPCClient())
+		config, err := ble.GetConfig(ctx)
+		if err != nil {
+			return err
+		}
+		result = &BLEConfig{}
+		if config.Enable != nil {
+			result.Enable = *config.Enable
+		}
+		if config.RPC != nil && config.RPC.Enable != nil {
+			result.RPCEnabled = *config.RPC.Enable
+		}
+		if config.Observer != nil && config.Observer.Enable != nil {
+			result.ObserverMode = *config.Observer.Enable
+		}
+		return nil
+	})
+	return result, err
+}
+
+// SetBLEConfig updates the BLE configuration.
+func (s *Service) SetBLEConfig(ctx context.Context, identifier string, enable, rpcEnabled, observerMode *bool) error {
+	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		ble := components.NewBLE(conn.RPCClient())
+
+		config := &components.BLEConfig{}
+		if enable != nil {
+			config.Enable = enable
+		}
+		if rpcEnabled != nil {
+			config.RPC = &components.BLERPCConfig{Enable: rpcEnabled}
+		}
+		if observerMode != nil {
+			config.Observer = &components.BLEObserverConfig{Enable: observerMode}
+		}
+
+		return ble.SetConfig(ctx, config)
+	})
+}
+
+// BTHomeDevice holds BTHome device information.
+type BTHomeDevice struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Addr     string `json:"addr"`
+	RSSI     int    `json:"rssi,omitempty"`
+	Battery  int    `json:"battery,omitempty"`
+	LastSeen int64  `json:"last_seen,omitempty"`
+}
+
+// BTHomeDiscovery holds BTHome discovery status.
+type BTHomeDiscovery struct {
+	Active    bool  `json:"active"`
+	StartedAt int64 `json:"started_at,omitempty"`
+	Duration  int   `json:"duration,omitempty"`
+}
+
+// GetBTHomeStatus returns the BTHome status including discovery.
+func (s *Service) GetBTHomeStatus(ctx context.Context, identifier string) (*BTHomeDiscovery, error) {
+	var result *BTHomeDiscovery
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		bthome := components.NewBTHome(conn.RPCClient())
+		status, err := bthome.GetStatus(ctx)
+		if err != nil {
+			return err
+		}
+		result = &BTHomeDiscovery{}
+		if status.Discovery != nil {
+			result.Active = true
+			result.StartedAt = int64(status.Discovery.StartedAt)
+			result.Duration = status.Discovery.Duration
+		}
+		return nil
+	})
+	return result, err
+}
+
+// StartBTHomeDiscovery starts BTHome device discovery.
+func (s *Service) StartBTHomeDiscovery(ctx context.Context, identifier string, duration int) error {
+	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		bthome := components.NewBTHome(conn.RPCClient())
+		return bthome.StartDeviceDiscovery(ctx, &duration)
+	})
+}
+
+// TUIMatterStatus holds Matter status information for the TUI.
+type TUIMatterStatus struct {
+	Enabled        bool `json:"enabled"`
+	Commissionable bool `json:"commissionable"`
+	FabricsCount   int  `json:"fabrics_count"`
+}
+
+// GetTUIMatterStatus returns the Matter status for the TUI.
+func (s *Service) GetTUIMatterStatus(ctx context.Context, identifier string) (*TUIMatterStatus, error) {
+	var result *TUIMatterStatus
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		// Matter uses a different import path - construct RPC call manually
+		matterResult, err := conn.Call(ctx, "Matter.GetConfig", nil)
+		if err != nil {
+			return err
+		}
+		configData, err := json.Marshal(matterResult)
+		if err != nil {
+			return err
+		}
+		var config struct {
+			Enable bool `json:"enable"`
+		}
+		if err := json.Unmarshal(configData, &config); err != nil {
+			return err
+		}
+
+		statusResult, err := conn.Call(ctx, "Matter.GetStatus", nil)
+		if err != nil {
+			return err
+		}
+		statusData, err := json.Marshal(statusResult)
+		if err != nil {
+			return err
+		}
+		var status struct {
+			Commissionable bool `json:"commissionable"`
+			FabricsCount   int  `json:"fabrics_count"`
+		}
+		if err := json.Unmarshal(statusData, &status); err != nil {
+			return err
+		}
+
+		result = &TUIMatterStatus{
+			Enabled:        config.Enable,
+			Commissionable: status.Commissionable,
+			FabricsCount:   status.FabricsCount,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// TUIZigbeeStatus holds Zigbee status information for the TUI.
+type TUIZigbeeStatus struct {
+	Enabled      bool   `json:"enabled"`
+	NetworkState string `json:"network_state"`
+	Channel      int    `json:"channel,omitempty"`
+	PANID        uint16 `json:"pan_id,omitempty"`
+}
+
+// GetTUIZigbeeStatus returns the Zigbee status for the TUI.
+func (s *Service) GetTUIZigbeeStatus(ctx context.Context, identifier string) (*TUIZigbeeStatus, error) {
+	var result *TUIZigbeeStatus
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		// Get config for enable state
+		configResult, err := conn.Call(ctx, "Zigbee.GetConfig", nil)
+		if err != nil {
+			return err
+		}
+		configData, err := json.Marshal(configResult)
+		if err != nil {
+			return err
+		}
+		var config struct {
+			Enable bool `json:"enable"`
+		}
+		if err := json.Unmarshal(configData, &config); err != nil {
+			return err
+		}
+
+		// Get status for network info
+		statusResult, err := conn.Call(ctx, "Zigbee.GetStatus", nil)
+		if err != nil {
+			return err
+		}
+		statusData, err := json.Marshal(statusResult)
+		if err != nil {
+			return err
+		}
+		var status struct {
+			NetworkState string `json:"network_state"`
+			Channel      int    `json:"channel"`
+			PANID        uint16 `json:"pan_id"`
+		}
+		if err := json.Unmarshal(statusData, &status); err != nil {
+			return err
+		}
+
+		result = &TUIZigbeeStatus{
+			Enabled:      config.Enable,
+			NetworkState: status.NetworkState,
+			Channel:      status.Channel,
+			PANID:        status.PANID,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// TUILoRaStatus holds LoRa status information for the TUI.
+type TUILoRaStatus struct {
+	Enabled   bool    `json:"enabled"`
+	Frequency int64   `json:"frequency"`
+	TxPower   int     `json:"tx_power"`
+	RSSI      int     `json:"rssi,omitempty"`
+	SNR       float64 `json:"snr,omitempty"`
+}
+
+// GetTUILoRaStatus returns the LoRa status for the TUI.
+func (s *Service) GetTUILoRaStatus(ctx context.Context, identifier string) (*TUILoRaStatus, error) {
+	var result *TUILoRaStatus
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		// Get config - LoRa uses ID 100 by default
+		configResult, err := conn.Call(ctx, "LoRa.GetConfig", map[string]any{"id": 100})
+		if err != nil {
+			return err
+		}
+		configData, err := json.Marshal(configResult)
+		if err != nil {
+			return err
+		}
+		var config struct {
+			Enable bool  `json:"enable"`
+			Freq   int64 `json:"freq"`
+			TxP    int   `json:"txp"`
+		}
+		if err := json.Unmarshal(configData, &config); err != nil {
+			return err
+		}
+
+		// Get status
+		statusResult, err := conn.Call(ctx, "LoRa.GetStatus", map[string]any{"id": 100})
+		if err != nil {
+			return err
+		}
+		statusData, err := json.Marshal(statusResult)
+		if err != nil {
+			return err
+		}
+		var status struct {
+			RSSI int     `json:"rssi"`
+			SNR  float64 `json:"snr"`
+		}
+		if err := json.Unmarshal(statusData, &status); err != nil {
+			return err
+		}
+
+		result = &TUILoRaStatus{
+			Enabled:   config.Enable,
+			Frequency: config.Freq,
+			TxPower:   config.TxP,
+			RSSI:      status.RSSI,
+			SNR:       status.SNR,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// TUISecurityStatus holds security status information for the TUI.
+type TUISecurityStatus struct {
+	AuthEnabled  bool   `json:"auth_enabled"`
+	EcoMode      bool   `json:"eco_mode"`
+	Discoverable bool   `json:"discoverable"`
+	DebugMQTT    bool   `json:"debug_mqtt"`
+	DebugWS      bool   `json:"debug_ws"`
+	DebugUDP     bool   `json:"debug_udp"`
+	DebugUDPAddr string `json:"debug_udp_addr,omitempty"`
+}
+
+// GetTUISecurityStatus returns the security status for the TUI.
+func (s *Service) GetTUISecurityStatus(ctx context.Context, identifier string) (*TUISecurityStatus, error) {
+	var result *TUISecurityStatus
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		// Get client info for auth status
+		info := conn.Info()
+
+		// Get system config for debug and visibility settings
+		sysResult, err := conn.Call(ctx, "Sys.GetConfig", nil)
+		if err != nil {
+			return err
+		}
+		sysData, err := json.Marshal(sysResult)
+		if err != nil {
+			return err
+		}
+		var sysConfig struct {
+			Device *struct {
+				EcoMode      *bool `json:"eco_mode"`
+				Discoverable *bool `json:"discoverable"`
+			} `json:"device"`
+			Debug *struct {
+				MQTT *struct {
+					Enable *bool `json:"enable"`
+				} `json:"mqtt"`
+				Websocket *struct {
+					Enable *bool `json:"enable"`
+				} `json:"websocket"`
+				UDP *struct {
+					Addr *string `json:"addr"`
+				} `json:"udp"`
+			} `json:"debug"`
+		}
+		if err := json.Unmarshal(sysData, &sysConfig); err != nil {
+			return err
+		}
+
+		result = &TUISecurityStatus{
+			AuthEnabled: info.AuthEn,
+		}
+
+		if sysConfig.Device != nil {
+			if sysConfig.Device.EcoMode != nil {
+				result.EcoMode = *sysConfig.Device.EcoMode
+			}
+			if sysConfig.Device.Discoverable != nil {
+				result.Discoverable = *sysConfig.Device.Discoverable
+			}
+		}
+
+		if sysConfig.Debug != nil {
+			if sysConfig.Debug.MQTT != nil && sysConfig.Debug.MQTT.Enable != nil {
+				result.DebugMQTT = *sysConfig.Debug.MQTT.Enable
+			}
+			if sysConfig.Debug.Websocket != nil && sysConfig.Debug.Websocket.Enable != nil {
+				result.DebugWS = *sysConfig.Debug.Websocket.Enable
+			}
+			if sysConfig.Debug.UDP != nil && sysConfig.Debug.UDP.Addr != nil && *sysConfig.Debug.UDP.Addr != "" {
+				result.DebugUDP = true
+				result.DebugUDPAddr = *sysConfig.Debug.UDP.Addr
+			}
+		}
+
+		return nil
+	})
+	return result, err
+}
+
+// ProvisioningDeviceInfo holds basic device information for provisioning.
+type ProvisioningDeviceInfo struct {
+	Model string
+	MAC   string
+	ID    string
+}
+
+// GetDeviceInfoByAddress attempts to connect to a device at the given address
+// and retrieve its basic info. Used for provisioning.
+func (s *Service) GetDeviceInfoByAddress(ctx context.Context, address string) (*ProvisioningDeviceInfo, error) {
+	var result *ProvisioningDeviceInfo
+	err := s.WithConnection(ctx, address, func(conn *client.Client) error {
+		info := conn.Info()
+		result = &ProvisioningDeviceInfo{
+			Model: info.Model,
+			MAC:   info.MAC,
+			ID:    info.ID,
+		}
+		return nil
+	})
+	return result, err
+}
+
+// ConfigureWiFi configures a device's WiFi station settings.
+// Used during provisioning to set up the device's network connection.
+func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string) error {
+	return s.WithConnection(ctx, address, func(conn *client.Client) error {
+		params := map[string]any{
+			"config": map[string]any{
+				"sta": map[string]any{
+					"ssid":   ssid,
+					"pass":   password,
+					"enable": true,
+				},
+			},
+		}
+		_, err := conn.Call(ctx, "WiFi.SetConfig", params)
+		return err
+	})
+}
+
 // ExtractWiFiSSID extracts the station SSID from a raw WiFi.GetConfig result.
 func ExtractWiFiSSID(rawResult any) string {
 	wifiBytes, err := json.Marshal(rawResult)
