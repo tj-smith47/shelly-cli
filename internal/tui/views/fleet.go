@@ -156,8 +156,8 @@ func NewFleet(deps FleetDeps) *Fleet {
 		layoutCalc:   layoutCalc,
 	}
 
-	// Initialize components with focus
-	f.devices = f.devices.SetFocused(true)
+	// Initialize focus states so the default focused panel (Devices) receives key events
+	f.updateFocusStates()
 
 	return f
 }

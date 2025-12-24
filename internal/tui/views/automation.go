@@ -176,7 +176,7 @@ func NewAutomation(deps AutomationDeps) *Automation {
 		{ID: layout.PanelID(PanelKVS), MinHeight: 4, ExpandOnFocus: true},
 	}
 
-	return &Automation{
+	a := &Automation{
 		ctx:            deps.Ctx,
 		svc:            deps.Svc,
 		id:             tabs.TabAutomation,
@@ -195,6 +195,11 @@ func NewAutomation(deps AutomationDeps) *Automation {
 			right: []AutomationPanel{PanelScriptEditor, PanelScheduleEditor, PanelVirtuals, PanelKVS},
 		},
 	}
+
+	// Initialize focus states so the default focused panel (Scripts) receives key events
+	a.updateFocusStates()
+
+	return a
 }
 
 // Init returns the initial command.
@@ -232,6 +237,9 @@ func (a *Automation) SetDevice(device string) tea.Cmd {
 
 	// Clear editor states
 	a.scriptEditor = a.scriptEditor.Clear()
+
+	// Ensure focus states are propagated after device change
+	a.updateFocusStates()
 
 	// Start sequential loading with first component
 	a.loadPhase = automationLoadScripts

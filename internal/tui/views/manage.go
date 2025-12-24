@@ -133,8 +133,8 @@ func NewManage(deps ManageDeps) *Manage {
 		layoutCalc:   layoutCalc,
 	}
 
-	// Initialize components with focus
-	m.discovery = m.discovery.SetFocused(true)
+	// Initialize focus states so the default focused panel (Discovery) receives key events
+	m.updateFocusStates()
 
 	// Load device lists for batch, firmware, and backup
 	m.batch = m.batch.LoadDevices()

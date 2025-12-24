@@ -136,7 +136,7 @@ func NewConfig(deps ConfigDeps) *Config {
 		{ID: layout.PanelID(PanelInputs), MinHeight: 6, ExpandOnFocus: true},
 	}
 
-	return &Config{
+	c := &Config{
 		ctx:          deps.Ctx,
 		svc:          deps.Svc,
 		id:           tabs.TabConfig,
@@ -148,6 +148,11 @@ func NewConfig(deps ConfigDeps) *Config {
 		styles:       DefaultConfigStyles(),
 		layoutCalc:   layoutCalc,
 	}
+
+	// Initialize focus states so the default focused panel (WiFi) receives key events
+	c.updateFocusStates()
+
+	return c
 }
 
 // Init returns the initial command.
