@@ -1,0 +1,20 @@
+{
+  "schema_version": "1",
+  "name": "tasmota",
+  "version": "1.0.0",
+  "description": "Tasmota device support for shelly-cli - detect, monitor, and control Tasmota-based smart home devices",
+  "capabilities": {
+    "device_detection": true,
+    "platform": "tasmota",
+    "components": ["switch", "light", "sensor", "energy"],
+    "firmware_updates": true
+  },
+  "hooks": {
+    "detect": "./shelly-tasmota detect",
+    "status": "./shelly-tasmota status",
+    "control": "./shelly-tasmota control",
+    "check_updates": "./shelly-tasmota check-updates",
+    "apply_update": "./shelly-tasmota apply-update"
+  },
+  "minimum_shelly_version": "1.0.0"
+}
