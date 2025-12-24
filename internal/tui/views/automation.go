@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/scripts"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/virtuals"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/webhooks"
+	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -89,6 +90,9 @@ type Automation struct {
 	width        int
 	height       int
 	styles       AutomationStyles
+
+	// Layout calculator for flexible panel sizing
+	layout *layout.TwoColumnLayout
 }
 
 // automationCols holds the left/right column assignments.
@@ -136,6 +140,24 @@ func NewAutomation(deps AutomationDeps) *Automation {
 	virtualsDeps := virtuals.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	kvsDeps := kvs.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
+	// Create flexible layout with 50/50 column split
+	layoutCalc := layout.NewTwoColumnLayout(0.5, 1)
+
+	// Configure left column panels with expansion on focus
+	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(PanelScripts), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelSchedules), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelWebhooks), MinHeight: 4, ExpandOnFocus: true},
+	}
+
+	// Configure right column panels with expansion on focus
+	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(PanelScriptEditor), MinHeight: 6, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelScheduleEditor), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelVirtuals), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelKVS), MinHeight: 4, ExpandOnFocus: true},
+	}
+
 	return &Automation{
 		ctx:            deps.Ctx,
 		svc:            deps.Svc,
@@ -149,6 +171,7 @@ func NewAutomation(deps AutomationDeps) *Automation {
 		kvs:            kvs.New(kvsDeps),
 		focusedPanel:   PanelScripts,
 		styles:         DefaultAutomationStyles(),
+		layout:         layoutCalc,
 		cols: automationCols{
 			left:  []AutomationPanel{PanelScripts, PanelSchedules, PanelWebhooks},
 			right: []AutomationPanel{PanelScriptEditor, PanelScheduleEditor, PanelVirtuals, PanelKVS},
@@ -279,6 +302,11 @@ func (a *Automation) updateFocusStates() {
 	a.webhooks = a.webhooks.SetFocused(a.focusedPanel == PanelWebhooks)
 	a.virtuals = a.virtuals.SetFocused(a.focusedPanel == PanelVirtuals)
 	a.kvs = a.kvs.SetFocused(a.focusedPanel == PanelKVS)
+
+	// Recalculate layout with new focus (panels resize on focus change)
+	if a.layout != nil && a.width > 0 && a.height > 0 {
+		a.SetSize(a.width, a.height)
+	}
 }
 
 func (a *Automation) updateFocusedComponent(msg tea.Msg) tea.Cmd {
@@ -316,8 +344,7 @@ func (a *Automation) updateAllComponents(msg tea.Msg) tea.Cmd {
 	a.virtuals, virtualsCmd = a.virtuals.Update(msg)
 	a.kvs, kvsCmd = a.kvs.Update(msg)
 
-	cmds = append(cmds, scriptsCmd, scriptEditorCmd, schedulesCmd, scheduleEditorCmd)
-	cmds = append(cmds, webhooksCmd, virtualsCmd, kvsCmd)
+	cmds = append(cmds, scriptsCmd, scriptEditorCmd, schedulesCmd, scheduleEditorCmd, webhooksCmd, virtualsCmd, kvsCmd)
 	return tea.Batch(cmds...)
 }
 
@@ -423,28 +450,44 @@ func (a *Automation) SetSize(width, height int) View {
 		return a
 	}
 
-	// Standard layout: 2-column split
-	leftWidth := width / 2
-	rightWidth := width - leftWidth - 1
+	// Update layout with new dimensions and focus
+	a.layout.SetSize(width, height)
+	a.layout.SetFocus(layout.PanelID(a.focusedPanel))
 
-	leftPanelCount := 3
-	rightPanelCount := 4
+	// Calculate panel dimensions using flexible layout
+	dims := a.layout.Calculate()
 
-	leftPanelHeight := height / leftPanelCount
-	rightPanelHeight := height / rightPanelCount
+	// Apply sizes to left column components (with border adjustment)
+	if d, ok := dims[layout.PanelID(PanelScripts)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		a.scripts = a.scripts.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(PanelSchedules)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		a.schedules = a.schedules.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(PanelWebhooks)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		a.webhooks = a.webhooks.SetSize(cw, ch)
+	}
 
-	// Set sizes for left column components
-	contentHeight := leftPanelHeight - 4 // Account for border and title
-	a.scripts = a.scripts.SetSize(leftWidth-4, contentHeight)
-	a.schedules = a.schedules.SetSize(leftWidth-4, contentHeight)
-	a.webhooks = a.webhooks.SetSize(leftWidth-4, height-2*leftPanelHeight-4)
-
-	// Set sizes for right column components
-	contentHeight = rightPanelHeight - 4
-	a.scriptEditor = a.scriptEditor.SetSize(rightWidth-4, contentHeight)
-	a.scheduleEditor = a.scheduleEditor.SetSize(rightWidth-4, contentHeight)
-	a.virtuals = a.virtuals.SetSize(rightWidth-4, contentHeight)
-	a.kvs = a.kvs.SetSize(rightWidth-4, height-3*rightPanelHeight-4)
+	// Apply sizes to right column components
+	if d, ok := dims[layout.PanelID(PanelScriptEditor)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		a.scriptEditor = a.scriptEditor.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(PanelScheduleEditor)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		a.scheduleEditor = a.scheduleEditor.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(PanelVirtuals)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		a.virtuals = a.virtuals.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(PanelKVS)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		a.kvs = a.kvs.SetSize(cw, ch)
+	}
 
 	return a
 }

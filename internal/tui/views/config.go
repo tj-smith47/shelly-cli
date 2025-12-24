@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/inputs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/system"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/wifi"
+	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -61,6 +62,9 @@ type Config struct {
 	width        int
 	height       int
 	styles       ConfigStyles
+
+	// Layout calculator for flexible panel sizing
+	layoutCalc *layout.TwoColumnLayout
 }
 
 // ConfigStyles holds styles for the config view.
@@ -100,6 +104,21 @@ func NewConfig(deps ConfigDeps) *Config {
 	cloudDeps := cloud.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	inputsDeps := inputs.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
+	// Create flexible layout with 50/50 column split
+	layoutCalc := layout.NewTwoColumnLayout(0.5, 1)
+
+	// Configure left column panels (WiFi, System) with expansion on focus
+	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(PanelWiFi), MinHeight: 6, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelSystem), MinHeight: 6, ExpandOnFocus: true},
+	}
+
+	// Configure right column panels (Cloud, Inputs) with expansion on focus
+	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(PanelCloud), MinHeight: 6, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelInputs), MinHeight: 6, ExpandOnFocus: true},
+	}
+
 	return &Config{
 		ctx:          deps.Ctx,
 		svc:          deps.Svc,
@@ -110,6 +129,7 @@ func NewConfig(deps ConfigDeps) *Config {
 		inputs:       inputs.New(inputsDeps),
 		focusedPanel: PanelWiFi,
 		styles:       DefaultConfigStyles(),
+		layoutCalc:   layoutCalc,
 	}
 }
 
@@ -211,6 +231,11 @@ func (c *Config) updateFocusStates() {
 	c.system = c.system.SetFocused(c.focusedPanel == PanelSystem)
 	c.cloud = c.cloud.SetFocused(c.focusedPanel == PanelCloud)
 	c.inputs = c.inputs.SetFocused(c.focusedPanel == PanelInputs)
+
+	// Recalculate layout with new focus (panels resize on focus change)
+	if c.layoutCalc != nil && c.width > 0 && c.height > 0 {
+		c.SetSize(c.width, c.height)
+	}
 }
 
 func (c *Config) updateFocusedComponent(msg tea.Msg) tea.Cmd {
@@ -311,20 +336,32 @@ func (c *Config) SetSize(width, height int) View {
 		return c
 	}
 
-	// Standard layout: 2-column split
-	leftWidth := width / 2
-	rightWidth := width - leftWidth - 1
+	// Update layout with new dimensions and focus
+	c.layoutCalc.SetSize(width, height)
+	c.layoutCalc.SetFocus(layout.PanelID(c.focusedPanel))
 
-	panelHeight := height / 2
-	contentHeight := panelHeight - 4 // Account for border and title
+	// Calculate panel dimensions using flexible layout
+	dims := c.layoutCalc.Calculate()
 
-	// Set sizes for left column components
-	c.wifi = c.wifi.SetSize(leftWidth-4, contentHeight)
-	c.system = c.system.SetSize(leftWidth-4, height-panelHeight-4)
+	// Apply sizes to left column components (with border adjustment)
+	if d, ok := dims[layout.PanelID(PanelWiFi)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		c.wifi = c.wifi.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(PanelSystem)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		c.system = c.system.SetSize(cw, ch)
+	}
 
-	// Set sizes for right column components
-	c.cloud = c.cloud.SetSize(rightWidth-4, contentHeight)
-	c.inputs = c.inputs.SetSize(rightWidth-4, height-panelHeight-4)
+	// Apply sizes to right column components
+	if d, ok := dims[layout.PanelID(PanelCloud)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		c.cloud = c.cloud.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(PanelInputs)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		c.inputs = c.inputs.SetSize(cw, ch)
+	}
 
 	return c
 }

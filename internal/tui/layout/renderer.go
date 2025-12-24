@@ -2,6 +2,7 @@
 package layout
 
 import (
+	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -12,28 +13,28 @@ import (
 // Renderer provides consistent panel rendering with borders, titles, and footers.
 // Inspired by superfile's rendering pattern.
 type Renderer struct {
-	width         int
-	height        int
-	title         string
-	lines         []string
-	footerItems   []string
-	focused       bool
-	borderStyle   lipgloss.Border
-	focusedColor  lipgloss.Color
-	unfocusedColor lipgloss.Color
-	scrollOffset  int
-	totalLines    int
+	width          int
+	height         int
+	title          string
+	lines          []string
+	footerItems    []string
+	focused        bool
+	borderStyle    lipgloss.Border
+	focusedColor   color.Color
+	unfocusedColor color.Color
+	scrollOffset   int
+	totalLines     int
 }
 
 // NewRenderer creates a new panel renderer.
 func NewRenderer(width, height int) *Renderer {
 	colors := theme.GetSemanticColors()
 	return &Renderer{
-		width:         width,
-		height:        height,
-		borderStyle:   lipgloss.RoundedBorder(),
-		focusedColor:  lipgloss.Color(colors.Highlight.RGBA()),
-		unfocusedColor: lipgloss.Color(colors.TableBorder.RGBA()),
+		width:          width,
+		height:         height,
+		borderStyle:    lipgloss.RoundedBorder(),
+		focusedColor:   colors.Highlight,
+		unfocusedColor: colors.TableBorder,
 	}
 }
 
@@ -265,7 +266,7 @@ func truncateOrPad(s string, width int) string {
 }
 
 // QuickPanel is a convenience function to render a simple panel.
-func QuickPanel(width, height int, title string, content string, focused bool) string {
+func QuickPanel(width, height int, title, content string, focused bool) string {
 	lines := strings.Split(content, "\n")
 	return NewRenderer(width, height).
 		SetTitle(title).
@@ -275,7 +276,7 @@ func QuickPanel(width, height int, title string, content string, focused bool) s
 }
 
 // QuickPanelWithFooter renders a panel with footer shortcuts.
-func QuickPanelWithFooter(width, height int, title string, content string, focused bool, footer ...string) string {
+func QuickPanelWithFooter(width, height int, title, content string, focused bool, footer ...string) string {
 	lines := strings.Split(content, "\n")
 	return NewRenderer(width, height).
 		SetTitle(title).

@@ -16,6 +16,7 @@ type Renderer struct {
 	width      int
 	height     int
 	title      string
+	footer     string
 	focused    bool
 	sections   []section
 	content    string
@@ -85,6 +86,13 @@ func (r *Renderer) SetContent(content string) *Renderer {
 	return r
 }
 
+// SetFooter sets the footer text to embed in the bottom border.
+// Footer appears as: ├─ footer text ─┤.
+func (r *Renderer) SetFooter(footer string) *Renderer {
+	r.footer = footer
+	return r
+}
+
 // Render produces the final bordered output.
 func (r *Renderer) Render() string {
 	if r.width < 5 || r.height < 3 {
@@ -150,8 +158,13 @@ func (r *Renderer) Render() string {
 		lines = append(lines, leftBorder+line+rightBorder)
 	}
 
-	// Bottom border
-	bottomBorder := BuildBottomBorder(r.width, r.border)
+	// Bottom border with optional footer
+	var bottomBorder string
+	if r.footer != "" {
+		bottomBorder = BuildBottomBorderWithFooter(r.width, r.footer, r.border)
+	} else {
+		bottomBorder = BuildBottomBorder(r.width, r.border)
+	}
 	lines = append(lines, borderStyle.Render(bottomBorder))
 
 	return strings.Join(lines, "\n")

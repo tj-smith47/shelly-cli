@@ -58,6 +58,11 @@ type SelectScheduleMsg struct {
 	Schedule Schedule
 }
 
+// CreateScheduleMsg signals that a new schedule should be created.
+type CreateScheduleMsg struct {
+	Device string
+}
+
 // ListModel displays schedules for a device.
 type ListModel struct {
 	ctx       context.Context
@@ -224,15 +229,20 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		m.scroll = 0
 	case "G":
 		m = m.cursorToEnd()
-	case "enter":
+	case "enter", "e":
+		// Edit schedule (open in editor)
 		return m, m.selectSchedule()
-	case "e":
-		return m, m.enableSchedule()
-	case "E":
-		return m, m.disableSchedule()
+	case "t":
+		// Toggle enable/disable
+		return m, m.toggleSchedule()
 	case "d":
+		// Delete schedule
 		return m, m.deleteSchedule()
-	case "r":
+	case "n":
+		// New schedule - will be handled by parent
+		return m, m.createSchedule()
+	case "R":
+		// Refresh list
 		m.loading = true
 		return m, m.fetchSchedules()
 	}
@@ -292,42 +302,6 @@ func (m ListModel) selectSchedule() tea.Cmd {
 	}
 }
 
-func (m ListModel) enableSchedule() tea.Cmd {
-	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
-		return nil
-	}
-	schedule := m.schedules[m.cursor]
-	if schedule.Enable {
-		return nil // Already enabled
-	}
-
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		err := m.svc.EnableSchedule(ctx, m.device, schedule.ID)
-		return ActionMsg{Action: "enable", ScheduleID: schedule.ID, Err: err}
-	}
-}
-
-func (m ListModel) disableSchedule() tea.Cmd {
-	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
-		return nil
-	}
-	schedule := m.schedules[m.cursor]
-	if !schedule.Enable {
-		return nil // Already disabled
-	}
-
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		err := m.svc.DisableSchedule(ctx, m.device, schedule.ID)
-		return ActionMsg{Action: "disable", ScheduleID: schedule.ID, Err: err}
-	}
-}
-
 func (m ListModel) deleteSchedule() tea.Cmd {
 	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
 		return nil
@@ -343,11 +317,50 @@ func (m ListModel) deleteSchedule() tea.Cmd {
 	}
 }
 
+func (m ListModel) toggleSchedule() tea.Cmd {
+	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
+		return nil
+	}
+	schedule := m.schedules[m.cursor]
+
+	// Toggle based on current state
+	if schedule.Enable {
+		return func() tea.Msg {
+			ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+			defer cancel()
+
+			err := m.svc.DisableSchedule(ctx, m.device, schedule.ID)
+			return ActionMsg{Action: "disable", ScheduleID: schedule.ID, Err: err}
+		}
+	}
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.EnableSchedule(ctx, m.device, schedule.ID)
+		return ActionMsg{Action: "enable", ScheduleID: schedule.ID, Err: err}
+	}
+}
+
+func (m ListModel) createSchedule() tea.Cmd {
+	if m.device == "" {
+		return nil
+	}
+	return func() tea.Msg {
+		return CreateScheduleMsg{Device: m.device}
+	}
+}
+
 // View renders the schedules list.
 func (m ListModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Schedules").
 		SetFocused(m.focused)
+
+	// Add footer with keybindings when focused
+	if m.focused && m.device != "" && len(m.schedules) > 0 {
+		r.SetFooter("e:edit t:toggle d:del n:new")
+	}
 
 	if m.device == "" {
 		r.SetContent(m.styles.Muted.Render("No device selected"))

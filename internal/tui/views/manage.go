@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/batch"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/discovery"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/firmware"
+	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -62,6 +63,9 @@ type Manage struct {
 	width        int
 	height       int
 	styles       ManageStyles
+
+	// Layout calculator for flexible panel sizing
+	layoutCalc *layout.TwoColumnLayout
 }
 
 // ManageStyles holds styles for the manage view.
@@ -101,6 +105,21 @@ func NewManage(deps ManageDeps) *Manage {
 	firmwareDeps := firmware.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	backupDeps := backup.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
+	// Create flexible layout with 40/60 column split (left/right)
+	layoutCalc := layout.NewTwoColumnLayout(0.4, 1)
+
+	// Configure left column panels (Discovery, Firmware, Backup) with expansion on focus
+	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(ManagePanelDiscovery), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(ManagePanelFirmware), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(ManagePanelBackup), MinHeight: 5, ExpandOnFocus: true},
+	}
+
+	// Configure right column (Batch takes full height)
+	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(ManagePanelBatch), MinHeight: 10, ExpandOnFocus: true},
+	}
+
 	m := &Manage{
 		ctx:          deps.Ctx,
 		svc:          deps.Svc,
@@ -111,6 +130,7 @@ func NewManage(deps ManageDeps) *Manage {
 		backup:       backup.New(backupDeps),
 		focusedPanel: ManagePanelDiscovery,
 		styles:       DefaultManageStyles(),
+		layoutCalc:   layoutCalc,
 	}
 
 	// Initialize components with focus
@@ -146,27 +166,42 @@ func (m *Manage) SetSize(width, height int) View {
 
 	if m.isNarrow() {
 		// Narrow mode: all components get full width, full height
-		m.discovery = m.discovery.SetSize(width, height-4)
-		m.batch = m.batch.SetSize(width, height-4)
-		m.firmware = m.firmware.SetSize(width, height-4)
-		m.backup = m.backup.SetSize(width, height-4)
+		contentWidth := width - 4
+		contentHeight := height - 6
+
+		m.discovery = m.discovery.SetSize(contentWidth, contentHeight)
+		m.batch = m.batch.SetSize(contentWidth, contentHeight)
+		m.firmware = m.firmware.SetSize(contentWidth, contentHeight)
+		m.backup = m.backup.SetSize(contentWidth, contentHeight)
 		return m
 	}
 
-	// Standard layout: left column (stacked) | right column (full height batch)
-	// Left column: 40% width, Right column: 60% width
-	leftWidth := (width - 1) * 2 / 5
-	rightWidth := width - leftWidth - 1
+	// Update layout with new dimensions and focus
+	m.layoutCalc.SetSize(width, height)
+	m.layoutCalc.SetFocus(layout.PanelID(m.focusedPanel))
 
-	// Left column has 3 stacked panels (Discovery, Firmware, Backup)
-	leftPanelHeight := (height - 2) / 3 // -2 for gaps between panels
+	// Calculate panel dimensions using flexible layout
+	dims := m.layoutCalc.Calculate()
 
-	m.discovery = m.discovery.SetSize(leftWidth, leftPanelHeight)
-	m.firmware = m.firmware.SetSize(leftWidth, leftPanelHeight)
-	m.backup = m.backup.SetSize(leftWidth, leftPanelHeight)
+	// Apply sizes to left column components (with border adjustment)
+	if d, ok := dims[layout.PanelID(ManagePanelDiscovery)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		m.discovery = m.discovery.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(ManagePanelFirmware)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		m.firmware = m.firmware.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(ManagePanelBackup)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		m.backup = m.backup.SetSize(cw, ch)
+	}
 
-	// Batch gets full height on right side
-	m.batch = m.batch.SetSize(rightWidth, height)
+	// Apply size to right column (Batch)
+	if d, ok := dims[layout.PanelID(ManagePanelBatch)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		m.batch = m.batch.SetSize(cw, ch)
+	}
 
 	return m
 }
@@ -224,6 +259,11 @@ func (m *Manage) updateFocusStates() {
 	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch)
 	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware)
 	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup)
+
+	// Recalculate layout with new focus (panels resize on focus change)
+	if m.layoutCalc != nil && m.width > 0 && m.height > 0 {
+		m.SetSize(m.width, m.height)
+	}
 }
 
 func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {

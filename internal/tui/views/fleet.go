@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/fleet"
+	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -77,6 +78,9 @@ type Fleet struct {
 	width        int
 	height       int
 	styles       FleetStyles
+
+	// Layout calculator for flexible panel sizing
+	layoutCalc *layout.TwoColumnLayout
 }
 
 // FleetStyles holds styles for the fleet view.
@@ -122,6 +126,21 @@ func NewFleet(deps FleetDeps) *Fleet {
 	healthDeps := fleet.HealthDeps{Ctx: deps.Ctx}
 	operationsDeps := fleet.OperationsDeps{Ctx: deps.Ctx}
 
+	// Create flexible layout with 60/40 column split (left/right)
+	layoutCalc := layout.NewTwoColumnLayout(0.6, 1)
+
+	// Configure left column (Devices takes full height)
+	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(FleetPanelDevices), MinHeight: 10, ExpandOnFocus: true},
+	}
+
+	// Configure right column panels (Groups, Health, Operations) with expansion on focus
+	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
+		{ID: layout.PanelID(FleetPanelGroups), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(FleetPanelHealth), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(FleetPanelOperations), MinHeight: 5, ExpandOnFocus: true},
+	}
+
 	f := &Fleet{
 		ctx:          deps.Ctx,
 		svc:          deps.Svc,
@@ -134,6 +153,7 @@ func NewFleet(deps FleetDeps) *Fleet {
 		operations:   fleet.NewOperations(operationsDeps),
 		focusedPanel: FleetPanelDevices,
 		styles:       DefaultFleetStyles(),
+		layoutCalc:   layoutCalc,
 	}
 
 	// Initialize components with focus
@@ -164,26 +184,42 @@ func (f *Fleet) SetSize(width, height int) View {
 
 	if f.isNarrow() {
 		// Narrow mode: all components get full width, full height
-		f.devices = f.devices.SetSize(width, height-4)
-		f.groups = f.groups.SetSize(width, height-4)
-		f.health = f.health.SetSize(width, height-4)
-		f.operations = f.operations.SetSize(width, height-4)
+		contentWidth := width - 4
+		contentHeight := height - 6
+
+		f.devices = f.devices.SetSize(contentWidth, contentHeight)
+		f.groups = f.groups.SetSize(contentWidth, contentHeight)
+		f.health = f.health.SetSize(contentWidth, contentHeight)
+		f.operations = f.operations.SetSize(contentWidth, contentHeight)
 		return f
 	}
 
-	// Standard layout: 2-column layout
-	// Left column: Devices (60% width, full height)
-	// Right column: Groups, Health, Operations (40% width, stacked)
-	leftWidth := (width - 1) * 3 / 5
-	rightWidth := width - leftWidth - 1
+	// Update layout with new dimensions and focus
+	f.layoutCalc.SetSize(width, height)
+	f.layoutCalc.SetFocus(layout.PanelID(f.focusedPanel))
 
-	// Right column has 3 stacked panels
-	rightPanelHeight := (height - 2) / 3
+	// Calculate panel dimensions using flexible layout
+	dims := f.layoutCalc.Calculate()
 
-	f.devices = f.devices.SetSize(leftWidth, height)
-	f.groups = f.groups.SetSize(rightWidth, rightPanelHeight)
-	f.health = f.health.SetSize(rightWidth, rightPanelHeight)
-	f.operations = f.operations.SetSize(rightWidth, rightPanelHeight)
+	// Apply size to left column (Devices)
+	if d, ok := dims[layout.PanelID(FleetPanelDevices)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		f.devices = f.devices.SetSize(cw, ch)
+	}
+
+	// Apply sizes to right column components
+	if d, ok := dims[layout.PanelID(FleetPanelGroups)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		f.groups = f.groups.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(FleetPanelHealth)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		f.health = f.health.SetSize(cw, ch)
+	}
+	if d, ok := dims[layout.PanelID(FleetPanelOperations)]; ok {
+		cw, ch := d.ContentDimensions(2)
+		f.operations = f.operations.SetSize(cw, ch)
+	}
 
 	return f
 }
@@ -270,6 +306,11 @@ func (f *Fleet) updateFocusStates() {
 	f.groups = f.groups.SetFocused(f.focusedPanel == FleetPanelGroups)
 	f.health = f.health.SetFocused(f.focusedPanel == FleetPanelHealth)
 	f.operations = f.operations.SetFocused(f.focusedPanel == FleetPanelOperations)
+
+	// Recalculate layout with new focus (panels resize on focus change)
+	if f.layoutCalc != nil && f.width > 0 && f.height > 0 {
+		f.SetSize(f.width, f.height)
+	}
 }
 
 func (f *Fleet) updateComponents(msg tea.Msg) tea.Cmd {

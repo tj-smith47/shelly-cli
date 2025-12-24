@@ -24,77 +24,84 @@ type Column struct {
 // When a panel is focused and has ExpandOnFocus=true, it gets maximum space.
 // Other panels shrink to their MinHeight.
 func (c *Column) CalculatePanelHeights() map[PanelID]int {
-	heights := make(map[PanelID]int)
-
 	if len(c.Panels) == 0 {
-		return heights
+		return make(map[PanelID]int)
 	}
 
 	// Find which panel should expand
-	expandingPanel := PanelID(-1)
-	for _, p := range c.Panels {
-		if p.ID == c.FocusedID && p.ExpandOnFocus {
-			expandingPanel = p.ID
-			break
-		}
-	}
-
+	expandingPanel := c.findExpandingPanel()
 	if expandingPanel == -1 {
 		// No panel is expanding - distribute evenly
 		return c.distributeEvenly()
 	}
 
+	return c.distributeWithExpansion(expandingPanel)
+}
+
+// findExpandingPanel returns the ID of the panel that should expand, or -1 if none.
+func (c *Column) findExpandingPanel() PanelID {
+	for _, p := range c.Panels {
+		if p.ID == c.FocusedID && p.ExpandOnFocus {
+			return p.ID
+		}
+	}
+	return -1
+}
+
+// distributeWithExpansion allocates heights with one panel expanded.
+func (c *Column) distributeWithExpansion(expandingID PanelID) map[PanelID]int {
+	heights := make(map[PanelID]int)
+
 	// Calculate minimum space needed by non-expanding panels
 	minSpaceNeeded := 0
+	var expandingMaxHeight int
 	for _, p := range c.Panels {
-		if p.ID != expandingPanel {
+		if p.ID != expandingID {
 			minSpaceNeeded += p.MinHeight
+		} else {
+			expandingMaxHeight = p.MaxHeight
 		}
 	}
 
-	// Give expanding panel all remaining space
-	expandingHeight := c.TotalHeight - minSpaceNeeded
-	if expandingHeight < 0 {
-		expandingHeight = 0
-	}
-
-	// Find the expanding panel's max height constraint
-	for _, p := range c.Panels {
-		if p.ID == expandingPanel {
-			if p.MaxHeight > 0 && expandingHeight > p.MaxHeight {
-				expandingHeight = p.MaxHeight
-			}
-			break
-		}
+	// Calculate expanding panel height
+	expandingHeight := max(0, c.TotalHeight-minSpaceNeeded)
+	if expandingMaxHeight > 0 && expandingHeight > expandingMaxHeight {
+		expandingHeight = expandingMaxHeight
 	}
 
 	// Assign heights
 	for _, p := range c.Panels {
-		if p.ID == expandingPanel {
+		if p.ID == expandingID {
 			heights[p.ID] = expandingHeight
 		} else {
 			heights[p.ID] = p.MinHeight
 		}
 	}
 
-	// If there's remaining space after max constraint, redistribute
+	// Handle remaining space after max constraint
+	c.distributeRemaining(heights, expandingID)
+
+	return heights
+}
+
+// distributeRemaining gives any leftover space to the last non-expanding panel.
+func (c *Column) distributeRemaining(heights map[PanelID]int, expandingID PanelID) {
 	usedHeight := 0
 	for _, h := range heights {
 		usedHeight += h
 	}
 	remaining := c.TotalHeight - usedHeight
-	if remaining > 0 {
-		// Give remaining to last non-expanding panel
-		for i := len(c.Panels) - 1; i >= 0; i-- {
-			p := c.Panels[i]
-			if p.ID != expandingPanel {
-				heights[p.ID] += remaining
-				break
-			}
+	if remaining <= 0 {
+		return
+	}
+	// Give remaining to last non-expanding panel
+	for i := len(c.Panels) - 1; i >= 0; i-- {
+		p := c.Panels[i]
+		if p.ID != expandingID {
+			heights[p.ID] += remaining
+			return
 		}
 	}
-
-	return heights
 }
 
 // distributeEvenly gives each panel equal height.
@@ -209,16 +216,16 @@ type PanelDimensions struct {
 }
 
 // ContentDimensions returns the usable content area (subtracting borders).
-func (d PanelDimensions) ContentDimensions(borderWidth int) (int, int) {
-	contentWidth := d.Width - (borderWidth * 2)
-	contentHeight := d.Height - 2 // Top and bottom border
-	if contentWidth < 0 {
-		contentWidth = 0
+func (d PanelDimensions) ContentDimensions(borderWidth int) (width, height int) {
+	width = d.Width - (borderWidth * 2)
+	height = d.Height - 2 // Top and bottom border
+	if width < 0 {
+		width = 0
 	}
-	if contentHeight < 0 {
-		contentHeight = 0
+	if height < 0 {
+		height = 0
 	}
-	return contentWidth, contentHeight
+	return width, height
 }
 
 // ThreeColumnLayout manages a three-column panel layout (for JSON preview).

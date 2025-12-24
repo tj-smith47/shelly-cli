@@ -109,6 +109,72 @@ func BuildBottomBorder(width int, border lipgloss.Border) string {
 	return bottomLeft + strings.Repeat(bottom, fillWidth/bottomW) + bottomRight
 }
 
+// BuildBottomBorderWithFooter creates a bottom border with embedded footer text.
+// Example output: "╰───├─ e:edit r:run ─┤───────╯".
+func BuildBottomBorderWithFooter(width int, footer string, border lipgloss.Border) string {
+	if width < 5 {
+		return ""
+	}
+
+	bottomLeft := border.BottomLeft
+	bottomRight := border.BottomRight
+	bottom := border.Bottom
+	midLeft := border.MiddleLeft
+	midRight := border.MiddleRight
+
+	bottomLeftW := charWidth(bottomLeft)
+	bottomRightW := charWidth(bottomRight)
+	bottomW := charWidth(bottom)
+	midLeftW := charWidth(midLeft)
+	midRightW := charWidth(midRight)
+
+	if footer == "" {
+		// No footer - simple bottom border
+		return BuildBottomBorder(width, border)
+	}
+
+	// Footer with padding: ├─ footer ─┤
+	footerText := " " + footer + " "
+	footerWidth := charWidth(footerText)
+
+	// Calculate available space
+	// Structure: BottomLeft + fill + midLeft + ─ + footerText + ─ + midRight + fill + BottomRight
+	minFooterWidth := midLeftW + bottomW + footerWidth + bottomW + midRightW // ├─ footer ─┤
+	availableForFill := width - bottomLeftW - bottomRightW - minFooterWidth
+
+	if availableForFill < 0 {
+		// Footer too long, truncate it
+		maxFooterLen := width - bottomLeftW - bottomRightW - midLeftW - midRightW - bottomW*2 - 2
+		if maxFooterLen < 3 {
+			// Can't fit any footer
+			return BuildBottomBorder(width, border)
+		}
+		footer = ansi.Truncate(footer, maxFooterLen, "..")
+		footerText = " " + footer + " "
+		footerWidth = charWidth(footerText)
+		minFooterWidth = midLeftW + bottomW + footerWidth + bottomW + midRightW
+		availableForFill = width - bottomLeftW - bottomRightW - minFooterWidth
+	}
+
+	// Distribute fill space evenly
+	leftFillCount := availableForFill / bottomW / 2
+	rightFillCount := (availableForFill / bottomW) - leftFillCount
+
+	if leftFillCount < 1 {
+		leftFillCount = 1
+		rightFillCount = (availableForFill / bottomW) - leftFillCount
+	}
+	if rightFillCount < 0 {
+		rightFillCount = 0
+	}
+
+	return bottomLeft +
+		strings.Repeat(bottom, leftFillCount) +
+		midLeft + bottom + footerText + bottom + midRight +
+		strings.Repeat(bottom, rightFillCount) +
+		bottomRight
+}
+
 // BuildDivider creates a section divider with embedded name.
 // Example output: "├─ Section ─┤─────────────────┤".
 func BuildDivider(width int, name string, border lipgloss.Border) string {

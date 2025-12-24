@@ -58,6 +58,11 @@ type SelectScriptMsg struct {
 	Script Script
 }
 
+// CreateScriptMsg signals that a new script should be created.
+type CreateScriptMsg struct {
+	Device string
+}
+
 // ListModel displays scripts for a device.
 type ListModel struct {
 	ctx     context.Context
@@ -229,15 +234,23 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		m.scroll = 0
 	case "G":
 		m = m.cursorToEnd()
-	case "enter":
+	case "enter", "e":
+		// Edit script (open in editor)
 		return m, m.selectScript()
-	case "s":
+	case "r":
+		// Run/start script
 		return m, m.startScript()
-	case "S":
+	case "s":
+		// Stop script
 		return m, m.stopScript()
 	case "d":
+		// Delete script
 		return m, m.deleteScript()
-	case "r":
+	case "n":
+		// New script - will be handled by parent
+		return m, m.createScript()
+	case "R":
+		// Refresh list
 		m.loading = true
 		return m, m.fetchScripts()
 	}
@@ -349,11 +362,25 @@ func (m ListModel) deleteScript() tea.Cmd {
 	}
 }
 
+func (m ListModel) createScript() tea.Cmd {
+	if m.device == "" {
+		return nil
+	}
+	return func() tea.Msg {
+		return CreateScriptMsg{Device: m.device}
+	}
+}
+
 // View renders the scripts list.
 func (m ListModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Scripts").
 		SetFocused(m.focused)
+
+	// Add footer with keybindings when focused
+	if m.focused && m.device != "" && len(m.scripts) > 0 {
+		r.SetFooter("e:edit r:run s:stop d:del n:new")
+	}
 
 	if m.device == "" {
 		r.SetContent(m.styles.Muted.Render("No device selected"))
