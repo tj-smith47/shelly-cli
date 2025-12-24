@@ -407,14 +407,139 @@ func (m EditorModel) renderCodeLines() string {
 	return content.String()
 }
 
-// highlightLine applies basic syntax highlighting to a line.
+// JavaScript keywords for syntax highlighting.
+var jsKeywords = map[string]bool{
+	"break": true, "case": true, "catch": true, "const": true, "continue": true,
+	"debugger": true, "default": true, "delete": true, "do": true, "else": true,
+	"export": true, "extends": true, "finally": true, "for": true, "function": true,
+	"if": true, "import": true, "in": true, "instanceof": true, "let": true,
+	"new": true, "return": true, "static": true, "switch": true, "this": true,
+	"throw": true, "try": true, "typeof": true, "var": true, "void": true,
+	"while": true, "with": true, "yield": true, "class": true, "await": true,
+	"async": true, "true": true, "false": true, "null": true, "undefined": true,
+}
+
+// isIdentifierStart returns true if c can start an identifier.
+func isIdentifierStart(c rune) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$'
+}
+
+// isIdentifierChar returns true if c can be part of an identifier.
+func isIdentifierChar(c rune) bool {
+	return isIdentifierStart(c) || (c >= '0' && c <= '9')
+}
+
+// isDigit returns true if c is a digit.
+func isDigit(c rune) bool {
+	return c >= '0' && c <= '9'
+}
+
+// isHexChar returns true if c is a hex digit.
+func isHexChar(c rune) bool {
+	return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+// isNumberChar returns true if c can be part of a number literal.
+func isNumberChar(c rune) bool {
+	return isDigit(c) || c == '.' || c == 'x' || c == 'X' || isHexChar(c) || c == '_'
+}
+
+// highlightLine applies JavaScript syntax highlighting to a line.
 func (m EditorModel) highlightLine(line string) string {
-	// Basic highlighting: comments only for now
 	trimmed := strings.TrimLeft(line, " \t")
 	if strings.HasPrefix(trimmed, "//") {
 		return m.styles.Comment.Render(line)
 	}
-	return m.styles.Code.Render(line)
+
+	var result strings.Builder
+	runes := []rune(line)
+	i := 0
+
+	for i < len(runes) {
+		c := runes[i]
+		switch {
+		case c == ' ' || c == '\t':
+			result.WriteRune(c)
+			i++
+		case c == '/':
+			i = m.highlightComment(&result, runes, i)
+		case c == '"' || c == '\'' || c == '`':
+			i = m.highlightString(&result, runes, i, c)
+		case isDigit(c) || (c == '.' && i+1 < len(runes) && isDigit(runes[i+1])):
+			i = m.highlightNumber(&result, runes, i)
+		case isIdentifierStart(c):
+			i = m.highlightIdentifier(&result, runes, i)
+		default:
+			result.WriteString(m.styles.Code.Render(string(c)))
+			i++
+		}
+	}
+	return result.String()
+}
+
+// highlightComment handles // and /* */ comments. Returns new index or -1 to break.
+func (m EditorModel) highlightComment(result *strings.Builder, runes []rune, i int) int {
+	if i+1 >= len(runes) {
+		result.WriteString(m.styles.Code.Render(string(runes[i])))
+		return i + 1
+	}
+	switch runes[i+1] {
+	case '/': // Line comment
+		result.WriteString(m.styles.Comment.Render(string(runes[i:])))
+		return len(runes)
+	case '*': // Block comment
+		end := strings.Index(string(runes[i+2:]), "*/")
+		if end >= 0 {
+			result.WriteString(m.styles.Comment.Render(string(runes[i : i+2+end+2])))
+			return i + 2 + end + 2
+		}
+		result.WriteString(m.styles.Comment.Render(string(runes[i:])))
+		return len(runes)
+	default:
+		result.WriteString(m.styles.Code.Render(string(runes[i])))
+		return i + 1
+	}
+}
+
+// highlightString handles string literals.
+func (m EditorModel) highlightString(result *strings.Builder, runes []rune, i int, quote rune) int {
+	j := i + 1
+	for j < len(runes) && runes[j] != quote {
+		if runes[j] == '\\' && j+1 < len(runes) {
+			j++ // Skip escaped char
+		}
+		j++
+	}
+	if j < len(runes) {
+		j++ // Include closing quote
+	}
+	result.WriteString(m.styles.String.Render(string(runes[i:j])))
+	return j
+}
+
+// highlightNumber handles numeric literals.
+func (m EditorModel) highlightNumber(result *strings.Builder, runes []rune, i int) int {
+	j := i
+	for j < len(runes) && isNumberChar(runes[j]) {
+		j++
+	}
+	result.WriteString(m.styles.String.Render(string(runes[i:j])))
+	return j
+}
+
+// highlightIdentifier handles identifiers and keywords.
+func (m EditorModel) highlightIdentifier(result *strings.Builder, runes []rune, i int) int {
+	j := i
+	for j < len(runes) && isIdentifierChar(runes[j]) {
+		j++
+	}
+	word := string(runes[i:j])
+	if jsKeywords[word] {
+		result.WriteString(m.styles.Keyword.Render(word))
+	} else {
+		result.WriteString(m.styles.Code.Render(word))
+	}
+	return j
 }
 
 // ScriptID returns the current script ID.

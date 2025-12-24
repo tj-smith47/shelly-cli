@@ -626,6 +626,15 @@ func (m Model) View() string {
 		SetTitle("Backup & Restore").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		if m.mode == ModeExport {
+			r.SetFooter("spc:sel a:all x:export 2:import")
+		} else {
+			r.SetFooter("enter:import r:refresh 1:export")
+		}
+	}
+
 	var content strings.Builder
 
 	// Mode selector
@@ -661,14 +670,6 @@ func (m Model) View() string {
 	} else if m.importing {
 		content.WriteString("\n")
 		content.WriteString(m.styles.InProgress.Render("Importing backup..."))
-	}
-
-	// Help text
-	content.WriteString("\n\n")
-	if m.mode == ModeExport {
-		content.WriteString(m.styles.Muted.Render("space: select | a: all | x: export | 2: import mode"))
-	} else {
-		content.WriteString(m.styles.Muted.Render("enter: import selected | r: refresh | 1: export mode"))
 	}
 
 	r.SetContent(content.String())

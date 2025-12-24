@@ -185,6 +185,11 @@ func (m GroupsModel) View() string {
 		SetTitle("Device Groups").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		r.SetFooter("j/k:nav r:refresh")
+	}
+
 	if m.fleet == nil {
 		r.SetContent(m.styles.Muted.Render("Not connected to Shelly Cloud"))
 		return r.Render()
@@ -255,10 +260,6 @@ func (m GroupsModel) View() string {
 		content.WriteString(line)
 		content.WriteString("\n")
 	}
-
-	// Help text
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render("j/k: navigate | r: refresh"))
 
 	r.SetContent(content.String())
 	return r.Render()

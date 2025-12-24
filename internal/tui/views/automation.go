@@ -45,6 +45,23 @@ const (
 	PanelKVS
 )
 
+// automationLoadPhase tracks which component is being loaded.
+type automationLoadPhase int
+
+const (
+	automationLoadIdle automationLoadPhase = iota
+	automationLoadScripts
+	automationLoadSchedules
+	automationLoadWebhooks
+	automationLoadVirtuals
+	automationLoadKVS
+)
+
+// automationLoadNextMsg triggers loading the next component in sequence.
+type automationLoadNextMsg struct {
+	phase automationLoadPhase
+}
+
 // Key string constants for key handling.
 const (
 	keyTab      = "tab"
@@ -90,6 +107,7 @@ type Automation struct {
 	width        int
 	height       int
 	styles       AutomationStyles
+	loadPhase    automationLoadPhase // Tracks sequential loading progress
 
 	// Layout calculator for flexible panel sizing
 	layout *layout.TwoColumnLayout
@@ -198,41 +216,116 @@ func (a *Automation) ID() ViewID {
 }
 
 // SetDevice sets the device for all components.
+// Components are loaded sequentially to avoid overwhelming the device with concurrent RPC calls.
 func (a *Automation) SetDevice(device string) tea.Cmd {
 	if device == a.device {
 		return nil
 	}
 	a.device = device
 
-	var cmds []tea.Cmd
+	// Reset all components by clearing their device (ignore cmds - no loading yet)
+	a.scripts, _ = a.scripts.SetDevice("")
+	a.schedules, _ = a.schedules.SetDevice("")
+	a.webhooks, _ = a.webhooks.SetDevice("")
+	a.virtuals, _ = a.virtuals.SetDevice("")
+	a.kvs, _ = a.kvs.SetDevice("")
 
-	// Set device on list components
-	newScripts, scriptsCmd := a.scripts.SetDevice(device)
-	a.scripts = newScripts
-	cmds = append(cmds, scriptsCmd)
+	// Clear editor states
+	a.scriptEditor = a.scriptEditor.Clear()
 
-	newSchedules, schedulesCmd := a.schedules.SetDevice(device)
-	a.schedules = newSchedules
-	cmds = append(cmds, schedulesCmd)
+	// Start sequential loading with first component
+	a.loadPhase = automationLoadScripts
+	return func() tea.Msg {
+		return automationLoadNextMsg{phase: automationLoadScripts}
+	}
+}
 
-	newWebhooks, webhooksCmd := a.webhooks.SetDevice(device)
-	a.webhooks = newWebhooks
-	cmds = append(cmds, webhooksCmd)
+// loadNextComponent triggers loading for the current phase.
+func (a *Automation) loadNextComponent() tea.Cmd {
+	switch a.loadPhase {
+	case automationLoadScripts:
+		newScripts, cmd := a.scripts.SetDevice(a.device)
+		a.scripts = newScripts
+		return cmd
+	case automationLoadSchedules:
+		newSchedules, cmd := a.schedules.SetDevice(a.device)
+		a.schedules = newSchedules
+		return cmd
+	case automationLoadWebhooks:
+		newWebhooks, cmd := a.webhooks.SetDevice(a.device)
+		a.webhooks = newWebhooks
+		return cmd
+	case automationLoadVirtuals:
+		newVirtuals, cmd := a.virtuals.SetDevice(a.device)
+		a.virtuals = newVirtuals
+		return cmd
+	case automationLoadKVS:
+		newKVS, cmd := a.kvs.SetDevice(a.device)
+		a.kvs = newKVS
+		return cmd
+	default:
+		return nil
+	}
+}
 
-	newVirtuals, virtualsCmd := a.virtuals.SetDevice(device)
-	a.virtuals = newVirtuals
-	cmds = append(cmds, virtualsCmd)
-
-	newKVS, kvsCmd := a.kvs.SetDevice(device)
-	a.kvs = newKVS
-	cmds = append(cmds, kvsCmd)
-
-	return tea.Batch(cmds...)
+// advanceLoadPhase moves to the next loading phase and returns command to trigger it.
+func (a *Automation) advanceLoadPhase() tea.Cmd {
+	switch a.loadPhase {
+	case automationLoadScripts:
+		a.loadPhase = automationLoadSchedules
+	case automationLoadSchedules:
+		a.loadPhase = automationLoadWebhooks
+	case automationLoadWebhooks:
+		a.loadPhase = automationLoadVirtuals
+	case automationLoadVirtuals:
+		a.loadPhase = automationLoadKVS
+	case automationLoadKVS:
+		a.loadPhase = automationLoadIdle
+		return nil // All done
+	default:
+		return nil
+	}
+	return func() tea.Msg {
+		return automationLoadNextMsg{phase: a.loadPhase}
+	}
 }
 
 // Update handles messages.
 func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	// Handle sequential loading messages
+	if loadMsg, ok := msg.(automationLoadNextMsg); ok {
+		if loadMsg.phase == a.loadPhase {
+			cmd := a.loadNextComponent()
+			cmds = append(cmds, cmd)
+		}
+		return a, tea.Batch(cmds...)
+	}
+
+	// Check for component completion to advance sequential loading
+	switch msg.(type) {
+	case scripts.LoadedMsg:
+		if a.loadPhase == automationLoadScripts {
+			cmds = append(cmds, a.advanceLoadPhase())
+		}
+	case schedules.LoadedMsg:
+		if a.loadPhase == automationLoadSchedules {
+			cmds = append(cmds, a.advanceLoadPhase())
+		}
+	case webhooks.LoadedMsg:
+		if a.loadPhase == automationLoadWebhooks {
+			cmds = append(cmds, a.advanceLoadPhase())
+		}
+	case virtuals.LoadedMsg:
+		if a.loadPhase == automationLoadVirtuals {
+			cmds = append(cmds, a.advanceLoadPhase())
+		}
+	case kvs.LoadedMsg:
+		if a.loadPhase == automationLoadKVS {
+			cmds = append(cmds, a.advanceLoadPhase())
+		}
+	}
 
 	// Handle keyboard input - only update focused component for key messages
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {

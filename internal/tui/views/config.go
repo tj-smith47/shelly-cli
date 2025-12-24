@@ -27,6 +27,22 @@ const (
 	PanelInputs
 )
 
+// configLoadPhase tracks which component is being loaded.
+type configLoadPhase int
+
+const (
+	configLoadIdle configLoadPhase = iota
+	configLoadWifi
+	configLoadSystem
+	configLoadCloud
+	configLoadInputs
+)
+
+// configLoadNextMsg triggers loading the next component in sequence.
+type configLoadNextMsg struct {
+	phase configLoadPhase
+}
+
 // ConfigDeps holds dependencies for the config view.
 type ConfigDeps struct {
 	Ctx context.Context
@@ -62,6 +78,7 @@ type Config struct {
 	width        int
 	height       int
 	styles       ConfigStyles
+	loadPhase    configLoadPhase // Tracks sequential loading progress
 
 	// Layout calculator for flexible panel sizing
 	layoutCalc *layout.TwoColumnLayout
@@ -149,36 +166,102 @@ func (c *Config) ID() ViewID {
 }
 
 // SetDevice sets the device for all components.
+// Components are loaded sequentially to avoid overwhelming the device with concurrent RPC calls.
 func (c *Config) SetDevice(device string) tea.Cmd {
 	if device == c.device {
 		return nil
 	}
 	c.device = device
 
-	var cmds []tea.Cmd
+	// Reset all components by clearing their device (ignore cmds - no loading yet)
+	c.wifi, _ = c.wifi.SetDevice("")
+	c.system, _ = c.system.SetDevice("")
+	c.cloud, _ = c.cloud.SetDevice("")
+	c.inputs, _ = c.inputs.SetDevice("")
 
-	newWifi, wifiCmd := c.wifi.SetDevice(device)
-	c.wifi = newWifi
-	cmds = append(cmds, wifiCmd)
+	// Start sequential loading with first component
+	c.loadPhase = configLoadWifi
+	return func() tea.Msg {
+		return configLoadNextMsg{phase: configLoadWifi}
+	}
+}
 
-	newSystem, systemCmd := c.system.SetDevice(device)
-	c.system = newSystem
-	cmds = append(cmds, systemCmd)
+// loadNextComponent triggers loading for the current phase.
+func (c *Config) loadNextComponent() tea.Cmd {
+	switch c.loadPhase {
+	case configLoadWifi:
+		newWifi, cmd := c.wifi.SetDevice(c.device)
+		c.wifi = newWifi
+		return cmd
+	case configLoadSystem:
+		newSystem, cmd := c.system.SetDevice(c.device)
+		c.system = newSystem
+		return cmd
+	case configLoadCloud:
+		newCloud, cmd := c.cloud.SetDevice(c.device)
+		c.cloud = newCloud
+		return cmd
+	case configLoadInputs:
+		newInputs, cmd := c.inputs.SetDevice(c.device)
+		c.inputs = newInputs
+		return cmd
+	default:
+		return nil
+	}
+}
 
-	newCloud, cloudCmd := c.cloud.SetDevice(device)
-	c.cloud = newCloud
-	cmds = append(cmds, cloudCmd)
-
-	newInputs, inputsCmd := c.inputs.SetDevice(device)
-	c.inputs = newInputs
-	cmds = append(cmds, inputsCmd)
-
-	return tea.Batch(cmds...)
+// advanceLoadPhase moves to the next loading phase and returns command to trigger it.
+func (c *Config) advanceLoadPhase() tea.Cmd {
+	switch c.loadPhase {
+	case configLoadWifi:
+		c.loadPhase = configLoadSystem
+	case configLoadSystem:
+		c.loadPhase = configLoadCloud
+	case configLoadCloud:
+		c.loadPhase = configLoadInputs
+	case configLoadInputs:
+		c.loadPhase = configLoadIdle
+		return nil // All done
+	default:
+		return nil
+	}
+	return func() tea.Msg {
+		return configLoadNextMsg{phase: c.loadPhase}
+	}
 }
 
 // Update handles messages.
 func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	// Handle sequential loading messages
+	if loadMsg, ok := msg.(configLoadNextMsg); ok {
+		if loadMsg.phase == c.loadPhase {
+			cmd := c.loadNextComponent()
+			cmds = append(cmds, cmd)
+		}
+		return c, tea.Batch(cmds...)
+	}
+
+	// Check for component completion to advance sequential loading
+	switch msg.(type) {
+	case wifi.StatusLoadedMsg:
+		if c.loadPhase == configLoadWifi {
+			cmds = append(cmds, c.advanceLoadPhase())
+		}
+	case system.StatusLoadedMsg:
+		if c.loadPhase == configLoadSystem {
+			cmds = append(cmds, c.advanceLoadPhase())
+		}
+	case cloud.StatusLoadedMsg:
+		if c.loadPhase == configLoadCloud {
+			cmds = append(cmds, c.advanceLoadPhase())
+		}
+	case inputs.LoadedMsg:
+		if c.loadPhase == configLoadInputs {
+			cmds = append(cmds, c.advanceLoadPhase())
+		}
+	}
 
 	// Handle keyboard input - only update focused component for key messages
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {

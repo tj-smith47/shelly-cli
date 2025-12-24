@@ -280,6 +280,11 @@ func (m Model) View() string {
 		SetTitle("Discovery").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		r.SetFooter("s:scan a:add 1-3:method")
+	}
+
 	var content strings.Builder
 
 	// Method selector
@@ -307,10 +312,6 @@ func (m Model) View() string {
 
 	// Device list
 	content.WriteString(m.renderDeviceList())
-
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("j/k: navigate | a: add | s: scan"))
 
 	r.SetContent(content.String())
 	return r.Render()

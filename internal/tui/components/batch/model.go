@@ -384,6 +384,11 @@ func (m Model) View() string {
 		SetTitle("Batch Operations").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		r.SetFooter("spc:sel a:all n:none x:exec 1-5:op")
+	}
+
 	var content strings.Builder
 
 	// Operation selector
@@ -419,10 +424,6 @@ func (m Model) View() string {
 		content.WriteString("\n")
 		content.WriteString(m.styles.Muted.Render("Executing..."))
 	}
-
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("space: toggle | a: all | n: none | x: execute"))
 
 	r.SetContent(content.String())
 	return r.Render()

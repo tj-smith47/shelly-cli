@@ -235,6 +235,11 @@ func (m OperationsModel) View() string {
 		SetTitle("Batch Operations").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		r.SetFooter("1-2:op h/l:sel enter:exec")
+	}
+
 	if m.fleet == nil {
 		r.SetContent(m.styles.Muted.Render("Not connected to Shelly Cloud"))
 		return r.Render()
@@ -300,10 +305,6 @@ func (m OperationsModel) View() string {
 			content.WriteString(m.styles.Success.Render(resultLine))
 		}
 	}
-
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("1-2: select | Enter: execute"))
 
 	r.SetContent(content.String())
 	return r.Render()

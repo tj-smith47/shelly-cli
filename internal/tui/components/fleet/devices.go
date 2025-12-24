@@ -205,6 +205,11 @@ func (m DevicesModel) View() string {
 		SetTitle("Cloud Devices").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		r.SetFooter("j/k:nav g/G:top/btm r:refresh")
+	}
+
 	// Handle early return cases
 	if msg := m.getStatusMessage(); msg != "" {
 		r.SetContent(msg)
@@ -248,10 +253,6 @@ func (m DevicesModel) renderDeviceList() string {
 		content.WriteString(m.renderDeviceLine(i))
 		content.WriteString("\n")
 	}
-
-	// Help text
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render("j/k: navigate | r: refresh"))
 
 	return content.String()
 }

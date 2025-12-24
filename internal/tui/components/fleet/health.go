@@ -180,6 +180,11 @@ func (m HealthModel) View() string {
 		SetTitle("Fleet Health").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		r.SetFooter("r:refresh")
+	}
+
 	if m.fleet == nil {
 		r.SetContent(m.styles.Muted.Render("Not connected to Shelly Cloud"))
 		return r.Render()
@@ -258,10 +263,6 @@ func (m HealthModel) View() string {
 		content.WriteString(m.styles.Label.Render("Controllable: "))
 		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", m.stats.AccountStats.ControllableDevices)))
 	}
-
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("r: refresh"))
 
 	r.SetContent(content.String())
 	return r.Render()

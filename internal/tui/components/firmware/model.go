@@ -419,6 +419,11 @@ func (m Model) View() string {
 		SetTitle("Firmware").
 		SetFocused(m.focused)
 
+	// Add footer with keybindings when focused
+	if m.focused {
+		r.SetFooter("c:check u:update spc:sel a:all")
+	}
+
 	var content strings.Builder
 
 	// Action buttons
@@ -451,10 +456,6 @@ func (m Model) View() string {
 		content.WriteString("\n")
 		content.WriteString(m.styles.Updating.Render("Updating devices..."))
 	}
-
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("space: select | a: all updates | c: check | u: update"))
 
 	r.SetContent(content.String())
 	return r.Render()
