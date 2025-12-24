@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
 // Executor runs plugins with proper environment setup.
@@ -35,7 +36,7 @@ func (e *Executor) ExecuteContext(ctx context.Context, plugin *Plugin, args []st
 	cmd.Stderr = os.Stderr
 
 	// Set up environment
-	cmd.Env = e.buildEnvironment()
+	cmd.Env = e.buildEnvironment(plugin)
 
 	// Run the plugin
 	return cmd.Run()
@@ -50,13 +51,13 @@ func (e *Executor) ExecuteCapture(plugin *Plugin, args []string) ([]byte, error)
 func (e *Executor) ExecuteCaptureContext(ctx context.Context, plugin *Plugin, args []string) ([]byte, error) {
 	//nolint:gosec // G204: Plugin path is validated by loader, not arbitrary user input
 	cmd := exec.CommandContext(ctx, plugin.Path, args...)
-	cmd.Env = e.buildEnvironment()
+	cmd.Env = e.buildEnvironment(plugin)
 
 	return cmd.Output()
 }
 
 // buildEnvironment creates the environment for plugin execution.
-func (e *Executor) buildEnvironment() []string {
+func (e *Executor) buildEnvironment(plugin *Plugin) []string {
 	// Start with current environment
 	env := os.Environ()
 
@@ -98,6 +99,14 @@ func (e *Executor) buildEnvironment() []string {
 	} else {
 		env = append(env, "SHELLY_DEVICES_JSON="+string(devicesJSON))
 	}
+
+	// SHELLY_PLUGIN_DIR: Directory where plugin is installed
+	if plugin != nil && plugin.Dir != "" {
+		env = append(env, "SHELLY_PLUGIN_DIR="+plugin.Dir)
+	}
+
+	// SHELLY_CLI_VERSION: CLI version for compatibility checks
+	env = append(env, "SHELLY_CLI_VERSION="+version.Version)
 
 	return env
 }

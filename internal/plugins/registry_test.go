@@ -216,3 +216,145 @@ func TestRegistry_IsInstalled(t *testing.T) {
 		t.Error("IsInstalled() returned true for non-installed plugin")
 	}
 }
+
+func TestRegistry_FindByPlatform(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
+
+	registry := &Registry{pluginsDir: tmpDir}
+
+	// Create plugin directory with manifest
+	pluginDir := filepath.Join(tmpDir, "shelly-tasmota")
+	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+
+	// Create executable
+	//nolint:gosec // Test file needs to be executable
+	if err := os.WriteFile(filepath.Join(pluginDir, "shelly-tasmota"), []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create plugin binary: %v", err)
+	}
+
+	// Create manifest with platform capability
+	manifest := `{
+		"schema_version": "1",
+		"name": "tasmota",
+		"binary": {
+			"name": "shelly-tasmota"
+		},
+		"capabilities": {
+			"platform": "tasmota",
+			"device_detection": true
+		}
+	}`
+	//nolint:gosec // G306: Manifest is not sensitive data
+	if err := os.WriteFile(filepath.Join(pluginDir, "manifest.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("failed to create manifest: %v", err)
+	}
+
+	// Test finding by platform
+	plugin, err := registry.FindByPlatform("tasmota")
+	if err != nil {
+		t.Fatalf("FindByPlatform() error: %v", err)
+	}
+	if plugin == nil {
+		t.Fatal("FindByPlatform() returned nil for existing platform")
+	}
+	if plugin.Name != "tasmota" {
+		t.Errorf("expected plugin name 'tasmota', got %q", plugin.Name)
+	}
+
+	// Test finding non-existent platform
+	plugin, err = registry.FindByPlatform("esphome")
+	if err != nil {
+		t.Fatalf("FindByPlatform() error for non-existent platform: %v", err)
+	}
+	if plugin != nil {
+		t.Error("FindByPlatform() should return nil for non-existent platform")
+	}
+}
+
+func TestRegistry_ListDetectionCapable(t *testing.T) {
+	t.Parallel()
+
+	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("warning: failed to remove temp dir: %v", err)
+		}
+	})
+
+	registry := &Registry{pluginsDir: tmpDir}
+
+	// Create plugin with detection capability
+	pluginDir1 := filepath.Join(tmpDir, "shelly-detector")
+	if err := os.MkdirAll(pluginDir1, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+	//nolint:gosec // Test file needs to be executable
+	if err := os.WriteFile(filepath.Join(pluginDir1, "shelly-detector"), []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create plugin binary: %v", err)
+	}
+	manifest1 := `{
+		"schema_version": "1",
+		"name": "detector",
+		"binary": {
+			"name": "shelly-detector"
+		},
+		"capabilities": {
+			"device_detection": true
+		}
+	}`
+	//nolint:gosec // G306: Manifest is not sensitive data
+	if err := os.WriteFile(filepath.Join(pluginDir1, "manifest.json"), []byte(manifest1), 0o644); err != nil {
+		t.Fatalf("failed to create manifest: %v", err)
+	}
+
+	// Create plugin without detection capability
+	pluginDir2 := filepath.Join(tmpDir, "shelly-other")
+	if err := os.MkdirAll(pluginDir2, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+	//nolint:gosec // Test file needs to be executable
+	if err := os.WriteFile(filepath.Join(pluginDir2, "shelly-other"), []byte("test"), 0o755); err != nil {
+		t.Fatalf("failed to create plugin binary: %v", err)
+	}
+	manifest2 := `{
+		"schema_version": "1",
+		"name": "other",
+		"binary": {
+			"name": "shelly-other"
+		},
+		"capabilities": {
+			"device_detection": false
+		}
+	}`
+	//nolint:gosec // G306: Manifest is not sensitive data
+	if err := os.WriteFile(filepath.Join(pluginDir2, "manifest.json"), []byte(manifest2), 0o644); err != nil {
+		t.Fatalf("failed to create manifest: %v", err)
+	}
+
+	// Test listing detection-capable plugins
+	plugins, err := registry.ListDetectionCapable()
+	if err != nil {
+		t.Fatalf("ListDetectionCapable() error: %v", err)
+	}
+	if len(plugins) != 1 {
+		t.Errorf("expected 1 detection-capable plugin, got %d", len(plugins))
+	}
+	if len(plugins) > 0 && plugins[0].Name != "detector" {
+		t.Errorf("expected plugin 'detector', got %q", plugins[0].Name)
+	}
+}

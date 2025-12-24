@@ -66,8 +66,8 @@ func TestManifest_WithCapabilitiesAndHooks(t *testing.T) {
 		t.Fatalf("failed to unmarshal new manifest: %v", err)
 	}
 
-	if m.Name != "tasmota" {
-		t.Errorf("expected name 'tasmota', got %q", m.Name)
+	if m.Name != testPlatformTasmota {
+		t.Errorf("expected name %q, got %q", testPlatformTasmota, m.Name)
 	}
 
 	// Verify capabilities.
@@ -77,8 +77,8 @@ func TestManifest_WithCapabilitiesAndHooks(t *testing.T) {
 	if !m.Capabilities.DeviceDetection {
 		t.Error("expected DeviceDetection to be true")
 	}
-	if m.Capabilities.Platform != "tasmota" {
-		t.Errorf("expected Platform 'tasmota', got %q", m.Capabilities.Platform)
+	if m.Capabilities.Platform != testPlatformTasmota {
+		t.Errorf("expected Platform %q, got %q", testPlatformTasmota, m.Capabilities.Platform)
 	}
 	if len(m.Capabilities.Components) != 3 {
 		t.Errorf("expected 3 components, got %d", len(m.Capabilities.Components))

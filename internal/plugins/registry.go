@@ -224,3 +224,43 @@ func (r *Registry) GetManifest(name string) (*Manifest, error) {
 
 	return LoadManifest(pluginDir)
 }
+
+// FindByPlatform returns the plugin that manages a given platform.
+// Returns nil if no plugin is found for the platform (not an error).
+func (r *Registry) FindByPlatform(platform string) (*Plugin, error) {
+	plugins, err := r.List()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range plugins {
+		p := &plugins[i]
+		if p.Manifest != nil && p.Manifest.Capabilities != nil {
+			if p.Manifest.Capabilities.Platform == platform {
+				return p, nil
+			}
+		}
+	}
+
+	return nil, nil //nolint:nilnil // Not found is valid, not an error
+}
+
+// ListDetectionCapable returns all plugins that can detect devices.
+// These are plugins with DeviceDetection capability set to true.
+func (r *Registry) ListDetectionCapable() ([]Plugin, error) {
+	plugins, err := r.List()
+	if err != nil {
+		return nil, err
+	}
+
+	var result []Plugin
+	for _, p := range plugins {
+		if p.Manifest != nil && p.Manifest.Capabilities != nil {
+			if p.Manifest.Capabilities.DeviceDetection {
+				result = append(result, p)
+			}
+		}
+	}
+
+	return result, nil
+}
