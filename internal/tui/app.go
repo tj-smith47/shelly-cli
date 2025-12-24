@@ -19,7 +19,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/confirm"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/deviceinfo"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/energybars"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/energyhistory"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/events"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/help"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/jsonviewer"
@@ -100,15 +102,17 @@ type Model struct {
 	height int
 
 	// Components
-	statusBar  statusbar.Model
-	search     search.Model
-	cmdMode    cmdmode.Model
-	help       help.Model
-	toast      toast.Model
-	events     events.Model
-	energyBars energybars.Model
-	jsonViewer jsonviewer.Model
-	confirm    confirm.Model
+	statusBar     statusbar.Model
+	search        search.Model
+	cmdMode       cmdmode.Model
+	help          help.Model
+	toast         toast.Model
+	events        events.Model
+	energyBars    energybars.Model
+	energyHistory energyhistory.Model
+	jsonViewer    jsonviewer.Model
+	confirm       confirm.Model
+	deviceInfo    deviceinfo.Model
 
 	// Settings
 	refreshInterval time.Duration
@@ -162,8 +166,14 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Create energy bars component
 	energyBarsModel := energybars.New(deviceCache)
 
+	// Create energy history sparklines component
+	energyHistoryModel := energyhistory.New(deviceCache)
+
 	// Create JSON viewer component
 	jsonViewerModel := jsonviewer.New(ctx, f.ShellyService())
+
+	// Create device info component
+	deviceInfoModel := deviceinfo.New()
 
 	// Create view manager and register all views
 	vm := views.New()
@@ -228,8 +238,10 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		toast:           toast.New(),
 		events:          eventsModel,
 		energyBars:      energyBarsModel,
+		energyHistory:   energyHistoryModel,
 		jsonViewer:      jsonViewerModel,
 		confirm:         confirm.New(),
+		deviceInfo:      deviceInfoModel,
 		debugLogger:     debug.New(), // nil if SHELLY_TUI_DEBUG not set
 	}
 }
@@ -280,26 +292,15 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg), nil, true
+	case tea.KeyPressMsg:
+		return m.handleKeyPressMsg(msg)
 	case DeviceActionMsg:
 		newModel, cmd := m.handleDeviceAction(msg)
 		return newModel, cmd, true
 	case cache.DeviceUpdateMsg, cache.RefreshTickMsg:
-		cmd := m.cache.Update(msg)
-		return m, cmd, true
+		return m, m.cache.Update(msg), true
 	case cache.AllDevicesLoadedMsg:
-		cmd := m.cache.Update(msg)
-		// Emit initial device selection for the first device
-		devices := m.getFilteredDevices()
-		if len(devices) > 0 && m.cursor < len(devices) {
-			d := devices[m.cursor]
-			return m, tea.Batch(cmd, func() tea.Msg {
-				return views.DeviceSelectedMsg{
-					Device:  d.Device.Name,
-					Address: d.Device.Address,
-				}
-			}), true
-		}
-		return m, cmd, true
+		return m.handleAllDevicesLoaded(msg)
 	case events.EventMsg, events.SubscriptionStatusMsg:
 		var cmd tea.Cmd
 		m.events, cmd = m.events.Update(msg)
@@ -308,23 +309,27 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.filter = msg.Filter
 		m.cursor = 0
 		return m, nil, true
-	case search.ClosedMsg, cmdmode.ClosedMsg:
+	case search.ClosedMsg, cmdmode.ClosedMsg, confirm.CancelledMsg:
 		return m, nil, true
 	case cmdmode.CommandMsg:
 		newModel, cmd := m.handleCommand(msg)
 		return newModel, cmd, true
 	case cmdmode.ErrorMsg:
 		return m, statusbar.SetMessage(msg.Message, statusbar.MessageError), true
+	default:
+		return m.handleViewAndComponentMsgs(msg)
+	}
+}
+
+// handleViewAndComponentMsgs handles view-related and component messages.
+func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
 	case tabs.TabChangedMsg:
-		// Sync view manager with tab bar
-		cmd := m.viewManager.SetActive(msg.Current)
-		return m, cmd, true
+		return m, m.viewManager.SetActive(msg.Current), true
 	case views.ViewChangedMsg:
-		// View changed, sync tab bar
 		m.tabBar, _ = m.tabBar.SetActive(msg.Current)
 		return m, nil, true
 	case views.DeviceSelectedMsg:
-		// Propagate device selection to all views that support it
 		return m, m.viewManager.PropagateDevice(msg.Device), true
 	case jsonviewer.CloseMsg:
 		m.focusedPanel = PanelDetail
@@ -334,15 +339,43 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.jsonViewer, cmd = m.jsonViewer.Update(msg)
 		return m, cmd, true
 	case confirm.ConfirmedMsg:
-		// Handle confirmed action
-		return m, toast.Success("Action confirmed: "+msg.Operation), true
-	case confirm.CancelledMsg:
-		// Action was cancelled
-		return m, nil, true
-	case tea.KeyPressMsg:
-		return m.handleKeyPressMsg(msg)
+		return m, toast.Success("Action confirmed: " + msg.Operation), true
+	case deviceinfo.RequestJSONMsg:
+		return m.handleRequestJSON(msg)
 	}
 	return m, nil, false
+}
+
+// handleAllDevicesLoaded handles the AllDevicesLoadedMsg and emits initial selection.
+func (m Model) handleAllDevicesLoaded(msg cache.AllDevicesLoadedMsg) (tea.Model, tea.Cmd, bool) {
+	cmd := m.cache.Update(msg)
+	devices := m.getFilteredDevices()
+	if len(devices) == 0 || m.cursor >= len(devices) {
+		return m, cmd, true
+	}
+	d := devices[m.cursor]
+	return m, tea.Batch(cmd, func() tea.Msg {
+		return views.DeviceSelectedMsg{
+			Device:  d.Device.Name,
+			Address: d.Device.Address,
+		}
+	}), true
+}
+
+// handleRequestJSON opens the JSON viewer for a requested endpoint.
+func (m Model) handleRequestJSON(msg deviceinfo.RequestJSONMsg) (tea.Model, tea.Cmd, bool) {
+	devices := m.getFilteredDevices()
+	for _, d := range devices {
+		if d.Device.Name != msg.DeviceName {
+			continue
+		}
+		m.focusedPanel = PanelEndpoints
+		endpoints := m.getDeviceMethods(d)
+		var cmd tea.Cmd
+		m.jsonViewer, cmd = m.jsonViewer.Open(d.Device.Address, msg.Endpoint, endpoints)
+		return m, cmd, true
+	}
+	return m, nil, true
 }
 
 // updateComponents forwards messages to components and collects commands.
@@ -362,6 +395,9 @@ func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
 		viewCmd := m.viewManager.UpdateAll(msg)
 		cmds = append(cmds, viewCmd)
 	}
+
+	// Update deviceInfo with current device selection
+	m = m.syncDeviceInfo()
 
 	return m, cmds
 }
@@ -581,52 +617,14 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "tab":
-		// Cycle between panels: DeviceList <-> Detail
-		switch m.focusedPanel {
-		case PanelDeviceList:
-			m.focusedPanel = PanelDetail
-		case PanelDetail:
-			m.focusedPanel = PanelDeviceList
-		case PanelEndpoints:
-			// When JSON overlay is visible, go to DeviceList
-			m.focusedPanel = PanelDeviceList
-		}
+		m.focusedPanel = m.nextPanel()
 		return m, nil, true
 	case "shift+tab":
-		// Reverse cycle between panels: Detail <-> DeviceList
-		switch m.focusedPanel {
-		case PanelDeviceList:
-			m.focusedPanel = PanelDetail
-		case PanelDetail:
-			m.focusedPanel = PanelDeviceList
-		case PanelEndpoints:
-			// When JSON overlay is visible, go to Detail
-			m.focusedPanel = PanelDetail
-		}
+		m.focusedPanel = m.prevPanel()
 		return m, nil, true
 	case "enter":
-		// Open JSON viewer when on Detail panel
-		if m.focusedPanel == PanelDetail {
-			devices := m.getFilteredDevices()
-			if len(devices) > 0 && m.cursor < len(devices) {
-				d := devices[m.cursor]
-				if d.Online {
-					m.focusedPanel = PanelEndpoints
-					methods := m.getDeviceMethods(d)
-					endpoint := ""
-					if m.endpointCursor < len(methods) {
-						endpoint = methods[m.endpointCursor]
-					} else if len(methods) > 0 {
-						endpoint = methods[0]
-					}
-					var cmd tea.Cmd
-					m.jsonViewer, cmd = m.jsonViewer.Open(d.Device.Address, endpoint, methods)
-					return m, cmd, true
-				}
-			}
-		}
+		return m.openJSONViewer()
 	case "escape":
-		// Close JSON viewer if visible
 		if m.jsonViewer.Visible() {
 			m.jsonViewer = m.jsonViewer.Close()
 			m.focusedPanel = PanelDetail
@@ -634,6 +632,58 @@ func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		}
 	}
 	return m, nil, false
+}
+
+// nextPanel returns the next panel in the cycle: DeviceList -> Detail -> DeviceList.
+func (m Model) nextPanel() PanelFocus {
+	if m.focusedPanel == PanelDeviceList {
+		return PanelDetail
+	}
+	return PanelDeviceList
+}
+
+// prevPanel returns the previous panel in the cycle: Detail -> DeviceList -> Detail.
+func (m Model) prevPanel() PanelFocus {
+	if m.focusedPanel == PanelDetail {
+		return PanelDeviceList
+	}
+	return PanelDetail
+}
+
+// openJSONViewer opens the JSON viewer for the selected device if on Detail panel.
+func (m Model) openJSONViewer() (Model, tea.Cmd, bool) {
+	if m.focusedPanel != PanelDetail {
+		return m, nil, false
+	}
+
+	devices := m.getFilteredDevices()
+	if len(devices) == 0 || m.cursor >= len(devices) {
+		return m, nil, false
+	}
+
+	d := devices[m.cursor]
+	if !d.Online {
+		return m, nil, false
+	}
+
+	m.focusedPanel = PanelEndpoints
+	methods := m.getDeviceMethods(d)
+	endpoint := m.selectEndpoint(methods)
+
+	var cmd tea.Cmd
+	m.jsonViewer, cmd = m.jsonViewer.Open(d.Device.Address, endpoint, methods)
+	return m, cmd, true
+}
+
+// selectEndpoint returns the appropriate endpoint based on cursor position.
+func (m Model) selectEndpoint(methods []string) string {
+	if m.endpointCursor < len(methods) {
+		return methods[m.endpointCursor]
+	}
+	if len(methods) > 0 {
+		return methods[0]
+	}
+	return ""
 }
 
 // handleGlobalKeys handles quit, help, filter, command, tab switching, and escape keys.
@@ -680,87 +730,147 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 	return m, nil, false
 }
 
+// navDirection represents a navigation direction for cursor movement.
+type navDirection int
+
+const (
+	navDown navDirection = iota
+	navUp
+	navFirst
+	navLast
+)
+
+// parseNavDirection converts a key string to a navigation direction.
+func parseNavDirection(keyStr string) (navDirection, bool) {
+	switch keyStr {
+	case "j", "down":
+		return navDown, true
+	case "k", "up":
+		return navUp, true
+	case "g":
+		return navFirst, true
+	case "G":
+		return navLast, true
+	default:
+		return 0, false
+	}
+}
+
 // handleNavigation handles j/k/g/G/h/l navigation keys based on focused panel.
 func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
-	devices := m.getFilteredDevices()
-	deviceCount := len(devices)
-	oldCursor := m.cursor
+	// When PanelDetail is focused, forward navigation to deviceInfo component
+	if m.focusedPanel == PanelDetail {
+		var cmd tea.Cmd
+		m.deviceInfo, cmd = m.deviceInfo.Update(msg)
+		return m, cmd, true
+	}
 
-	switch msg.String() {
-	case "j", "down":
-		switch m.focusedPanel {
-		case PanelDeviceList:
-			if m.cursor < deviceCount-1 {
-				m.cursor++
-				m.componentCursor = -1
-				m.endpointCursor = 0
-			}
-		case PanelDetail, PanelEndpoints:
-			if m.cursor >= 0 && m.cursor < deviceCount {
-				methods := m.getDeviceMethods(devices[m.cursor])
-				if m.endpointCursor < len(methods)-1 {
-					m.endpointCursor++
-				}
-			}
-		}
+	devices := m.getFilteredDevices()
+	oldCursor := m.cursor
+	keyStr := msg.String()
+
+	// Handle vertical navigation (j/k/g/G)
+	if dir, ok := parseNavDirection(keyStr); ok {
+		m = m.applyVerticalNav(dir, devices)
 		return m, m.emitDeviceSelection(devices, oldCursor), true
-	case "k", "up":
-		switch m.focusedPanel {
-		case PanelDeviceList:
-			if m.cursor > 0 {
-				m.cursor--
-				m.componentCursor = -1
-				m.endpointCursor = 0
-			}
-		case PanelDetail, PanelEndpoints:
-			if m.endpointCursor > 0 {
-				m.endpointCursor--
-			}
-		}
-		return m, m.emitDeviceSelection(devices, oldCursor), true
-	case "g":
-		switch m.focusedPanel {
-		case PanelDeviceList:
-			m.cursor = 0
+	}
+
+	// Handle horizontal navigation (h/l)
+	if m, handled := m.applyHorizontalNav(keyStr, devices); handled {
+		return m, nil, true
+	}
+
+	return m, nil, false
+}
+
+// applyVerticalNav applies vertical navigation based on direction and focused panel.
+func (m Model) applyVerticalNav(dir navDirection, devices []*cache.DeviceData) Model {
+	if m.focusedPanel == PanelDeviceList {
+		return m.navDeviceList(dir, len(devices))
+	}
+	if m.focusedPanel == PanelEndpoints {
+		return m.navEndpoints(dir, devices)
+	}
+	return m
+}
+
+// navDeviceList handles vertical navigation within the device list.
+func (m Model) navDeviceList(dir navDirection, deviceCount int) Model {
+	switch dir {
+	case navDown:
+		if m.cursor < deviceCount-1 {
+			m.cursor++
 			m.componentCursor = -1
 			m.endpointCursor = 0
-		case PanelDetail, PanelEndpoints:
+		}
+	case navUp:
+		if m.cursor > 0 {
+			m.cursor--
+			m.componentCursor = -1
 			m.endpointCursor = 0
 		}
-		return m, m.emitDeviceSelection(devices, oldCursor), true
-	case "G":
-		switch m.focusedPanel {
-		case PanelDeviceList:
-			if deviceCount > 0 {
-				m.cursor = deviceCount - 1
-				m.componentCursor = -1
-				m.endpointCursor = 0
-			}
-		case PanelDetail, PanelEndpoints:
-			if m.cursor >= 0 && m.cursor < deviceCount {
-				methods := m.getDeviceMethods(devices[m.cursor])
-				if len(methods) > 0 {
-					m.endpointCursor = len(methods) - 1
-				}
+	case navFirst:
+		m.cursor = 0
+		m.componentCursor = -1
+		m.endpointCursor = 0
+	case navLast:
+		if deviceCount > 0 {
+			m.cursor = deviceCount - 1
+			m.componentCursor = -1
+			m.endpointCursor = 0
+		}
+	}
+	return m
+}
+
+// navEndpoints handles vertical navigation within the endpoints panel.
+func (m Model) navEndpoints(dir navDirection, devices []*cache.DeviceData) Model {
+	deviceCount := len(devices)
+	switch dir {
+	case navDown:
+		if m.cursor >= 0 && m.cursor < deviceCount {
+			methods := m.getDeviceMethods(devices[m.cursor])
+			if m.endpointCursor < len(methods)-1 {
+				m.endpointCursor++
 			}
 		}
-		return m, m.emitDeviceSelection(devices, oldCursor), true
+	case navUp:
+		if m.endpointCursor > 0 {
+			m.endpointCursor--
+		}
+	case navFirst:
+		m.endpointCursor = 0
+	case navLast:
+		if m.cursor >= 0 && m.cursor < deviceCount {
+			methods := m.getDeviceMethods(devices[m.cursor])
+			if len(methods) > 0 {
+				m.endpointCursor = len(methods) - 1
+			}
+		}
+	}
+	return m
+}
+
+// applyHorizontalNav handles h/l horizontal navigation for component selection.
+func (m Model) applyHorizontalNav(keyStr string, devices []*cache.DeviceData) (Model, bool) {
+	deviceCount := len(devices)
+	switch keyStr {
 	case "h", "left":
 		if m.componentCursor > -1 {
 			m.componentCursor--
 		}
-		return m, nil, true
+		return m, true
 	case "l", "right":
-		if m.cursor < deviceCount && m.cursor >= 0 {
+		if m.cursor >= 0 && m.cursor < deviceCount {
 			d := devices[m.cursor]
 			maxComponent := len(d.Switches) - 1
 			if m.componentCursor < maxComponent {
 				m.componentCursor++
 			}
 		}
-		return m, nil, true
+		return m, true
 	}
-	return m, nil, false
+	return m, false
 }
 
 // emitDeviceSelection emits a DeviceSelectedMsg if the cursor changed.
@@ -775,6 +885,23 @@ func (m Model) emitDeviceSelection(devices []*cache.DeviceData, oldCursor int) t
 			Address: d.Device.Address,
 		}
 	}
+}
+
+// syncDeviceInfo syncs the deviceInfo component with current selection and focus.
+func (m Model) syncDeviceInfo() Model {
+	devices := m.getFilteredDevices()
+
+	// Update selected device
+	if len(devices) > 0 && m.cursor < len(devices) {
+		m.deviceInfo = m.deviceInfo.SetDevice(devices[m.cursor])
+	} else {
+		m.deviceInfo = m.deviceInfo.SetDevice(nil)
+	}
+
+	// Update focus state
+	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail)
+
+	return m
 }
 
 // handleDeviceActionKey handles device action key presses.
@@ -1050,10 +1177,19 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	return content
 }
 
-// renderEnergyPanel renders the energy consumption bars panel.
+// renderEnergyPanel renders the energy consumption bars with sparkline history.
 func (m Model) renderEnergyPanel(width, height int) string {
-	m.energyBars = m.energyBars.SetSize(width, height)
-	return m.energyBars.View()
+	// Split width between bars and history
+	barsWidth := width * 60 / 100
+	historyWidth := width - barsWidth - 1
+
+	m.energyBars = m.energyBars.SetSize(barsWidth, height)
+	m.energyHistory = m.energyHistory.SetSize(historyWidth, height)
+
+	barsView := m.energyBars.View()
+	historyView := m.energyHistory.View()
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, barsView, " ", historyView)
 }
 
 // renderNarrowLayout renders panels stacked vertically for narrow terminals.
@@ -1223,94 +1359,11 @@ func (m Model) renderDeviceListColumn(devices []*cache.DeviceData, width, height
 	return r.SetContent(content.String()).Render()
 }
 
-// renderDeviceInfoColumn renders device info, power metrics, and endpoints.
-func (m Model) renderDeviceInfoColumn(devices []*cache.DeviceData, width, height int, borderColor color.Color) string {
-	colors := theme.GetSemanticColors()
-
-	r := rendering.New(width, height).
-		SetTitle("Device Info").
-		SetFocused(m.focusedPanel == PanelDetail).
-		SetFocusColor(borderColor).
-		SetBlurColor(borderColor)
-
-	var content strings.Builder
-	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
-
-	if len(devices) == 0 || m.cursor >= len(devices) {
-		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render("Select a device"))
-		return r.SetContent(content.String()).Render()
-	}
-
-	d := devices[m.cursor]
-	labelStyle := lipgloss.NewStyle().Foreground(theme.Purple())
-	valueStyle := lipgloss.NewStyle().Foreground(theme.Cyan()).Bold(true)
-
-	if !d.Fetched {
-		content.WriteString(lipgloss.NewStyle().Foreground(theme.Yellow()).Render("Connecting..."))
-		return r.SetContent(content.String()).Render()
-	}
-
-	if !d.Online {
-		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render("✗ Offline"))
-		return r.SetContent(content.String()).Render()
-	}
-
-	// Device info
-	if d.Info != nil {
-		modelName := m.factory.ShellyService().ModelDisplayName(d.Info.Model)
-		content.WriteString(labelStyle.Render(" Model:    ") + valueStyle.Render(modelName) + "\n")
-		content.WriteString(labelStyle.Render(" Firmware: ") + valueStyle.Render(d.Info.Firmware) + "\n")
-		content.WriteString(labelStyle.Render(" MAC:      ") + valueStyle.Render(d.Info.MAC) + "\n")
-	}
-	content.WriteString(labelStyle.Render(" Address:  ") + valueStyle.Render(d.Device.Address) + "\n")
-
-	// Power metrics (if available)
-	writePowerMetrics(&content, d, titleStyle, labelStyle, valueStyle)
-
-	// Switch states
-	if len(d.Switches) > 0 {
-		content.WriteString("\n" + titleStyle.Render(" Components") + "\n")
-		for i, sw := range d.Switches {
-			state := lipgloss.NewStyle().Foreground(colors.Offline).Render("OFF")
-			if sw.On {
-				state = lipgloss.NewStyle().Foreground(theme.Green()).Bold(true).Render("ON")
-			}
-			prefix := "  "
-			if i == m.componentCursor {
-				prefix = "▶ "
-			}
-			content.WriteString(fmt.Sprintf("%sSwitch %d: %s\n", prefix, sw.ID, state))
-		}
-		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
-			Render("  h/l: select, t: toggle") + "\n")
-	}
-
-	// Endpoints section
-	content.WriteString("\n" + titleStyle.Render(" Endpoints") + "\n")
-	methods := m.getDeviceMethods(d)
-	methodStyle := lipgloss.NewStyle().Foreground(theme.Cyan())
-
-	maxMethods := height - 20
-	if maxMethods < 3 {
-		maxMethods = 3
-	}
-
-	for i, method := range methods {
-		if i >= maxMethods {
-			content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).
-				Render(fmt.Sprintf("  +%d more\n", len(methods)-maxMethods)))
-			break
-		}
-		prefix := "  "
-		if i == m.endpointCursor && m.focusedPanel == PanelDetail {
-			prefix = "▶ "
-		}
-		content.WriteString(prefix + methodStyle.Render(method) + "\n")
-	}
-	content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
-		Render("  Enter: view JSON") + "\n")
-
-	return r.SetContent(content.String()).Render()
+// renderDeviceInfoColumn renders device info using the deviceInfo component.
+func (m Model) renderDeviceInfoColumn(_ []*cache.DeviceData, width, height int, _ color.Color) string {
+	// Set size and return the deviceInfo component's view
+	m.deviceInfo = m.deviceInfo.SetSize(width, height)
+	return m.deviceInfo.View()
 }
 
 func (m Model) renderHeader() string {
@@ -1434,36 +1487,6 @@ func (m Model) renderWithHelpOverlay(content string, contentHeight int) string {
 		helpView,
 		lipgloss.WithWhitespaceChars(" "),
 	)
-}
-
-func formatEnergy(wh float64) string {
-	if wh >= 1000000 {
-		return fmt.Sprintf("%.2f MWh", wh/1000000)
-	}
-	if wh >= 1000 {
-		return fmt.Sprintf("%.2f kWh", wh/1000)
-	}
-	return fmt.Sprintf("%.1f Wh", wh)
-}
-
-func writePowerMetrics(content *strings.Builder, d *cache.DeviceData, titleStyle, labelStyle, valueStyle lipgloss.Style) {
-	if d.Power == 0 && d.Voltage == 0 {
-		return
-	}
-	content.WriteString("\n" + titleStyle.Render(" Power Metrics") + "\n")
-	powerStyle := lipgloss.NewStyle().Foreground(theme.Orange()).Bold(true)
-	if d.Power != 0 {
-		content.WriteString(labelStyle.Render(" Power:   ") + powerStyle.Render(fmt.Sprintf("%.1fW", d.Power)) + "\n")
-	}
-	if d.Voltage != 0 {
-		content.WriteString(labelStyle.Render(" Voltage: ") + valueStyle.Render(fmt.Sprintf("%.1fV", d.Voltage)) + "\n")
-	}
-	if d.Current != 0 {
-		content.WriteString(labelStyle.Render(" Current: ") + valueStyle.Render(fmt.Sprintf("%.2fA", d.Current)) + "\n")
-	}
-	if d.TotalEnergy != 0 {
-		content.WriteString(labelStyle.Render(" Total:   ") + valueStyle.Render(formatEnergy(d.TotalEnergy)) + "\n")
-	}
 }
 
 // Run starts the TUI application.
