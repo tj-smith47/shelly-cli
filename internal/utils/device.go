@@ -14,6 +14,7 @@ import (
 )
 
 // DiscoveredDeviceToConfig converts a discovered device to a model.Device.
+// Discovered devices are always native Shelly devices (platform: shelly).
 func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 	name := d.ID
 	if d.Name != "" {
@@ -23,6 +24,7 @@ func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 	return model.Device{
 		Name:       name,
 		Address:    d.Address.String(),
+		Platform:   model.PlatformShelly,
 		Generation: int(d.Generation),
 		Type:       d.Model,
 		Model:      d.Model,

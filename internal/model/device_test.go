@@ -95,6 +95,7 @@ func TestDevice_Fields(t *testing.T) {
 	dev := Device{
 		Name:       "Kitchen Light",
 		Address:    "192.168.1.50",
+		Platform:   PlatformShelly,
 		Generation: 2,
 		Type:       "SHSW-PM",
 		Model:      "Shelly Plus 1PM",
@@ -110,6 +111,9 @@ func TestDevice_Fields(t *testing.T) {
 	if dev.Address != "192.168.1.50" {
 		t.Errorf("Address = %q, want %q", dev.Address, "192.168.1.50")
 	}
+	if dev.Platform != PlatformShelly {
+		t.Errorf("Platform = %q, want %q", dev.Platform, PlatformShelly)
+	}
 	if dev.Generation != 2 {
 		t.Errorf("Generation = %d, want %d", dev.Generation, 2)
 	}
@@ -124,5 +128,188 @@ func TestDevice_Fields(t *testing.T) {
 	}
 	if dev.Auth.Password != "secret123" {
 		t.Errorf("Auth.Password = %q, want %q", dev.Auth.Password, "secret123")
+	}
+}
+
+func TestDevice_IsShelly(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		platform string
+		want     bool
+	}{
+		{
+			name:     "empty platform defaults to Shelly",
+			platform: "",
+			want:     true,
+		},
+		{
+			name:     "explicit shelly platform",
+			platform: PlatformShelly,
+			want:     true,
+		},
+		{
+			name:     "tasmota platform is not Shelly",
+			platform: "tasmota",
+			want:     false,
+		},
+		{
+			name:     "esphome platform is not Shelly",
+			platform: "esphome",
+			want:     false,
+		},
+		{
+			name:     "custom platform is not Shelly",
+			platform: "custom-plugin",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dev := Device{Platform: tt.platform}
+			got := dev.IsShelly()
+			if got != tt.want {
+				t.Errorf("Device.IsShelly() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDevice_IsPluginManaged(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		platform string
+		want     bool
+	}{
+		{
+			name:     "empty platform is not plugin-managed",
+			platform: "",
+			want:     false,
+		},
+		{
+			name:     "shelly platform is not plugin-managed",
+			platform: PlatformShelly,
+			want:     false,
+		},
+		{
+			name:     "tasmota platform is plugin-managed",
+			platform: "tasmota",
+			want:     true,
+		},
+		{
+			name:     "esphome platform is plugin-managed",
+			platform: "esphome",
+			want:     true,
+		},
+		{
+			name:     "custom platform is plugin-managed",
+			platform: "custom-plugin",
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dev := Device{Platform: tt.platform}
+			got := dev.IsPluginManaged()
+			if got != tt.want {
+				t.Errorf("Device.IsPluginManaged() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDevice_GetPlatform(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		platform string
+		want     string
+	}{
+		{
+			name:     "empty platform defaults to shelly",
+			platform: "",
+			want:     PlatformShelly,
+		},
+		{
+			name:     "explicit shelly platform",
+			platform: PlatformShelly,
+			want:     PlatformShelly,
+		},
+		{
+			name:     "tasmota platform",
+			platform: "tasmota",
+			want:     "tasmota",
+		},
+		{
+			name:     "custom platform",
+			platform: "my-plugin",
+			want:     "my-plugin",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dev := Device{Platform: tt.platform}
+			got := dev.GetPlatform()
+			if got != tt.want {
+				t.Errorf("Device.GetPlatform() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDevice_PluginName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		platform string
+		want     string
+	}{
+		{
+			name:     "empty platform returns empty (native Shelly)",
+			platform: "",
+			want:     "",
+		},
+		{
+			name:     "shelly platform returns empty",
+			platform: PlatformShelly,
+			want:     "",
+		},
+		{
+			name:     "tasmota platform returns shelly-tasmota",
+			platform: "tasmota",
+			want:     "shelly-tasmota",
+		},
+		{
+			name:     "esphome platform returns shelly-esphome",
+			platform: "esphome",
+			want:     "shelly-esphome",
+		},
+		{
+			name:     "custom platform returns shelly-custom",
+			platform: "custom",
+			want:     "shelly-custom",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dev := Device{Platform: tt.platform}
+			got := dev.PluginName()
+			if got != tt.want {
+				t.Errorf("Device.PluginName() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

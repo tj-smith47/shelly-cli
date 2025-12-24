@@ -48,4 +48,12 @@ func TestNewCommand_Flags(t *testing.T) {
 	if typeFlag.Shorthand != "t" {
 		t.Errorf("type shorthand = %q, want t", typeFlag.Shorthand)
 	}
+
+	platformFlag := cmd.Flags().Lookup("platform")
+	if platformFlag == nil {
+		t.Fatal("platform flag not found")
+	}
+	if platformFlag.Shorthand != "p" {
+		t.Errorf("platform shorthand = %q, want p", platformFlag.Shorthand)
+	}
 }

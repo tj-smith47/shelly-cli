@@ -119,6 +119,8 @@ cloud:
 devices:
   # Example device entries:
   #
+  # Native Shelly devices (platform defaults to "shelly"):
+  #
   # kitchen-light:
   #   address: 192.168.1.50
   #   generation: 2
@@ -139,6 +141,15 @@ devices:
   #   generation: 2
   #   type: light
   #   model: SHDM-2
+  #
+  # Plugin-managed devices (requires corresponding plugin installed):
+  # Platform value maps to plugin name: "tasmota" -> "shelly-tasmota"
+  #
+  # garage-plug:
+  #   address: 192.168.1.60
+  #   platform: tasmota        # Managed by shelly-tasmota plugin
+  #   type: switch
+  #   model: "Sonoff Basic R3"
 
 # =============================================================================
 # Command Aliases
