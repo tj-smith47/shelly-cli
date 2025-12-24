@@ -49,6 +49,11 @@ func TestNew_EnabledWithEnv(t *testing.T) {
 	if !l.Enabled() {
 		t.Error("expected logger to be enabled")
 	}
+
+	// Verify session directory was created
+	if l.SessionDir() == "" {
+		t.Error("expected session directory to be set")
+	}
 }
 
 //nolint:paralleltest // Tests modify environment variables
@@ -78,24 +83,21 @@ func TestLogger_Log(t *testing.T) {
 	if l == nil {
 		t.Fatal("expected non-nil logger")
 	}
-	defer func() {
-		if err := l.Close(); err != nil {
-			t.Logf("warning: close: %v", err)
-		}
-	}()
 
 	// Log some entries
 	l.Log("Dashboard", "Devices", 120, 40, "test view content")
 	l.LogEvent("test event")
+
+	// Get the log path before closing
+	logPath := filepath.Join(l.SessionDir(), MainLogFile)
 
 	// Close to flush
 	if err := l.Close(); err != nil {
 		t.Logf("warning: close: %v", err)
 	}
 
-	// Read log file - path is constructed from known tmpDir, not user input
-	logPath := filepath.Join(tmpDir, ".config", "shelly", "tui-debug.log")
-	content, err := os.ReadFile(logPath) //nolint:gosec // Path from t.TempDir()
+	// Read log file
+	content, err := os.ReadFile(logPath) //nolint:gosec // Path from SessionDir()
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}
@@ -117,10 +119,72 @@ func TestLogger_Log(t *testing.T) {
 	if !strings.Contains(contentStr, "test event") {
 		t.Error("expected log to contain event")
 	}
+	if !strings.Contains(contentStr, "Session Ended") {
+		t.Error("expected log to contain session end footer")
+	}
 }
 
 //nolint:paralleltest // Tests modify environment variables
 func TestLogger_SkipDuplicateViews(t *testing.T) {
+	tmpDir := t.TempDir()
+	homeDir := os.Getenv("HOME")
+	if err := os.Setenv("HOME", tmpDir); err != nil {
+		t.Fatalf("setenv HOME: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("HOME", homeDir); err != nil {
+			t.Logf("warning: restore HOME: %v", err)
+		}
+	}()
+
+	if err := os.Setenv(EnvKey, "1"); err != nil {
+		t.Fatalf("setenv: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv(EnvKey); err != nil {
+			t.Logf("warning: unsetenv: %v", err)
+		}
+	}()
+
+	l := New()
+	if l == nil {
+		t.Fatal("expected non-nil logger")
+	}
+
+	// Log same view twice, different view once
+	l.Log("Dashboard", "Devices", 120, 40, "same content")
+	l.Log("Dashboard", "Devices", 120, 40, "same content") // Should be skipped
+	l.Log("Dashboard", "Devices", 120, 40, "different content")
+
+	logPath := filepath.Join(l.SessionDir(), MainLogFile)
+
+	if err := l.Close(); err != nil {
+		t.Logf("warning: close: %v", err)
+	}
+
+	// Read and count occurrences
+	content, err := os.ReadFile(logPath) //nolint:gosec // Path from SessionDir()
+	if err != nil {
+		t.Fatalf("read log: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// "same content" should appear only once (duplicate skipped)
+	sameCount := strings.Count(contentStr, "same content")
+	if sameCount != 1 {
+		t.Errorf("expected 'same content' to appear once, got %d", sameCount)
+	}
+
+	// "different content" should appear once
+	diffCount := strings.Count(contentStr, "different content")
+	if diffCount != 1 {
+		t.Errorf("expected 'different content' to appear once, got %d", diffCount)
+	}
+}
+
+//nolint:paralleltest // Tests modify environment variables
+func TestLogger_SessionDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	homeDir := os.Getenv("HOME")
 	if err := os.Setenv("HOME", tmpDir); err != nil {
@@ -151,14 +215,20 @@ func TestLogger_SkipDuplicateViews(t *testing.T) {
 		}
 	}()
 
-	// Log same view twice
-	l.Log("Dashboard", "Devices", 120, 40, "same content")
-	initialSize := l.size
-	l.Log("Dashboard", "Devices", 120, 40, "same content")
+	sessionDir := l.SessionDir()
 
-	// Size should not have changed
-	if l.size != initialSize {
-		t.Error("expected duplicate view to be skipped")
+	// Verify session directory exists
+	info, err := os.Stat(sessionDir)
+	if err != nil {
+		t.Fatalf("session dir stat: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("expected session dir to be a directory")
+	}
+
+	// Verify it's under debug/
+	if !strings.Contains(sessionDir, DebugDir) {
+		t.Errorf("expected session dir to contain '%s', got: %s", DebugDir, sessionDir)
 	}
 }
 
@@ -175,6 +245,9 @@ func TestLogger_NilSafe(t *testing.T) {
 	}
 	if l.Enabled() {
 		t.Error("expected nil logger to not be enabled")
+	}
+	if l.SessionDir() != "" {
+		t.Error("expected nil logger SessionDir to return empty string")
 	}
 }
 

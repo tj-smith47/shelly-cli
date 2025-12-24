@@ -1,5 +1,9 @@
 // Package debug provides TUI debug logging for development and troubleshooting.
 // This logs the rendered view output to a file for debugging TUI layout issues.
+//
+// Debug logs are stored in ~/.config/shelly/debug/<timestamp>/ where each TUI
+// session gets its own timestamped folder containing:
+//   - tui.log: Main debug log with view renders and events
 package debug
 
 import (
@@ -16,26 +20,26 @@ import (
 )
 
 const (
-	// MaxLogSize is the maximum size of a log file before rotation (5MB).
-	MaxLogSize = 5 * 1024 * 1024
-	// MaxBackups is the number of backup log files to keep.
-	MaxBackups = 3
 	// EnvKey is the environment variable to enable debug logging.
 	EnvKey = "SHELLY_TUI_DEBUG"
+	// DebugDir is the subdirectory under config for debug logs.
+	DebugDir = "debug"
+	// MainLogFile is the main log file name.
+	MainLogFile = "tui.log"
 )
 
 // Logger writes TUI debug information to a log file.
 type Logger struct {
-	mu       sync.Mutex
-	enabled  bool
-	file     *os.File
-	path     string
-	maxSize  int64
-	size     int64
-	lastView string
+	mu         sync.Mutex
+	enabled    bool
+	file       *os.File
+	sessionDir string
+	lastView   string
+	startTime  time.Time
 }
 
 // New creates a new Logger if SHELLY_TUI_DEBUG=1 is set.
+// Creates a timestamped session folder under ~/.config/shelly/debug/.
 // Returns nil if debug logging is disabled.
 func New() *Logger {
 	if os.Getenv(EnvKey) != "1" {
@@ -48,33 +52,29 @@ func New() *Logger {
 		return nil
 	}
 
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
-		iostreams.DebugErr("create config dir", err)
+	// Create timestamped session directory
+	startTime := time.Now()
+	sessionName := startTime.Format("2006-01-02_15-04-05")
+	sessionDir := filepath.Join(configDir, DebugDir, sessionName)
+
+	if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+		iostreams.DebugErr("create debug session dir", err)
 		return nil
 	}
 
-	logPath := filepath.Join(configDir, "tui-debug.log")
-	//nolint:gosec // Path constructed from config.Dir() + fixed suffix, not user input
-	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	logPath := filepath.Join(sessionDir, MainLogFile)
+	//nolint:gosec // Path constructed from config.Dir() + fixed constants, not user input
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		iostreams.DebugErr("open log file", err)
 		return nil
 	}
 
-	// Get current file size
-	info, err := f.Stat()
-	if err != nil {
-		iostreams.DebugErr("stat log file", err)
-		iostreams.CloseWithDebug("close log file", f)
-		return nil
-	}
-
 	l := &Logger{
-		enabled: true,
-		file:    f,
-		path:    logPath,
-		maxSize: MaxLogSize,
-		size:    info.Size(),
+		enabled:    true,
+		file:       f,
+		sessionDir: sessionDir,
+		startTime:  startTime,
 	}
 
 	// Write header
@@ -83,17 +83,25 @@ func New() *Logger {
 	return l
 }
 
+// SessionDir returns the path to the current debug session directory.
+func (l *Logger) SessionDir() string {
+	if l == nil {
+		return ""
+	}
+	return l.sessionDir
+}
+
 // writeHeader writes a session start header to the log.
 func (l *Logger) writeHeader() {
-	header := fmt.Sprintf("\n%s\n=== TUI Debug Session Started ===\n%s\n\n",
-		strings.Repeat("=", 50),
-		time.Now().Format(time.RFC3339))
-	n, err := l.file.WriteString(header)
-	if err != nil {
+	header := fmt.Sprintf("%s\nTUI Debug Session\n%s\nStarted: %s\nSession: %s\n%s\n\n",
+		strings.Repeat("=", 60),
+		strings.Repeat("=", 60),
+		l.startTime.Format(time.RFC3339),
+		l.sessionDir,
+		strings.Repeat("=", 60))
+	if _, err := l.file.WriteString(header); err != nil {
 		iostreams.DebugErr("write log header", err)
-		return
 	}
-	l.size += int64(n)
 }
 
 // Log writes a debug entry for the current view state.
@@ -111,22 +119,14 @@ func (l *Logger) Log(tab, focus string, width, height int, view string) {
 	}
 	l.lastView = view
 
-	// Check if rotation is needed
-	if l.size >= l.maxSize {
-		l.rotate()
-	}
-
 	// Format log entry
 	timestamp := time.Now().Format("2006-01-02T15:04:05.000")
 	entry := fmt.Sprintf("[%s] Tab: %s | Focus: %s | Size: %dx%d\n--- VIEW OUTPUT ---\n%s\n--- END VIEW ---\n\n",
 		timestamp, tab, focus, width, height, view)
 
-	n, err := l.file.WriteString(entry)
-	if err != nil {
+	if _, err := l.file.WriteString(entry); err != nil {
 		iostreams.DebugErr("write log entry", err)
-		return
 	}
-	l.size += int64(n)
 }
 
 // LogEvent writes a simple event message.
@@ -141,52 +141,12 @@ func (l *Logger) LogEvent(event string) {
 	timestamp := time.Now().Format("2006-01-02T15:04:05.000")
 	entry := fmt.Sprintf("[%s] EVENT: %s\n", timestamp, event)
 
-	n, err := l.file.WriteString(entry)
-	if err != nil {
+	if _, err := l.file.WriteString(entry); err != nil {
 		iostreams.DebugErr("write log event", err)
-		return
 	}
-	l.size += int64(n)
 }
 
-// rotate rotates the log file, keeping up to MaxBackups old files.
-func (l *Logger) rotate() {
-	if l.file == nil {
-		return
-	}
-
-	// Close current file
-	iostreams.CloseWithDebug("close for rotation", l.file)
-
-	// Rotate existing backups
-	for i := MaxBackups - 1; i > 0; i-- {
-		oldPath := fmt.Sprintf("%s.%d", l.path, i)
-		newPath := fmt.Sprintf("%s.%d", l.path, i+1)
-		if err := os.Rename(oldPath, newPath); err != nil && !os.IsNotExist(err) {
-			iostreams.DebugErr("rotate backup", err)
-		}
-	}
-
-	// Rename current to .1
-	if err := os.Rename(l.path, l.path+".1"); err != nil && !os.IsNotExist(err) {
-		iostreams.DebugErr("rotate current", err)
-	}
-
-	// Create new log file
-	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		iostreams.DebugErr("create new log", err)
-		l.enabled = false
-		return
-	}
-
-	l.file = f
-	l.size = 0
-	l.lastView = ""
-	l.writeHeader()
-}
-
-// Close closes the logger.
+// Close closes the logger and writes session summary.
 func (l *Logger) Close() error {
 	if l == nil || l.file == nil {
 		return nil
@@ -195,10 +155,13 @@ func (l *Logger) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Write footer
-	footer := fmt.Sprintf("\n=== TUI Debug Session Ended ===\n%s\n%s\n",
+	// Write footer with session duration
+	duration := time.Since(l.startTime)
+	footer := fmt.Sprintf("\n%s\nSession Ended: %s\nDuration: %s\n%s\n",
+		strings.Repeat("=", 60),
 		time.Now().Format(time.RFC3339),
-		strings.Repeat("=", 50))
+		duration.Round(time.Second),
+		strings.Repeat("=", 60))
 	if _, err := l.file.WriteString(footer); err != nil {
 		iostreams.DebugErr("write log footer", err)
 	}

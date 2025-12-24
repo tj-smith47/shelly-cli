@@ -1,89 +1,35 @@
 // Package devicelist provides the device list component for the TUI.
+// This component displays a split-pane view with a device list and detail panel.
+// It uses the shared cache for device data rather than doing its own fetching.
 package devicelist
 
 import (
-	"context"
 	"fmt"
-	"sort"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 )
 
-// Deps holds the dependencies for the device list component.
-type Deps struct {
-	Ctx             context.Context
-	Svc             *shelly.Service
-	IOS             *iostreams.IOStreams
-	RefreshInterval time.Duration
+// DeviceSelectedMsg is sent when a device is selected.
+type DeviceSelectedMsg struct {
+	Name    string
+	Address string
 }
-
-// validate ensures all required dependencies are set.
-func (d Deps) validate() error {
-	if d.Ctx == nil {
-		return fmt.Errorf("context is required")
-	}
-	if d.Svc == nil {
-		return fmt.Errorf("service is required")
-	}
-	if d.IOS == nil {
-		return fmt.Errorf("iostreams is required")
-	}
-	return nil
-}
-
-// DeviceStatus represents a device with its live status.
-type DeviceStatus struct {
-	Device   model.Device
-	Online   bool
-	Checking bool // True while status is being fetched
-	Power    float64
-	Voltage  float64
-	Current  float64
-	Info     *shelly.DeviceInfo // Full device info for detail panel
-	Error    error
-}
-
-// DevicesLoadedMsg signals that devices were loaded.
-type DevicesLoadedMsg struct {
-	Devices []DeviceStatus
-	Err     error
-}
-
-// DeviceStatusUpdateMsg signals a single device status update (for streaming).
-type DeviceStatusUpdateMsg struct {
-	Name   string
-	Status DeviceStatus
-}
-
-// RefreshTickMsg triggers periodic refresh.
-type RefreshTickMsg struct{}
 
 // Model holds the device list state.
 type Model struct {
-	ctx             context.Context
-	svc             *shelly.Service
-	ios             *iostreams.IOStreams
-	devices         map[string]*DeviceStatus // Keyed by name for fast updates
-	deviceOrder     []string                 // Sorted order of device names
-	filtered        []string                 // Filtered device names for display
-	filter          string                   // Current filter string
-	cursor          int                      // Currently selected index in filtered list
-	scrollOffset    int                      // Scroll offset for list
-	loading         bool                     // Initial load in progress
-	err             error
-	width           int
-	height          int
-	styles          Styles
-	refreshInterval time.Duration
+	cache        *cache.Cache // Shared device cache
+	filter       string       // Current filter string
+	cursor       int          // Currently selected index in filtered list
+	scrollOffset int          // Scroll offset for list
+	focused      bool         // Whether this component has focus
+	width        int
+	height       int
+	styles       Styles
 }
 
 // Styles for the device list component.
@@ -171,232 +117,55 @@ func DefaultStyles() Styles {
 	}
 }
 
-// New creates a new device list model.
-func New(deps Deps) Model {
-	if err := deps.validate(); err != nil {
-		panic(fmt.Sprintf("devicelist: invalid deps: %v", err))
-	}
-
-	refreshInterval := deps.RefreshInterval
-	if refreshInterval == 0 {
-		refreshInterval = 5 * time.Second
-	}
-
+// New creates a new device list model using the shared cache.
+func New(c *cache.Cache) Model {
 	return Model{
-		ctx:             deps.Ctx,
-		svc:             deps.Svc,
-		ios:             deps.IOS,
-		devices:         make(map[string]*DeviceStatus),
-		deviceOrder:     []string{},
-		filtered:        []string{},
-		loading:         true,
-		styles:          DefaultStyles(),
-		refreshInterval: refreshInterval,
+		cache:  c,
+		styles: DefaultStyles(),
 	}
 }
 
-// Init returns the initial command to fetch devices.
+// Init initializes the device list component.
+// The cache handles device loading and refresh, so no commands needed here.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.loadDevicesFromConfig(),
-		m.scheduleRefresh(),
-	)
-}
-
-// scheduleRefresh schedules the next refresh tick.
-func (m Model) scheduleRefresh() tea.Cmd {
-	return tea.Tick(m.refreshInterval, func(time.Time) tea.Msg {
-		return RefreshTickMsg{}
-	})
-}
-
-// loadDevicesFromConfig immediately loads devices from config and starts fetching status.
-func (m Model) loadDevicesFromConfig() tea.Cmd {
-	return func() tea.Msg {
-		deviceMap := config.ListDevices()
-		if len(deviceMap) == 0 {
-			return DevicesLoadedMsg{Devices: nil}
-		}
-
-		// Create initial device list with "checking" status
-		devices := make([]DeviceStatus, 0, len(deviceMap))
-		for _, d := range deviceMap {
-			devices = append(devices, DeviceStatus{
-				Device:   d,
-				Checking: true,
-			})
-		}
-
-		// Sort by name
-		sort.Slice(devices, func(i, j int) bool {
-			return devices[i].Device.Name < devices[j].Device.Name
-		})
-
-		return DevicesLoadedMsg{Devices: devices}
-	}
-}
-
-// fetchAllDeviceStatuses fetches status for all devices concurrently, sending individual updates.
-func (m Model) fetchAllDeviceStatuses() tea.Cmd {
-	return func() tea.Msg {
-		// Collect all device names to fetch
-		names := make([]string, 0, len(m.devices))
-		for name := range m.devices {
-			names = append(names, name)
-		}
-
-		if len(names) == 0 {
-			return nil
-		}
-
-		// Return a batch of commands, one per device
-		return tea.BatchMsg(m.createStatusFetchCommands(names))
-	}
-}
-
-// createStatusFetchCommands creates individual fetch commands for each device.
-func (m Model) createStatusFetchCommands(names []string) []tea.Cmd {
-	cmds := make([]tea.Cmd, len(names))
-	for i, name := range names {
-		deviceName := name
-		device := m.devices[name]
-		if device == nil {
-			continue
-		}
-		cmds[i] = m.fetchSingleDeviceStatus(deviceName, device.Device)
-	}
-	return cmds
-}
-
-// fetchSingleDeviceStatus fetches status for a single device.
-func (m Model) fetchSingleDeviceStatus(name string, device model.Device) tea.Cmd {
-	return func() tea.Msg {
-		status := DeviceStatus{
-			Device:   device,
-			Checking: false,
-		}
-
-		// Per-device timeout
-		ctx, cancel := context.WithTimeout(m.ctx, 3*time.Second)
-		defer cancel()
-
-		// Get device info (includes firmware, model, etc.)
-		info, err := m.svc.DeviceInfo(ctx, device.Address)
-		if err != nil {
-			status.Error = err
-			return DeviceStatusUpdateMsg{Name: name, Status: status}
-		}
-		status.Info = info
-		status.Online = true
-
-		// Get monitoring snapshot for power data
-		snapshot, err := m.svc.GetMonitoringSnapshot(ctx, device.Address)
-		if err == nil {
-			aggregatePowerData(&status, snapshot)
-		}
-
-		return DeviceStatusUpdateMsg{Name: name, Status: status}
-	}
-}
-
-// aggregatePowerData aggregates power data from a monitoring snapshot.
-func aggregatePowerData(status *DeviceStatus, snapshot *shelly.MonitoringSnapshot) {
-	for _, pm := range snapshot.PM {
-		status.Power += pm.APower
-		if status.Voltage == 0 && pm.Voltage > 0 {
-			status.Voltage = pm.Voltage
-		}
-		if status.Current == 0 && pm.Current > 0 {
-			status.Current = pm.Current
-		}
-	}
-	for _, em := range snapshot.EM {
-		status.Power += em.TotalActivePower
-		if status.Voltage == 0 && em.AVoltage > 0 {
-			status.Voltage = em.AVoltage
-		}
-	}
-	for _, em1 := range snapshot.EM1 {
-		status.Power += em1.ActPower
-		if status.Voltage == 0 && em1.Voltage > 0 {
-			status.Voltage = em1.Voltage
-		}
-	}
-}
-
-// Refresh returns a command to refresh the device list.
-func (m Model) Refresh() tea.Cmd {
-	// Mark all devices as checking
-	for _, d := range m.devices {
-		d.Checking = true
-	}
-	return m.fetchAllDeviceStatuses()
+	return nil
 }
 
 // Update handles messages for the device list.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case DevicesLoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		oldCursor := m.cursor
+		m = m.handleKeyPress(keyMsg)
+		// Emit selection change if cursor moved
+		if m.cursor != oldCursor {
+			return m, m.emitSelection()
 		}
-
-		// Populate device map and order
-		m.devices = make(map[string]*DeviceStatus, len(msg.Devices))
-		m.deviceOrder = make([]string, 0, len(msg.Devices))
-		for i := range msg.Devices {
-			d := msg.Devices[i]
-			m.devices[d.Device.Name] = &d
-			m.deviceOrder = append(m.deviceOrder, d.Device.Name)
-		}
-		m = m.applyFilter()
-
-		// Start fetching statuses
-		return m, m.fetchAllDeviceStatuses()
-
-	case DeviceStatusUpdateMsg:
-		// Update single device status
-		if d, ok := m.devices[msg.Name]; ok {
-			*d = msg.Status
-		}
-		return m, nil
-
-	case RefreshTickMsg:
-		return m, tea.Batch(
-			m.Refresh(),
-			m.scheduleRefresh(),
-		)
-
-	case tea.KeyPressMsg:
-		m = m.handleKeyPress(msg)
 	}
-
 	return m, nil
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
+	devices := m.getFilteredDevices()
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m = m.cursorDown(devices)
 	case "k", "up":
 		m = m.cursorUp()
 	case "g":
 		m.cursor = 0
 		m.scrollOffset = 0
 	case "G":
-		m = m.cursorToEnd()
+		m = m.cursorToEnd(devices)
 	case "pgdown", "ctrl+d":
-		m = m.pageDown()
+		m = m.pageDown(devices)
 	case "pgup", "ctrl+u":
 		m = m.pageUp()
 	}
 	return m
 }
 
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.filtered)-1 {
+func (m Model) cursorDown(devices []*cache.DeviceData) Model {
+	if m.cursor < len(devices)-1 {
 		m.cursor++
 		if m.cursor >= m.scrollOffset+m.visibleRows() {
 			m.scrollOffset = m.cursor - m.visibleRows() + 1
@@ -415,10 +184,10 @@ func (m Model) cursorUp() Model {
 	return m
 }
 
-func (m Model) cursorToEnd() Model {
-	if len(m.filtered) > 0 {
-		m.cursor = len(m.filtered) - 1
-		maxOffset := len(m.filtered) - m.visibleRows()
+func (m Model) cursorToEnd(devices []*cache.DeviceData) Model {
+	if len(devices) > 0 {
+		m.cursor = len(devices) - 1
+		maxOffset := len(devices) - m.visibleRows()
 		if maxOffset < 0 {
 			maxOffset = 0
 		}
@@ -427,13 +196,13 @@ func (m Model) cursorToEnd() Model {
 	return m
 }
 
-func (m Model) pageDown() Model {
-	if len(m.filtered) == 0 {
+func (m Model) pageDown(devices []*cache.DeviceData) Model {
+	if len(devices) == 0 {
 		return m
 	}
 	m.cursor += m.visibleRows()
-	if m.cursor >= len(m.filtered) {
-		m.cursor = len(m.filtered) - 1
+	if m.cursor >= len(devices) {
+		m.cursor = len(devices) - 1
 	}
 	if m.cursor >= m.scrollOffset+m.visibleRows() {
 		m.scrollOffset = m.cursor - m.visibleRows() + 1
@@ -442,9 +211,6 @@ func (m Model) pageDown() Model {
 }
 
 func (m Model) pageUp() Model {
-	if len(m.filtered) == 0 {
-		return m
-	}
 	m.cursor -= m.visibleRows()
 	if m.cursor < 0 {
 		m.cursor = 0
@@ -455,42 +221,68 @@ func (m Model) pageUp() Model {
 	return m
 }
 
-// SetFilter sets the filter string and re-applies it to the device list.
-func (m Model) SetFilter(filter string) Model {
-	m.filter = filter
-	return m.applyFilter()
-}
-
-// applyFilter filters the device list based on the current filter string.
-func (m Model) applyFilter() Model {
-	if m.filter == "" {
-		m.filtered = m.deviceOrder
-	} else {
-		filterLower := strings.ToLower(m.filter)
-		m.filtered = make([]string, 0, len(m.deviceOrder))
-		for _, name := range m.deviceOrder {
-			d := m.devices[name]
-			if d == nil {
-				continue
-			}
-			if strings.Contains(strings.ToLower(d.Device.Name), filterLower) ||
-				strings.Contains(strings.ToLower(d.Device.Address), filterLower) ||
-				strings.Contains(strings.ToLower(d.Device.Type), filterLower) ||
-				strings.Contains(strings.ToLower(d.Device.Model), filterLower) {
-				m.filtered = append(m.filtered, name)
-			}
+// emitSelection returns a command that emits a DeviceSelectedMsg for the current selection.
+func (m Model) emitSelection() tea.Cmd {
+	devices := m.getFilteredDevices()
+	if m.cursor < 0 || m.cursor >= len(devices) {
+		return nil
+	}
+	d := devices[m.cursor]
+	return func() tea.Msg {
+		return DeviceSelectedMsg{
+			Name:    d.Device.Name,
+			Address: d.Device.Address,
 		}
 	}
+}
 
-	// Reset cursor if out of bounds
-	if m.cursor >= len(m.filtered) {
-		m.cursor = len(m.filtered) - 1
+// getFilteredDevices returns devices from cache filtered by the current filter.
+func (m Model) getFilteredDevices() []*cache.DeviceData {
+	if m.cache == nil {
+		return nil
+	}
+
+	all := m.cache.GetAllDevices()
+	if m.filter == "" {
+		return all
+	}
+
+	filterLower := strings.ToLower(m.filter)
+	filtered := make([]*cache.DeviceData, 0, len(all))
+	for _, d := range all {
+		if strings.Contains(strings.ToLower(d.Device.Name), filterLower) ||
+			strings.Contains(strings.ToLower(d.Device.Address), filterLower) ||
+			strings.Contains(strings.ToLower(d.Device.Type), filterLower) ||
+			strings.Contains(strings.ToLower(d.Device.Model), filterLower) {
+			filtered = append(filtered, d)
+		}
+	}
+	return filtered
+}
+
+// SetFilter sets the filter string.
+func (m Model) SetFilter(filter string) Model {
+	m.filter = filter
+	// Reset cursor if it's now out of bounds
+	devices := m.getFilteredDevices()
+	if m.cursor >= len(devices) {
+		m.cursor = len(devices) - 1
 		if m.cursor < 0 {
 			m.cursor = 0
 		}
 	}
-
 	return m
+}
+
+// SetFocused sets whether this component has focus.
+func (m Model) SetFocused(focused bool) Model {
+	m.focused = focused
+	return m
+}
+
+// Focused returns whether this component has focus.
+func (m Model) Focused() bool {
+	return m.focused
 }
 
 // visibleRows calculates how many rows can be displayed in the list panel.
@@ -522,7 +314,17 @@ func (m Model) SetSize(width, height int) Model {
 
 // View renders the device list with split pane.
 func (m Model) View() string {
-	if m.loading && len(m.devices) == 0 {
+	if m.cache == nil {
+		return m.styles.Table.
+			Width(m.width-4).
+			Height(m.height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render("No cache available")
+	}
+
+	devices := m.getFilteredDevices()
+
+	if m.cache.IsLoading() && len(devices) == 0 {
 		return m.styles.Table.
 			Width(m.width-4).
 			Height(m.height).
@@ -530,13 +332,7 @@ func (m Model) View() string {
 			Render("Loading devices...")
 	}
 
-	if m.err != nil {
-		return m.styles.Table.
-			Width(m.width - 4).
-			Render(m.styles.StatusError.Render("Error: " + m.err.Error()))
-	}
-
-	if len(m.devices) == 0 {
+	if m.cache.DeviceCount() == 0 {
 		return m.styles.Table.
 			Width(m.width-4).
 			Height(m.height).
@@ -544,7 +340,7 @@ func (m Model) View() string {
 			Render("No devices registered.\nUse 'shelly device add' to add devices.")
 	}
 
-	if len(m.filtered) == 0 && m.filter != "" {
+	if len(devices) == 0 && m.filter != "" {
 		return m.styles.Table.
 			Width(m.width-4).
 			Height(m.height).
@@ -556,14 +352,22 @@ func (m Model) View() string {
 	listWidth := m.listPanelWidth()
 	detailWidth := m.detailPanelWidth()
 
-	listPanel := m.renderListPanel(listWidth)
-	detailPanel := m.renderDetailPanel(detailWidth)
+	listPanel := m.renderListPanel(devices, listWidth)
+	detailPanel := m.renderDetailPanel(devices, detailWidth)
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, listPanel, " ", detailPanel)
 }
 
 // renderListPanel renders the left panel with the device list.
-func (m Model) renderListPanel(width int) string {
+func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
+	colors := theme.GetSemanticColors()
+	borderColor := colors.TableBorder
+	if m.focused {
+		borderColor = colors.Highlight
+	}
+
+	panelStyle := m.styles.ListPanel.BorderForeground(borderColor)
+
 	// Header
 	header := m.styles.ListHeader.Width(width - 4).Render("Devices")
 
@@ -571,18 +375,13 @@ func (m Model) renderListPanel(width int) string {
 	visible := m.visibleRows()
 	startIdx := m.scrollOffset
 	endIdx := startIdx + visible
-	if endIdx > len(m.filtered) {
-		endIdx = len(m.filtered)
+	if endIdx > len(devices) {
+		endIdx = len(devices)
 	}
 
 	var rows strings.Builder
 	for i := startIdx; i < endIdx; i++ {
-		name := m.filtered[i]
-		d := m.devices[name]
-		if d == nil {
-			continue
-		}
-
+		d := devices[i]
 		isSelected := i == m.cursor
 		row := m.renderListRow(d, isSelected, width-4)
 		rows.WriteString(row + "\n")
@@ -590,26 +389,26 @@ func (m Model) renderListPanel(width int) string {
 
 	// Scroll indicator
 	scrollInfo := ""
-	if len(m.filtered) > visible {
+	if len(devices) > visible {
 		scrollInfo = m.styles.Separator.Render(
-			fmt.Sprintf(" [%d/%d]", m.cursor+1, len(m.filtered)),
+			fmt.Sprintf(" [%d/%d]", m.cursor+1, len(devices)),
 		)
 	}
 
 	content := header + "\n" + rows.String() + scrollInfo
 
-	return m.styles.ListPanel.
+	return panelStyle.
 		Width(width).
 		Height(m.height).
 		Render(content)
 }
 
 // renderListRow renders a single row in the device list.
-func (m Model) renderListRow(d *DeviceStatus, isSelected bool, width int) string {
+func (m Model) renderListRow(d *cache.DeviceData, isSelected bool, width int) string {
 	// Status icon
 	var icon string
 	switch {
-	case d.Checking:
+	case !d.Fetched:
 		icon = m.styles.Checking.Render("◐")
 	case d.Online:
 		icon = m.styles.Online.Render("●")
@@ -626,7 +425,7 @@ func (m Model) renderListRow(d *DeviceStatus, isSelected bool, width int) string
 	// Name (truncate if needed)
 	maxNameWidth := width - 6 // icon, selector, padding
 	name := d.Device.Name
-	if len(name) > maxNameWidth {
+	if len(name) > maxNameWidth && maxNameWidth > 3 {
 		name = name[:maxNameWidth-1] + "…"
 	}
 
@@ -639,24 +438,25 @@ func (m Model) renderListRow(d *DeviceStatus, isSelected bool, width int) string
 }
 
 // renderDetailPanel renders the right panel with device details.
-func (m Model) renderDetailPanel(width int) string {
+func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string {
+	colors := theme.GetSemanticColors()
+	borderColor := colors.TableBorder
+	if !m.focused {
+		borderColor = colors.Highlight // Detail is focused when list is not
+	}
+
+	panelStyle := m.styles.DetailPanel.BorderForeground(borderColor)
+
 	// Get selected device
-	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
-		return m.styles.DetailPanel.
+	if len(devices) == 0 || m.cursor < 0 || m.cursor >= len(devices) {
+		return panelStyle.
 			Width(width).
 			Height(m.height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("No device selected")
 	}
 
-	name := m.filtered[m.cursor]
-	d := m.devices[name]
-	if d == nil {
-		return m.styles.DetailPanel.
-			Width(width).
-			Height(m.height).
-			Render("Device not found")
-	}
+	d := devices[m.cursor]
 
 	var content strings.Builder
 
@@ -675,16 +475,16 @@ func (m Model) renderDetailPanel(width int) string {
 	// Power data
 	m.renderPowerMetrics(&content, d)
 
-	return m.styles.DetailPanel.
+	return panelStyle.
 		Width(width).
 		Height(m.height).
 		Render(content.String())
 }
 
 // renderDeviceStatus renders the device status line.
-func (m Model) renderDeviceStatus(d *DeviceStatus) string {
+func (m Model) renderDeviceStatus(d *cache.DeviceData) string {
 	switch {
-	case d.Checking:
+	case !d.Fetched:
 		return m.styles.Checking.Render("◐ Checking...")
 	case d.Online:
 		return m.styles.Online.Render("● Online")
@@ -702,7 +502,7 @@ func (m Model) renderDeviceStatus(d *DeviceStatus) string {
 }
 
 // renderBasicInfo renders basic device info from config.
-func (m Model) renderBasicInfo(content *strings.Builder, d *DeviceStatus) {
+func (m Model) renderBasicInfo(content *strings.Builder, d *cache.DeviceData) {
 	content.WriteString(m.renderDetailRow("Address", d.Device.Address))
 	content.WriteString(m.renderDetailRow("Type", d.Device.Type))
 	content.WriteString(m.renderDetailRow("Model", d.Device.Model))
@@ -710,7 +510,7 @@ func (m Model) renderBasicInfo(content *strings.Builder, d *DeviceStatus) {
 }
 
 // renderDeviceInfo renders device info from API.
-func (m Model) renderDeviceInfo(content *strings.Builder, d *DeviceStatus) {
+func (m Model) renderDeviceInfo(content *strings.Builder, d *cache.DeviceData) {
 	if d.Info == nil {
 		return
 	}
@@ -730,7 +530,7 @@ func (m Model) renderDeviceInfo(content *strings.Builder, d *DeviceStatus) {
 }
 
 // renderPowerMetrics renders power metrics section.
-func (m Model) renderPowerMetrics(content *strings.Builder, d *DeviceStatus) {
+func (m Model) renderPowerMetrics(content *strings.Builder, d *cache.DeviceData) {
 	if !d.Online || (d.Power == 0 && d.Voltage == 0 && d.Current == 0) {
 		return
 	}
@@ -760,23 +560,45 @@ func (m Model) renderDetailRow(label, value string) string {
 }
 
 // SelectedDevice returns the currently selected device, if any.
-func (m Model) SelectedDevice() *DeviceStatus {
-	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
+func (m Model) SelectedDevice() *cache.DeviceData {
+	devices := m.getFilteredDevices()
+	if m.cursor < 0 || m.cursor >= len(devices) {
 		return nil
 	}
+	return devices[m.cursor]
+}
 
-	name := m.filtered[m.cursor]
-	return m.devices[name]
+// Cursor returns the current cursor position.
+func (m Model) Cursor() int {
+	return m.cursor
+}
+
+// SetCursor sets the cursor position.
+func (m Model) SetCursor(cursor int) Model {
+	devices := m.getFilteredDevices()
+	if cursor >= 0 && cursor < len(devices) {
+		m.cursor = cursor
+		// Adjust scroll offset if needed
+		if m.cursor < m.scrollOffset {
+			m.scrollOffset = m.cursor
+		} else if m.cursor >= m.scrollOffset+m.visibleRows() {
+			m.scrollOffset = m.cursor - m.visibleRows() + 1
+		}
+	}
+	return m
 }
 
 // DeviceCount returns the number of filtered devices.
 func (m Model) DeviceCount() int {
-	return len(m.filtered)
+	return len(m.getFilteredDevices())
 }
 
 // TotalDeviceCount returns the total number of devices (before filtering).
 func (m Model) TotalDeviceCount() int {
-	return len(m.devices)
+	if m.cache == nil {
+		return 0
+	}
+	return m.cache.DeviceCount()
 }
 
 // Filter returns the current filter string.

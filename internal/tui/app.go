@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"image/color"
 	"strings"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/confirm"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/deviceinfo"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicelist"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/energybars"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/energyhistory"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/events"
@@ -41,12 +41,6 @@ type DeviceActionMsg struct {
 	Action string
 	Err    error
 }
-
-// UI constants.
-const (
-	selectedPrefix   = "▶ "
-	unselectedPrefix = "  "
-)
 
 // PanelFocus tracks which panel is focused.
 type PanelFocus int
@@ -113,6 +107,7 @@ type Model struct {
 	jsonViewer    jsonviewer.Model
 	confirm       confirm.Model
 	deviceInfo    deviceinfo.Model
+	deviceList    devicelist.Model
 
 	// Settings
 	refreshInterval time.Duration
@@ -174,6 +169,9 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 	// Create device info component
 	deviceInfoModel := deviceinfo.New()
+
+	// Create device list component (uses shared cache)
+	deviceListModel := devicelist.New(deviceCache)
 
 	// Create view manager and register all views
 	vm := views.New()
@@ -242,6 +240,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		jsonViewer:      jsonViewerModel,
 		confirm:         confirm.New(),
 		deviceInfo:      deviceInfoModel,
+		deviceList:      deviceListModel,
 		debugLogger:     debug.New(), // nil if SHELLY_TUI_DEBUG not set
 	}
 }
@@ -297,7 +296,13 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case DeviceActionMsg:
 		newModel, cmd := m.handleDeviceAction(msg)
 		return newModel, cmd, true
-	case cache.DeviceUpdateMsg, cache.RefreshTickMsg:
+	case cache.DeviceUpdateMsg:
+		// Forward to cache AND energyHistory (to record power history)
+		cacheCmd := m.cache.Update(msg)
+		var historyCmd tea.Cmd
+		m.energyHistory, historyCmd = m.energyHistory.Update(msg)
+		return m, tea.Batch(cacheCmd, historyCmd), true
+	case cache.RefreshTickMsg, cache.WaveMsg, cache.DeviceRefreshMsg:
 		return m, m.cache.Update(msg), true
 	case cache.AllDevicesLoadedMsg:
 		return m.handleAllDevicesLoaded(msg)
@@ -308,6 +313,7 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case search.FilterChangedMsg:
 		m.filter = msg.Filter
 		m.cursor = 0
+		m.deviceList = m.deviceList.SetFilter(msg.Filter)
 		return m, nil, true
 	case search.ClosedMsg, cmdmode.ClosedMsg, confirm.CancelledMsg:
 		return m, nil, true
@@ -331,6 +337,10 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		return m, nil, true
 	case views.DeviceSelectedMsg:
 		return m, m.viewManager.PropagateDevice(msg.Device), true
+	case devicelist.DeviceSelectedMsg:
+		// Sync cursor from deviceList to app.go
+		m.cursor = m.deviceList.Cursor()
+		return m, m.viewManager.PropagateDevice(msg.Name), true
 	case jsonviewer.CloseMsg:
 		m.focusedPanel = PanelDetail
 		return m, nil, true
@@ -479,6 +489,10 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) Model {
 
 	// Set confirm dialog size
 	m.confirm = m.confirm.SetSize(m.width, m.height)
+
+	// Set deviceList size (events column + device list/detail columns)
+	deviceListWidth := m.width - m.width*25/100 - 2 // Full width minus events column
+	m.deviceList = m.deviceList.SetSize(deviceListWidth, m.height-branding.BannerHeight()-5)
 
 	return m
 }
@@ -758,6 +772,15 @@ func parseNavDirection(keyStr string) (navDirection, bool) {
 
 // handleNavigation handles j/k/g/G/h/l navigation keys based on focused panel.
 func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	// When PanelDeviceList is focused, forward navigation to deviceList component
+	if m.focusedPanel == PanelDeviceList {
+		var cmd tea.Cmd
+		m.deviceList, cmd = m.deviceList.Update(msg)
+		// Sync cursor from deviceList
+		m.cursor = m.deviceList.Cursor()
+		return m, cmd, true
+	}
+
 	// When PanelDetail is focused, forward navigation to deviceInfo component
 	if m.focusedPanel == PanelDetail {
 		var cmd tea.Cmd
@@ -765,62 +788,18 @@ func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m, cmd, true
 	}
 
+	// Handle endpoints panel navigation
 	devices := m.getFilteredDevices()
-	oldCursor := m.cursor
 	keyStr := msg.String()
 
-	// Handle vertical navigation (j/k/g/G)
-	if dir, ok := parseNavDirection(keyStr); ok {
-		m = m.applyVerticalNav(dir, devices)
-		return m, m.emitDeviceSelection(devices, oldCursor), true
-	}
-
-	// Handle horizontal navigation (h/l)
-	if m, handled := m.applyHorizontalNav(keyStr, devices); handled {
-		return m, nil, true
+	if m.focusedPanel == PanelEndpoints {
+		if dir, ok := parseNavDirection(keyStr); ok {
+			m = m.navEndpoints(dir, devices)
+			return m, nil, true
+		}
 	}
 
 	return m, nil, false
-}
-
-// applyVerticalNav applies vertical navigation based on direction and focused panel.
-func (m Model) applyVerticalNav(dir navDirection, devices []*cache.DeviceData) Model {
-	if m.focusedPanel == PanelDeviceList {
-		return m.navDeviceList(dir, len(devices))
-	}
-	if m.focusedPanel == PanelEndpoints {
-		return m.navEndpoints(dir, devices)
-	}
-	return m
-}
-
-// navDeviceList handles vertical navigation within the device list.
-func (m Model) navDeviceList(dir navDirection, deviceCount int) Model {
-	switch dir {
-	case navDown:
-		if m.cursor < deviceCount-1 {
-			m.cursor++
-			m.componentCursor = -1
-			m.endpointCursor = 0
-		}
-	case navUp:
-		if m.cursor > 0 {
-			m.cursor--
-			m.componentCursor = -1
-			m.endpointCursor = 0
-		}
-	case navFirst:
-		m.cursor = 0
-		m.componentCursor = -1
-		m.endpointCursor = 0
-	case navLast:
-		if deviceCount > 0 {
-			m.cursor = deviceCount - 1
-			m.componentCursor = -1
-			m.endpointCursor = 0
-		}
-	}
-	return m
 }
 
 // navEndpoints handles vertical navigation within the endpoints panel.
@@ -849,53 +828,6 @@ func (m Model) navEndpoints(dir navDirection, devices []*cache.DeviceData) Model
 		}
 	}
 	return m
-}
-
-// applyHorizontalNav handles h/l horizontal navigation for component selection.
-func (m Model) applyHorizontalNav(keyStr string, devices []*cache.DeviceData) (Model, bool) {
-	deviceCount := len(devices)
-	switch keyStr {
-	case "h", "left":
-		if m.componentCursor > -1 {
-			m.componentCursor--
-		}
-		return m, true
-	case "l", "right":
-		if m.cursor >= 0 && m.cursor < deviceCount {
-			d := devices[m.cursor]
-			maxComponent := len(d.Switches) - 1
-			if m.componentCursor < maxComponent {
-				m.componentCursor++
-			}
-		}
-		return m, true
-	}
-	return m, false
-}
-
-// emitDeviceSelection emits a DeviceSelectedMsg if the cursor changed.
-// Also updates the cache's focused device for adaptive refresh intervals.
-func (m Model) emitDeviceSelection(devices []*cache.DeviceData, oldCursor int) tea.Cmd {
-	if m.cursor == oldCursor || len(devices) == 0 || m.cursor >= len(devices) {
-		return nil
-	}
-	d := devices[m.cursor]
-
-	// Update cache focused device for adaptive refresh (focused device refreshes faster)
-	cacheCmd := m.cache.SetFocusedDevice(d.Device.Name)
-
-	// Emit device selection message
-	selectionCmd := func() tea.Msg {
-		return views.DeviceSelectedMsg{
-			Device:  d.Device.Name,
-			Address: d.Device.Address,
-		}
-	}
-
-	if cacheCmd != nil {
-		return tea.Batch(cacheCmd, selectionCmd)
-	}
-	return selectionCmd
 }
 
 // syncDeviceInfo syncs the deviceInfo component with current selection and focus.
@@ -1106,15 +1038,12 @@ func (m Model) isDashboardActive() bool {
 	return false
 }
 
-// renderMultiPanelLayout renders 3 panels, horizontally or vertically based on width.
+// renderMultiPanelLayout renders panels horizontally or vertically based on width.
 func (m Model) renderMultiPanelLayout(height int) string {
 	// Narrow mode: stack panels vertically
 	if m.layoutMode() == LayoutNarrow {
 		return m.renderNarrowLayout(height)
 	}
-
-	colors := theme.GetSemanticColors()
-	devices := m.getFilteredDevices()
 
 	// Split height: top 75% for panels, bottom 25% for energy bars
 	topHeight := height * 75 / 100
@@ -1127,40 +1056,28 @@ func (m Model) renderMultiPanelLayout(height int) string {
 		energyHeight = 5
 	}
 
-	// Calculate column widths based on layout mode
-	var col1Width, col2Width, col3Width int
+	// Calculate column widths: events column + deviceList (which has internal 40/60 split)
+	var eventsWidth, deviceListWidth int
 	if m.layoutMode() == LayoutWide {
-		col1Width = m.width * 25 / 100
-		col2Width = m.width * 20 / 100
-		col3Width = m.width - col1Width - col2Width - 2
+		eventsWidth = m.width * 25 / 100
 	} else {
-		col1Width = m.width * 30 / 100
-		col2Width = m.width * 25 / 100
-		col3Width = m.width - col1Width - col2Width - 2
+		eventsWidth = m.width * 30 / 100
+	}
+	deviceListWidth = m.width - eventsWidth - 1 // -1 for gap
+
+	if eventsWidth < 15 {
+		eventsWidth = 15
 	}
 
-	if col1Width < 15 {
-		col1Width = 15
-	}
+	// Render events column
+	eventsCol := m.renderEventsColumn(eventsWidth, topHeight)
 
-	focusBorder := colors.Highlight
-	unfocusBorder := colors.TableBorder
+	// Render device list component (includes list + detail in split pane)
+	m.deviceList = m.deviceList.SetSize(deviceListWidth, topHeight)
+	m.deviceList = m.deviceList.SetFocused(m.focusedPanel == PanelDeviceList)
+	deviceListCol := m.deviceList.View()
 
-	eventsCol := m.renderEventsColumn(col1Width, topHeight)
-
-	listBorder := unfocusBorder
-	if m.focusedPanel == PanelDeviceList {
-		listBorder = focusBorder
-	}
-	listCol := m.renderDeviceListColumn(devices, col2Width, topHeight, listBorder)
-
-	infoBorder := unfocusBorder
-	if m.focusedPanel == PanelDetail || m.focusedPanel == PanelEndpoints {
-		infoBorder = focusBorder
-	}
-	infoCol := m.renderDeviceInfoColumn(devices, col3Width, topHeight, infoBorder)
-
-	topContent := lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", listCol, " ", infoCol)
+	topContent := lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", deviceListCol)
 
 	// Ensure topContent fills the full width
 	topContentStyle := lipgloss.NewStyle().Width(m.width)
@@ -1205,49 +1122,30 @@ func (m Model) renderEnergyPanel(width, height int) string {
 
 // renderNarrowLayout renders panels stacked vertically for narrow terminals.
 func (m Model) renderNarrowLayout(height int) string {
-	colors := theme.GetSemanticColors()
-	devices := m.getFilteredDevices()
 	panelWidth := m.width - 2 // Full width minus borders
 
-	// Divide height into 3 parts: events (20%), list (40%), info (40%)
-	eventsHeight := height * 20 / 100
-	listHeight := height * 40 / 100
-	infoHeight := height - eventsHeight - listHeight - 2 // -2 for gaps
+	// Divide height into 2 parts: events (25%), deviceList (75%)
+	eventsHeight := height * 25 / 100
+	deviceListHeight := height - eventsHeight - 1 // -1 for gap
 
 	// Minimum heights
 	if eventsHeight < 4 {
 		eventsHeight = 4
 	}
-	if listHeight < 6 {
-		listHeight = 6
+	if deviceListHeight < 10 {
+		deviceListHeight = 10
 	}
-	if infoHeight < 6 {
-		infoHeight = 6
-	}
-
-	// Get focused panel border color
-	focusBorder := colors.Highlight
-	unfocusBorder := colors.TableBorder
 
 	// Row 1: Events panel (compact)
 	eventsRow := m.renderEventsColumn(panelWidth, eventsHeight)
 
-	// Row 2: Device List
-	listBorder := unfocusBorder
-	if m.focusedPanel == PanelDeviceList {
-		listBorder = focusBorder
-	}
-	listRow := m.renderDeviceListColumn(devices, panelWidth, listHeight, listBorder)
-
-	// Row 3: Device Info (always rendered)
-	infoBorder := unfocusBorder
-	if m.focusedPanel == PanelDetail || m.focusedPanel == PanelEndpoints {
-		infoBorder = focusBorder
-	}
-	infoRow := m.renderDeviceInfoColumn(devices, panelWidth, infoHeight, infoBorder)
+	// Row 2: Device List (with internal split pane)
+	m.deviceList = m.deviceList.SetSize(panelWidth, deviceListHeight)
+	m.deviceList = m.deviceList.SetFocused(m.focusedPanel == PanelDeviceList)
+	deviceListRow := m.deviceList.View()
 
 	// Stack panels vertically
-	content := lipgloss.JoinVertical(lipgloss.Left, eventsRow, listRow, infoRow)
+	content := lipgloss.JoinVertical(lipgloss.Left, eventsRow, deviceListRow)
 
 	// JSON viewer overlay (centered on top of content when active)
 	if m.jsonViewer.Visible() {
@@ -1285,96 +1183,6 @@ func (m Model) renderEventsColumn(width, height int) string {
 	}
 
 	return r.SetContent(eventsView).Render()
-}
-
-// renderDeviceListColumn renders just the device list.
-func (m Model) renderDeviceListColumn(devices []*cache.DeviceData, width, height int, borderColor color.Color) string {
-	colors := theme.GetSemanticColors()
-
-	title := fmt.Sprintf("Devices (%d)", len(devices))
-	r := rendering.New(width, height).
-		SetTitle(title).
-		SetFocused(m.focusedPanel == PanelDeviceList).
-		SetFocusColor(borderColor).
-		SetBlurColor(borderColor)
-
-	var content strings.Builder
-
-	if len(devices) == 0 {
-		if m.cache.IsLoading() {
-			content.WriteString(lipgloss.NewStyle().Foreground(theme.Cyan()).Render("Loading..."))
-		} else {
-			content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render("No devices"))
-		}
-		return r.SetContent(content.String()).Render()
-	}
-
-	// Ensure cursor is valid
-	if m.cursor >= len(devices) {
-		m.cursor = len(devices) - 1
-	}
-	if m.cursor < 0 {
-		m.cursor = 0
-	}
-
-	// Show device list
-	visibleItems := height - 5
-	if visibleItems < 1 {
-		visibleItems = 1
-	}
-
-	scrollOffset := 0
-	if m.cursor >= visibleItems {
-		scrollOffset = m.cursor - visibleItems + 1
-	}
-
-	endIdx := min(scrollOffset+visibleItems, len(devices))
-	for i := scrollOffset; i < endIdx; i++ {
-		d := devices[i]
-		selected := i == m.cursor
-		prefix := unselectedPrefix
-		if selected {
-			prefix = selectedPrefix
-		}
-
-		status := lipgloss.NewStyle().Foreground(colors.Offline).Render("○")
-		if !d.Fetched {
-			status = lipgloss.NewStyle().Foreground(theme.Yellow()).Render("◐")
-		} else if d.Online {
-			status = lipgloss.NewStyle().Foreground(theme.Green()).Render("●")
-		}
-
-		name := d.Device.Name
-		maxLen := width - 10
-		if len(name) > maxLen && maxLen > 3 {
-			name = name[:maxLen-3] + "..."
-		}
-
-		line := fmt.Sprintf("%s%s %s", prefix, status, name)
-		if selected {
-			content.WriteString(lipgloss.NewStyle().
-				Background(colors.AltBackground).
-				Foreground(theme.Pink()).
-				Bold(true).
-				Render(line) + "\n")
-		} else {
-			content.WriteString(lipgloss.NewStyle().Foreground(colors.Text).Render(line) + "\n")
-		}
-	}
-
-	if len(devices) > visibleItems {
-		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).
-			Render(fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(devices))))
-	}
-
-	return r.SetContent(content.String()).Render()
-}
-
-// renderDeviceInfoColumn renders device info using the deviceInfo component.
-func (m Model) renderDeviceInfoColumn(_ []*cache.DeviceData, width, height int, _ color.Color) string {
-	// Set size and return the deviceInfo component's view
-	m.deviceInfo = m.deviceInfo.SetSize(width, height)
-	return m.deviceInfo.View()
 }
 
 func (m Model) renderHeader() string {

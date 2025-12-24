@@ -645,3 +645,34 @@ func sortStrings(s []string) {
 		}
 	}
 }
+
+// NewForTesting creates a cache instance for testing without network dependencies.
+func NewForTesting() *Cache {
+	return &Cache{
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+	}
+}
+
+// SetDeviceForTesting adds a device to the cache for testing purposes.
+func (c *Cache) SetDeviceForTesting(device model.Device, online bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	data := &DeviceData{
+		Device:    device,
+		Online:    online,
+		Fetched:   true,
+		UpdatedAt: time.Now(),
+	}
+
+	c.devices[device.Name] = data
+
+	// Maintain sorted order
+	c.order = make([]string, 0, len(c.devices))
+	for name := range c.devices {
+		c.order = append(c.order, name)
+	}
+	sortStrings(c.order)
+}
