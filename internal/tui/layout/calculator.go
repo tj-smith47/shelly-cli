@@ -1,0 +1,304 @@
+// Package layout provides flexible panel sizing and rendering utilities for the TUI.
+package layout
+
+// PanelID uniquely identifies a panel within a view.
+type PanelID int
+
+// PanelConfig defines how a panel should be sized.
+type PanelConfig struct {
+	ID            PanelID
+	MinHeight     int  // Minimum rows when collapsed (includes border)
+	MaxHeight     int  // Maximum rows when expanded (0 = fill available)
+	ExpandOnFocus bool // Grow to MaxHeight when focused
+}
+
+// Column represents a vertical column of panels.
+type Column struct {
+	Panels      []PanelConfig
+	Width       int
+	TotalHeight int
+	FocusedID   PanelID
+}
+
+// CalculatePanelHeights distributes available height among panels in a column.
+// When a panel is focused and has ExpandOnFocus=true, it gets maximum space.
+// Other panels shrink to their MinHeight.
+func (c *Column) CalculatePanelHeights() map[PanelID]int {
+	heights := make(map[PanelID]int)
+
+	if len(c.Panels) == 0 {
+		return heights
+	}
+
+	// Find which panel should expand
+	expandingPanel := PanelID(-1)
+	for _, p := range c.Panels {
+		if p.ID == c.FocusedID && p.ExpandOnFocus {
+			expandingPanel = p.ID
+			break
+		}
+	}
+
+	if expandingPanel == -1 {
+		// No panel is expanding - distribute evenly
+		return c.distributeEvenly()
+	}
+
+	// Calculate minimum space needed by non-expanding panels
+	minSpaceNeeded := 0
+	for _, p := range c.Panels {
+		if p.ID != expandingPanel {
+			minSpaceNeeded += p.MinHeight
+		}
+	}
+
+	// Give expanding panel all remaining space
+	expandingHeight := c.TotalHeight - minSpaceNeeded
+	if expandingHeight < 0 {
+		expandingHeight = 0
+	}
+
+	// Find the expanding panel's max height constraint
+	for _, p := range c.Panels {
+		if p.ID == expandingPanel {
+			if p.MaxHeight > 0 && expandingHeight > p.MaxHeight {
+				expandingHeight = p.MaxHeight
+			}
+			break
+		}
+	}
+
+	// Assign heights
+	for _, p := range c.Panels {
+		if p.ID == expandingPanel {
+			heights[p.ID] = expandingHeight
+		} else {
+			heights[p.ID] = p.MinHeight
+		}
+	}
+
+	// If there's remaining space after max constraint, redistribute
+	usedHeight := 0
+	for _, h := range heights {
+		usedHeight += h
+	}
+	remaining := c.TotalHeight - usedHeight
+	if remaining > 0 {
+		// Give remaining to last non-expanding panel
+		for i := len(c.Panels) - 1; i >= 0; i-- {
+			p := c.Panels[i]
+			if p.ID != expandingPanel {
+				heights[p.ID] += remaining
+				break
+			}
+		}
+	}
+
+	return heights
+}
+
+// distributeEvenly gives each panel equal height.
+func (c *Column) distributeEvenly() map[PanelID]int {
+	heights := make(map[PanelID]int)
+	if len(c.Panels) == 0 {
+		return heights
+	}
+
+	baseHeight := c.TotalHeight / len(c.Panels)
+	remainder := c.TotalHeight % len(c.Panels)
+
+	for i, p := range c.Panels {
+		h := baseHeight
+		// Give extra pixel to last panels to use all space
+		if i >= len(c.Panels)-remainder {
+			h++
+		}
+		heights[p.ID] = h
+	}
+
+	return heights
+}
+
+// TwoColumnLayout manages a two-column panel layout.
+type TwoColumnLayout struct {
+	LeftColumn  Column
+	RightColumn Column
+	TotalWidth  int
+	TotalHeight int
+	LeftRatio   float64 // Ratio of total width for left column (0.0-1.0)
+	Gap         int     // Gap between columns
+}
+
+// NewTwoColumnLayout creates a new two-column layout.
+func NewTwoColumnLayout(leftRatio float64, gap int) *TwoColumnLayout {
+	if leftRatio <= 0 || leftRatio >= 1 {
+		leftRatio = 0.5
+	}
+	if gap < 0 {
+		gap = 1
+	}
+	return &TwoColumnLayout{
+		LeftRatio: leftRatio,
+		Gap:       gap,
+	}
+}
+
+// SetSize updates the total dimensions available.
+func (l *TwoColumnLayout) SetSize(width, height int) {
+	l.TotalWidth = width
+	l.TotalHeight = height
+
+	// Calculate column widths
+	leftWidth := int(float64(width) * l.LeftRatio)
+	rightWidth := width - leftWidth - l.Gap
+
+	l.LeftColumn.Width = leftWidth
+	l.LeftColumn.TotalHeight = height
+
+	l.RightColumn.Width = rightWidth
+	l.RightColumn.TotalHeight = height
+}
+
+// SetFocus updates which panel is focused.
+func (l *TwoColumnLayout) SetFocus(panelID PanelID) {
+	// Check if panel is in left or right column
+	for _, p := range l.LeftColumn.Panels {
+		if p.ID == panelID {
+			l.LeftColumn.FocusedID = panelID
+			l.RightColumn.FocusedID = -1
+			return
+		}
+	}
+	for _, p := range l.RightColumn.Panels {
+		if p.ID == panelID {
+			l.RightColumn.FocusedID = panelID
+			l.LeftColumn.FocusedID = -1
+			return
+		}
+	}
+}
+
+// Calculate returns the width and height for each panel.
+func (l *TwoColumnLayout) Calculate() map[PanelID]PanelDimensions {
+	result := make(map[PanelID]PanelDimensions)
+
+	leftHeights := l.LeftColumn.CalculatePanelHeights()
+	rightHeights := l.RightColumn.CalculatePanelHeights()
+
+	for id, h := range leftHeights {
+		result[id] = PanelDimensions{
+			Width:  l.LeftColumn.Width,
+			Height: h,
+		}
+	}
+
+	for id, h := range rightHeights {
+		result[id] = PanelDimensions{
+			Width:  l.RightColumn.Width,
+			Height: h,
+		}
+	}
+
+	return result
+}
+
+// PanelDimensions holds the calculated width and height for a panel.
+type PanelDimensions struct {
+	Width  int
+	Height int
+}
+
+// ContentDimensions returns the usable content area (subtracting borders).
+func (d PanelDimensions) ContentDimensions(borderWidth int) (int, int) {
+	contentWidth := d.Width - (borderWidth * 2)
+	contentHeight := d.Height - 2 // Top and bottom border
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+	return contentWidth, contentHeight
+}
+
+// ThreeColumnLayout manages a three-column panel layout (for JSON preview).
+type ThreeColumnLayout struct {
+	LeftColumn   Column
+	MiddleColumn Column
+	RightColumn  Column
+	TotalWidth   int
+	TotalHeight  int
+	LeftRatio    float64 // Ratio for left column
+	MiddleRatio  float64 // Ratio for middle column
+	// Right column gets remaining space
+	Gap            int
+	RightCollapsed bool // When true, right column has 0 width
+}
+
+// NewThreeColumnLayout creates a new three-column layout.
+func NewThreeColumnLayout(leftRatio, middleRatio float64, gap int) *ThreeColumnLayout {
+	return &ThreeColumnLayout{
+		LeftRatio:   leftRatio,
+		MiddleRatio: middleRatio,
+		Gap:         gap,
+	}
+}
+
+// SetSize updates the total dimensions.
+func (l *ThreeColumnLayout) SetSize(width, height int) {
+	l.TotalWidth = width
+	l.TotalHeight = height
+	l.recalculateWidths()
+}
+
+// SetRightCollapsed shows/hides the right column (for slide-in effect).
+func (l *ThreeColumnLayout) SetRightCollapsed(collapsed bool) {
+	l.RightCollapsed = collapsed
+	l.recalculateWidths()
+}
+
+func (l *ThreeColumnLayout) recalculateWidths() {
+	if l.RightCollapsed {
+		// Two-column mode
+		leftWidth := int(float64(l.TotalWidth) * l.LeftRatio / (l.LeftRatio + l.MiddleRatio))
+		middleWidth := l.TotalWidth - leftWidth - l.Gap
+
+		l.LeftColumn.Width = leftWidth
+		l.MiddleColumn.Width = middleWidth
+		l.RightColumn.Width = 0
+	} else {
+		// Three-column mode
+		leftWidth := int(float64(l.TotalWidth) * l.LeftRatio)
+		middleWidth := int(float64(l.TotalWidth) * l.MiddleRatio)
+		rightWidth := l.TotalWidth - leftWidth - middleWidth - (l.Gap * 2)
+
+		l.LeftColumn.Width = leftWidth
+		l.MiddleColumn.Width = middleWidth
+		l.RightColumn.Width = rightWidth
+	}
+
+	l.LeftColumn.TotalHeight = l.TotalHeight
+	l.MiddleColumn.TotalHeight = l.TotalHeight
+	l.RightColumn.TotalHeight = l.TotalHeight
+}
+
+// Calculate returns dimensions for all panels.
+func (l *ThreeColumnLayout) Calculate() map[PanelID]PanelDimensions {
+	result := make(map[PanelID]PanelDimensions)
+
+	leftHeights := l.LeftColumn.CalculatePanelHeights()
+	middleHeights := l.MiddleColumn.CalculatePanelHeights()
+	rightHeights := l.RightColumn.CalculatePanelHeights()
+
+	for id, h := range leftHeights {
+		result[id] = PanelDimensions{Width: l.LeftColumn.Width, Height: h}
+	}
+	for id, h := range middleHeights {
+		result[id] = PanelDimensions{Width: l.MiddleColumn.Width, Height: h}
+	}
+	for id, h := range rightHeights {
+		result[id] = PanelDimensions{Width: l.RightColumn.Width, Height: h}
+	}
+
+	return result
+}

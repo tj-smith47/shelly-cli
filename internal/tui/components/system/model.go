@@ -142,7 +142,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 
 func (m Model) fetchStatus() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		status, err := m.svc.GetSysStatus(ctx, m.device)
@@ -248,7 +248,7 @@ func (m Model) toggleCurrentField() (Model, tea.Cmd) {
 
 func (m Model) setEcoMode(enable bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.SetSysEcoMode(ctx, m.device, enable)
@@ -271,7 +271,7 @@ func (m Model) setEcoMode(enable bool) tea.Cmd {
 
 func (m Model) setDiscoverable(discoverable bool) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.SetSysDiscoverable(ctx, m.device, discoverable)

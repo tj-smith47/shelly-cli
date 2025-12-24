@@ -88,3 +88,42 @@ func (s *Service) DeviceStatus(ctx context.Context, identifier string) (*DeviceS
 func (s *Service) DevicePing(ctx context.Context, identifier string) (*DeviceInfo, error) {
 	return s.DeviceInfo(ctx, identifier)
 }
+
+// DeviceInfoAuto returns device info, auto-detecting generation (Gen1 vs Gen2).
+// It first tries Gen2, then falls back to Gen1 if Gen2 fails.
+// Use this for TUI/cache where we need to handle all device types.
+func (s *Service) DeviceInfoAuto(ctx context.Context, identifier string) (*DeviceInfo, error) {
+	// Try Gen2 first (more common)
+	result, err := s.DeviceInfo(ctx, identifier)
+	if err == nil {
+		return result, nil
+	}
+
+	// Gen2 failed, try Gen1
+	gen1Result, gen1Err := s.DeviceInfoGen1(ctx, identifier)
+	if gen1Err == nil {
+		return gen1Result, nil
+	}
+
+	// Both failed, return the original Gen2 error (more informative)
+	return nil, err
+}
+
+// DeviceInfoGen1 returns information about a Gen1 device.
+func (s *Service) DeviceInfoGen1(ctx context.Context, identifier string) (*DeviceInfo, error) {
+	var result *DeviceInfo
+	err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		info := conn.Info()
+		result = &DeviceInfo{
+			ID:         info.ID,
+			MAC:        info.MAC,
+			Model:      info.Model,
+			Generation: info.Generation,
+			Firmware:   info.Firmware,
+			App:        info.App,
+			AuthEn:     info.AuthEn,
+		}
+		return nil
+	})
+	return result, err
+}

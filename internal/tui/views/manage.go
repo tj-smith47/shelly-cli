@@ -193,18 +193,6 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 		m.focusNext()
 	case keyShiftTab:
 		m.focusPrev()
-	case "1":
-		m.focusedPanel = ManagePanelDiscovery
-		m.updateFocusStates()
-	case "2":
-		m.focusedPanel = ManagePanelBatch
-		m.updateFocusStates()
-	case "3":
-		m.focusedPanel = ManagePanelFirmware
-		m.updateFocusStates()
-	case "4":
-		m.focusedPanel = ManagePanelBackup
-		m.updateFocusStates()
 	}
 }
 
@@ -290,54 +278,31 @@ func (m *Manage) View() string {
 
 func (m *Manage) renderNarrowLayout() string {
 	// In narrow mode, show only the focused panel at full width
-	panelHeight := m.height - 2
-
+	// Components already have embedded titles from rendering.New()
 	switch m.focusedPanel {
 	case ManagePanelDiscovery:
-		return m.renderPanel(m.discovery.View(), m.width, panelHeight, true)
+		return m.discovery.View()
 	case ManagePanelBatch:
-		return m.renderPanel(m.batch.View(), m.width, panelHeight, true)
+		return m.batch.View()
 	case ManagePanelFirmware:
-		return m.renderPanel(m.firmware.View(), m.width, panelHeight, true)
+		return m.firmware.View()
 	case ManagePanelBackup:
-		return m.renderPanel(m.backup.View(), m.width, panelHeight, true)
+		return m.backup.View()
 	default:
-		return m.renderPanel(m.discovery.View(), m.width, panelHeight, true)
+		return m.discovery.View()
 	}
 }
 
 func (m *Manage) renderStandardLayout() string {
-	// Calculate panel dimensions for layout
-	leftWidth := (m.width - 1) * 2 / 5
-	rightWidth := m.width - leftWidth - 1
-	leftPanelHeight := (m.height - 2) / 3
-
-	// Render left column panels (stacked vertically)
-	discoveryView := m.renderPanel(m.discovery.View(), leftWidth, leftPanelHeight, m.focusedPanel == ManagePanelDiscovery)
-	firmwareView := m.renderPanel(m.firmware.View(), leftWidth, leftPanelHeight, m.focusedPanel == ManagePanelFirmware)
-	backupView := m.renderPanel(m.backup.View(), leftWidth, leftPanelHeight, m.focusedPanel == ManagePanelBackup)
-
-	// Render right column (full height batch panel)
-	batchView := m.renderPanel(m.batch.View(), rightWidth, m.height, m.focusedPanel == ManagePanelBatch)
-
-	// Build left column (stacked Discovery, Firmware, Backup)
-	leftColumn := lipgloss.JoinVertical(lipgloss.Left, discoveryView, firmwareView, backupView)
+	// Render panels (components already have embedded titles)
+	leftColumn := lipgloss.JoinVertical(lipgloss.Left,
+		m.discovery.View(),
+		m.firmware.View(),
+		m.backup.View(),
+	)
 
 	// Join left column with right column (batch)
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, " ", batchView)
-}
-
-func (m *Manage) renderPanel(content string, width, height int, focused bool) string {
-	style := m.styles.Panel
-	if focused {
-		style = m.styles.PanelActive
-	}
-
-	// Wrap content in panel style
-	return style.
-		Width(width).
-		Height(height).
-		Render(content)
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, " ", m.batch.View())
 }
 
 // Refresh reloads all components.

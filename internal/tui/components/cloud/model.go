@@ -140,7 +140,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 
 func (m Model) fetchStatus() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		status, err := m.svc.GetCloudStatus(ctx, m.device)
@@ -247,7 +247,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 func (m Model) toggleCloud() tea.Cmd {
 	newEnabled := !m.enabled
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.SetCloudEnabled(ctx, m.device, newEnabled)

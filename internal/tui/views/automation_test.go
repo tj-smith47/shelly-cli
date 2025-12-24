@@ -210,48 +210,6 @@ func TestAutomation_HandleKeyPress_Tab(t *testing.T) {
 	}
 }
 
-func TestAutomation_HandleKeyPress_Numbers(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		key  string
-		want AutomationPanel
-	}{
-		{"1", PanelScripts},
-		{"2", PanelSchedules},
-		{"3", PanelWebhooks},
-		{"4", PanelVirtuals},
-		{"5", PanelKVS},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.key, func(t *testing.T) {
-			t.Parallel()
-			a := newTestAutomation()
-
-			// Create key press message based on key
-			var msg tea.KeyPressMsg
-			switch tt.key {
-			case "1":
-				msg = tea.KeyPressMsg{Code: 49} // '1'
-			case "2":
-				msg = tea.KeyPressMsg{Code: 50} // '2'
-			case "3":
-				msg = tea.KeyPressMsg{Code: 51} // '3'
-			case "4":
-				msg = tea.KeyPressMsg{Code: 52} // '4'
-			case "5":
-				msg = tea.KeyPressMsg{Code: 53} // '5'
-			}
-
-			a.handleKeyPress(msg)
-
-			if a.focusedPanel != tt.want {
-				t.Errorf("focusedPanel = %v, want %v", a.focusedPanel, tt.want)
-			}
-		})
-	}
-}
-
 func TestAutomation_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	a := newTestAutomation()

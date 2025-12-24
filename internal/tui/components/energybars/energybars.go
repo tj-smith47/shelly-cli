@@ -141,8 +141,8 @@ func (m Model) View() string {
 	}
 
 	return m.styles.Container.
-		Width(m.width - 4).
-		Height(m.height - 2).
+		Width(m.width).
+		Height(m.height).
 		Render(content.String())
 }
 
@@ -214,16 +214,16 @@ func (m Model) renderTotal(total float64) string {
 
 func (m Model) renderEmpty() string {
 	return m.styles.Container.
-		Width(m.width-4).
-		Height(m.height-2).
+		Width(m.width).
+		Height(m.height).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No devices online")
 }
 
 func (m Model) renderNoData() string {
 	return m.styles.Container.
-		Width(m.width-4).
-		Height(m.height-2).
+		Width(m.width).
+		Height(m.height).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No power data available")
 }

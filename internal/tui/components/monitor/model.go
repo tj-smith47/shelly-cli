@@ -247,7 +247,7 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	}
 
 	// Per-device timeout to prevent single slow device from blocking others
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	snapshot, err := m.svc.GetMonitoringSnapshot(ctx, device.Address)

@@ -131,7 +131,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 
 func (m Model) fetchInputs() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		inputs, err := m.svc.InputList(ctx, m.device)

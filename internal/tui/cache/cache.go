@@ -143,11 +143,11 @@ func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
 		}
 
 		// Per-device timeout
-		ctx, cancel := context.WithTimeout(c.ctx, 3*time.Second)
+		ctx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
 		defer cancel()
 
-		// Get device info first
-		info, err := c.svc.DeviceInfo(ctx, device.Address)
+		// Get device info first (auto-detects Gen1 vs Gen2)
+		info, err := c.svc.DeviceInfoAuto(ctx, device.Address)
 		if err != nil {
 			data.Error = err
 			data.Online = false
@@ -157,7 +157,14 @@ func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
 		data.Info = info
 		data.Online = true
 
-		// Get switch states
+		// Gen1 devices use different APIs - skip Gen2-specific calls
+		if info.Generation == 1 {
+			// For Gen1, we're online but don't have switch/monitoring data yet
+			// TODO: Add Gen1-specific relay status collection
+			return DeviceUpdateMsg{Name: name, Data: data}
+		}
+
+		// Gen2+ device - get switch states
 		switches, err := c.svc.SwitchList(ctx, device.Address)
 		if err == nil {
 			for _, sw := range switches {
@@ -168,8 +175,8 @@ func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
 			}
 		}
 
-		// Get monitoring snapshot for power metrics
-		snapshot, err := c.svc.GetMonitoringSnapshot(ctx, device.Address)
+		// Get monitoring snapshot for power metrics (auto-detects Gen1 vs Gen2)
+		snapshot, err := c.svc.GetMonitoringSnapshotAuto(ctx, device.Address)
 		if err != nil {
 			// Device is online but couldn't get snapshot - that's OK for non-metering devices
 			c.ios.DebugErr("cache snapshot "+name, err)

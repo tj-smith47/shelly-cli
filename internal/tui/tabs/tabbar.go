@@ -105,12 +105,10 @@ func DefaultStyles() Styles {
 			BorderForeground(colors.TableBorder).
 			BorderBottom(true).
 			Padding(0, 1),
-		Tab: lipgloss.NewStyle().
-			Padding(0, 2),
+		Tab: lipgloss.NewStyle(),
 		Active: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
-			Bold(true).
-			Underline(true),
+			Bold(true),
 		Inactive: lipgloss.NewStyle().
 			Foreground(colors.Text),
 		Disabled: lipgloss.NewStyle().
@@ -218,22 +216,23 @@ func (m Model) View() string {
 		}
 
 		// Build tab content
-		var content string
+		var tabContent string
 		if m.showIcons && tab.Icon != "" {
-			content = m.styles.Icon.Render(tab.Icon) + tab.Label
+			tabContent = tab.Icon + " " + tab.Label
 		} else {
-			content = tab.Label
+			tabContent = tab.Label
 		}
 
 		// Add number prefix for keyboard shortcut
 		numPrefix := lipgloss.NewStyle().Foreground(theme.Purple()).Render(intToStr(i+1) + ":")
-		content = numPrefix + style.Render(content)
+		content := numPrefix + style.Render(tabContent)
 
-		tabs = append(tabs, m.styles.Tab.Render(content))
+		tabs = append(tabs, content)
 	}
 
 	content := strings.Join(tabs, divider)
-	return m.styles.Container.Width(m.width).Render(content)
+	// Render without width constraint to avoid padding/truncation issues
+	return m.styles.Container.Render(content)
 }
 
 // intToStr converts an int to a string without using strconv.

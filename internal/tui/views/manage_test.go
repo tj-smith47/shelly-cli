@@ -160,37 +160,6 @@ func TestManage_Update_FocusPrev(t *testing.T) {
 	}
 }
 
-func TestManage_Update_NumberKeyFocus(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		key      rune
-		expected ManagePanel
-	}{
-		{'1', ManagePanelDiscovery},
-		{'2', ManagePanelBatch},
-		{'3', ManagePanelFirmware},
-		{'4', ManagePanelBackup},
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.key), func(t *testing.T) {
-			t.Parallel()
-			m := newTestManage()
-
-			msg := tea.KeyPressMsg{Code: tt.key}
-			updated, _ := m.Update(msg)
-			manage, ok := updated.(*Manage)
-			if !ok {
-				t.Fatal("Update should return *Manage")
-			}
-
-			if manage.focusedPanel != tt.expected {
-				t.Errorf("focusedPanel after '%c' = %v, want %v", tt.key, manage.focusedPanel, tt.expected)
-			}
-		})
-	}
-}
-
 func TestManage_FocusCycle(t *testing.T) {
 	t.Parallel()
 	m := newTestManage()

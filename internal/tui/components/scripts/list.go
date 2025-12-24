@@ -150,7 +150,7 @@ func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 // fetchScripts creates a command to fetch scripts from the device.
 func (m ListModel) fetchScripts() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		scripts, err := m.svc.ListScripts(ctx, m.device)
@@ -308,7 +308,7 @@ func (m ListModel) startScript() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.StartScript(ctx, m.device, script.ID)
@@ -326,7 +326,7 @@ func (m ListModel) stopScript() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.StopScript(ctx, m.device, script.ID)
@@ -341,7 +341,7 @@ func (m ListModel) deleteScript() tea.Cmd {
 	script := m.scripts[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.DeleteScript(ctx, m.device, script.ID)

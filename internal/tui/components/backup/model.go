@@ -706,8 +706,9 @@ func (m Model) renderExportView() string {
 
 	selectedCount := len(m.selectedDevices())
 	content.WriteString(m.styles.Label.Render(
-		fmt.Sprintf("Devices (%d selected):\n\n", selectedCount),
+		fmt.Sprintf("Devices (%d selected):", selectedCount),
 	))
+	content.WriteString("\n\n")
 
 	visible := m.visibleRows()
 	endIdx := m.scroll + visible
@@ -783,8 +784,9 @@ func (m Model) renderImportView() string {
 	var content strings.Builder
 
 	content.WriteString(m.styles.Label.Render(
-		fmt.Sprintf("Backup files (%d):\n\n", len(m.backupFiles)),
+		fmt.Sprintf("Backup files (%d):", len(m.backupFiles)),
 	))
+	content.WriteString("\n\n")
 
 	visible := m.visibleRows()
 	endIdx := m.scroll + visible

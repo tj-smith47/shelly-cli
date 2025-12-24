@@ -251,7 +251,7 @@ func (m Model) View() string {
 	input := m.textInput.View()
 
 	return m.styles.Container.
-		Width(m.width - 4).
+		Width(m.width).
 		Render(prompt + input)
 }
 

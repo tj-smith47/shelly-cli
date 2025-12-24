@@ -15,15 +15,19 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/branding"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/energybars"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/events"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/help"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/search"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/views"
 )
@@ -32,6 +36,13 @@ import (
 type DeviceActionMsg struct {
 	Device string
 	Action string
+	Err    error
+}
+
+// EndpointFetchMsg reports the result of an endpoint RPC call.
+type EndpointFetchMsg struct {
+	Method string
+	Data   any
 	Err    error
 }
 
@@ -89,21 +100,29 @@ type Model struct {
 	filter          string     // Device name filter
 	focusedPanel    PanelFocus // Which panel is currently focused
 	endpointCursor  int        // Selected endpoint in JSON panel
+	endpointData    any        // Fetched endpoint data
+	endpointMethod  string     // Currently fetched endpoint method
+	endpointLoading bool       // Whether endpoint data is being fetched
+	endpointError   error      // Error from endpoint fetch
 
 	// Dimensions
 	width  int
 	height int
 
 	// Components
-	statusBar statusbar.Model
-	search    search.Model
-	cmdMode   cmdmode.Model
-	help      help.Model
-	toast     toast.Model
-	events    events.Model // Event stream component
+	statusBar  statusbar.Model
+	search     search.Model
+	cmdMode    cmdmode.Model
+	help       help.Model
+	toast      toast.Model
+	events     events.Model
+	energyBars energybars.Model
 
 	// Settings
 	refreshInterval time.Duration
+
+	// Debug logging (enabled by SHELLY_TUI_DEBUG=1)
+	debugLogger *debug.Logger
 }
 
 // Options configures the TUI.
@@ -147,6 +166,9 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		Svc: f.ShellyService(),
 		IOS: f.IOStreams(),
 	})
+
+	// Create energy bars component
+	energyBarsModel := energybars.New(deviceCache)
 
 	// Create view manager and register all views
 	vm := views.New()
@@ -210,6 +232,15 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		help:            help.New(),
 		toast:           toast.New(),
 		events:          eventsModel,
+		energyBars:      energyBarsModel,
+		debugLogger:     debug.New(), // nil if SHELLY_TUI_DEBUG not set
+	}
+}
+
+// Close cleans up resources used by the TUI.
+func (m Model) Close() {
+	if err := m.debugLogger.Close(); err != nil {
+		iostreams.DebugErr("close debug logger", err)
 	}
 }
 
@@ -255,8 +286,22 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case DeviceActionMsg:
 		newModel, cmd := m.handleDeviceAction(msg)
 		return newModel, cmd, true
-	case cache.DeviceUpdateMsg, cache.AllDevicesLoadedMsg, cache.RefreshTickMsg:
+	case cache.DeviceUpdateMsg, cache.RefreshTickMsg:
 		cmd := m.cache.Update(msg)
+		return m, cmd, true
+	case cache.AllDevicesLoadedMsg:
+		cmd := m.cache.Update(msg)
+		// Emit initial device selection for the first device
+		devices := m.getFilteredDevices()
+		if len(devices) > 0 && m.cursor < len(devices) {
+			d := devices[m.cursor]
+			return m, tea.Batch(cmd, func() tea.Msg {
+				return views.DeviceSelectedMsg{
+					Device:  d.Device.Name,
+					Address: d.Device.Address,
+				}
+			}), true
+		}
 		return m, cmd, true
 	case events.EventMsg, events.SubscriptionStatusMsg:
 		var cmd tea.Cmd
@@ -284,6 +329,17 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case views.DeviceSelectedMsg:
 		// Propagate device selection to all views that support it
 		return m, m.viewManager.PropagateDevice(msg.Device), true
+	case EndpointFetchMsg:
+		m.endpointLoading = false
+		if msg.Err != nil {
+			m.endpointError = msg.Err
+			m.endpointData = nil
+		} else {
+			m.endpointData = msg.Data
+			m.endpointMethod = msg.Method
+			m.endpointError = nil
+		}
+		return m, nil, true
 	case tea.KeyPressMsg:
 		return m.handleKeyPressMsg(msg)
 	}
@@ -300,6 +356,13 @@ func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
 	m.toast, toastCmd = m.toast.Update(msg)
 	m.events, eventsCmd = m.events.Update(msg)
 	cmds = append(cmds, statusCmd, toastCmd, eventsCmd)
+
+	// Forward non-key messages to ALL views so async results can be processed
+	// (e.g., Config's wifi.StatusLoadedMsg needs to reach Config even if Dashboard is active)
+	if _, isKey := msg.(tea.KeyPressMsg); !isKey {
+		viewCmd := m.viewManager.UpdateAll(msg)
+		cmds = append(cmds, viewCmd)
+	}
 
 	return m, cmds
 }
@@ -405,7 +468,7 @@ func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
 
 	case cmdmode.CmdHelp:
 		m.help = m.help.SetSize(m.width, m.height)
-		m.help = m.help.SetContext(keys.ContextDevices)
+		m.help = m.help.SetContext(m.getHelpContext())
 		m.help = m.help.Toggle()
 		return m, nil
 
@@ -417,6 +480,24 @@ func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
 
 	default:
 		return m, statusbar.SetMessage("Unknown command", statusbar.MessageError)
+	}
+}
+
+// getHelpContext returns the help context based on the current active tab.
+func (m Model) getHelpContext() keys.Context {
+	switch m.tabBar.ActiveTabID() {
+	case tabs.TabDashboard:
+		return keys.ContextDevices
+	case tabs.TabAutomation:
+		return keys.ContextAutomation
+	case tabs.TabConfig:
+		return keys.ContextConfig
+	case tabs.TabManage:
+		return keys.ContextManage
+	case tabs.TabFleet:
+		return keys.ContextFleet
+	default:
+		return keys.ContextDevices
 	}
 }
 
@@ -441,19 +522,27 @@ func (m Model) getFilteredDevices() []*cache.DeviceData {
 
 // handleKeyPress handles global key presses.
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	// Global actions
+	// Global actions (view switching, quit, help, etc.)
 	if newModel, cmd, handled := m.handleGlobalKeys(msg); handled {
 		return newModel, cmd, true
 	}
 
+	// If NOT on Dashboard, forward keys to the active view
+	if !m.isDashboardActive() {
+		cmd := m.viewManager.Update(msg)
+		return m, cmd, true
+	}
+
+	// Dashboard-specific handling below
+
 	// Panel switching with Tab/Shift+Tab
-	if newModel, handled := m.handlePanelSwitch(msg); handled {
-		return newModel, nil, true
+	if newModel, cmd, handled := m.handlePanelSwitch(msg); handled {
+		return newModel, cmd, true
 	}
 
 	// Navigation (based on focused panel)
-	if newModel, handled := m.handleNavigation(msg); handled {
-		return newModel, nil, true
+	if newModel, cmd, handled := m.handleNavigation(msg); handled {
+		return newModel, cmd, true
 	}
 
 	// Device actions
@@ -464,33 +553,52 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handlePanelSwitch handles Tab/Shift+Tab for switching panels.
-func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, bool) {
+// handlePanelSwitch handles Tab/Shift+Tab for switching panels and Enter for JSON overlay.
+func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "tab":
-		// Cycle through panels: DeviceList -> Detail -> Endpoints -> DeviceList
+		// Cycle between panels: DeviceList <-> Detail
 		switch m.focusedPanel {
 		case PanelDeviceList:
 			m.focusedPanel = PanelDetail
 		case PanelDetail:
-			m.focusedPanel = PanelEndpoints
+			m.focusedPanel = PanelDeviceList
 		case PanelEndpoints:
+			// When JSON overlay is visible, go to DeviceList
 			m.focusedPanel = PanelDeviceList
 		}
-		return m, true
+		return m, nil, true
 	case "shift+tab":
-		// Reverse cycle
+		// Reverse cycle between panels: Detail <-> DeviceList
 		switch m.focusedPanel {
 		case PanelDeviceList:
-			m.focusedPanel = PanelEndpoints
+			m.focusedPanel = PanelDetail
 		case PanelDetail:
 			m.focusedPanel = PanelDeviceList
 		case PanelEndpoints:
+			// When JSON overlay is visible, go to Detail
 			m.focusedPanel = PanelDetail
 		}
-		return m, true
+		return m, nil, true
+	case "enter":
+		// Toggle JSON overlay - Enter shows it when on Detail, Escape hides it
+		if m.focusedPanel == PanelDetail {
+			m.focusedPanel = PanelEndpoints
+			// Trigger endpoint fetch for the selected endpoint
+			cmd := m.fetchSelectedEndpoint()
+			return m, cmd, true
+		}
+	case "escape":
+		// Close JSON overlay and clear endpoint data
+		if m.focusedPanel == PanelEndpoints {
+			m.focusedPanel = PanelDetail
+			m.endpointData = nil
+			m.endpointError = nil
+			m.endpointLoading = false
+			return m, nil, true
+		}
 	}
-	return m, false
+	return m, nil, false
 }
 
 // handleGlobalKeys handles quit, help, filter, command, tab switching, and escape keys.
@@ -501,7 +609,7 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 		return m, tea.Quit, true
 	case key.Matches(msg, m.keys.Help):
 		m.help = m.help.SetSize(m.width, m.height)
-		m.help = m.help.SetContext(keys.ContextDevices)
+		m.help = m.help.SetContext(m.getHelpContext())
 		m.help = m.help.Toggle()
 		return m, nil, true
 	case key.Matches(msg, m.keys.Filter):
@@ -518,7 +626,6 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 			m.cursor = 0
 			return m, nil, true
 		}
-	// Tab switching (1-5)
 	case key.Matches(msg, m.keys.View1):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabDashboard)
 		return m, m.viewManager.SetActive(views.ViewDashboard), true
@@ -538,42 +645,77 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 	return m, nil, false
 }
 
-// handleNavigation handles j/k/g/G/h/l navigation keys.
-func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, bool) {
+// handleNavigation handles j/k/g/G/h/l navigation keys based on focused panel.
+func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	devices := m.getFilteredDevices()
 	deviceCount := len(devices)
+	oldCursor := m.cursor
 
 	switch msg.String() {
 	case "j", "down":
-		if m.cursor < deviceCount-1 {
-			m.cursor++
-			m.componentCursor = -1 // Reset component selection when changing device
+		switch m.focusedPanel {
+		case PanelDeviceList:
+			if m.cursor < deviceCount-1 {
+				m.cursor++
+				m.componentCursor = -1
+				m.endpointCursor = 0
+			}
+		case PanelDetail, PanelEndpoints:
+			if m.cursor >= 0 && m.cursor < deviceCount {
+				methods := m.getDeviceMethods(devices[m.cursor])
+				if m.endpointCursor < len(methods)-1 {
+					m.endpointCursor++
+				}
+			}
 		}
-		return m, true
+		return m, m.emitDeviceSelection(devices, oldCursor), true
 	case "k", "up":
-		if m.cursor > 0 {
-			m.cursor--
-			m.componentCursor = -1 // Reset component selection when changing device
+		switch m.focusedPanel {
+		case PanelDeviceList:
+			if m.cursor > 0 {
+				m.cursor--
+				m.componentCursor = -1
+				m.endpointCursor = 0
+			}
+		case PanelDetail, PanelEndpoints:
+			if m.endpointCursor > 0 {
+				m.endpointCursor--
+			}
 		}
-		return m, true
+		return m, m.emitDeviceSelection(devices, oldCursor), true
 	case "g":
-		m.cursor = 0
-		m.componentCursor = -1
-		return m, true
-	case "G":
-		if deviceCount > 0 {
-			m.cursor = deviceCount - 1
+		switch m.focusedPanel {
+		case PanelDeviceList:
+			m.cursor = 0
 			m.componentCursor = -1
+			m.endpointCursor = 0
+		case PanelDetail, PanelEndpoints:
+			m.endpointCursor = 0
 		}
-		return m, true
+		return m, m.emitDeviceSelection(devices, oldCursor), true
+	case "G":
+		switch m.focusedPanel {
+		case PanelDeviceList:
+			if deviceCount > 0 {
+				m.cursor = deviceCount - 1
+				m.componentCursor = -1
+				m.endpointCursor = 0
+			}
+		case PanelDetail, PanelEndpoints:
+			if m.cursor >= 0 && m.cursor < deviceCount {
+				methods := m.getDeviceMethods(devices[m.cursor])
+				if len(methods) > 0 {
+					m.endpointCursor = len(methods) - 1
+				}
+			}
+		}
+		return m, m.emitDeviceSelection(devices, oldCursor), true
 	case "h", "left":
-		// Navigate to previous component or back to "all"
 		if m.componentCursor > -1 {
 			m.componentCursor--
 		}
-		return m, true
+		return m, nil, true
 	case "l", "right":
-		// Navigate to next component
 		if m.cursor < deviceCount && m.cursor >= 0 {
 			d := devices[m.cursor]
 			maxComponent := len(d.Switches) - 1
@@ -581,9 +723,23 @@ func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, bool) {
 				m.componentCursor++
 			}
 		}
-		return m, true
+		return m, nil, true
 	}
-	return m, false
+	return m, nil, false
+}
+
+// emitDeviceSelection emits a DeviceSelectedMsg if the cursor changed.
+func (m Model) emitDeviceSelection(devices []*cache.DeviceData, oldCursor int) tea.Cmd {
+	if m.cursor == oldCursor || len(devices) == 0 || m.cursor >= len(devices) {
+		return nil
+	}
+	d := devices[m.cursor]
+	return func() tea.Msg {
+		return views.DeviceSelectedMsg{
+			Device:  d.Device.Name,
+			Address: d.Device.Address,
+		}
+	}
 }
 
 // handleDeviceActionKey handles device action key presses.
@@ -689,7 +845,7 @@ func (m Model) View() tea.View {
 	footerHeight := 2
 	inputHeight := 0
 	if inputBar != "" {
-		inputHeight = 1
+		inputHeight = 3 // Input bar has top border, content, bottom border
 	}
 	contentHeight := m.height - bannerHeight - tabBarHeight - footerHeight - inputHeight
 
@@ -728,10 +884,27 @@ func (m Model) View() tea.View {
 		result = m.toast.Overlay(result)
 	}
 
+	// Debug logging (if enabled)
+	m.debugLogger.Log(m.tabBar.ActiveTabID().String(), m.focusedPanelName(), m.width, m.height, result)
+
 	v := tea.NewView(result)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
+}
+
+// focusedPanelName returns a human-readable name for the currently focused panel.
+func (m Model) focusedPanelName() string {
+	switch m.focusedPanel {
+	case PanelDeviceList:
+		return "DeviceList"
+	case PanelDetail:
+		return "Detail"
+	case PanelEndpoints:
+		return "Endpoints"
+	default:
+		return "Unknown"
+	}
 }
 
 // isDashboardActive returns true if the Dashboard view is active.
@@ -757,54 +930,82 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	colors := theme.GetSemanticColors()
 	devices := m.getFilteredDevices()
 
+	// Split height: top 75% for panels, bottom 25% for energy bars
+	topHeight := height * 75 / 100
+	energyHeight := height - topHeight - 1 // -1 for gap
+
+	if topHeight < 10 {
+		topHeight = 10
+	}
+	if energyHeight < 5 {
+		energyHeight = 5
+	}
+
 	// Calculate column widths based on layout mode
 	var col1Width, col2Width, col3Width int
 	if m.layoutMode() == LayoutWide {
-		// Wide mode: 15% events, 35% list, 50% info
-		col1Width = m.width * 15 / 100
-		col2Width = m.width * 35 / 100
-		col3Width = m.width - col1Width - col2Width - 2 // -2 for gaps
+		col1Width = m.width * 25 / 100
+		col2Width = m.width * 20 / 100
+		col3Width = m.width - col1Width - col2Width - 2
 	} else {
-		// Standard mode: 20% events, 40% list, 40% info
-		col1Width = m.width * 20 / 100
-		col2Width = m.width * 40 / 100
-		col3Width = m.width - col1Width - col2Width - 2 // -2 for gaps
+		col1Width = m.width * 30 / 100
+		col2Width = m.width * 25 / 100
+		col3Width = m.width - col1Width - col2Width - 2
 	}
 
 	if col1Width < 15 {
 		col1Width = 15
 	}
 
-	// Get focused panel border color
 	focusBorder := colors.Highlight
 	unfocusBorder := colors.TableBorder
 
-	// Column 1: Events panel (ORANGE border, full height)
-	eventsCol := m.renderEventsColumn(col1Width, height)
+	eventsCol := m.renderEventsColumn(col1Width, topHeight)
 
-	// Column 2: Device List
 	listBorder := unfocusBorder
 	if m.focusedPanel == PanelDeviceList {
 		listBorder = focusBorder
 	}
-	listCol := m.renderDeviceListColumn(devices, col2Width, height, listBorder)
+	listCol := m.renderDeviceListColumn(devices, col2Width, topHeight, listBorder)
 
-	// Column 3: Device Info OR JSON overlay
-	var infoCol string
+	infoBorder := unfocusBorder
+	if m.focusedPanel == PanelDetail || m.focusedPanel == PanelEndpoints {
+		infoBorder = focusBorder
+	}
+	infoCol := m.renderDeviceInfoColumn(devices, col3Width, topHeight, infoBorder)
+
+	topContent := lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", listCol, " ", infoCol)
+
+	// Ensure topContent fills the full width
+	topContentStyle := lipgloss.NewStyle().Width(m.width)
+	topContent = topContentStyle.Render(topContent)
+
+	// Energy bars panel at bottom (full width)
+	energyPanel := m.renderEnergyPanel(m.width, energyHeight)
+
+	// Combine top and bottom sections
+	content := lipgloss.JoinVertical(lipgloss.Left, topContent, energyPanel)
+
+	// JSON overlay (centered on top of content when active)
 	if m.focusedPanel == PanelEndpoints {
-		// JSON overlay mode
-		infoCol = m.renderJSONOverlay(devices, col3Width, height)
-	} else {
-		// Normal device info
-		infoBorder := unfocusBorder
-		if m.focusedPanel == PanelDetail {
-			infoBorder = focusBorder
-		}
-		infoCol = m.renderDeviceInfoColumn(devices, col3Width, height, infoBorder)
+		jsonOverlay := m.renderJSONOverlay(devices, m.width*2/3, height*2/3)
+		return lipgloss.Place(
+			m.width,
+			height,
+			lipgloss.Center,
+			lipgloss.Center,
+			jsonOverlay,
+			lipgloss.WithWhitespaceChars(" "),
+		)
 	}
 
-	// Join columns horizontally
-	return lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", listCol, " ", infoCol)
+	return content
+}
+
+// renderEnergyPanel renders the energy consumption bars panel.
+func (m Model) renderEnergyPanel(width, height int) string {
+	m.energyBars = m.energyBars.SetSize(width, height)
+	return m.energyBars.View()
 }
 
 // renderNarrowLayout renders panels stacked vertically for narrow terminals.
@@ -843,89 +1044,74 @@ func (m Model) renderNarrowLayout(height int) string {
 	}
 	listRow := m.renderDeviceListColumn(devices, panelWidth, listHeight, listBorder)
 
-	// Row 3: Device Info OR JSON overlay
-	var infoRow string
-	if m.focusedPanel == PanelEndpoints {
-		infoRow = m.renderJSONOverlay(devices, panelWidth, infoHeight)
-	} else {
-		infoBorder := unfocusBorder
-		if m.focusedPanel == PanelDetail {
-			infoBorder = focusBorder
-		}
-		infoRow = m.renderDeviceInfoColumn(devices, panelWidth, infoHeight, infoBorder)
+	// Row 3: Device Info (always rendered)
+	infoBorder := unfocusBorder
+	if m.focusedPanel == PanelDetail || m.focusedPanel == PanelEndpoints {
+		infoBorder = focusBorder
 	}
+	infoRow := m.renderDeviceInfoColumn(devices, panelWidth, infoHeight, infoBorder)
 
 	// Stack panels vertically
-	return lipgloss.JoinVertical(lipgloss.Left, eventsRow, listRow, infoRow)
+	content := lipgloss.JoinVertical(lipgloss.Left, eventsRow, listRow, infoRow)
+
+	// JSON overlay (centered on top of content when active)
+	if m.focusedPanel == PanelEndpoints {
+		jsonOverlay := m.renderJSONOverlay(devices, m.width-4, height*2/3)
+		return lipgloss.Place(
+			m.width,
+			height,
+			lipgloss.Center,
+			lipgloss.Center,
+			jsonOverlay,
+			lipgloss.WithWhitespaceChars(" "),
+		)
+	}
+
+	return content
 }
 
-// renderEventsColumn renders the events column with ORANGE border, full height.
+// renderEventsColumn renders the events column with embedded title.
 func (m Model) renderEventsColumn(width, height int) string {
 	colors := theme.GetSemanticColors()
-
-	// ORANGE border for events column
 	orangeBorder := theme.Orange()
 
-	colStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(orangeBorder).
-		Width(width - 2).
-		Height(height - 2)
-
-	var content strings.Builder
-	titleStyle := lipgloss.NewStyle().Foreground(orangeBorder).Bold(true)
-	content.WriteString(titleStyle.Render(" Events") + "\n")
-
 	eventCount := m.events.EventCount()
-	countStyle := lipgloss.NewStyle().Foreground(theme.Green())
-	content.WriteString(countStyle.Render(fmt.Sprintf(" %d total", eventCount)) + "\n\n")
+	title := fmt.Sprintf("Events (%d)", eventCount)
 
-	// Get events from the component's internal state
+	r := rendering.New(width, height).
+		SetTitle(title).
+		SetFocused(false).
+		SetFocusColor(orangeBorder).
+		SetBlurColor(orangeBorder)
+
 	eventsView := m.events.View()
 	if eventsView == "" {
-		content.WriteString(lipgloss.NewStyle().Foreground(colors.Muted).Italic(true).Render(" Waiting..."))
-	} else {
-		m.writeEventLines(&content, eventsView, width, height)
+		eventsView = lipgloss.NewStyle().Foreground(colors.Muted).Italic(true).Render("Waiting...")
 	}
 
-	return colStyle.Render(content.String())
-}
-
-func (m Model) writeEventLines(content *strings.Builder, eventsView string, width, height int) {
-	lines := strings.Split(eventsView, "\n")
-	maxLines := max(height-6, 3)
-	for i, line := range lines {
-		if i >= maxLines {
-			break
-		}
-		if len(line) > width-6 {
-			line = line[:width-9] + "..."
-		}
-		content.WriteString(line + "\n")
-	}
+	return r.SetContent(eventsView).Render()
 }
 
 // renderDeviceListColumn renders just the device list.
 func (m Model) renderDeviceListColumn(devices []*cache.DeviceData, width, height int, borderColor color.Color) string {
 	colors := theme.GetSemanticColors()
 
-	colStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		Width(width - 2).
-		Height(height - 2)
+	title := fmt.Sprintf("Devices (%d)", len(devices))
+	r := rendering.New(width, height).
+		SetTitle(title).
+		SetFocused(m.focusedPanel == PanelDeviceList).
+		SetFocusColor(borderColor).
+		SetBlurColor(borderColor)
 
 	var content strings.Builder
-	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
-	content.WriteString(titleStyle.Render(fmt.Sprintf(" Devices (%d)", len(devices))) + "\n\n")
 
 	if len(devices) == 0 {
 		if m.cache.IsLoading() {
-			content.WriteString(lipgloss.NewStyle().Foreground(theme.Cyan()).Render(" Loading..."))
+			content.WriteString(lipgloss.NewStyle().Foreground(theme.Cyan()).Render("Loading..."))
 		} else {
-			content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render(" No devices"))
+			content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render("No devices"))
 		}
-		return colStyle.Render(content.String())
+		return r.SetContent(content.String()).Render()
 	}
 
 	// Ensure cursor is valid
@@ -983,29 +1169,28 @@ func (m Model) renderDeviceListColumn(devices []*cache.DeviceData, width, height
 
 	if len(devices) > visibleItems {
 		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).
-			Render(fmt.Sprintf("\n [%d/%d]", m.cursor+1, len(devices))))
+			Render(fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(devices))))
 	}
 
-	return colStyle.Render(content.String())
+	return r.SetContent(content.String()).Render()
 }
 
 // renderDeviceInfoColumn renders device info, power metrics, and endpoints.
 func (m Model) renderDeviceInfoColumn(devices []*cache.DeviceData, width, height int, borderColor color.Color) string {
 	colors := theme.GetSemanticColors()
 
-	colStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		Width(width - 2).
-		Height(height - 2)
+	r := rendering.New(width, height).
+		SetTitle("Device Info").
+		SetFocused(m.focusedPanel == PanelDetail).
+		SetFocusColor(borderColor).
+		SetBlurColor(borderColor)
 
 	var content strings.Builder
 	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
-	content.WriteString(titleStyle.Render(" Device Info") + "\n\n")
 
 	if len(devices) == 0 || m.cursor >= len(devices) {
-		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render(" Select a device"))
-		return colStyle.Render(content.String())
+		content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Render("Select a device"))
+		return r.SetContent(content.String()).Render()
 	}
 
 	d := devices[m.cursor]
@@ -1013,13 +1198,13 @@ func (m Model) renderDeviceInfoColumn(devices []*cache.DeviceData, width, height
 	valueStyle := lipgloss.NewStyle().Foreground(theme.Cyan()).Bold(true)
 
 	if !d.Fetched {
-		content.WriteString(lipgloss.NewStyle().Foreground(theme.Yellow()).Render(" Connecting..."))
-		return colStyle.Render(content.String())
+		content.WriteString(lipgloss.NewStyle().Foreground(theme.Yellow()).Render("Connecting..."))
+		return r.SetContent(content.String()).Render()
 	}
 
 	if !d.Online {
-		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render(" ✗ Offline"))
-		return colStyle.Render(content.String())
+		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render("✗ Offline"))
+		return r.SetContent(content.String()).Render()
 	}
 
 	// Device info
@@ -1077,42 +1262,70 @@ func (m Model) renderDeviceInfoColumn(devices []*cache.DeviceData, width, height
 	content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
 		Render("  Enter: view JSON") + "\n")
 
-	return colStyle.Render(content.String())
+	return r.SetContent(content.String()).Render()
 }
 
 // renderJSONOverlay renders the JSON pop-over that covers the device info column.
 func (m Model) renderJSONOverlay(devices []*cache.DeviceData, width, height int) string {
 	colors := theme.GetSemanticColors()
 
-	// Use pink border for JSON overlay to make it pop
-	colStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(theme.Pink()).
-		Width(width - 2).
-		Height(height - 2)
+	title := "JSON Response"
+	if m.endpointMethod != "" {
+		title = m.endpointMethod
+	}
+
+	r := rendering.New(width, height).
+		SetTitle(title).
+		SetFocused(true).
+		SetFocusColor(theme.Pink()).
+		SetBlurColor(theme.Pink())
 
 	var content strings.Builder
-	titleStyle := lipgloss.NewStyle().Foreground(theme.Pink()).Bold(true)
-	content.WriteString(titleStyle.Render(" JSON Response") + "\n")
 	content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
-		Render(" Esc: close | j/k: scroll") + "\n\n")
+		Render("Esc: close | j/k: scroll") + "\n\n")
 
 	if len(devices) == 0 || m.cursor >= len(devices) {
-		return colStyle.Render(content.String())
+		return r.SetContent(content.String()).Render()
 	}
 
 	d := devices[m.cursor]
 	if !d.Online {
-		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render(" Device offline"))
-		return colStyle.Render(content.String())
+		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render("Device offline"))
+		return r.SetContent(content.String()).Render()
 	}
 
 	jsonStyle := lipgloss.NewStyle().Foreground(theme.Green())
 	labelStyle := lipgloss.NewStyle().Foreground(theme.Cyan()).Bold(true)
+	errorStyle := lipgloss.NewStyle().Foreground(colors.Error)
 
-	// Show device info as JSON
+	// Show loading state
+	if m.endpointLoading {
+		content.WriteString(lipgloss.NewStyle().Foreground(colors.Warning).Render("Loading..."))
+		return r.SetContent(content.String()).Render()
+	}
+
+	// Show error if any
+	if m.endpointError != nil {
+		content.WriteString(errorStyle.Render("Error: " + m.endpointError.Error()))
+		return r.SetContent(content.String()).Render()
+	}
+
+	// Show fetched endpoint data
+	if m.endpointData != nil {
+		content.WriteString(labelStyle.Render(m.endpointMethod+":") + "\n")
+		if jsonBytes, err := json.MarshalIndent(m.endpointData, "", "  "); err == nil {
+			for _, line := range strings.Split(string(jsonBytes), "\n") {
+				content.WriteString(jsonStyle.Render(line) + "\n")
+			}
+		} else {
+			content.WriteString(errorStyle.Render("Failed to format JSON: " + err.Error()))
+		}
+		return r.SetContent(content.String()).Render()
+	}
+
+	// Fallback: show cached data if no endpoint fetch in progress
 	if d.Info != nil {
-		content.WriteString(labelStyle.Render("DeviceInfo:") + "\n")
+		content.WriteString(labelStyle.Render("DeviceInfo (cached):") + "\n")
 		jsonData := map[string]any{
 			"id":       d.Info.ID,
 			"model":    d.Info.Model,
@@ -1128,7 +1341,7 @@ func (m Model) renderJSONOverlay(devices []*cache.DeviceData, width, height int)
 
 	// Show switch states as JSON
 	if len(d.Switches) > 0 {
-		content.WriteString("\n" + labelStyle.Render("SwitchStatus:") + "\n")
+		content.WriteString("\n" + labelStyle.Render("SwitchStatus (cached):") + "\n")
 		switchData := make([]map[string]any, len(d.Switches))
 		for i, sw := range d.Switches {
 			switchData[i] = map[string]any{"id": sw.ID, "output": sw.On}
@@ -1143,7 +1356,7 @@ func (m Model) renderJSONOverlay(devices []*cache.DeviceData, width, height int)
 	// Show power metrics as JSON
 	writePowerMetricsJSON(&content, d, labelStyle, jsonStyle)
 
-	return colStyle.Render(content.String())
+	return r.SetContent(content.String()).Render()
 }
 
 func (m Model) renderHeader() string {
@@ -1251,27 +1464,22 @@ func (m Model) renderHeader() string {
 	return result.String()
 }
 
-// renderWithHelpOverlay renders main content stacked with help popup at bottom.
+// renderWithHelpOverlay renders help as a centered overlay on top of main content.
 func (m Model) renderWithHelpOverlay(content string, contentHeight int) string {
 	helpView := m.help.View()
 	if helpView == "" {
 		return content
 	}
 
-	// Get help popup height
-	helpHeight := m.help.ViewHeight()
-
-	// Reduce main content height to make room for help
-	reducedHeight := contentHeight - helpHeight
-	if reducedHeight < 5 {
-		reducedHeight = 5
-	}
-
-	// Re-render main content at reduced height with multi-panel layout
-	mainContent := m.renderMultiPanelLayout(reducedHeight)
-
-	// Stack main content above help popup
-	return lipgloss.JoinVertical(lipgloss.Left, mainContent, helpView)
+	// Center the help overlay on top of the content
+	return lipgloss.Place(
+		m.width,
+		contentHeight,
+		lipgloss.Center,
+		lipgloss.Center,
+		helpView,
+		lipgloss.WithWhitespaceChars(" "),
+	)
 }
 
 func formatEnergy(wh float64) string {
@@ -1329,6 +1537,7 @@ func writePowerMetricsJSON(content *strings.Builder, d *cache.DeviceData, labelS
 // Run starts the TUI application.
 func Run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
 	m := New(ctx, f, opts)
+	defer m.Close()
 	p := tea.NewProgram(m,
 		tea.WithContext(ctx),
 	)
@@ -1340,25 +1549,103 @@ func (m Model) getDeviceMethods(d *cache.DeviceData) []string {
 	if d == nil || !d.Online {
 		return nil
 	}
-	if d.Device.Generation == 1 {
+	if d.Device.Generation == 1 || (d.Info != nil && d.Info.Generation == 1) {
+		// Gen1 uses REST API paths, not RPC methods
 		return []string{
-			"Shelly.GetInfo",
-			"Shelly.GetStatus",
-			"Relay.GetStatus",
-			"Meter.GetInfo",
+			"/shelly",
+			"/status",
+			"/settings",
+			"/relay/0",
+			"/meter/0",
 		}
 	}
-	return []string{
+
+	// Base methods available on all Gen2 devices
+	methods := []string{
 		"Shelly.GetDeviceInfo",
 		"Shelly.GetStatus",
 		"Shelly.GetConfig",
-		"Switch.GetStatus",
-		"Switch.GetConfig",
-		"PM.GetStatus",
-		"EM.GetStatus",
 		"Sys.GetStatus",
 		"Wifi.GetStatus",
 		"Cloud.GetStatus",
 		"Script.List",
+	}
+
+	// Add Switch methods if device has switches
+	if len(d.Switches) > 0 {
+		methods = append(methods, "Switch.GetStatus", "Switch.GetConfig")
+	}
+
+	// Add PM/EM methods only if device has those components
+	if d.Snapshot != nil {
+		if len(d.Snapshot.PM) > 0 {
+			methods = append(methods, "PM.GetStatus")
+		}
+		if len(d.Snapshot.EM) > 0 {
+			methods = append(methods, "EM.GetStatus")
+		}
+		if len(d.Snapshot.EM1) > 0 {
+			methods = append(methods, "EM1.GetStatus")
+		}
+	}
+
+	return methods
+}
+
+// fetchSelectedEndpoint returns a command to fetch the currently selected endpoint.
+func (m Model) fetchSelectedEndpoint() tea.Cmd {
+	devices := m.getFilteredDevices()
+	if len(devices) == 0 || m.cursor >= len(devices) {
+		return nil
+	}
+
+	d := devices[m.cursor]
+	if !d.Online {
+		return nil
+	}
+
+	methods := m.getDeviceMethods(d)
+	if m.endpointCursor >= len(methods) {
+		return nil
+	}
+
+	method := methods[m.endpointCursor]
+	address := d.Device.Address
+	svc := m.factory.ShellyService()
+	ctx := m.ctx
+	isGen1 := d.Device.Generation == 1 || (d.Info != nil && d.Info.Generation == 1)
+
+	m.endpointLoading = true
+	m.endpointData = nil
+	m.endpointError = nil
+	m.endpointMethod = method
+
+	return func() tea.Msg {
+		var data any
+		var err error
+
+		if isGen1 {
+			// Gen1 uses REST API - method is actually a path like "/shelly"
+			var bytes []byte
+			bytes, err = svc.RawGen1Call(ctx, address, method)
+			if err == nil {
+				// Try to parse as JSON for display
+				var jsonData any
+				if jsonErr := json.Unmarshal(bytes, &jsonData); jsonErr == nil {
+					data = jsonData
+				} else {
+					data = string(bytes)
+				}
+			}
+		} else {
+			// Gen2 uses RPC
+			data, err = svc.RawRPC(ctx, address, method, nil)
+		}
+
+		return EndpointFetchMsg{
+			Method: method,
+			Data:   data,
+			Err:    err,
+		}
 	}
 }

@@ -173,7 +173,7 @@ func (m EditorModel) Clear() EditorModel {
 // fetchCode creates a command to fetch script code.
 func (m EditorModel) fetchCode() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		code, err := m.svc.GetScriptCode(ctx, m.device, m.scriptID)
@@ -184,7 +184,7 @@ func (m EditorModel) fetchCode() tea.Cmd {
 // fetchStatus creates a command to fetch script status.
 func (m EditorModel) fetchStatus() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		status, err := m.svc.GetScriptStatus(ctx, m.device, m.scriptID)

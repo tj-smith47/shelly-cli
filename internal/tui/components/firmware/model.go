@@ -492,8 +492,9 @@ func (m Model) renderDeviceList() string {
 		}
 	}
 	content.WriteString(m.styles.Label.Render(
-		fmt.Sprintf("Devices (%d with updates):\n\n", updateCount),
+		fmt.Sprintf("Devices (%d with updates):", updateCount),
 	))
+	content.WriteString("\n\n")
 
 	visible := m.visibleRows()
 	endIdx := m.scroll + visible

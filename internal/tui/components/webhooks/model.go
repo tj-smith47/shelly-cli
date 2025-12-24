@@ -152,7 +152,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 // fetchWebhooks creates a command to fetch webhooks from the device.
 func (m Model) fetchWebhooks() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		hooks, err := m.svc.ListWebhooks(ctx, m.device)
@@ -305,7 +305,7 @@ func (m Model) toggleWebhook() tea.Cmd {
 	webhook := m.webhooks[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		newEnable := !webhook.Enable
@@ -331,7 +331,7 @@ func (m Model) deleteWebhook() tea.Cmd {
 	webhook := m.webhooks[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.DeleteWebhook(ctx, m.device, webhook.ID)

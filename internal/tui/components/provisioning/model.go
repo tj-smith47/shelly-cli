@@ -299,7 +299,7 @@ func (m Model) handleFinalKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 func (m Model) checkDevice() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		info, err := m.svc.GetDeviceInfoByAddress(ctx, DefaultAPAddress)

@@ -146,7 +146,7 @@ func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 // fetchSchedules creates a command to fetch schedules from the device.
 func (m ListModel) fetchSchedules() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		jobs, err := m.svc.ListSchedules(ctx, m.device)
@@ -302,7 +302,7 @@ func (m ListModel) enableSchedule() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.EnableSchedule(ctx, m.device, schedule.ID)
@@ -320,7 +320,7 @@ func (m ListModel) disableSchedule() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.DisableSchedule(ctx, m.device, schedule.ID)
@@ -335,7 +335,7 @@ func (m ListModel) deleteSchedule() tea.Cmd {
 	schedule := m.schedules[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.DeleteSchedule(ctx, m.device, schedule.ID)

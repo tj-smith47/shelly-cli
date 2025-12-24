@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tj-smith47/shelly-go/gen1"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 	"github.com/tj-smith47/shelly-go/transport"
 
@@ -449,6 +450,85 @@ func (s *Service) GetMonitoringSnapshot(ctx context.Context, device string) (*Mo
 	}
 	status := s.collectDeviceStatus(ctx, device, opts)
 	return &status, nil
+}
+
+// GetMonitoringSnapshotAuto returns monitoring data for a device, auto-detecting generation.
+// It first tries Gen2 RPC calls, then falls back to Gen1 REST API if that fails.
+// Use this for TUI/energy dashboard where we need to handle all device types.
+func (s *Service) GetMonitoringSnapshotAuto(ctx context.Context, device string) (*MonitoringSnapshot, error) {
+	// Try Gen2 first (more common)
+	snapshot, err := s.GetMonitoringSnapshot(ctx, device)
+	if err == nil && (len(snapshot.PM) > 0 || len(snapshot.EM) > 0 || len(snapshot.EM1) > 0) {
+		return snapshot, nil
+	}
+
+	// Gen2 failed or returned empty, try Gen1
+	gen1Snapshot, gen1Err := s.getGen1MonitoringSnapshot(ctx, device)
+	if gen1Err == nil {
+		return gen1Snapshot, nil
+	}
+
+	// Both failed, return Gen2 result (empty snapshot is valid for devices without meters)
+	if err == nil {
+		return snapshot, nil
+	}
+	return nil, err
+}
+
+// getGen1MonitoringSnapshot gets monitoring data from a Gen1 device.
+func (s *Service) getGen1MonitoringSnapshot(ctx context.Context, device string) (*MonitoringSnapshot, error) {
+	var snapshot *MonitoringSnapshot
+	err := s.WithGen1Connection(ctx, device, func(conn *client.Gen1Client) error {
+		status, err := conn.GetStatus(ctx)
+		if err != nil {
+			return err
+		}
+
+		snapshot = &MonitoringSnapshot{
+			Device:    device,
+			Timestamp: time.Now(),
+			Online:    true,
+		}
+
+		// Convert Gen1 meters to PM format
+		snapshot.PM = convertGen1Meters(status.Meters)
+
+		// Convert Gen1 emeters to our EMStatus-like format via PM
+		// Gen1 EMeters are more like PM in terms of data (power, voltage, current)
+		for i, em := range status.EMeters {
+			snapshot.PM = append(snapshot.PM, PMStatus{
+				ID:      len(status.Meters) + i, // Offset ID to avoid collision
+				Voltage: em.Voltage,
+				Current: em.Current,
+				APower:  em.Power,
+				AEnergy: &EnergyCounters{
+					Total: em.Total, // Gen1 EMeters report total in Wh
+				},
+			})
+		}
+
+		return nil
+	})
+	return snapshot, err
+}
+
+// convertGen1Meters converts Gen1 MeterStatus to our PMStatus format.
+func convertGen1Meters(meters []gen1.MeterStatus) []PMStatus {
+	result := make([]PMStatus, 0, len(meters))
+	for i, m := range meters {
+		pm := PMStatus{
+			ID:     i,
+			APower: m.Power,
+		}
+		// Gen1 meters report Total in watt-minutes, convert to Wh
+		if m.Total > 0 {
+			pm.AEnergy = &EnergyCounters{
+				Total: float64(m.Total) / 60.0, // watt-minutes to Wh
+			}
+		}
+		result = append(result, pm)
+	}
+	return result
 }
 
 // DeviceSnapshot holds the latest status for a device in multi-device monitoring.

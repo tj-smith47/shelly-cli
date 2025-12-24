@@ -106,14 +106,11 @@ type Styles struct {
 }
 
 // DefaultStyles returns default styles for events.
-// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(1, 2),
+			Padding(0, 1),
 		Header: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Highlight).

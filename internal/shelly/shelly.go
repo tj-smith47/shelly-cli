@@ -69,6 +69,20 @@ func (s *Service) RawRPC(ctx context.Context, identifier, method string, params 
 	return result, err
 }
 
+// RawGen1Call sends a raw REST API call to a Gen1 device and returns the response as bytes.
+func (s *Service) RawGen1Call(ctx context.Context, identifier, path string) ([]byte, error) {
+	var result []byte
+	err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		res, err := conn.Call(ctx, path)
+		if err != nil {
+			return err
+		}
+		result = res
+		return nil
+	})
+	return result, err
+}
+
 // ResolveWithGeneration resolves a device identifier with generation auto-detection.
 // If the resolver implements GenerationAwareResolver, it uses that; otherwise falls back to basic resolution.
 func (s *Service) ResolveWithGeneration(ctx context.Context, identifier string) (model.Device, error) {

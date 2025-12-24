@@ -193,8 +193,8 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 		t.Errorf("initial focus = %v, want %v", m.focusedPanel, PanelDeviceList)
 	}
 
-	// Tab to next panel
-	newM, handled := m.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
+	// Tab to next panel (DeviceList -> Detail)
+	newM, _, handled := m.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
 	if !handled {
 		t.Error("tab should be handled")
 	}
@@ -202,17 +202,8 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 		t.Errorf("after tab = %v, want %v", newM.focusedPanel, PanelDetail)
 	}
 
-	// Tab to next panel
-	newM, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
-	if !handled {
-		t.Error("tab should be handled")
-	}
-	if newM.focusedPanel != PanelEndpoints {
-		t.Errorf("after second tab = %v, want %v", newM.focusedPanel, PanelEndpoints)
-	}
-
-	// Tab should wrap back to DeviceList
-	newM, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
+	// Tab should wrap back to DeviceList (2-panel cycle: Detail -> DeviceList)
+	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
 	if !handled {
 		t.Error("tab should be handled")
 	}
@@ -227,14 +218,14 @@ func TestModel_ShiftTabReversesFocus(t *testing.T) {
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
-	// Shift+Tab from DeviceList should go to Endpoints (reverse wrap)
+	// Shift+Tab from DeviceList should go to Detail (reverse cycle in 2-panel mode)
 	msg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
-	newM, handled := m.handlePanelSwitch(msg)
+	newM, _, handled := m.handlePanelSwitch(msg)
 	if !handled {
 		t.Error("shift+tab should be handled")
 	}
-	if newM.focusedPanel != PanelEndpoints {
-		t.Errorf("after shift+tab = %v, want %v", newM.focusedPanel, PanelEndpoints)
+	if newM.focusedPanel != PanelDetail {
+		t.Errorf("after shift+tab = %v, want %v", newM.focusedPanel, PanelDetail)
 	}
 }
 
@@ -417,7 +408,7 @@ func TestModel_Navigation(t *testing.T) {
 
 	// Test g key (go to top)
 	msg := tea.KeyPressMsg{Code: 'g'}
-	updated, _ := m.handleNavigation(msg)
+	updated, _, _ := m.handleNavigation(msg)
 	if updated.cursor != 0 {
 		t.Errorf("after g cursor = %d, want 0", updated.cursor)
 	}
@@ -626,7 +617,7 @@ func TestModel_NavigationKeys(t *testing.T) {
 				msg = tea.KeyPressMsg{Code: tea.KeyUp}
 			}
 
-			_, handled := m.handleNavigation(msg)
+			_, _, handled := m.handleNavigation(msg)
 			if !handled {
 				t.Errorf("key %q should be handled", tt.key)
 			}

@@ -233,18 +233,6 @@ func (f *Fleet) handleKeyPress(msg tea.KeyPressMsg) {
 		f.focusNext()
 	case keyShiftTab:
 		f.focusPrev()
-	case "1":
-		f.focusedPanel = FleetPanelDevices
-		f.updateFocusStates()
-	case "2":
-		f.focusedPanel = FleetPanelGroups
-		f.updateFocusStates()
-	case "3":
-		f.focusedPanel = FleetPanelHealth
-		f.updateFocusStates()
-	case "4":
-		f.focusedPanel = FleetPanelOperations
-		f.updateFocusStates()
 	case "c":
 		// Connect/disconnect
 		if f.fleetConn == nil && !f.connecting {
@@ -341,41 +329,30 @@ func (f *Fleet) View() string {
 
 func (f *Fleet) renderNarrowLayout() string {
 	// In narrow mode, show only the focused panel at full width
-	panelHeight := f.height - 2
-
+	// Components already have embedded titles from rendering.New()
 	switch f.focusedPanel {
 	case FleetPanelDevices:
-		return f.renderPanel(f.devices.View(), f.width, panelHeight, true)
+		return f.devices.View()
 	case FleetPanelGroups:
-		return f.renderPanel(f.groups.View(), f.width, panelHeight, true)
+		return f.groups.View()
 	case FleetPanelHealth:
-		return f.renderPanel(f.health.View(), f.width, panelHeight, true)
+		return f.health.View()
 	case FleetPanelOperations:
-		return f.renderPanel(f.operations.View(), f.width, panelHeight, true)
+		return f.operations.View()
 	default:
-		return f.renderPanel(f.devices.View(), f.width, panelHeight, true)
+		return f.devices.View()
 	}
 }
 
 func (f *Fleet) renderStandardLayout() string {
-	// Calculate panel dimensions
-	leftWidth := (f.width - 1) * 3 / 5
-	rightWidth := f.width - leftWidth - 1
-	rightPanelHeight := (f.height - 2) / 3
+	// Render panels (components already have embedded titles)
+	rightColumn := lipgloss.JoinVertical(lipgloss.Left,
+		f.groups.View(),
+		f.health.View(),
+		f.operations.View(),
+	)
 
-	// Render left column (devices)
-	devicesView := f.renderPanel(f.devices.View(), leftWidth, f.height, f.focusedPanel == FleetPanelDevices)
-
-	// Render right column panels (stacked vertically)
-	groupsView := f.renderPanel(f.groups.View(), rightWidth, rightPanelHeight, f.focusedPanel == FleetPanelGroups)
-	healthView := f.renderPanel(f.health.View(), rightWidth, rightPanelHeight, f.focusedPanel == FleetPanelHealth)
-	operationsView := f.renderPanel(f.operations.View(), rightWidth, rightPanelHeight, f.focusedPanel == FleetPanelOperations)
-
-	// Build right column (stacked)
-	rightColumn := lipgloss.JoinVertical(lipgloss.Left, groupsView, healthView, operationsView)
-
-	// Join columns
-	return lipgloss.JoinHorizontal(lipgloss.Top, devicesView, " ", rightColumn)
+	return lipgloss.JoinHorizontal(lipgloss.Top, f.devices.View(), " ", rightColumn)
 }
 
 func (f *Fleet) renderConnectionPrompt() string {
@@ -411,18 +388,6 @@ func (f *Fleet) renderConnectionPrompt() string {
 		Align(lipgloss.Center, lipgloss.Center)
 
 	return style.Render(content.String())
-}
-
-func (f *Fleet) renderPanel(content string, width, height int, focused bool) string {
-	style := f.styles.Panel
-	if focused {
-		style = f.styles.PanelActive
-	}
-
-	return style.
-		Width(width).
-		Height(height).
-		Render(content)
 }
 
 // Refresh reloads all components.

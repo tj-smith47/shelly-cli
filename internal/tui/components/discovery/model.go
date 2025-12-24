@@ -326,7 +326,8 @@ func (m Model) renderDeviceList() string {
 	}
 
 	var content strings.Builder
-	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Found %d device(s):\n\n", len(m.devices))))
+	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Found %d device(s):", len(m.devices))))
+	content.WriteString("\n\n")
 
 	visible := m.visibleRows()
 	endIdx := m.scroll + visible

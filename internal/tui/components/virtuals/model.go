@@ -161,7 +161,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 // fetchVirtuals creates a command to fetch virtual components from the device.
 func (m Model) fetchVirtuals() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		components, err := m.svc.ListVirtualComponents(ctx, m.device)
@@ -311,7 +311,7 @@ func (m Model) toggleOrTrigger() tea.Cmd {
 	v := m.virtuals[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		var err error
@@ -338,7 +338,7 @@ func (m Model) adjustValue(delta int) tea.Cmd {
 	v := m.virtuals[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		var err error
@@ -386,7 +386,7 @@ func (m Model) deleteVirtual() tea.Cmd {
 	v := m.virtuals[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.DeleteVirtualComponent(ctx, m.device, v.Key)

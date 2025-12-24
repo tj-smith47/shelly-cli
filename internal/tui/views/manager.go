@@ -158,6 +158,26 @@ func (m *Manager) Update(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
+// UpdateAll forwards messages to ALL views (not just active).
+// Use this for async messages that may need to reach non-active views
+// (e.g., StatusLoadedMsg for views that started a fetch before being deactivated).
+func (m *Manager) UpdateAll(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+	for id, v := range m.views {
+		if v != nil {
+			newV, cmd := v.Update(msg)
+			m.views[id] = newV
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
 // View renders the active view.
 func (m *Manager) View() string {
 	if v := m.views[m.active]; v != nil {

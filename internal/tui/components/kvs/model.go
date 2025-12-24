@@ -156,7 +156,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 // fetchItems creates a command to fetch KVS items from the device.
 func (m Model) fetchItems() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		kvsItems, err := m.svc.GetAllKVS(ctx, m.device)
@@ -304,7 +304,7 @@ func (m Model) deleteItem() tea.Cmd {
 	item := m.items[m.cursor]
 
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		err := m.svc.DeleteKVS(ctx, m.device, item.Key)

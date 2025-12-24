@@ -458,8 +458,9 @@ func (m Model) renderDeviceList() string {
 
 	selected := m.selectedDevices()
 	content.WriteString(m.styles.Label.Render(
-		fmt.Sprintf("Devices (%d selected):\n\n", len(selected)),
+		fmt.Sprintf("Devices (%d selected):", len(selected)),
 	))
+	content.WriteString("\n\n")
 
 	visible := m.visibleRows()
 	endIdx := m.scroll + visible

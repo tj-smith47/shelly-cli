@@ -147,7 +147,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 
 func (m Model) fetchStatus() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
 		status, err := m.svc.GetWifiStatus(ctx, m.device)

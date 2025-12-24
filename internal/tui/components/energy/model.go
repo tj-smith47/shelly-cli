@@ -261,10 +261,11 @@ func (m Model) fetchDeviceEnergy(ctx context.Context, device model.Device) Devic
 	}
 
 	// Per-device timeout to prevent single slow device from blocking others
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	snapshot, err := m.svc.GetMonitoringSnapshot(ctx, device.Address)
+	// Use GetMonitoringSnapshotAuto to handle both Gen1 and Gen2 devices
+	snapshot, err := m.svc.GetMonitoringSnapshotAuto(ctx, device.Address)
 	if err != nil {
 		energy.Error = err
 		return energy

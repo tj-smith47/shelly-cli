@@ -160,14 +160,16 @@ func (c *Config) SetDevice(device string) tea.Cmd {
 func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	// Handle keyboard input
+	// Handle keyboard input - only update focused component for key messages
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		c.handleKeyPress(keyMsg)
+		cmd := c.updateFocusedComponent(msg)
+		cmds = append(cmds, cmd)
+	} else {
+		// For non-key messages (async results), update ALL components
+		cmd := c.updateAllComponents(msg)
+		cmds = append(cmds, cmd)
 	}
-
-	// Update focused component
-	cmd := c.updateFocusedComponent(msg)
-	cmds = append(cmds, cmd)
 
 	return c, tea.Batch(cmds...)
 }
@@ -178,18 +180,6 @@ func (c *Config) handleKeyPress(msg tea.KeyPressMsg) {
 		c.focusNext()
 	case "shift+tab":
 		c.focusPrev()
-	case "1":
-		c.focusedPanel = PanelWiFi
-		c.updateFocusStates()
-	case "2":
-		c.focusedPanel = PanelSystem
-		c.updateFocusStates()
-	case "3":
-		c.focusedPanel = PanelCloud
-		c.updateFocusStates()
-	case "4":
-		c.focusedPanel = PanelInputs
-		c.updateFocusStates()
 	}
 }
 
@@ -238,6 +228,19 @@ func (c *Config) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
+func (c *Config) updateAllComponents(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+
+	var wifiCmd, systemCmd, cloudCmd, inputsCmd tea.Cmd
+	c.wifi, wifiCmd = c.wifi.Update(msg)
+	c.system, systemCmd = c.system.Update(msg)
+	c.cloud, cloudCmd = c.cloud.Update(msg)
+	c.inputs, inputsCmd = c.inputs.Update(msg)
+
+	cmds = append(cmds, wifiCmd, systemCmd, cloudCmd, inputsCmd)
+	return tea.Batch(cmds...)
+}
+
 // isNarrow returns true if the view should use narrow/vertical layout.
 func (c *Config) isNarrow() bool {
 	return c.width < 80
@@ -258,66 +261,37 @@ func (c *Config) View() string {
 
 func (c *Config) renderNarrowLayout() string {
 	// In narrow mode, show only the focused panel at full width
-	panelHeight := c.height - 2
-
+	// Components already have embedded titles from rendering.New()
 	switch c.focusedPanel {
 	case PanelWiFi:
-		return c.renderPanel("WiFi", c.wifi.View(), c.width, panelHeight, true)
+		return c.wifi.View()
 	case PanelSystem:
-		return c.renderPanel("System", c.system.View(), c.width, panelHeight, true)
+		return c.system.View()
 	case PanelCloud:
-		return c.renderPanel("Cloud", c.cloud.View(), c.width, panelHeight, true)
+		return c.cloud.View()
 	case PanelInputs:
-		return c.renderPanel("Inputs", c.inputs.View(), c.width, panelHeight, true)
+		return c.inputs.View()
 	default:
-		return c.renderPanel("WiFi", c.wifi.View(), c.width, panelHeight, true)
+		return c.wifi.View()
 	}
 }
 
 func (c *Config) renderStandardLayout() string {
-	// Calculate column widths (50/50 split)
-	leftWidth := c.width / 2
-	rightWidth := c.width - leftWidth - 1 // -1 for gap
-
-	// Calculate panel heights (2 panels per column)
-	leftTopHeight := c.height / 2
-	leftBottomHeight := c.height - leftTopHeight
-	rightTopHeight := c.height / 2
-	rightBottomHeight := c.height - rightTopHeight
-
-	// Render left column panels
+	// Render panels (components already have embedded titles)
 	leftPanels := []string{
-		c.renderPanel("WiFi", c.wifi.View(), leftWidth, leftTopHeight, c.focusedPanel == PanelWiFi),
-		c.renderPanel("System", c.system.View(), leftWidth, leftBottomHeight, c.focusedPanel == PanelSystem),
+		c.wifi.View(),
+		c.system.View(),
 	}
 
-	// Render right column panels
 	rightPanels := []string{
-		c.renderPanel("Cloud", c.cloud.View(), rightWidth, rightTopHeight, c.focusedPanel == PanelCloud),
-		c.renderPanel("Inputs", c.inputs.View(), rightWidth, rightBottomHeight, c.focusedPanel == PanelInputs),
+		c.cloud.View(),
+		c.inputs.View(),
 	}
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, " ", rightCol)
-}
-
-func (c *Config) renderPanel(title, content string, width, height int, focused bool) string {
-	style := c.styles.Panel
-	if focused {
-		style = c.styles.PanelActive
-	}
-
-	style = style.Width(width - 2).Height(height - 2)
-
-	titleStr := c.styles.Title.Render(title)
-	if content == "" {
-		content = c.styles.Muted.Render("(empty)")
-	}
-
-	inner := lipgloss.JoinVertical(lipgloss.Left, titleStr, "", content)
-	return style.Render(inner)
 }
 
 // SetSize sets the view dimensions.

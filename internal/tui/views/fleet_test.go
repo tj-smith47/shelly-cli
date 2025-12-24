@@ -161,37 +161,6 @@ func TestFleet_Update_FocusPrev(t *testing.T) {
 	}
 }
 
-func TestFleet_Update_NumberKeyFocus(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		key      rune
-		expected FleetPanel
-	}{
-		{'1', FleetPanelDevices},
-		{'2', FleetPanelGroups},
-		{'3', FleetPanelHealth},
-		{'4', FleetPanelOperations},
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.key), func(t *testing.T) {
-			t.Parallel()
-			f := newTestFleet()
-
-			msg := tea.KeyPressMsg{Code: tt.key}
-			updated, _ := f.Update(msg)
-			fleet, ok := updated.(*Fleet)
-			if !ok {
-				t.Fatal("Update should return *Fleet")
-			}
-
-			if fleet.focusedPanel != tt.expected {
-				t.Errorf("focusedPanel after '%c' = %v, want %v", tt.key, fleet.focusedPanel, tt.expected)
-			}
-		})
-	}
-}
-
 func TestFleet_FocusCycle(t *testing.T) {
 	t.Parallel()
 	f := newTestFleet()

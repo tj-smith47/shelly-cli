@@ -211,17 +211,19 @@ func (a *Automation) SetDevice(device string) tea.Cmd {
 func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	// Handle keyboard input
+	// Handle keyboard input - only update focused component for key messages
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		a.handleKeyPress(keyMsg)
+		cmd := a.updateFocusedComponent(msg)
+		cmds = append(cmds, cmd)
+	} else {
+		// For non-key messages (async results), update ALL components
+		cmd := a.updateAllComponents(msg)
+		cmds = append(cmds, cmd)
 	}
 
-	// Update focused component
-	cmd := a.updateFocusedComponent(msg)
-	cmds = append(cmds, cmd)
-
 	// Handle cross-component messages
-	cmd = a.handleComponentMessages(msg)
+	cmd := a.handleComponentMessages(msg)
 	cmds = append(cmds, cmd)
 
 	return a, tea.Batch(cmds...)
@@ -233,21 +235,6 @@ func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) {
 		a.focusNext()
 	case keyShiftTab:
 		a.focusPrev()
-	case "1":
-		a.focusedPanel = PanelScripts
-		a.updateFocusStates()
-	case "2":
-		a.focusedPanel = PanelSchedules
-		a.updateFocusStates()
-	case "3":
-		a.focusedPanel = PanelWebhooks
-		a.updateFocusStates()
-	case "4":
-		a.focusedPanel = PanelVirtuals
-		a.updateFocusStates()
-	case "5":
-		a.focusedPanel = PanelKVS
-		a.updateFocusStates()
 	}
 }
 
@@ -315,6 +302,25 @@ func (a *Automation) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
+func (a *Automation) updateAllComponents(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+
+	var scriptsCmd, scriptEditorCmd, schedulesCmd, scheduleEditorCmd tea.Cmd
+	var webhooksCmd, virtualsCmd, kvsCmd tea.Cmd
+
+	a.scripts, scriptsCmd = a.scripts.Update(msg)
+	a.scriptEditor, scriptEditorCmd = a.scriptEditor.Update(msg)
+	a.schedules, schedulesCmd = a.schedules.Update(msg)
+	a.scheduleEditor, scheduleEditorCmd = a.scheduleEditor.Update(msg)
+	a.webhooks, webhooksCmd = a.webhooks.Update(msg)
+	a.virtuals, virtualsCmd = a.virtuals.Update(msg)
+	a.kvs, kvsCmd = a.kvs.Update(msg)
+
+	cmds = append(cmds, scriptsCmd, scriptEditorCmd, schedulesCmd, scheduleEditorCmd)
+	cmds = append(cmds, webhooksCmd, virtualsCmd, kvsCmd)
+	return tea.Batch(cmds...)
+}
+
 func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case scripts.SelectScriptMsg:
@@ -355,76 +361,46 @@ func (a *Automation) View() string {
 
 func (a *Automation) renderNarrowLayout() string {
 	// In narrow mode, show only the focused panel at full width
-	panelHeight := a.height - 2
-
+	// Components already have embedded titles from rendering.New()
 	switch a.focusedPanel {
 	case PanelScripts:
-		return a.renderPanel("Scripts", a.scripts.View(), a.width, panelHeight, true)
+		return a.scripts.View()
 	case PanelScriptEditor:
-		return a.renderPanel("Script Editor", a.scriptEditor.View(), a.width, panelHeight, true)
+		return a.scriptEditor.View()
 	case PanelSchedules:
-		return a.renderPanel("Schedules", a.schedules.View(), a.width, panelHeight, true)
+		return a.schedules.View()
 	case PanelScheduleEditor:
-		return a.renderPanel("Schedule Details", a.scheduleEditor.View(), a.width, panelHeight, true)
+		return a.scheduleEditor.View()
 	case PanelWebhooks:
-		return a.renderPanel("Webhooks", a.webhooks.View(), a.width, panelHeight, true)
+		return a.webhooks.View()
 	case PanelVirtuals:
-		return a.renderPanel("Virtual Components", a.virtuals.View(), a.width, panelHeight, true)
+		return a.virtuals.View()
 	case PanelKVS:
-		return a.renderPanel("Key-Value Store", a.kvs.View(), a.width, panelHeight, true)
+		return a.kvs.View()
 	default:
-		return a.renderPanel("Scripts", a.scripts.View(), a.width, panelHeight, true)
+		return a.scripts.View()
 	}
 }
 
 func (a *Automation) renderStandardLayout() string {
-	// Calculate column widths (50/50 split)
-	leftWidth := a.width / 2
-	rightWidth := a.width - leftWidth - 1 // -1 for gap
-
-	// Calculate panel heights
-	leftPanelCount := 3  // Scripts, Schedules, Webhooks
-	rightPanelCount := 4 // ScriptEditor, ScheduleEditor, Virtuals, KVS
-
-	leftPanelHeight := a.height / leftPanelCount
-	rightPanelHeight := a.height / rightPanelCount
-
-	// Render left column panels
+	// Render panels (components already have embedded titles)
 	leftPanels := []string{
-		a.renderPanel("Scripts", a.scripts.View(), leftWidth, leftPanelHeight, a.focusedPanel == PanelScripts),
-		a.renderPanel("Schedules", a.schedules.View(), leftWidth, leftPanelHeight, a.focusedPanel == PanelSchedules),
-		a.renderPanel("Webhooks", a.webhooks.View(), leftWidth, a.height-2*leftPanelHeight, a.focusedPanel == PanelWebhooks),
+		a.scripts.View(),
+		a.schedules.View(),
+		a.webhooks.View(),
 	}
 
-	// Render right column panels
 	rightPanels := []string{
-		a.renderPanel("Script Editor", a.scriptEditor.View(), rightWidth, rightPanelHeight, a.focusedPanel == PanelScriptEditor),
-		a.renderPanel("Schedule Details", a.scheduleEditor.View(), rightWidth, rightPanelHeight, a.focusedPanel == PanelScheduleEditor),
-		a.renderPanel("Virtual Components", a.virtuals.View(), rightWidth, rightPanelHeight, a.focusedPanel == PanelVirtuals),
-		a.renderPanel("Key-Value Store", a.kvs.View(), rightWidth, a.height-3*rightPanelHeight, a.focusedPanel == PanelKVS),
+		a.scriptEditor.View(),
+		a.scheduleEditor.View(),
+		a.virtuals.View(),
+		a.kvs.View(),
 	}
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 	rightCol := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftCol, " ", rightCol)
-}
-
-func (a *Automation) renderPanel(title, content string, width, height int, focused bool) string {
-	style := a.styles.Panel
-	if focused {
-		style = a.styles.PanelActive
-	}
-
-	style = style.Width(width - 2).Height(height - 2)
-
-	titleStr := a.styles.Title.Render(title)
-	if content == "" {
-		content = a.styles.Muted.Render("(empty)")
-	}
-
-	inner := lipgloss.JoinVertical(lipgloss.Left, titleStr, "", content)
-	return style.Render(inner)
 }
 
 // SetSize sets the view dimensions.

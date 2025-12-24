@@ -212,44 +212,6 @@ func TestConfig_HandleKeyPress_Tab(t *testing.T) {
 	}
 }
 
-func TestConfig_HandleKeyPress_Numbers(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		key  string
-		want ConfigPanel
-	}{
-		{"1", PanelWiFi},
-		{"2", PanelSystem},
-		{"3", PanelCloud},
-		{"4", PanelInputs},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.key, func(t *testing.T) {
-			t.Parallel()
-			c := newTestConfig()
-
-			var msg tea.KeyPressMsg
-			switch tt.key {
-			case "1":
-				msg = tea.KeyPressMsg{Code: 49}
-			case "2":
-				msg = tea.KeyPressMsg{Code: 50}
-			case "3":
-				msg = tea.KeyPressMsg{Code: 51}
-			case "4":
-				msg = tea.KeyPressMsg{Code: 52}
-			}
-
-			c.handleKeyPress(msg)
-
-			if c.focusedPanel != tt.want {
-				t.Errorf("focusedPanel = %v, want %v", c.focusedPanel, tt.want)
-			}
-		})
-	}
-}
-
 func TestConfig_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig()
