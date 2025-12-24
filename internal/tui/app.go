@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"image/color"
 	"strings"
@@ -19,9 +18,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/confirm"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/energybars"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/events"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/help"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/jsonviewer"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/search"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
@@ -36,13 +37,6 @@ import (
 type DeviceActionMsg struct {
 	Device string
 	Action string
-	Err    error
-}
-
-// EndpointFetchMsg reports the result of an endpoint RPC call.
-type EndpointFetchMsg struct {
-	Method string
-	Data   any
 	Err    error
 }
 
@@ -100,10 +94,6 @@ type Model struct {
 	filter          string     // Device name filter
 	focusedPanel    PanelFocus // Which panel is currently focused
 	endpointCursor  int        // Selected endpoint in JSON panel
-	endpointData    any        // Fetched endpoint data
-	endpointMethod  string     // Currently fetched endpoint method
-	endpointLoading bool       // Whether endpoint data is being fetched
-	endpointError   error      // Error from endpoint fetch
 
 	// Dimensions
 	width  int
@@ -117,6 +107,8 @@ type Model struct {
 	toast      toast.Model
 	events     events.Model
 	energyBars energybars.Model
+	jsonViewer jsonviewer.Model
+	confirm    confirm.Model
 
 	// Settings
 	refreshInterval time.Duration
@@ -169,6 +161,9 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 	// Create energy bars component
 	energyBarsModel := energybars.New(deviceCache)
+
+	// Create JSON viewer component
+	jsonViewerModel := jsonviewer.New(ctx, f.ShellyService())
 
 	// Create view manager and register all views
 	vm := views.New()
@@ -233,6 +228,8 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		toast:           toast.New(),
 		events:          eventsModel,
 		energyBars:      energyBarsModel,
+		jsonViewer:      jsonViewerModel,
+		confirm:         confirm.New(),
 		debugLogger:     debug.New(), // nil if SHELLY_TUI_DEBUG not set
 	}
 }
@@ -329,16 +326,18 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case views.DeviceSelectedMsg:
 		// Propagate device selection to all views that support it
 		return m, m.viewManager.PropagateDevice(msg.Device), true
-	case EndpointFetchMsg:
-		m.endpointLoading = false
-		if msg.Err != nil {
-			m.endpointError = msg.Err
-			m.endpointData = nil
-		} else {
-			m.endpointData = msg.Data
-			m.endpointMethod = msg.Method
-			m.endpointError = nil
-		}
+	case jsonviewer.CloseMsg:
+		m.focusedPanel = PanelDetail
+		return m, nil, true
+	case jsonviewer.FetchedMsg:
+		var cmd tea.Cmd
+		m.jsonViewer, cmd = m.jsonViewer.Update(msg)
+		return m, cmd, true
+	case confirm.ConfirmedMsg:
+		// Handle confirmed action
+		return m, toast.Success("Action confirmed: "+msg.Operation), true
+	case confirm.CancelledMsg:
+		// Action was cancelled
 		return m, nil, true
 	case tea.KeyPressMsg:
 		return m.handleKeyPressMsg(msg)
@@ -394,6 +393,20 @@ func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool)
 		return m, cmd, true
 	}
 
+	// If JSON viewer is visible, forward all keys to it
+	if m.jsonViewer.Visible() {
+		var cmd tea.Cmd
+		m.jsonViewer, cmd = m.jsonViewer.Update(msg)
+		return m, cmd, true
+	}
+
+	// If confirm dialog is visible, forward all keys to it
+	if m.confirm.Visible() {
+		var cmd tea.Cmd
+		m.confirm, cmd = m.confirm.Update(msg)
+		return m, cmd, true
+	}
+
 	return m.handleKeyPress(msg)
 }
 
@@ -419,6 +432,17 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) Model {
 	panelHeight := (m.height - branding.BannerHeight() - 3) / 2
 	panelWidth := m.width / 2
 	m.events = m.events.SetSize(panelWidth, panelHeight)
+
+	// Set JSON viewer size (centered overlay)
+	jsonWidth := m.width * 2 / 3
+	jsonHeight := m.height * 2 / 3
+	if jsonWidth > 100 {
+		jsonWidth = 100
+	}
+	m.jsonViewer = m.jsonViewer.SetSize(jsonWidth, jsonHeight)
+
+	// Set confirm dialog size
+	m.confirm = m.confirm.SetSize(m.width, m.height)
 
 	return m
 }
@@ -581,20 +605,31 @@ func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 	case "enter":
-		// Toggle JSON overlay - Enter shows it when on Detail, Escape hides it
+		// Open JSON viewer when on Detail panel
 		if m.focusedPanel == PanelDetail {
-			m.focusedPanel = PanelEndpoints
-			// Trigger endpoint fetch for the selected endpoint
-			cmd := m.fetchSelectedEndpoint()
-			return m, cmd, true
+			devices := m.getFilteredDevices()
+			if len(devices) > 0 && m.cursor < len(devices) {
+				d := devices[m.cursor]
+				if d.Online {
+					m.focusedPanel = PanelEndpoints
+					methods := m.getDeviceMethods(d)
+					endpoint := ""
+					if m.endpointCursor < len(methods) {
+						endpoint = methods[m.endpointCursor]
+					} else if len(methods) > 0 {
+						endpoint = methods[0]
+					}
+					var cmd tea.Cmd
+					m.jsonViewer, cmd = m.jsonViewer.Open(d.Device.Address, endpoint, methods)
+					return m, cmd, true
+				}
+			}
 		}
 	case "escape":
-		// Close JSON overlay and clear endpoint data
-		if m.focusedPanel == PanelEndpoints {
+		// Close JSON viewer if visible
+		if m.jsonViewer.Visible() {
+			m.jsonViewer = m.jsonViewer.Close()
 			m.focusedPanel = PanelDetail
-			m.endpointData = nil
-			m.endpointError = nil
-			m.endpointLoading = false
 			return m, nil, true
 		}
 	}
@@ -884,6 +919,19 @@ func (m Model) View() tea.View {
 		result = m.toast.Overlay(result)
 	}
 
+	// Add confirm dialog overlay
+	if m.confirm.Visible() {
+		confirmView := m.confirm.View()
+		result = lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			confirmView,
+			lipgloss.WithWhitespaceChars(" "),
+		)
+	}
+
 	// Debug logging (if enabled)
 	m.debugLogger.Log(m.tabBar.ActiveTabID().String(), m.focusedPanelName(), m.width, m.height, result)
 
@@ -986,9 +1034,9 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	// Combine top and bottom sections
 	content := lipgloss.JoinVertical(lipgloss.Left, topContent, energyPanel)
 
-	// JSON overlay (centered on top of content when active)
-	if m.focusedPanel == PanelEndpoints {
-		jsonOverlay := m.renderJSONOverlay(devices, m.width*2/3, height*2/3)
+	// JSON viewer overlay (centered on top of content when active)
+	if m.jsonViewer.Visible() {
+		jsonOverlay := m.jsonViewer.View()
 		return lipgloss.Place(
 			m.width,
 			height,
@@ -1054,9 +1102,9 @@ func (m Model) renderNarrowLayout(height int) string {
 	// Stack panels vertically
 	content := lipgloss.JoinVertical(lipgloss.Left, eventsRow, listRow, infoRow)
 
-	// JSON overlay (centered on top of content when active)
-	if m.focusedPanel == PanelEndpoints {
-		jsonOverlay := m.renderJSONOverlay(devices, m.width-4, height*2/3)
+	// JSON viewer overlay (centered on top of content when active)
+	if m.jsonViewer.Visible() {
+		jsonOverlay := m.jsonViewer.View()
 		return lipgloss.Place(
 			m.width,
 			height,
@@ -1265,100 +1313,6 @@ func (m Model) renderDeviceInfoColumn(devices []*cache.DeviceData, width, height
 	return r.SetContent(content.String()).Render()
 }
 
-// renderJSONOverlay renders the JSON pop-over that covers the device info column.
-func (m Model) renderJSONOverlay(devices []*cache.DeviceData, width, height int) string {
-	colors := theme.GetSemanticColors()
-
-	title := "JSON Response"
-	if m.endpointMethod != "" {
-		title = m.endpointMethod
-	}
-
-	r := rendering.New(width, height).
-		SetTitle(title).
-		SetFocused(true).
-		SetFocusColor(theme.Pink()).
-		SetBlurColor(theme.Pink())
-
-	var content strings.Builder
-	content.WriteString(lipgloss.NewStyle().Foreground(theme.Purple()).Italic(true).
-		Render("Esc: close | j/k: scroll") + "\n\n")
-
-	if len(devices) == 0 || m.cursor >= len(devices) {
-		return r.SetContent(content.String()).Render()
-	}
-
-	d := devices[m.cursor]
-	if !d.Online {
-		content.WriteString(lipgloss.NewStyle().Foreground(colors.Error).Render("Device offline"))
-		return r.SetContent(content.String()).Render()
-	}
-
-	jsonStyle := lipgloss.NewStyle().Foreground(theme.Green())
-	labelStyle := lipgloss.NewStyle().Foreground(theme.Cyan()).Bold(true)
-	errorStyle := lipgloss.NewStyle().Foreground(colors.Error)
-
-	// Show loading state
-	if m.endpointLoading {
-		content.WriteString(lipgloss.NewStyle().Foreground(colors.Warning).Render("Loading..."))
-		return r.SetContent(content.String()).Render()
-	}
-
-	// Show error if any
-	if m.endpointError != nil {
-		content.WriteString(errorStyle.Render("Error: " + m.endpointError.Error()))
-		return r.SetContent(content.String()).Render()
-	}
-
-	// Show fetched endpoint data
-	if m.endpointData != nil {
-		content.WriteString(labelStyle.Render(m.endpointMethod+":") + "\n")
-		if jsonBytes, err := json.MarshalIndent(m.endpointData, "", "  "); err == nil {
-			for _, line := range strings.Split(string(jsonBytes), "\n") {
-				content.WriteString(jsonStyle.Render(line) + "\n")
-			}
-		} else {
-			content.WriteString(errorStyle.Render("Failed to format JSON: " + err.Error()))
-		}
-		return r.SetContent(content.String()).Render()
-	}
-
-	// Fallback: show cached data if no endpoint fetch in progress
-	if d.Info != nil {
-		content.WriteString(labelStyle.Render("DeviceInfo (cached):") + "\n")
-		jsonData := map[string]any{
-			"id":       d.Info.ID,
-			"model":    d.Info.Model,
-			"firmware": d.Info.Firmware,
-			"mac":      d.Info.MAC,
-		}
-		if jsonBytes, err := json.MarshalIndent(jsonData, "", "  "); err == nil {
-			for _, line := range strings.Split(string(jsonBytes), "\n") {
-				content.WriteString(jsonStyle.Render(line) + "\n")
-			}
-		}
-	}
-
-	// Show switch states as JSON
-	if len(d.Switches) > 0 {
-		content.WriteString("\n" + labelStyle.Render("SwitchStatus (cached):") + "\n")
-		switchData := make([]map[string]any, len(d.Switches))
-		for i, sw := range d.Switches {
-			switchData[i] = map[string]any{"id": sw.ID, "output": sw.On}
-		}
-		if jsonBytes, err := json.MarshalIndent(switchData, "", "  "); err == nil {
-			for _, line := range strings.Split(string(jsonBytes), "\n") {
-				content.WriteString(jsonStyle.Render(line) + "\n")
-			}
-		}
-	}
-
-	// Show power metrics as JSON
-	writePowerMetricsJSON(&content, d, labelStyle, jsonStyle)
-
-	return r.SetContent(content.String()).Render()
-}
-
 func (m Model) renderHeader() string {
 	colors := theme.GetSemanticColors()
 
@@ -1512,28 +1466,6 @@ func writePowerMetrics(content *strings.Builder, d *cache.DeviceData, titleStyle
 	}
 }
 
-func writePowerMetricsJSON(content *strings.Builder, d *cache.DeviceData, labelStyle, jsonStyle lipgloss.Style) {
-	if d.Power == 0 && d.Voltage == 0 {
-		return
-	}
-	content.WriteString("\n" + labelStyle.Render("PowerMetrics:") + "\n")
-	powerData := map[string]any{}
-	if d.Power != 0 {
-		powerData["power"] = d.Power
-	}
-	if d.Voltage != 0 {
-		powerData["voltage"] = d.Voltage
-	}
-	if d.Current != 0 {
-		powerData["current"] = d.Current
-	}
-	if jsonBytes, err := json.MarshalIndent(powerData, "", "  "); err == nil {
-		for _, line := range strings.Split(string(jsonBytes), "\n") {
-			content.WriteString(jsonStyle.Render(line) + "\n")
-		}
-	}
-}
-
 // Run starts the TUI application.
 func Run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
 	m := New(ctx, f, opts)
@@ -1590,62 +1522,4 @@ func (m Model) getDeviceMethods(d *cache.DeviceData) []string {
 	}
 
 	return methods
-}
-
-// fetchSelectedEndpoint returns a command to fetch the currently selected endpoint.
-func (m Model) fetchSelectedEndpoint() tea.Cmd {
-	devices := m.getFilteredDevices()
-	if len(devices) == 0 || m.cursor >= len(devices) {
-		return nil
-	}
-
-	d := devices[m.cursor]
-	if !d.Online {
-		return nil
-	}
-
-	methods := m.getDeviceMethods(d)
-	if m.endpointCursor >= len(methods) {
-		return nil
-	}
-
-	method := methods[m.endpointCursor]
-	address := d.Device.Address
-	svc := m.factory.ShellyService()
-	ctx := m.ctx
-	isGen1 := d.Device.Generation == 1 || (d.Info != nil && d.Info.Generation == 1)
-
-	m.endpointLoading = true
-	m.endpointData = nil
-	m.endpointError = nil
-	m.endpointMethod = method
-
-	return func() tea.Msg {
-		var data any
-		var err error
-
-		if isGen1 {
-			// Gen1 uses REST API - method is actually a path like "/shelly"
-			var bytes []byte
-			bytes, err = svc.RawGen1Call(ctx, address, method)
-			if err == nil {
-				// Try to parse as JSON for display
-				var jsonData any
-				if jsonErr := json.Unmarshal(bytes, &jsonData); jsonErr == nil {
-					data = jsonData
-				} else {
-					data = string(bytes)
-				}
-			}
-		} else {
-			// Gen2 uses RPC
-			data, err = svc.RawRPC(ctx, address, method, nil)
-		}
-
-		return EndpointFetchMsg{
-			Method: method,
-			Data:   data,
-			Err:    err,
-		}
-	}
 }
