@@ -874,17 +874,28 @@ func (m Model) applyHorizontalNav(keyStr string, devices []*cache.DeviceData) (M
 }
 
 // emitDeviceSelection emits a DeviceSelectedMsg if the cursor changed.
+// Also updates the cache's focused device for adaptive refresh intervals.
 func (m Model) emitDeviceSelection(devices []*cache.DeviceData, oldCursor int) tea.Cmd {
 	if m.cursor == oldCursor || len(devices) == 0 || m.cursor >= len(devices) {
 		return nil
 	}
 	d := devices[m.cursor]
-	return func() tea.Msg {
+
+	// Update cache focused device for adaptive refresh (focused device refreshes faster)
+	cacheCmd := m.cache.SetFocusedDevice(d.Device.Name)
+
+	// Emit device selection message
+	selectionCmd := func() tea.Msg {
 		return views.DeviceSelectedMsg{
 			Device:  d.Device.Name,
 			Address: d.Device.Address,
 		}
 	}
+
+	if cacheCmd != nil {
+		return tea.Batch(cacheCmd, selectionCmd)
+	}
+	return selectionCmd
 }
 
 // syncDeviceInfo syncs the deviceInfo component with current selection and focus.

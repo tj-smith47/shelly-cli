@@ -195,8 +195,9 @@ func (m Model) checkAllDevices() tea.Cmd {
 			mu      sync.Mutex
 		)
 
+		// Limit to 3 concurrent requests to avoid overloading devices
 		g, gctx := errgroup.WithContext(ctx)
-		g.SetLimit(5)
+		g.SetLimit(3)
 
 		for _, dev := range m.devices {
 			device := dev
