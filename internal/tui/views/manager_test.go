@@ -25,16 +25,16 @@ func TestNew(t *testing.T) {
 	if m == nil {
 		t.Fatal("New() returned nil")
 	}
-	if m.Active() != ViewDevices {
-		t.Errorf("Active() = %v, want %v", m.Active(), ViewDevices)
+	if m.Active() != ViewDashboard {
+		t.Errorf("Active() = %v, want %v", m.Active(), ViewDashboard)
 	}
 }
 
 func TestManager_Register(t *testing.T) {
 	t.Parallel()
 	m := New()
-	m.Register(mockView{id: ViewDevices})
-	m.Register(mockView{id: ViewEvents})
+	m.Register(mockView{id: ViewDashboard})
+	m.Register(mockView{id: ViewConfig})
 
 	if m.ViewCount() != 2 {
 		t.Errorf("ViewCount() = %d, want 2", m.ViewCount())
@@ -44,10 +44,10 @@ func TestManager_Register(t *testing.T) {
 func TestManager_SetActive(t *testing.T) {
 	t.Parallel()
 	m := New()
-	m.Register(mockView{id: ViewDevices})
-	m.Register(mockView{id: ViewEvents})
+	m.Register(mockView{id: ViewDashboard})
+	m.Register(mockView{id: ViewConfig})
 
-	cmd := m.SetActive(ViewEvents)
+	cmd := m.SetActive(ViewConfig)
 	if cmd == nil {
 		t.Fatal("SetActive() should return a command")
 	}
@@ -57,11 +57,11 @@ func TestManager_SetActive(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected ViewChangedMsg, got %T", msg)
 	}
-	if vcMsg.Previous != ViewDevices {
-		t.Errorf("Previous = %v, want %v", vcMsg.Previous, ViewDevices)
+	if vcMsg.Previous != ViewDashboard {
+		t.Errorf("Previous = %v, want %v", vcMsg.Previous, ViewDashboard)
 	}
-	if vcMsg.Current != ViewEvents {
-		t.Errorf("Current = %v, want %v", vcMsg.Current, ViewEvents)
+	if vcMsg.Current != ViewConfig {
+		t.Errorf("Current = %v, want %v", vcMsg.Current, ViewConfig)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestManager_SetActive_NoChange(t *testing.T) {
 	t.Parallel()
 	m := New()
 
-	cmd := m.SetActive(ViewDevices)
+	cmd := m.SetActive(ViewDashboard)
 	if cmd != nil {
 		t.Error("SetActive() should return nil when view doesn't change")
 	}
@@ -78,28 +78,28 @@ func TestManager_SetActive_NoChange(t *testing.T) {
 func TestManager_Back(t *testing.T) {
 	t.Parallel()
 	m := New()
-	m.Register(mockView{id: ViewDevices})
-	m.Register(mockView{id: ViewEvents})
-	m.Register(mockView{id: ViewEnergy})
+	m.Register(mockView{id: ViewDashboard})
+	m.Register(mockView{id: ViewConfig})
+	m.Register(mockView{id: ViewManage})
 
-	// Navigate: Devices -> Events -> Energy
-	m.SetActive(ViewEvents)
-	m.SetActive(ViewEnergy)
+	// Navigate: Dashboard -> Config -> Manage
+	m.SetActive(ViewConfig)
+	m.SetActive(ViewManage)
 
-	if m.Active() != ViewEnergy {
-		t.Errorf("Active() = %v, want %v", m.Active(), ViewEnergy)
+	if m.Active() != ViewManage {
+		t.Errorf("Active() = %v, want %v", m.Active(), ViewManage)
 	}
 
 	// Go back
 	m.Back()
-	if m.Active() != ViewEvents {
-		t.Errorf("After Back(), Active() = %v, want %v", m.Active(), ViewEvents)
+	if m.Active() != ViewConfig {
+		t.Errorf("After Back(), Active() = %v, want %v", m.Active(), ViewConfig)
 	}
 
 	// Go back again
 	m.Back()
-	if m.Active() != ViewDevices {
-		t.Errorf("After second Back(), Active() = %v, want %v", m.Active(), ViewDevices)
+	if m.Active() != ViewDashboard {
+		t.Errorf("After second Back(), Active() = %v, want %v", m.Active(), ViewDashboard)
 	}
 }
 
@@ -121,7 +121,7 @@ func TestManager_HasHistory(t *testing.T) {
 		t.Error("HasHistory() should be false initially")
 	}
 
-	m.SetActive(ViewEvents)
+	m.SetActive(ViewConfig)
 
 	if !m.HasHistory() {
 		t.Error("HasHistory() should be true after navigation")
@@ -131,15 +131,15 @@ func TestManager_HasHistory(t *testing.T) {
 func TestManager_Get(t *testing.T) {
 	t.Parallel()
 	m := New()
-	v := mockView{id: ViewDevices}
+	v := mockView{id: ViewDashboard}
 	m.Register(v)
 
-	got := m.Get(ViewDevices)
+	got := m.Get(ViewDashboard)
 	if got == nil {
 		t.Error("Get() returned nil for registered view")
 	}
 
-	notFound := m.Get(ViewEnergy)
+	notFound := m.Get(ViewManage)
 	if notFound != nil {
 		t.Error("Get() should return nil for unregistered view")
 	}
@@ -148,33 +148,33 @@ func TestManager_Get(t *testing.T) {
 func TestManager_ActiveView(t *testing.T) {
 	t.Parallel()
 	m := New()
-	v := mockView{id: ViewDevices}
+	v := mockView{id: ViewDashboard}
 	m.Register(v)
 
 	av := m.ActiveView()
 	if av == nil {
 		t.Error("ActiveView() returned nil")
 	}
-	if av.ID() != ViewDevices {
-		t.Errorf("ActiveView().ID() = %v, want %v", av.ID(), ViewDevices)
+	if av.ID() != ViewDashboard {
+		t.Errorf("ActiveView().ID() = %v, want %v", av.ID(), ViewDashboard)
 	}
 }
 
 func TestManager_View(t *testing.T) {
 	t.Parallel()
 	m := New()
-	m.Register(mockView{id: ViewDevices})
+	m.Register(mockView{id: ViewDashboard})
 
 	view := m.View()
-	if view != "mock-Devices" {
-		t.Errorf("View() = %q, want %q", view, "mock-Devices")
+	if view != "mock-Dashboard" {
+		t.Errorf("View() = %q, want %q", view, "mock-Dashboard")
 	}
 }
 
 func TestManager_SetSize(t *testing.T) {
 	t.Parallel()
 	m := New()
-	m.Register(mockView{id: ViewDevices})
+	m.Register(mockView{id: ViewDashboard})
 
 	m.SetSize(100, 50)
 
@@ -183,5 +183,52 @@ func TestManager_SetSize(t *testing.T) {
 	}
 	if m.Height() != 50 {
 		t.Errorf("Height() = %d, want 50", m.Height())
+	}
+}
+
+// mockSettableView is a mock view that implements DeviceSettable.
+type mockSettableView struct {
+	mockView
+	device string
+}
+
+func (v *mockSettableView) SetDevice(device string) tea.Cmd {
+	if v.device == device {
+		return nil
+	}
+	v.device = device
+	return func() tea.Msg { return struct{}{} }
+}
+
+func TestManager_PropagateDevice(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Register a settable view
+	settable := &mockSettableView{mockView: mockView{id: ViewAutomation}}
+	m.Register(settable)
+
+	// Register a non-settable view
+	m.Register(mockView{id: ViewDashboard})
+
+	cmd := m.PropagateDevice("kitchen-plug")
+	if cmd == nil {
+		t.Fatal("PropagateDevice() should return a command when settable views exist")
+	}
+
+	// Verify the device was set on the settable view
+	if settable.device != "kitchen-plug" {
+		t.Errorf("device = %q, want %q", settable.device, "kitchen-plug")
+	}
+}
+
+func TestManager_PropagateDevice_NoSettable(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m.Register(mockView{id: ViewDashboard})
+
+	cmd := m.PropagateDevice("device")
+	if cmd != nil {
+		t.Error("PropagateDevice() should return nil when no settable views")
 	}
 }

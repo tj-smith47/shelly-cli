@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
 const testConfigDevice = "192.168.1.100"
@@ -28,8 +29,8 @@ func TestNewConfig(t *testing.T) {
 	if c.focusedPanel != PanelWiFi {
 		t.Errorf("focusedPanel = %v, want PanelWiFi", c.focusedPanel)
 	}
-	if c.ID() != TabConfig {
-		t.Errorf("ID() = %v, want TabConfig", c.ID())
+	if c.ID() != tabs.TabConfig {
+		t.Errorf("ID() = %v, want tabs.TabConfig", c.ID())
 	}
 }
 

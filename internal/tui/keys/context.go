@@ -20,6 +20,7 @@ const (
 	ContextJSON
 	ContextAutomation
 	ContextConfig
+	ContextManage
 	ContextFleet
 	ContextHelp
 )
@@ -60,6 +61,7 @@ const (
 	ActionTab2
 	ActionTab3
 	ActionTab4
+	ActionTab5
 )
 
 // KeyBinding represents a key and its description.
@@ -96,6 +98,7 @@ func (m *ContextMap) initDefaults() {
 		"2":         ActionTab2,
 		"3":         ActionTab3,
 		"4":         ActionTab4,
+		"5":         ActionTab5,
 		"ctrl+c":    ActionQuit,
 	}
 
@@ -199,6 +202,18 @@ func (m *ContextMap) initDefaults() {
 		"up":    ActionUp,
 		"enter": ActionEnter,
 		"e":     ActionEnter,
+	}
+
+	// Manage context
+	m.bindings[ContextManage] = map[string]Action{
+		"j":     ActionDown,
+		"k":     ActionUp,
+		"down":  ActionDown,
+		"up":    ActionUp,
+		"enter": ActionEnter,
+		"r":     ActionRefresh, // Refresh device list
+		"space": ActionToggle,  // Select device
+		"a":     ActionExpand,  // Select all
 	}
 
 	// Fleet context
@@ -320,9 +335,10 @@ var actionDescriptions = map[Action]string{
 	ActionExpand:    "Expand/Toggle all",
 	ActionRefresh:   "Refresh",
 	ActionTab1:      "Dashboard tab",
-	ActionTab2:      "Monitor tab",
-	ActionTab3:      "Events tab",
-	ActionTab4:      "Energy tab",
+	ActionTab2:      "Automation tab",
+	ActionTab3:      "Config tab",
+	ActionTab4:      "Manage tab",
+	ActionTab5:      "Fleet tab",
 }
 
 // ActionDesc returns a human-readable description for an action.
@@ -349,6 +365,8 @@ func ContextName(ctx Context) string {
 		return "Automation"
 	case ContextConfig:
 		return "Config"
+	case ContextManage:
+		return "Manage"
 	case ContextFleet:
 		return "Fleet"
 	case ContextHelp:

@@ -9,14 +9,12 @@ import (
 
 // Banner is the ASCII art banner for Shelly CLI.
 // This can be used in init, dash TUI loading screen, or other places.
-const Banner = `   _____ _          _ _         _____ _      _____
-  / ____| |        | | |       / ____| |    |_   _|
- | (___ | |__   ___| | |_   _ | |    | |      | |
-  \___ \| '_ \ / _ \ | | | | || |    | |      | |
-  ____) | | | |  __/ | | |_| || |____| |____ _| |_
- |_____/|_| |_|\___|_|_|\__, | \_____|______|_____|
-                         __/ |
-                        |___/                      `
+const Banner = `    _____ __         ____         ________    ____
+   / ___// /_  ___  / / /_  __   / ____/ /   /  _/
+   \__ \/ __ \/ _ \/ / / / / /  / /   / /    / /
+  ___/ / / / /  __/ / / /_/ /  / /___/ /____/ /
+ /____/_/ /_/\___/_/_/\__, /   \____/_____/___/
+                     /____/                        `
 
 // BannerLines returns the banner split into lines for line-by-line rendering.
 func BannerLines() []string {

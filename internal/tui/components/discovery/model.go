@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Deps holds the dependencies for the Discovery component.
@@ -293,9 +294,14 @@ func (m Model) View() string {
 	}
 	content.WriteString("\n\n")
 
-	// Error display
+	// Error display with categorized messaging and retry hint
 	if m.err != nil {
-		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg, hint := tuierrors.FormatError(m.err)
+		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString("\n")
+		content.WriteString(m.styles.Muted.Render("  " + hint))
+		content.WriteString("\n")
+		content.WriteString(m.styles.Muted.Render("  Press 'r' to retry"))
 		content.WriteString("\n\n")
 	}
 

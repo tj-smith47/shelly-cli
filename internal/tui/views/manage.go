@@ -27,9 +27,6 @@ const (
 	ManagePanelBackup
 )
 
-// TabManage is the manage tab ID.
-const TabManage tabs.TabID = 12
-
 // ManageDeps holds dependencies for the manage view.
 type ManageDeps struct {
 	Ctx context.Context
@@ -107,7 +104,7 @@ func NewManage(deps ManageDeps) *Manage {
 	m := &Manage{
 		ctx:          deps.Ctx,
 		svc:          deps.Svc,
-		id:           TabManage,
+		id:           tabs.TabManage,
 		discovery:    discovery.New(discoveryDeps),
 		batch:        batch.New(batchDeps),
 		firmware:     firmware.New(firmwareDeps),
@@ -147,7 +144,16 @@ func (m *Manage) SetSize(width, height int) View {
 	m.width = width
 	m.height = height
 
-	// Layout: left column (stacked) | right column (full height batch)
+	if m.isNarrow() {
+		// Narrow mode: all components get full width, full height
+		m.discovery = m.discovery.SetSize(width, height-4)
+		m.batch = m.batch.SetSize(width, height-4)
+		m.firmware = m.firmware.SetSize(width, height-4)
+		m.backup = m.backup.SetSize(width, height-4)
+		return m
+	}
+
+	// Standard layout: left column (stacked) | right column (full height batch)
 	// Left column: 40% width, Right column: 60% width
 	leftWidth := (width - 1) * 2 / 5
 	rightWidth := width - leftWidth - 1
@@ -264,12 +270,43 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// isNarrow returns true if the view should use narrow/vertical layout.
+func (m *Manage) isNarrow() bool {
+	return m.width < 80
+}
+
 // View renders the manage view.
 func (m *Manage) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
 
+	if m.isNarrow() {
+		return m.renderNarrowLayout()
+	}
+
+	return m.renderStandardLayout()
+}
+
+func (m *Manage) renderNarrowLayout() string {
+	// In narrow mode, show only the focused panel at full width
+	panelHeight := m.height - 2
+
+	switch m.focusedPanel {
+	case ManagePanelDiscovery:
+		return m.renderPanel(m.discovery.View(), m.width, panelHeight, true)
+	case ManagePanelBatch:
+		return m.renderPanel(m.batch.View(), m.width, panelHeight, true)
+	case ManagePanelFirmware:
+		return m.renderPanel(m.firmware.View(), m.width, panelHeight, true)
+	case ManagePanelBackup:
+		return m.renderPanel(m.backup.View(), m.width, panelHeight, true)
+	default:
+		return m.renderPanel(m.discovery.View(), m.width, panelHeight, true)
+	}
+}
+
+func (m *Manage) renderStandardLayout() string {
 	// Calculate panel dimensions for layout
 	leftWidth := (m.width - 1) * 2 / 5
 	rightWidth := m.width - leftWidth - 1

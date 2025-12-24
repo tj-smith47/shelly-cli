@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
 const testAutomationDevice = "192.168.1.100"
@@ -29,8 +30,8 @@ func TestNewAutomation(t *testing.T) {
 	if a.focusedPanel != PanelScripts {
 		t.Errorf("focusedPanel = %v, want PanelScripts", a.focusedPanel)
 	}
-	if a.ID() != TabAutomation {
-		t.Errorf("ID() = %v, want TabAutomation", a.ID())
+	if a.ID() != tabs.TabAutomation {
+		t.Errorf("ID() = %v, want tabs.TabAutomation", a.ID())
 	}
 }
 

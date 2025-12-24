@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
 func TestNewFleet(t *testing.T) {
@@ -27,8 +28,8 @@ func TestNewFleet(t *testing.T) {
 	if f.focusedPanel != FleetPanelDevices {
 		t.Errorf("focusedPanel = %v, want FleetPanelDevices", f.focusedPanel)
 	}
-	if f.id != TabFleet {
-		t.Errorf("id = %v, want TabFleet", f.id)
+	if f.id != tabs.TabFleet {
+		t.Errorf("id = %v, want tabs.TabFleet", f.id)
 	}
 }
 
@@ -103,8 +104,8 @@ func TestFleet_ID(t *testing.T) {
 	t.Parallel()
 	f := newTestFleet()
 
-	if f.ID() != TabFleet {
-		t.Errorf("ID() = %v, want TabFleet", f.ID())
+	if f.ID() != tabs.TabFleet {
+		t.Errorf("ID() = %v, want tabs.TabFleet", f.ID())
 	}
 }
 

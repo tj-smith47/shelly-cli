@@ -24,6 +24,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
+	"github.com/tj-smith47/shelly-cli/internal/tui/views"
 )
 
 // DeviceActionMsg reports the result of a device action.
@@ -51,6 +53,18 @@ const (
 	PanelEndpoints
 )
 
+// LayoutMode represents the terminal layout mode based on width.
+type LayoutMode int
+
+const (
+	// LayoutNarrow for terminals < 80 cols - vertical stack.
+	LayoutNarrow LayoutMode = iota
+	// LayoutStandard for 80-120 cols - standard 3-panel.
+	LayoutStandard
+	// LayoutWide for > 120 cols - extra detail space.
+	LayoutWide
+)
+
 // Model is the main TUI application model.
 type Model struct {
 	// Core
@@ -59,6 +73,10 @@ type Model struct {
 	cfg     *config.Config
 	keys    KeyMap
 	styles  Styles
+
+	// View management (5-tab system)
+	viewManager *views.Manager
+	tabBar      tabs.Model
 
 	// Shared device cache
 	cache *cache.Cache
@@ -130,6 +148,46 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		IOS: f.IOStreams(),
 	})
 
+	// Create view manager and register all views
+	vm := views.New()
+
+	// Register Dashboard view (delegates rendering to app.go)
+	dashboard := views.NewDashboard(views.DashboardDeps{Ctx: ctx})
+	vm.Register(dashboard)
+
+	// Register Automation view
+	automation := views.NewAutomation(views.AutomationDeps{
+		Ctx: ctx,
+		Svc: f.ShellyService(),
+	})
+	vm.Register(automation)
+
+	// Register Config view
+	configView := views.NewConfig(views.ConfigDeps{
+		Ctx: ctx,
+		Svc: f.ShellyService(),
+	})
+	vm.Register(configView)
+
+	// Register Manage view
+	manage := views.NewManage(views.ManageDeps{
+		Ctx: ctx,
+		Svc: f.ShellyService(),
+	})
+	vm.Register(manage)
+
+	// Register Fleet view
+	fleet := views.NewFleet(views.FleetDeps{
+		Ctx: ctx,
+		Svc: f.ShellyService(),
+		IOS: f.IOStreams(),
+		Cfg: cfg,
+	})
+	vm.Register(fleet)
+
+	// Create 5-tab bar
+	tabBar := tabs.New()
+
 	// Load keybindings from config or use defaults
 	keymap := KeyMapFromConfig(cfg)
 
@@ -139,6 +197,8 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		cfg:             cfg,
 		keys:            keymap,
 		styles:          DefaultStyles(),
+		viewManager:     vm,
+		tabBar:          tabBar,
 		cache:           deviceCache,
 		refreshInterval: opts.RefreshInterval,
 		filter:          opts.Filter,
@@ -153,6 +213,17 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	}
 }
 
+// layoutMode returns the current layout mode based on terminal width.
+func (m Model) layoutMode() LayoutMode {
+	if m.width < 80 {
+		return LayoutNarrow
+	}
+	if m.width > 120 {
+		return LayoutWide
+	}
+	return LayoutStandard
+}
+
 // Init initializes the TUI and returns the first command to run.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
@@ -160,6 +231,7 @@ func (m Model) Init() tea.Cmd {
 		m.statusBar.Init(),
 		m.toast.Init(),
 		m.events.Init(),
+		m.viewManager.Init(),
 	)
 }
 
@@ -201,6 +273,17 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return newModel, cmd, true
 	case cmdmode.ErrorMsg:
 		return m, statusbar.SetMessage(msg.Message, statusbar.MessageError), true
+	case tabs.TabChangedMsg:
+		// Sync view manager with tab bar
+		cmd := m.viewManager.SetActive(msg.Current)
+		return m, cmd, true
+	case views.ViewChangedMsg:
+		// View changed, sync tab bar
+		m.tabBar, _ = m.tabBar.SetActive(msg.Current)
+		return m, nil, true
+	case views.DeviceSelectedMsg:
+		// Propagate device selection to all views that support it
+		return m, m.viewManager.PropagateDevice(msg.Device), true
 	case tea.KeyPressMsg:
 		return m.handleKeyPressMsg(msg)
 	}
@@ -262,6 +345,12 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) Model {
 	m.cmdMode = m.cmdMode.SetWidth(m.width)
 	m.toast = m.toast.SetSize(m.width, m.height)
 	m.help = m.help.SetSize(m.width, m.height)
+	m.tabBar = m.tabBar.SetWidth(m.width)
+
+	// Calculate content height (banner + tab bar + status bar)
+	tabBarHeight := 1
+	contentHeight := m.height - branding.BannerHeight() - tabBarHeight - 2
+	m.viewManager.SetSize(m.width, contentHeight)
 
 	// Calculate panel sizes for events
 	panelHeight := (m.height - branding.BannerHeight() - 3) / 2
@@ -404,7 +493,7 @@ func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, bool) {
 	return m, false
 }
 
-// handleGlobalKeys handles quit, help, filter, command, and escape keys.
+// handleGlobalKeys handles quit, help, filter, command, tab switching, and escape keys.
 func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch {
 	case key.Matches(msg, m.keys.ForceQuit), key.Matches(msg, m.keys.Quit):
@@ -429,6 +518,22 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 			m.cursor = 0
 			return m, nil, true
 		}
+	// Tab switching (1-5)
+	case key.Matches(msg, m.keys.View1):
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabDashboard)
+		return m, m.viewManager.SetActive(views.ViewDashboard), true
+	case key.Matches(msg, m.keys.View2):
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabAutomation)
+		return m, m.viewManager.SetActive(views.ViewAutomation), true
+	case key.Matches(msg, m.keys.View3):
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabConfig)
+		return m, m.viewManager.SetActive(views.ViewConfig), true
+	case key.Matches(msg, m.keys.View4):
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabManage)
+		return m, m.viewManager.SetActive(views.ViewManage), true
+	case key.Matches(msg, m.keys.View5):
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabFleet)
+		return m, m.viewManager.SetActive(views.ViewFleet), true
 	}
 	return m, nil, false
 }
@@ -567,6 +672,9 @@ func (m Model) View() tea.View {
 	// Header with metadata on left, banner on right
 	headerBanner := m.renderHeader()
 
+	// Tab bar
+	tabBarView := m.tabBar.View()
+
 	// Input bar (search or command mode)
 	var inputBar string
 	if m.search.IsActive() {
@@ -577,15 +685,23 @@ func (m Model) View() tea.View {
 
 	// Calculate content area
 	bannerHeight := branding.BannerHeight()
+	tabBarHeight := 1
 	footerHeight := 2
 	inputHeight := 0
 	if inputBar != "" {
 		inputHeight = 1
 	}
-	contentHeight := m.height - bannerHeight - footerHeight - inputHeight
+	contentHeight := m.height - bannerHeight - tabBarHeight - footerHeight - inputHeight
 
-	// Multi-panel layout: 4 panels
-	content := m.renderMultiPanelLayout(contentHeight)
+	// Render content based on active view
+	var content string
+	if m.isDashboardActive() {
+		// Dashboard uses the multi-panel layout rendered by app.go
+		content = m.renderMultiPanelLayout(contentHeight)
+	} else {
+		// Other views render themselves
+		content = m.viewManager.View()
+	}
 
 	// Help overlay - overlay on content when visible
 	if m.help.Visible() {
@@ -599,11 +715,11 @@ func (m Model) View() tea.View {
 	var result string
 	if inputBar != "" {
 		result = lipgloss.JoinVertical(lipgloss.Left,
-			headerBanner, inputBar, content, footer,
+			headerBanner, tabBarView, inputBar, content, footer,
 		)
 	} else {
 		result = lipgloss.JoinVertical(lipgloss.Left,
-			headerBanner, content, footer,
+			headerBanner, tabBarView, content, footer,
 		)
 	}
 
@@ -618,15 +734,42 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// renderMultiPanelLayout renders 3 vertical columns like superfile.
+// isDashboardActive returns true if the Dashboard view is active.
+func (m Model) isDashboardActive() bool {
+	activeView := m.viewManager.ActiveView()
+	if activeView == nil {
+		return true // Default to dashboard
+	}
+	// Check if active view is a Dashboard view (which has empty View())
+	if d, ok := activeView.(*views.Dashboard); ok {
+		return d.IsDashboardView()
+	}
+	return false
+}
+
+// renderMultiPanelLayout renders 3 panels, horizontally or vertically based on width.
 func (m Model) renderMultiPanelLayout(height int) string {
+	// Narrow mode: stack panels vertically
+	if m.layoutMode() == LayoutNarrow {
+		return m.renderNarrowLayout(height)
+	}
+
 	colors := theme.GetSemanticColors()
 	devices := m.getFilteredDevices()
 
-	// Calculate column widths: 20% events, 40% list, 40% info
-	col1Width := m.width * 20 / 100
-	col2Width := m.width * 40 / 100
-	col3Width := m.width - col1Width - col2Width - 2 // -2 for gaps
+	// Calculate column widths based on layout mode
+	var col1Width, col2Width, col3Width int
+	if m.layoutMode() == LayoutWide {
+		// Wide mode: 15% events, 35% list, 50% info
+		col1Width = m.width * 15 / 100
+		col2Width = m.width * 35 / 100
+		col3Width = m.width - col1Width - col2Width - 2 // -2 for gaps
+	} else {
+		// Standard mode: 20% events, 40% list, 40% info
+		col1Width = m.width * 20 / 100
+		col2Width = m.width * 40 / 100
+		col3Width = m.width - col1Width - col2Width - 2 // -2 for gaps
+	}
 
 	if col1Width < 15 {
 		col1Width = 15
@@ -662,6 +805,58 @@ func (m Model) renderMultiPanelLayout(height int) string {
 
 	// Join columns horizontally
 	return lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", listCol, " ", infoCol)
+}
+
+// renderNarrowLayout renders panels stacked vertically for narrow terminals.
+func (m Model) renderNarrowLayout(height int) string {
+	colors := theme.GetSemanticColors()
+	devices := m.getFilteredDevices()
+	panelWidth := m.width - 2 // Full width minus borders
+
+	// Divide height into 3 parts: events (20%), list (40%), info (40%)
+	eventsHeight := height * 20 / 100
+	listHeight := height * 40 / 100
+	infoHeight := height - eventsHeight - listHeight - 2 // -2 for gaps
+
+	// Minimum heights
+	if eventsHeight < 4 {
+		eventsHeight = 4
+	}
+	if listHeight < 6 {
+		listHeight = 6
+	}
+	if infoHeight < 6 {
+		infoHeight = 6
+	}
+
+	// Get focused panel border color
+	focusBorder := colors.Highlight
+	unfocusBorder := colors.TableBorder
+
+	// Row 1: Events panel (compact)
+	eventsRow := m.renderEventsColumn(panelWidth, eventsHeight)
+
+	// Row 2: Device List
+	listBorder := unfocusBorder
+	if m.focusedPanel == PanelDeviceList {
+		listBorder = focusBorder
+	}
+	listRow := m.renderDeviceListColumn(devices, panelWidth, listHeight, listBorder)
+
+	// Row 3: Device Info OR JSON overlay
+	var infoRow string
+	if m.focusedPanel == PanelEndpoints {
+		infoRow = m.renderJSONOverlay(devices, panelWidth, infoHeight)
+	} else {
+		infoBorder := unfocusBorder
+		if m.focusedPanel == PanelDetail {
+			infoBorder = focusBorder
+		}
+		infoRow = m.renderDeviceInfoColumn(devices, panelWidth, infoHeight, infoBorder)
+	}
+
+	// Stack panels vertically
+	return lipgloss.JoinVertical(lipgloss.Left, eventsRow, listRow, infoRow)
 }
 
 // renderEventsColumn renders the events column with ORANGE border, full height.

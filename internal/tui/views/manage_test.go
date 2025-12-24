@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
 func TestNewManage(t *testing.T) {
@@ -26,8 +27,8 @@ func TestNewManage(t *testing.T) {
 	if m.focusedPanel != ManagePanelDiscovery {
 		t.Errorf("focusedPanel = %v, want ManagePanelDiscovery", m.focusedPanel)
 	}
-	if m.id != TabManage {
-		t.Errorf("id = %v, want TabManage", m.id)
+	if m.id != tabs.TabManage {
+		t.Errorf("id = %v, want tabs.TabManage", m.id)
 	}
 }
 
@@ -102,8 +103,8 @@ func TestManage_ID(t *testing.T) {
 	t.Parallel()
 	m := newTestManage()
 
-	if m.ID() != TabManage {
-		t.Errorf("ID() = %v, want TabManage", m.ID())
+	if m.ID() != tabs.TabManage {
+		t.Errorf("ID() = %v, want tabs.TabManage", m.ID())
 	}
 }
 

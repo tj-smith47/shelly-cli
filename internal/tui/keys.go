@@ -44,6 +44,7 @@ type KeyMap struct {
 	View2    key.Binding
 	View3    key.Binding
 	View4    key.Binding
+	View5    key.Binding
 }
 
 // DefaultKeyMap returns vim-style keyboard bindings.
@@ -146,19 +147,23 @@ func DefaultKeyMap() KeyMap {
 		),
 		View1: key.NewBinding(
 			key.WithKeys("1"),
-			key.WithHelp("1", "devices"),
+			key.WithHelp("1", "dashboard"),
 		),
 		View2: key.NewBinding(
 			key.WithKeys("2"),
-			key.WithHelp("2", "monitor"),
+			key.WithHelp("2", "automation"),
 		),
 		View3: key.NewBinding(
 			key.WithKeys("3"),
-			key.WithHelp("3", "events"),
+			key.WithHelp("3", "config"),
 		),
 		View4: key.NewBinding(
 			key.WithKeys("4"),
-			key.WithHelp("4", "energy"),
+			key.WithHelp("4", "manage"),
+		),
+		View5: key.NewBinding(
+			key.WithKeys("5"),
+			key.WithHelp("5", "fleet"),
 		),
 	}
 }
@@ -175,7 +180,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.PageUp, k.PageDown, k.Home, k.End},
 		{k.Enter, k.Escape, k.Refresh, k.Filter},
 		{k.Toggle, k.TurnOn, k.TurnOff, k.Reboot},
-		{k.Tab, k.View1, k.View2, k.View3},
+		{k.Tab, k.View1, k.View2, k.View3, k.View4, k.View5},
 		{k.Command, k.Help, k.Quit},
 	}
 }
@@ -240,10 +245,11 @@ func applyDeviceActionBindings(km *KeyMap, kb *config.KeybindingsConfig) {
 func applyViewBindings(km *KeyMap, kb *config.KeybindingsConfig) {
 	applyBinding(&km.Tab, kb.Tab, "next view")
 	applyBinding(&km.ShiftTab, kb.ShiftTab, "prev view")
-	applyBinding(&km.View1, kb.View1, "devices")
-	applyBinding(&km.View2, kb.View2, "monitor")
-	applyBinding(&km.View3, kb.View3, "events")
-	applyBinding(&km.View4, kb.View4, "energy")
+	applyBinding(&km.View1, kb.View1, "dashboard")
+	applyBinding(&km.View2, kb.View2, "automation")
+	applyBinding(&km.View3, kb.View3, "config")
+	applyBinding(&km.View4, kb.View4, "manage")
+	applyBinding(&km.View5, kb.View5, "fleet")
 }
 
 // applyBinding applies a keybinding override if keys are provided.

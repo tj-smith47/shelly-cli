@@ -29,6 +29,11 @@ func TestContextMap_Match_Global(t *testing.T) {
 		{"?", ActionHelp},
 		{"/", ActionFilter},
 		{":", ActionCommand},
+		{"1", ActionTab1},
+		{"2", ActionTab2},
+		{"3", ActionTab3},
+		{"4", ActionTab4},
+		{"5", ActionTab5},
 	}
 
 	for _, tt := range tests {
@@ -154,6 +159,11 @@ func TestContextName(t *testing.T) {
 		{ContextInfo, "Device Info"},
 		{ContextEnergy, "Energy"},
 		{ContextJSON, "JSON Viewer"},
+		{ContextAutomation, "Automation"},
+		{ContextConfig, "Config"},
+		{ContextManage, "Manage"},
+		{ContextFleet, "Fleet"},
+		{ContextHelp, "Help"},
 		{Context(999), "Unknown"},
 	}
 

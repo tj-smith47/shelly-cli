@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Deps holds the dependencies for the Backup component.
@@ -638,10 +639,19 @@ func (m Model) View() string {
 		content.WriteString(m.renderImportView())
 	}
 
-	// Error display
+	// Error display with categorized messaging and retry hint
 	if m.err != nil {
+		msg, hint := tuierrors.FormatError(m.err)
 		content.WriteString("\n")
-		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
+		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString("\n")
+		content.WriteString(m.styles.Muted.Render("  " + hint))
+		content.WriteString("\n")
+		if m.mode == ModeImport {
+			content.WriteString(m.styles.Muted.Render("  Press 'r' to refresh"))
+		} else {
+			content.WriteString(m.styles.Muted.Render("  Press 'x' to retry export"))
+		}
 	}
 
 	// Status indicator

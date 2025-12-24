@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // OperationsDeps holds the dependencies for the Operations component.
@@ -185,6 +186,14 @@ func (m OperationsModel) handleKey(msg tea.KeyPressMsg) (OperationsModel, tea.Cm
 			m.lastResults = nil
 			return m, m.executeOperation()
 		}
+	case "r":
+		// Retry: clear error and re-execute
+		if m.lastErr != nil && !m.executing && m.fleet != nil {
+			m.executing = true
+			m.lastErr = nil
+			m.lastResults = nil
+			return m, m.executeOperation()
+		}
 	case "h", "left":
 		if m.operation > OpAllOn {
 			m.operation--
@@ -266,7 +275,12 @@ func (m OperationsModel) View() string {
 	case m.executing:
 		content.WriteString(m.styles.Muted.Render("Executing operation..."))
 	case m.lastErr != nil:
-		content.WriteString(m.styles.Error.Render("Error: " + m.lastErr.Error()))
+		msg, hint := tuierrors.FormatError(m.lastErr)
+		content.WriteString(m.styles.Error.Render(msg))
+		content.WriteString("\n")
+		content.WriteString(m.styles.Muted.Render("  " + hint))
+		content.WriteString("\n")
+		content.WriteString(m.styles.Muted.Render("  Press 'r' to retry"))
 	case len(m.lastResults) > 0:
 		success := 0
 		failed := 0

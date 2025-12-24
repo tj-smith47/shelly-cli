@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // DevicesDeps holds the dependencies for the Devices component.
@@ -221,7 +222,10 @@ func (m DevicesModel) getStatusMessage() string {
 	case m.loading:
 		return m.styles.Muted.Render("Loading devices...")
 	case m.err != nil:
-		return m.styles.Error.Render("Error: " + m.err.Error())
+		msg, hint := tuierrors.FormatError(m.err)
+		return m.styles.Error.Render(msg) + "\n" +
+			m.styles.Muted.Render("  "+hint) + "\n" +
+			m.styles.Muted.Render("  Press 'r' to retry")
 	case len(m.devices) == 0:
 		return m.styles.Muted.Render("No devices in fleet")
 	default:

@@ -26,9 +26,6 @@ const (
 	PanelInputs
 )
 
-// TabConfig is the config tab ID.
-const TabConfig tabs.TabID = 11
-
 // ConfigDeps holds dependencies for the config view.
 type ConfigDeps struct {
 	Ctx context.Context
@@ -106,7 +103,7 @@ func NewConfig(deps ConfigDeps) *Config {
 	return &Config{
 		ctx:          deps.Ctx,
 		svc:          deps.Svc,
-		id:           TabConfig,
+		id:           tabs.TabConfig,
 		wifi:         wifi.New(wifiDeps),
 		system:       system.New(systemDeps),
 		cloud:        cloud.New(cloudDeps),
@@ -241,12 +238,43 @@ func (c *Config) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
+// isNarrow returns true if the view should use narrow/vertical layout.
+func (c *Config) isNarrow() bool {
+	return c.width < 80
+}
+
 // View renders the config view.
 func (c *Config) View() string {
 	if c.device == "" {
 		return c.styles.Muted.Render("No device selected. Select a device from the Devices tab.")
 	}
 
+	if c.isNarrow() {
+		return c.renderNarrowLayout()
+	}
+
+	return c.renderStandardLayout()
+}
+
+func (c *Config) renderNarrowLayout() string {
+	// In narrow mode, show only the focused panel at full width
+	panelHeight := c.height - 2
+
+	switch c.focusedPanel {
+	case PanelWiFi:
+		return c.renderPanel("WiFi", c.wifi.View(), c.width, panelHeight, true)
+	case PanelSystem:
+		return c.renderPanel("System", c.system.View(), c.width, panelHeight, true)
+	case PanelCloud:
+		return c.renderPanel("Cloud", c.cloud.View(), c.width, panelHeight, true)
+	case PanelInputs:
+		return c.renderPanel("Inputs", c.inputs.View(), c.width, panelHeight, true)
+	default:
+		return c.renderPanel("WiFi", c.wifi.View(), c.width, panelHeight, true)
+	}
+}
+
+func (c *Config) renderStandardLayout() string {
 	// Calculate column widths (50/50 split)
 	leftWidth := c.width / 2
 	rightWidth := c.width - leftWidth - 1 // -1 for gap
@@ -297,7 +325,19 @@ func (c *Config) SetSize(width, height int) View {
 	c.width = width
 	c.height = height
 
-	// Calculate component sizes
+	if c.isNarrow() {
+		// Narrow mode: all components get full width, full height
+		contentWidth := width - 4
+		contentHeight := height - 6
+
+		c.wifi = c.wifi.SetSize(contentWidth, contentHeight)
+		c.system = c.system.SetSize(contentWidth, contentHeight)
+		c.cloud = c.cloud.SetSize(contentWidth, contentHeight)
+		c.inputs = c.inputs.SetSize(contentWidth, contentHeight)
+		return c
+	}
+
+	// Standard layout: 2-column split
 	leftWidth := width / 2
 	rightWidth := width - leftWidth - 1
 

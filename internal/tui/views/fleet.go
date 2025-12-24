@@ -27,9 +27,6 @@ const (
 	FleetPanelOperations
 )
 
-// TabFleet is the fleet tab ID.
-const TabFleet tabs.TabID = 13
-
 // FleetDeps holds dependencies for the fleet view.
 type FleetDeps struct {
 	Ctx context.Context
@@ -130,7 +127,7 @@ func NewFleet(deps FleetDeps) *Fleet {
 		svc:          deps.Svc,
 		ios:          deps.IOS,
 		cfg:          deps.Cfg,
-		id:           TabFleet,
+		id:           tabs.TabFleet,
 		devices:      fleet.NewDevices(devicesDeps),
 		groups:       fleet.NewGroups(groupsDeps),
 		health:       fleet.NewHealth(healthDeps),
@@ -165,7 +162,16 @@ func (f *Fleet) SetSize(width, height int) View {
 	f.width = width
 	f.height = height
 
-	// Layout: 2-column layout
+	if f.isNarrow() {
+		// Narrow mode: all components get full width, full height
+		f.devices = f.devices.SetSize(width, height-4)
+		f.groups = f.groups.SetSize(width, height-4)
+		f.health = f.health.SetSize(width, height-4)
+		f.operations = f.operations.SetSize(width, height-4)
+		return f
+	}
+
+	// Standard layout: 2-column layout
 	// Left column: Devices (60% width, full height)
 	// Right column: Groups, Health, Operations (40% width, stacked)
 	leftWidth := (width - 1) * 3 / 5
@@ -310,6 +316,11 @@ func (f *Fleet) updateComponents(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// isNarrow returns true if the view should use narrow/vertical layout.
+func (f *Fleet) isNarrow() bool {
+	return f.width < 80
+}
+
 // View renders the fleet view.
 func (f *Fleet) View() string {
 	if f.width == 0 || f.height == 0 {
@@ -321,6 +332,32 @@ func (f *Fleet) View() string {
 		return f.renderConnectionPrompt()
 	}
 
+	if f.isNarrow() {
+		return f.renderNarrowLayout()
+	}
+
+	return f.renderStandardLayout()
+}
+
+func (f *Fleet) renderNarrowLayout() string {
+	// In narrow mode, show only the focused panel at full width
+	panelHeight := f.height - 2
+
+	switch f.focusedPanel {
+	case FleetPanelDevices:
+		return f.renderPanel(f.devices.View(), f.width, panelHeight, true)
+	case FleetPanelGroups:
+		return f.renderPanel(f.groups.View(), f.width, panelHeight, true)
+	case FleetPanelHealth:
+		return f.renderPanel(f.health.View(), f.width, panelHeight, true)
+	case FleetPanelOperations:
+		return f.renderPanel(f.operations.View(), f.width, panelHeight, true)
+	default:
+		return f.renderPanel(f.devices.View(), f.width, panelHeight, true)
+	}
+}
+
+func (f *Fleet) renderStandardLayout() string {
 	// Calculate panel dimensions
 	leftWidth := (f.width - 1) * 3 / 5
 	rightWidth := f.width - leftWidth - 1

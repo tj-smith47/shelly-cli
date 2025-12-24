@@ -44,9 +44,6 @@ const (
 	PanelKVS
 )
 
-// TabAutomation is the automation tab ID.
-const TabAutomation tabs.TabID = 10
-
 // Key string constants for key handling.
 const (
 	keyTab      = "tab"
@@ -142,7 +139,7 @@ func NewAutomation(deps AutomationDeps) *Automation {
 	return &Automation{
 		ctx:            deps.Ctx,
 		svc:            deps.Svc,
-		id:             TabAutomation,
+		id:             tabs.TabAutomation,
 		scripts:        scripts.NewList(scriptListDeps),
 		scriptEditor:   scripts.NewEditor(scriptEditorDeps),
 		schedules:      schedules.NewList(schedulesListDeps),
@@ -338,12 +335,49 @@ func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
+// isNarrow returns true if the view should use narrow/vertical layout.
+func (a *Automation) isNarrow() bool {
+	return a.width < 80
+}
+
 // View renders the automation view.
 func (a *Automation) View() string {
 	if a.device == "" {
 		return a.styles.Muted.Render("No device selected. Select a device from the Devices tab.")
 	}
 
+	if a.isNarrow() {
+		return a.renderNarrowLayout()
+	}
+
+	return a.renderStandardLayout()
+}
+
+func (a *Automation) renderNarrowLayout() string {
+	// In narrow mode, show only the focused panel at full width
+	panelHeight := a.height - 2
+
+	switch a.focusedPanel {
+	case PanelScripts:
+		return a.renderPanel("Scripts", a.scripts.View(), a.width, panelHeight, true)
+	case PanelScriptEditor:
+		return a.renderPanel("Script Editor", a.scriptEditor.View(), a.width, panelHeight, true)
+	case PanelSchedules:
+		return a.renderPanel("Schedules", a.schedules.View(), a.width, panelHeight, true)
+	case PanelScheduleEditor:
+		return a.renderPanel("Schedule Details", a.scheduleEditor.View(), a.width, panelHeight, true)
+	case PanelWebhooks:
+		return a.renderPanel("Webhooks", a.webhooks.View(), a.width, panelHeight, true)
+	case PanelVirtuals:
+		return a.renderPanel("Virtual Components", a.virtuals.View(), a.width, panelHeight, true)
+	case PanelKVS:
+		return a.renderPanel("Key-Value Store", a.kvs.View(), a.width, panelHeight, true)
+	default:
+		return a.renderPanel("Scripts", a.scripts.View(), a.width, panelHeight, true)
+	}
+}
+
+func (a *Automation) renderStandardLayout() string {
 	// Calculate column widths (50/50 split)
 	leftWidth := a.width / 2
 	rightWidth := a.width - leftWidth - 1 // -1 for gap
@@ -398,7 +432,22 @@ func (a *Automation) SetSize(width, height int) View {
 	a.width = width
 	a.height = height
 
-	// Calculate component sizes
+	if a.isNarrow() {
+		// Narrow mode: all components get full width, full height
+		contentWidth := width - 4
+		contentHeight := height - 6
+
+		a.scripts = a.scripts.SetSize(contentWidth, contentHeight)
+		a.schedules = a.schedules.SetSize(contentWidth, contentHeight)
+		a.webhooks = a.webhooks.SetSize(contentWidth, contentHeight)
+		a.scriptEditor = a.scriptEditor.SetSize(contentWidth, contentHeight)
+		a.scheduleEditor = a.scheduleEditor.SetSize(contentWidth, contentHeight)
+		a.virtuals = a.virtuals.SetSize(contentWidth, contentHeight)
+		a.kvs = a.kvs.SetSize(contentWidth, contentHeight)
+		return a
+	}
+
+	// Standard layout: 2-column split
 	leftWidth := width / 2
 	rightWidth := width - leftWidth - 1
 

@@ -14,27 +14,31 @@ import (
 type TabID int
 
 const (
-	// TabDevices is the devices tab.
-	TabDevices TabID = iota
-	// TabMonitor is the monitor tab.
-	TabMonitor
-	// TabEvents is the events tab.
-	TabEvents
-	// TabEnergy is the energy tab.
-	TabEnergy
+	// TabDashboard is the main dashboard tab showing devices, events, and status.
+	TabDashboard TabID = iota
+	// TabAutomation is the automation tab for scripts, schedules, and webhooks.
+	TabAutomation
+	// TabConfig is the configuration tab for WiFi, system, cloud, and inputs.
+	TabConfig
+	// TabManage is the local device management tab for discovery, batch, firmware, and backup.
+	TabManage
+	// TabFleet is the Shelly Cloud Fleet management tab.
+	TabFleet
 )
 
 // String returns the tab name for display.
 func (t TabID) String() string {
 	switch t {
-	case TabDevices:
-		return "Devices"
-	case TabMonitor:
-		return "Monitor"
-	case TabEvents:
-		return "Events"
-	case TabEnergy:
-		return "Energy"
+	case TabDashboard:
+		return "Dashboard"
+	case TabAutomation:
+		return "Automation"
+	case TabConfig:
+		return "Config"
+	case TabManage:
+		return "Manage"
+	case TabFleet:
+		return "Fleet"
 	default:
 		return "Unknown"
 	}
@@ -43,14 +47,16 @@ func (t TabID) String() string {
 // Icon returns the icon for the tab.
 func (t TabID) Icon() string {
 	switch t {
-	case TabDevices:
-		return "󰋊" // device icon
-	case TabMonitor:
-		return "󰄪" // monitoring icon
-	case TabEvents:
-		return "󰂚" // notification icon
-	case TabEnergy:
-		return "󰒓" // energy/power icon
+	case TabDashboard:
+		return "󰋊" // dashboard/home icon
+	case TabAutomation:
+		return "󰃭" // automation/robot icon
+	case TabConfig:
+		return "󰒓" // config/settings icon
+	case TabManage:
+		return "󰑣" // manage/tools icon
+	case TabFleet:
+		return "󰒍" // fleet/cloud icon
 	default:
 		return "?"
 	}
@@ -121,10 +127,11 @@ func DefaultStyles() Styles {
 func New() Model {
 	return Model{
 		tabs: []Tab{
-			{ID: TabDevices, Label: TabDevices.String(), Icon: TabDevices.Icon(), Enabled: true},
-			{ID: TabMonitor, Label: TabMonitor.String(), Icon: TabMonitor.Icon(), Enabled: true},
-			{ID: TabEvents, Label: TabEvents.String(), Icon: TabEvents.Icon(), Enabled: true},
-			{ID: TabEnergy, Label: TabEnergy.String(), Icon: TabEnergy.Icon(), Enabled: true},
+			{ID: TabDashboard, Label: TabDashboard.String(), Icon: TabDashboard.Icon(), Enabled: true},
+			{ID: TabAutomation, Label: TabAutomation.String(), Icon: TabAutomation.Icon(), Enabled: true},
+			{ID: TabConfig, Label: TabConfig.String(), Icon: TabConfig.Icon(), Enabled: true},
+			{ID: TabManage, Label: TabManage.String(), Icon: TabManage.Icon(), Enabled: true},
+			{ID: TabFleet, Label: TabFleet.String(), Icon: TabFleet.Icon(), Enabled: true},
 		},
 		active:    0,
 		styles:    DefaultStyles(),
@@ -166,6 +173,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.setActive(2)
 	case "4":
 		return m.setActive(3)
+	case "5":
+		return m.setActive(4)
 	}
 	return m, nil
 }

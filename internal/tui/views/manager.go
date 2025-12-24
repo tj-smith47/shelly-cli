@@ -1,5 +1,5 @@
 // Package views provides view management for the TUI.
-// It handles switching between different views (Devices, Monitor, Events, Energy)
+// It handles switching between different views (Dashboard, Automation, Config, Manage, Fleet)
 // and provides a consistent interface for rendering view content.
 package views
 
@@ -13,14 +13,16 @@ import (
 type ViewID = tabs.TabID
 
 const (
-	// ViewDevices is the devices view.
-	ViewDevices = tabs.TabDevices
-	// ViewMonitor is the monitor view.
-	ViewMonitor = tabs.TabMonitor
-	// ViewEvents is the events view.
-	ViewEvents = tabs.TabEvents
-	// ViewEnergy is the energy view.
-	ViewEnergy = tabs.TabEnergy
+	// ViewDashboard is the main dashboard view showing devices, events, and status.
+	ViewDashboard = tabs.TabDashboard
+	// ViewAutomation is the automation view for scripts, schedules, and webhooks.
+	ViewAutomation = tabs.TabAutomation
+	// ViewConfig is the configuration view for WiFi, system, cloud, and inputs.
+	ViewConfig = tabs.TabConfig
+	// ViewManage is the local device management view for discovery, batch, firmware, and backup.
+	ViewManage = tabs.TabManage
+	// ViewFleet is the Shelly Cloud Fleet management view.
+	ViewFleet = tabs.TabFleet
 )
 
 // View represents a renderable view.
@@ -56,7 +58,7 @@ type Manager struct {
 func New() *Manager {
 	return &Manager{
 		views:   make(map[ViewID]View),
-		active:  ViewDevices,
+		active:  ViewDashboard,
 		history: make([]ViewID, 0, 10),
 	}
 }
@@ -187,4 +189,35 @@ func (m *Manager) Width() int {
 // Height returns the current height.
 func (m *Manager) Height() int {
 	return m.height
+}
+
+// DeviceSelectedMsg is emitted when a device is selected in the Dashboard view.
+// Other views can respond to this to load data for the selected device.
+type DeviceSelectedMsg struct {
+	Device  string
+	Address string
+}
+
+// DeviceSettable is an interface for views that can receive a device selection.
+type DeviceSettable interface {
+	SetDevice(device string) tea.Cmd
+}
+
+// PropagateDevice sends the selected device to all views that support it.
+// This enables context propagation from Dashboard to Automation, Config, etc.
+func (m *Manager) PropagateDevice(device string) tea.Cmd {
+	var cmds []tea.Cmd
+
+	for _, v := range m.views {
+		if settable, ok := v.(DeviceSettable); ok {
+			if cmd := settable.SetDevice(device); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+	}
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
 }
