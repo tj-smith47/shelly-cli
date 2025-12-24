@@ -166,7 +166,16 @@ func (m *Manager) Path() string {
 // RegisterDevice adds a device to the registry.
 // The name is normalized for use as a key (e.g., "Master Bathroom" → "master-bathroom")
 // but the original display name is preserved in the Device struct.
+// For plugin-managed devices, use RegisterDeviceWithPlatform instead.
 func (m *Manager) RegisterDevice(name, address string, generation int, deviceType, deviceModel string, auth *model.Auth) error {
+	return m.RegisterDeviceWithPlatform(name, address, generation, deviceType, deviceModel, "", auth)
+}
+
+// RegisterDeviceWithPlatform adds a device to the registry with platform support.
+// The name is normalized for use as a key (e.g., "Master Bathroom" → "master-bathroom")
+// but the original display name is preserved in the Device struct.
+// Empty platform defaults to "shelly" for native Shelly devices.
+func (m *Manager) RegisterDeviceWithPlatform(name, address string, generation int, deviceType, deviceModel, platform string, auth *model.Auth) error {
 	if err := ValidateDeviceName(name); err != nil {
 		return err
 	}
@@ -178,6 +187,7 @@ func (m *Manager) RegisterDevice(name, address string, generation int, deviceTyp
 	m.config.Devices[key] = model.Device{
 		Name:       name, // Preserve original display name
 		Address:    address,
+		Platform:   platform,
 		Generation: generation,
 		Type:       deviceType,
 		Model:      deviceModel,

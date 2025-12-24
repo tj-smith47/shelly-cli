@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
 // DiscoveredDeviceToConfig converts a discovered device to a model.Device.
@@ -254,4 +255,59 @@ func registerParsedDevice(name, address, username, password string) error {
 	// Register with generation=0 (unknown) - will be auto-detected on first use
 	// Device type and model will also be detected on first use
 	return config.RegisterDevice(name, address, 0, "", "", auth)
+}
+
+// ListRegisteredDevices returns all registered devices from the config.
+func ListRegisteredDevices() map[string]model.Device {
+	return config.ListDevices()
+}
+
+// PluginDetectionResultToConfig converts a plugin detection result to a model.Device.
+// The address parameter is used since the detection result may not have the IP address.
+func PluginDetectionResultToConfig(result *plugins.DeviceDetectionResult, address string) model.Device {
+	name := result.DeviceName
+	if name == "" {
+		name = result.DeviceID
+	}
+	if name == "" {
+		name = address
+	}
+
+	return model.Device{
+		Name:       name,
+		Address:    address,
+		Platform:   result.Platform,
+		Generation: 0, // Plugin devices don't have Shelly generations
+		Type:       result.Model,
+		Model:      result.Model,
+	}
+}
+
+// RegisterPluginDiscoveredDevice registers a plugin-detected device.
+// Returns true if the device was added, false if it was already registered.
+func RegisterPluginDiscoveredDevice(result *plugins.DeviceDetectionResult, address string, skipExisting bool) (bool, error) {
+	device := PluginDetectionResultToConfig(result, address)
+
+	// Check if already registered
+	if skipExisting {
+		if _, exists := config.GetDevice(device.Name); exists {
+			return false, nil
+		}
+	}
+
+	// Use RegisterDeviceWithPlatform if we need platform support
+	err := config.RegisterDeviceWithPlatform(
+		device.Name,
+		device.Address,
+		device.Generation,
+		device.Type,
+		device.Model,
+		device.Platform,
+		nil,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to register device %q: %w", device.Name, err)
+	}
+
+	return true, nil
 }

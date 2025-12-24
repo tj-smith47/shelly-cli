@@ -79,6 +79,12 @@ func RegisterDevice(name, address string, generation int, deviceType, deviceMode
 	return getDefaultManager().RegisterDevice(name, address, generation, deviceType, deviceModel, auth)
 }
 
+// RegisterDeviceWithPlatform adds a device to the registry with platform support.
+// Use this for plugin-managed devices (e.g., Tasmota, ESPHome).
+func RegisterDeviceWithPlatform(name, address string, generation int, deviceType, deviceModel, platform string, auth *model.Auth) error {
+	return getDefaultManager().RegisterDeviceWithPlatform(name, address, generation, deviceType, deviceModel, platform, auth)
+}
+
 // UnregisterDevice removes a device from the registry.
 func UnregisterDevice(name string) error {
 	return getDefaultManager().UnregisterDevice(name)
