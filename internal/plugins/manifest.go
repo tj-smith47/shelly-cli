@@ -33,15 +33,17 @@ const (
 
 // Manifest holds metadata for an installed plugin.
 type Manifest struct {
-	SchemaVersion        string `json:"schema_version"`
-	Name                 string `json:"name"`
-	Version              string `json:"version,omitempty"`
-	Description          string `json:"description,omitempty"`
-	InstalledAt          string `json:"installed_at"`
-	UpdatedAt            string `json:"updated_at,omitempty"`
-	Source               Source `json:"source"`
-	Binary               Binary `json:"binary"`
-	MinimumShellyVersion string `json:"minimum_shelly_version,omitempty"`
+	SchemaVersion        string        `json:"schema_version"`
+	Name                 string        `json:"name"`
+	Version              string        `json:"version,omitempty"`
+	Description          string        `json:"description,omitempty"`
+	InstalledAt          string        `json:"installed_at"`
+	UpdatedAt            string        `json:"updated_at,omitempty"`
+	Source               Source        `json:"source"`
+	Binary               Binary        `json:"binary"`
+	MinimumShellyVersion string        `json:"minimum_shelly_version,omitempty"`
+	Capabilities         *Capabilities `json:"capabilities,omitempty"`
+	Hooks                *Hooks        `json:"hooks,omitempty"`
 }
 
 // Source describes where a plugin was installed from.
@@ -59,6 +61,52 @@ type Binary struct {
 	Checksum string `json:"checksum"`
 	Platform string `json:"platform,omitempty"`
 	Size     int64  `json:"size,omitempty"`
+}
+
+// Capabilities defines what a plugin can do.
+// All fields are optional for backward compatibility with existing plugins.
+type Capabilities struct {
+	// DeviceDetection indicates plugin can detect devices during discovery.
+	DeviceDetection bool `json:"device_detection,omitempty"`
+
+	// Platform is the device platform this plugin manages (e.g., "tasmota").
+	Platform string `json:"platform,omitempty"`
+
+	// Components lists controllable component types.
+	// Values: "switch", "light", "cover", "sensor", "energy"
+	Components []string `json:"components,omitempty"`
+
+	// FirmwareUpdates indicates plugin supports firmware update operations.
+	FirmwareUpdates bool `json:"firmware_updates,omitempty"`
+}
+
+// Hooks defines executable entry points for integration.
+// All fields are optional - plugins only implement hooks they support.
+type Hooks struct {
+	// Detect is called during discovery to probe if address is this platform.
+	// Input: --address=<ip> [--auth-user=<user> --auth-pass=<pass>]
+	// Output: JSON DeviceDetectionResult or exit code 1 if not this platform.
+	Detect string `json:"detect,omitempty"`
+
+	// Status returns device status.
+	// Input: --address=<ip> [--auth-user=<user> --auth-pass=<pass>]
+	// Output: JSON with power state, sensor readings, etc.
+	Status string `json:"status,omitempty"`
+
+	// Control executes device control commands.
+	// Input: --address=<ip> --action=<on|off|toggle> --component=<switch|light> --id=<n>
+	// Output: JSON with result.
+	Control string `json:"control,omitempty"`
+
+	// CheckUpdates checks for firmware updates.
+	// Input: --address=<ip>
+	// Output: JSON FirmwareUpdateInfo.
+	CheckUpdates string `json:"check_updates,omitempty"`
+
+	// ApplyUpdate applies firmware update.
+	// Input: --address=<ip> [--url=<ota_url>] [--stage=<stable|beta>]
+	// Output: JSON with success/error.
+	ApplyUpdate string `json:"apply_update,omitempty"`
 }
 
 // NewManifest creates a new manifest with default values.
