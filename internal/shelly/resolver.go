@@ -114,3 +114,15 @@ func tryDetectGeneration(ctx context.Context, address string, auth *model.Auth) 
 func NewService() *Service {
 	return New(NewConfigResolver())
 }
+
+// NewServiceWithRateLimiting creates a new Shelly service with rate limiting from app config.
+// This reads the rate limit config from the config package and applies it.
+func NewServiceWithRateLimiting() *Service {
+	cfg := config.Get()
+	if cfg == nil {
+		return NewService()
+	}
+
+	rateLimitCfg := cfg.GetRateLimitConfig()
+	return New(NewConfigResolver(), WithRateLimiterFromAppConfig(rateLimitCfg))
+}

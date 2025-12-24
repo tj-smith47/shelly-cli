@@ -387,13 +387,74 @@ plugins:
     - ~/custom-plugins
 ```
 
+### Rate Limiting Settings
+
+Configure rate limiting to prevent overloading Shelly devices. This is particularly important for Gen1 (ESP8266) devices which have very limited resources:
+
+- **Gen1 (ESP8266):** Maximum 2 concurrent HTTP connections, easily overwhelmed
+- **Gen2+ (ESP32):** Maximum 5 concurrent HTTP transactions, more resilient
+
+The CLI uses sensible defaults based on these hardware constraints. Customize only if needed.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ratelimit.gen1.min_interval` | duration | `2s` | Minimum time between requests to same Gen1 device |
+| `ratelimit.gen1.max_concurrent` | int | `1` | Max simultaneous requests per Gen1 device |
+| `ratelimit.gen1.circuit_threshold` | int | `3` | Failures before circuit breaker opens |
+| `ratelimit.gen2.min_interval` | duration | `500ms` | Minimum time between requests to same Gen2 device |
+| `ratelimit.gen2.max_concurrent` | int | `3` | Max simultaneous requests per Gen2 device |
+| `ratelimit.gen2.circuit_threshold` | int | `5` | Failures before circuit breaker opens |
+| `ratelimit.global.max_concurrent` | int | `5` | Total concurrent requests across all devices |
+| `ratelimit.global.circuit_open_duration` | duration | `60s` | How long to back off unresponsive devices |
+| `ratelimit.global.circuit_success_threshold` | int | `2` | Successes needed to close circuit |
+
+```yaml
+ratelimit:
+  gen1:
+    min_interval: 2s
+    max_concurrent: 1
+    circuit_threshold: 3
+  gen2:
+    min_interval: 500ms
+    max_concurrent: 3
+    circuit_threshold: 5
+  global:
+    max_concurrent: 5
+    circuit_open_duration: 60s
+    circuit_success_threshold: 2
+```
+
+**Circuit Breaker Pattern:**
+
+The circuit breaker protects both the CLI and devices from cascading failures:
+
+1. **Closed** (normal): Requests flow normally
+2. **Open** (backing off): After `circuit_threshold` consecutive failures, the circuit opens and requests are rejected immediately for `circuit_open_duration`
+3. **Half-Open** (testing): After the duration, a single probe request is allowed. If successful, circuit closes; if failed, circuit reopens
+
 ### TUI Settings
 
 Configure the TUI dashboard.
 
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `tui.refresh_interval` | int | `5` | Legacy: global refresh interval in seconds (deprecated) |
+| `tui.refresh.gen1_online` | duration | `15s` | Refresh interval for online Gen1 devices |
+| `tui.refresh.gen1_offline` | duration | `60s` | Refresh interval for offline Gen1 devices |
+| `tui.refresh.gen2_online` | duration | `5s` | Refresh interval for online Gen2+ devices |
+| `tui.refresh.gen2_offline` | duration | `30s` | Refresh interval for offline Gen2+ devices |
+| `tui.refresh.focused_boost` | duration | `3s` | Faster refresh for currently selected device |
+
 ```yaml
 tui:
-  refresh_interval: 5  # seconds
+  # Adaptive refresh intervals (preferred over refresh_interval)
+  refresh:
+    gen1_online: 15s      # Gen1 is fragile, poll conservatively
+    gen1_offline: 60s     # Don't hammer offline Gen1 devices
+    gen2_online: 5s       # Gen2 handles faster polling
+    gen2_offline: 30s     # Back off for offline Gen2
+    focused_boost: 3s     # Selected device gets priority refresh
+
   theme:
     name: nord  # Independent TUI theme
   keybindings:
@@ -627,9 +688,29 @@ plugins:
   path:
     - ~/.config/shelly/plugins
 
+# Rate limiting (uses sensible defaults - customize only if needed)
+ratelimit:
+  gen1:
+    min_interval: 2s
+    max_concurrent: 1
+    circuit_threshold: 3
+  gen2:
+    min_interval: 500ms
+    max_concurrent: 3
+    circuit_threshold: 5
+  global:
+    max_concurrent: 5
+    circuit_open_duration: 60s
+    circuit_success_threshold: 2
+
 # TUI settings
 tui:
-  refresh_interval: 5
+  refresh:
+    gen1_online: 15s
+    gen1_offline: 60s
+    gen2_online: 5s
+    gen2_offline: 30s
+    focused_boost: 3s
   keybindings:
     quit: [q, ctrl+c]
     toggle: [t, space]

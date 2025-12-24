@@ -34,6 +34,7 @@ type Factory struct {
 	Config func() (*config.Config, error)
 
 	// ShellyService provides the business logic service for device operations.
+	// Rate limiting is automatically applied from config to prevent device overload.
 	ShellyService func() *shelly.Service
 
 	// Browser provides cross-platform URL opening capabilities.
@@ -78,7 +79,9 @@ func NewFactory() *Factory {
 
 	f.ShellyService = func() *shelly.Service {
 		if f.shellyService == nil {
-			f.shellyService = shelly.NewService()
+			// Always use rate limiting from config - it's transparent to callers
+			// and defaults are sensible (prevents device overload with zero config)
+			f.shellyService = shelly.NewServiceWithRateLimiting()
 		}
 		return f.shellyService
 	}

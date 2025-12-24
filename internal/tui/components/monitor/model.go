@@ -201,9 +201,8 @@ func (m Model) fetchStatuses() tea.Cmd {
 		defer cancel()
 
 		// Use errgroup for concurrent status fetching
-		// Limit to 3 concurrent requests to avoid overloading Gen1 (ESP8266) devices
+		// Rate limiting is handled at the service layer
 		g, gctx := errgroup.WithContext(ctx)
-		g.SetLimit(3)
 
 		results := make(chan DeviceStatus, len(deviceMap))
 

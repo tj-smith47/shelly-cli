@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-go/gen2/components"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -251,7 +252,8 @@ func (s *Service) CollectDashboardData(ctx context.Context, ios *iostreams.IOStr
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(10)
+	// Use global rate limit for concurrency (service layer also enforces this)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
 
 	for i, device := range devices {
 		idx, dev := i, device
@@ -345,7 +347,8 @@ func (s *Service) CollectComparisonData(ctx context.Context, ios *iostreams.IOSt
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(10)
+	// Use global rate limit for concurrency (service layer also enforces this)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
 
 	for i, device := range devices {
 		idx, dev := i, device

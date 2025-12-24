@@ -11,6 +11,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -26,6 +27,21 @@ func logVerbose(format string, args ...any) {
 	if viper.GetBool("verbose") {
 		fmt.Fprintf(os.Stderr, "debug: "+format+"\n", args...)
 	}
+}
+
+// CapConcurrency caps the requested concurrency to the global rate limit.
+// If the requested value exceeds the global limit, it prints a warning and returns the capped value.
+// This ensures user-requested parallelism doesn't exceed the rate limiter's global constraint.
+func CapConcurrency(ios *iostreams.IOStreams, requested int) int {
+	globalMax := config.GetGlobalMaxConcurrent()
+
+	if requested > globalMax {
+		ios.Warning("Requested concurrency %d exceeds global rate limit %d; capping to %d.\n"+
+			"  Adjust ratelimit.global.max_concurrent in config to increase.",
+			requested, globalMax, globalMax)
+		return globalMax
+	}
+	return requested
 }
 
 // ComponentAction is a function that operates on a device component.
@@ -54,7 +70,7 @@ func RunWithSpinnerResult[T any](ctx context.Context, ios *iostreams.IOStreams, 
 }
 
 // RunBatch executes an action on multiple devices concurrently.
-// It uses errgroup for concurrency with a configurable limit.
+// It uses errgroup for concurrency, capped to the global rate limit.
 // Errors from individual operations are logged but don't stop the batch.
 // Returns an error only if context is cancelled.
 func RunBatch(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, targets []string, concurrent int, action DeviceAction) error {
@@ -62,8 +78,11 @@ func RunBatch(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service
 		return nil
 	}
 
+	// Cap concurrency to global rate limit
+	capped := CapConcurrency(ios, concurrent)
+
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(concurrent)
+	g.SetLimit(capped)
 
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
 
@@ -112,9 +131,17 @@ type BatchResult struct {
 
 // RunBatchWithResults executes an action on multiple devices and collects results.
 // Unlike RunBatch, this returns all results for further processing.
+// Concurrency is capped to the global rate limit (silently, since no ios available).
 func RunBatchWithResults(ctx context.Context, svc *shelly.Service, targets []string, concurrent int, action DeviceAction) []BatchResult {
 	if len(targets) == 0 {
 		return nil
+	}
+
+	// Cap concurrency to global rate limit (silently)
+	globalMax := config.GetGlobalMaxConcurrent()
+	capped := concurrent
+	if concurrent > globalMax {
+		capped = globalMax
 	}
 
 	results := make([]BatchResult, len(targets))
@@ -124,7 +151,7 @@ func RunBatchWithResults(ctx context.Context, svc *shelly.Service, targets []str
 	}, len(targets))
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(concurrent)
+	g.SetLimit(capped)
 
 	for i, target := range targets {
 		idx := i

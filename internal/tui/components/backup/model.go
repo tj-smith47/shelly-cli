@@ -328,9 +328,8 @@ func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
 			mu      sync.Mutex
 		)
 
-		// Limit to 2 concurrent exports - backups are heavy operations
+		// Rate limiting is handled at the service layer
 		g, gctx := errgroup.WithContext(ctx)
-		g.SetLimit(2)
 
 		for _, dev := range devices {
 			device := dev

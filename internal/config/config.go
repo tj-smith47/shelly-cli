@@ -63,13 +63,17 @@ type Config struct {
 	// Plugin settings
 	Plugins PluginsConfig `mapstructure:"plugins"`
 
+	// Rate limiting settings
+	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
+
 	// TUI settings
 	TUI TUIConfig `mapstructure:"tui"`
 }
 
 // TUIConfig holds TUI dashboard settings.
 type TUIConfig struct {
-	RefreshInterval int               `mapstructure:"refresh_interval"` // Refresh interval in seconds
+	RefreshInterval int               `mapstructure:"refresh_interval"` // Legacy: global refresh interval in seconds (deprecated, use Refresh)
+	Refresh         TUIRefreshConfig  `mapstructure:"refresh"`          // Adaptive refresh intervals per generation
 	Keybindings     KeybindingsConfig `mapstructure:"keybindings"`
 	Theme           *ThemeConfig      `mapstructure:"theme"` // Independent TUI theme (replaces main theme when set)
 }
@@ -178,6 +182,177 @@ type Template struct {
 type PluginsConfig struct {
 	Enabled bool     `mapstructure:"enabled"`
 	Path    []string `mapstructure:"path"` // Additional plugin search paths
+}
+
+// RateLimitConfig holds rate limiting settings to prevent overloading Shelly devices.
+// Shelly devices have hardware limitations:
+//   - Gen1 (ESP8266): MAX 2 concurrent HTTP connections
+//   - Gen2 (ESP32): MAX 5 concurrent HTTP transactions
+type RateLimitConfig struct {
+	Gen1   GenerationRateLimitConfig `mapstructure:"gen1"`
+	Gen2   GenerationRateLimitConfig `mapstructure:"gen2"`
+	Global GlobalRateLimitConfig     `mapstructure:"global"`
+}
+
+// GenerationRateLimitConfig holds rate limiting settings for a specific device generation.
+type GenerationRateLimitConfig struct {
+	MinInterval      time.Duration `mapstructure:"min_interval"`      // Min time between requests to same device
+	MaxConcurrent    int           `mapstructure:"max_concurrent"`    // Max in-flight requests per device
+	CircuitThreshold int           `mapstructure:"circuit_threshold"` // Failures before circuit opens
+}
+
+// GlobalRateLimitConfig holds global rate limiting settings.
+type GlobalRateLimitConfig struct {
+	MaxConcurrent           int           `mapstructure:"max_concurrent"`            // Total concurrent requests across all devices
+	CircuitOpenDuration     time.Duration `mapstructure:"circuit_open_duration"`     // How long circuit stays open
+	CircuitSuccessThreshold int           `mapstructure:"circuit_success_threshold"` // Successes to close circuit
+}
+
+// DefaultRateLimitConfig returns sensible defaults based on Shelly hardware constraints.
+func DefaultRateLimitConfig() RateLimitConfig {
+	return RateLimitConfig{
+		Gen1: GenerationRateLimitConfig{
+			MinInterval:      2 * time.Second, // Gen1 needs breathing room
+			MaxConcurrent:    1,               // Leave 1 connection for safety
+			CircuitThreshold: 3,               // Open circuit after 3 failures
+		},
+		Gen2: GenerationRateLimitConfig{
+			MinInterval:      500 * time.Millisecond, // Gen2 handles faster polling
+			MaxConcurrent:    3,                      // Leave 2 connections for safety
+			CircuitThreshold: 5,                      // Gen2 is more resilient
+		},
+		Global: GlobalRateLimitConfig{
+			MaxConcurrent:           5,                // Total across all devices
+			CircuitOpenDuration:     60 * time.Second, // Standard backoff
+			CircuitSuccessThreshold: 2,                // Successes to close circuit
+		},
+	}
+}
+
+// TUIRefreshConfig holds adaptive refresh interval settings for the TUI.
+type TUIRefreshConfig struct {
+	Gen1Online   time.Duration `mapstructure:"gen1_online"`   // Refresh for online Gen1 devices
+	Gen1Offline  time.Duration `mapstructure:"gen1_offline"`  // Refresh for offline Gen1 devices
+	Gen2Online   time.Duration `mapstructure:"gen2_online"`   // Refresh for online Gen2 devices
+	Gen2Offline  time.Duration `mapstructure:"gen2_offline"`  // Refresh for offline Gen2 devices
+	FocusedBoost time.Duration `mapstructure:"focused_boost"` // Refresh for focused device
+}
+
+// DefaultTUIRefreshConfig returns sensible defaults for TUI refresh intervals.
+func DefaultTUIRefreshConfig() TUIRefreshConfig {
+	return TUIRefreshConfig{
+		Gen1Online:   15 * time.Second, // Gen1 responds well but is fragile
+		Gen1Offline:  60 * time.Second, // Don't hammer offline Gen1
+		Gen2Online:   5 * time.Second,  // Gen2 handles faster polling
+		Gen2Offline:  30 * time.Second, // Back off for offline Gen2
+		FocusedBoost: 3 * time.Second,  // Focused device gets priority
+	}
+}
+
+// GetRateLimitConfig returns the rate limit config with defaults applied.
+// Zero values in the config are replaced with sensible defaults.
+func (c *Config) GetRateLimitConfig() RateLimitConfig {
+	defaults := DefaultRateLimitConfig()
+	cfg := c.RateLimit
+
+	// Apply defaults for zero values
+	if cfg.Gen1.MinInterval == 0 {
+		cfg.Gen1.MinInterval = defaults.Gen1.MinInterval
+	}
+	if cfg.Gen1.MaxConcurrent == 0 {
+		cfg.Gen1.MaxConcurrent = defaults.Gen1.MaxConcurrent
+	}
+	if cfg.Gen1.CircuitThreshold == 0 {
+		cfg.Gen1.CircuitThreshold = defaults.Gen1.CircuitThreshold
+	}
+
+	if cfg.Gen2.MinInterval == 0 {
+		cfg.Gen2.MinInterval = defaults.Gen2.MinInterval
+	}
+	if cfg.Gen2.MaxConcurrent == 0 {
+		cfg.Gen2.MaxConcurrent = defaults.Gen2.MaxConcurrent
+	}
+	if cfg.Gen2.CircuitThreshold == 0 {
+		cfg.Gen2.CircuitThreshold = defaults.Gen2.CircuitThreshold
+	}
+
+	if cfg.Global.MaxConcurrent == 0 {
+		cfg.Global.MaxConcurrent = defaults.Global.MaxConcurrent
+	}
+	if cfg.Global.CircuitOpenDuration == 0 {
+		cfg.Global.CircuitOpenDuration = defaults.Global.CircuitOpenDuration
+	}
+	if cfg.Global.CircuitSuccessThreshold == 0 {
+		cfg.Global.CircuitSuccessThreshold = defaults.Global.CircuitSuccessThreshold
+	}
+
+	return cfg
+}
+
+// GetTUIRefreshConfig returns the TUI refresh config with defaults applied.
+// Zero values in the config are replaced with sensible defaults.
+func (c *Config) GetTUIRefreshConfig() TUIRefreshConfig {
+	defaults := DefaultTUIRefreshConfig()
+	cfg := c.TUI.Refresh
+
+	if cfg.Gen1Online == 0 {
+		cfg.Gen1Online = defaults.Gen1Online
+	}
+	if cfg.Gen1Offline == 0 {
+		cfg.Gen1Offline = defaults.Gen1Offline
+	}
+	if cfg.Gen2Online == 0 {
+		cfg.Gen2Online = defaults.Gen2Online
+	}
+	if cfg.Gen2Offline == 0 {
+		cfg.Gen2Offline = defaults.Gen2Offline
+	}
+	if cfg.FocusedBoost == 0 {
+		cfg.FocusedBoost = defaults.FocusedBoost
+	}
+
+	return cfg
+}
+
+// GetGlobalMaxConcurrent returns the global max concurrent setting.
+// This is a convenience function for rate limiting concurrency across the codebase.
+// It uses the configured value if available, otherwise returns the default.
+func GetGlobalMaxConcurrent() int {
+	cfg := Get()
+	if cfg != nil {
+		rlCfg := cfg.GetRateLimitConfig()
+		if rlCfg.Global.MaxConcurrent > 0 {
+			return rlCfg.Global.MaxConcurrent
+		}
+	}
+	return DefaultRateLimitConfig().Global.MaxConcurrent
+}
+
+// Validate validates the rate limit configuration.
+func (c *RateLimitConfig) Validate() error {
+	if c.Gen1.MaxConcurrent < 0 || c.Gen1.MaxConcurrent > 2 {
+		return fmt.Errorf("gen1.max_concurrent must be 0-2 (Gen1 devices only support 2 connections), got %d", c.Gen1.MaxConcurrent)
+	}
+	if c.Gen2.MaxConcurrent < 0 || c.Gen2.MaxConcurrent > 5 {
+		return fmt.Errorf("gen2.max_concurrent must be 0-5 (Gen2 devices only support 5 connections), got %d", c.Gen2.MaxConcurrent)
+	}
+	if c.Gen1.MinInterval < 0 {
+		return fmt.Errorf("gen1.min_interval must be non-negative, got %v", c.Gen1.MinInterval)
+	}
+	if c.Gen2.MinInterval < 0 {
+		return fmt.Errorf("gen2.min_interval must be non-negative, got %v", c.Gen2.MinInterval)
+	}
+	if c.Global.MaxConcurrent < 1 {
+		return fmt.Errorf("global.max_concurrent must be at least 1, got %d", c.Global.MaxConcurrent)
+	}
+	return nil
+}
+
+// IsZero returns true if all fields are zero values (no config specified).
+func (c *RateLimitConfig) IsZero() bool {
+	return c.Gen1.MinInterval == 0 && c.Gen1.MaxConcurrent == 0 && c.Gen1.CircuitThreshold == 0 &&
+		c.Gen2.MinInterval == 0 && c.Gen2.MaxConcurrent == 0 && c.Gen2.CircuitThreshold == 0 &&
+		c.Global.MaxConcurrent == 0 && c.Global.CircuitOpenDuration == 0 && c.Global.CircuitSuccessThreshold == 0
 }
 
 var (

@@ -108,6 +108,9 @@ func run(ctx context.Context, f *cmdutil.Factory, targets []string, method strin
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
+	// Cap concurrency to global rate limit
+	concurrent = cmdutil.CapConcurrency(ios, concurrent)
+
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
 

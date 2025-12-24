@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
@@ -50,6 +51,39 @@ func WithDefaultRateLimiter() ServiceOption {
 	}
 }
 
+// WithRateLimiterFromConfig configures the service with rate limiting from ratelimit.Config.
+// This allows using custom rate limit settings from configuration files.
+func WithRateLimiterFromConfig(cfg ratelimit.Config) ServiceOption {
+	return func(s *Service) {
+		s.rateLimiter = ratelimit.NewWithConfig(cfg)
+	}
+}
+
+// WithRateLimiterFromAppConfig configures the service with rate limiting from app config.
+// This converts config.RateLimitConfig to ratelimit.Config and creates a rate limiter.
+func WithRateLimiterFromAppConfig(cfg config.RateLimitConfig) ServiceOption {
+	return func(s *Service) {
+		rlConfig := ratelimit.Config{
+			Gen1: ratelimit.GenerationConfig{
+				MinInterval:      cfg.Gen1.MinInterval,
+				MaxConcurrent:    cfg.Gen1.MaxConcurrent,
+				CircuitThreshold: cfg.Gen1.CircuitThreshold,
+			},
+			Gen2: ratelimit.GenerationConfig{
+				MinInterval:      cfg.Gen2.MinInterval,
+				MaxConcurrent:    cfg.Gen2.MaxConcurrent,
+				CircuitThreshold: cfg.Gen2.CircuitThreshold,
+			},
+			Global: ratelimit.GlobalConfig{
+				MaxConcurrent:           cfg.Global.MaxConcurrent,
+				CircuitOpenDuration:     cfg.Global.CircuitOpenDuration,
+				CircuitSuccessThreshold: cfg.Global.CircuitSuccessThreshold,
+			},
+		}
+		s.rateLimiter = ratelimit.NewWithConfig(rlConfig)
+	}
+}
+
 // New creates a new Shelly service with optional configuration.
 func New(resolver DeviceResolver, opts ...ServiceOption) *Service {
 	svc := &Service{resolver: resolver}
@@ -70,8 +104,42 @@ func (s *Service) Connect(ctx context.Context, identifier string) (*client.Clien
 }
 
 // WithConnection executes a function with a device connection, handling cleanup.
+// Rate limiting is automatically applied if configured.
 func (s *Service) WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error {
-	conn, err := s.Connect(ctx, identifier)
+	// Resolve device to get address and generation for rate limiting
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+	if err != nil {
+		return err
+	}
+
+	// If no rate limiter, execute directly (backward compatible)
+	if s.rateLimiter == nil {
+		return s.executeWithConnection(ctx, device, fn)
+	}
+
+	// Acquire rate limiter slot
+	release, err := s.rateLimiter.Acquire(ctx, device.Address, device.Generation)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	// Execute the operation
+	err = s.executeWithConnection(ctx, device, fn)
+
+	// Record success/failure for circuit breaker
+	if err != nil {
+		s.rateLimiter.RecordFailure(device.Address)
+	} else {
+		s.rateLimiter.RecordSuccess(device.Address)
+	}
+
+	return err
+}
+
+// executeWithConnection performs the actual connection and function execution.
+func (s *Service) executeWithConnection(ctx context.Context, device model.Device, fn func(*client.Client) error) error {
+	conn, err := client.Connect(ctx, device)
 	if err != nil {
 		return err
 	}
@@ -128,8 +196,42 @@ func (s *Service) ConnectGen1(ctx context.Context, identifier string) (*client.G
 }
 
 // WithGen1Connection executes a function with a Gen1 device connection, handling cleanup.
+// Rate limiting is automatically applied if configured.
 func (s *Service) WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error {
-	conn, err := s.ConnectGen1(ctx, identifier)
+	// Resolve device to get address for rate limiting
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+	if err != nil {
+		return err
+	}
+
+	// If no rate limiter, execute directly (backward compatible)
+	if s.rateLimiter == nil {
+		return s.executeWithGen1Connection(ctx, device, fn)
+	}
+
+	// Gen1 devices always use generation=1 for rate limiting
+	release, err := s.rateLimiter.Acquire(ctx, device.Address, 1)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	// Execute the operation
+	err = s.executeWithGen1Connection(ctx, device, fn)
+
+	// Record success/failure for circuit breaker
+	if err != nil {
+		s.rateLimiter.RecordFailure(device.Address)
+	} else {
+		s.rateLimiter.RecordSuccess(device.Address)
+	}
+
+	return err
+}
+
+// executeWithGen1Connection performs the actual Gen1 connection and function execution.
+func (s *Service) executeWithGen1Connection(ctx context.Context, device model.Device, fn func(*client.Gen1Client) error) error {
+	conn, err := client.ConnectGen1(ctx, device)
 	if err != nil {
 		return err
 	}

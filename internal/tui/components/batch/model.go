@@ -337,8 +337,8 @@ func (m Model) executeOperation(devices []DeviceSelection) tea.Cmd {
 			mu      sync.Mutex
 		)
 
+		// Rate limiting is handled at the service layer
 		g, gctx := errgroup.WithContext(ctx)
-		g.SetLimit(5) // Limit concurrent operations
 
 		for _, dev := range devices {
 			device := dev

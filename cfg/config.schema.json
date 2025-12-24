@@ -178,16 +178,39 @@
       },
       "additionalProperties": false
     },
+    "ratelimit": {
+      "type": "object",
+      "description": "Rate limiting settings to prevent overloading Shelly devices. Gen1 (ESP8266) supports max 2 concurrent connections, Gen2 (ESP32) supports max 5 concurrent transactions.",
+      "properties": {
+        "gen1": {
+          "$ref": "#/$defs/generationRateLimitConfig",
+          "description": "Rate limiting for Gen1 (ESP8266) devices"
+        },
+        "gen2": {
+          "$ref": "#/$defs/generationRateLimitConfig",
+          "description": "Rate limiting for Gen2 (ESP32) devices"
+        },
+        "global": {
+          "$ref": "#/$defs/globalRateLimitConfig",
+          "description": "Global rate limiting settings"
+        }
+      },
+      "additionalProperties": false
+    },
     "tui": {
       "type": "object",
       "description": "TUI dashboard settings",
       "properties": {
         "refresh_interval": {
           "type": "integer",
-          "description": "Refresh interval in seconds",
+          "description": "Legacy refresh interval in seconds (deprecated, use 'refresh' for generation-aware intervals)",
           "minimum": 1,
           "maximum": 300,
           "default": 5
+        },
+        "refresh": {
+          "$ref": "#/$defs/tuiRefreshConfig",
+          "description": "Adaptive refresh intervals based on device generation and state"
         },
         "keybindings": {
           "$ref": "#/$defs/keybindings"
@@ -653,6 +676,95 @@
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$",
           "description": "Table border color"
+        }
+      },
+      "additionalProperties": false
+    },
+    "generationRateLimitConfig": {
+      "type": "object",
+      "description": "Rate limiting settings for a specific device generation",
+      "properties": {
+        "min_interval": {
+          "type": "string",
+          "description": "Minimum time between requests to the same device (e.g., '2s', '500ms')",
+          "pattern": "^[0-9]+(ms|s|m)$",
+          "examples": ["2s", "500ms"]
+        },
+        "max_concurrent": {
+          "type": "integer",
+          "description": "Maximum in-flight requests per device",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "circuit_threshold": {
+          "type": "integer",
+          "description": "Number of consecutive failures before circuit breaker opens",
+          "minimum": 1,
+          "maximum": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "globalRateLimitConfig": {
+      "type": "object",
+      "description": "Global rate limiting settings across all devices",
+      "properties": {
+        "max_concurrent": {
+          "type": "integer",
+          "description": "Total concurrent requests across all devices",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 5
+        },
+        "circuit_open_duration": {
+          "type": "string",
+          "description": "How long a circuit stays open before testing recovery (e.g., '60s', '2m')",
+          "pattern": "^[0-9]+(ms|s|m)$",
+          "default": "60s"
+        },
+        "circuit_success_threshold": {
+          "type": "integer",
+          "description": "Number of consecutive successes needed to close circuit",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 2
+        }
+      },
+      "additionalProperties": false
+    },
+    "tuiRefreshConfig": {
+      "type": "object",
+      "description": "Adaptive refresh intervals for TUI based on device generation and online status",
+      "properties": {
+        "gen1_online": {
+          "type": "string",
+          "description": "Refresh interval for online Gen1 devices (e.g., '15s')",
+          "pattern": "^[0-9]+(ms|s|m)$",
+          "default": "15s"
+        },
+        "gen1_offline": {
+          "type": "string",
+          "description": "Refresh interval for offline Gen1 devices (e.g., '60s')",
+          "pattern": "^[0-9]+(ms|s|m)$",
+          "default": "60s"
+        },
+        "gen2_online": {
+          "type": "string",
+          "description": "Refresh interval for online Gen2 devices (e.g., '5s')",
+          "pattern": "^[0-9]+(ms|s|m)$",
+          "default": "5s"
+        },
+        "gen2_offline": {
+          "type": "string",
+          "description": "Refresh interval for offline Gen2 devices (e.g., '30s')",
+          "pattern": "^[0-9]+(ms|s|m)$",
+          "default": "30s"
+        },
+        "focused_boost": {
+          "type": "string",
+          "description": "Faster refresh interval for the currently focused device (e.g., '3s')",
+          "pattern": "^[0-9]+(ms|s|m)$",
+          "default": "3s"
         }
       },
       "additionalProperties": false

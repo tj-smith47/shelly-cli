@@ -195,9 +195,8 @@ func (m Model) checkAllDevices() tea.Cmd {
 			mu      sync.Mutex
 		)
 
-		// Limit to 3 concurrent requests to avoid overloading devices
+		// Rate limiting is handled at the service layer
 		g, gctx := errgroup.WithContext(ctx)
-		g.SetLimit(3)
 
 		for _, dev := range m.devices {
 			device := dev

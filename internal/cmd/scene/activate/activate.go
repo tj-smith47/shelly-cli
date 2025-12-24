@@ -62,6 +62,9 @@ Use --dry-run to preview actions without executing them.`,
 func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Duration, concurrent int, dryRun bool) error {
 	ios := f.IOStreams()
 
+	// Cap concurrency to global rate limit
+	concurrent = cmdutil.CapConcurrency(ios, concurrent)
+
 	scene, exists := config.GetScene(name)
 	if !exists {
 		return fmt.Errorf("scene %q not found", name)

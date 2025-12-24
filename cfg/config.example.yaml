@@ -246,12 +246,47 @@ plugins:
   #   - ~/my-shelly-plugins
 
 # =============================================================================
+# Rate Limiting Settings
+# =============================================================================
+
+# Rate limiting prevents overloading Shelly devices, which have hardware limits:
+# - Gen1 (ESP8266): MAX 2 concurrent HTTP connections, easily overwhelmed
+# - Gen2 (ESP32): MAX 5 concurrent HTTP transactions, more resilient
+
+# These are the defaults - uncomment to customize:
+# ratelimit:
+#   gen1:
+#     min_interval: 2s       # Minimum time between requests to same Gen1 device
+#     max_concurrent: 1      # Max simultaneous requests per Gen1 device
+#     circuit_threshold: 3   # Failures before circuit breaker opens
+#   gen2:
+#     min_interval: 500ms    # Gen2 can handle faster polling
+#     max_concurrent: 3      # More headroom for Gen2
+#     circuit_threshold: 5   # Gen2 is more resilient
+#   global:
+#     max_concurrent: 5           # Total concurrent requests across all devices
+#     circuit_open_duration: 60s  # How long to back off unresponsive devices
+#     circuit_success_threshold: 2 # Successes needed to close circuit
+
+# =============================================================================
 # TUI Dashboard Settings
 # =============================================================================
 
 tui:
-  # Auto-refresh interval in seconds (1-300)
-  refresh_interval: 5
+  # Legacy: global refresh interval (deprecated, use 'refresh' below)
+  # refresh_interval: 5
+
+  # Adaptive refresh intervals based on device generation and state
+  # Gen1 devices get longer intervals to avoid overwhelming them
+  # Focused device (currently selected) refreshes faster for responsiveness
+  #
+  # These are the defaults - uncomment to customize:
+  # refresh:
+  #   gen1_online: 15s     # Online Gen1 devices (conservative)
+  #   gen1_offline: 60s    # Offline Gen1 devices (don't hammer them)
+  #   gen2_online: 5s      # Online Gen2 devices (handles faster polling)
+  #   gen2_offline: 30s    # Offline Gen2 devices
+  #   focused_boost: 3s    # Currently selected device gets priority
 
   # TUI-specific theme (independent - completely replaces main theme when set)
   # Supports same formats as main theme: string, block with colors, or file

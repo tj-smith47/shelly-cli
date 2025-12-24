@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -149,7 +150,8 @@ func (s *Service) CheckFirmwareAll(ctx context.Context, ios *iostreams.IOStreams
 	ios.StartProgress("Checking firmware on all devices...")
 
 	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(5) // Limit concurrent checks
+	// Use global rate limit for concurrency (service layer also enforces this)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
 
 	for _, name := range devices {
 		deviceName := name
@@ -188,7 +190,8 @@ func (s *Service) CheckDevicesForUpdates(ctx context.Context, ios *iostreams.IOS
 	)
 
 	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(5)
+	// Use global rate limit for concurrency (service layer also enforces this)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
 
 	for _, name := range devices {
 		deviceName := name
@@ -247,6 +250,16 @@ type UpdateResult struct {
 
 // UpdateDevices performs firmware updates on multiple devices concurrently.
 func (s *Service) UpdateDevices(ctx context.Context, ios *iostreams.IOStreams, devices []DeviceUpdateStatus, opts UpdateOpts) []UpdateResult {
+	// Cap parallelism to global rate limit
+	parallelism := opts.Parallelism
+	globalMax := config.GetGlobalMaxConcurrent()
+	if parallelism > globalMax {
+		ios.Warning("Requested parallelism %d exceeds global rate limit %d; capping to %d.\n"+
+			"  Adjust ratelimit.global.max_concurrent in config to increase.",
+			parallelism, globalMax, globalMax)
+		parallelism = globalMax
+	}
+
 	ios.StartProgress("Updating devices...")
 
 	var (
@@ -255,7 +268,7 @@ func (s *Service) UpdateDevices(ctx context.Context, ios *iostreams.IOStreams, d
 	)
 
 	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(opts.Parallelism)
+	g.SetLimit(parallelism)
 
 	for _, status := range devices {
 		dev := status

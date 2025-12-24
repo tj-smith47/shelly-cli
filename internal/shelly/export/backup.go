@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -51,13 +52,20 @@ func NewBackupExporter(svc *shelly.Service) *BackupExporter {
 // ExportAll exports backups for all provided devices concurrently.
 // It returns results for each device, including failures.
 func (e *BackupExporter) ExportAll(ctx context.Context, devices map[string]model.Device, opts BackupExportOptions) []BackupResult {
+	// Cap parallelism to global rate limit (silently, no ios available)
+	parallelism := opts.Parallel
+	globalMax := config.GetGlobalMaxConcurrent()
+	if parallelism > globalMax {
+		parallelism = globalMax
+	}
+
 	var (
 		mu      sync.Mutex
 		results []BackupResult
 	)
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(opts.Parallel)
+	g.SetLimit(parallelism)
 
 	for name, device := range devices {
 		deviceName := name

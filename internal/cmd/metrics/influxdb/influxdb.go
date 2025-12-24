@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -159,7 +160,8 @@ func collectAndWrite(ctx context.Context, svc *shelly.Service, devices []string,
 	now := time.Now()
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(10)
+	// Use global rate limit for concurrency (service layer also enforces this)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
 
 	var mu sync.Mutex
 	var allPoints []shelly.InfluxDBPoint
