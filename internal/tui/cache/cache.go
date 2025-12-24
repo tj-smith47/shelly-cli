@@ -4,7 +4,9 @@ package cache
 
 import (
 	"context"
+	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -37,6 +39,10 @@ type DeviceData struct {
 	Switches []SwitchState
 
 	UpdatedAt time.Time
+
+	// lastRequestID tracks the most recent request for stale response handling.
+	// Responses with older request IDs are discarded.
+	lastRequestID uint64
 }
 
 // SwitchState holds the state of a switch component.
@@ -48,15 +54,59 @@ type SwitchState struct {
 
 // DeviceUpdateMsg is sent when a single device's data is updated.
 type DeviceUpdateMsg struct {
-	Name string
-	Data *DeviceData
+	Name      string
+	Data      *DeviceData
+	RequestID uint64 // For stale response handling
 }
 
 // AllDevicesLoadedMsg is sent when all devices have been fetched at least once.
 type AllDevicesLoadedMsg struct{}
 
-// RefreshTickMsg triggers periodic refresh.
+// RefreshTickMsg triggers periodic refresh (deprecated, kept for compatibility).
 type RefreshTickMsg struct{}
+
+// DeviceRefreshMsg triggers refresh for a single device.
+type DeviceRefreshMsg struct {
+	Name string
+}
+
+// WaveMsg represents a wave of devices to load.
+type WaveMsg struct {
+	Wave      int
+	Devices   []deviceFetch
+	Remaining [][]deviceFetch
+}
+
+// WaveCompleteMsg signals a wave has completed loading.
+type WaveCompleteMsg struct {
+	Wave int
+}
+
+// deviceFetch holds info for fetching a single device.
+type deviceFetch struct {
+	Name   string
+	Device model.Device
+}
+
+// RefreshConfig holds adaptive refresh intervals.
+type RefreshConfig struct {
+	Gen1Online   time.Duration // Refresh interval for online Gen1 devices
+	Gen1Offline  time.Duration // Refresh interval for offline Gen1 devices
+	Gen2Online   time.Duration // Refresh interval for online Gen2 devices
+	Gen2Offline  time.Duration // Refresh interval for offline Gen2 devices
+	FocusedBoost time.Duration // Faster refresh for currently focused device
+}
+
+// DefaultRefreshConfig returns sensible defaults for refresh intervals.
+func DefaultRefreshConfig() RefreshConfig {
+	return RefreshConfig{
+		Gen1Online:   15 * time.Second, // Gen1 responds well but is fragile
+		Gen1Offline:  60 * time.Second, // Don't hammer offline Gen1
+		Gen2Online:   5 * time.Second,  // Gen2 handles faster polling
+		Gen2Offline:  30 * time.Second, // Back off for offline Gen2
+		FocusedBoost: 3 * time.Second,  // Fast refresh for focused device
+	}
+}
 
 // Cache holds shared device data for all TUI components.
 type Cache struct {
@@ -67,42 +117,135 @@ type Cache struct {
 	ctx             context.Context
 	svc             *shelly.Service
 	ios             *iostreams.IOStreams
-	refreshInterval time.Duration
+	refreshInterval time.Duration // Base interval (still used for compatibility)
+	refreshConfig   RefreshConfig // Adaptive refresh intervals
 
 	// Track fetch progress
 	pendingCount int
 	initialLoad  bool
+
+	// Wave loading state
+	currentWave int
+
+	// Adaptive refresh state
+	focusedDevice      string               // Currently focused device gets faster refresh
+	deviceRefreshTimes map[string]time.Time // Track last refresh per device
+
+	// Request ID tracking for stale response handling
+	requestCounter uint64
 }
 
 // New creates a new shared cache.
 func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, refreshInterval time.Duration) *Cache {
 	return &Cache{
-		ctx:             ctx,
-		svc:             svc,
-		ios:             ios,
-		refreshInterval: refreshInterval,
-		devices:         make(map[string]*DeviceData),
-		initialLoad:     true,
+		ctx:                ctx,
+		svc:                svc,
+		ios:                ios,
+		refreshInterval:    refreshInterval,
+		refreshConfig:      DefaultRefreshConfig(),
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		initialLoad:        true,
+	}
+}
+
+// NewWithRefreshConfig creates a cache with custom refresh configuration.
+func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, cfg RefreshConfig) *Cache {
+	return &Cache{
+		ctx:                ctx,
+		svc:                svc,
+		ios:                ios,
+		refreshInterval:    cfg.Gen2Online, // Use Gen2 online as base
+		refreshConfig:      cfg,
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		initialLoad:        true,
 	}
 }
 
 // Init returns the initial command to start fetching devices.
 func (c *Cache) Init() tea.Cmd {
-	return tea.Batch(
-		c.loadDevices(),
-		c.scheduleRefresh(),
-	)
+	return c.loadDevicesWave()
 }
 
-// scheduleRefresh schedules the next refresh tick.
+// scheduleRefresh schedules the next refresh tick (deprecated - use scheduleDeviceRefresh).
 func (c *Cache) scheduleRefresh() tea.Cmd {
 	return tea.Tick(c.refreshInterval, func(time.Time) tea.Msg {
 		return RefreshTickMsg{}
 	})
 }
 
-// loadDevices loads all devices from config and starts fetching their status.
-func (c *Cache) loadDevices() tea.Cmd {
+// scheduleDeviceRefresh schedules refresh for a single device based on its state.
+func (c *Cache) scheduleDeviceRefresh(name string, data *DeviceData) tea.Cmd {
+	interval := c.getRefreshInterval(data)
+	return tea.Tick(interval, func(time.Time) tea.Msg {
+		return DeviceRefreshMsg{Name: name}
+	})
+}
+
+// getRefreshInterval returns the appropriate refresh interval for a device.
+func (c *Cache) getRefreshInterval(data *DeviceData) time.Duration {
+	// Focused device gets faster refresh
+	if data != nil && data.Device.Name != "" && data.Device.Name == c.focusedDevice {
+		return c.refreshConfig.FocusedBoost
+	}
+
+	// No data or info - use default Gen2 online interval
+	if data == nil {
+		return c.refreshConfig.Gen2Online
+	}
+
+	// Unknown generation - check online status only
+	if data.Info == nil {
+		if data.Online {
+			return c.refreshConfig.Gen2Online
+		}
+		return c.refreshConfig.Gen2Offline
+	}
+
+	// Gen1 device intervals
+	if data.Info.Generation == 1 {
+		if data.Online {
+			return c.refreshConfig.Gen1Online
+		}
+		return c.refreshConfig.Gen1Offline
+	}
+
+	// Gen2+ device intervals
+	if data.Online {
+		return c.refreshConfig.Gen2Online
+	}
+	return c.refreshConfig.Gen2Offline
+}
+
+// SetFocusedDevice sets the currently focused device for faster refresh.
+func (c *Cache) SetFocusedDevice(name string) tea.Cmd {
+	c.mu.Lock()
+	old := c.focusedDevice
+	c.focusedDevice = name
+	c.mu.Unlock()
+
+	if name != old && name != "" {
+		// Trigger immediate refresh of newly focused device
+		c.mu.RLock()
+		data := c.devices[name]
+		c.mu.RUnlock()
+		if data != nil {
+			return c.fetchDeviceWithID(name, data.Device)
+		}
+	}
+	return nil
+}
+
+// GetFocusedDevice returns the currently focused device name.
+func (c *Cache) GetFocusedDevice() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.focusedDevice
+}
+
+// loadDevicesWave initiates wave-based device loading.
+func (c *Cache) loadDevicesWave() tea.Cmd {
 	return func() tea.Msg {
 		deviceMap := config.ListDevices()
 		if len(deviceMap) == 0 {
@@ -124,22 +267,111 @@ func (c *Cache) loadDevices() tea.Cmd {
 		c.pendingCount = len(deviceMap)
 		c.mu.Unlock()
 
-		// Return a batch of commands to fetch each device
-		cmds := make([]tea.Cmd, 0, len(deviceMap))
-		for name, dev := range deviceMap {
-			cmds = append(cmds, c.fetchDevice(name, dev))
+		// Create waves (Gen2 first for resilience)
+		waves := createWaves(deviceMap)
+		if len(waves) == 0 {
+			return AllDevicesLoadedMsg{}
 		}
-		return tea.BatchMsg(cmds)
+
+		// Start first wave immediately
+		return WaveMsg{
+			Wave:      0,
+			Devices:   waves[0],
+			Remaining: waves[1:],
+		}
 	}
 }
 
-// fetchDevice fetches status for a single device.
+// createWaves creates device loading waves with Gen2 devices first.
+// Gen2 devices (ESP32) are more resilient and can handle concurrent requests better.
+// Wave sizing: first wave is 3 devices for quick UI feedback, then 2 per wave.
+func createWaves(devices map[string]model.Device) [][]deviceFetch {
+	if len(devices) == 0 {
+		return nil
+	}
+
+	// Convert to slice for sorting
+	fetches := make([]deviceFetch, 0, len(devices))
+	for name, dev := range devices {
+		fetches = append(fetches, deviceFetch{Name: name, Device: dev})
+	}
+
+	// Sort: Gen2 first (generation > 1 or unknown), then Gen1, then by name
+	sort.Slice(fetches, func(i, j int) bool {
+		iGen := fetches[i].Device.Generation
+		jGen := fetches[j].Device.Generation
+		// Gen2+ first (generation 0 = unknown, treat as Gen2)
+		iGen1 := iGen == 1
+		jGen1 := jGen == 1
+		if iGen1 != jGen1 {
+			return !iGen1 // Gen2 first
+		}
+		return fetches[i].Name < fetches[j].Name
+	})
+
+	// Determine wave sizes
+	// First wave: 3 devices for quick feedback
+	// Subsequent waves: 2 devices to avoid overloading
+	firstWaveSize := 3
+	subsequentWaveSize := 2
+
+	if len(fetches) <= firstWaveSize {
+		return [][]deviceFetch{fetches}
+	}
+
+	waves := make([][]deviceFetch, 0)
+	waves = append(waves, fetches[:firstWaveSize])
+	remaining := fetches[firstWaveSize:]
+
+	for len(remaining) > 0 {
+		size := subsequentWaveSize
+		if size > len(remaining) {
+			size = len(remaining)
+		}
+		waves = append(waves, remaining[:size])
+		remaining = remaining[size:]
+	}
+
+	return waves
+}
+
+// processWave processes a wave of device fetches.
+func (c *Cache) processWave(msg WaveMsg) tea.Cmd {
+	// Fetch all devices in this wave
+	cmds := make([]tea.Cmd, 0, len(msg.Devices)+1)
+	for _, df := range msg.Devices {
+		cmds = append(cmds, c.fetchDeviceWithID(df.Name, df.Device))
+	}
+
+	// Schedule next wave with delay if there are more
+	if len(msg.Remaining) > 0 {
+		cmds = append(cmds, tea.Tick(300*time.Millisecond, func(time.Time) tea.Msg {
+			return WaveMsg{
+				Wave:      msg.Wave + 1,
+				Devices:   msg.Remaining[0],
+				Remaining: msg.Remaining[1:],
+			}
+		}))
+	}
+
+	return tea.Batch(cmds...)
+}
+
+// fetchDevice fetches status for a single device (deprecated - use fetchDeviceWithID).
 func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
+	return c.fetchDeviceWithID(name, device)
+}
+
+// fetchDeviceWithID fetches status for a single device with request ID tracking.
+func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
+	requestID := atomic.AddUint64(&c.requestCounter, 1)
+
 	return func() tea.Msg {
 		data := &DeviceData{
-			Device:    device,
-			Fetched:   true,
-			UpdatedAt: time.Now(),
+			Device:        device,
+			Fetched:       true,
+			UpdatedAt:     time.Now(),
+			lastRequestID: requestID,
 		}
 
 		// Per-device timeout
@@ -151,7 +383,7 @@ func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
 		if err != nil {
 			data.Error = err
 			data.Online = false
-			return DeviceUpdateMsg{Name: name, Data: data}
+			return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
 		}
 
 		data.Info = info
@@ -161,7 +393,7 @@ func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
 		if info.Generation == 1 {
 			// For Gen1, we're online but don't have switch/monitoring data yet
 			// TODO: Add Gen1-specific relay status collection
-			return DeviceUpdateMsg{Name: name, Data: data}
+			return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
 		}
 
 		// Gen2+ device - get switch states
@@ -185,7 +417,7 @@ func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
 			c.aggregateMetrics(data, snapshot)
 		}
 
-		return DeviceUpdateMsg{Name: name, Data: data}
+		return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
 	}
 }
 
@@ -229,9 +461,25 @@ func (c *Cache) aggregateMetrics(data *DeviceData, snapshot *shelly.MonitoringSn
 // Update handles cache-related messages.
 func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
+	case WaveMsg:
+		c.mu.Lock()
+		c.currentWave = msg.Wave
+		c.mu.Unlock()
+		return c.processWave(msg)
+
 	case DeviceUpdateMsg:
 		c.mu.Lock()
+		existing := c.devices[msg.Name]
+
+		// Discard stale responses - only accept newer request IDs
+		if existing != nil && msg.RequestID > 0 && msg.RequestID < existing.lastRequestID {
+			c.mu.Unlock()
+			return nil // Stale response, discard
+		}
+
+		// Update device data
 		c.devices[msg.Name] = msg.Data
+		c.deviceRefreshTimes[msg.Name] = time.Now()
 		c.pendingCount--
 		allDone := c.pendingCount <= 0 && c.initialLoad
 		if allDone {
@@ -239,12 +487,32 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		}
 		c.mu.Unlock()
 
+		// Schedule next refresh for this device (adaptive interval)
+		var cmds []tea.Cmd
+		cmds = append(cmds, c.scheduleDeviceRefresh(msg.Name, msg.Data))
+
 		if allDone {
-			return func() tea.Msg { return AllDevicesLoadedMsg{} }
+			cmds = append(cmds, func() tea.Msg { return AllDevicesLoadedMsg{} })
 		}
-		return nil
+
+		if len(cmds) == 1 {
+			return cmds[0]
+		}
+		return tea.Batch(cmds...)
+
+	case DeviceRefreshMsg:
+		// Refresh a single device
+		c.mu.RLock()
+		data := c.devices[msg.Name]
+		c.mu.RUnlock()
+
+		if data == nil {
+			return nil
+		}
+		return c.fetchDeviceWithID(msg.Name, data.Device)
 
 	case RefreshTickMsg:
+		// Legacy: batch refresh all devices (kept for compatibility)
 		return tea.Batch(
 			c.refreshAllDevices(),
 			c.scheduleRefresh(),

@@ -6,6 +6,13 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+)
+
+const (
+	deviceKitchen = "kitchen"
+	deviceOffice  = "office"
+	deviceBedroom = "bedroom"
 )
 
 func TestSortStrings(t *testing.T) {
@@ -135,12 +142,12 @@ func TestDeviceUpdateMsg_Fields(t *testing.T) {
 	}
 
 	msg := DeviceUpdateMsg{
-		Name: "kitchen",
+		Name: deviceKitchen,
 		Data: data,
 	}
 
-	if msg.Name != "kitchen" {
-		t.Errorf("DeviceUpdateMsg.Name = %q, want 'kitchen'", msg.Name)
+	if msg.Name != deviceKitchen {
+		t.Errorf("DeviceUpdateMsg.Name = %q, want %q", msg.Name, deviceKitchen)
 	}
 	if msg.Data != data {
 		t.Error("DeviceUpdateMsg.Data should match input")
@@ -388,5 +395,515 @@ func TestCache_FetchedCount(t *testing.T) {
 
 	if count := c.FetchedCount(); count != 3 {
 		t.Errorf("FetchedCount() = %d, want 3", count)
+	}
+}
+
+// === Tests for Phase 0.5.2: Wave-Based Device Loading ===
+
+func TestCreateWaves_Empty(t *testing.T) {
+	t.Parallel()
+
+	waves := createWaves(map[string]model.Device{})
+	if waves != nil {
+		t.Errorf("createWaves(empty) = %v, want nil", waves)
+	}
+}
+
+func TestCreateWaves_SingleDevice(t *testing.T) {
+	t.Parallel()
+
+	devices := map[string]model.Device{
+		"kitchen": {Address: "192.168.1.100", Generation: 2},
+	}
+
+	waves := createWaves(devices)
+	if len(waves) != 1 {
+		t.Fatalf("createWaves() returned %d waves, want 1", len(waves))
+	}
+	if len(waves[0]) != 1 {
+		t.Errorf("waves[0] has %d devices, want 1", len(waves[0]))
+	}
+}
+
+func TestCreateWaves_ThreeDevices(t *testing.T) {
+	t.Parallel()
+
+	// Three devices should fit in a single wave (first wave is 3)
+	devices := map[string]model.Device{
+		"a": {Address: "192.168.1.100", Generation: 2},
+		"b": {Address: "192.168.1.101", Generation: 2},
+		"c": {Address: "192.168.1.102", Generation: 2},
+	}
+
+	waves := createWaves(devices)
+	if len(waves) != 1 {
+		t.Fatalf("createWaves() returned %d waves, want 1", len(waves))
+	}
+	if len(waves[0]) != 3 {
+		t.Errorf("waves[0] has %d devices, want 3", len(waves[0]))
+	}
+}
+
+func TestCreateWaves_MultipleWaves(t *testing.T) {
+	t.Parallel()
+
+	// 7 devices: first wave = 3, then 2, then 2
+	devices := map[string]model.Device{
+		"a": {Address: "192.168.1.100", Generation: 2},
+		"b": {Address: "192.168.1.101", Generation: 2},
+		"c": {Address: "192.168.1.102", Generation: 2},
+		"d": {Address: "192.168.1.103", Generation: 2},
+		"e": {Address: "192.168.1.104", Generation: 2},
+		"f": {Address: "192.168.1.105", Generation: 2},
+		"g": {Address: "192.168.1.106", Generation: 2},
+	}
+
+	waves := createWaves(devices)
+	if len(waves) != 3 {
+		t.Fatalf("createWaves() returned %d waves, want 3", len(waves))
+	}
+	if len(waves[0]) != 3 {
+		t.Errorf("waves[0] has %d devices, want 3", len(waves[0]))
+	}
+	if len(waves[1]) != 2 {
+		t.Errorf("waves[1] has %d devices, want 2", len(waves[1]))
+	}
+	if len(waves[2]) != 2 {
+		t.Errorf("waves[2] has %d devices, want 2", len(waves[2]))
+	}
+}
+
+func TestCreateWaves_Gen2First(t *testing.T) {
+	t.Parallel()
+
+	// Gen2 devices should come before Gen1
+	devices := map[string]model.Device{
+		"gen1_a": {Address: "192.168.1.100", Generation: 1},
+		"gen2_b": {Address: "192.168.1.101", Generation: 2},
+		"gen1_c": {Address: "192.168.1.102", Generation: 1},
+		"gen2_d": {Address: "192.168.1.103", Generation: 2},
+	}
+
+	waves := createWaves(devices)
+	if len(waves) < 1 {
+		t.Fatal("createWaves() returned no waves")
+	}
+
+	// First devices in first wave should be Gen2
+	firstWave := waves[0]
+	gen2Count := 0
+	for _, df := range firstWave {
+		if df.Device.Generation != 1 {
+			gen2Count++
+		}
+	}
+
+	// With 4 devices (2 Gen1, 2 Gen2), first wave of 3 should have both Gen2
+	if gen2Count < 2 {
+		t.Errorf("first wave has %d Gen2 devices, want at least 2", gen2Count)
+	}
+}
+
+func TestCreateWaves_UnknownGenTreatedAsGen2(t *testing.T) {
+	t.Parallel()
+
+	// Generation 0 (unknown) should be treated as Gen2 (prioritized)
+	devices := map[string]model.Device{
+		"gen1":    {Address: "192.168.1.100", Generation: 1},
+		"unknown": {Address: "192.168.1.101", Generation: 0},
+	}
+
+	waves := createWaves(devices)
+	if len(waves) < 1 {
+		t.Fatal("createWaves() returned no waves")
+	}
+
+	// Unknown generation should be first (treated as Gen2)
+	if waves[0][0].Device.Generation == 1 {
+		t.Error("Gen1 device should not be first; unknown generation should be prioritized")
+	}
+}
+
+// === Tests for Phase 0.5.3: Adaptive Refresh Intervals ===
+
+func TestDefaultRefreshConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultRefreshConfig()
+
+	if cfg.Gen1Online != 15*time.Second {
+		t.Errorf("Gen1Online = %v, want 15s", cfg.Gen1Online)
+	}
+	if cfg.Gen1Offline != 60*time.Second {
+		t.Errorf("Gen1Offline = %v, want 60s", cfg.Gen1Offline)
+	}
+	if cfg.Gen2Online != 5*time.Second {
+		t.Errorf("Gen2Online = %v, want 5s", cfg.Gen2Online)
+	}
+	if cfg.Gen2Offline != 30*time.Second {
+		t.Errorf("Gen2Offline = %v, want 30s", cfg.Gen2Offline)
+	}
+	if cfg.FocusedBoost != 3*time.Second {
+		t.Errorf("FocusedBoost = %v, want 3s", cfg.FocusedBoost)
+	}
+}
+
+func TestGetRefreshInterval_NilData(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{refreshConfig: DefaultRefreshConfig()}
+
+	interval := c.getRefreshInterval(nil)
+	if interval != 5*time.Second {
+		t.Errorf("getRefreshInterval(nil) = %v, want 5s (Gen2Online)", interval)
+	}
+}
+
+func TestGetRefreshInterval_Gen1Online(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{refreshConfig: DefaultRefreshConfig()}
+	data := &DeviceData{
+		Online: true,
+		Info:   &shelly.DeviceInfo{Generation: 1},
+	}
+
+	interval := c.getRefreshInterval(data)
+	if interval != 15*time.Second {
+		t.Errorf("getRefreshInterval(Gen1 online) = %v, want 15s", interval)
+	}
+}
+
+func TestGetRefreshInterval_Gen1Offline(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{refreshConfig: DefaultRefreshConfig()}
+	data := &DeviceData{
+		Online: false,
+		Info:   &shelly.DeviceInfo{Generation: 1},
+	}
+
+	interval := c.getRefreshInterval(data)
+	if interval != 60*time.Second {
+		t.Errorf("getRefreshInterval(Gen1 offline) = %v, want 60s", interval)
+	}
+}
+
+func TestGetRefreshInterval_Gen2Online(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{refreshConfig: DefaultRefreshConfig()}
+	data := &DeviceData{
+		Online: true,
+		Info:   &shelly.DeviceInfo{Generation: 2},
+	}
+
+	interval := c.getRefreshInterval(data)
+	if interval != 5*time.Second {
+		t.Errorf("getRefreshInterval(Gen2 online) = %v, want 5s", interval)
+	}
+}
+
+func TestGetRefreshInterval_Gen2Offline(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{refreshConfig: DefaultRefreshConfig()}
+	data := &DeviceData{
+		Online: false,
+		Info:   &shelly.DeviceInfo{Generation: 2},
+	}
+
+	interval := c.getRefreshInterval(data)
+	if interval != 30*time.Second {
+		t.Errorf("getRefreshInterval(Gen2 offline) = %v, want 30s", interval)
+	}
+}
+
+func TestGetRefreshInterval_FocusedDevice(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{
+		refreshConfig: DefaultRefreshConfig(),
+		focusedDevice: "kitchen",
+	}
+	data := &DeviceData{
+		Device: model.Device{Name: "kitchen"},
+		Online: true,
+		Info:   &shelly.DeviceInfo{Generation: 2},
+	}
+
+	interval := c.getRefreshInterval(data)
+	if interval != 3*time.Second {
+		t.Errorf("getRefreshInterval(focused) = %v, want 3s", interval)
+	}
+}
+
+func TestGetRefreshInterval_UnknownGenOnline(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{refreshConfig: DefaultRefreshConfig()}
+	data := &DeviceData{
+		Online: true,
+		Info:   nil, // Unknown generation
+	}
+
+	interval := c.getRefreshInterval(data)
+	if interval != 5*time.Second {
+		t.Errorf("getRefreshInterval(unknown gen online) = %v, want 5s (Gen2Online)", interval)
+	}
+}
+
+func TestGetRefreshInterval_UnknownGenOffline(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{refreshConfig: DefaultRefreshConfig()}
+	data := &DeviceData{
+		Online: false,
+		Info:   nil, // Unknown generation
+	}
+
+	interval := c.getRefreshInterval(data)
+	if interval != 30*time.Second {
+		t.Errorf("getRefreshInterval(unknown gen offline) = %v, want 30s (Gen2Offline)", interval)
+	}
+}
+
+func TestSetFocusedDevice(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+	}
+
+	// Set focused device
+	_ = c.SetFocusedDevice(deviceKitchen)
+	if c.focusedDevice != deviceKitchen {
+		t.Errorf("focusedDevice = %q, want %q", c.focusedDevice, deviceKitchen)
+	}
+
+	// Setting same device should not trigger refresh
+	_ = c.SetFocusedDevice(deviceKitchen)
+	if c.focusedDevice != deviceKitchen {
+		t.Errorf("focusedDevice = %q, want %q", c.focusedDevice, deviceKitchen)
+	}
+
+	// Setting different device should update
+	_ = c.SetFocusedDevice(deviceOffice)
+	if c.focusedDevice != deviceOffice {
+		t.Errorf("focusedDevice = %q, want %q", c.focusedDevice, deviceOffice)
+	}
+
+	// Clearing focused device
+	_ = c.SetFocusedDevice("")
+	if c.focusedDevice != "" {
+		t.Errorf("focusedDevice = %q, want ''", c.focusedDevice)
+	}
+}
+
+func TestGetFocusedDevice(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{focusedDevice: deviceKitchen}
+
+	if got := c.GetFocusedDevice(); got != deviceKitchen {
+		t.Errorf("GetFocusedDevice() = %q, want %q", got, deviceKitchen)
+	}
+}
+
+// === Tests for Phase 0.5.4: Stale Response Handling ===
+
+func TestDeviceUpdateMsg_RequestID(t *testing.T) {
+	t.Parallel()
+
+	data := &DeviceData{
+		Device: model.Device{Address: "192.168.1.100"},
+		Online: true,
+	}
+
+	msg := DeviceUpdateMsg{
+		Name:      "kitchen",
+		Data:      data,
+		RequestID: 42,
+	}
+
+	if msg.RequestID != 42 {
+		t.Errorf("DeviceUpdateMsg.RequestID = %d, want 42", msg.RequestID)
+	}
+}
+
+func TestDeviceData_LastRequestID(t *testing.T) {
+	t.Parallel()
+
+	data := DeviceData{
+		Device:        model.Device{Address: "192.168.1.100"},
+		lastRequestID: 123,
+	}
+
+	if data.lastRequestID != 123 {
+		t.Errorf("DeviceData.lastRequestID = %d, want 123", data.lastRequestID)
+	}
+}
+
+func TestStaleResponseDiscard(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+		pendingCount:       1,
+	}
+
+	// Add existing device with request ID 100
+	c.devices["kitchen"] = &DeviceData{
+		Device:        model.Device{Address: "192.168.1.100"},
+		Online:        true,
+		lastRequestID: 100,
+	}
+
+	// Try to update with older request ID (stale response)
+	staleMsg := DeviceUpdateMsg{
+		Name: "kitchen",
+		Data: &DeviceData{
+			Device:        model.Device{Address: "192.168.1.100"},
+			Online:        false, // Different state to detect if applied
+			lastRequestID: 50,
+		},
+		RequestID: 50,
+	}
+
+	_ = c.Update(staleMsg)
+
+	// Device should still be online (stale response discarded)
+	if !c.devices["kitchen"].Online {
+		t.Error("stale response should have been discarded, device should still be online")
+	}
+	if c.devices["kitchen"].lastRequestID != 100 {
+		t.Errorf("lastRequestID = %d, want 100 (unchanged)", c.devices["kitchen"].lastRequestID)
+	}
+}
+
+func TestNewerResponseAccepted(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+		pendingCount:       1,
+	}
+
+	// Add existing device with request ID 100
+	c.devices["kitchen"] = &DeviceData{
+		Device:        model.Device{Address: "192.168.1.100"},
+		Online:        true,
+		lastRequestID: 100,
+	}
+
+	// Update with newer request ID
+	newerMsg := DeviceUpdateMsg{
+		Name: "kitchen",
+		Data: &DeviceData{
+			Device:        model.Device{Address: "192.168.1.100"},
+			Online:        false, // Changed state
+			lastRequestID: 150,
+		},
+		RequestID: 150,
+	}
+
+	_ = c.Update(newerMsg)
+
+	// Device should now be offline (newer response accepted)
+	if c.devices["kitchen"].Online {
+		t.Error("newer response should have been accepted, device should be offline")
+	}
+	if c.devices["kitchen"].lastRequestID != 150 {
+		t.Errorf("lastRequestID = %d, want 150", c.devices["kitchen"].lastRequestID)
+	}
+}
+
+func TestZeroRequestIDAlwaysAccepted(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{
+		devices:            make(map[string]*DeviceData),
+		deviceRefreshTimes: make(map[string]time.Time),
+		refreshConfig:      DefaultRefreshConfig(),
+		pendingCount:       1,
+	}
+
+	// Add existing device with request ID 100
+	c.devices["kitchen"] = &DeviceData{
+		Device:        model.Device{Address: "192.168.1.100"},
+		Online:        true,
+		lastRequestID: 100,
+	}
+
+	// Update with zero request ID (should be accepted for backwards compatibility)
+	zeroMsg := DeviceUpdateMsg{
+		Name: "kitchen",
+		Data: &DeviceData{
+			Device:        model.Device{Address: "192.168.1.100"},
+			Online:        false,
+			lastRequestID: 0,
+		},
+		RequestID: 0,
+	}
+
+	_ = c.Update(zeroMsg)
+
+	// Zero request ID should be accepted
+	if c.devices["kitchen"].Online {
+		t.Error("zero request ID should be accepted, device should be offline")
+	}
+}
+
+// === Tests for new message types ===
+
+func TestDeviceRefreshMsg(t *testing.T) {
+	t.Parallel()
+
+	msg := DeviceRefreshMsg{Name: "kitchen"}
+	if msg.Name != "kitchen" {
+		t.Errorf("DeviceRefreshMsg.Name = %q, want 'kitchen'", msg.Name)
+	}
+}
+
+func TestWaveMsg(t *testing.T) {
+	t.Parallel()
+
+	devices := []deviceFetch{
+		{Name: "a", Device: model.Device{Address: "192.168.1.100"}},
+		{Name: "b", Device: model.Device{Address: "192.168.1.101"}},
+	}
+	remaining := [][]deviceFetch{
+		{{Name: "c", Device: model.Device{Address: "192.168.1.102"}}},
+	}
+
+	msg := WaveMsg{
+		Wave:      1,
+		Devices:   devices,
+		Remaining: remaining,
+	}
+
+	if msg.Wave != 1 {
+		t.Errorf("WaveMsg.Wave = %d, want 1", msg.Wave)
+	}
+	if len(msg.Devices) != 2 {
+		t.Errorf("WaveMsg.Devices length = %d, want 2", len(msg.Devices))
+	}
+	if len(msg.Remaining) != 1 {
+		t.Errorf("WaveMsg.Remaining length = %d, want 1", len(msg.Remaining))
+	}
+}
+
+func TestWaveCompleteMsg(t *testing.T) {
+	t.Parallel()
+
+	msg := WaveCompleteMsg{Wave: 2}
+	if msg.Wave != 2 {
+		t.Errorf("WaveCompleteMsg.Wave = %d, want 2", msg.Wave)
 	}
 }
