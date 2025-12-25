@@ -166,12 +166,15 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 }
 
 func (m Model) cursorDown(devices []*cache.DeviceData) Model {
-	if m.cursor < len(devices)-1 {
-		m.cursor++
-		if m.cursor >= m.scrollOffset+m.visibleRows() {
-			m.scrollOffset = m.cursor - m.visibleRows() + 1
-		}
+	if m.cursor >= len(devices)-1 {
+		return m
 	}
+	m.cursor++
+	visible := m.visibleRows()
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
+	}
+	m.scrollOffset = m.capScrollOffset(len(devices), visible)
 	return m
 }
 
@@ -201,13 +204,15 @@ func (m Model) pageDown(devices []*cache.DeviceData) Model {
 	if len(devices) == 0 {
 		return m
 	}
-	m.cursor += m.visibleRows()
+	visible := m.visibleRows()
+	m.cursor += visible
 	if m.cursor >= len(devices) {
 		m.cursor = len(devices) - 1
 	}
-	if m.cursor >= m.scrollOffset+m.visibleRows() {
-		m.scrollOffset = m.cursor - m.visibleRows() + 1
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
 	}
+	m.scrollOffset = m.capScrollOffset(len(devices), visible)
 	return m
 }
 
@@ -388,12 +393,22 @@ func (m Model) View() string {
 func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 	colors := theme.GetSemanticColors()
 
-	// Rows
+	// Rows - calculate visible window maintaining consistent item count
 	visible := m.visibleRows()
 	startIdx := m.scrollOffset
 	endIdx := startIdx + visible
+
+	// Cap endIdx to list bounds
 	if endIdx > len(devices) {
 		endIdx = len(devices)
+	}
+
+	// Adjust startIdx to show as many items as possible (prevent shrinking list)
+	if endIdx-startIdx < visible && len(devices) >= visible {
+		startIdx = endIdx - visible
+		if startIdx < 0 {
+			startIdx = 0
+		}
 	}
 
 	var rows strings.Builder
@@ -608,16 +623,35 @@ func (m Model) Cursor() int {
 // SetCursor sets the cursor position.
 func (m Model) SetCursor(cursor int) Model {
 	devices := m.getFilteredDevices()
-	if cursor >= 0 && cursor < len(devices) {
-		m.cursor = cursor
-		// Adjust scroll offset if needed
-		if m.cursor < m.scrollOffset {
-			m.scrollOffset = m.cursor
-		} else if m.cursor >= m.scrollOffset+m.visibleRows() {
-			m.scrollOffset = m.cursor - m.visibleRows() + 1
-		}
+	if cursor < 0 || cursor >= len(devices) {
+		return m
 	}
+
+	m.cursor = cursor
+	visible := m.visibleRows()
+
+	// Adjust scroll offset if needed
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	} else if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
+	}
+
+	// Cap scrollOffset to prevent list from shrinking
+	m.scrollOffset = m.capScrollOffset(len(devices), visible)
 	return m
+}
+
+// capScrollOffset ensures scrollOffset doesn't exceed the maximum valid value.
+func (m Model) capScrollOffset(deviceCount, visible int) int {
+	maxOffset := deviceCount - visible
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.scrollOffset > maxOffset {
+		return maxOffset
+	}
+	return m.scrollOffset
 }
 
 // DeviceCount returns the number of filtered devices.
