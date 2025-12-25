@@ -205,3 +205,28 @@ func DisplayDevicesToUpdate(ios *iostreams.IOStreams, devices []shelly.DeviceUpd
 	}
 	ios.Println("")
 }
+
+// DisplayFirmwareUpdateInfo shows detailed firmware update information for a device.
+// This is used by the --list flag to provide comprehensive update details.
+func DisplayFirmwareUpdateInfo(ios *iostreams.IOStreams, info *shelly.FirmwareInfo, deviceName, platform string) {
+	ios.Println("")
+	ios.Printf("Firmware Update Information for %s\n", deviceName)
+	ios.Println("─────────────────────────────────────────")
+	ios.Printf("  Platform:        %s\n", platform)
+	if info.DeviceModel != "" {
+		ios.Printf("  Model:           %s\n", info.DeviceModel)
+	}
+	ios.Printf("  Current Version: %s\n", info.Current)
+	if info.Available != "" {
+		ios.Printf("  Stable Version:  %s\n", info.Available)
+	}
+	if info.Beta != "" {
+		ios.Printf("  Beta Version:    %s\n", info.Beta)
+	}
+	if info.HasUpdate {
+		ios.Printf("  Status:          Update available\n")
+	} else {
+		ios.Printf("  Status:          Up to date\n")
+	}
+	ios.Println("")
+}

@@ -249,6 +249,75 @@ func (s *Service) checkPluginFirmware(ctx context.Context, device model.Device) 
 	}, nil
 }
 
+// UpdatePluginFirmware applies a firmware update to a plugin-managed device.
+func (s *Service) UpdatePluginFirmware(ctx context.Context, device model.Device, stage, url string) error {
+	if s.pluginRegistry == nil {
+		return fmt.Errorf("plugin registry not configured")
+	}
+
+	plugin, err := s.pluginRegistry.FindByPlatform(device.Platform)
+	if err != nil {
+		return fmt.Errorf("error finding plugin for platform %q: %w", device.Platform, err)
+	}
+	if plugin == nil {
+		return fmt.Errorf("no plugin found for platform %q", device.Platform)
+	}
+
+	executor := plugins.NewHookExecutor(plugin)
+	result, err := executor.ExecuteApplyUpdate(ctx, device.Address, device.Auth, stage, url)
+	if err != nil {
+		return err
+	}
+
+	if !result.Success {
+		errMsg := result.Error
+		if errMsg == "" {
+			errMsg = "update failed (no error details)"
+		}
+		return fmt.Errorf("%s", errMsg)
+	}
+
+	return nil
+}
+
+// UpdateDeviceFirmware updates firmware for a device (either plugin-managed or native Shelly).
+// This is a unified entry point that handles platform detection and dispatches to the
+// appropriate update method. Returns nil on success.
+func (s *Service) UpdateDeviceFirmware(ctx context.Context, device model.Device, useBeta bool, customURL string) error {
+	if device.IsPluginManaged() {
+		stage := "stable"
+		if useBeta {
+			stage = "beta"
+		}
+		return s.UpdatePluginFirmware(ctx, device, stage, customURL)
+	}
+
+	switch {
+	case customURL != "":
+		return s.UpdateFirmwareFromURL(ctx, device.Name, customURL)
+	case useBeta:
+		return s.UpdateFirmwareBeta(ctx, device.Name)
+	default:
+		return s.UpdateFirmwareStable(ctx, device.Name)
+	}
+}
+
+// CheckDeviceFirmware checks firmware for a device (either plugin-managed or native Shelly).
+// This is a unified entry point that handles platform detection and dispatches to the
+// appropriate check method.
+func (s *Service) CheckDeviceFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
+	if device.IsPluginManaged() {
+		return s.CheckPluginFirmware(ctx, device)
+	}
+	return s.CheckFirmware(ctx, device.Name)
+}
+
+// CheckPluginFirmware checks for firmware updates on a plugin-managed device.
+// This is the public version of checkPluginFirmware for use by commands.
+func (s *Service) CheckPluginFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
+	return s.checkPluginFirmware(ctx, device)
+}
+
 // DeviceUpdateStatus holds the status of a device for update operations.
 type DeviceUpdateStatus struct {
 	Name      string

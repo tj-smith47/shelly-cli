@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -19,6 +20,7 @@ var (
 	urlFlag     string
 	yesFlag     bool
 	allFlag     bool
+	listFlag    bool
 	parallelism int
 	stagedFlag  int
 )
@@ -34,16 +36,28 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 By default, updates to the latest stable version. Use --beta for beta firmware
 or --url for a custom firmware file.
 
+Use --list to show available updates before prompting for confirmation.
+This is useful for reviewing what version will be installed.
+
+Supports both native Shelly devices and plugin-managed devices (Tasmota, etc.).
+Plugin devices are automatically detected and updated using the appropriate plugin.
+
 Use --all to update all registered devices. The --staged flag allows percentage-based
 rollouts (e.g., --staged 25 updates 25% of devices).`,
 		Example: `  # Update to latest stable
   shelly firmware update living-room
+
+  # Show update info before prompting
+  shelly firmware update living-room --list
 
   # Update to beta
   shelly firmware update living-room --beta
 
   # Update from custom URL
   shelly firmware update living-room --url http://example.com/firmware.zip
+
+  # Update plugin-managed device (Tasmota)
+  shelly firmware update tasmota-plug --url http://ota.tasmota.com/tasmota.bin.gz
 
   # Update all devices
   shelly firmware update --all
@@ -66,29 +80,53 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
 	cmd.Flags().StringVar(&urlFlag, "url", "", "Custom firmware URL")
 	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
 	cmd.Flags().BoolVar(&allFlag, "all", false, "Update all registered devices")
+	cmd.Flags().BoolVarP(&listFlag, "list", "l", false, "Show available updates before prompting")
 	cmd.Flags().IntVar(&parallelism, "parallel", 3, "Number of devices to update in parallel")
 	cmd.Flags().IntVar(&stagedFlag, "staged", 100, "Percentage of devices to update (for staged rollouts)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, deviceName string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	// Check for updates first
+	// Resolve device to check if it's plugin-managed
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	device, ok := cfg.Devices[deviceName]
+	if !ok {
+		// Ad-hoc device (IP address) - treat as Shelly
+		device = model.Device{
+			Name:     deviceName,
+			Address:  deviceName,
+			Platform: model.PlatformShelly,
+		}
+	} else {
+		device.Name = deviceName
+	}
+
+	// Check for updates first (platform-aware)
 	var info *shelly.FirmwareInfo
-	err := cmdutil.RunWithSpinner(ctx, ios, "Checking for updates...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Checking for updates...", func(ctx context.Context) error {
 		var checkErr error
-		info, checkErr = svc.CheckFirmware(ctx, device)
+		info, checkErr = svc.CheckDeviceFirmware(ctx, device)
 		return checkErr
 	})
 	if err != nil {
 		return fmt.Errorf("failed to check for updates: %w", err)
 	}
 
+	// If --list flag, show detailed update info
+	if listFlag {
+		term.DisplayFirmwareUpdateInfo(ios, info, device.DisplayName(), device.GetPlatform())
+	}
+
 	if !info.HasUpdate && urlFlag == "" && !betaFlag {
-		ios.Info("Device %s is already up to date (version %s)", device, info.Current)
+		ios.Info("Device %s is already up to date (version %s)", deviceName, info.Current)
 		return nil
 	}
 
@@ -118,20 +156,11 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	defer cancel()
 
 	return cmdutil.RunWithSpinner(updateCtx, ios, "Updating firmware...", func(ctx context.Context) error {
-		var updateErr error
-		switch {
-		case urlFlag != "":
-			updateErr = svc.UpdateFirmwareFromURL(ctx, device, urlFlag)
-		case betaFlag:
-			updateErr = svc.UpdateFirmwareBeta(ctx, device)
-		default:
-			updateErr = svc.UpdateFirmwareStable(ctx, device)
+		if err := svc.UpdateDeviceFirmware(ctx, device, betaFlag, urlFlag); err != nil {
+			return fmt.Errorf("failed to start update: %w", err)
 		}
-		if updateErr != nil {
-			return fmt.Errorf("failed to start update: %w", updateErr)
-		}
-		ios.Success("Firmware update started on %s", device)
-		ios.Info("The device will reboot automatically. Use 'shelly firmware status %s' to check progress.", device)
+		ios.Success("Firmware update started on %s", deviceName)
+		ios.Info("The device will reboot automatically. Use 'shelly firmware status %s' to check progress.", deviceName)
 		return nil
 	})
 }
