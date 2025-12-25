@@ -250,7 +250,7 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	snapshot, err := m.svc.GetMonitoringSnapshot(ctx, device.Address)
+	snapshot, err := m.svc.GetMonitoringSnapshotAuto(ctx, device.Address)
 	if err != nil {
 		status.Error = err
 		return status

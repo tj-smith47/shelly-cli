@@ -60,6 +60,11 @@ type SelectMsg struct {
 	Webhook Webhook
 }
 
+// CreateMsg signals that a new webhook should be created.
+type CreateMsg struct {
+	Device string
+}
+
 // Model displays webhooks for a device.
 type Model struct {
 	ctx      context.Context
@@ -238,12 +243,23 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.toggleWebhook()
 	case "d":
 		return m, m.deleteWebhook()
+	case "n":
+		return m, m.createWebhook()
 	case "r":
 		m.loading = true
 		return m, m.fetchWebhooks()
 	}
 
 	return m, nil
+}
+
+func (m Model) createWebhook() tea.Cmd {
+	if m.device == "" {
+		return nil
+	}
+	return func() tea.Msg {
+		return CreateMsg{Device: m.device}
+	}
 }
 
 func (m Model) cursorDown() Model {
@@ -344,6 +360,13 @@ func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Webhooks").
 		SetFocused(m.focused)
+
+	// Add footer with keybindings when focused
+	if m.focused && m.device != "" && len(m.webhooks) > 0 {
+		r.SetFooter("t:toggle d:del n:new r:refresh")
+	} else if m.focused && m.device != "" {
+		r.SetFooter("n:new r:refresh")
+	}
 
 	if m.device == "" {
 		r.SetContent(m.styles.Muted.Render("No device selected"))

@@ -166,20 +166,21 @@ func (m *ContextMap) initDefaults() {
 
 	// JSON context
 	m.bindings[ContextJSON] = map[string]Action{
-		"j":     ActionDown,
-		"k":     ActionUp,
-		"down":  ActionDown,
-		"up":    ActionUp,
-		"h":     ActionLeft,
-		"l":     ActionRight,
-		"left":  ActionLeft,
-		"right": ActionRight,
-		"q":     ActionEscape,
-		"esc":   ActionEscape,
-		"y":     ActionCopy,
-		"r":     ActionRefresh,
-		"g":     ActionHome,
-		"G":     ActionEnd,
+		"j":      ActionDown,
+		"k":      ActionUp,
+		"down":   ActionDown,
+		"up":     ActionUp,
+		"h":      ActionLeft,
+		"l":      ActionRight,
+		"left":   ActionLeft,
+		"right":  ActionRight,
+		"q":      ActionEscape,
+		"esc":    ActionEscape,
+		"ctrl+[": ActionEscape,
+		"y":      ActionCopy,
+		"r":      ActionRefresh,
+		"g":      ActionHome,
+		"G":      ActionEnd,
 	}
 
 	// Automation context
@@ -229,11 +230,12 @@ func (m *ContextMap) initDefaults() {
 
 	// Help context
 	m.bindings[ContextHelp] = map[string]Action{
-		"?":   ActionEscape,
-		"q":   ActionEscape,
-		"esc": ActionEscape,
-		"j":   ActionDown,
-		"k":   ActionUp,
+		"?":      ActionEscape,
+		"q":      ActionEscape,
+		"esc":    ActionEscape,
+		"ctrl+[": ActionEscape,
+		"j":      ActionDown,
+		"k":      ActionUp,
 	}
 }
 
@@ -268,7 +270,7 @@ func (m *ContextMap) GetBindings(ctx Context) []KeyBinding {
 			bindings = append(bindings, KeyBinding{
 				Key:    key,
 				Action: action,
-				Desc:   ActionDesc(action),
+				Desc:   ContextActionDesc(ctx, action),
 			})
 		}
 	}
@@ -341,8 +343,52 @@ var actionDescriptions = map[Action]string{
 	ActionTab5:      "Fleet tab",
 }
 
+// contextActionDescriptions overrides action descriptions for specific contexts.
+var contextActionDescriptions = map[Context]map[Action]string{
+	ContextAutomation: {
+		ActionEnter:  "Edit script",
+		ActionClear:  "Delete",
+		ActionExpand: "New script",
+	},
+	ContextEvents: {
+		ActionPause: "Pause events",
+		ActionClear: "Clear events",
+	},
+	ContextDevices: {
+		ActionEnter:   "View details",
+		ActionRefresh: "Refresh device",
+	},
+	ContextInfo: {
+		ActionEnter:  "View JSON",
+		ActionExpand: "Toggle view",
+	},
+	ContextEnergy: {
+		ActionSort:   "Sort by power",
+		ActionExpand: "Expand details",
+	},
+	ContextManage: {
+		ActionToggle: "Select device",
+		ActionExpand: "Select all",
+	},
+	ContextFleet: {
+		ActionToggle: "Select device",
+		ActionExpand: "Select all",
+	},
+}
+
 // ActionDesc returns a human-readable description for an action.
 func ActionDesc(a Action) string {
+	return actionDescriptions[a]
+}
+
+// ContextActionDesc returns a context-aware description for an action.
+// Falls back to generic description if no context-specific one exists.
+func ContextActionDesc(ctx Context, a Action) string {
+	if ctxDescs, ok := contextActionDescriptions[ctx]; ok {
+		if desc, ok := ctxDescs[a]; ok {
+			return desc
+		}
+	}
 	return actionDescriptions[a]
 }
 

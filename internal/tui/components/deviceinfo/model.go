@@ -279,9 +279,7 @@ func (m Model) writeFirmwareInfo(content *strings.Builder) {
 	if m.device.Info.Firmware != "" {
 		content.WriteString(m.renderRow("Firmware", m.device.Info.Firmware) + "\n")
 	}
-	if m.device.Info.App != "" {
-		content.WriteString(m.renderRow("App", m.device.Info.App) + "\n")
-	}
+	// App field is redundant with Model - Type now shows model code/SKU
 }
 
 func (m Model) writeComponentsSection(content *strings.Builder, components []ComponentInfo) {

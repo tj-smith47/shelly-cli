@@ -4,6 +4,7 @@ package views
 import (
 	"context"
 	"errors"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -109,6 +110,7 @@ type Automation struct {
 	height       int
 	styles       AutomationStyles
 	loadPhase    automationLoadPhase // Tracks sequential loading progress
+	pendingEdit  bool                // Flag to launch editor after code loads
 
 	// Layout calculator for flexible panel sizing
 	layout *layout.TwoColumnLayout
@@ -453,12 +455,52 @@ func (a *Automation) updateAllComponents(msg tea.Msg) tea.Cmd {
 func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case scripts.SelectScriptMsg:
-		// When a script is selected, load it in the editor
+		// When a script is selected, load it in the viewer
 		var cmd tea.Cmd
 		a.scriptEditor, cmd = a.scriptEditor.SetScript(a.device, msg.Script)
 		a.focusedPanel = PanelScriptEditor
 		a.updateFocusStates()
 		return cmd
+
+	case scripts.EditScriptMsg:
+		// When edit is requested, set pending flag and load the script
+		a.pendingEdit = true
+		var loadCmd tea.Cmd
+		a.scriptEditor, loadCmd = a.scriptEditor.SetScript(a.device, msg.Script)
+		return loadCmd
+
+	case scripts.CodeLoadedMsg:
+		// Code loaded - if we have a pending edit, launch the external editor
+		if a.pendingEdit {
+			a.pendingEdit = false
+			return a.scriptEditor.Edit()
+		}
+		return nil
+
+	case scripts.EditorFinishedMsg:
+		// External editor closed, upload the modified code
+		if msg.Err != nil {
+			// Editor failed - could show error toast here
+			return nil
+		}
+		// Upload the modified code to the device
+		return a.uploadScriptCode(msg.Device, msg.ScriptID, msg.Code)
+
+	case scripts.CodeUploadedMsg:
+		// Code upload completed
+		if msg.Err != nil {
+			// Upload failed - could show error toast here
+			return nil
+		}
+		// Refresh the script list and editor
+		var cmds []tea.Cmd
+		var scriptsCmd tea.Cmd
+		a.scripts, scriptsCmd = a.scripts.Refresh()
+		cmds = append(cmds, scriptsCmd)
+		var editorCmd tea.Cmd
+		a.scriptEditor, editorCmd = a.scriptEditor.Refresh()
+		cmds = append(cmds, editorCmd)
+		return tea.Batch(cmds...)
 
 	case schedules.SelectScheduleMsg:
 		// When a schedule is selected, load it in the editor
@@ -468,6 +510,17 @@ func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 		return nil
 	}
 	return nil
+}
+
+// uploadScriptCode uploads the modified script code to the device.
+func (a *Automation) uploadScriptCode(device string, scriptID int, code string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
+		defer cancel()
+
+		err := a.svc.UpdateScriptCode(ctx, device, scriptID, code, false)
+		return scripts.CodeUploadedMsg{Device: device, ScriptID: scriptID, Err: err}
+	}
 }
 
 // isNarrow returns true if the view should use narrow/vertical layout.

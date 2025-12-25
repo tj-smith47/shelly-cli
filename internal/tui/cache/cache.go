@@ -375,9 +375,16 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 			lastRequestID: requestID,
 		}
 
-		// Per-device timeout - 8 seconds is safe (Gen2 times out at 10s internally)
-		// and much faster than 30s for offline device detection
-		ctx, cancel := context.WithTimeout(c.ctx, 8*time.Second)
+		// Per-device timeout based on known generation.
+		// Gen1 (ESP8266) needs more time than Gen2 (ESP32).
+		// Unknown generation uses 15s to allow for Gen2->Gen1 fallback in DeviceInfoAuto.
+		timeout := 15 * time.Second
+		if device.Generation == 1 {
+			timeout = 20 * time.Second // Gen1 is slower
+		} else if device.Generation >= 2 {
+			timeout = 10 * time.Second // Gen2+ is faster
+		}
+		ctx, cancel := context.WithTimeout(c.ctx, timeout)
 		defer cancel()
 
 		// Get device info first (auto-detects Gen1 vs Gen2)
@@ -392,13 +399,13 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		data.Online = true
 
 		// Populate device model from DeviceInfo if not already set
-		// Use human-readable product name if available
+		// Use human-readable product name if available (e.g., "Shelly Pro 1PM")
 		if data.Device.Model == "" && info.Model != "" {
 			data.Device.Model = types.ModelDisplayName(info.Model)
 		}
-		// Use App as Type if available (e.g., "Pro1PM", "PlusPlugS")
-		if data.Device.Type == "" && info.App != "" {
-			data.Device.Type = info.App
+		// Type is the model code/SKU (e.g., "SPSW-001PE16EU") for reference
+		if data.Device.Type == "" && info.Model != "" {
+			data.Device.Type = info.Model
 		}
 		// Update generation if not set
 		if data.Device.Generation == 0 && info.Generation > 0 {

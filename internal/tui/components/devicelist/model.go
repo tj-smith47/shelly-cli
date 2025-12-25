@@ -671,3 +671,52 @@ func (m Model) TotalDeviceCount() int {
 func (m Model) Filter() string {
 	return m.filter
 }
+
+// OptimalWidth calculates the minimum width needed to display all device names
+// without truncation, plus the status icon and selector (6 chars overhead).
+func (m Model) OptimalWidth() int {
+	if m.cache == nil {
+		return 20 // Minimum default
+	}
+
+	devices := m.getFilteredDevices()
+	if len(devices) == 0 {
+		return 20
+	}
+
+	maxLen := 0
+	for _, d := range devices {
+		if len(d.Device.Name) > maxLen {
+			maxLen = len(d.Device.Name)
+		}
+	}
+
+	// Add overhead: selector (2) + icon (1) + space (1) + padding (4) + border (2)
+	optimal := maxLen + 10
+
+	// Apply min/max constraints
+	if optimal < 20 {
+		optimal = 20
+	}
+	if optimal > 50 {
+		optimal = 50 // Don't let device list get too wide
+	}
+
+	return optimal
+}
+
+// MaxDeviceNameLen returns the length of the longest device name in the list.
+func (m Model) MaxDeviceNameLen() int {
+	if m.cache == nil {
+		return 0
+	}
+
+	devices := m.getFilteredDevices()
+	maxLen := 0
+	for _, d := range devices {
+		if len(d.Device.Name) > maxLen {
+			maxLen = len(d.Device.Name)
+		}
+	}
+	return maxLen
+}

@@ -67,6 +67,20 @@ const (
 	LayoutWide
 )
 
+// PanelWidths holds calculated panel widths for the dashboard layout.
+type PanelWidths struct {
+	Events     int // Events panel width
+	DeviceList int // Device list panel width
+	DeviceInfo int // Device info/detail panel width
+}
+
+// PanelConstraints defines min/max widths for each panel.
+type PanelConstraints struct {
+	MinPercent int // Minimum width as percentage of total
+	MaxPercent int // Maximum width as percentage of total
+	MinChars   int // Minimum absolute character width
+}
+
 // Model is the main TUI application model.
 type Model struct {
 	// Core
@@ -280,6 +294,82 @@ func (m Model) layoutMode() LayoutMode {
 	return LayoutStandard
 }
 
+// calculateOptimalWidths determines panel widths based on content.
+// It balances content needs with available space and min/max constraints.
+func (m Model) calculateOptimalWidths() PanelWidths {
+	totalWidth := m.width
+
+	// Get content-based optimal widths from components
+	eventsOptimal := m.events.OptimalWidth()
+	deviceListOptimal := m.deviceList.OptimalWidth()
+
+	// Define constraints as percentages
+	eventsMin := totalWidth * 25 / 100
+	eventsMax := totalWidth * 45 / 100
+	deviceListMin := totalWidth * 15 / 100
+	deviceListMax := totalWidth * 40 / 100
+	deviceInfoMin := totalWidth * 25 / 100
+
+	// Apply constraints to optimal values
+	eventsWidth := eventsOptimal
+	if eventsWidth < eventsMin {
+		eventsWidth = eventsMin
+	}
+	if eventsWidth > eventsMax {
+		eventsWidth = eventsMax
+	}
+
+	deviceListWidth := deviceListOptimal
+	if deviceListWidth < deviceListMin {
+		deviceListWidth = deviceListMin
+	}
+	if deviceListWidth > deviceListMax {
+		deviceListWidth = deviceListMax
+	}
+
+	// Calculate remaining space for device info
+	gaps := 2 // Two 1-char gaps between panels
+	deviceInfoWidth := totalWidth - eventsWidth - deviceListWidth - gaps
+
+	// Ensure device info meets minimum by shrinking other panels if needed
+	deviceInfoWidth = m.adjustPanelWidths(&eventsWidth, &deviceListWidth, deviceInfoWidth,
+		deviceInfoMin, eventsMin, deviceListMin, totalWidth, gaps)
+
+	return PanelWidths{
+		Events:     eventsWidth,
+		DeviceList: deviceListWidth,
+		DeviceInfo: deviceInfoWidth,
+	}
+}
+
+// adjustPanelWidths shrinks events and deviceList panels to ensure deviceInfo meets minimum.
+func (m Model) adjustPanelWidths(eventsWidth, deviceListWidth *int, deviceInfoWidth int,
+	deviceInfoMin, eventsMin, deviceListMin, totalWidth, gaps int) int {
+	if deviceInfoWidth >= deviceInfoMin {
+		return deviceInfoWidth
+	}
+
+	deficit := deviceInfoMin - deviceInfoWidth
+
+	// Take from events first (it adapts better with truncation)
+	eventsReduction := deficit
+	if *eventsWidth-eventsReduction < eventsMin {
+		eventsReduction = *eventsWidth - eventsMin
+	}
+	*eventsWidth -= eventsReduction
+	deficit -= eventsReduction
+
+	// Take remainder from device list
+	if deficit > 0 {
+		*deviceListWidth -= deficit
+		if *deviceListWidth < deviceListMin {
+			*deviceListWidth = deviceListMin
+		}
+	}
+
+	return totalWidth - *eventsWidth - *deviceListWidth - gaps
+}
+
 // Init initializes the TUI and returns the first command to run.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
@@ -333,7 +423,10 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.cursor = 0
 		m.deviceList = m.deviceList.SetFilter(msg.Filter)
 		return m, nil, true
-	case search.ClosedMsg, cmdmode.ClosedMsg, confirm.CancelledMsg:
+	case search.ClosedMsg, cmdmode.ClosedMsg:
+		m = m.updateViewManagerSize()
+		return m, nil, true
+	case confirm.CancelledMsg:
 		return m, nil, true
 	case cmdmode.CommandMsg:
 		newModel, cmd := m.handleCommand(msg)
@@ -520,10 +613,34 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) Model {
 	// Set confirm dialog size
 	m.confirm = m.confirm.SetSize(m.width, m.height)
 
-	// Note: deviceList and deviceInfo sizes are calculated in renderMultiPanelLayout
-	// based on the actual layout mode and available space
+	// Set deviceList size - needed for proper scroll calculations
+	// The actual layout may adjust this in render, but we need a valid
+	// size for navigation to work correctly (visibleRows() calculation)
+	deviceListHeight := contentHeight - 2 // Account for borders
+	if deviceListHeight < 5 {
+		deviceListHeight = 5
+	}
+	deviceListWidth := m.width * 40 / 100 // 40% for list panel
+	if deviceListWidth < 20 {
+		deviceListWidth = 20
+	}
+	m.deviceList = m.deviceList.SetSize(deviceListWidth, deviceListHeight)
 
 	m = m.updateStatusBarContext()
+	return m
+}
+
+// updateViewManagerSize recalculates and sets the view manager size
+// based on current input bar state (search or command mode).
+func (m Model) updateViewManagerSize() Model {
+	tabBarHeight := 1
+	footerHeight := 2
+	inputHeight := 0
+	if m.search.IsActive() || m.cmdMode.IsActive() {
+		inputHeight = 3 // Input bar has top border, content, bottom border
+	}
+	contentHeight := m.height - branding.BannerHeight() - tabBarHeight - footerHeight - inputHeight
+	m.viewManager.SetSize(m.width, contentHeight)
 	return m
 }
 
@@ -580,6 +697,8 @@ func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
 	case cmdmode.CmdDevice, cmdmode.CmdFilter:
 		m.filter = msg.Args
 		m.cursor = 0
+		m.deviceList = m.deviceList.SetFilter(msg.Args)
+		m.deviceList = m.deviceList.SetCursor(0)
 		if msg.Args == "" {
 			return m, statusbar.SetMessage("Filter cleared", statusbar.MessageSuccess)
 		}
@@ -770,15 +889,19 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 	case key.Matches(msg, m.keys.Filter):
 		var cmd tea.Cmd
 		m.search, cmd = m.search.Activate()
+		m = m.updateViewManagerSize()
 		return m, cmd, true
 	case key.Matches(msg, m.keys.Command):
 		var cmd tea.Cmd
 		m.cmdMode, cmd = m.cmdMode.Activate()
+		m = m.updateViewManagerSize()
 		return m, cmd, true
 	case key.Matches(msg, m.keys.Escape):
 		if m.filter != "" {
 			m.filter = ""
 			m.cursor = 0
+			m.deviceList = m.deviceList.SetFilter("")
+			m.deviceList = m.deviceList.SetCursor(0)
 			return m, nil, true
 		}
 	case key.Matches(msg, m.keys.View1):
@@ -1154,25 +1277,15 @@ func (m Model) renderMultiPanelLayout(height int) string {
 		energyHeight = 5
 	}
 
-	// Calculate column widths: events column + deviceList (which has internal 40/60 split)
-	var eventsWidth, deviceListWidth int
-	if m.layoutMode() == LayoutWide {
-		eventsWidth = m.width * 25 / 100
-	} else {
-		eventsWidth = m.width * 30 / 100
-	}
-	deviceListWidth = m.width - eventsWidth - 1 // -1 for gap
-
-	if eventsWidth < 15 {
-		eventsWidth = 15
-	}
+	// Calculate dynamic panel widths based on content
+	widths := m.calculateOptimalWidths()
 
 	// Render events column
-	eventsCol := m.renderEventsColumn(eventsWidth, topHeight)
+	eventsCol := m.renderEventsColumn(widths.Events, topHeight)
 
-	// Calculate widths for device list (40%) and device info (60%)
-	listWidth := deviceListWidth * 40 / 100
-	infoWidth := deviceListWidth - listWidth - 1 // -1 for gap
+	// Use calculated widths for device list and info panels
+	listWidth := widths.DeviceList
+	infoWidth := widths.DeviceInfo
 
 	// Render device list with consistent border styling
 	deviceListCol := m.renderDeviceListColumn(listWidth, topHeight)
@@ -1348,54 +1461,49 @@ func (m Model) renderHeader() string {
 	valueStyle := lipgloss.NewStyle().Foreground(colors.Text)
 	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
 
-	// Create metadata lines to match banner height
+	// Create metadata lines to match banner height (condensed layout)
 	metaLines := make([]string, len(bannerLines))
 
 	// Line 0: Title
 	metaLines[0] = titleStyle.Render("Shelly Dashboard")
 
-	// Line 1: Empty for spacing
-	metaLines[1] = ""
-
-	// Line 2: Device counts
+	// Line 1: Device counts (moved up, no blank line after title)
 	if m.cache.IsLoading() {
 		fetched := m.cache.FetchedCount()
-		metaLines[2] = labelStyle.Render("Devices: ") + valueStyle.Render(fmt.Sprintf("Loading... %d/%d", fetched, total))
+		metaLines[1] = labelStyle.Render("Devices: ") + valueStyle.Render(fmt.Sprintf("Loading... %d/%d", fetched, total))
 	} else {
-		metaLines[2] = labelStyle.Render("Devices: ") +
+		metaLines[1] = labelStyle.Render("Devices: ") +
 			onlineStyle.Render(fmt.Sprintf("%d online", online))
 		if offline > 0 {
-			metaLines[2] += labelStyle.Render(" / ") + offlineStyle.Render(fmt.Sprintf("%d offline", offline))
+			metaLines[1] += labelStyle.Render(" / ") + offlineStyle.Render(fmt.Sprintf("%d offline", offline))
 		}
 	}
 
-	// Line 3: Power consumption
+	// Line 2: Power consumption
 	if totalPower != 0 {
 		powerStr := fmt.Sprintf("%.1fW", totalPower)
 		if totalPower >= 1000 || totalPower <= -1000 {
 			powerStr = fmt.Sprintf("%.2fkW", totalPower/1000)
 		}
-		metaLines[3] = labelStyle.Render("Power:   ") + powerStyle.Render(powerStr)
+		metaLines[2] = labelStyle.Render("Power:   ") + powerStyle.Render(powerStr)
 	} else {
-		metaLines[3] = labelStyle.Render("Power:   ") + valueStyle.Render("--")
+		metaLines[2] = labelStyle.Render("Power:   ") + valueStyle.Render("--")
 	}
 
-	// Line 4: Current filter
+	// Line 3: Theme (moved up, no blank line before)
+	themeName := theme.CurrentThemeName()
+	if themeName != "" {
+		metaLines[3] = labelStyle.Render("Theme:   ") + valueStyle.Render(themeName)
+	}
+
+	// Line 4: Current filter (if set)
 	if m.filter != "" {
 		filterStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Italic(true)
 		metaLines[4] = labelStyle.Render("Filter:  ") + filterStyle.Render(m.filter)
-	} else {
-		metaLines[4] = ""
 	}
 
-	// Line 5: Theme
-	themeName := theme.CurrentThemeName()
-	if themeName != "" && len(metaLines) > 5 {
-		metaLines[5] = labelStyle.Render("Theme:   ") + valueStyle.Render(themeName)
-	}
-
-	// Fill remaining lines if banner is taller
-	for i := 6; i < len(metaLines); i++ {
+	// Fill remaining lines with empty strings
+	for i := 5; i < len(metaLines); i++ {
 		metaLines[i] = ""
 	}
 
@@ -1477,21 +1585,23 @@ func (m Model) getDeviceMethods(d *cache.DeviceData) []string {
 		"Script.List",
 	}
 
-	// Add Switch methods if device has switches
-	if len(d.Switches) > 0 {
-		methods = append(methods, "Switch.GetStatus", "Switch.GetConfig")
+	// Add Switch methods if device has switches (each switch requires id parameter)
+	for _, sw := range d.Switches {
+		methods = append(methods,
+			fmt.Sprintf("Switch.GetStatus?id=%d", sw.ID),
+			fmt.Sprintf("Switch.GetConfig?id=%d", sw.ID))
 	}
 
-	// Add PM/EM methods only if device has those components
+	// Add PM/EM methods only if device has those components (each requires id parameter)
 	if d.Snapshot != nil {
-		if len(d.Snapshot.PM) > 0 {
-			methods = append(methods, "PM.GetStatus")
+		for _, pm := range d.Snapshot.PM {
+			methods = append(methods, fmt.Sprintf("PM.GetStatus?id=%d", pm.ID))
 		}
-		if len(d.Snapshot.EM) > 0 {
-			methods = append(methods, "EM.GetStatus")
+		for _, em := range d.Snapshot.EM {
+			methods = append(methods, fmt.Sprintf("EM.GetStatus?id=%d", em.ID))
 		}
-		if len(d.Snapshot.EM1) > 0 {
-			methods = append(methods, "EM1.GetStatus")
+		for _, em1 := range d.Snapshot.EM1 {
+			methods = append(methods, fmt.Sprintf("EM1.GetStatus?id=%d", em1.ID))
 		}
 	}
 

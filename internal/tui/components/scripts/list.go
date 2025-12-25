@@ -58,6 +58,11 @@ type SelectScriptMsg struct {
 	Script Script
 }
 
+// EditScriptMsg signals that a script should be edited in external editor.
+type EditScriptMsg struct {
+	Script Script
+}
+
 // CreateScriptMsg signals that a new script should be created.
 type CreateScriptMsg struct {
 	Device string
@@ -234,9 +239,12 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		m.scroll = 0
 	case "G":
 		m = m.cursorToEnd()
-	case "enter", "e":
-		// Edit script (open in editor)
+	case "enter":
+		// View script (open in viewer)
 		return m, m.selectScript()
+	case "e":
+		// Edit script (open in external editor)
+		return m, m.editScript()
 	case "r":
 		// Run/start script
 		return m, m.startScript()
@@ -308,6 +316,16 @@ func (m ListModel) selectScript() tea.Cmd {
 	script := m.scripts[m.cursor]
 	return func() tea.Msg {
 		return SelectScriptMsg{Script: script}
+	}
+}
+
+func (m ListModel) editScript() tea.Cmd {
+	if len(m.scripts) == 0 || m.cursor >= len(m.scripts) {
+		return nil
+	}
+	script := m.scripts[m.cursor]
+	return func() tea.Msg {
+		return EditScriptMsg{Script: script}
 	}
 }
 

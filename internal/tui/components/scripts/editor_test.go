@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 func TestEditorDeps_Validate(t *testing.T) {
@@ -384,27 +385,28 @@ func TestEditorModel_View_WithStatus(t *testing.T) {
 	}
 }
 
-func TestEditorModel_HighlightLine(t *testing.T) {
+func TestEditorModel_SyntaxHighlighting(t *testing.T) {
 	t.Parallel()
-	m := EditorModel{styles: DefaultEditorStyles()}
 
 	tests := []struct {
 		name string
-		line string
+		code string
 	}{
 		{"regular code", "let x = 1;"},
 		{"comment", "// this is a comment"},
 		{"indented comment", "    // indented comment"},
 		{"empty", ""},
+		{"function", "function foo() { return 42; }"},
+		{"string", `const msg = "hello world";`},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := m.highlightLine(tt.line)
-			// Just verify it returns something
-			if result == "" && tt.line != "" {
-				t.Error("highlightLine() returned empty for non-empty line")
+			result := theme.HighlightJavaScript(tt.code)
+			// Just verify it returns something (highlighting may add ANSI codes)
+			if result == "" && tt.code != "" {
+				t.Error("HighlightJavaScript() returned empty for non-empty code")
 			}
 		})
 	}

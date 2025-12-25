@@ -233,12 +233,31 @@ func (m Model) sortBindings(bindings []keys.KeyBinding) []keys.KeyBinding {
 }
 
 func (m Model) formatBindings(bindings []keys.KeyBinding) string {
-	lines := make([]string, 0, len(bindings))
+	// Group bindings by description (action) to collapse duplicates
+	descToKeys := make(map[string][]string)
+	descOrder := make([]string, 0)
+
 	for _, b := range bindings {
 		if b.Desc == "" {
 			continue
 		}
-		line := m.styles.Key.Render(b.Key) + " " + m.styles.Desc.Render(b.Desc)
+		if _, exists := descToKeys[b.Desc]; !exists {
+			descOrder = append(descOrder, b.Desc)
+		}
+		descToKeys[b.Desc] = append(descToKeys[b.Desc], b.Key)
+	}
+
+	lines := make([]string, 0, len(descOrder))
+	for _, desc := range descOrder {
+		keysList := descToKeys[desc]
+		// Sort keys for consistent display
+		sort.Strings(keysList)
+		// Join keys with / separator, limit to 3 for readability
+		keyStr := strings.Join(keysList, "/")
+		if len(keysList) > 3 {
+			keyStr = strings.Join(keysList[:3], "/") + "..."
+		}
+		line := m.styles.Key.Render(keyStr) + " " + m.styles.Desc.Render(desc)
 		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")

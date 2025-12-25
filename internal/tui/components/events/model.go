@@ -521,12 +521,12 @@ func (m Model) View() string {
 
 	eventsToShow := events[startIdx:endIdx]
 
-	// Column widths for fixed-width layout
+	// Column widths for fixed-width layout (compact to maximize description)
 	const (
-		colTime   = 10 // HH:MM:SS + space
-		colDevice = 16
-		colComp   = 12
-		colType   = 14
+		colTime   = 9  // HH:MM:SS + space
+		colDevice = 12 // Truncate long device names
+		colComp   = 10 // Switch:0, etc.
+		colType   = 8  // info/warning/error
 	)
 
 	var rows string
@@ -566,7 +566,12 @@ func (m Model) View() string {
 		typeVal := output.Truncate(e.Type, colType-2)
 		typeStr := m.styles.Type.Inherit(typeStyle).Render(output.PadRight(typeVal, colType))
 
-		descStr := m.styles.Description.Render(output.Truncate(e.Description, 40))
+		// Calculate remaining width for description (panel width minus other columns and padding)
+		descWidth := m.width - colTime - colDevice - colComp - colType - 6 // 6 for borders/padding
+		if descWidth < 20 {
+			descWidth = 20 // Minimum readable width
+		}
+		descStr := m.styles.Description.Render(output.Truncate(e.Description, descWidth))
 
 		row := timeStr + deviceStr + compStr + typeStr + descStr
 
@@ -609,4 +614,77 @@ func (m Model) Cleanup() {
 		cancel()
 	}
 	m.state.subscriptions = make(map[string]context.CancelFunc)
+}
+
+// OptimalWidth calculates the minimum width needed to display events
+// without excessive truncation. Considers fixed columns plus description.
+func (m Model) OptimalWidth() int {
+	// Fixed column widths from the View function
+	const (
+		colTime   = 9  // HH:MM:SS + space
+		colDevice = 12 // Device name
+		colComp   = 10 // Component
+		colType   = 8  // Event type
+		overhead  = 10 // Borders, padding, separators
+	)
+
+	fixedWidth := colTime + colDevice + colComp + colType + overhead
+
+	// Get events safely with locking
+	m.state.mu.Lock()
+	events := make([]Event, len(m.state.events))
+	copy(events, m.state.events)
+	m.state.mu.Unlock()
+
+	if len(events) == 0 {
+		return fixedWidth + 30 // Default description width
+	}
+
+	// Use median description length for optimal width
+	totalDescLen := 0
+	maxDescLen := 0
+	for _, e := range events {
+		descLen := len(e.Description)
+		totalDescLen += descLen
+		if descLen > maxDescLen {
+			maxDescLen = descLen
+		}
+	}
+
+	avgDescLen := totalDescLen / len(events)
+
+	// Use 75th percentile: average + 25% of difference to max
+	optimalDescWidth := avgDescLen + (maxDescLen-avgDescLen)/4
+
+	// Apply constraints on description width
+	if optimalDescWidth < 20 {
+		optimalDescWidth = 20
+	}
+	if optimalDescWidth > 60 {
+		optimalDescWidth = 60 // Don't let events panel get too wide
+	}
+
+	return fixedWidth + optimalDescWidth
+}
+
+// MinWidth returns the minimum usable width for the events panel.
+func (m Model) MinWidth() int {
+	// Minimum to show truncated but readable content
+	return 50
+}
+
+// MaxDescriptionLen returns the length of the longest event description.
+func (m Model) MaxDescriptionLen() int {
+	m.state.mu.Lock()
+	events := make([]Event, len(m.state.events))
+	copy(events, m.state.events)
+	m.state.mu.Unlock()
+
+	maxLen := 0
+	for _, e := range events {
+		if len(e.Description) > maxLen {
+			maxLen = len(e.Description)
+		}
+	}
+	return maxLen
 }
