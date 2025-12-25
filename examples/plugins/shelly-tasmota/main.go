@@ -38,6 +38,8 @@ The plugin communicates with Tasmota devices using their HTTP API.`,
 	rootCmd.AddCommand(cmd.NewDetectCmd())
 	rootCmd.AddCommand(cmd.NewStatusCmd())
 	rootCmd.AddCommand(cmd.NewControlCmd())
+	rootCmd.AddCommand(cmd.NewCheckUpdatesCmd())
+	rootCmd.AddCommand(cmd.NewApplyUpdateCmd())
 
 	// Add version command
 	rootCmd.AddCommand(&cobra.Command{
