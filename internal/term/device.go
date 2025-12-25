@@ -2,10 +2,13 @@ package term
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -90,4 +93,88 @@ func DisplayAuthStatus(ios *iostreams.IOStreams, status *shelly.AuthStatus) {
 	ios.Println()
 
 	ios.Printf("  Status: %s\n", output.RenderBoolState(status.Enabled, "Enabled", "Disabled"))
+}
+
+// DisplayPluginDeviceStatus prints status for a plugin-managed device.
+func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, status *plugins.DeviceStatusResult) {
+	// Header with device info
+	ios.Info("Device: %s", theme.Bold().Render(device.DisplayName()))
+	ios.Info("Platform: %s", device.GetPlatform())
+	if device.Model != "" {
+		ios.Info("Model: %s", device.Model)
+	}
+	ios.Info("Address: %s", device.Address)
+	ios.Println()
+
+	// Online status
+	onlineStr := output.RenderOnline(status.Online, output.CaseTitle)
+	ios.Printf("  Status: %s\n", onlineStr)
+	ios.Println()
+
+	// Components
+	if len(status.Components) > 0 {
+		ios.Printf("%s\n", theme.Bold().Render("Components"))
+
+		table := output.NewTable("Component", "State")
+
+		// Sort component keys for consistent output
+		keys := make([]string, 0, len(status.Components))
+		for k := range status.Components {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			value := status.Components[key]
+			table.AddRow(key, output.FormatDisplayValue(value))
+		}
+		printTable(ios, table)
+		ios.Println()
+	}
+
+	// Sensors
+	if len(status.Sensors) > 0 {
+		ios.Printf("%s\n", theme.Bold().Render("Sensors"))
+
+		table := output.NewTable("Sensor", "Value")
+
+		// Sort sensor keys for consistent output
+		keys := make([]string, 0, len(status.Sensors))
+		for k := range status.Sensors {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			value := status.Sensors[key]
+			table.AddRow(key, output.FormatDisplayValue(value))
+		}
+		printTable(ios, table)
+		ios.Println()
+	}
+
+	// Energy metrics
+	if status.Energy != nil {
+		ios.Printf("%s\n", theme.Bold().Render("Energy"))
+		displayPluginEnergy(ios, status.Energy)
+	}
+}
+
+// displayPluginEnergy prints energy metrics from a plugin status.
+func displayPluginEnergy(ios *iostreams.IOStreams, energy *plugins.EnergyStatus) {
+	if energy.Power > 0 {
+		ios.Printf("  Power:   %s\n", output.FormatPowerColored(energy.Power))
+	}
+	if energy.Voltage > 0 {
+		ios.Printf("  Voltage: %.1f V\n", energy.Voltage)
+	}
+	if energy.Current > 0 {
+		ios.Printf("  Current: %.3f A\n", energy.Current)
+	}
+	if energy.PowerFactor > 0 {
+		ios.Printf("  PF:      %.2f\n", energy.PowerFactor)
+	}
+	if energy.Total > 0 {
+		ios.Printf("  Total:   %.3f kWh\n", energy.Total)
+	}
 }
