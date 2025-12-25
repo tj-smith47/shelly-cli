@@ -55,12 +55,8 @@ func run(ctx context.Context, f *cmdutil.Factory, all bool, args []string) error
 			return nil
 		}
 
-		deviceNames := make([]string, 0, len(cfg.Devices))
-		for name := range cfg.Devices {
-			deviceNames = append(deviceNames, name)
-		}
-
-		results := svc.CheckFirmwareAll(ctx, ios, deviceNames)
+		// Use platform-aware checking that includes plugin-managed devices
+		results := svc.CheckFirmwareAllPlatforms(ctx, ios, cfg.Devices)
 		term.DisplayFirmwareCheckAll(ios, results)
 		return nil
 	}

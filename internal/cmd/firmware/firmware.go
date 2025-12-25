@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/rollback"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/update"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/firmware/updates"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
@@ -36,6 +37,12 @@ Check for updates, update to the latest version, or rollback to a previous versi
   # Update to beta firmware
   shelly firmware update living-room --beta
 
+  # Interactive update workflow
+  shelly firmware updates
+
+  # Update all devices (non-interactive)
+  shelly firmware updates --all --yes
+
   # Rollback to previous firmware
   shelly firmware rollback living-room
 
@@ -46,6 +53,7 @@ Check for updates, update to the latest version, or rollback to a previous versi
 	cmd.AddCommand(check.NewCommand(f))
 	cmd.AddCommand(status.NewCommand(f))
 	cmd.AddCommand(update.NewCommand(f))
+	cmd.AddCommand(updates.NewCommand(f))
 	cmd.AddCommand(rollback.NewCommand(f))
 	cmd.AddCommand(download.NewCommand(f))
 

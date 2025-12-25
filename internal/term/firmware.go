@@ -65,29 +65,62 @@ func DisplayFirmwareInfo(ios *iostreams.IOStreams, info *shelly.FirmwareInfo) {
 	}
 }
 
+// firmwareCheckRow holds display values for a single firmware check result.
+type firmwareCheckRow struct {
+	name, platform, current, stable, beta, status string
+	hasUpdate                                     bool
+}
+
+// buildFirmwareCheckRow builds display values from a firmware check result.
+func buildFirmwareCheckRow(r shelly.FirmwareCheckResult) firmwareCheckRow {
+	row := firmwareCheckRow{name: r.Name}
+
+	if r.Err != nil {
+		row.status = output.RenderErrorState()
+		row.platform = output.LabelPlaceholder
+		row.current = output.LabelPlaceholder
+		row.stable = r.Err.Error()
+		row.beta = output.LabelPlaceholder
+		return row
+	}
+
+	// Get platform, defaulting to "shelly" if empty
+	row.platform = r.Info.Platform
+	if row.platform == "" {
+		row.platform = "shelly"
+	}
+
+	row.current = r.Info.Current
+	row.stable = r.Info.Available
+	if row.stable == "" {
+		row.stable = output.LabelPlaceholder
+	}
+	row.beta = r.Info.Beta
+	if row.beta == "" {
+		row.beta = output.LabelPlaceholder
+	}
+
+	if r.Info.HasUpdate {
+		row.status = output.RenderBoolState(true, "update available", "")
+		row.hasUpdate = true
+	} else {
+		row.status = output.FormatPlaceholder("up to date")
+	}
+
+	return row
+}
+
 // DisplayFirmwareCheckAll displays the results of checking firmware on all devices.
 func DisplayFirmwareCheckAll(ios *iostreams.IOStreams, results []shelly.FirmwareCheckResult) {
-	table := output.NewTable("Device", "Current", "Available", "Status")
+	table := output.NewTable("Device", "Platform", "Current", "Stable", "Beta", "Status")
 	updatesAvailable := 0
 
 	for _, r := range results {
-		var status, current, available string
-		if r.Err != nil {
-			status = output.RenderErrorState()
-			current = output.LabelPlaceholder
-			available = r.Err.Error()
-		} else {
-			current = r.Info.Current
-			if r.Info.HasUpdate {
-				status = output.RenderBoolState(true, "update available", "")
-				available = r.Info.Available
-				updatesAvailable++
-			} else {
-				status = output.FormatPlaceholder("up to date")
-				available = output.LabelPlaceholder
-			}
+		row := buildFirmwareCheckRow(r)
+		if row.hasUpdate {
+			updatesAvailable++
 		}
-		table.AddRow(r.Name, current, available, status)
+		table.AddRow(row.name, row.platform, row.current, row.stable, row.beta, row.status)
 	}
 
 	if err := table.PrintTo(ios.Out); err != nil {

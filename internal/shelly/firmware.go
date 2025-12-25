@@ -3,6 +3,7 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/tj-smith47/shelly-go/firmware"
@@ -11,6 +12,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
 // FirmwareInfo contains firmware update information.
@@ -22,6 +25,7 @@ type FirmwareInfo struct {
 	DeviceModel string
 	DeviceID    string
 	Generation  int
+	Platform    string // "shelly", "tasmota", etc.
 }
 
 // FirmwareStatus contains the current firmware status.
@@ -52,6 +56,7 @@ func (s *Service) CheckFirmware(ctx context.Context, identifier string) (*Firmwa
 			DeviceModel: deviceInfo.Model,
 			DeviceID:    deviceInfo.ID,
 			Generation:  deviceInfo.Generation,
+			Platform:    "shelly", // Native Shelly device
 		}
 		return nil
 	})
@@ -170,6 +175,78 @@ func (s *Service) CheckFirmwareAll(ctx context.Context, ios *iostreams.IOStreams
 	ios.StopProgress()
 
 	return results
+}
+
+// CheckFirmwareAllPlatforms checks firmware for all devices including plugin-managed ones.
+// This is the platform-aware version that uses plugin hooks for non-Shelly devices.
+func (s *Service) CheckFirmwareAllPlatforms(ctx context.Context, ios *iostreams.IOStreams, deviceConfigs map[string]model.Device) []FirmwareCheckResult {
+	var (
+		results []FirmwareCheckResult
+		mu      sync.Mutex
+	)
+
+	ios.StartProgress("Checking firmware on all devices...")
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
+
+	for name, device := range deviceConfigs {
+		deviceName := name
+		dev := device
+		g.Go(func() error {
+			var info *FirmwareInfo
+			var checkErr error
+
+			if dev.IsPluginManaged() {
+				info, checkErr = s.checkPluginFirmware(gctx, dev)
+			} else {
+				info, checkErr = s.CheckFirmware(gctx, deviceName)
+			}
+
+			mu.Lock()
+			results = append(results, FirmwareCheckResult{Name: deviceName, Info: info, Err: checkErr})
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		ios.DebugErr("errgroup wait", err)
+	}
+	ios.StopProgress()
+
+	return results
+}
+
+// checkPluginFirmware checks firmware updates for a plugin-managed device.
+func (s *Service) checkPluginFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
+	if s.pluginRegistry == nil {
+		return nil, fmt.Errorf("plugin registry not configured")
+	}
+
+	plugin, err := s.pluginRegistry.FindByPlatform(device.Platform)
+	if err != nil {
+		return nil, fmt.Errorf("error finding plugin for platform %q: %w", device.Platform, err)
+	}
+	if plugin == nil {
+		return nil, fmt.Errorf("no plugin found for platform %q", device.Platform)
+	}
+
+	executor := plugins.NewHookExecutor(plugin)
+	result, err := executor.ExecuteCheckUpdates(ctx, device.Address, device.Auth)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FirmwareInfo{
+		Current:     result.CurrentVersion,
+		Available:   result.LatestStable,
+		Beta:        result.LatestBeta,
+		HasUpdate:   result.HasUpdate,
+		DeviceModel: device.Model,
+		DeviceID:    device.Name,
+		Platform:    device.Platform,
+	}, nil
 }
 
 // DeviceUpdateStatus holds the status of a device for update operations.
