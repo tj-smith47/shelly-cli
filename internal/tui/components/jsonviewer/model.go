@@ -379,8 +379,10 @@ func (m Model) Open(deviceAddress, endpoint string, endpoints []string) (Model, 
 	}
 
 	// Update viewport size
-	contentWidth := m.width - 6
-	contentHeight := m.height - 10
+	// Subtract: 2 for borders, 2 for horizontal padding
+	contentWidth := m.width - 4
+	// Subtract: 2 for borders, 3 for footer (\n\n + line), 1 buffer for nav
+	contentHeight := m.height - 6
 	if contentWidth > 10 {
 		m.viewport.SetWidth(contentWidth)
 	}
@@ -409,8 +411,10 @@ func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
 
-	contentWidth := width - 6
-	contentHeight := height - 10
+	// Subtract: 2 for borders, 2 for horizontal padding
+	contentWidth := width - 4
+	// Subtract: 2 for borders, 3 for footer (\n\n + line), 1 buffer for nav
+	contentHeight := height - 6
 	if contentWidth > 10 {
 		m.viewport.SetWidth(contentWidth)
 	}
