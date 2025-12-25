@@ -231,7 +231,10 @@ func (m Model) View() string {
 	}
 
 	content := strings.Join(tabs, divider)
-	// Render without width constraint to avoid padding/truncation issues
+	// Use full width for the separator line
+	if m.width > 0 {
+		return m.styles.Container.Width(m.width).Render(content)
+	}
 	return m.styles.Container.Render(content)
 }
 

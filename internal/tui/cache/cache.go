@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -389,21 +390,30 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		data.Info = info
 		data.Online = true
 
-		// Gen1 devices use different APIs - skip Gen2-specific calls
-		if info.Generation == 1 {
-			// For Gen1, we're online but don't have switch/monitoring data yet
-			// TODO: Add Gen1-specific relay status collection
-			return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
+		// Populate device model from DeviceInfo if not already set
+		// Use human-readable product name if available
+		if data.Device.Model == "" && info.Model != "" {
+			data.Device.Model = types.ModelDisplayName(info.Model)
+		}
+		// Use App as Type if available (e.g., "Pro1PM", "PlusPlugS")
+		if data.Device.Type == "" && info.App != "" {
+			data.Device.Type = info.App
+		}
+		// Update generation if not set
+		if data.Device.Generation == 0 && info.Generation > 0 {
+			data.Device.Generation = info.Generation
 		}
 
-		// Gen2+ device - get switch states
-		switches, err := c.svc.SwitchList(ctx, device.Address)
-		if err == nil {
-			for _, sw := range switches {
-				data.Switches = append(data.Switches, SwitchState{
-					ID: sw.ID,
-					On: sw.Output,
-				})
+		// Get switch states (Gen2+ only - Gen1 uses different relay API)
+		if info.Generation > 1 {
+			switches, err := c.svc.SwitchList(ctx, device.Address)
+			if err == nil {
+				for _, sw := range switches {
+					data.Switches = append(data.Switches, SwitchState{
+						ID: sw.ID,
+						On: sw.Output,
+					})
+				}
 			}
 		}
 

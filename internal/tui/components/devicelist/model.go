@@ -440,10 +440,8 @@ func (m Model) renderListRow(d *cache.DeviceData, isSelected bool, width int) st
 // renderDetailPanel renders the right panel with device details.
 func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string {
 	colors := theme.GetSemanticColors()
+	// Detail panel always uses standard border - only list panel highlights on focus
 	borderColor := colors.TableBorder
-	if !m.focused {
-		borderColor = colors.Highlight // Detail is focused when list is not
-	}
 
 	panelStyle := m.styles.DetailPanel.BorderForeground(borderColor)
 
