@@ -78,6 +78,11 @@ type Capabilities struct {
 
 	// FirmwareUpdates indicates plugin supports firmware update operations.
 	FirmwareUpdates bool `json:"firmware_updates,omitempty"`
+
+	// Hints provides helpful messages for unsupported commands.
+	// Keys are command names (e.g., "scene", "script", "schedule").
+	// Values are user-friendly hints explaining alternatives.
+	Hints map[string]string `json:"hints,omitempty"`
 }
 
 // Hooks defines executable entry points for integration.

@@ -33,6 +33,14 @@ func NewRegistry() (*Registry, error) {
 	}, nil
 }
 
+// NewRegistryWithDir creates a registry with a custom plugins directory.
+// This is primarily intended for testing.
+func NewRegistryWithDir(pluginsDir string) *Registry {
+	return &Registry{
+		pluginsDir: pluginsDir,
+	}
+}
+
 // PluginsDir returns the plugins directory path.
 func (r *Registry) PluginsDir() string {
 	return r.pluginsDir

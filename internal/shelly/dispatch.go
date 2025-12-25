@@ -134,6 +134,14 @@ func (s *Service) SupportsPluginCommand(device model.Device, command string) err
 	}
 
 	if !hookAvailable {
+		// Look up hint from plugin manifest if available
+		hint := ""
+		if plugin.Manifest.Capabilities != nil && plugin.Manifest.Capabilities.Hints != nil {
+			hint = plugin.Manifest.Capabilities.Hints[command]
+		}
+		if hint != "" {
+			return NewPlatformErrorWithHint(device.Platform, command, hint)
+		}
 		return NewPlatformError(device.Platform, command)
 	}
 

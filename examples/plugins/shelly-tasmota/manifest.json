@@ -7,7 +7,15 @@
     "device_detection": true,
     "platform": "tasmota",
     "components": ["switch", "light", "sensor", "energy"],
-    "firmware_updates": true
+    "firmware_updates": true,
+    "hints": {
+      "scene": "Tasmota uses Rules for automation. See: https://tasmota.github.io/docs/Rules/",
+      "script": "Tasmota uses Berry scripting on ESP32. See: https://tasmota.github.io/docs/Berry/",
+      "schedule": "Tasmota uses Timers for scheduling. See: https://tasmota.github.io/docs/Timers/",
+      "kvs": "Tasmota uses Var and Mem commands for persistent storage. See: https://tasmota.github.io/docs/Commands/#control",
+      "webhook": "Tasmota can send HTTP requests via Rules. See: https://tasmota.github.io/docs/Rules/#rule-trigger",
+      "virtual": "Tasmota does not support virtual components"
+    }
   },
   "hooks": {
     "detect": "./shelly-tasmota detect",
