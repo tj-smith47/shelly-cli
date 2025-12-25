@@ -37,6 +37,7 @@ The plugin communicates with Tasmota devices using their HTTP API.`,
 	// Add subcommands for plugin hooks
 	rootCmd.AddCommand(cmd.NewDetectCmd())
 	rootCmd.AddCommand(cmd.NewStatusCmd())
+	rootCmd.AddCommand(cmd.NewControlCmd())
 
 	// Add version command
 	rootCmd.AddCommand(&cobra.Command{

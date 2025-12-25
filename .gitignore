@@ -12,6 +12,7 @@ CLAUDE.md
 *.dylib
 bin/
 dist/
+examples/plugins/*/shelly-*
 
 # Test binary, built with `go test -c`
 *.test
