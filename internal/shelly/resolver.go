@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
 // ConfigResolver resolves device identifiers using the config package.
@@ -125,4 +126,24 @@ func NewServiceWithRateLimiting() *Service {
 
 	rateLimitCfg := cfg.GetRateLimitConfig()
 	return New(NewConfigResolver(), WithRateLimiterFromAppConfig(rateLimitCfg))
+}
+
+// NewServiceWithPluginSupport creates a new Shelly service with rate limiting and plugin registry.
+// This is the recommended constructor for CLI commands that need plugin support.
+func NewServiceWithPluginSupport() *Service {
+	cfg := config.Get()
+	opts := []ServiceOption{}
+
+	if cfg != nil {
+		rateLimitCfg := cfg.GetRateLimitConfig()
+		opts = append(opts, WithRateLimiterFromAppConfig(rateLimitCfg))
+	}
+
+	// Try to initialize plugin registry - ignore errors (plugins are optional)
+	registry, err := plugins.NewRegistry()
+	if err == nil {
+		opts = append(opts, WithPluginRegistry(registry))
+	}
+
+	return New(NewConfigResolver(), opts...)
 }

@@ -79,9 +79,10 @@ func NewFactory() *Factory {
 
 	f.ShellyService = func() *shelly.Service {
 		if f.shellyService == nil {
-			// Always use rate limiting from config - it's transparent to callers
-			// and defaults are sensible (prevents device overload with zero config)
-			f.shellyService = shelly.NewServiceWithRateLimiting()
+			// Use rate limiting and plugin support from config
+			// Rate limiting prevents device overload
+			// Plugin support enables control of non-Shelly devices (Tasmota, ESPHome, etc.)
+			f.shellyService = shelly.NewServiceWithPluginSupport()
 		}
 		return f.shellyService
 	}

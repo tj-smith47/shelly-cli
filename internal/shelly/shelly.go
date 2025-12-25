@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 )
 
@@ -17,8 +18,9 @@ const DefaultTimeout = 10 * time.Second
 
 // Service provides high-level operations on Shelly devices.
 type Service struct {
-	resolver    DeviceResolver
-	rateLimiter *ratelimit.DeviceRateLimiter
+	resolver       DeviceResolver
+	rateLimiter    *ratelimit.DeviceRateLimiter
+	pluginRegistry *plugins.Registry
 }
 
 // DeviceResolver resolves device identifiers to device configurations.
@@ -81,6 +83,15 @@ func WithRateLimiterFromAppConfig(cfg config.RateLimitConfig) ServiceOption {
 			},
 		}
 		s.rateLimiter = ratelimit.NewWithConfig(rlConfig)
+	}
+}
+
+// WithPluginRegistry configures the service with a plugin registry.
+// This enables dispatching commands to plugin-managed devices.
+// If not provided, plugin-managed devices will return ErrPluginNotFound.
+func WithPluginRegistry(registry *plugins.Registry) ServiceOption {
+	return func(s *Service) {
+		s.pluginRegistry = registry
 	}
 }
 
@@ -316,4 +327,16 @@ func (s *Service) SetDeviceGeneration(address string, generation int) {
 	if s.rateLimiter != nil {
 		s.rateLimiter.SetGeneration(address, generation)
 	}
+}
+
+// PluginRegistry returns the service's plugin registry, if configured.
+// Returns nil if no plugin registry is enabled.
+func (s *Service) PluginRegistry() *plugins.Registry {
+	return s.pluginRegistry
+}
+
+// SetPluginRegistry sets the plugin registry after service creation.
+// This is useful when the registry needs to be set up after the service is created.
+func (s *Service) SetPluginRegistry(registry *plugins.Registry) {
+	s.pluginRegistry = registry
 }

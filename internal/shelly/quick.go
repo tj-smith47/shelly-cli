@@ -20,15 +20,34 @@ const (
 type QuickResult struct {
 	// Count is the number of components affected.
 	Count int
+	// PluginResult holds the result from a plugin dispatch (nil for Shelly devices).
+	PluginResult *PluginQuickResult
 }
 
 // QuickOn turns on controllable components on a device.
 // If componentID is nil, turns on all controllable components.
 // If componentID is set, turns on only that specific component.
-func (s *Service) QuickOn(ctx context.Context, device string, componentID *int) (*QuickResult, error) {
+// For plugin-managed devices, dispatches to the plugin's control hook.
+func (s *Service) QuickOn(ctx context.Context, identifier string, componentID *int) (*QuickResult, error) {
+	// Resolve the device to check if it's plugin-managed
+	device, err := s.resolver.Resolve(identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	// Dispatch to plugin for non-Shelly devices
+	if device.IsPluginManaged() {
+		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionOn, "switch", componentID)
+		if err != nil {
+			return nil, err
+		}
+		return &QuickResult{Count: 1, PluginResult: pluginResult}, nil
+	}
+
+	// Shelly device - use native control
 	result := &QuickResult{}
 
-	err := s.WithConnection(ctx, device, func(conn *client.Client) error {
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		controllable, err := findControllable(ctx, conn)
 		if err != nil {
 			return err
@@ -68,10 +87,27 @@ func (s *Service) QuickOn(ctx context.Context, device string, componentID *int) 
 // QuickOff turns off controllable components on a device.
 // If componentID is nil, turns off all controllable components.
 // If componentID is set, turns off only that specific component.
-func (s *Service) QuickOff(ctx context.Context, device string, componentID *int) (*QuickResult, error) {
+// For plugin-managed devices, dispatches to the plugin's control hook.
+func (s *Service) QuickOff(ctx context.Context, identifier string, componentID *int) (*QuickResult, error) {
+	// Resolve the device to check if it's plugin-managed
+	device, err := s.resolver.Resolve(identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	// Dispatch to plugin for non-Shelly devices
+	if device.IsPluginManaged() {
+		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionOff, "switch", componentID)
+		if err != nil {
+			return nil, err
+		}
+		return &QuickResult{Count: 1, PluginResult: pluginResult}, nil
+	}
+
+	// Shelly device - use native control
 	result := &QuickResult{}
 
-	err := s.WithConnection(ctx, device, func(conn *client.Client) error {
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		controllable, err := findControllable(ctx, conn)
 		if err != nil {
 			return err
@@ -111,10 +147,27 @@ func (s *Service) QuickOff(ctx context.Context, device string, componentID *int)
 // QuickToggle toggles controllable components on a device.
 // If componentID is nil, toggles all controllable components.
 // If componentID is set, toggles only that specific component.
-func (s *Service) QuickToggle(ctx context.Context, device string, componentID *int) (*QuickResult, error) {
+// For plugin-managed devices, dispatches to the plugin's control hook.
+func (s *Service) QuickToggle(ctx context.Context, identifier string, componentID *int) (*QuickResult, error) {
+	// Resolve the device to check if it's plugin-managed
+	device, err := s.resolver.Resolve(identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	// Dispatch to plugin for non-Shelly devices
+	if device.IsPluginManaged() {
+		pluginResult, err := s.dispatchToPlugin(ctx, device, ActionToggle, "switch", componentID)
+		if err != nil {
+			return nil, err
+		}
+		return &QuickResult{Count: 1, PluginResult: pluginResult}, nil
+	}
+
+	// Shelly device - use native control
 	result := &QuickResult{}
 
-	err := s.WithConnection(ctx, device, func(conn *client.Client) error {
+	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		controllable, err := findControllable(ctx, conn)
 		if err != nil {
 			return err
