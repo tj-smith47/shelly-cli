@@ -128,7 +128,8 @@ func TestModel_TabSwitching(t *testing.T) {
 		{"key 2 switches to Automation", "2", tabs.TabAutomation},
 		{"key 3 switches to Config", "3", tabs.TabConfig},
 		{"key 4 switches to Manage", "4", tabs.TabManage},
-		{"key 5 switches to Fleet", "5", tabs.TabFleet},
+		{"key 5 switches to Monitor", "5", tabs.TabMonitor},
+		{"key 6 switches to Fleet", "6", tabs.TabFleet},
 	}
 
 	for _, tt := range tests {

@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/confirm"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicedetail"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/deviceinfo"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicelist"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/energybars"
@@ -108,6 +109,7 @@ type Model struct {
 	confirm       confirm.Model
 	deviceInfo    deviceinfo.Model
 	deviceList    devicelist.Model
+	deviceDetail  devicedetail.Model
 
 	// Settings
 	refreshInterval time.Duration
@@ -173,6 +175,12 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Create device list component (uses shared cache)
 	deviceListModel := devicelist.New(deviceCache)
 
+	// Create device detail overlay component
+	deviceDetailModel := devicedetail.New(devicedetail.Deps{
+		Ctx: ctx,
+		Svc: f.ShellyService(),
+	})
+
 	// Create view manager and register all views
 	vm := views.New()
 
@@ -201,6 +209,14 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	})
 	vm.Register(manage)
 
+	// Register Monitor view
+	monitorView := views.NewMonitor(views.MonitorDeps{
+		Ctx: ctx,
+		Svc: f.ShellyService(),
+		IOS: f.IOStreams(),
+	})
+	vm.Register(monitorView)
+
 	// Register Fleet view
 	fleet := views.NewFleet(views.FleetDeps{
 		Ctx: ctx,
@@ -210,7 +226,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	})
 	vm.Register(fleet)
 
-	// Create 5-tab bar
+	// Create tab bar
 	tabBar := tabs.New()
 
 	// Load keybindings from config or use defaults
@@ -241,6 +257,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		confirm:         confirm.New(),
 		deviceInfo:      deviceInfoModel,
 		deviceList:      deviceListModel,
+		deviceDetail:    deviceDetailModel,
 		debugLogger:     debug.New(), // nil if SHELLY_TUI_DEBUG not set
 	}
 }
@@ -301,6 +318,7 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		cacheCmd := m.cache.Update(msg)
 		var historyCmd tea.Cmd
 		m.energyHistory, historyCmd = m.energyHistory.Update(msg)
+		m = m.updateStatusBarContext()
 		return m, tea.Batch(cacheCmd, historyCmd), true
 	case cache.RefreshTickMsg, cache.WaveMsg, cache.DeviceRefreshMsg:
 		return m, m.cache.Update(msg), true
@@ -352,6 +370,10 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		return m, toast.Success("Action confirmed: " + msg.Operation), true
 	case deviceinfo.RequestJSONMsg:
 		return m.handleRequestJSON(msg)
+	case devicedetail.Msg, devicedetail.ClosedMsg:
+		var cmd tea.Cmd
+		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
+		return m, cmd, true
 	}
 	return m, nil, false
 }
@@ -359,6 +381,7 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 // handleAllDevicesLoaded handles the AllDevicesLoadedMsg and emits initial selection.
 func (m Model) handleAllDevicesLoaded(msg cache.AllDevicesLoadedMsg) (tea.Model, tea.Cmd, bool) {
 	cmd := m.cache.Update(msg)
+	m = m.updateStatusBarContext()
 	devices := m.getFilteredDevices()
 	if len(devices) == 0 || m.cursor >= len(devices) {
 		return m, cmd, true
@@ -453,6 +476,13 @@ func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool)
 		return m, cmd, true
 	}
 
+	// If device detail overlay is visible, forward all keys to it
+	if m.deviceDetail.Visible() {
+		var cmd tea.Cmd
+		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
+		return m, cmd, true
+	}
+
 	return m.handleKeyPress(msg)
 }
 
@@ -490,10 +520,10 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) Model {
 	// Set confirm dialog size
 	m.confirm = m.confirm.SetSize(m.width, m.height)
 
-	// Set deviceList size (events column + device list/detail columns)
-	deviceListWidth := m.width - m.width*25/100 - 2 // Full width minus events column
-	m.deviceList = m.deviceList.SetSize(deviceListWidth, m.height-branding.BannerHeight()-5)
+	// Note: deviceList and deviceInfo sizes are calculated in renderMultiPanelLayout
+	// based on the actual layout mode and available space
 
+	m = m.updateStatusBarContext()
 	return m
 }
 
@@ -512,6 +542,32 @@ func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
 		)
 	}
 	return m, statusCmd
+}
+
+// updateStatusBarContext updates the status bar with context-specific items.
+func (m Model) updateStatusBarContext() Model {
+	total := m.cache.DeviceCount()
+	online := m.cache.OnlineCount()
+
+	m.statusBar = m.statusBar.ClearItems()
+
+	if total > 0 {
+		m.statusBar = m.statusBar.AddItem(
+			fmt.Sprintf("%d devices (%d online)", total, online),
+			fmt.Sprintf("%d (%d on)", total, online),
+			fmt.Sprintf("%d/%d", total, online),
+		)
+	}
+
+	if m.filter != "" {
+		m.statusBar = m.statusBar.AddItem(
+			fmt.Sprintf("Filter: %s", m.filter),
+			fmt.Sprintf("F: %s", m.filter),
+			"F",
+		)
+	}
+
+	return m
 }
 
 // handleCommand handles command mode commands.
@@ -738,6 +794,9 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabManage)
 		return m, m.viewManager.SetActive(views.ViewManage), true
 	case key.Matches(msg, m.keys.View5):
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabMonitor)
+		return m, m.viewManager.SetActive(views.ViewMonitor), true
+	case key.Matches(msg, m.keys.View6):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabFleet)
 		return m, m.viewManager.SetActive(views.ViewFleet), true
 	}
@@ -849,6 +908,11 @@ func (m Model) syncDeviceInfo() Model {
 
 // handleDeviceActionKey handles device action key presses.
 func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	// Handle 'd' to show device detail overlay
+	if msg.String() == "d" || msg.String() == "D" {
+		return m.showDeviceDetail()
+	}
+
 	var action string
 	switch {
 	case key.Matches(msg, m.keys.Toggle):
@@ -867,6 +931,27 @@ func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		return m, cmd, true
 	}
 	return m, nil, false
+}
+
+// showDeviceDetail shows the device detail overlay for the selected device.
+func (m Model) showDeviceDetail() (tea.Model, tea.Cmd, bool) {
+	devices := m.getFilteredDevices()
+	if m.cursor >= len(devices) || m.cursor < 0 {
+		return m, nil, false
+	}
+
+	selected := devices[m.cursor]
+	if !selected.Online {
+		return m, nil, false
+	}
+
+	// Set size for the overlay
+	m.deviceDetail = m.deviceDetail.SetSize(m.width*2/3, m.height*2/3)
+
+	// Show the overlay with the device
+	var cmd tea.Cmd
+	m.deviceDetail, cmd = m.deviceDetail.Show(selected.Device)
+	return m, cmd, true
 }
 
 // executeDeviceAction executes a device action on the selected device.
@@ -1002,6 +1087,19 @@ func (m Model) View() tea.View {
 		)
 	}
 
+	// Add device detail overlay
+	if m.deviceDetail.Visible() {
+		detailView := m.deviceDetail.View()
+		result = lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			detailView,
+			lipgloss.WithWhitespaceChars(" "),
+		)
+	}
+
 	// Debug logging (if enabled)
 	m.debugLogger.Log(m.tabBar.ActiveTabID().String(), m.focusedPanelName(), m.width, m.height, result)
 
@@ -1072,12 +1170,22 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	// Render events column
 	eventsCol := m.renderEventsColumn(eventsWidth, topHeight)
 
-	// Render device list component (includes list + detail in split pane)
-	m.deviceList = m.deviceList.SetSize(deviceListWidth, topHeight)
-	m.deviceList = m.deviceList.SetFocused(m.focusedPanel == PanelDeviceList)
-	deviceListCol := m.deviceList.View()
+	// Calculate widths for device list (40%) and device info (60%)
+	listWidth := deviceListWidth * 40 / 100
+	infoWidth := deviceListWidth - listWidth - 1 // -1 for gap
 
-	topContent := lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", deviceListCol)
+	// Render device list with consistent border styling
+	deviceListCol := m.renderDeviceListColumn(listWidth, topHeight)
+
+	// Render device info component (detail panel)
+	m.deviceInfo = m.deviceInfo.SetSize(infoWidth, topHeight)
+	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail)
+	deviceInfoCol := m.deviceInfo.View()
+
+	// Combine list and info panels
+	devicePanels := lipgloss.JoinHorizontal(lipgloss.Top, deviceListCol, " ", deviceInfoCol)
+
+	topContent := lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", devicePanels)
 
 	// Ensure topContent fills the full width
 	topContentStyle := lipgloss.NewStyle().Width(m.width)
@@ -1139,9 +1247,11 @@ func (m Model) renderNarrowLayout(height int) string {
 	// Row 1: Events panel (compact)
 	eventsRow := m.renderEventsColumn(panelWidth, eventsHeight)
 
-	// Row 2: Device List (with internal split pane)
+	// Row 2: Device List (list only) + Device Info stacked in narrow mode
+	// In narrow mode, we keep devicelist's internal split pane for compactness
 	m.deviceList = m.deviceList.SetSize(panelWidth, deviceListHeight)
 	m.deviceList = m.deviceList.SetFocused(m.focusedPanel == PanelDeviceList)
+	m.deviceList = m.deviceList.SetListOnly(false) // Use split pane in narrow mode
 	deviceListRow := m.deviceList.View()
 
 	// Stack panels vertically
@@ -1161,6 +1271,29 @@ func (m Model) renderNarrowLayout(height int) string {
 	}
 
 	return content
+}
+
+// renderDeviceListColumn renders the device list with consistent border styling.
+func (m Model) renderDeviceListColumn(width, height int) string {
+	focused := m.focusedPanel == PanelDeviceList
+
+	// Account for border when setting component size
+	innerWidth := width - 2   // left + right border
+	innerHeight := height - 2 // top + bottom border
+
+	m.deviceList = m.deviceList.SetSize(innerWidth, innerHeight)
+	m.deviceList = m.deviceList.SetFocused(focused)
+	m.deviceList = m.deviceList.SetListOnly(true)
+
+	deviceCount := m.cache.DeviceCount()
+	onlineCount := m.cache.OnlineCount()
+	title := fmt.Sprintf("Devices (%d/%d)", onlineCount, deviceCount)
+
+	r := rendering.New(width, height).
+		SetTitle(title).
+		SetFocused(focused)
+
+	return r.SetContent(m.deviceList.View()).Render()
 }
 
 // renderEventsColumn renders the events column with embedded title.
@@ -1211,8 +1344,8 @@ func (m Model) renderHeader() string {
 	onlineStyle := lipgloss.NewStyle().Foreground(colors.Online).Bold(true)
 	offlineStyle := lipgloss.NewStyle().Foreground(colors.Offline)
 	powerStyle := lipgloss.NewStyle().Foreground(colors.Warning).Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(colors.Muted)
-	valueStyle := lipgloss.NewStyle().Foreground(colors.Text).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(colors.Highlight)
+	valueStyle := lipgloss.NewStyle().Foreground(colors.Text)
 	titleStyle := lipgloss.NewStyle().Foreground(colors.Highlight).Bold(true)
 
 	// Create metadata lines to match banner height
@@ -1227,7 +1360,7 @@ func (m Model) renderHeader() string {
 	// Line 2: Device counts
 	if m.cache.IsLoading() {
 		fetched := m.cache.FetchedCount()
-		metaLines[2] = labelStyle.Render("Devices: ") + fmt.Sprintf("Loading... %d/%d", fetched, total)
+		metaLines[2] = labelStyle.Render("Devices: ") + valueStyle.Render(fmt.Sprintf("Loading... %d/%d", fetched, total))
 	} else {
 		metaLines[2] = labelStyle.Render("Devices: ") +
 			onlineStyle.Render(fmt.Sprintf("%d online", online))
@@ -1258,8 +1391,7 @@ func (m Model) renderHeader() string {
 	// Line 5: Theme
 	themeName := theme.CurrentThemeName()
 	if themeName != "" && len(metaLines) > 5 {
-		themeStyle := lipgloss.NewStyle().Foreground(colors.Secondary)
-		metaLines[5] = labelStyle.Render("Theme:   ") + themeStyle.Render(themeName)
+		metaLines[5] = labelStyle.Render("Theme:   ") + valueStyle.Render(themeName)
 	}
 
 	// Fill remaining lines if banner is taller

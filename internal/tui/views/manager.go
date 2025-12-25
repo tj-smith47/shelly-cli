@@ -21,6 +21,8 @@ const (
 	ViewConfig = tabs.TabConfig
 	// ViewManage is the local device management view for discovery, batch, firmware, and backup.
 	ViewManage = tabs.TabManage
+	// ViewMonitor is the real-time monitoring view.
+	ViewMonitor = tabs.TabMonitor
 	// ViewFleet is the Shelly Cloud Fleet management view.
 	ViewFleet = tabs.TabFleet
 )

@@ -9,8 +9,8 @@ import (
 func TestNew(t *testing.T) {
 	t.Parallel()
 	m := New()
-	if m.TabCount() != 5 {
-		t.Errorf("TabCount() = %d, want 5", m.TabCount())
+	if m.TabCount() != 6 {
+		t.Errorf("TabCount() = %d, want 6", m.TabCount())
 	}
 	if m.ActiveTabID() != TabDashboard {
 		t.Errorf("ActiveTabID() = %v, want %v", m.ActiveTabID(), TabDashboard)
@@ -148,6 +148,7 @@ func TestTabID_String(t *testing.T) {
 		{TabAutomation, "Automation"},
 		{TabConfig, "Config"},
 		{TabManage, "Manage"},
+		{TabMonitor, "Monitor"},
 		{TabFleet, "Fleet"},
 		{TabID(99), "Unknown"},
 	}
@@ -165,7 +166,7 @@ func TestTabID_String(t *testing.T) {
 func TestTabID_Icon(t *testing.T) {
 	t.Parallel()
 	// Just verify icons are non-empty for known tabs
-	tabs := []TabID{TabDashboard, TabAutomation, TabConfig, TabManage, TabFleet}
+	tabs := []TabID{TabDashboard, TabAutomation, TabConfig, TabManage, TabMonitor, TabFleet}
 	for _, tab := range tabs {
 		if tab.Icon() == "" {
 			t.Errorf("Icon() for %v returned empty string", tab)
@@ -184,7 +185,8 @@ func TestModel_KeyboardShortcuts(t *testing.T) {
 		{"key 2 selects Automation", "2", TabAutomation},
 		{"key 3 selects Config", "3", TabConfig},
 		{"key 4 selects Manage", "4", TabManage},
-		{"key 5 selects Fleet", "5", TabFleet},
+		{"key 5 selects Monitor", "5", TabMonitor},
+		{"key 6 selects Fleet", "6", TabFleet},
 	}
 
 	for _, tt := range tests {

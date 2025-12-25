@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/batch"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/discovery"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/firmware"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/provisioning"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -26,6 +27,7 @@ const (
 	ManagePanelBatch
 	ManagePanelFirmware
 	ManagePanelBackup
+	ManagePanelProvisioning
 )
 
 // ManageDeps holds dependencies for the manage view.
@@ -45,7 +47,7 @@ func (d ManageDeps) Validate() error {
 	return nil
 }
 
-// Manage is the manage view that composes Discovery, Batch, Firmware, and Backup components.
+// Manage is the manage view that composes Discovery, Batch, Firmware, Backup, and Provisioning.
 // This provides local device administration (not Shelly Cloud Fleet).
 type Manage struct {
 	ctx context.Context
@@ -53,16 +55,18 @@ type Manage struct {
 	id  ViewID
 
 	// Component models
-	discovery discovery.Model
-	batch     batch.Model
-	firmware  firmware.Model
-	backup    backup.Model
+	discovery    discovery.Model
+	batch        batch.Model
+	firmware     firmware.Model
+	backup       backup.Model
+	provisioning provisioning.Model
 
 	// State
-	focusedPanel ManagePanel
-	width        int
-	height       int
-	styles       ManageStyles
+	focusedPanel     ManagePanel
+	showProvisioning bool // Whether provisioning wizard is visible
+	width            int
+	height           int
+	styles           ManageStyles
 
 	// Layout calculator for flexible panel sizing
 	layoutCalc *layout.TwoColumnLayout
@@ -104,6 +108,7 @@ func NewManage(deps ManageDeps) *Manage {
 	batchDeps := batch.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	firmwareDeps := firmware.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	backupDeps := backup.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
+	provisioningDeps := provisioning.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
 	// Create flexible layout with 40/60 column split (left/right)
 	layoutCalc := layout.NewTwoColumnLayout(0.4, 1)
@@ -128,6 +133,7 @@ func NewManage(deps ManageDeps) *Manage {
 		batch:        batch.New(batchDeps),
 		firmware:     firmware.New(firmwareDeps),
 		backup:       backup.New(backupDeps),
+		provisioning: provisioning.New(provisioningDeps),
 		focusedPanel: ManagePanelDiscovery,
 		styles:       DefaultManageStyles(),
 		layoutCalc:   layoutCalc,
@@ -151,6 +157,7 @@ func (m *Manage) Init() tea.Cmd {
 		m.batch.Init(),
 		m.firmware.Init(),
 		m.backup.Init(),
+		m.provisioning.Init(),
 	)
 }
 
@@ -163,6 +170,9 @@ func (m *Manage) ID() ViewID {
 func (m *Manage) SetSize(width, height int) View {
 	m.width = width
 	m.height = height
+
+	// Provisioning always gets full dimensions when visible
+	m.provisioning = m.provisioning.SetSize(width-4, height-4)
 
 	if m.isNarrow() {
 		// Narrow mode: all components get full width, full height
@@ -228,6 +238,27 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 		m.focusNext()
 	case keyShiftTab:
 		m.focusPrev()
+	case "p":
+		// Toggle provisioning wizard when pressing 'p' from Discovery panel
+		if m.focusedPanel == ManagePanelDiscovery {
+			m.showProvisioning = !m.showProvisioning
+			if m.showProvisioning {
+				m.focusedPanel = ManagePanelProvisioning
+				m.provisioning = m.provisioning.SetFocused(true)
+			} else {
+				m.focusedPanel = ManagePanelDiscovery
+				m.provisioning = m.provisioning.Reset()
+			}
+			m.updateFocusStates()
+		}
+	case "esc":
+		// Close provisioning wizard with Escape
+		if m.showProvisioning {
+			m.showProvisioning = false
+			m.focusedPanel = ManagePanelDiscovery
+			m.provisioning = m.provisioning.Reset()
+			m.updateFocusStates()
+		}
 	}
 }
 
@@ -255,10 +286,11 @@ func (m *Manage) focusPrev() {
 }
 
 func (m *Manage) updateFocusStates() {
-	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery)
-	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch)
-	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware)
-	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup)
+	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !m.showProvisioning)
+	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning)
+	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning)
+	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning)
+	m.provisioning = m.provisioning.SetFocused(m.showProvisioning)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if m.layoutCalc != nil && m.width > 0 && m.height > 0 {
@@ -272,6 +304,12 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 
 	// Only update the focused component for key messages
 	if _, ok := msg.(tea.KeyPressMsg); ok {
+		// If provisioning wizard is open, it gets all key events
+		if m.showProvisioning {
+			m.provisioning, cmd = m.provisioning.Update(msg)
+			cmds = append(cmds, cmd)
+			return tea.Batch(cmds...)
+		}
 		switch m.focusedPanel {
 		case ManagePanelDiscovery:
 			m.discovery, cmd = m.discovery.Update(msg)
@@ -281,6 +319,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 			m.firmware, cmd = m.firmware.Update(msg)
 		case ManagePanelBackup:
 			m.backup, cmd = m.backup.Update(msg)
+		case ManagePanelProvisioning:
+			m.provisioning, cmd = m.provisioning.Update(msg)
 		}
 		cmds = append(cmds, cmd)
 	} else {
@@ -292,6 +332,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 		m.firmware, cmd = m.firmware.Update(msg)
 		cmds = append(cmds, cmd)
 		m.backup, cmd = m.backup.Update(msg)
+		cmds = append(cmds, cmd)
+		m.provisioning, cmd = m.provisioning.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -307,6 +349,11 @@ func (m *Manage) isNarrow() bool {
 func (m *Manage) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
+	}
+
+	// If provisioning wizard is active, show it as overlay
+	if m.showProvisioning {
+		return m.provisioning.View()
 	}
 
 	if m.isNarrow() {
@@ -328,6 +375,8 @@ func (m *Manage) renderNarrowLayout() string {
 		return m.firmware.View()
 	case ManagePanelBackup:
 		return m.backup.View()
+	case ManagePanelProvisioning:
+		return m.provisioning.View()
 	default:
 		return m.discovery.View()
 	}

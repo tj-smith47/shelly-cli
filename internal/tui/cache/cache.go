@@ -375,8 +375,9 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 			lastRequestID: requestID,
 		}
 
-		// Per-device timeout
-		ctx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
+		// Per-device timeout - 8 seconds is safe (Gen2 times out at 10s internally)
+		// and much faster than 30s for offline device detection
+		ctx, cancel := context.WithTimeout(c.ctx, 8*time.Second)
 		defer cancel()
 
 		// Get device info first (auto-detects Gen1 vs Gen2)
@@ -431,6 +432,53 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 	}
 }
 
+// handleDeviceUpdate processes a device update message.
+func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
+	c.mu.Lock()
+	existing := c.devices[msg.Name]
+
+	// Discard stale responses - only accept newer request IDs
+	if existing != nil && msg.RequestID > 0 && msg.RequestID < existing.lastRequestID {
+		c.mu.Unlock()
+		return nil // Stale response, discard
+	}
+
+	// If refresh failed but we have existing good data, preserve it
+	// Only update the error/online status, keep cached info
+	if msg.Data.Error != nil && existing != nil && existing.Fetched && existing.Info != nil {
+		// Preserve the existing cached data, just mark offline
+		existing.Online = false
+		existing.Error = msg.Data.Error
+		existing.UpdatedAt = msg.Data.UpdatedAt
+		existing.lastRequestID = msg.RequestID
+		// Keep existing.Info, Snapshot, Power, etc. - don't clear good data
+		c.devices[msg.Name] = existing
+	} else {
+		// Normal update - new data or first fetch
+		c.devices[msg.Name] = msg.Data
+	}
+	c.deviceRefreshTimes[msg.Name] = time.Now()
+	c.pendingCount--
+	allDone := c.pendingCount <= 0 && c.initialLoad
+	if allDone {
+		c.initialLoad = false
+	}
+	c.mu.Unlock()
+
+	// Schedule next refresh for this device (adaptive interval)
+	var cmds []tea.Cmd
+	cmds = append(cmds, c.scheduleDeviceRefresh(msg.Name, msg.Data))
+
+	if allDone {
+		cmds = append(cmds, func() tea.Msg { return AllDevicesLoadedMsg{} })
+	}
+
+	if len(cmds) == 1 {
+		return cmds[0]
+	}
+	return tea.Batch(cmds...)
+}
+
 // aggregateMetrics extracts metrics from the monitoring snapshot.
 func (c *Cache) aggregateMetrics(data *DeviceData, snapshot *shelly.MonitoringSnapshot) {
 	// Power meters (PM) - most common for switches with power monitoring
@@ -478,37 +526,7 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		return c.processWave(msg)
 
 	case DeviceUpdateMsg:
-		c.mu.Lock()
-		existing := c.devices[msg.Name]
-
-		// Discard stale responses - only accept newer request IDs
-		if existing != nil && msg.RequestID > 0 && msg.RequestID < existing.lastRequestID {
-			c.mu.Unlock()
-			return nil // Stale response, discard
-		}
-
-		// Update device data
-		c.devices[msg.Name] = msg.Data
-		c.deviceRefreshTimes[msg.Name] = time.Now()
-		c.pendingCount--
-		allDone := c.pendingCount <= 0 && c.initialLoad
-		if allDone {
-			c.initialLoad = false
-		}
-		c.mu.Unlock()
-
-		// Schedule next refresh for this device (adaptive interval)
-		var cmds []tea.Cmd
-		cmds = append(cmds, c.scheduleDeviceRefresh(msg.Name, msg.Data))
-
-		if allDone {
-			cmds = append(cmds, func() tea.Msg { return AllDevicesLoadedMsg{} })
-		}
-
-		if len(cmds) == 1 {
-			return cmds[0]
-		}
-		return tea.Batch(cmds...)
+		return c.handleDeviceUpdate(msg)
 
 	case DeviceRefreshMsg:
 		// Refresh a single device

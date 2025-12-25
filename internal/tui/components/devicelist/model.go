@@ -27,6 +27,7 @@ type Model struct {
 	cursor       int          // Currently selected index in filtered list
 	scrollOffset int          // Scroll offset for list
 	focused      bool         // Whether this component has focus
+	listOnly     bool         // When true, only render list panel (detail rendered separately)
 	width        int
 	height       int
 	styles       Styles
@@ -280,6 +281,17 @@ func (m Model) SetFocused(focused bool) Model {
 	return m
 }
 
+// SetListOnly sets whether to render only the list panel (detail rendered separately).
+func (m Model) SetListOnly(listOnly bool) Model {
+	m.listOnly = listOnly
+	return m
+}
+
+// ListOnly returns whether list-only mode is enabled.
+func (m Model) ListOnly() bool {
+	return m.listOnly
+}
+
 // Focused returns whether this component has focus.
 func (m Model) Focused() bool {
 	return m.focused
@@ -287,8 +299,17 @@ func (m Model) Focused() bool {
 
 // visibleRows calculates how many rows can be displayed in the list panel.
 func (m Model) visibleRows() int {
-	// Account for borders, header, padding
-	available := m.height - 4
+	var overhead int
+	if m.listOnly {
+		// In listOnly mode, border is handled by app.go's rendering.New()
+		// Only account for scroll indicator (~1 line)
+		overhead = 1
+	} else {
+		// In split-pane mode, account for panel borders (2), header (~3), padding
+		overhead = 5
+	}
+
+	available := m.height - overhead
 	if available < 1 {
 		return 1
 	}
@@ -348,6 +369,11 @@ func (m Model) View() string {
 			Render(fmt.Sprintf("No devices match filter %q.\nPress / to clear or modify filter.", m.filter))
 	}
 
+	// List-only mode: render just the list panel at full width
+	if m.listOnly {
+		return m.renderListPanel(devices, m.width)
+	}
+
 	// Split pane layout
 	listWidth := m.listPanelWidth()
 	detailWidth := m.detailPanelWidth()
@@ -361,15 +387,6 @@ func (m Model) View() string {
 // renderListPanel renders the left panel with the device list.
 func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 	colors := theme.GetSemanticColors()
-	borderColor := colors.TableBorder
-	if m.focused {
-		borderColor = colors.Highlight
-	}
-
-	panelStyle := m.styles.ListPanel.BorderForeground(borderColor)
-
-	// Header
-	header := m.styles.ListHeader.Width(width - 4).Render("Devices")
 
 	// Rows
 	visible := m.visibleRows()
@@ -383,7 +400,7 @@ func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 	for i := startIdx; i < endIdx; i++ {
 		d := devices[i]
 		isSelected := i == m.cursor
-		row := m.renderListRow(d, isSelected, width-4)
+		row := m.renderListRow(d, isSelected, width-2) // -2 for padding
 		rows.WriteString(row + "\n")
 	}
 
@@ -395,12 +412,29 @@ func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 		)
 	}
 
-	content := header + "\n" + rows.String() + scrollInfo
+	content := rows.String() + scrollInfo
+
+	// In listOnly mode, just return content (border handled by app.go)
+	if m.listOnly {
+		return lipgloss.NewStyle().
+			Foreground(colors.Text).
+			Width(width).
+			Height(m.height).
+			Render(content)
+	}
+
+	// For split-pane mode, use panel styling with header
+	borderColor := colors.TableBorder
+	if m.focused {
+		borderColor = colors.Highlight
+	}
+	panelStyle := m.styles.ListPanel.BorderForeground(borderColor)
+	header := m.styles.ListHeader.Width(width - 4).Render("Devices")
 
 	return panelStyle.
 		Width(width).
 		Height(m.height).
-		Render(content)
+		Render(header + "\n" + content)
 }
 
 // renderListRow renders a single row in the device list.

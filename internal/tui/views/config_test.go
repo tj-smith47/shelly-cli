@@ -162,24 +162,24 @@ func TestConfig_FocusNext(t *testing.T) {
 	}
 
 	c.focusNext()
-	if c.focusedPanel != PanelCloud {
-		t.Errorf("after focusNext = %v, want PanelCloud", c.focusedPanel)
+	if c.focusedPanel != PanelBLE {
+		t.Errorf("after focusNext = %v, want PanelBLE", c.focusedPanel)
 	}
 
 	c.focusNext()
-	if c.focusedPanel != PanelInputs {
-		t.Errorf("after focusNext = %v, want PanelInputs", c.focusedPanel)
+	if c.focusedPanel != PanelCloud {
+		t.Errorf("after focusNext = %v, want PanelCloud", c.focusedPanel)
 	}
 }
 
 func TestConfig_FocusPrev(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig()
-	c.focusedPanel = PanelInputs
+	c.focusedPanel = PanelCloud
 
 	c.focusPrev()
-	if c.focusedPanel != PanelCloud {
-		t.Errorf("after focusPrev = %v, want PanelCloud", c.focusedPanel)
+	if c.focusedPanel != PanelBLE {
+		t.Errorf("after focusPrev = %v, want PanelBLE", c.focusedPanel)
 	}
 
 	c.focusPrev()
@@ -191,7 +191,7 @@ func TestConfig_FocusPrev(t *testing.T) {
 func TestConfig_FocusWrap(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig()
-	c.focusedPanel = PanelInputs
+	c.focusedPanel = PanelSecurity // Last panel in the list
 
 	// Focus next should wrap to PanelWiFi
 	c.focusNext()

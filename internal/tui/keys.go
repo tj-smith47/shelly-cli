@@ -45,6 +45,7 @@ type KeyMap struct {
 	View3    key.Binding
 	View4    key.Binding
 	View5    key.Binding
+	View6    key.Binding
 }
 
 // DefaultKeyMap returns vim-style keyboard bindings.
@@ -163,7 +164,11 @@ func DefaultKeyMap() KeyMap {
 		),
 		View5: key.NewBinding(
 			key.WithKeys("5"),
-			key.WithHelp("5", "fleet"),
+			key.WithHelp("5", "monitor"),
+		),
+		View6: key.NewBinding(
+			key.WithKeys("6"),
+			key.WithHelp("6", "fleet"),
 		),
 	}
 }
@@ -180,7 +185,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.PageUp, k.PageDown, k.Home, k.End},
 		{k.Enter, k.Escape, k.Refresh, k.Filter},
 		{k.Toggle, k.TurnOn, k.TurnOff, k.Reboot},
-		{k.Tab, k.View1, k.View2, k.View3, k.View4, k.View5},
+		{k.Tab, k.View1, k.View2, k.View3, k.View4, k.View5, k.View6},
 		{k.Command, k.Help, k.Quit},
 	}
 }
@@ -249,7 +254,8 @@ func applyViewBindings(km *KeyMap, kb *config.KeybindingsConfig) {
 	applyBinding(&km.View2, kb.View2, "automation")
 	applyBinding(&km.View3, kb.View3, "config")
 	applyBinding(&km.View4, kb.View4, "manage")
-	applyBinding(&km.View5, kb.View5, "fleet")
+	applyBinding(&km.View5, kb.View5, "monitor")
+	applyBinding(&km.View6, kb.View6, "fleet")
 }
 
 // applyBinding applies a keybinding override if keys are provided.

@@ -113,6 +113,7 @@ type KeybindingsConfig struct {
 	View3    []string `mapstructure:"view3"`
 	View4    []string `mapstructure:"view4"`
 	View5    []string `mapstructure:"view5"`
+	View6    []string `mapstructure:"view6"`
 }
 
 // DiscoveryConfig holds device discovery settings.

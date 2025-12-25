@@ -21,8 +21,9 @@ import (
 
 // Error variables for validation.
 var (
-	errNilContext = errors.New("context is required")
-	errNilService = errors.New("service is required")
+	errNilContext   = errors.New("context is required")
+	errNilService   = errors.New("service is required")
+	errNilIOStreams = errors.New("iostreams is required")
 )
 
 // AutomationPanel identifies which panel is focused.

@@ -22,6 +22,8 @@ const (
 	TabConfig
 	// TabManage is the local device management tab for discovery, batch, firmware, and backup.
 	TabManage
+	// TabMonitor is the real-time monitoring tab.
+	TabMonitor
 	// TabFleet is the Shelly Cloud Fleet management tab.
 	TabFleet
 )
@@ -37,6 +39,8 @@ func (t TabID) String() string {
 		return "Config"
 	case TabManage:
 		return "Manage"
+	case TabMonitor:
+		return "Monitor"
 	case TabFleet:
 		return "Fleet"
 	default:
@@ -55,6 +59,8 @@ func (t TabID) Icon() string {
 		return "󰒓" // config/settings icon
 	case TabManage:
 		return "󰑣" // manage/tools icon
+	case TabMonitor:
+		return "󰄪" // monitor/gauge icon
 	case TabFleet:
 		return "󰒍" // fleet/cloud icon
 	default:
@@ -129,6 +135,7 @@ func New() Model {
 			{ID: TabAutomation, Label: TabAutomation.String(), Icon: TabAutomation.Icon(), Enabled: true},
 			{ID: TabConfig, Label: TabConfig.String(), Icon: TabConfig.Icon(), Enabled: true},
 			{ID: TabManage, Label: TabManage.String(), Icon: TabManage.Icon(), Enabled: true},
+			{ID: TabMonitor, Label: TabMonitor.String(), Icon: TabMonitor.Icon(), Enabled: true},
 			{ID: TabFleet, Label: TabFleet.String(), Icon: TabFleet.Icon(), Enabled: true},
 		},
 		active:    0,
@@ -173,6 +180,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.setActive(3)
 	case "5":
 		return m.setActive(4)
+	case "6":
+		return m.setActive(5)
 	}
 	return m, nil
 }
