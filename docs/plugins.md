@@ -486,6 +486,225 @@ shelly plugin remove myext
 shelly plugin install gh:user/shelly-myext
 ```
 
+## Enhanced Plugin Capabilities
+
+Plugins can declare capabilities and hooks to integrate deeply with shelly-cli. This enables features like device detection during discovery, device control via unified commands, and firmware updates.
+
+### Capabilities
+
+The `capabilities` field in the manifest declares what a plugin can do:
+
+```json
+{
+  "capabilities": {
+    "device_detection": true,
+    "platform": "tasmota",
+    "components": ["switch", "light", "sensor", "energy"],
+    "firmware_updates": true,
+    "hints": {
+      "scene": "Tasmota uses Rules for automation. See: https://tasmota.github.io/docs/Rules/",
+      "script": "Tasmota uses Berry scripting on ESP32. See: https://tasmota.github.io/docs/Berry/"
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `device_detection` | boolean | Plugin can detect devices during `shelly discover` |
+| `platform` | string | Platform name (e.g., "tasmota", "esphome") |
+| `components` | array | Controllable component types: "switch", "light", "cover", "sensor", "energy" |
+| `firmware_updates` | boolean | Plugin supports firmware update operations |
+| `hints` | object | Helpful messages for unsupported commands (key=command, value=hint) |
+
+### Hooks
+
+The `hooks` field defines executable entry points that shelly-cli calls:
+
+```json
+{
+  "hooks": {
+    "detect": "./shelly-myext detect",
+    "status": "./shelly-myext status",
+    "control": "./shelly-myext control",
+    "check_updates": "./shelly-myext check-updates",
+    "apply_update": "./shelly-myext apply-update"
+  }
+}
+```
+
+#### Detect Hook
+
+Called during `shelly discover` to probe if an address belongs to this platform.
+
+**Input:**
+```bash
+./shelly-myext detect --address=192.168.1.100 [--auth-user=<user> --auth-pass=<pass>]
+```
+
+**Output:** JSON `DeviceDetectionResult`:
+```json
+{
+  "detected": true,
+  "platform": "tasmota",
+  "device_id": "sonoff-basic-1234",
+  "device_name": "Garage Light",
+  "model": "Sonoff Basic R3",
+  "firmware": "14.3.0",
+  "mac": "AA:BB:CC:DD:EE:FF",
+  "components": [
+    {"type": "switch", "id": 0, "name": "Relay 1"}
+  ]
+}
+```
+
+**Exit codes:** 0 = detected, 1 = not this platform
+
+#### Status Hook
+
+Called to get device status.
+
+**Input:**
+```bash
+./shelly-myext status --address=192.168.1.100 [--auth-user=<user> --auth-pass=<pass>]
+```
+
+**Output:** JSON `DeviceStatusResult`:
+```json
+{
+  "online": true,
+  "components": {
+    "switch:0": {"output": true}
+  },
+  "sensors": {
+    "wifi_rssi": -52
+  },
+  "energy": {
+    "power": 45.3,
+    "voltage": 121.5,
+    "current": 0.372,
+    "total": 123.456
+  }
+}
+```
+
+#### Control Hook
+
+Called to execute device control commands.
+
+**Input:**
+```bash
+./shelly-myext control --address=192.168.1.100 --action=<on|off|toggle> --component=<switch|light|cover> --id=<n> [--auth-user=<user> --auth-pass=<pass>]
+```
+
+**Output:** JSON `ControlResult`:
+```json
+{
+  "success": true,
+  "state": "on"
+}
+```
+
+#### Check Updates Hook
+
+Called to check for firmware updates.
+
+**Input:**
+```bash
+./shelly-myext check-updates --address=192.168.1.100 [--auth-user=<user> --auth-pass=<pass>]
+```
+
+**Output:** JSON `FirmwareUpdateInfo`:
+```json
+{
+  "current_version": "14.3.0",
+  "latest_stable": "15.2.0",
+  "latest_beta": "15.3.0b1",
+  "has_update": true,
+  "has_beta_update": true,
+  "ota_url_stable": "http://ota.tasmota.com/tasmota/release/tasmota.bin.gz",
+  "ota_url_beta": "http://ota.tasmota.com/tasmota/tasmota.bin.gz",
+  "chip_type": "ESP8266"
+}
+```
+
+#### Apply Update Hook
+
+Called to apply a firmware update.
+
+**Input:**
+```bash
+./shelly-myext apply-update --address=192.168.1.100 --stage=<stable|beta> [--url=<custom_ota_url>] [--auth-user=<user> --auth-pass=<pass>]
+```
+
+**Output:** JSON `UpdateResult`:
+```json
+{
+  "success": true,
+  "message": "Update initiated",
+  "rebooting": true
+}
+```
+
+### Device Lifecycle
+
+When a plugin declares `device_detection: true`, it participates in the discovery flow:
+
+1. **Discovery**: `shelly discover` scans the network
+2. **Detection**: For addresses that aren't Shelly devices, each detection-capable plugin's `detect` hook is called
+3. **Registration**: Detected devices are registered with `platform: "<plugin-platform>"`
+4. **Command Routing**: When running commands on plugin-managed devices, the CLI routes to the appropriate plugin hook
+
+### Environment Variables for Hooks
+
+Hooks receive the standard plugin environment variables plus:
+
+| Variable | Description |
+|----------|-------------|
+| `SHELLY_PLUGIN_DIR` | Directory where the plugin is installed |
+| `SHELLY_CLI_VERSION` | CLI version for compatibility checks |
+
+### Complete Manifest Example
+
+```json
+{
+  "schema_version": "1",
+  "name": "tasmota",
+  "version": "1.0.0",
+  "description": "Tasmota device support for shelly-cli",
+  "installed_at": "2024-12-25T10:30:00Z",
+  "source": {
+    "type": "github",
+    "url": "https://github.com/user/shelly-tasmota",
+    "ref": "v1.0.0"
+  },
+  "binary": {
+    "name": "shelly-tasmota",
+    "checksum": "sha256:abc123...",
+    "platform": "linux-amd64"
+  },
+  "minimum_shelly_version": "1.0.0",
+  "capabilities": {
+    "device_detection": true,
+    "platform": "tasmota",
+    "components": ["switch", "light", "sensor", "energy"],
+    "firmware_updates": true,
+    "hints": {
+      "scene": "Tasmota uses Rules for automation",
+      "script": "Tasmota uses Berry scripting on ESP32",
+      "schedule": "Tasmota uses Timers for scheduling"
+    }
+  },
+  "hooks": {
+    "detect": "./shelly-tasmota detect",
+    "status": "./shelly-tasmota status",
+    "control": "./shelly-tasmota control",
+    "check_updates": "./shelly-tasmota check-updates",
+    "apply_update": "./shelly-tasmota apply-update"
+  }
+}
+```
+
 ## Troubleshooting
 
 ### Plugin not found
