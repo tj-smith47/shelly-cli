@@ -559,36 +559,30 @@ func (a *Automation) SetSize(width, height int) View {
 	// Calculate panel dimensions using flexible layout
 	dims := a.layout.Calculate()
 
-	// Apply sizes to left column components (with border adjustment)
+	// Apply sizes to left column components
+	// Pass full panel dimensions - components handle their own borders via rendering.New()
 	if d, ok := dims[layout.PanelID(PanelScripts)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		a.scripts = a.scripts.SetSize(cw, ch)
+		a.scripts = a.scripts.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelSchedules)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		a.schedules = a.schedules.SetSize(cw, ch)
+		a.schedules = a.schedules.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelWebhooks)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		a.webhooks = a.webhooks.SetSize(cw, ch)
+		a.webhooks = a.webhooks.SetSize(d.Width, d.Height)
 	}
 
 	// Apply sizes to right column components
 	if d, ok := dims[layout.PanelID(PanelScriptEditor)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		a.scriptEditor = a.scriptEditor.SetSize(cw, ch)
+		a.scriptEditor = a.scriptEditor.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelScheduleEditor)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		a.scheduleEditor = a.scheduleEditor.SetSize(cw, ch)
+		a.scheduleEditor = a.scheduleEditor.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelVirtuals)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		a.virtuals = a.virtuals.SetSize(cw, ch)
+		a.virtuals = a.virtuals.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelKVS)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		a.kvs = a.kvs.SetSize(cw, ch)
+		a.kvs = a.kvs.SetSize(d.Width, d.Height)
 	}
 
 	return a

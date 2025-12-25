@@ -202,23 +202,20 @@ func (f *Fleet) SetSize(width, height int) View {
 	dims := f.layoutCalc.Calculate()
 
 	// Apply size to left column (Devices)
+	// Pass full panel dimensions - components handle their own borders via rendering.New()
 	if d, ok := dims[layout.PanelID(FleetPanelDevices)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		f.devices = f.devices.SetSize(cw, ch)
+		f.devices = f.devices.SetSize(d.Width, d.Height)
 	}
 
 	// Apply sizes to right column components
 	if d, ok := dims[layout.PanelID(FleetPanelGroups)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		f.groups = f.groups.SetSize(cw, ch)
+		f.groups = f.groups.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(FleetPanelHealth)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		f.health = f.health.SetSize(cw, ch)
+		f.health = f.health.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(FleetPanelOperations)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		f.operations = f.operations.SetSize(cw, ch)
+		f.operations = f.operations.SetSize(d.Width, d.Height)
 	}
 
 	return f

@@ -193,24 +193,21 @@ func (m *Manage) SetSize(width, height int) View {
 	// Calculate panel dimensions using flexible layout
 	dims := m.layoutCalc.Calculate()
 
-	// Apply sizes to left column components (with border adjustment)
+	// Apply sizes to left column components
+	// Pass full panel dimensions - components handle their own borders via rendering.New()
 	if d, ok := dims[layout.PanelID(ManagePanelDiscovery)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		m.discovery = m.discovery.SetSize(cw, ch)
+		m.discovery = m.discovery.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(ManagePanelFirmware)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		m.firmware = m.firmware.SetSize(cw, ch)
+		m.firmware = m.firmware.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(ManagePanelBackup)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		m.backup = m.backup.SetSize(cw, ch)
+		m.backup = m.backup.SetSize(d.Width, d.Height)
 	}
 
 	// Apply size to right column (Batch)
 	if d, ok := dims[layout.PanelID(ManagePanelBatch)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		m.batch = m.batch.SetSize(cw, ch)
+		m.batch = m.batch.SetSize(d.Width, d.Height)
 	}
 
 	return m

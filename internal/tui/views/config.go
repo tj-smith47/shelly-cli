@@ -529,35 +529,29 @@ func (c *Config) SetSize(width, height int) View {
 	dims := c.layoutCalc.Calculate()
 
 	// Apply sizes to left column components (WiFi, System, BLE)
+	// Pass full panel dimensions - components handle their own borders via rendering.New()
 	if d, ok := dims[layout.PanelID(PanelWiFi)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		c.wifi = c.wifi.SetSize(cw, ch)
+		c.wifi = c.wifi.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelSystem)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		c.system = c.system.SetSize(cw, ch)
+		c.system = c.system.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelBLE)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		c.ble = c.ble.SetSize(cw, ch)
+		c.ble = c.ble.SetSize(d.Width, d.Height)
 	}
 
 	// Apply sizes to right column components (Cloud, Inputs, Protocols, Security)
 	if d, ok := dims[layout.PanelID(PanelCloud)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		c.cloud = c.cloud.SetSize(cw, ch)
+		c.cloud = c.cloud.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelInputs)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		c.inputs = c.inputs.SetSize(cw, ch)
+		c.inputs = c.inputs.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelProtocols)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		c.protocols = c.protocols.SetSize(cw, ch)
+		c.protocols = c.protocols.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelSecurity)]; ok {
-		cw, ch := d.ContentDimensions(2)
-		c.security = c.security.SetSize(cw, ch)
+		c.security = c.security.SetSize(d.Width, d.Height)
 	}
 
 	return c

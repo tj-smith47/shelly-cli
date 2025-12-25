@@ -2,6 +2,7 @@
 package jsonviewer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,11 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -250,140 +256,66 @@ func (m Model) formatJSON() string {
 	return m.highlightJSON(string(formatted))
 }
 
+// highlightJSON applies chroma-based syntax highlighting to JSON.
 func (m Model) highlightJSON(jsonStr string) string {
-	var result strings.Builder
-	inString := false
-	inKey := false
-	afterColon := false
-	escapeNext := false
+	lexer := lexers.Get("json")
+	if lexer == nil {
+		return jsonStr
+	}
+	lexer = chroma.Coalesce(lexer)
 
-	for i := 0; i < len(jsonStr); i++ {
-		c := jsonStr[i]
+	// Get a style that matches the current theme
+	style := m.getChromaStyle()
 
-		if escapeNext {
-			result.WriteByte(c)
-			escapeNext = false
-			continue
-		}
+	// Use terminal256 formatter for broad compatibility
+	formatter := formatters.Get("terminal256")
+	if formatter == nil {
+		formatter = formatters.Fallback
+	}
 
-		if c == '\\' && inString {
-			result.WriteByte(c)
-			escapeNext = true
-			continue
-		}
+	iterator, err := lexer.Tokenise(nil, jsonStr)
+	if err != nil {
+		return jsonStr
+	}
 
-		switch c {
-		case '"':
-			if !inString {
-				// Opening quote - entering string
-				inString = true
-				inKey = isJSONKey(jsonStr, i)
-				result.WriteString(m.renderStringChar(c, inKey))
-			} else {
-				// Closing quote - exiting string
-				result.WriteString(m.renderStringChar(c, inKey))
-				inString = false
-				inKey = false
-			}
-		case ':':
-			result.WriteString(m.renderPunctuation(c, inString, inKey, &afterColon, true))
-		case '{', '}', '[', ']':
-			result.WriteString(m.renderPunctuation(c, inString, inKey, &afterColon, false))
-		case ',':
-			result.WriteString(m.renderPunctuation(c, inString, inKey, &afterColon, false))
-			if !inString {
-				afterColon = false
-			}
-		default:
-			i = m.renderDefault(&result, jsonStr, i, c, inString, inKey, afterColon)
+	var buf bytes.Buffer
+	if err := formatter.Format(&buf, style, iterator); err != nil {
+		return jsonStr
+	}
+
+	return buf.String()
+}
+
+// getChromaStyle returns a chroma style that matches the current theme.
+func (m Model) getChromaStyle() *chroma.Style {
+	// Try to match the current theme name to a chroma style
+	currentTheme := viper.GetString("theme.name")
+	if currentTheme == "" {
+		currentTheme = "dracula"
+	}
+
+	// Map theme names to chroma styles
+	styleMap := map[string]string{
+		"dracula":      "dracula",
+		"nord":         "nord",
+		"gruvbox":      "gruvbox",
+		"gruvbox-dark": "gruvbox",
+		"tokyo-night":  "tokyonight-night",
+		"catppuccin":   "catppuccin-mocha",
+	}
+
+	if chromaStyle, ok := styleMap[strings.ToLower(currentTheme)]; ok {
+		if style := styles.Get(chromaStyle); style != nil {
+			return style
 		}
 	}
 
-	return result.String()
-}
-
-func (m Model) renderStringChar(c byte, inKey bool) string {
-	if inKey {
-		return m.styles.Key.Render(string(c))
+	// Default to dracula which works well on dark terminals
+	if style := styles.Get("dracula"); style != nil {
+		return style
 	}
-	return m.styles.String.Render(string(c))
-}
 
-func (m Model) renderPunctuation(c byte, inString, inKey bool, afterColon *bool, setAfterColon bool) string {
-	switch {
-	case !inString:
-		if setAfterColon {
-			*afterColon = true
-		}
-		return m.styles.Bracket.Render(string(c))
-	case inKey:
-		return m.styles.Key.Render(string(c))
-	default:
-		return m.styles.String.Render(string(c))
-	}
-}
-
-func (m Model) renderDefault(result *strings.Builder, jsonStr string, i int, c byte, inString, inKey, afterColon bool) int {
-	switch {
-	case inString && inKey:
-		result.WriteString(m.styles.Key.Render(string(c)))
-	case inString:
-		result.WriteString(m.styles.String.Render(string(c)))
-	case afterColon:
-		remaining := jsonStr[i:]
-		switch {
-		case strings.HasPrefix(remaining, "true"):
-			result.WriteString(m.styles.Bool.Render("true"))
-			return i + 3
-		case strings.HasPrefix(remaining, "false"):
-			result.WriteString(m.styles.Bool.Render("false"))
-			return i + 4
-		case strings.HasPrefix(remaining, "null"):
-			result.WriteString(m.styles.Null.Render("null"))
-			return i + 3
-		case c == '-' || (c >= '0' && c <= '9'):
-			numEnd := i
-			for numEnd < len(jsonStr) && isNumberChar(jsonStr[numEnd]) {
-				numEnd++
-			}
-			result.WriteString(m.styles.Number.Render(jsonStr[i:numEnd]))
-			return numEnd - 1
-		default:
-			result.WriteByte(c)
-		}
-	default:
-		result.WriteByte(c)
-	}
-	return i
-}
-
-func isJSONKey(s string, quotePos int) bool {
-	// Look for `:` after the closing quote
-	depth := 0
-	for i := quotePos + 1; i < len(s); i++ {
-		c := s[i]
-		if c == '\\' {
-			i++ // Skip escaped char
-			continue
-		}
-		if c == '"' {
-			depth++
-			if depth == 1 {
-				// Found closing quote, look for :
-				for j := i + 1; j < len(s); j++ {
-					if s[j] == ' ' || s[j] == '\t' || s[j] == '\n' {
-						continue
-					}
-					return s[j] == ':'
-				}
-			}
-		}
-	}
-	return false
-}
-
-func isNumberChar(c byte) bool {
-	return (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E'
+	return styles.Fallback
 }
 
 // fetchEndpoint fetches JSON from device.

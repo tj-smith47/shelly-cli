@@ -105,55 +105,14 @@ func TestHighlightJSON(t *testing.T) {
 	}
 }
 
-func TestIsJSONKey(t *testing.T) {
+func TestGetChromaStyle(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		json     string
-		pos      int
-		expected bool
-	}{
-		{`{"key": "value"}`, 1, true},  // "key" is a key
-		{`{"key": "value"}`, 8, false}, // "value" is not a key
-		{`{"a": {"b": 1}}`, 1, true},   // "a" is a key
-		{`{"a": {"b": 1}}`, 7, true},   // "b" is a key
-	}
+	m := New(context.Background(), nil)
 
-	for _, tt := range tests {
-		t.Run(tt.json, func(t *testing.T) {
-			t.Parallel()
-			result := isJSONKey(tt.json, tt.pos)
-			if result != tt.expected {
-				t.Errorf("isJSONKey(%q, %d) = %v, want %v", tt.json, tt.pos, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestIsNumberChar(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		c    byte
-		want bool
-	}{
-		{'0', true},
-		{'9', true},
-		{'.', true},
-		{'-', true},
-		{'+', true},
-		{'e', true},
-		{'E', true},
-		{'a', false},
-		{' ', false},
-	}
-
-	for _, tt := range tests {
-		t.Run(string(tt.c), func(t *testing.T) {
-			t.Parallel()
-			got := isNumberChar(tt.c)
-			if got != tt.want {
-				t.Errorf("isNumberChar(%q) = %v, want %v", tt.c, got, tt.want)
-			}
-		})
+	// Should return a non-nil style
+	style := m.getChromaStyle()
+	if style == nil {
+		t.Error("getChromaStyle() should return a non-nil style")
 	}
 }
 
