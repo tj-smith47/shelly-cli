@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -74,8 +75,7 @@ type ListModel struct {
 	svc        *shelly.Service
 	device     string
 	scripts    []Script
-	cursor     int
-	scroll     int
+	scroller   *panel.Scroller
 	loading    bool
 	err        error
 	width      int
@@ -130,10 +130,11 @@ func NewList(deps ListDeps) ListModel {
 	}
 
 	return ListModel{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultListStyles(),
+		ctx:      deps.Ctx,
+		svc:      deps.Svc,
+		scroller: panel.NewScroller(0, 1),
+		loading:  false,
+		styles:   DefaultListStyles(),
 	}
 }
 
@@ -146,8 +147,7 @@ func (m ListModel) Init() tea.Cmd {
 func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 	m.device = device
 	m.scripts = nil
-	m.cursor = 0
-	m.scroll = 0
+	m.scroller.SetItemCount(0)
 	m.err = nil
 
 	if device == "" {
@@ -187,6 +187,12 @@ func (m ListModel) fetchScripts() tea.Cmd {
 func (m ListModel) SetSize(width, height int) ListModel {
 	m.width = width
 	m.height = height
+	// Calculate visible rows: height - borders (2) - title (1) - footer (1)
+	visibleRows := height - 4
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -212,8 +218,8 @@ func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
 			return m, nil
 		}
 		m.scripts = msg.Scripts
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.SetItemCount(len(m.scripts))
+		m.scroller.CursorToStart()
 		return m, nil
 
 	case ActionMsg:
@@ -238,14 +244,17 @@ func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 	case "g":
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.CursorToStart()
 	case "G":
-		m = m.cursorToEnd()
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "enter":
 		// View script (open in viewer)
 		return m, m.selectScript()
@@ -273,74 +282,34 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m ListModel) cursorDown() ListModel {
-	if m.cursor < len(m.scripts)-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m ListModel) cursorUp() ListModel {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m ListModel) cursorToEnd() ListModel {
-	if len(m.scripts) > 0 {
-		m.cursor = len(m.scripts) - 1
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m ListModel) ensureVisible() ListModel {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m ListModel) visibleRows() int {
-	// Account for borders, title, and padding
-	rows := m.height - 4
-	if rows < 1 {
-		return 1
-	}
-	return rows
-}
-
 func (m ListModel) selectScript() tea.Cmd {
-	if len(m.scripts) == 0 || m.cursor >= len(m.scripts) {
+	cursor := m.scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
-	script := m.scripts[m.cursor]
+	script := m.scripts[cursor]
 	return func() tea.Msg {
 		return SelectScriptMsg{Script: script}
 	}
 }
 
 func (m ListModel) editScript() tea.Cmd {
-	if len(m.scripts) == 0 || m.cursor >= len(m.scripts) {
+	cursor := m.scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
-	script := m.scripts[m.cursor]
+	script := m.scripts[cursor]
 	return func() tea.Msg {
 		return EditScriptMsg{Script: script}
 	}
 }
 
 func (m ListModel) startScript() tea.Cmd {
-	if len(m.scripts) == 0 || m.cursor >= len(m.scripts) {
+	cursor := m.scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
-	script := m.scripts[m.cursor]
+	script := m.scripts[cursor]
 	if script.Running {
 		return nil // Already running
 	}
@@ -355,10 +324,11 @@ func (m ListModel) startScript() tea.Cmd {
 }
 
 func (m ListModel) stopScript() tea.Cmd {
-	if len(m.scripts) == 0 || m.cursor >= len(m.scripts) {
+	cursor := m.scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
-	script := m.scripts[m.cursor]
+	script := m.scripts[cursor]
 	if !script.Running {
 		return nil // Not running
 	}
@@ -373,10 +343,11 @@ func (m ListModel) stopScript() tea.Cmd {
 }
 
 func (m ListModel) deleteScript() tea.Cmd {
-	if len(m.scripts) == 0 || m.cursor >= len(m.scripts) {
+	cursor := m.scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
-	script := m.scripts[m.cursor]
+	script := m.scripts[cursor]
 
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
@@ -436,28 +407,22 @@ func (m ListModel) View() string {
 	}
 
 	var content strings.Builder
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
-	if endIdx > len(m.scripts) {
-		endIdx = len(m.scripts)
-	}
+	start, end := m.scroller.VisibleRange()
 
-	for i := m.scroll; i < endIdx; i++ {
+	for i := start; i < end; i++ {
 		script := m.scripts[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 
 		line := m.renderScriptLine(script, isSelected)
 		content.WriteString(line)
-		if i < endIdx-1 {
+		if i < end-1 {
 			content.WriteString("\n")
 		}
 	}
 
 	// Add scroll indicator if needed
-	if len(m.scripts) > visible {
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(m.scripts)),
-		))
+	if m.scroller.HasMore() || m.scroller.HasPrevious() {
+		content.WriteString(m.styles.Muted.Render("\n" + m.scroller.ScrollInfo()))
 	}
 
 	r.SetContent(content.String())
@@ -502,10 +467,11 @@ func (m ListModel) renderScriptLine(script Script, isSelected bool) string {
 
 // SelectedScript returns the currently selected script, if any.
 func (m ListModel) SelectedScript() *Script {
-	if len(m.scripts) == 0 || m.cursor >= len(m.scripts) {
+	cursor := m.scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
-	return &m.scripts[m.cursor]
+	return &m.scripts[cursor]
 }
 
 // ScriptCount returns the number of scripts.
@@ -535,4 +501,9 @@ func (m ListModel) Refresh() (ListModel, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.fetchScripts()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m ListModel) FooterText() string {
+	return "j/k:scroll g/G:top/bottom space:toggle enter:edit"
 }

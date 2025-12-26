@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
@@ -50,8 +51,7 @@ type Model struct {
 	ctx        context.Context
 	svc        *shelly.Service
 	devices    []shelly.DiscoveredDevice
-	cursor     int
-	scroll     int
+	scroller   *panel.Scroller
 	scanning   bool
 	method     shelly.DiscoveryMethod
 	err        error
@@ -115,6 +115,7 @@ func New(deps Deps) Model {
 	return Model{
 		ctx:      deps.Ctx,
 		svc:      deps.Svc,
+		scroller: panel.NewScroller(0, 10),
 		scanning: false,
 		method:   shelly.DiscoveryMDNS,
 		styles:   DefaultStyles(),
@@ -130,6 +131,12 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	// Reserve space for header, method selector, and footer
+	visibleRows := height - 8
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -153,8 +160,8 @@ func (m Model) StartScan() (Model, tea.Cmd) {
 	m.scanning = true
 	m.err = nil
 	m.devices = nil
-	m.cursor = 0
-	m.scroll = 0
+	m.scroller.SetItemCount(0)
+	m.scroller.CursorToStart()
 	return m, m.scanDevices()
 }
 
@@ -184,6 +191,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.devices = msg.Devices
+		m.scroller.SetItemCount(len(m.devices))
 		return m, nil
 
 	case DeviceAddedMsg:
@@ -213,9 +221,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
+	case "g":
+		m.scroller.CursorToStart()
+	case "G":
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "s", "r":
 		return m.StartScan()
 	case "a", "enter":
@@ -231,46 +247,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.devices)-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) ensureVisible() Model {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m Model) visibleRows() int {
-	rows := m.height - 8 // Reserve space for header, method selector, and footer
-	if rows < 1 {
-		return 1
-	}
-	return rows
-}
-
 func (m Model) addSelectedDevice() (Model, tea.Cmd) {
-	if len(m.devices) == 0 || m.cursor >= len(m.devices) {
+	cursor := m.scroller.Cursor()
+	if len(m.devices) == 0 || cursor >= len(m.devices) {
 		return m, nil
 	}
 
-	device := m.devices[m.cursor]
+	device := m.devices[cursor]
 	if device.Added {
 		return m, nil // Already added
 	}
@@ -338,28 +321,19 @@ func (m Model) renderDeviceList() string {
 	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Found %d device(s):", len(m.devices))))
 	content.WriteString("\n\n")
 
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
-	if endIdx > len(m.devices) {
-		endIdx = len(m.devices)
-	}
-
-	for i := m.scroll; i < endIdx; i++ {
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end; i++ {
 		device := m.devices[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 		content.WriteString(m.renderDeviceLine(device, isSelected))
-		if i < endIdx-1 {
+		if i < end-1 {
 			content.WriteString("\n")
 		}
 	}
 
 	// Scroll indicator
-	if len(m.devices) > visible {
-		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("[%d/%d]", m.cursor+1, len(m.devices)),
-		))
-	}
+	content.WriteString("\n")
+	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 
 	return content.String()
 }
@@ -458,10 +432,15 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.cursor
+	return m.scroller.Cursor()
 }
 
 // Refresh triggers a new scan.
 func (m Model) Refresh() (Model, tea.Cmd) {
 	return m.StartScan()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom enter:add r:refresh"
 }

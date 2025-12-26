@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 // Deps holds the dependencies for the energy component.
@@ -69,14 +70,13 @@ type Model struct {
 	svc             *shelly.Service
 	ios             *iostreams.IOStreams
 	devices         []DeviceEnergy
+	scroller        *panel.Scroller
 	loading         bool
 	err             error
 	width           int
 	height          int
 	styles          Styles
 	refreshInterval time.Duration
-	scrollOffset    int
-	cursor          int // Currently selected row
 }
 
 // Styles for the energy component.
@@ -182,6 +182,7 @@ func New(deps Deps) Model {
 		svc:             deps.Svc,
 		ios:             deps.IOS,
 		devices:         []DeviceEnergy{},
+		scroller:        panel.NewScroller(0, 10),
 		loading:         true,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
@@ -343,6 +344,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.devices = msg.Devices
+		m.scroller.SetItemCount(len(m.devices))
 		return m, nil
 
 	case RefreshTickMsg:
@@ -361,88 +363,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 	case "g":
-		m.cursor = 0
-		m.scrollOffset = 0
+		m.scroller.CursorToStart()
 	case "G":
-		m = m.cursorToEnd()
+		m.scroller.CursorToEnd()
 	case "pgdown", "ctrl+d":
-		m = m.pageDown()
+		m.scroller.PageDown()
 	case "pgup", "ctrl+u":
-		m = m.pageUp()
-	}
-	return m
-}
-
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.devices)-1 {
-		m.cursor++
-		visibleDevices := m.visibleDevices()
-		if m.cursor >= m.scrollOffset+visibleDevices {
-			m.scrollOffset = m.cursor - visibleDevices + 1
-		}
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		if m.cursor < m.scrollOffset {
-			m.scrollOffset = m.cursor
-		}
-	}
-	return m
-}
-
-func (m Model) cursorToEnd() Model {
-	if len(m.devices) > 0 {
-		m.cursor = len(m.devices) - 1
-		maxOffset := len(m.devices) - m.visibleDevices()
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		m.scrollOffset = maxOffset
-	}
-	return m
-}
-
-func (m Model) pageDown() Model {
-	if len(m.devices) == 0 {
-		return m
-	}
-	visibleDevices := m.visibleDevices()
-	m.cursor += visibleDevices
-	if m.cursor >= len(m.devices) {
-		m.cursor = len(m.devices) - 1
-	}
-	if m.cursor >= m.scrollOffset+visibleDevices {
-		m.scrollOffset = m.cursor - visibleDevices + 1
-	}
-	maxOffset := len(m.devices) - visibleDevices
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if m.scrollOffset > maxOffset {
-		m.scrollOffset = maxOffset
-	}
-	return m
-}
-
-func (m Model) pageUp() Model {
-	if len(m.devices) == 0 {
-		return m
-	}
-	visibleDevices := m.visibleDevices()
-	m.cursor -= visibleDevices
-	if m.cursor < 0 {
-		m.cursor = 0
-	}
-	if m.cursor < m.scrollOffset {
-		m.scrollOffset = m.cursor
+		m.scroller.PageUp()
 	}
 	return m
 }
@@ -460,6 +391,7 @@ func (m Model) visibleDevices() int {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.scroller.SetVisibleRows(m.visibleDevices())
 	return m
 }
 
@@ -512,17 +444,12 @@ func (m Model) View() string {
 	)
 
 	// Device rows with scrolling
-	visibleDevices := m.visibleDevices()
-	startIdx := m.scrollOffset
-	endIdx := startIdx + visibleDevices
-	if endIdx > len(m.devices) {
-		endIdx = len(m.devices)
-	}
+	startIdx, endIdx := m.scroller.VisibleRange()
 
 	var deviceRows string
 	for i := startIdx; i < endIdx; i++ {
 		d := m.devices[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 		deviceRows += m.renderDeviceRow(d, isSelected)
 		if i < endIdx-1 {
 			deviceRows += m.styles.Separator.Render("─────────────────────────────────────────────────") + "\n"
@@ -534,12 +461,8 @@ func (m Model) View() string {
 	}
 
 	// Footer with scroll info
-	scrollInfo := ""
-	if len(m.devices) > visibleDevices {
-		scrollInfo = fmt.Sprintf(" [%d-%d of %d]", startIdx+1, endIdx, len(m.devices))
-	}
 	footer := m.styles.Footer.Render(
-		fmt.Sprintf("Last updated: %s  j/k: scroll%s", time.Now().Format("15:04:05"), scrollInfo),
+		fmt.Sprintf("Last updated: %s  j/k: scroll %s", time.Now().Format("15:04:05"), m.scroller.ScrollInfo()),
 	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, header, summary, "", deviceRows, footer)
@@ -684,16 +607,19 @@ func (m Model) DeviceCount() int {
 
 // SelectedDevice returns the currently selected device, if any.
 func (m Model) SelectedDevice() *DeviceEnergy {
-	if len(m.devices) == 0 {
+	cursor := m.scroller.Cursor()
+	if len(m.devices) == 0 || cursor < 0 || cursor >= len(m.devices) {
 		return nil
 	}
-	if m.cursor < 0 || m.cursor >= len(m.devices) {
-		return nil
-	}
-	return &m.devices[m.cursor]
+	return &m.devices[cursor]
 }
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.cursor
+	return m.scroller.Cursor()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom r:refresh"
 }

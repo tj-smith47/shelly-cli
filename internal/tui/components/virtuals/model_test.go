@@ -68,7 +68,7 @@ func TestDeps_Validate(t *testing.T) {
 
 func TestModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := Model{}
+	m := newTestModel()
 	m = m.SetSize(100, 50)
 
 	if m.width != 100 {
@@ -81,7 +81,7 @@ func TestModel_SetSize(t *testing.T) {
 
 func TestModel_SetFocused(t *testing.T) {
 	t.Parallel()
-	m := Model{}
+	m := newTestModel()
 
 	m = m.SetFocused(true)
 	if !m.focused {
@@ -94,122 +94,107 @@ func TestModel_SetFocused(t *testing.T) {
 	}
 }
 
-func TestModel_VisibleRows(t *testing.T) {
+func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name   string
-		height int
-		want   int
-	}{
-		{"zero height", 0, 1},
-		{"small height", 5, 1},
-		{"normal height", 20, 16},
-		{"large height", 100, 96},
+	m := newTestModel()
+	m.virtuals = make([]Virtual, 20)
+	m.scroller.SetItemCount(20)
+
+	// SetSize configures visible rows (height - 4 overhead)
+	m = m.SetSize(80, 20)
+	if m.scroller.VisibleRows() != 16 {
+		t.Errorf("visibleRows = %d, want 16", m.scroller.VisibleRows())
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			m := Model{height: tt.height}
-			got := m.visibleRows()
-			if got != tt.want {
-				t.Errorf("visibleRows() = %d, want %d", got, tt.want)
-			}
-		})
+	// Small height
+	m = m.SetSize(80, 5)
+	if m.scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
 	}
 }
 
-func TestModel_CursorNavigation(t *testing.T) {
+func TestModel_ScrollerCursorNavigation(t *testing.T) {
 	t.Parallel()
-	virtuals := []Virtual{
+	m := newTestModel()
+	m.virtuals = []Virtual{
 		{Key: "boolean:200", Type: shelly.VirtualBoolean},
 		{Key: "number:201", Type: shelly.VirtualNumber},
 		{Key: "text:202", Type: shelly.VirtualText},
 	}
-
-	m := Model{
-		virtuals: virtuals,
-		cursor:   0,
-		height:   20,
-	}
+	m.scroller.SetItemCount(len(m.virtuals))
+	m = m.SetSize(80, 20)
 
 	// Cursor down
-	m = m.cursorDown()
-	if m.cursor != 1 {
-		t.Errorf("after cursorDown: cursor = %d, want 1", m.cursor)
+	m.scroller.CursorDown()
+	if m.Cursor() != 1 {
+		t.Errorf("after CursorDown: cursor = %d, want 1", m.Cursor())
 	}
 
-	m = m.cursorDown()
-	if m.cursor != 2 {
-		t.Errorf("after 2nd cursorDown: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorDown()
+	if m.Cursor() != 2 {
+		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Don't go past end
-	m = m.cursorDown()
-	if m.cursor != 2 {
-		t.Errorf("cursor at end: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorDown()
+	if m.Cursor() != 2 {
+		t.Errorf("cursor at end: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Cursor up
-	m = m.cursorUp()
-	if m.cursor != 1 {
-		t.Errorf("after cursorUp: cursor = %d, want 1", m.cursor)
+	m.scroller.CursorUp()
+	if m.Cursor() != 1 {
+		t.Errorf("after CursorUp: cursor = %d, want 1", m.Cursor())
 	}
 
 	// Don't go before start
-	m.cursor = 0
-	m = m.cursorUp()
-	if m.cursor != 0 {
-		t.Errorf("cursor at start: cursor = %d, want 0", m.cursor)
+	m.scroller.CursorToStart()
+	m.scroller.CursorUp()
+	if m.Cursor() != 0 {
+		t.Errorf("cursor at start: cursor = %d, want 0", m.Cursor())
 	}
 
 	// Cursor to end
-	m = m.cursorToEnd()
-	if m.cursor != 2 {
-		t.Errorf("after cursorToEnd: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorToEnd()
+	if m.Cursor() != 2 {
+		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.Cursor())
 	}
 }
 
-func TestModel_EnsureVisible(t *testing.T) {
+func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	t.Parallel()
-	virtuals := make([]Virtual, 20)
-	for i := range virtuals {
-		virtuals[i] = Virtual{Key: "boolean:200"}
+	m := newTestModel()
+	m.virtuals = make([]Virtual, 20)
+	for i := range m.virtuals {
+		m.virtuals[i] = Virtual{Key: "boolean:200"}
+	}
+	m.scroller.SetItemCount(20)
+	m = m.SetSize(80, 10) // Sets visibleRows = 10 - 4 = 6
+
+	// Cursor at end should scroll
+	m.scroller.CursorToEnd()
+	start, _ := m.scroller.VisibleRange()
+	if start == 0 {
+		t.Error("scroll should increase when cursor at end of long list")
 	}
 
-	m := Model{
-		virtuals: virtuals,
-		height:   10,
-		cursor:   0,
-		scroll:   0,
-	}
-
-	// Move cursor past visible
-	m.cursor = 10
-	m = m.ensureVisible()
-	if m.scroll < 5 {
-		t.Errorf("scroll should adjust for cursor=10, got scroll=%d", m.scroll)
-	}
-
-	// Move cursor before scroll
-	m.cursor = 2
-	m = m.ensureVisible()
-	if m.scroll != 2 {
-		t.Errorf("scroll should adjust to cursor=2, got scroll=%d", m.scroll)
+	// Cursor back to start
+	m.scroller.CursorToStart()
+	start, _ = m.scroller.VisibleRange()
+	if start != 0 {
+		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}
 }
 
 func TestModel_SelectedVirtual(t *testing.T) {
 	t.Parallel()
-	virtuals := []Virtual{
+	m := newTestModel()
+	m.virtuals = []Virtual{
 		{Key: "boolean:200", ID: 200},
 		{Key: "number:201", ID: 201},
 	}
-
-	m := Model{
-		virtuals: virtuals,
-		cursor:   1,
-	}
+	m.scroller.SetItemCount(len(m.virtuals))
+	m.scroller.SetCursor(1)
 
 	selected := m.SelectedVirtual()
 	if selected == nil {
@@ -221,6 +206,7 @@ func TestModel_SelectedVirtual(t *testing.T) {
 
 	// Empty list
 	m.virtuals = nil
+	m.scroller.SetItemCount(0)
 	selected = m.SelectedVirtual()
 	if selected != nil {
 		t.Error("SelectedVirtual() on empty list should return nil")
@@ -229,9 +215,8 @@ func TestModel_SelectedVirtual(t *testing.T) {
 
 func TestModel_VirtualCount(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		virtuals: []Virtual{{Key: "a"}, {Key: "b"}, {Key: "c"}},
-	}
+	m := newTestModel()
+	m.virtuals = []Virtual{{Key: "a"}, {Key: "b"}, {Key: "c"}}
 
 	if got := m.VirtualCount(); got != 3 {
 		t.Errorf("VirtualCount() = %d, want 3", got)
@@ -245,7 +230,8 @@ func TestModel_VirtualCount(t *testing.T) {
 
 func TestModel_Device(t *testing.T) {
 	t.Parallel()
-	m := Model{device: "192.168.1.100"}
+	m := newTestModel()
+	m.device = "192.168.1.100"
 	if got := m.Device(); got != "192.168.1.100" {
 		t.Errorf("Device() = %q, want %q", got, "192.168.1.100")
 	}
@@ -253,7 +239,8 @@ func TestModel_Device(t *testing.T) {
 
 func TestModel_Loading(t *testing.T) {
 	t.Parallel()
-	m := Model{loading: true}
+	m := newTestModel()
+	m.loading = true
 	if !m.Loading() {
 		t.Error("Loading() = false, want true")
 	}
@@ -266,7 +253,7 @@ func TestModel_Loading(t *testing.T) {
 
 func TestModel_Error(t *testing.T) {
 	t.Parallel()
-	m := Model{}
+	m := newTestModel()
 	if err := m.Error(); err != nil {
 		t.Errorf("Error() = %v, want nil", err)
 	}
@@ -279,12 +266,9 @@ func TestModel_Error(t *testing.T) {
 
 func TestModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		device: "",
-		width:  40,
-		height: 10,
-		styles: DefaultStyles(),
-	}
+	m := newTestModel()
+	m.device = ""
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No device selected") {
@@ -294,13 +278,10 @@ func TestModel_View_NoDevice(t *testing.T) {
 
 func TestModel_View_Loading(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		device:  "192.168.1.100",
-		loading: true,
-		width:   40,
-		height:  10,
-		styles:  DefaultStyles(),
-	}
+	m := newTestModel()
+	m.device = "192.168.1.100"
+	m.loading = true
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "Loading") {
@@ -310,14 +291,11 @@ func TestModel_View_Loading(t *testing.T) {
 
 func TestModel_View_NoVirtuals(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		device:   "192.168.1.100",
-		loading:  false,
-		virtuals: []Virtual{},
-		width:    40,
-		height:   10,
-		styles:   DefaultStyles(),
-	}
+	m := newTestModel()
+	m.device = "192.168.1.100"
+	m.loading = false
+	m.virtuals = []Virtual{}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No virtual") {
@@ -330,30 +308,27 @@ func TestModel_View_WithVirtuals(t *testing.T) {
 	boolVal := true
 	numVal := 22.5
 
-	m := Model{
-		device:  "192.168.1.100",
-		loading: false,
-		virtuals: []Virtual{
-			{
-				Key:       "boolean:200",
-				Type:      shelly.VirtualBoolean,
-				ID:        200,
-				Name:      "Light",
-				BoolValue: &boolVal,
-			},
-			{
-				Key:      "number:201",
-				Type:     shelly.VirtualNumber,
-				ID:       201,
-				Name:     "Temp",
-				NumValue: &numVal,
-			},
+	m := newTestModel()
+	m.device = "192.168.1.100"
+	m.loading = false
+	m.virtuals = []Virtual{
+		{
+			Key:       "boolean:200",
+			Type:      shelly.VirtualBoolean,
+			ID:        200,
+			Name:      "Light",
+			BoolValue: &boolVal,
 		},
-		cursor: 0,
-		width:  60,
-		height: 15,
-		styles: DefaultStyles(),
+		{
+			Key:      "number:201",
+			Type:     shelly.VirtualNumber,
+			ID:       201,
+			Name:     "Temp",
+			NumValue: &numVal,
+		},
 	}
+	m.scroller.SetItemCount(len(m.virtuals))
+	m = m.SetSize(60, 15)
 
 	view := m.View()
 	if !strings.Contains(view, "BOOL") {
@@ -544,10 +519,8 @@ func TestFindIndex(t *testing.T) {
 
 func TestModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		loading: true,
-		styles:  DefaultStyles(),
-	}
+	m := newTestModel()
+	m.loading = true
 
 	virtuals := []Virtual{
 		{Key: "boolean:200"},
@@ -566,10 +539,8 @@ func TestModel_Update_LoadedMsg(t *testing.T) {
 
 func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		loading: true,
-		styles:  DefaultStyles(),
-	}
+	m := newTestModel()
+	m.loading = true
 
 	m, _ = m.Update(LoadedMsg{Err: context.DeadlineExceeded})
 
@@ -583,17 +554,15 @@ func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 
 func TestModel_Update_KeyPress_NotFocused(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		focused:  false,
-		virtuals: []Virtual{{Key: "a"}},
-		cursor:   0,
-		styles:   DefaultStyles(),
-	}
+	m := newTestModel()
+	m.focused = false
+	m.virtuals = []Virtual{{Key: "a"}}
+	m.scroller.SetItemCount(len(m.virtuals))
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 106}) // 'j'
 
-	if m.cursor != 0 {
-		t.Errorf("cursor changed when not focused: %d", m.cursor)
+	if m.Cursor() != 0 {
+		t.Errorf("cursor changed when not focused: %d", m.Cursor())
 	}
 }
 
@@ -621,4 +590,11 @@ func TestDefaultStyles(t *testing.T) {
 	_ = styles.Selected.Render("test")
 	_ = styles.Error.Render("test")
 	_ = styles.Muted.Render("test")
+}
+
+func newTestModel() Model {
+	ctx := context.Background()
+	svc := &shelly.Service{}
+	deps := Deps{Ctx: ctx, Svc: svc}
+	return New(deps)
 }

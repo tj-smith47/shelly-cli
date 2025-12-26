@@ -257,3 +257,117 @@ func TestGetTUIThemeConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestManager_UpdateDeviceInfo(t *testing.T) {
+	t.Parallel()
+
+	// Create temp dir for isolated config
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Register a device first
+	if err := m.RegisterDevice("test-device", "192.168.1.1", 0, "", "", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+
+	// Verify device exists without Type/Model/Generation
+	dev, ok := m.GetDevice("test-device")
+	if !ok {
+		t.Fatal("expected device to exist")
+	}
+	if dev.Type != "" || dev.Model != "" || dev.Generation != 0 {
+		t.Errorf("expected empty Type/Model/Generation, got Type=%q Model=%q Gen=%d",
+			dev.Type, dev.Model, dev.Generation)
+	}
+
+	// Update with partial info
+	if err := m.UpdateDeviceInfo("test-device", DeviceUpdates{
+		Type:       "SPSW-001PE16EU",
+		Model:      "Shelly Pro 1PM",
+		Generation: 2,
+	}); err != nil {
+		t.Fatalf("UpdateDeviceInfo() error: %v", err)
+	}
+
+	// Verify updates applied
+	dev, ok = m.GetDevice("test-device")
+	if !ok {
+		t.Fatal("expected device to exist after update")
+	}
+	if dev.Type != "SPSW-001PE16EU" {
+		t.Errorf("expected Type 'SPSW-001PE16EU', got %q", dev.Type)
+	}
+	if dev.Model != "Shelly Pro 1PM" {
+		t.Errorf("expected Model 'Shelly Pro 1PM', got %q", dev.Model)
+	}
+	if dev.Generation != 2 {
+		t.Errorf("expected Generation 2, got %d", dev.Generation)
+	}
+
+	// Update with partial info (only Model)
+	if err := m.UpdateDeviceInfo("test-device", DeviceUpdates{
+		Model: "Shelly Pro 1PM Updated",
+	}); err != nil {
+		t.Fatalf("UpdateDeviceInfo() partial update error: %v", err)
+	}
+
+	// Verify only Model changed
+	dev, ok = m.GetDevice("test-device")
+	if !ok {
+		t.Fatal("expected device to exist after partial update")
+	}
+	if dev.Type != "SPSW-001PE16EU" {
+		t.Errorf("expected Type unchanged 'SPSW-001PE16EU', got %q", dev.Type)
+	}
+	if dev.Model != "Shelly Pro 1PM Updated" {
+		t.Errorf("expected Model 'Shelly Pro 1PM Updated', got %q", dev.Model)
+	}
+	if dev.Generation != 2 {
+		t.Errorf("expected Generation unchanged 2, got %d", dev.Generation)
+	}
+}
+
+func TestManager_UpdateDeviceInfo_NotFound(t *testing.T) {
+	t.Parallel()
+
+	// Create temp dir for isolated config
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Try to update non-existent device
+	err := m.UpdateDeviceInfo("nonexistent", DeviceUpdates{Type: "test"})
+	if err == nil {
+		t.Error("expected error for non-existent device")
+	}
+}
+
+func TestManager_UpdateDeviceInfo_NoChanges(t *testing.T) {
+	t.Parallel()
+
+	// Create temp dir for isolated config
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Register a device with values already set
+	if err := m.RegisterDevice("test-device", "192.168.1.1", 2, "SPSW-001PE16EU", "Shelly Pro 1PM", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+
+	// Update with same values (should not write to disk)
+	if err := m.UpdateDeviceInfo("test-device", DeviceUpdates{
+		Type:       "SPSW-001PE16EU",
+		Model:      "Shelly Pro 1PM",
+		Generation: 2,
+	}); err != nil {
+		t.Fatalf("UpdateDeviceInfo() no-change error: %v", err)
+	}
+}

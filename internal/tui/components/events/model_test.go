@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 // createTestModel creates a model with test events for navigation testing.
@@ -14,9 +16,11 @@ func createTestModel(eventCount int) Model {
 			subscriptions: make(map[string]context.CancelFunc),
 			connStatus:    make(map[string]bool),
 		},
-		height:   100, // Large enough for 10+ visible rows
-		maxItems: 100,
-		styles:   DefaultStyles(),
+		scroller:   panel.NewScroller(eventCount, 10),
+		height:     100, // Large enough for 10+ visible rows
+		maxItems:   100,
+		autoScroll: true,
+		styles:     DefaultStyles(),
 	}
 	// Create test events
 	for i := range eventCount {
@@ -30,113 +34,82 @@ func createTestModel(eventCount int) Model {
 	return m
 }
 
-func TestCursorDown(t *testing.T) {
+func TestScrollerCursorDown(t *testing.T) {
 	t.Parallel()
 
 	t.Run("moves cursor down", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(10)
-		m.cursor = 0
 
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 
-		if m.cursor != 1 {
-			t.Errorf("expected cursor 1, got %d", m.cursor)
+		if m.scroller.Cursor() != 1 {
+			t.Errorf("expected cursor 1, got %d", m.scroller.Cursor())
 		}
 	})
 
 	t.Run("stops at last item", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(5)
-		m.cursor = 4 // Last item
+		m.scroller.SetCursor(4) // Last item
 
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 
-		if m.cursor != 4 {
-			t.Errorf("expected cursor to stay at 4, got %d", m.cursor)
+		if m.scroller.Cursor() != 4 {
+			t.Errorf("expected cursor to stay at 4, got %d", m.scroller.Cursor())
 		}
 	})
 
 	t.Run("handles empty list", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(0)
-		m.cursor = 0
 
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 
-		if m.cursor != 0 {
-			t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
-		}
-	})
-
-	t.Run("adjusts scroll when cursor below visible", func(t *testing.T) {
-		t.Parallel()
-		m := createTestModel(30) // More events than visible rows
-		m.height = 10            // Small height so 10 visible rows
-		m.cursor = m.visibleRows() - 1
-		m.scrollOffset = 0
-
-		m = m.cursorDown()
-
-		if m.scrollOffset == 0 {
-			t.Error("expected scrollOffset to increase when cursor moves below visible area")
+		if m.scroller.Cursor() != 0 {
+			t.Errorf("expected cursor to stay at 0, got %d", m.scroller.Cursor())
 		}
 	})
 }
 
-func TestCursorUp(t *testing.T) {
+func TestScrollerCursorUp(t *testing.T) {
 	t.Parallel()
 
 	t.Run("moves cursor up", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(10)
-		m.cursor = 5
+		m.scroller.SetCursor(5)
 
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 
-		if m.cursor != 4 {
-			t.Errorf("expected cursor 4, got %d", m.cursor)
+		if m.scroller.Cursor() != 4 {
+			t.Errorf("expected cursor 4, got %d", m.scroller.Cursor())
 		}
 	})
 
 	t.Run("stops at first item", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(5)
-		m.cursor = 0
 
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 
-		if m.cursor != 0 {
-			t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
-		}
-	})
-
-	t.Run("adjusts scroll when cursor above visible", func(t *testing.T) {
-		t.Parallel()
-		m := createTestModel(20)
-		m.cursor = 5
-		m.scrollOffset = 5
-
-		m = m.cursorUp()
-
-		if m.scrollOffset != 4 {
-			t.Errorf("expected scrollOffset 4, got %d", m.scrollOffset)
+		if m.scroller.Cursor() != 0 {
+			t.Errorf("expected cursor to stay at 0, got %d", m.scroller.Cursor())
 		}
 	})
 }
 
-func TestCursorToBottom(t *testing.T) {
+func TestScrollerCursorToEnd(t *testing.T) {
 	t.Parallel()
 
 	t.Run("moves cursor to last item", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(10)
-		m.cursor = 0
 
-		m = m.cursorToBottom()
+		m.scroller.CursorToEnd()
 
-		if m.cursor != 9 {
-			t.Errorf("expected cursor 9, got %d", m.cursor)
+		if m.scroller.Cursor() != 9 {
+			t.Errorf("expected cursor 9, got %d", m.scroller.Cursor())
 		}
 	})
 
@@ -144,94 +117,67 @@ func TestCursorToBottom(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(0)
 
-		m = m.cursorToBottom()
+		m.scroller.CursorToEnd()
 
-		if m.cursor != 0 {
-			t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
-		}
-	})
-
-	t.Run("adjusts scrollOffset", func(t *testing.T) {
-		t.Parallel()
-		m := createTestModel(30) // More events than visible rows
-		m.height = 10            // Small height so 10 visible rows
-		m.scrollOffset = 0
-
-		m = m.cursorToBottom()
-
-		if m.scrollOffset <= 0 {
-			t.Error("expected scrollOffset to be positive when jumping to bottom of long list")
+		if m.scroller.Cursor() != 0 {
+			t.Errorf("expected cursor to stay at 0, got %d", m.scroller.Cursor())
 		}
 	})
 }
 
-func TestPageDown(t *testing.T) {
+func TestScrollerPageDown(t *testing.T) {
 	t.Parallel()
 
 	t.Run("moves cursor by visible rows", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(50)
-		m.height = 20
-		m.cursor = 0
-		visibleRows := m.visibleRows()
+		m.scroller.SetVisibleRows(20)
 
-		m = m.pageDown()
+		m.scroller.PageDown()
 
-		if m.cursor != visibleRows {
-			t.Errorf("expected cursor %d, got %d", visibleRows, m.cursor)
+		if m.scroller.Cursor() != 20 {
+			t.Errorf("expected cursor 20, got %d", m.scroller.Cursor())
 		}
 	})
 
 	t.Run("stops at last item", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(5)
-		m.cursor = 3
+		m.scroller.SetCursor(3)
 
-		m = m.pageDown()
+		m.scroller.PageDown()
 
-		if m.cursor != 4 {
-			t.Errorf("expected cursor 4, got %d", m.cursor)
-		}
-	})
-
-	t.Run("handles empty list", func(t *testing.T) {
-		t.Parallel()
-		m := createTestModel(0)
-
-		m = m.pageDown()
-
-		if m.cursor != 0 {
-			t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
+		if m.scroller.Cursor() != 4 {
+			t.Errorf("expected cursor 4, got %d", m.scroller.Cursor())
 		}
 	})
 }
 
-func TestPageUp(t *testing.T) {
+func TestScrollerPageUp(t *testing.T) {
 	t.Parallel()
 
 	t.Run("moves cursor by visible rows", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(50)
-		m.height = 20
-		visibleRows := m.visibleRows()
-		m.cursor = visibleRows * 2
+		m.scroller.SetVisibleRows(20)
+		m.scroller.SetCursor(40)
 
-		m = m.pageUp()
+		m.scroller.PageUp()
 
-		if m.cursor != visibleRows {
-			t.Errorf("expected cursor %d, got %d", visibleRows, m.cursor)
+		if m.scroller.Cursor() != 20 {
+			t.Errorf("expected cursor 20, got %d", m.scroller.Cursor())
 		}
 	})
 
 	t.Run("stops at first item", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(10)
-		m.cursor = 2
+		m.scroller.SetCursor(2)
 
-		m = m.pageUp()
+		m.scroller.PageUp()
 
-		if m.cursor != 0 {
-			t.Errorf("expected cursor 0, got %d", m.cursor)
+		if m.scroller.Cursor() != 0 {
+			t.Errorf("expected cursor 0, got %d", m.scroller.Cursor())
 		}
 	})
 }
@@ -325,27 +271,106 @@ func TestEventCount(t *testing.T) {
 	}
 }
 
-func TestVisibleRows(t *testing.T) {
+func TestScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns minimum 10 for small height", func(t *testing.T) {
+	t.Run("returns configured visible rows", func(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(0)
-		m.height = 5 // Very small
+		m.scroller.SetVisibleRows(15)
 
-		if m.visibleRows() < 1 {
-			t.Error("expected at least 1 visible row")
+		if m.scroller.VisibleRows() != 15 {
+			t.Errorf("expected 15 visible rows, got %d", m.scroller.VisibleRows())
+		}
+	})
+}
+
+func TestAutoScrollBehavior(t *testing.T) {
+	t.Parallel()
+
+	t.Run("autoScroll is true at cursor 0", func(t *testing.T) {
+		t.Parallel()
+		m := createTestModel(10)
+		m.autoScroll = true
+
+		// Moving down should disable autoScroll
+		m.scroller.CursorDown()
+		m.autoScroll = m.scroller.Cursor() == 0
+
+		if m.autoScroll {
+			t.Error("expected autoScroll to be false after moving cursor from 0")
 		}
 	})
 
-	t.Run("calculates based on height", func(t *testing.T) {
+	t.Run("autoScroll re-enabled when returning to cursor 0", func(t *testing.T) {
 		t.Parallel()
-		m := createTestModel(0)
-		m.height = 100
+		m := createTestModel(10)
+		m.scroller.SetCursor(1)
+		m.autoScroll = false
 
-		rows := m.visibleRows()
-		if rows <= 0 {
-			t.Error("expected positive visible rows for height 100")
+		// Moving up to 0 should enable autoScroll
+		m.scroller.CursorUp()
+		m.autoScroll = m.scroller.Cursor() == 0
+
+		if !m.autoScroll {
+			t.Error("expected autoScroll to be true when cursor is at 0")
+		}
+	})
+}
+
+func TestSetSize(t *testing.T) {
+	t.Parallel()
+
+	t.Run("updates scroller visible rows", func(t *testing.T) {
+		t.Parallel()
+		m := createTestModel(10)
+
+		m = m.SetSize(80, 20)
+
+		// SetSize reserves 1 row for header
+		if m.scroller.VisibleRows() != 19 {
+			t.Errorf("expected 19 visible rows, got %d", m.scroller.VisibleRows())
+		}
+	})
+
+	t.Run("minimum visible rows is 1", func(t *testing.T) {
+		t.Parallel()
+		m := createTestModel(10)
+
+		m = m.SetSize(80, 1) // Very small
+
+		if m.scroller.VisibleRows() < 1 {
+			t.Errorf("expected at least 1 visible row, got %d", m.scroller.VisibleRows())
+		}
+	})
+}
+
+func TestScrollInfo(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns position info", func(t *testing.T) {
+		t.Parallel()
+		m := createTestModel(5)
+		m.scroller.SetVisibleRows(10)
+
+		info := m.ScrollInfo()
+
+		// Scroller always returns position info like "[1/5]"
+		if info != "[1/5]" {
+			t.Errorf("expected [1/5], got %q", info)
+		}
+	})
+
+	t.Run("returns scroll info with position", func(t *testing.T) {
+		t.Parallel()
+		m := createTestModel(20)
+		m.scroller.SetVisibleRows(10)
+		m.scroller.SetCursor(5)
+
+		info := m.ScrollInfo()
+
+		if info != "[6/20]" {
+			t.Errorf("expected [6/20], got %q", info)
 		}
 	})
 }

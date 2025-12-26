@@ -753,29 +753,34 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		data.Info = info
 		data.Online = true
 
-		// Populate device model from DeviceInfo
+		// Populate missing device info from DeviceInfo response.
+		// When a device is added with just name+address, we discover Type/Model/Generation
+		// on first fetch and persist them so subsequent sessions don't re-detect.
 		// Model = human-readable product name (e.g., "Shelly Pro 1PM")
 		// Type = model code/SKU (e.g., "SPSW-001PE16EU")
+		var updates config.DeviceUpdates
 		if info.Model != "" {
 			displayName := types.ModelDisplayName(info.Model)
-			// Always update Model to display name if empty or if Model==Type (old bug)
+			// Populate Model if empty or if Model==Type (old bug where both had same value)
 			if data.Device.Model == "" || data.Device.Model == data.Device.Type {
 				data.Device.Model = displayName
+				updates.Model = displayName
 			}
-			// Always update Type to raw code if empty
+			// Populate Type if empty
 			if data.Device.Type == "" {
 				data.Device.Type = info.Model
+				updates.Type = info.Model
 			}
 		}
-		// Update generation if not set and persist to config for faster subsequent operations
+		// Populate generation if not yet known (0 = unset)
 		if data.Device.Generation == 0 && info.Generation > 0 {
 			data.Device.Generation = info.Generation
-			// Persist generation to config to avoid re-detection on toggle commands
-			if err := config.RegisterDevice(
-				name, data.Device.Address, info.Generation,
-				data.Device.Type, data.Device.Model, data.Device.Auth,
-			); err != nil {
-				c.ios.DebugErr("persist device generation", err)
+			updates.Generation = info.Generation
+		}
+		// Persist discovered info to config so it's available immediately on next session
+		if updates.Type != "" || updates.Model != "" || updates.Generation > 0 {
+			if err := config.UpdateDeviceInfo(name, updates); err != nil {
+				c.ios.DebugErr("persist device info", err)
 			}
 		}
 

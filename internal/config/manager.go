@@ -196,6 +196,55 @@ func (m *Manager) RegisterDeviceWithPlatform(name, address string, generation in
 	return m.saveWithoutLock()
 }
 
+// DeviceUpdates holds partial device info updates.
+// Empty strings and zero values are ignored (existing values preserved).
+type DeviceUpdates struct {
+	Type       string // Device type/SKU (e.g., "SPSW-001PE16EU")
+	Model      string // Human-readable model name (e.g., "Shelly Pro 1PM")
+	Generation int    // Device generation (1, 2, 3, etc.)
+}
+
+// UpdateDeviceInfo updates device info fields without requiring full re-registration.
+// Only non-empty/non-zero values are applied; empty values preserve existing data.
+// This is more efficient than RegisterDevice for partial updates discovered at runtime.
+func (m *Manager) UpdateDeviceInfo(name string, updates DeviceUpdates) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Try exact match first, then normalized
+	key := name
+	dev, ok := m.config.Devices[key]
+	if !ok {
+		key = NormalizeDeviceName(name)
+		dev, ok = m.config.Devices[key]
+		if !ok {
+			return fmt.Errorf("device %q not found", name)
+		}
+	}
+
+	// Apply non-empty updates
+	changed := false
+	if updates.Type != "" && dev.Type != updates.Type {
+		dev.Type = updates.Type
+		changed = true
+	}
+	if updates.Model != "" && dev.Model != updates.Model {
+		dev.Model = updates.Model
+		changed = true
+	}
+	if updates.Generation > 0 && dev.Generation != updates.Generation {
+		dev.Generation = updates.Generation
+		changed = true
+	}
+
+	if !changed {
+		return nil // No changes, skip disk write
+	}
+
+	m.config.Devices[key] = dev
+	return m.saveWithoutLock()
+}
+
 // UnregisterDevice removes a device from the registry.
 // Accepts both display name ("Master Bathroom") and normalized key ("master-bathroom").
 func (m *Manager) UnregisterDevice(name string) error {

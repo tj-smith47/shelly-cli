@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
@@ -40,7 +41,7 @@ type DevicesModel struct {
 	ctx        context.Context
 	fleet      *integrator.FleetManager
 	devices    []integrator.AccountDevice
-	cursor     int
+	scroller   *panel.Scroller
 	loading    bool
 	err        error
 	width      int
@@ -104,8 +105,9 @@ func NewDevices(deps DevicesDeps) DevicesModel {
 	}
 
 	return DevicesModel{
-		ctx:    deps.Ctx,
-		styles: DefaultDevicesStyles(),
+		ctx:      deps.Ctx,
+		scroller: panel.NewScroller(0, 10),
+		styles:   DefaultDevicesStyles(),
 	}
 }
 
@@ -139,6 +141,11 @@ func (m DevicesModel) loadDevices() tea.Cmd {
 func (m DevicesModel) SetSize(width, height int) DevicesModel {
 	m.width = width
 	m.height = height
+	visibleRows := height - 6 // Account for borders, title, stats line
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -166,10 +173,7 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 		}
 		m.devices = msg.Devices
 		m.err = nil
-		// Reset cursor if needed
-		if m.cursor >= len(m.devices) {
-			m.cursor = max(0, len(m.devices)-1)
-		}
+		m.scroller.SetItemCount(len(m.devices))
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -185,17 +189,17 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		if m.cursor < len(m.devices)-1 {
-			m.cursor++
-		}
+		m.scroller.CursorDown()
 	case "k", "up":
-		if m.cursor > 0 {
-			m.cursor--
-		}
+		m.scroller.CursorUp()
 	case "g":
-		m.cursor = 0
+		m.scroller.CursorToStart()
 	case "G":
-		m.cursor = max(0, len(m.devices)-1)
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "r":
 		if !m.loading {
 			m.loading = true
@@ -256,34 +260,21 @@ func (m DevicesModel) renderDeviceList() string {
 	content.WriteString("\n\n")
 
 	// Device list with scroll
-	startIdx, endIdx := m.calculateScrollRange()
-	for i := startIdx; i < endIdx; i++ {
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end; i++ {
 		content.WriteString(m.renderDeviceLine(i))
 		content.WriteString("\n")
 	}
 
+	// Scroll indicator
+	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+
 	return content.String()
-}
-
-func (m DevicesModel) calculateScrollRange() (start, end int) {
-	visibleHeight := m.height - 6
-	if visibleHeight < 1 {
-		visibleHeight = 5
-	}
-
-	start = 0
-	if m.cursor >= visibleHeight {
-		start = m.cursor - visibleHeight + 1
-	}
-	end = start + visibleHeight
-	if end > len(m.devices) {
-		end = len(m.devices)
-	}
-	return start, end
 }
 
 func (m DevicesModel) renderDeviceLine(idx int) string {
 	device := m.devices[idx]
+	isSelected := m.scroller.IsCursorAt(idx)
 
 	// Online indicator
 	statusIcon := m.styles.Offline.Render("○")
@@ -293,7 +284,7 @@ func (m DevicesModel) renderDeviceLine(idx int) string {
 
 	// Cursor
 	cursor := "  "
-	if idx == m.cursor && m.focused {
+	if isSelected && m.focused {
 		cursor = m.styles.Cursor.Render("> ")
 	}
 
@@ -319,7 +310,7 @@ func (m DevicesModel) renderDeviceLine(idx int) string {
 		m.styles.Type.Render("("+deviceType+")"),
 	)
 
-	if idx == m.cursor && m.focused {
+	if isSelected && m.focused {
 		line = m.styles.Selected.Render(line)
 	}
 
@@ -328,10 +319,16 @@ func (m DevicesModel) renderDeviceLine(idx int) string {
 
 // SelectedDevice returns the currently selected device.
 func (m DevicesModel) SelectedDevice() *integrator.AccountDevice {
-	if m.cursor >= 0 && m.cursor < len(m.devices) {
-		return &m.devices[m.cursor]
+	cursor := m.scroller.Cursor()
+	if cursor >= 0 && cursor < len(m.devices) {
+		return &m.devices[cursor]
 	}
 	return nil
+}
+
+// Cursor returns the current cursor position.
+func (m DevicesModel) Cursor() int {
+	return m.scroller.Cursor()
 }
 
 // Devices returns all devices.
@@ -372,4 +369,9 @@ func (m DevicesModel) Refresh() (DevicesModel, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.loadDevices()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m DevicesModel) FooterText() string {
+	return "j/k:scroll g/G:top/bottom enter:details"
 }

@@ -33,6 +33,9 @@ func TestNew(t *testing.T) {
 	if m.mode != ModeExport {
 		t.Errorf("mode = %v, want ModeExport", m.mode)
 	}
+	if m.scroller == nil {
+		t.Error("scroller should be initialized")
+	}
 }
 
 func TestNew_PanicOnNilCtx(t *testing.T) {
@@ -138,6 +141,10 @@ func TestModel_SetSize(t *testing.T) {
 	if updated.height != 50 {
 		t.Errorf("height = %d, want 50", updated.height)
 	}
+	// visible rows = height - 10
+	if updated.scroller.VisibleRows() != 40 {
+		t.Errorf("scroller.VisibleRows() = %d, want 40", updated.scroller.VisibleRows())
+	}
 }
 
 func TestModel_SetFocused(t *testing.T) {
@@ -235,17 +242,18 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 		{Name: "device1"},
 		{Name: "device2"},
 	}
+	m.scroller.SetItemCount(3)
 
 	// Move down
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
-	if updated.cursor != 1 {
-		t.Errorf("cursor after j = %d, want 1", updated.cursor)
+	if updated.scroller.Cursor() != 1 {
+		t.Errorf("cursor after j = %d, want 1", updated.scroller.Cursor())
 	}
 
 	// Move up
 	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
-	if updated.cursor != 0 {
-		t.Errorf("cursor after k = %d, want 0", updated.cursor)
+	if updated.scroller.Cursor() != 0 {
+		t.Errorf("cursor after k = %d, want 0", updated.scroller.Cursor())
 	}
 }
 
@@ -258,6 +266,7 @@ func TestModel_HandleKey_Selection(t *testing.T) {
 		{Name: "device0", Selected: false},
 		{Name: "device1", Selected: false},
 	}
+	m.scroller.SetItemCount(2)
 
 	// Toggle selection with space
 	updated, _ := m.Update(tea.KeyPressMsg{Code: ' '})
@@ -371,15 +380,16 @@ func TestModel_HandleKey_NotFocused(t *testing.T) {
 	m := newTestModel()
 	m.focused = false
 	m.devices = []DeviceBackup{{Name: "device0"}}
+	m.scroller.SetItemCount(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
 
-	if updated.cursor != 0 {
+	if updated.scroller.Cursor() != 0 {
 		t.Error("cursor should not change when not focused")
 	}
 }
 
-func TestModel_CursorBounds(t *testing.T) {
+func TestModel_ScrollerCursorBounds(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
@@ -387,33 +397,34 @@ func TestModel_CursorBounds(t *testing.T) {
 		{Name: "device0"},
 		{Name: "device1"},
 	}
+	m.scroller.SetItemCount(2)
 
 	// Can't go below 0
-	updated := m.cursorUp()
-	if updated.cursor != 0 {
-		t.Errorf("cursor = %d, want 0 (can't go below)", updated.cursor)
+	m.scroller.CursorUp()
+	if m.scroller.Cursor() != 0 {
+		t.Errorf("cursor = %d, want 0 (can't go below)", m.scroller.Cursor())
 	}
 
 	// Can't exceed list length
-	updated.cursor = 1
-	updated = updated.cursorDown()
-	if updated.cursor != 1 {
-		t.Errorf("cursor = %d, want 1 (can't exceed list)", updated.cursor)
+	m.scroller.SetCursor(1)
+	m.scroller.CursorDown()
+	if m.scroller.Cursor() != 1 {
+		t.Errorf("cursor = %d, want 1 (can't exceed list)", m.scroller.Cursor())
 	}
 }
 
-func TestModel_VisibleRows(t *testing.T) {
+func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 
-	m.height = 20
-	if rows := m.visibleRows(); rows != 10 {
-		t.Errorf("visibleRows() = %d, want 10", rows)
+	m = m.SetSize(80, 20)
+	if rows := m.scroller.VisibleRows(); rows != 10 {
+		t.Errorf("scroller.VisibleRows() = %d, want 10", rows)
 	}
 
-	m.height = 5
-	if rows := m.visibleRows(); rows != 1 {
-		t.Errorf("visibleRows() with small height = %d, want 1", rows)
+	m = m.SetSize(80, 5)
+	if rows := m.scroller.VisibleRows(); rows != 1 {
+		t.Errorf("scroller.VisibleRows() with small height = %d, want 1", rows)
 	}
 }
 
@@ -453,6 +464,7 @@ func TestModel_View_ExportMode(t *testing.T) {
 		{Name: "device0", Selected: true},
 		{Name: "device1", Selected: false, Exported: true, FilePath: "/tmp/backup.json"},
 	}
+	m.scroller.SetItemCount(2)
 	m = m.SetSize(80, 30)
 
 	view := m.View()
@@ -514,7 +526,8 @@ func TestModel_Accessors(t *testing.T) {
 	m.exporting = true
 	m.importing = true
 	m.err = errors.New("test error")
-	m.cursor = 2
+	m.scroller.SetItemCount(5)
+	m.scroller.SetCursor(2)
 	m.backupDir = "/custom/backups"
 
 	if len(m.Devices()) != 2 {
@@ -540,51 +553,6 @@ func TestModel_Accessors(t *testing.T) {
 	}
 	if m.BackupDir() != "/custom/backups" {
 		t.Errorf("BackupDir() = %q, want /custom/backups", m.BackupDir())
-	}
-}
-
-func TestModel_EnsureVisible(t *testing.T) {
-	t.Parallel()
-	m := newTestModel()
-	m.height = 15
-	m.devices = make([]DeviceBackup, 20)
-	for i := range m.devices {
-		m.devices[i] = DeviceBackup{Name: string(rune('a' + i))}
-	}
-
-	// Cursor at beginning
-	m.cursor = 0
-	m.scroll = 5
-	m = m.ensureVisible()
-	if m.scroll != 0 {
-		t.Errorf("scroll = %d, want 0 when cursor at beginning", m.scroll)
-	}
-
-	// Cursor past visible area
-	m.cursor = 15
-	m.scroll = 0
-	m = m.ensureVisible()
-	if m.scroll <= 0 {
-		t.Error("scroll should increase when cursor past visible")
-	}
-}
-
-func TestModel_CurrentListLen(t *testing.T) {
-	t.Parallel()
-	m := newTestModel()
-	m.devices = []DeviceBackup{{Name: "device0"}, {Name: "device1"}}
-	m.backupFiles = []File{{Name: "backup0.json"}}
-
-	// Export mode
-	m.mode = ModeExport
-	if m.currentListLen() != 2 {
-		t.Errorf("currentListLen() in export mode = %d, want 2", m.currentListLen())
-	}
-
-	// Import mode
-	m.mode = ModeImport
-	if m.currentListLen() != 1 {
-		t.Errorf("currentListLen() in import mode = %d, want 1", m.currentListLen())
 	}
 }
 

@@ -29,7 +29,7 @@ func TestNewDeviceList(t *testing.T) {
 	if m.cache != c {
 		t.Error("expected cache to be set")
 	}
-	if m.cursor != 0 {
+	if m.Cursor() != 0 {
 		t.Error("expected cursor to start at 0")
 	}
 	if m.filter != "" {

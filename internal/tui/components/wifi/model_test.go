@@ -269,23 +269,24 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 		{SSID: "Network2"},
 		{SSID: "Network3"},
 	}
+	m.scroller.SetItemCount(len(m.networks))
 
 	// Move down
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
-	if updated.cursor != 1 {
-		t.Errorf("cursor after j = %d, want 1", updated.cursor)
+	if updated.Cursor() != 1 {
+		t.Errorf("cursor after j = %d, want 1", updated.Cursor())
 	}
 
 	// Move down again
 	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'j'})
-	if updated.cursor != 2 {
-		t.Errorf("cursor after second j = %d, want 2", updated.cursor)
+	if updated.Cursor() != 2 {
+		t.Errorf("cursor after second j = %d, want 2", updated.Cursor())
 	}
 
 	// Move up
 	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
-	if updated.cursor != 1 {
-		t.Errorf("cursor after k = %d, want 1", updated.cursor)
+	if updated.Cursor() != 1 {
+		t.Errorf("cursor after k = %d, want 1", updated.Cursor())
 	}
 }
 
@@ -327,15 +328,16 @@ func TestModel_HandleKey_NotFocused(t *testing.T) {
 	m.focused = false
 	m.device = testDevice
 	m.networks = []shelly.WifiNetwork{{SSID: "Network1"}}
+	m.scroller.SetItemCount(len(m.networks))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
 
-	if updated.cursor != 0 {
+	if updated.Cursor() != 0 {
 		t.Error("cursor should not change when not focused")
 	}
 }
 
-func TestModel_CursorBounds(t *testing.T) {
+func TestModel_ScrollerCursorBounds(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
@@ -343,33 +345,35 @@ func TestModel_CursorBounds(t *testing.T) {
 		{SSID: "Network1"},
 		{SSID: "Network2"},
 	}
+	m.scroller.SetItemCount(len(m.networks))
 
 	// Can't go below 0
-	updated := m.cursorUp()
-	if updated.cursor != 0 {
-		t.Errorf("cursor = %d, want 0 (can't go below)", updated.cursor)
+	m.scroller.CursorUp()
+	if m.Cursor() != 0 {
+		t.Errorf("cursor = %d, want 0 (can't go below)", m.Cursor())
 	}
 
 	// Can't exceed list length
-	updated.cursor = 1
-	updated = updated.cursorDown()
-	if updated.cursor != 1 {
-		t.Errorf("cursor = %d, want 1 (can't exceed list)", updated.cursor)
+	m.scroller.SetCursor(1)
+	m.scroller.CursorDown()
+	if m.Cursor() != 1 {
+		t.Errorf("cursor = %d, want 1 (can't exceed list)", m.Cursor())
 	}
 }
 
-func TestModel_VisibleRows(t *testing.T) {
+func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 
-	m.height = 20
-	if rows := m.visibleRows(); rows != 8 {
-		t.Errorf("visibleRows() = %d, want 8", rows)
+	// SetSize configures visible rows (height - 12 overhead)
+	m = m.SetSize(80, 20)
+	if m.scroller.VisibleRows() != 8 {
+		t.Errorf("visibleRows = %d, want 8", m.scroller.VisibleRows())
 	}
 
-	m.height = 5
-	if rows := m.visibleRows(); rows != 1 {
-		t.Errorf("visibleRows() with small height = %d, want 1", rows)
+	m = m.SetSize(80, 5)
+	if m.scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
 	}
 }
 
@@ -642,29 +646,28 @@ func TestDefaultStyles(t *testing.T) {
 	_ = styles.Muted.Render("test")
 }
 
-func TestModel_EnsureVisible(t *testing.T) {
+func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	m.height = 20
 	m.networks = make([]shelly.WifiNetwork, 20)
 	for i := range m.networks {
 		m.networks[i] = shelly.WifiNetwork{SSID: "Network"}
 	}
+	m.scroller.SetItemCount(20)
+	m = m.SetSize(80, 20) // Sets visibleRows = 20 - 12 = 8
 
-	// Cursor at beginning
-	m.cursor = 0
-	m.scroll = 5
-	m = m.ensureVisible()
-	if m.scroll != 0 {
-		t.Errorf("scroll = %d, want 0 when cursor at beginning", m.scroll)
+	// Cursor at end should scroll
+	m.scroller.CursorToEnd()
+	start, _ := m.scroller.VisibleRange()
+	if start == 0 {
+		t.Error("scroll should increase when cursor at end of long list")
 	}
 
-	// Cursor past visible area
-	m.cursor = 15
-	m.scroll = 0
-	m = m.ensureVisible()
-	if m.scroll <= 0 {
-		t.Error("scroll should increase when cursor past visible")
+	// Cursor back to start
+	m.scroller.CursorToStart()
+	start, _ = m.scroller.VisibleRange()
+	if start != 0 {
+		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -106,11 +107,11 @@ func run(ctx context.Context, opts *Options) error {
 			ios.Println()
 			ios.Info("This action type requires physical interaction:")
 			switch {
-			case isButtonEvent(event):
+			case shelly.IsButtonEvent(event):
 				ios.Info("  Press the physical button on the device")
-			case isRollerEvent(event):
+			case shelly.IsRollerEvent(event):
 				ios.Info("  Use 'shelly cover open/close/stop %s'", opts.Device)
-			case isSensorEvent(event):
+			case shelly.IsSensorEvent(event):
 				ios.Info("  Trigger the sensor condition")
 			default:
 				ios.Info("  Trigger the corresponding device event")
@@ -128,34 +129,4 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	return nil
-}
-
-func isButtonEvent(e gen1.ActionEvent) bool {
-	switch e { //nolint:exhaustive // it be that way sometimes
-	case gen1.ActionLongpush, gen1.ActionShortpush, gen1.ActionDoublepush, gen1.ActionTriplepush,
-		gen1.ActionBtn1On, gen1.ActionBtn1Off, gen1.ActionBtn2On, gen1.ActionBtn2Off:
-		return true
-	}
-	return false
-}
-
-func isRollerEvent(e gen1.ActionEvent) bool {
-	switch e { //nolint:exhaustive // it be that way sometimes
-	case gen1.ActionRollerOpen, gen1.ActionRollerClose, gen1.ActionRollerStop,
-		gen1.ActionRollerOpenUrl, gen1.ActionRollerCloseUrl, gen1.ActionRollerStopUrl:
-		return true
-	}
-	return false
-}
-
-func isSensorEvent(e gen1.ActionEvent) bool {
-	switch e { //nolint:exhaustive // it be that way sometimes
-	case gen1.ActionSensorOpen, gen1.ActionSensorClose, gen1.ActionSensorMotion,
-		gen1.ActionSensorNoMotion, gen1.ActionSensorFlood, gen1.ActionSensorNoFlood,
-		gen1.ActionSensorSmoke, gen1.ActionSensorNoSmoke, gen1.ActionSensorGas,
-		gen1.ActionSensorNoGas, gen1.ActionSensorVibration, gen1.ActionSensorTemp,
-		gen1.ActionSensorTempUnder:
-		return true
-	}
-	return false
 }

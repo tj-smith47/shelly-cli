@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -44,8 +45,7 @@ type Model struct {
 	svc        *shelly.Service
 	device     string
 	inputs     []shelly.InputInfo
-	cursor     int
-	scroll     int
+	scroller   *panel.Scroller
 	loading    bool
 	err        error
 	width      int
@@ -102,10 +102,11 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultStyles(),
+		ctx:      deps.Ctx,
+		svc:      deps.Svc,
+		scroller: panel.NewScroller(0, 10),
+		loading:  false,
+		styles:   DefaultStyles(),
 	}
 }
 
@@ -118,8 +119,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.inputs = nil
-	m.cursor = 0
-	m.scroll = 0
+	m.scroller.SetItemCount(0)
+	m.scroller.CursorToStart()
 	m.err = nil
 
 	if device == "" {
@@ -144,6 +145,11 @@ func (m Model) fetchInputs() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	visibleRows := height - 6 // Reserve space for header and footer
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -169,6 +175,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.inputs = msg.Inputs
+		m.scroller.SetItemCount(len(m.inputs))
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -184,9 +191,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
+	case "g":
+		m.scroller.CursorToStart()
+	case "G":
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "r":
 		if !m.loading && m.device != "" {
 			m.loading = true
@@ -195,40 +210,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
-}
-
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.inputs)-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) ensureVisible() Model {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m Model) visibleRows() int {
-	rows := m.height - 6 // Reserve space for header and footer
-	if rows < 1 {
-		return 1
-	}
-	return rows
 }
 
 // View renders the Inputs component.
@@ -264,28 +245,19 @@ func (m Model) View() string {
 	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Inputs (%d):\n\n", len(m.inputs))))
 
 	// Input list
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
-	if endIdx > len(m.inputs) {
-		endIdx = len(m.inputs)
-	}
-
-	for i := m.scroll; i < endIdx; i++ {
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end; i++ {
 		input := m.inputs[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 		content.WriteString(m.renderInputLine(input, isSelected))
-		if i < endIdx-1 {
+		if i < end-1 {
 			content.WriteString("\n")
 		}
 	}
 
 	// Scroll indicator
-	if len(m.inputs) > visible {
-		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("[%d/%d]", m.cursor+1, len(m.inputs)),
-		))
-	}
+	content.WriteString("\n")
+	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 
 	// Help text
 	content.WriteString("\n\n")
@@ -352,7 +324,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.cursor
+	return m.scroller.Cursor()
 }
 
 // Refresh triggers a refresh of the inputs.
@@ -362,4 +334,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.fetchInputs()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom enter:details"
 }

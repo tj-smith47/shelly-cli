@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
+
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // ValidThermostatModes contains the valid thermostat operating modes.
@@ -190,4 +192,33 @@ func ParseScheduleCreateResponse(result any) (ScheduleCreateResult, error) {
 	}
 
 	return resp, nil
+}
+
+// CollectThermostats extracts thermostat information from a device status map.
+// The status map should be the result of a Shelly.GetStatus call.
+func CollectThermostats(status map[string]json.RawMessage) []model.ThermostatInfo {
+	var thermostats []model.ThermostatInfo
+
+	for key, raw := range status {
+		if strings.HasPrefix(key, "thermostat:") {
+			var t struct {
+				ID       int      `json:"id"`
+				Output   *bool    `json:"output"`
+				TargetC  *float64 `json:"target_C"`
+				CurrentC *float64 `json:"current_C"`
+			}
+			if err := json.Unmarshal(raw, &t); err == nil {
+				info := model.ThermostatInfo{
+					ID:      t.ID,
+					Enabled: t.Output != nil && *t.Output,
+				}
+				if t.TargetC != nil {
+					info.TargetC = *t.TargetC
+				}
+				thermostats = append(thermostats, info)
+			}
+		}
+	}
+
+	return thermostats
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -64,8 +65,7 @@ type Model struct {
 	svc        *shelly.Service
 	device     string
 	items      []Item
-	cursor     int
-	scroll     int
+	scroller   *panel.Scroller
 	loading    bool
 	err        error
 	width      int
@@ -126,10 +126,11 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultStyles(),
+		ctx:      deps.Ctx,
+		svc:      deps.Svc,
+		scroller: panel.NewScroller(0, 10),
+		loading:  false,
+		styles:   DefaultStyles(),
 	}
 }
 
@@ -142,8 +143,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.items = nil
-	m.cursor = 0
-	m.scroll = 0
+	m.scroller.SetItemCount(0)
+	m.scroller.CursorToStart()
 	m.err = nil
 
 	if device == "" {
@@ -182,6 +183,11 @@ func (m Model) fetchItems() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	visibleRows := height - 4
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -207,8 +213,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.items = msg.Items
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.SetItemCount(len(m.items))
+		m.scroller.CursorToStart()
 		return m, nil
 
 	case ActionMsg:
@@ -232,14 +238,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 	case "g":
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.CursorToStart()
 	case "G":
-		m = m.cursorToEnd()
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "enter":
 		return m, m.selectItem()
 	case "d":
@@ -252,63 +261,23 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.items)-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorToEnd() Model {
-	if len(m.items) > 0 {
-		m.cursor = len(m.items) - 1
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) ensureVisible() Model {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m Model) visibleRows() int {
-	rows := m.height - 4
-	if rows < 1 {
-		return 1
-	}
-	return rows
-}
-
 func (m Model) selectItem() tea.Cmd {
-	if len(m.items) == 0 || m.cursor >= len(m.items) {
+	cursor := m.scroller.Cursor()
+	if len(m.items) == 0 || cursor >= len(m.items) {
 		return nil
 	}
-	item := m.items[m.cursor]
+	item := m.items[cursor]
 	return func() tea.Msg {
 		return SelectMsg{Item: item}
 	}
 }
 
 func (m Model) deleteItem() tea.Cmd {
-	if len(m.items) == 0 || m.cursor >= len(m.items) {
+	cursor := m.scroller.Cursor()
+	if len(m.items) == 0 || cursor >= len(m.items) {
 		return nil
 	}
-	item := m.items[m.cursor]
+	item := m.items[cursor]
 
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
@@ -354,28 +323,22 @@ func (m Model) View() string {
 	}
 
 	var content strings.Builder
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
-	if endIdx > len(m.items) {
-		endIdx = len(m.items)
-	}
 
-	for i := m.scroll; i < endIdx; i++ {
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end; i++ {
 		item := m.items[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 
 		line := m.renderItemLine(item, isSelected)
 		content.WriteString(line)
-		if i < endIdx-1 {
+		if i < end-1 {
 			content.WriteString("\n")
 		}
 	}
 
-	if len(m.items) > visible {
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(m.items)),
-		))
-	}
+	// Scroll indicator
+	content.WriteString("\n")
+	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 
 	r.SetContent(content.String())
 	return r.Render()
@@ -442,10 +405,16 @@ func (m Model) formatValue(value any) string {
 
 // SelectedItem returns the currently selected item, if any.
 func (m Model) SelectedItem() *Item {
-	if len(m.items) == 0 || m.cursor >= len(m.items) {
+	cursor := m.scroller.Cursor()
+	if len(m.items) == 0 || cursor >= len(m.items) {
 		return nil
 	}
-	return &m.items[m.cursor]
+	return &m.items[cursor]
+}
+
+// Cursor returns the current cursor position.
+func (m Model) Cursor() int {
+	return m.scroller.Cursor()
 }
 
 // ItemCount returns the number of items.
@@ -475,4 +444,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.fetchItems()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom enter:details d:delete"
 }

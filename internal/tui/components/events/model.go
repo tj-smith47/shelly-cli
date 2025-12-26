@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 // Event level constants.
@@ -26,6 +27,9 @@ const (
 	levelWarning    = "warning"
 	levelError      = "error"
 	levelScript     = "script"
+
+	// Minimum width to show dual columns.
+	dualColumnMinWidth = 100
 )
 
 // Deps holds the dependencies for the events component.
@@ -90,19 +94,18 @@ type RefreshTickMsg struct{}
 
 // Model holds the events state.
 type Model struct {
-	ctx          context.Context
-	svc          *shelly.Service
-	ios          *iostreams.IOStreams
-	eventStream  *shelly.EventStream
-	state        *sharedState
-	maxItems     int
-	width        int
-	height       int
-	styles       Styles
-	scrollOffset int
-	cursor       int
-	paused       bool
-	autoScroll   bool // Auto-scroll to top when new events arrive (newest at top)
+	ctx         context.Context
+	svc         *shelly.Service
+	ios         *iostreams.IOStreams
+	eventStream *shelly.EventStream
+	state       *sharedState
+	scroller    *panel.Scroller
+	maxItems    int
+	width       int
+	height      int
+	styles      Styles
+	paused      bool
+	autoScroll  bool // Auto-scroll to top when new events arrive (newest at top)
 
 	// Filtering
 	filterByDevice bool   // When true, only show events for selectedDevice
@@ -184,6 +187,7 @@ func New(deps Deps) Model {
 		svc:         deps.Svc,
 		ios:         deps.IOS,
 		eventStream: deps.EventStream,
+		scroller:    panel.NewScroller(0, 10), // Will be updated by SetSize
 		maxItems:    100,
 		autoScroll:  true, // Start with auto-scroll enabled (cursor stays at top/newest)
 		styles:      DefaultStyles(),
@@ -334,10 +338,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case RefreshTickMsg:
+		// Update scroller with current event count
+		m.scroller.SetItemCount(m.eventCount())
 		// Auto-scroll to top if enabled (newest events appear at top)
 		if m.autoScroll {
-			m.scrollOffset = 0
-			m.cursor = 0
+			m.scroller.CursorToStart()
 		}
 		// Reschedule next refresh - the tick itself triggers a re-render
 		// which will pick up any events added by background goroutines
@@ -374,113 +379,32 @@ func (m Model) handleSubscriptionStatus(msg SubscriptionStatusMsg) Model {
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
+		m.autoScroll = m.scroller.Cursor() == 0
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
+		m.autoScroll = m.scroller.Cursor() == 0
 	case "pgdown", "ctrl+d":
-		m = m.pageDown()
+		m.scroller.PageDown()
+		m.autoScroll = false
 	case "pgup", "ctrl+u":
-		m = m.pageUp()
+		m.scroller.PageUp()
+		m.autoScroll = m.scroller.Cursor() == 0
 	case "g":
-		m.cursor = 0
-		m.scrollOffset = 0
+		m.scroller.CursorToStart()
 		m.autoScroll = true // User went to top (newest), enable auto-scroll
 	case "G":
-		m = m.cursorToBottom()
+		m.scroller.CursorToEnd()
 		m.autoScroll = false // User went to bottom (oldest), disable auto-scroll
 	case "c":
 		m.Clear()
-		m.cursor = 0
-		m.scrollOffset = 0
+		m.scroller.SetItemCount(0)
 		m.autoScroll = true // After clear, re-enable auto-scroll
 	case "p":
 		m = m.togglePause()
 	case "f":
 		m = m.ToggleFilter()
 	}
-	return m
-}
-
-func (m Model) cursorDown() Model {
-	count := m.eventCount()
-	if count == 0 {
-		return m
-	}
-	if m.cursor < count-1 {
-		m.cursor++
-	}
-	visibleRows := m.visibleRows()
-	if m.cursor >= m.scrollOffset+visibleRows {
-		m.scrollOffset = m.cursor - visibleRows + 1
-	}
-	// Disable auto-scroll when moving away from top (newest)
-	m.autoScroll = false
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-	}
-	if m.cursor < m.scrollOffset {
-		m.scrollOffset = m.cursor
-	}
-	// Enable auto-scroll when at top (newest events)
-	m.autoScroll = m.cursor == 0
-	return m
-}
-
-func (m Model) cursorToBottom() Model {
-	count := m.eventCount()
-	if count > 0 {
-		m.cursor = count - 1
-		visibleRows := m.visibleRows()
-		maxOffset := count - visibleRows
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		m.scrollOffset = maxOffset
-	}
-	m.autoScroll = false // Going to bottom (oldest) disables auto-scroll
-	return m
-}
-
-func (m Model) pageDown() Model {
-	count := m.eventCount()
-	if count == 0 {
-		return m
-	}
-	visibleRows := m.visibleRows()
-	m.cursor += visibleRows
-	if m.cursor >= count {
-		m.cursor = count - 1
-	}
-	if m.cursor >= m.scrollOffset+visibleRows {
-		m.scrollOffset = m.cursor - visibleRows + 1
-	}
-	maxOffset := count - visibleRows
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if m.scrollOffset > maxOffset {
-		m.scrollOffset = maxOffset
-	}
-	// Disable auto-scroll when paging away from top (newest)
-	m.autoScroll = false
-	return m
-}
-
-func (m Model) pageUp() Model {
-	visibleRows := m.visibleRows()
-	m.cursor -= visibleRows
-	if m.cursor < 0 {
-		m.cursor = 0
-	}
-	if m.cursor < m.scrollOffset {
-		m.scrollOffset = m.cursor
-	}
-	// Enable auto-scroll when at top (newest events)
-	m.autoScroll = m.cursor == 0
 	return m
 }
 
@@ -496,19 +420,16 @@ func (m Model) eventCount() int {
 	return len(m.state.events)
 }
 
-// visibleRows calculates how many rows can be displayed.
-// Full height available since header/footer are handled by wrapper.
-func (m Model) visibleRows() int {
-	if m.height < 1 {
-		return 10
-	}
-	return m.height
-}
-
 // SetSize sets the component size.
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	// Reserve 1 row for header
+	visibleRows := height - 1
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -528,13 +449,19 @@ func (m Model) View() string {
 			Render("Waiting for events...")
 	}
 
-	// Reserve 1 row for header
-	visibleRows := m.visibleRows() - 1
-	if visibleRows < 1 {
-		visibleRows = 1
+	// Use dual column layout when width permits
+	if m.width >= dualColumnMinWidth {
+		return m.renderDualColumns(eventList)
 	}
-	startIdx := m.scrollOffset
-	endIdx := startIdx + visibleRows
+
+	// Single column layout (original behavior)
+	return m.renderSingleColumn(eventList)
+}
+
+// renderSingleColumn renders events in a single column (original layout).
+func (m Model) renderSingleColumn(eventList []Event) string {
+	// Get visible range from scroller
+	startIdx, endIdx := m.scroller.VisibleRange()
 	if endIdx > len(eventList) {
 		endIdx = len(eventList)
 	}
@@ -543,8 +470,8 @@ func (m Model) View() string {
 
 	// Column widths - account for header text + content + padding
 	// Header text: TIME(4), DEVICE(6), COMPONENT(9), LEVEL(5), DESCRIPTION
-	colTime := 10   // HH:MM:SS (8) + 2 padding
-	colLevel := 13  // "full_status" (11) + 2 padding
+	colTime := 10  // HH:MM:SS (8) + 2 padding
+	colLevel := 13 // "full_status" (11) + 2 padding
 
 	// Measure actual device and component widths from visible events
 	maxDevice := 6 // Min for "DEVICE" header
@@ -568,7 +495,7 @@ func (m Model) View() string {
 	var rows string
 	for i, e := range eventsToShow {
 		actualIdx := startIdx + i
-		isSelected := actualIdx == m.cursor
+		isSelected := m.scroller.IsCursorAt(actualIdx)
 		rows += m.renderEventRow(e, isSelected, colTime, colDevice, colComp, colLevel)
 	}
 
@@ -779,20 +706,131 @@ func (m Model) StatusBadge() string {
 
 // ScrollInfo returns scroll position info for the wrapper.
 func (m Model) ScrollInfo() string {
-	count := m.eventCount()
-	visibleRows := m.visibleRows()
-	if count <= visibleRows {
-		return ""
-	}
-	startIdx := m.scrollOffset
-	endIdx := startIdx + visibleRows
-	if endIdx > count {
-		endIdx = count
-	}
-	return fmt.Sprintf("%d-%d/%d", startIdx+1, endIdx, count)
+	return m.scroller.ScrollInfo()
 }
 
 // IsPaused returns whether event collection is paused.
 func (m Model) IsPaused() bool {
 	return m.paused
+}
+
+// isUserEvent returns true if the event is user-relevant (not system noise).
+// User events: status changes, online/offline, errors, script output, warnings.
+// System events: full_status updates (frequent polling noise).
+func isUserEvent(e Event) bool {
+	switch e.Type {
+	case levelFullStatus:
+		return false // System noise - exclude from user column
+	case levelStatus, levelInfo, levelWarning, levelError, levelScript:
+		return true // User-relevant events
+	default:
+		return true // Unknown types go to user column
+	}
+}
+
+// splitEventsByType splits events into user and system categories.
+func splitEventsByType(eventList []Event) (user, system []Event) {
+	user = make([]Event, 0, len(eventList)/2)
+	system = make([]Event, 0, len(eventList)/2)
+	for _, e := range eventList {
+		if isUserEvent(e) {
+			user = append(user, e)
+		} else {
+			system = append(system, e)
+		}
+	}
+	return user, system
+}
+
+// renderDualColumns renders events in two columns: User (left) and System (right).
+func (m Model) renderDualColumns(eventList []Event) string {
+	colors := theme.GetSemanticColors()
+
+	// Split events by type
+	userEvents, systemEvents := splitEventsByType(eventList)
+
+	// Calculate column widths
+	colWidth := (m.width - 3) / 2 // -3 for separator (│) and spacing
+	visibleRows := m.height - 2   // -2 for headers
+
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+
+	// Limit events to visible rows
+	if len(userEvents) > visibleRows {
+		userEvents = userEvents[:visibleRows]
+	}
+	if len(systemEvents) > visibleRows {
+		systemEvents = systemEvents[:visibleRows]
+	}
+
+	// Build headers
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Highlight)
+	leftHeader := headerStyle.Render("Events")
+	rightHeader := lipgloss.NewStyle().Bold(true).Foreground(colors.Muted).Render("System")
+
+	// Pad headers to column width
+	leftHeader = output.PadRight(leftHeader, colWidth)
+	rightHeader = output.PadRight(rightHeader, colWidth)
+
+	separator := lipgloss.NewStyle().Foreground(colors.TableBorder).Render("│")
+
+	// Build rows
+	lines := make([]string, 0, visibleRows+1)
+	lines = append(lines, leftHeader+" "+separator+" "+rightHeader)
+
+	for i := range visibleRows {
+		leftCell := ""
+		rightCell := ""
+
+		if i < len(userEvents) {
+			leftCell = m.renderCompactEvent(userEvents[i], colWidth)
+		}
+		if i < len(systemEvents) {
+			rightCell = m.renderCompactEvent(systemEvents[i], colWidth)
+		}
+
+		// Pad cells to column width
+		leftCell = output.PadRight(leftCell, colWidth)
+		rightCell = output.PadRight(rightCell, colWidth)
+
+		lines = append(lines, leftCell+" "+separator+" "+rightCell)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// renderCompactEvent renders a single event in compact format for dual columns.
+func (m Model) renderCompactEvent(e Event, maxWidth int) string {
+	// Format: HH:MM:SS device level desc
+	timeStr := m.styles.Time.Render(e.Timestamp.Format("15:04:05"))
+
+	// Truncate device name if needed
+	device := e.Device
+	if len(device) > 10 {
+		device = device[:9] + "…"
+	}
+	deviceStr := m.styles.Device.Render(device)
+
+	// Level indicator (short form)
+	levelStyle := m.getTypeStyle(e.Type)
+	levelShort := e.Type
+	if len(levelShort) > 6 {
+		levelShort = levelShort[:6]
+	}
+	levelStr := levelStyle.Render(levelShort)
+
+	prefix := timeStr + " " + deviceStr + " " + levelStr + " "
+	prefixLen := 8 + 1 + min(len(e.Device), 10) + 1 + min(len(e.Type), 6) + 1
+
+	// Description with remaining width
+	descWidth := maxWidth - prefixLen
+	if descWidth < 5 {
+		descWidth = 5
+	}
+	desc := output.Truncate(e.Description, descWidth)
+	descStr := m.styles.Description.Render(desc)
+
+	return prefix + descStr
 }

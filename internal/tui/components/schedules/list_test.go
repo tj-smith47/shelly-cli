@@ -65,7 +65,7 @@ func TestListDeps_Validate(t *testing.T) {
 
 func TestListModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := ListModel{}
+	m := newTestListModel()
 	m = m.SetSize(100, 50)
 
 	if m.width != 100 {
@@ -78,7 +78,7 @@ func TestListModel_SetSize(t *testing.T) {
 
 func TestListModel_SetFocused(t *testing.T) {
 	t.Parallel()
-	m := ListModel{}
+	m := newTestListModel()
 
 	m = m.SetFocused(true)
 	if !m.focused {
@@ -91,122 +91,105 @@ func TestListModel_SetFocused(t *testing.T) {
 	}
 }
 
-func TestListModel_VisibleRows(t *testing.T) {
+func TestListModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name   string
-		height int
-		want   int
-	}{
-		{"zero height", 0, 1},
-		{"small height", 5, 1},
-		{"normal height", 20, 16},
-		{"large height", 100, 96},
+	m := newTestListModel()
+
+	// SetSize configures visible rows (height - 4 overhead)
+	m = m.SetSize(80, 20)
+	if m.scroller.VisibleRows() != 16 {
+		t.Errorf("visibleRows = %d, want 16", m.scroller.VisibleRows())
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			m := ListModel{height: tt.height}
-			got := m.visibleRows()
-			if got != tt.want {
-				t.Errorf("visibleRows() = %d, want %d", got, tt.want)
-			}
-		})
+	m = m.SetSize(80, 5)
+	if m.scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
 	}
 }
 
-func TestListModel_CursorNavigation(t *testing.T) {
+func TestListModel_ScrollerCursorNavigation(t *testing.T) {
 	t.Parallel()
-	schedules := []Schedule{
+	m := newTestListModel()
+	m.schedules = []Schedule{
 		{ID: 1, Timespec: "0 0 9 * * *"},
 		{ID: 2, Timespec: "0 0 18 * * *"},
 		{ID: 3, Timespec: "0 30 12 * * *"},
 	}
-
-	m := ListModel{
-		schedules: schedules,
-		cursor:    0,
-		height:    20,
-	}
+	m.scroller.SetItemCount(len(m.schedules))
+	m = m.SetSize(80, 20)
 
 	// Cursor down
-	m = m.cursorDown()
-	if m.cursor != 1 {
-		t.Errorf("after cursorDown: cursor = %d, want 1", m.cursor)
+	m.scroller.CursorDown()
+	if m.Cursor() != 1 {
+		t.Errorf("after CursorDown: cursor = %d, want 1", m.Cursor())
 	}
 
-	m = m.cursorDown()
-	if m.cursor != 2 {
-		t.Errorf("after 2nd cursorDown: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorDown()
+	if m.Cursor() != 2 {
+		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Don't go past end
-	m = m.cursorDown()
-	if m.cursor != 2 {
-		t.Errorf("cursor at end: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorDown()
+	if m.Cursor() != 2 {
+		t.Errorf("cursor at end: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Cursor up
-	m = m.cursorUp()
-	if m.cursor != 1 {
-		t.Errorf("after cursorUp: cursor = %d, want 1", m.cursor)
+	m.scroller.CursorUp()
+	if m.Cursor() != 1 {
+		t.Errorf("after CursorUp: cursor = %d, want 1", m.Cursor())
 	}
 
 	// Don't go before start
-	m.cursor = 0
-	m = m.cursorUp()
-	if m.cursor != 0 {
-		t.Errorf("cursor at start: cursor = %d, want 0", m.cursor)
+	m.scroller.CursorToStart()
+	m.scroller.CursorUp()
+	if m.Cursor() != 0 {
+		t.Errorf("cursor at start: cursor = %d, want 0", m.Cursor())
 	}
 
 	// Cursor to end
-	m = m.cursorToEnd()
-	if m.cursor != 2 {
-		t.Errorf("after cursorToEnd: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorToEnd()
+	if m.Cursor() != 2 {
+		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.Cursor())
 	}
 }
 
-func TestListModel_EnsureVisible(t *testing.T) {
+func TestListModel_ScrollerEnsureVisible(t *testing.T) {
 	t.Parallel()
+	m := newTestListModel()
 	schedules := make([]Schedule, 20)
 	for i := range schedules {
 		schedules[i] = Schedule{ID: i, Timespec: "0 0 * * * *"}
 	}
+	m.schedules = schedules
+	m.scroller.SetItemCount(20)
+	m = m.SetSize(80, 15) // Sets visibleRows = 15 - 4 = 11
 
-	m := ListModel{
-		schedules: schedules,
-		height:    10,
-		cursor:    0,
-		scroll:    0,
+	// Cursor at end should scroll
+	m.scroller.CursorToEnd()
+	start, _ := m.scroller.VisibleRange()
+	if start == 0 {
+		t.Error("scroll should increase when cursor at end of long list")
 	}
 
-	// Move cursor past visible
-	m.cursor = 10
-	m = m.ensureVisible()
-	if m.scroll < 5 {
-		t.Errorf("scroll should adjust for cursor=10, got scroll=%d", m.scroll)
-	}
-
-	// Move cursor before scroll
-	m.cursor = 2
-	m = m.ensureVisible()
-	if m.scroll != 2 {
-		t.Errorf("scroll should adjust to cursor=2, got scroll=%d", m.scroll)
+	// Cursor back to start
+	m.scroller.CursorToStart()
+	start, _ = m.scroller.VisibleRange()
+	if start != 0 {
+		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}
 }
 
 func TestListModel_SelectedSchedule(t *testing.T) {
 	t.Parallel()
-	schedules := []Schedule{
+	m := newTestListModel()
+	m.schedules = []Schedule{
 		{ID: 1, Timespec: "0 0 9 * * *"},
 		{ID: 2, Timespec: "0 0 18 * * *"},
 	}
-
-	m := ListModel{
-		schedules: schedules,
-		cursor:    1,
-	}
+	m.scroller.SetItemCount(len(m.schedules))
+	m.scroller.SetCursor(1)
 
 	selected := m.SelectedSchedule()
 	if selected == nil {
@@ -218,6 +201,7 @@ func TestListModel_SelectedSchedule(t *testing.T) {
 
 	// Empty list
 	m.schedules = nil
+	m.scroller.SetItemCount(0)
 	selected = m.SelectedSchedule()
 	if selected != nil {
 		t.Error("SelectedSchedule() on empty list should return nil")
@@ -324,28 +308,25 @@ func TestListModel_View_NoSchedules(t *testing.T) {
 
 func TestListModel_View_WithSchedules(t *testing.T) {
 	t.Parallel()
-	m := ListModel{
-		device:  "192.168.1.100",
-		loading: false,
-		schedules: []Schedule{
-			{
-				ID:       1,
-				Enable:   true,
-				Timespec: "0 0 9 * * MON-FRI",
-				Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
-			},
-			{
-				ID:       2,
-				Enable:   false,
-				Timespec: "0 0 22 * * *",
-				Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
-			},
+	m := newTestListModel()
+	m.device = "192.168.1.100"
+	m.loading = false
+	m.schedules = []Schedule{
+		{
+			ID:       1,
+			Enable:   true,
+			Timespec: "0 0 9 * * MON-FRI",
+			Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
 		},
-		cursor: 0,
-		width:  60,
-		height: 15,
-		styles: DefaultListStyles(),
+		{
+			ID:       2,
+			Enable:   false,
+			Timespec: "0 0 22 * * *",
+			Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
+		},
 	}
+	m.scroller.SetItemCount(len(m.schedules))
+	m = m.SetSize(60, 15)
 
 	view := m.View()
 	if !strings.Contains(view, "Switch.Set") {
@@ -423,10 +404,8 @@ func TestListModel_RenderScheduleLine(t *testing.T) {
 
 func TestListModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
-	m := ListModel{
-		loading: true,
-		styles:  DefaultListStyles(),
-	}
+	m := newTestListModel()
+	m.loading = true
 
 	schedules := []Schedule{
 		{ID: 1, Timespec: "0 0 9 * * *"},
@@ -445,10 +424,8 @@ func TestListModel_Update_LoadedMsg(t *testing.T) {
 
 func TestListModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
-	m := ListModel{
-		loading: true,
-		styles:  DefaultListStyles(),
-	}
+	m := newTestListModel()
+	m.loading = true
 
 	m, _ = m.Update(LoadedMsg{Err: context.DeadlineExceeded})
 
@@ -462,17 +439,15 @@ func TestListModel_Update_LoadedMsg_Error(t *testing.T) {
 
 func TestListModel_Update_KeyPress_NotFocused(t *testing.T) {
 	t.Parallel()
-	m := ListModel{
-		focused:   false,
-		schedules: []Schedule{{ID: 1}},
-		cursor:    0,
-		styles:    DefaultListStyles(),
-	}
+	m := newTestListModel()
+	m.focused = false
+	m.schedules = []Schedule{{ID: 1}}
+	m.scroller.SetItemCount(len(m.schedules))
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 106}) // 'j'
 
-	if m.cursor != 0 {
-		t.Errorf("cursor changed when not focused: %d", m.cursor)
+	if m.Cursor() != 0 {
+		t.Errorf("cursor changed when not focused: %d", m.Cursor())
 	}
 }
 
@@ -496,4 +471,11 @@ func TestDefaultListStyles(t *testing.T) {
 	_ = styles.Selected.Render("test")
 	_ = styles.Error.Render("test")
 	_ = styles.Muted.Render("test")
+}
+
+func newTestListModel() ListModel {
+	ctx := context.Background()
+	svc := &shelly.Service{}
+	deps := ListDeps{Ctx: ctx, Svc: svc}
+	return NewList(deps)
 }

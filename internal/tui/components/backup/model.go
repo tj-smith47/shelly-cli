@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
@@ -109,8 +110,7 @@ type Model struct {
 	mode        Mode
 	devices     []DeviceBackup
 	backupFiles []File
-	cursor      int
-	scroll      int
+	scroller    *panel.Scroller
 	exporting   bool
 	importing   bool
 	backupDir   string
@@ -188,6 +188,7 @@ func New(deps Deps) Model {
 		ctx:       deps.Ctx,
 		svc:       deps.Svc,
 		mode:      ModeExport,
+		scroller:  panel.NewScroller(0, 10),
 		backupDir: backupDir,
 		styles:    DefaultStyles(),
 	}
@@ -211,6 +212,11 @@ func (m Model) LoadDevices() Model {
 			Name:    name,
 			Address: dev.Address,
 		})
+	}
+
+	// Update scroller if in export mode
+	if m.mode == ModeExport {
+		m.scroller.SetItemCount(len(m.devices))
 	}
 
 	return m
@@ -264,6 +270,11 @@ func (m Model) LoadBackupFiles() Model {
 		})
 	}
 
+	// Update scroller if in import mode
+	if m.mode == ModeImport {
+		m.scroller.SetItemCount(len(m.backupFiles))
+	}
+
 	return m
 }
 
@@ -271,6 +282,12 @@ func (m Model) LoadBackupFiles() Model {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	// Calculate visible rows: height - mode selector - header - borders
+	visibleRows := height - 10
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -401,12 +418,13 @@ func (m Model) ImportSelected() (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.cursor >= len(m.backupFiles) {
+	cursor := m.scroller.Cursor()
+	if cursor >= len(m.backupFiles) {
 		m.err = fmt.Errorf("no backup file selected")
 		return m, nil
 	}
 
-	backupFile := m.backupFiles[m.cursor]
+	backupFile := m.backupFiles[cursor]
 	m.importing = true
 	m.err = nil
 
@@ -520,9 +538,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
+	case "g":
+		m.scroller.CursorToStart()
+	case "G":
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "space":
 		m = m.toggleSelection()
 	case "a":
@@ -531,13 +557,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m = m.selectNone()
 	case "1":
 		m.mode = ModeExport
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.SetItemCount(len(m.devices))
+		m.scroller.CursorToStart()
 	case "2":
 		m.mode = ModeImport
-		m.cursor = 0
-		m.scroll = 0
 		m = m.LoadBackupFiles()
+		m.scroller.CursorToStart()
 	case "enter", "x":
 		if m.mode == ModeExport {
 			return m.ExportSelected()
@@ -552,51 +577,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) cursorDown() Model {
-	maxItems := m.currentListLen()
-	if m.cursor < maxItems-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) currentListLen() int {
-	if m.mode == ModeExport {
-		return len(m.devices)
-	}
-	return len(m.backupFiles)
-}
-
-func (m Model) ensureVisible() Model {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m Model) visibleRows() int {
-	rows := m.height - 10
-	if rows < 1 {
-		return 1
-	}
-	return rows
-}
-
 func (m Model) toggleSelection() Model {
-	if m.mode == ModeExport && len(m.devices) > 0 && m.cursor < len(m.devices) {
-		m.devices[m.cursor].Selected = !m.devices[m.cursor].Selected
+	cursor := m.scroller.Cursor()
+	if m.mode == ModeExport && len(m.devices) > 0 && cursor < len(m.devices) {
+		m.devices[cursor].Selected = !m.devices[cursor].Selected
 	}
 	return m
 }
@@ -721,15 +705,14 @@ func (m Model) renderExportView() string {
 	))
 	content.WriteString("\n\n")
 
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
+	startIdx, endIdx := m.scroller.VisibleRange()
 	if endIdx > len(m.devices) {
 		endIdx = len(m.devices)
 	}
 
-	for i := m.scroll; i < endIdx; i++ {
+	for i := startIdx; i < endIdx; i++ {
 		device := m.devices[i]
-		isCursor := i == m.cursor
+		isCursor := m.scroller.IsCursorAt(i)
 		content.WriteString(m.renderExportDeviceLine(device, isCursor))
 		if i < endIdx-1 {
 			content.WriteString("\n")
@@ -737,11 +720,9 @@ func (m Model) renderExportView() string {
 	}
 
 	// Scroll indicator
-	if len(m.devices) > visible {
+	if m.scroller.HasMore() || m.scroller.HasPrevious() {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("[%d/%d]", m.cursor+1, len(m.devices)),
-		))
+		content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 	}
 
 	return content.String()
@@ -799,15 +780,14 @@ func (m Model) renderImportView() string {
 	))
 	content.WriteString("\n\n")
 
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
+	startIdx, endIdx := m.scroller.VisibleRange()
 	if endIdx > len(m.backupFiles) {
 		endIdx = len(m.backupFiles)
 	}
 
-	for i := m.scroll; i < endIdx; i++ {
+	for i := startIdx; i < endIdx; i++ {
 		backupFile := m.backupFiles[i]
-		isCursor := i == m.cursor
+		isCursor := m.scroller.IsCursorAt(i)
 		content.WriteString(m.renderBackupFileLine(backupFile, isCursor))
 		if i < endIdx-1 {
 			content.WriteString("\n")
@@ -815,11 +795,9 @@ func (m Model) renderImportView() string {
 	}
 
 	// Scroll indicator
-	if len(m.backupFiles) > visible {
+	if m.scroller.HasMore() || m.scroller.HasPrevious() {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("[%d/%d]", m.cursor+1, len(m.backupFiles)),
-		))
+		content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 	}
 
 	return content.String()
@@ -887,7 +865,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.cursor
+	return m.scroller.Cursor()
 }
 
 // SelectedCount returns the number of selected devices.
@@ -912,4 +890,12 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	m = m.LoadDevices()
 	m = m.LoadBackupFiles()
 	return m, nil
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	if m.mode == ModeExport {
+		return "j/k:scroll g/G:top/bottom enter:backup"
+	}
+	return "j/k:scroll g/G:top/bottom enter:restore"
 }

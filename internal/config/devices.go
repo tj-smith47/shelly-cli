@@ -85,6 +85,12 @@ func RegisterDeviceWithPlatform(name, address string, generation int, deviceType
 	return getDefaultManager().RegisterDeviceWithPlatform(name, address, generation, deviceType, deviceModel, platform, auth)
 }
 
+// UpdateDeviceInfo updates device info fields without requiring full re-registration.
+// Only non-empty/non-zero values are applied; empty values preserve existing data.
+func UpdateDeviceInfo(name string, updates DeviceUpdates) error {
+	return getDefaultManager().UpdateDeviceInfo(name, updates)
+}
+
 // UnregisterDevice removes a device from the registry.
 func UnregisterDevice(name string) error {
 	return getDefaultManager().UnregisterDevice(name)

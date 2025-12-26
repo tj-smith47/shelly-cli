@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 // DeviceSelectedMsg is sent when a device is selected.
@@ -27,17 +28,16 @@ type OpenBrowserMsg struct {
 
 // Model holds the device list state.
 type Model struct {
-	cache        *cache.Cache // Shared device cache
-	filter       string       // Current filter string
-	cursor       int          // Currently selected index in filtered list
-	scrollOffset int          // Scroll offset for list
-	focused      bool         // Whether this component has focus
-	listOnly     bool         // When true, only render list panel (detail rendered separately)
-	gPressed     bool         // Tracks if 'g' was just pressed (for vim-style gx, gg commands)
-	panelIndex   int
-	width        int
-	height       int
-	styles       Styles
+	cache      *cache.Cache    // Shared device cache
+	filter     string          // Current filter string
+	scroller   *panel.Scroller // Shared scroll/cursor management
+	focused    bool            // Whether this component has focus
+	listOnly   bool            // When true, only render list panel (detail rendered separately)
+	gPressed   bool            // Tracks if 'g' was just pressed (for vim-style gx, gg commands)
+	panelIndex int
+	width      int
+	height     int
+	styles     Styles
 }
 
 // Styles for the device list component.
@@ -128,8 +128,9 @@ func DefaultStyles() Styles {
 // New creates a new device list model using the shared cache.
 func New(c *cache.Cache) Model {
 	return Model{
-		cache:  c,
-		styles: DefaultStyles(),
+		cache:    c,
+		scroller: panel.NewScroller(0, 10),
+		styles:   DefaultStyles(),
 	}
 }
 
@@ -142,11 +143,15 @@ func (m Model) Init() tea.Cmd {
 // Update handles messages for the device list.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
-		oldCursor := m.cursor
+		// Sync item count from cache before handling key
+		devices := m.getFilteredDevices()
+		m.scroller.SetItemCount(len(devices))
+
+		oldCursor := m.scroller.Cursor()
 		var cmd tea.Cmd
 		m, cmd = m.handleKeyPress(keyMsg)
 		// Emit selection change if cursor moved (unless a command is already being returned)
-		if m.cursor != oldCursor && cmd == nil {
+		if m.scroller.Cursor() != oldCursor && cmd == nil {
 			return m, m.emitSelection()
 		}
 		return m, cmd
@@ -155,7 +160,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	devices := m.getFilteredDevices()
 	key := msg.String()
 
 	// Handle g-prefix commands (gx for browser, gg for top)
@@ -172,8 +176,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m, nil
 		case "g":
 			// gg: go to top
-			m.cursor = 0
-			m.scrollOffset = 0
+			m.scroller.CursorToStart()
 			return m, nil
 		}
 		// Other keys after g: just process normally
@@ -181,92 +184,32 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 	switch key {
 	case "j", "down":
-		m = m.cursorDown(devices)
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 	case "g":
 		// Start g-prefix mode (for gg, gx commands)
 		m.gPressed = true
 		return m, nil
 	case "G":
-		m = m.cursorToEnd(devices)
+		m.scroller.CursorToEnd()
 	case "pgdown", "ctrl+d":
-		m = m.pageDown(devices)
+		m.scroller.PageDown()
 	case "pgup", "ctrl+u":
-		m = m.pageUp()
+		m.scroller.PageUp()
 	}
 	return m, nil
 }
 
-func (m Model) cursorDown(devices []*cache.DeviceData) Model {
-	if m.cursor >= len(devices)-1 {
-		return m
-	}
-	m.cursor++
-	visible := m.visibleRows()
-	if m.cursor >= m.scrollOffset+visible {
-		m.scrollOffset = m.cursor - visible + 1
-	}
-	m.scrollOffset = m.capScrollOffset(len(devices), visible)
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		if m.cursor < m.scrollOffset {
-			m.scrollOffset = m.cursor
-		}
-	}
-	return m
-}
-
-func (m Model) cursorToEnd(devices []*cache.DeviceData) Model {
-	if len(devices) > 0 {
-		m.cursor = len(devices) - 1
-		maxOffset := len(devices) - m.visibleRows()
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		m.scrollOffset = maxOffset
-	}
-	return m
-}
-
-func (m Model) pageDown(devices []*cache.DeviceData) Model {
-	if len(devices) == 0 {
-		return m
-	}
-	visible := m.visibleRows()
-	m.cursor += visible
-	if m.cursor >= len(devices) {
-		m.cursor = len(devices) - 1
-	}
-	if m.cursor >= m.scrollOffset+visible {
-		m.scrollOffset = m.cursor - visible + 1
-	}
-	m.scrollOffset = m.capScrollOffset(len(devices), visible)
-	return m
-}
-
-func (m Model) pageUp() Model {
-	m.cursor -= m.visibleRows()
-	if m.cursor < 0 {
-		m.cursor = 0
-	}
-	if m.cursor < m.scrollOffset {
-		m.scrollOffset = m.cursor
-	}
-	return m
-}
 
 // emitSelection returns a command that emits a DeviceSelectedMsg for the current selection.
 func (m Model) emitSelection() tea.Cmd {
 	devices := m.getFilteredDevices()
-	if m.cursor < 0 || m.cursor >= len(devices) {
+	cursor := m.scroller.Cursor()
+	if cursor < 0 || cursor >= len(devices) {
 		return nil
 	}
-	d := devices[m.cursor]
+	d := devices[cursor]
 	return func() tea.Msg {
 		return DeviceSelectedMsg{
 			Name:    d.Device.Name,
@@ -302,14 +245,9 @@ func (m Model) getFilteredDevices() []*cache.DeviceData {
 // SetFilter sets the filter string.
 func (m Model) SetFilter(filter string) Model {
 	m.filter = filter
-	// Reset cursor if it's now out of bounds
+	// Update item count for new filter
 	devices := m.getFilteredDevices()
-	if m.cursor >= len(devices) {
-		m.cursor = len(devices) - 1
-		if m.cursor < 0 {
-			m.cursor = 0
-		}
-	}
+	m.scroller.SetItemCount(len(devices))
 	return m
 }
 
@@ -328,6 +266,8 @@ func (m Model) SetPanelIndex(index int) Model {
 // SetListOnly sets whether to render only the list panel (detail rendered separately).
 func (m Model) SetListOnly(listOnly bool) Model {
 	m.listOnly = listOnly
+	// Update visible rows as overhead differs between modes
+	m.scroller.SetVisibleRows(m.visibleRows())
 	return m
 }
 
@@ -374,6 +314,7 @@ func (m Model) detailPanelWidth() int {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.scroller.SetVisibleRows(m.visibleRows())
 	return m
 }
 
@@ -432,39 +373,22 @@ func (m Model) View() string {
 func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 	colors := theme.GetSemanticColors()
 
-	// Rows - calculate visible window maintaining consistent item count
-	visible := m.visibleRows()
-	startIdx := m.scrollOffset
-	endIdx := startIdx + visible
+	// Update scroller with current device count
+	m.scroller.SetItemCount(len(devices))
 
-	// Cap endIdx to list bounds
-	if endIdx > len(devices) {
-		endIdx = len(devices)
-	}
-
-	// Adjust startIdx to show as many items as possible (prevent shrinking list)
-	if endIdx-startIdx < visible && len(devices) >= visible {
-		startIdx = endIdx - visible
-		if startIdx < 0 {
-			startIdx = 0
-		}
-	}
+	// Get visible range from scroller
+	startIdx, endIdx := m.scroller.VisibleRange()
 
 	var rows strings.Builder
 	for i := startIdx; i < endIdx; i++ {
 		d := devices[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 		row := m.renderListRow(d, isSelected, width-2) // -2 for padding
 		rows.WriteString(row + "\n")
 	}
 
 	// Scroll indicator
-	scrollInfo := ""
-	if len(devices) > visible {
-		scrollInfo = m.styles.Separator.Render(
-			fmt.Sprintf(" [%d/%d]", m.cursor+1, len(devices)),
-		)
-	}
+	scrollInfo := m.styles.Separator.Render(m.scroller.ScrollInfo())
 
 	content := rows.String() + scrollInfo
 
@@ -534,7 +458,8 @@ func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string 
 	panelStyle := m.styles.DetailPanel.BorderForeground(borderColor)
 
 	// Get selected device
-	if len(devices) == 0 || m.cursor < 0 || m.cursor >= len(devices) {
+	cursor := m.scroller.Cursor()
+	if len(devices) == 0 || cursor < 0 || cursor >= len(devices) {
 		return panelStyle.
 			Width(width).
 			Height(m.height).
@@ -542,7 +467,7 @@ func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string 
 			Render("No device selected")
 	}
 
-	d := devices[m.cursor]
+	d := devices[cursor]
 
 	var content strings.Builder
 
@@ -648,49 +573,27 @@ func (m Model) renderDetailRow(label, value string) string {
 // SelectedDevice returns the currently selected device, if any.
 func (m Model) SelectedDevice() *cache.DeviceData {
 	devices := m.getFilteredDevices()
-	if m.cursor < 0 || m.cursor >= len(devices) {
+	cursor := m.scroller.Cursor()
+	if cursor < 0 || cursor >= len(devices) {
 		return nil
 	}
-	return devices[m.cursor]
+	return devices[cursor]
 }
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.cursor
+	return m.scroller.Cursor()
 }
 
 // SetCursor sets the cursor position.
 func (m Model) SetCursor(cursor int) Model {
 	devices := m.getFilteredDevices()
+	m.scroller.SetItemCount(len(devices))
 	if cursor < 0 || cursor >= len(devices) {
 		return m
 	}
-
-	m.cursor = cursor
-	visible := m.visibleRows()
-
-	// Adjust scroll offset if needed
-	if m.cursor < m.scrollOffset {
-		m.scrollOffset = m.cursor
-	} else if m.cursor >= m.scrollOffset+visible {
-		m.scrollOffset = m.cursor - visible + 1
-	}
-
-	// Cap scrollOffset to prevent list from shrinking
-	m.scrollOffset = m.capScrollOffset(len(devices), visible)
+	m.scroller.SetCursor(cursor)
 	return m
-}
-
-// capScrollOffset ensures scrollOffset doesn't exceed the maximum valid value.
-func (m Model) capScrollOffset(deviceCount, visible int) int {
-	maxOffset := deviceCount - visible
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if m.scrollOffset > maxOffset {
-		return maxOffset
-	}
-	return m.scrollOffset
 }
 
 // DeviceCount returns the number of filtered devices.
@@ -758,4 +661,9 @@ func (m Model) MaxDeviceNameLen() int {
 		}
 	}
 	return maxLen
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom /:filter"
 }

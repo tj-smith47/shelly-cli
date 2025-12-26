@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 // Deps holds the dependencies for the monitor component.
@@ -91,8 +92,7 @@ type Model struct {
 	height          int
 	styles          Styles
 	refreshInterval time.Duration
-	scrollOffset    int
-	cursor          int // Currently selected row
+	scroller        *panel.Scroller
 }
 
 // Styles for the monitor component.
@@ -112,6 +112,7 @@ type Styles struct {
 	Label        lipgloss.Style
 	Value        lipgloss.Style
 	LastUpdated  lipgloss.Style
+	Timestamp    lipgloss.Style // Yellow timestamp for device updates
 	Separator    lipgloss.Style
 	SummaryCard  lipgloss.Style
 	SummaryValue lipgloss.Style
@@ -163,6 +164,8 @@ func DefaultStyles() Styles {
 		LastUpdated: lipgloss.NewStyle().
 			Foreground(colors.Muted).
 			Italic(true),
+		Timestamp: lipgloss.NewStyle().
+			Foreground(colors.Warning),
 		Separator: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		SummaryCard: lipgloss.NewStyle().
@@ -223,6 +226,7 @@ func New(deps Deps) Model {
 		eventChan:       eventChan,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
+		scroller:        panel.NewScroller(0, 10),
 	}
 }
 
@@ -417,6 +421,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.statuses = msg.Statuses
+		m.scroller.SetItemCount(len(m.statuses))
 		// Build status map for O(1) updates
 		m.statusMap = make(map[string]*DeviceStatus, len(m.statuses))
 		for i := range m.statuses {
@@ -531,114 +536,37 @@ func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 	case "g":
-		m.cursor = 0
-		m.scrollOffset = 0
+		m.scroller.CursorToStart()
 	case "G":
-		m = m.cursorToEnd()
+		m.scroller.CursorToEnd()
 	case "pgdown", "ctrl+d":
-		m = m.pageDown()
+		m.scroller.PageDown()
 	case "pgup", "ctrl+u":
-		m = m.pageUp()
+		m.scroller.PageUp()
 	}
 	return m
 }
 
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.statuses)-1 {
-		m.cursor++
-		visibleRows := m.visibleRows()
-		if m.cursor >= m.scrollOffset+visibleRows {
-			m.scrollOffset = m.cursor - visibleRows + 1
-		}
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		if m.cursor < m.scrollOffset {
-			m.scrollOffset = m.cursor
-		}
-	}
-	return m
-}
-
-func (m Model) cursorToEnd() Model {
-	if len(m.statuses) > 0 {
-		m.cursor = len(m.statuses) - 1
-		maxOffset := len(m.statuses) - m.visibleRows()
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		m.scrollOffset = maxOffset
-	}
-	return m
-}
-
-func (m Model) pageDown() Model {
-	if len(m.statuses) == 0 {
-		return m
-	}
-	visibleRows := m.visibleRows()
-	m.cursor += visibleRows
-	if m.cursor >= len(m.statuses) {
-		m.cursor = len(m.statuses) - 1
-	}
-	if m.cursor >= m.scrollOffset+visibleRows {
-		m.scrollOffset = m.cursor - visibleRows + 1
-	}
-	maxOffset := len(m.statuses) - visibleRows
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if m.scrollOffset > maxOffset {
-		m.scrollOffset = maxOffset
-	}
-	return m
-}
-
-func (m Model) pageUp() Model {
-	if len(m.statuses) == 0 {
-		return m
-	}
-	visibleRows := m.visibleRows()
-	m.cursor -= visibleRows
-	if m.cursor < 0 {
-		m.cursor = 0
-	}
-	if m.cursor < m.scrollOffset {
-		m.scrollOffset = m.cursor
-	}
-	return m
-}
 
 // SetSize sets the component size.
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	// Account for: header (2), summary (4), empty line (1), footer (2), container padding (2) = 11 lines overhead
+	// Each card: 2 lines content + 1 margin + 1 separator = 4 lines
+	availableHeight := height - 11
+	visibleRows := (availableHeight + 1) / 4
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
-// visibleRows calculates how many device rows can be displayed.
-// Each device card takes 3 lines (2 content + margin) + 1 separator = 4 lines total.
-func (m Model) visibleRows() int {
-	// Account for: header (2), summary (4), empty line (1), footer (2), container padding (2) = 11 lines overhead
-	availableHeight := m.height - 11
-	// Each card: 2 lines content + 1 margin + 1 separator = 4 lines
-	// Last card has no separator, so for N cards: 4N - 1 lines
-	// Solving for N: N = (availableHeight + 1) / 4
-	rowHeight := 4
-	visibleRows := (availableHeight + 1) / rowHeight
-	if visibleRows < 1 {
-		return 1
-	}
-	return visibleRows
-}
 
 // View renders the monitor.
 func (m Model) View() string {
@@ -685,12 +613,8 @@ func (m Model) View() string {
 		m.renderSummaryCard("Devices", fmt.Sprintf("%d/%d online", onlineCount, len(m.statuses))),
 	)
 
-	// Calculate visible rows
-	visibleRows := m.visibleRows()
-
-	// Apply scroll offset
-	startIdx := m.scrollOffset
-	endIdx := startIdx + visibleRows
+	// Get visible range from scroller
+	startIdx, endIdx := m.scroller.VisibleRange()
 	if endIdx > len(m.statuses) {
 		endIdx = len(m.statuses)
 	}
@@ -701,7 +625,7 @@ func (m Model) View() string {
 	var rows string
 	for i := startIdx; i < endIdx; i++ {
 		s := m.statuses[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 		rows += m.renderDeviceCard(s, isSelected)
 		if i < endIdx-1 {
 			separator := m.styles.Separator.Render(strings.Repeat("─", contentWidth))
@@ -711,10 +635,8 @@ func (m Model) View() string {
 
 	// Scroll indicator
 	scrollInfo := ""
-	if len(m.statuses) > visibleRows {
-		scrollInfo = m.styles.LastUpdated.Render(
-			fmt.Sprintf(" [%d-%d of %d] ", startIdx+1, endIdx, len(m.statuses)),
-		)
+	if info := m.scroller.ScrollInfo(); info != "" {
+		scrollInfo = m.styles.LastUpdated.Render(" " + info + " ")
 	}
 
 	footer := m.styles.LastUpdated.Render(
@@ -772,13 +694,17 @@ func (m Model) renderDeviceCard(s DeviceStatus, isSelected bool) string {
 		statusIcon = m.styles.OnlineIcon.Render("●")
 	}
 
-	// First line: selection indicator, icon, name, address, type
-	line1 := fmt.Sprintf("%s%s %s  %s  %s",
+	// Yellow timestamp showing last update time
+	timestamp := m.styles.Timestamp.Render(s.UpdatedAt.Format("15:04:05"))
+
+	// First line: selection indicator, icon, name, address, type, timestamp
+	line1 := fmt.Sprintf("%s%s %s  %s  %s  %s",
 		selIndicator,
 		statusIcon,
 		m.styles.DeviceName.Render(s.Name),
 		m.styles.Address.Render(s.Address),
 		m.styles.Address.Render(s.Type),
+		timestamp,
 	)
 
 	if !s.Online {
@@ -853,18 +779,16 @@ func (m Model) StatusCount() (online, offline int) {
 
 // SelectedDevice returns the currently selected device, if any.
 func (m Model) SelectedDevice() *DeviceStatus {
-	if len(m.statuses) == 0 {
+	cursor := m.scroller.Cursor()
+	if len(m.statuses) == 0 || cursor < 0 || cursor >= len(m.statuses) {
 		return nil
 	}
-	if m.cursor < 0 || m.cursor >= len(m.statuses) {
-		return nil
-	}
-	return &m.statuses[m.cursor]
+	return &m.statuses[cursor]
 }
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.cursor
+	return m.scroller.Cursor()
 }
 
 // IsRefreshing returns true if the monitor is currently refreshing.
@@ -875,4 +799,9 @@ func (m Model) IsRefreshing() bool {
 // IsLoading returns true if the initial load is in progress.
 func (m Model) IsLoading() bool {
 	return m.initialLoad
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom r:refresh"
 }

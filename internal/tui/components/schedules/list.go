@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -69,8 +70,7 @@ type ListModel struct {
 	svc        *shelly.Service
 	device     string
 	schedules  []Schedule
-	cursor     int
-	scroll     int
+	scroller   *panel.Scroller
 	loading    bool
 	err        error
 	width      int
@@ -121,10 +121,11 @@ func NewList(deps ListDeps) ListModel {
 	}
 
 	return ListModel{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultListStyles(),
+		ctx:      deps.Ctx,
+		svc:      deps.Svc,
+		scroller: panel.NewScroller(0, 10),
+		loading:  false,
+		styles:   DefaultListStyles(),
 	}
 }
 
@@ -137,8 +138,8 @@ func (m ListModel) Init() tea.Cmd {
 func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 	m.device = device
 	m.schedules = nil
-	m.cursor = 0
-	m.scroll = 0
+	m.scroller.SetItemCount(0)
+	m.scroller.CursorToStart()
 	m.err = nil
 
 	if device == "" {
@@ -178,6 +179,11 @@ func (m ListModel) fetchSchedules() tea.Cmd {
 func (m ListModel) SetSize(width, height int) ListModel {
 	m.width = width
 	m.height = height
+	visibleRows := height - 4
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -203,8 +209,8 @@ func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
 			return m, nil
 		}
 		m.schedules = msg.Schedules
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.SetItemCount(len(m.schedules))
+		m.scroller.CursorToStart()
 		return m, nil
 
 	case ActionMsg:
@@ -228,14 +234,17 @@ func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 	case "g":
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.CursorToStart()
 	case "G":
-		m = m.cursorToEnd()
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "enter", "e":
 		// Edit schedule (open in editor)
 		return m, m.selectSchedule()
@@ -257,63 +266,23 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m ListModel) cursorDown() ListModel {
-	if m.cursor < len(m.schedules)-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m ListModel) cursorUp() ListModel {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m ListModel) cursorToEnd() ListModel {
-	if len(m.schedules) > 0 {
-		m.cursor = len(m.schedules) - 1
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m ListModel) ensureVisible() ListModel {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m ListModel) visibleRows() int {
-	rows := m.height - 4
-	if rows < 1 {
-		return 1
-	}
-	return rows
-}
-
 func (m ListModel) selectSchedule() tea.Cmd {
-	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
+	cursor := m.scroller.Cursor()
+	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
-	schedule := m.schedules[m.cursor]
+	schedule := m.schedules[cursor]
 	return func() tea.Msg {
 		return SelectScheduleMsg{Schedule: schedule}
 	}
 }
 
 func (m ListModel) deleteSchedule() tea.Cmd {
-	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
+	cursor := m.scroller.Cursor()
+	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
-	schedule := m.schedules[m.cursor]
+	schedule := m.schedules[cursor]
 
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
@@ -325,10 +294,11 @@ func (m ListModel) deleteSchedule() tea.Cmd {
 }
 
 func (m ListModel) toggleSchedule() tea.Cmd {
-	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
+	cursor := m.scroller.Cursor()
+	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
-	schedule := m.schedules[m.cursor]
+	schedule := m.schedules[cursor]
 
 	// Toggle based on current state
 	if schedule.Enable {
@@ -398,28 +368,22 @@ func (m ListModel) View() string {
 	}
 
 	var content strings.Builder
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
-	if endIdx > len(m.schedules) {
-		endIdx = len(m.schedules)
-	}
 
-	for i := m.scroll; i < endIdx; i++ {
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end; i++ {
 		schedule := m.schedules[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 
 		line := m.renderScheduleLine(schedule, isSelected)
 		content.WriteString(line)
-		if i < endIdx-1 {
+		if i < end-1 {
 			content.WriteString("\n")
 		}
 	}
 
-	if len(m.schedules) > visible {
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(m.schedules)),
-		))
-	}
+	// Scroll indicator
+	content.WriteString("\n")
+	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 
 	r.SetContent(content.String())
 	return r.Render()
@@ -467,10 +431,16 @@ func (m ListModel) renderScheduleLine(schedule Schedule, isSelected bool) string
 
 // SelectedSchedule returns the currently selected schedule, if any.
 func (m ListModel) SelectedSchedule() *Schedule {
-	if len(m.schedules) == 0 || m.cursor >= len(m.schedules) {
+	cursor := m.scroller.Cursor()
+	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
-	return &m.schedules[m.cursor]
+	return &m.schedules[cursor]
+}
+
+// Cursor returns the current cursor position.
+func (m ListModel) Cursor() int {
+	return m.scroller.Cursor()
 }
 
 // ScheduleCount returns the number of schedules.
@@ -500,4 +470,9 @@ func (m ListModel) Refresh() (ListModel, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.fetchSchedules()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m ListModel) FooterText() string {
+	return "j/k:scroll g/G:top/bottom space:toggle enter:edit"
 }

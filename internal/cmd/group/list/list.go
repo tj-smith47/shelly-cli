@@ -9,26 +9,19 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
-
-// GroupInfo represents a group for JSON/YAML output.
-type GroupInfo struct {
-	Name        string   `json:"name" yaml:"name"`
-	DeviceCount int      `json:"device_count" yaml:"device_count"`
-	Devices     []string `json:"devices" yaml:"devices"`
-}
 
 // NewCommand creates the group list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return factories.NewConfigListCommand(f, factories.ConfigListOpts[GroupInfo]{
+	return factories.NewConfigListCommand(f, factories.ConfigListOpts[model.GroupInfo]{
 		Resource: "group",
-		FetchFunc: func() []GroupInfo {
+		FetchFunc: func() []model.GroupInfo {
 			groups := config.ListGroups()
-			result := make([]GroupInfo, 0, len(groups))
+			result := make([]model.GroupInfo, 0, len(groups))
 			for name, group := range groups {
-				result = append(result, GroupInfo{
+				result = append(result, model.GroupInfo{
 					Name:        name,
 					DeviceCount: len(group.Devices),
 					Devices:     group.Devices,
@@ -39,21 +32,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 			})
 			return result
 		},
-		DisplayFunc: displayGroups,
+		DisplayFunc: term.DisplayGroups,
 		EmptyMsg:    "No groups defined",
 		HintMsg:     "Use 'shelly group create <name>' to create a group",
 	})
-}
-
-func displayGroups(ios *iostreams.IOStreams, groups []GroupInfo) {
-	table := output.NewTable("Name", "Devices")
-	for _, g := range groups {
-		table.AddRow(g.Name, output.FormatDeviceCount(g.DeviceCount))
-	}
-
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-	ios.Println()
-	ios.Count("group", len(groups))
 }

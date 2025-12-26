@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -53,8 +54,7 @@ type Model struct {
 	status     *shelly.WifiStatus
 	config     *shelly.WifiConfig
 	networks   []shelly.WifiNetwork
-	cursor     int
-	scroll     int
+	scroller   *panel.Scroller
 	loading    bool
 	scanning   bool
 	err        error
@@ -116,10 +116,11 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultStyles(),
+		ctx:      deps.Ctx,
+		svc:      deps.Svc,
+		scroller: panel.NewScroller(0, 10),
+		loading:  false,
+		styles:   DefaultStyles(),
 	}
 }
 
@@ -134,8 +135,8 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.status = nil
 	m.config = nil
 	m.networks = nil
-	m.cursor = 0
-	m.scroll = 0
+	m.scroller.SetItemCount(0)
+	m.scroller.CursorToStart()
 	m.err = nil
 
 	if device == "" {
@@ -179,6 +180,11 @@ func (m Model) scanNetworks() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	visibleRows := height - 12 // Reserve space for status section
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -214,6 +220,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.networks = msg.Networks
+		m.scroller.SetItemCount(len(m.networks))
+		m.scroller.CursorToStart()
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -229,9 +237,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
+	case "g":
+		m.scroller.CursorToStart()
+	case "G":
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "s":
 		if !m.scanning && m.device != "" {
 			m.scanning = true
@@ -246,40 +262,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
-}
-
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.networks)-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) ensureVisible() Model {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m Model) visibleRows() int {
-	rows := m.height - 12 // Reserve space for status section
-	if rows < 1 {
-		return 1
-	}
-	return rows
 }
 
 // View renders the WiFi component.
@@ -443,28 +425,21 @@ func (m Model) renderNetworks() string {
 
 	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Available Networks (%d):\n", len(m.networks))))
 
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
-	if endIdx > len(m.networks) {
-		endIdx = len(m.networks)
-	}
-
-	for i := m.scroll; i < endIdx; i++ {
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end; i++ {
 		network := m.networks[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 
 		line := m.renderNetworkLine(network, isSelected)
 		content.WriteString(line)
-		if i < endIdx-1 {
+		if i < end-1 {
 			content.WriteString("\n")
 		}
 	}
 
-	if len(m.networks) > visible {
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(m.networks)),
-		))
-	}
+	// Scroll indicator
+	content.WriteString("\n")
+	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 
 	return content.String()
 }
@@ -537,6 +512,11 @@ func (m Model) Error() error {
 	return m.err
 }
 
+// Cursor returns the current cursor position.
+func (m Model) Cursor() int {
+	return m.scroller.Cursor()
+}
+
 // Refresh triggers a refresh of the WiFi status.
 func (m Model) Refresh() (Model, tea.Cmd) {
 	if m.device == "" {
@@ -544,4 +524,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.fetchStatus()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom s:scan"
 }

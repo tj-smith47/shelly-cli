@@ -94,16 +94,15 @@ func TestGroupsModel_SetFocused(t *testing.T) {
 	}
 }
 
-func TestGroupsModel_Navigation(t *testing.T) {
+func TestGroupsModel_ScrollerNavigation(t *testing.T) {
 	t.Parallel()
 	m := newTestGroups()
 	m.focused = true
-	m.cursor = 0
 
 	// Test down navigation (no groups, should stay at 0)
 	m, _ = m.handleKey(tea.KeyPressMsg{Code: 'j'})
-	if m.cursor != 0 {
-		t.Errorf("cursor = %d, want 0", m.cursor)
+	if m.Cursor() != 0 {
+		t.Errorf("cursor = %d, want 0", m.Cursor())
 	}
 }
 

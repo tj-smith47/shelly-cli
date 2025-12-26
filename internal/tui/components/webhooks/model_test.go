@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
 func TestWebhook(t *testing.T) {
@@ -66,7 +68,7 @@ func TestDeps_Validate(t *testing.T) {
 
 func TestModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := Model{}
+	m := Model{scroller: panel.NewScroller(0, 1)}
 	m = m.SetSize(100, 50)
 
 	if m.width != 100 {
@@ -74,6 +76,10 @@ func TestModel_SetSize(t *testing.T) {
 	}
 	if m.height != 50 {
 		t.Errorf("height = %d, want 50", m.height)
+	}
+	// Visible rows should be height - 4 (borders + title + footer)
+	if m.scroller.VisibleRows() != 46 {
+		t.Errorf("scroller.VisibleRows() = %d, want 46", m.scroller.VisibleRows())
 	}
 }
 
@@ -92,7 +98,7 @@ func TestModel_SetFocused(t *testing.T) {
 	}
 }
 
-func TestModel_VisibleRows(t *testing.T) {
+func TestModel_SetSize_VisibleRows(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
@@ -108,10 +114,11 @@ func TestModel_VisibleRows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := Model{height: tt.height}
-			got := m.visibleRows()
+			m := Model{scroller: panel.NewScroller(0, 1)}
+			m = m.SetSize(80, tt.height)
+			got := m.scroller.VisibleRows()
 			if got != tt.want {
-				t.Errorf("visibleRows() = %d, want %d", got, tt.want)
+				t.Errorf("scroller.VisibleRows() = %d, want %d", got, tt.want)
 			}
 		})
 	}
@@ -127,73 +134,69 @@ func TestModel_CursorNavigation(t *testing.T) {
 
 	m := Model{
 		webhooks: webhooks,
-		cursor:   0,
+		scroller: panel.NewScroller(3, 10),
 		height:   20,
 	}
 
 	// Cursor down
-	m = m.cursorDown()
-	if m.cursor != 1 {
-		t.Errorf("after cursorDown: cursor = %d, want 1", m.cursor)
+	m.scroller.CursorDown()
+	if m.scroller.Cursor() != 1 {
+		t.Errorf("after CursorDown: cursor = %d, want 1", m.scroller.Cursor())
 	}
 
-	m = m.cursorDown()
-	if m.cursor != 2 {
-		t.Errorf("after 2nd cursorDown: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorDown()
+	if m.scroller.Cursor() != 2 {
+		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.scroller.Cursor())
 	}
 
 	// Don't go past end
-	m = m.cursorDown()
-	if m.cursor != 2 {
-		t.Errorf("cursor at end: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorDown()
+	if m.scroller.Cursor() != 2 {
+		t.Errorf("cursor at end: cursor = %d, want 2", m.scroller.Cursor())
 	}
 
 	// Cursor up
-	m = m.cursorUp()
-	if m.cursor != 1 {
-		t.Errorf("after cursorUp: cursor = %d, want 1", m.cursor)
+	m.scroller.CursorUp()
+	if m.scroller.Cursor() != 1 {
+		t.Errorf("after CursorUp: cursor = %d, want 1", m.scroller.Cursor())
 	}
 
 	// Don't go before start
-	m.cursor = 0
-	m = m.cursorUp()
-	if m.cursor != 0 {
-		t.Errorf("cursor at start: cursor = %d, want 0", m.cursor)
+	m.scroller.SetCursor(0)
+	m.scroller.CursorUp()
+	if m.scroller.Cursor() != 0 {
+		t.Errorf("cursor at start: cursor = %d, want 0", m.scroller.Cursor())
 	}
 
 	// Cursor to end
-	m = m.cursorToEnd()
-	if m.cursor != 2 {
-		t.Errorf("after cursorToEnd: cursor = %d, want 2", m.cursor)
+	m.scroller.CursorToEnd()
+	if m.scroller.Cursor() != 2 {
+		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.scroller.Cursor())
 	}
 }
 
-func TestModel_EnsureVisible(t *testing.T) {
+func TestModel_ScrollerVisibility(t *testing.T) {
 	t.Parallel()
-	webhooks := make([]Webhook, 20)
-	for i := range webhooks {
-		webhooks[i] = Webhook{ID: i, Event: "event"}
+	// Scroller handles visibility automatically via SetCursor
+	// Testing with 20 items, 6 visible rows
+	s := panel.NewScroller(20, 6)
+
+	// Initially at position 0, visible range is [0,6)
+	start, end := s.VisibleRange()
+	if start != 0 || end != 6 {
+		t.Errorf("initial range = [%d,%d), want [0,6)", start, end)
 	}
 
-	m := Model{
-		webhooks: webhooks,
-		height:   10,
-		cursor:   0,
-		scroll:   0,
+	// Move cursor to 10, scroll should adjust
+	s.SetCursor(10)
+	if !s.IsVisible(10) {
+		t.Error("cursor 10 should be visible after SetCursor(10)")
 	}
 
-	// Move cursor past visible
-	m.cursor = 10
-	m = m.ensureVisible()
-	if m.scroll < 5 {
-		t.Errorf("scroll should adjust for cursor=10, got scroll=%d", m.scroll)
-	}
-
-	// Move cursor before scroll
-	m.cursor = 2
-	m = m.ensureVisible()
-	if m.scroll != 2 {
-		t.Errorf("scroll should adjust to cursor=2, got scroll=%d", m.scroll)
+	// Move cursor back to 2
+	s.SetCursor(2)
+	if !s.IsVisible(2) {
+		t.Error("cursor 2 should be visible after SetCursor(2)")
 	}
 }
 
@@ -204,9 +207,11 @@ func TestModel_SelectedWebhook(t *testing.T) {
 		{ID: 2, Event: "switch.off"},
 	}
 
+	scroller := panel.NewScroller(2, 10)
+	scroller.SetCursor(1)
 	m := Model{
 		webhooks: webhooks,
-		cursor:   1,
+		scroller: scroller,
 	}
 
 	selected := m.SelectedWebhook()
@@ -219,6 +224,7 @@ func TestModel_SelectedWebhook(t *testing.T) {
 
 	// Empty list
 	m.webhooks = nil
+	m.scroller.SetItemCount(0)
 	selected = m.SelectedWebhook()
 	if selected != nil {
 		t.Error("SelectedWebhook() on empty list should return nil")
@@ -278,10 +284,11 @@ func TestModel_Error(t *testing.T) {
 func TestModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		device: "",
-		width:  40,
-		height: 10,
-		styles: DefaultStyles(),
+		device:   "",
+		scroller: panel.NewScroller(0, 1),
+		width:    40,
+		height:   10,
+		styles:   DefaultStyles(),
 	}
 
 	view := m.View()
@@ -293,11 +300,12 @@ func TestModel_View_NoDevice(t *testing.T) {
 func TestModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		device:  "192.168.1.100",
-		loading: true,
-		width:   40,
-		height:  10,
-		styles:  DefaultStyles(),
+		device:   "192.168.1.100",
+		loading:  true,
+		scroller: panel.NewScroller(0, 1),
+		width:    40,
+		height:   10,
+		styles:   DefaultStyles(),
 	}
 
 	view := m.View()
@@ -312,6 +320,7 @@ func TestModel_View_NoWebhooks(t *testing.T) {
 		device:   "192.168.1.100",
 		loading:  false,
 		webhooks: []Webhook{},
+		scroller: panel.NewScroller(0, 1),
 		width:    40,
 		height:   10,
 		styles:   DefaultStyles(),
@@ -325,27 +334,28 @@ func TestModel_View_NoWebhooks(t *testing.T) {
 
 func TestModel_View_WithWebhooks(t *testing.T) {
 	t.Parallel()
-	m := Model{
-		device:  "192.168.1.100",
-		loading: false,
-		webhooks: []Webhook{
-			{
-				ID:     1,
-				Event:  "switch.on",
-				Enable: true,
-				URLs:   []string{"http://example.com/hook1"},
-			},
-			{
-				ID:     2,
-				Event:  "switch.off",
-				Enable: false,
-				URLs:   []string{"http://example.com/hook2"},
-			},
+	webhooks := []Webhook{
+		{
+			ID:     1,
+			Event:  "switch.on",
+			Enable: true,
+			URLs:   []string{"http://example.com/hook1"},
 		},
-		cursor: 0,
-		width:  60,
-		height: 15,
-		styles: DefaultStyles(),
+		{
+			ID:     2,
+			Event:  "switch.off",
+			Enable: false,
+			URLs:   []string{"http://example.com/hook2"},
+		},
+	}
+	m := Model{
+		device:   "192.168.1.100",
+		loading:  false,
+		webhooks: webhooks,
+		scroller: panel.NewScroller(len(webhooks), 10),
+		width:    60,
+		height:   15,
+		styles:   DefaultStyles(),
 	}
 
 	view := m.View()
@@ -435,8 +445,9 @@ func TestModel_RenderWebhookLine(t *testing.T) {
 func TestModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		loading: true,
-		styles:  DefaultStyles(),
+		loading:  true,
+		scroller: panel.NewScroller(0, 10),
+		styles:   DefaultStyles(),
 	}
 
 	webhooks := []Webhook{
@@ -452,13 +463,17 @@ func TestModel_Update_LoadedMsg(t *testing.T) {
 	if len(m.webhooks) != 2 {
 		t.Errorf("webhooks length = %d, want 2", len(m.webhooks))
 	}
+	if m.scroller.ItemCount() != 2 {
+		t.Errorf("scroller.ItemCount() = %d, want 2", m.scroller.ItemCount())
+	}
 }
 
 func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		loading: true,
-		styles:  DefaultStyles(),
+		loading:  true,
+		scroller: panel.NewScroller(0, 10),
+		styles:   DefaultStyles(),
 	}
 
 	m, _ = m.Update(LoadedMsg{Err: context.DeadlineExceeded})
@@ -476,14 +491,14 @@ func TestModel_Update_KeyPress_NotFocused(t *testing.T) {
 	m := Model{
 		focused:  false,
 		webhooks: []Webhook{{ID: 1}},
-		cursor:   0,
+		scroller: panel.NewScroller(1, 10),
 		styles:   DefaultStyles(),
 	}
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 106}) // 'j'
 
-	if m.cursor != 0 {
-		t.Errorf("cursor changed when not focused: %d", m.cursor)
+	if m.scroller.Cursor() != 0 {
+		t.Errorf("cursor changed when not focused: %d", m.scroller.Cursor())
 	}
 }
 

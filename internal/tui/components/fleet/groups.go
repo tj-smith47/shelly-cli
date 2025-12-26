@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -37,7 +38,7 @@ type GroupsModel struct {
 	ctx        context.Context
 	fleet      *integrator.FleetManager
 	groups     []*integrator.DeviceGroup
-	cursor     int
+	scroller   *panel.Scroller
 	loading    bool
 	err        error
 	width      int
@@ -90,8 +91,9 @@ func NewGroups(deps GroupsDeps) GroupsModel {
 	}
 
 	return GroupsModel{
-		ctx:    deps.Ctx,
-		styles: DefaultGroupsStyles(),
+		ctx:      deps.Ctx,
+		scroller: panel.NewScroller(0, 10),
+		styles:   DefaultGroupsStyles(),
 	}
 }
 
@@ -125,6 +127,11 @@ func (m GroupsModel) loadGroups() tea.Cmd {
 func (m GroupsModel) SetSize(width, height int) GroupsModel {
 	m.width = width
 	m.height = height
+	visibleRows := height - 5 // Account for borders, title, stats
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -151,9 +158,7 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 		}
 		m.groups = msg.Groups
 		m.err = nil
-		if m.cursor >= len(m.groups) {
-			m.cursor = max(0, len(m.groups)-1)
-		}
+		m.scroller.SetItemCount(len(m.groups))
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -169,13 +174,17 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		if m.cursor < len(m.groups)-1 {
-			m.cursor++
-		}
+		m.scroller.CursorDown()
 	case "k", "up":
-		if m.cursor > 0 {
-			m.cursor--
-		}
+		m.scroller.CursorUp()
+	case "g":
+		m.scroller.CursorToStart()
+	case "G":
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "r":
 		if !m.loading {
 			m.loading = true
@@ -225,25 +234,13 @@ func (m GroupsModel) View() string {
 	content.WriteString("\n\n")
 
 	// Group list
-	visibleHeight := m.height - 5
-	if visibleHeight < 1 {
-		visibleHeight = 5
-	}
-
-	startIdx := 0
-	if m.cursor >= visibleHeight {
-		startIdx = m.cursor - visibleHeight + 1
-	}
-	endIdx := startIdx + visibleHeight
-	if endIdx > len(m.groups) {
-		endIdx = len(m.groups)
-	}
-
-	for i := startIdx; i < endIdx; i++ {
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end; i++ {
 		group := m.groups[i]
+		isSelected := m.scroller.IsCursorAt(i)
 
 		cursor := "  "
-		if i == m.cursor && m.focused {
+		if isSelected && m.focused {
 			cursor = m.styles.Cursor.Render("> ")
 		}
 
@@ -261,7 +258,7 @@ func (m GroupsModel) View() string {
 			m.styles.Count.Render(countStr),
 		)
 
-		if i == m.cursor && m.focused {
+		if isSelected && m.focused {
 			line = m.styles.Selected.Render(line)
 		}
 
@@ -269,16 +266,25 @@ func (m GroupsModel) View() string {
 		content.WriteString("\n")
 	}
 
+	// Scroll indicator
+	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+
 	r.SetContent(content.String())
 	return r.Render()
 }
 
 // SelectedGroup returns the currently selected group.
 func (m GroupsModel) SelectedGroup() *integrator.DeviceGroup {
-	if m.cursor >= 0 && m.cursor < len(m.groups) {
-		return m.groups[m.cursor]
+	cursor := m.scroller.Cursor()
+	if cursor >= 0 && cursor < len(m.groups) {
+		return m.groups[cursor]
 	}
 	return nil
+}
+
+// Cursor returns the current cursor position.
+func (m GroupsModel) Cursor() int {
+	return m.scroller.Cursor()
 }
 
 // Groups returns all groups.
@@ -308,4 +314,9 @@ func (m GroupsModel) Refresh() (GroupsModel, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.loadGroups()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m GroupsModel) FooterText() string {
+	return "j/k:scroll g/G:top/bottom enter:details"
 }

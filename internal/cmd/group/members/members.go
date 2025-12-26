@@ -8,8 +8,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the group members command.
@@ -51,42 +51,23 @@ func run(f *cmdutil.Factory, cmd *cobra.Command, groupName string) error {
 		return nil
 	}
 
-	return outputMembers(ios, cmd, groupName, group.Devices)
-}
-
-func outputMembers(ios *iostreams.IOStreams, cmd *cobra.Command, groupName string, devices []string) error {
 	if output.WantsJSON() {
 		data := map[string]any{
 			"group":   groupName,
-			"members": devices,
-			"count":   len(devices),
+			"members": group.Devices,
+			"count":   len(group.Devices),
 		}
 		return output.JSON(cmd.OutOrStdout(), data)
 	}
 	if output.WantsYAML() {
 		data := map[string]any{
 			"group":   groupName,
-			"members": devices,
-			"count":   len(devices),
+			"members": group.Devices,
+			"count":   len(group.Devices),
 		}
 		return output.YAML(cmd.OutOrStdout(), data)
 	}
 
-	printTable(ios, groupName, devices)
+	term.DisplayGroupMembers(ios, groupName, group.Devices)
 	return nil
-}
-
-func printTable(ios *iostreams.IOStreams, groupName string, devices []string) {
-	ios.Title("Group: %s", groupName)
-	ios.Printf("\n")
-
-	t := output.NewTable("#", "Device")
-	for i, device := range devices {
-		t.AddRow(fmt.Sprintf("%d", i+1), device)
-	}
-	if err := t.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print group members table", err)
-	}
-	ios.Println()
-	ios.Count("member", len(devices))
 }

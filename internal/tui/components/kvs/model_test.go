@@ -189,7 +189,7 @@ func TestModel_Update_LoadedMsg(t *testing.T) {
 	if len(m.items) != 2 {
 		t.Errorf("items count = %d, want 2", len(m.items))
 	}
-	if m.cursor != 0 {
+	if m.Cursor() != 0 {
 		t.Error("cursor should be reset to 0")
 	}
 	if cmd != nil {
@@ -252,12 +252,13 @@ func TestModel_Update_KeyPressMsg_NotFocused(t *testing.T) {
 	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
 	m.focused = false
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}}
+	m.scroller.SetItemCount(len(m.items))
 
 	msg := tea.KeyPressMsg{Code: 106} // 'j'
 
 	m, _ = m.Update(msg)
 
-	if m.cursor != 0 {
+	if m.Cursor() != 0 {
 		t.Error("cursor should not change when not focused")
 	}
 }
@@ -267,55 +268,56 @@ func TestModel_Update_KeyPressMsg_Navigation(t *testing.T) {
 	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
 	m.focused = true
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}, {Key: "key3"}}
-	m.height = 20
+	m.scroller.SetItemCount(len(m.items))
+	m = m.SetSize(80, 20)
 
 	// Test j/down
 	msg := tea.KeyPressMsg{Code: 106} // 'j'
 	m, _ = m.Update(msg)
-	if m.cursor != 1 {
-		t.Errorf("cursor after j = %d, want 1", m.cursor)
+	if m.Cursor() != 1 {
+		t.Errorf("cursor after j = %d, want 1", m.Cursor())
 	}
 
 	// Test k/up
 	msg = tea.KeyPressMsg{Code: 107} // 'k'
 	m, _ = m.Update(msg)
-	if m.cursor != 0 {
-		t.Errorf("cursor after k = %d, want 0", m.cursor)
+	if m.Cursor() != 0 {
+		t.Errorf("cursor after k = %d, want 0", m.Cursor())
 	}
 
 	// Test G (go to end)
 	msg = tea.KeyPressMsg{Code: 71} // 'G'
 	m, _ = m.Update(msg)
-	if m.cursor != 2 {
-		t.Errorf("cursor after G = %d, want 2", m.cursor)
+	if m.Cursor() != 2 {
+		t.Errorf("cursor after G = %d, want 2", m.Cursor())
 	}
 
 	// Test g (go to start)
 	msg = tea.KeyPressMsg{Code: 103} // 'g'
 	m, _ = m.Update(msg)
-	if m.cursor != 0 {
-		t.Errorf("cursor after g = %d, want 0", m.cursor)
+	if m.Cursor() != 0 {
+		t.Errorf("cursor after g = %d, want 0", m.Cursor())
 	}
 }
 
-func TestModel_CursorBounds(t *testing.T) {
+func TestModel_ScrollerCursorBounds(t *testing.T) {
 	t.Parallel()
 	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}}
-	m.height = 20
+	m.scroller.SetItemCount(len(m.items))
+	m = m.SetSize(80, 20)
 
 	// Cursor should not go below 0
-	m.cursor = 0
-	m = m.cursorUp()
-	if m.cursor != 0 {
-		t.Errorf("cursor should stay at 0, got %d", m.cursor)
+	m.scroller.CursorUp()
+	if m.Cursor() != 0 {
+		t.Errorf("cursor should stay at 0, got %d", m.Cursor())
 	}
 
 	// Cursor should not exceed items
-	m.cursor = 1
-	m = m.cursorDown()
-	if m.cursor != 1 {
-		t.Errorf("cursor should stay at 1, got %d", m.cursor)
+	m.scroller.SetCursor(1)
+	m.scroller.CursorDown()
+	if m.Cursor() != 1 {
+		t.Errorf("cursor should stay at 1, got %d", m.Cursor())
 	}
 }
 
@@ -436,7 +438,8 @@ func TestModel_SelectedItem(t *testing.T) {
 		{Key: "key1", Value: "value1"},
 		{Key: "key2", Value: "value2"},
 	}
-	m.cursor = 1
+	m.scroller.SetItemCount(len(m.items))
+	m.scroller.SetCursor(1)
 
 	item := m.SelectedItem()
 	if item == nil {
@@ -530,45 +533,47 @@ func TestModel_Refresh(t *testing.T) {
 	}
 }
 
-func TestModel_VisibleRows(t *testing.T) {
+func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
 	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m.items = make([]Item, 20)
+	m.scroller.SetItemCount(20)
 
-	// Very small height
-	m.height = 2
-	if m.visibleRows() != 1 {
-		t.Errorf("visibleRows() = %d, want 1 for small height", m.visibleRows())
+	// SetSize configures visible rows (height - 4 overhead)
+	m = m.SetSize(80, 20)
+	if m.scroller.VisibleRows() != 16 {
+		t.Errorf("visibleRows = %d, want 16", m.scroller.VisibleRows())
 	}
 
-	// Normal height
-	m.height = 20
-	expected := 16 // 20 - 4 for borders/title
-	if m.visibleRows() != expected {
-		t.Errorf("visibleRows() = %d, want %d", m.visibleRows(), expected)
+	// Small height
+	m = m.SetSize(80, 5)
+	if m.scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
 	}
 }
 
-func TestModel_EnsureVisible(t *testing.T) {
+func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	t.Parallel()
 	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
-	m.height = 10 // 6 visible rows (10 - 4)
 	m.items = make([]Item, 20)
+	for i := range m.items {
+		m.items[i] = Item{Key: string(rune('a' + i))}
+	}
+	m.scroller.SetItemCount(20)
+	m = m.SetSize(80, 10) // Sets visibleRows = 10 - 4 = 6
 
-	// Cursor above scroll
-	m.cursor = 2
-	m.scroll = 5
-	m = m.ensureVisible()
-	if m.scroll != 2 {
-		t.Errorf("scroll = %d, want 2 (scroll to cursor)", m.scroll)
+	// Cursor at end should scroll
+	m.scroller.CursorToEnd()
+	start, _ := m.scroller.VisibleRange()
+	if start == 0 {
+		t.Error("scroll should increase when cursor at end of long list")
 	}
 
-	// Cursor below visible area
-	m.cursor = 15
-	m.scroll = 0
-	m = m.ensureVisible()
-	// cursor 15, visible 6, so scroll should be 15 - 6 + 1 = 10
-	if m.scroll != 10 {
-		t.Errorf("scroll = %d, want 10 (scroll up to show cursor)", m.scroll)
+	// Cursor back to start
+	m.scroller.CursorToStart()
+	start, _ = m.scroller.VisibleRange()
+	if start != 0 {
+		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}
 }
 

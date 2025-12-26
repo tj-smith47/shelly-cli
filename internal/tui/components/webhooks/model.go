@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -71,8 +72,7 @@ type Model struct {
 	svc        *shelly.Service
 	device     string
 	webhooks   []Webhook
-	cursor     int
-	scroll     int
+	scroller   *panel.Scroller
 	loading    bool
 	err        error
 	width      int
@@ -127,10 +127,11 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultStyles(),
+		ctx:      deps.Ctx,
+		svc:      deps.Svc,
+		scroller: panel.NewScroller(0, 1),
+		loading:  false,
+		styles:   DefaultStyles(),
 	}
 }
 
@@ -143,8 +144,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.webhooks = nil
-	m.cursor = 0
-	m.scroll = 0
+	m.scroller.SetItemCount(0)
 	m.err = nil
 
 	if device == "" {
@@ -186,6 +186,12 @@ func (m Model) fetchWebhooks() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	// Calculate visible rows: height - borders (2) - title (1) - footer (1)
+	visibleRows := height - 4
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -211,8 +217,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.webhooks = msg.Webhooks
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.SetItemCount(len(m.webhooks))
+		m.scroller.CursorToStart()
 		return m, nil
 
 	case ActionMsg:
@@ -236,14 +242,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
-		m = m.cursorDown()
+		m.scroller.CursorDown()
 	case "k", "up":
-		m = m.cursorUp()
+		m.scroller.CursorUp()
 	case "g":
-		m.cursor = 0
-		m.scroll = 0
+		m.scroller.CursorToStart()
 	case "G":
-		m = m.cursorToEnd()
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
 	case "enter":
 		return m, m.selectWebhook()
 	case "t":
@@ -269,63 +278,23 @@ func (m Model) createWebhook() tea.Cmd {
 	}
 }
 
-func (m Model) cursorDown() Model {
-	if m.cursor < len(m.webhooks)-1 {
-		m.cursor++
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorUp() Model {
-	if m.cursor > 0 {
-		m.cursor--
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) cursorToEnd() Model {
-	if len(m.webhooks) > 0 {
-		m.cursor = len(m.webhooks) - 1
-		m = m.ensureVisible()
-	}
-	return m
-}
-
-func (m Model) ensureVisible() Model {
-	visible := m.visibleRows()
-	if m.cursor < m.scroll {
-		m.scroll = m.cursor
-	} else if m.cursor >= m.scroll+visible {
-		m.scroll = m.cursor - visible + 1
-	}
-	return m
-}
-
-func (m Model) visibleRows() int {
-	rows := m.height - 4
-	if rows < 1 {
-		return 1
-	}
-	return rows
-}
-
 func (m Model) selectWebhook() tea.Cmd {
-	if len(m.webhooks) == 0 || m.cursor >= len(m.webhooks) {
+	cursor := m.scroller.Cursor()
+	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
-	webhook := m.webhooks[m.cursor]
+	webhook := m.webhooks[cursor]
 	return func() tea.Msg {
 		return SelectMsg{Webhook: webhook}
 	}
 }
 
 func (m Model) toggleWebhook() tea.Cmd {
-	if len(m.webhooks) == 0 || m.cursor >= len(m.webhooks) {
+	cursor := m.scroller.Cursor()
+	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
-	webhook := m.webhooks[m.cursor]
+	webhook := m.webhooks[cursor]
 
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
@@ -348,10 +317,11 @@ func (m Model) toggleWebhook() tea.Cmd {
 }
 
 func (m Model) deleteWebhook() tea.Cmd {
-	if len(m.webhooks) == 0 || m.cursor >= len(m.webhooks) {
+	cursor := m.scroller.Cursor()
+	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
-	webhook := m.webhooks[m.cursor]
+	webhook := m.webhooks[cursor]
 
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
@@ -424,27 +394,21 @@ func (m Model) getErrorContent() string {
 // renderWebhookList renders the list of webhooks.
 func (m Model) renderWebhookList() string {
 	var content strings.Builder
-	visible := m.visibleRows()
-	endIdx := m.scroll + visible
-	if endIdx > len(m.webhooks) {
-		endIdx = len(m.webhooks)
-	}
+	start, end := m.scroller.VisibleRange()
 
-	for i := m.scroll; i < endIdx; i++ {
+	for i := start; i < end; i++ {
 		webhook := m.webhooks[i]
-		isSelected := i == m.cursor
+		isSelected := m.scroller.IsCursorAt(i)
 
 		line := m.renderWebhookLine(webhook, isSelected)
 		content.WriteString(line)
-		if i < endIdx-1 {
+		if i < end-1 {
 			content.WriteString("\n")
 		}
 	}
 
-	if len(m.webhooks) > visible {
-		content.WriteString(m.styles.Muted.Render(
-			fmt.Sprintf("\n[%d/%d]", m.cursor+1, len(m.webhooks)),
-		))
+	if m.scroller.HasMore() || m.scroller.HasPrevious() {
+		content.WriteString(m.styles.Muted.Render("\n" + m.scroller.ScrollInfo()))
 	}
 
 	return content.String()
@@ -497,10 +461,11 @@ func (m Model) renderWebhookLine(webhook Webhook, isSelected bool) string {
 
 // SelectedWebhook returns the currently selected webhook, if any.
 func (m Model) SelectedWebhook() *Webhook {
-	if len(m.webhooks) == 0 || m.cursor >= len(m.webhooks) {
+	cursor := m.scroller.Cursor()
+	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
-	return &m.webhooks[m.cursor]
+	return &m.webhooks[cursor]
 }
 
 // WebhookCount returns the number of webhooks.
@@ -530,4 +495,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, m.fetchWebhooks()
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	return "j/k:scroll g/G:top/bottom enter:details d:delete"
 }
