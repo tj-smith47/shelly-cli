@@ -159,7 +159,7 @@ func New(deps Deps) Model {
 
 	refreshInterval := deps.RefreshInterval
 	if refreshInterval == 0 {
-		refreshInterval = 5 * time.Second
+		refreshInterval = 10 * time.Second // Increased from 5s to reduce load
 	}
 
 	return Model{
@@ -247,7 +247,7 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	}
 
 	// Per-device timeout to prevent single slow device from blocking others
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	snapshot, err := m.svc.GetMonitoringSnapshotAuto(ctx, device.Address)
@@ -328,6 +328,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case RefreshTickMsg:
+		// Skip refresh if already loading to prevent overlap
+		if m.loading {
+			return m, m.scheduleRefresh()
+		}
+		m.loading = true
 		return m, tea.Batch(
 			m.fetchStatuses(),
 			m.scheduleRefresh(),
@@ -457,7 +462,7 @@ func (m Model) View() string {
 	if m.loading {
 		loadingText := m.styles.UpdatingIcon.Render("◐ ") + "Fetching device statuses..."
 		return m.styles.Container.
-			Width(m.width-4).
+			Width(m.width).
 			Height(m.height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render(loadingText)
@@ -465,13 +470,13 @@ func (m Model) View() string {
 
 	if m.err != nil {
 		return m.styles.Container.
-			Width(m.width - 4).
+			Width(m.width).
 			Render(theme.StatusError().Render("Error: " + m.err.Error()))
 	}
 
 	if len(m.statuses) == 0 {
 		return m.styles.Container.
-			Width(m.width-4).
+			Width(m.width).
 			Height(m.height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("No devices to monitor.\nUse 'shelly device add' to add devices.")
@@ -513,7 +518,7 @@ func (m Model) View() string {
 	) + scrollInfo
 
 	content := lipgloss.JoinVertical(lipgloss.Left, header, rows, footer)
-	return m.styles.Container.Width(m.width - 4).Render(content)
+	return m.styles.Container.Width(m.width).Render(content)
 }
 
 // renderDeviceCard renders a single device status card.

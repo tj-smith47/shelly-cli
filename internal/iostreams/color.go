@@ -26,7 +26,7 @@ func (s *IOStreams) Info(format string, args ...any) {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.Out, theme.StatusInfo().Render("ℹ")+" "+msg)
+	writelnQuietly(s.Out, theme.StatusInfo().Render("→")+" "+msg)
 }
 
 // Success prints a success message with theme styling.
@@ -114,7 +114,7 @@ func (s *IOStreams) Added(noun string, count int) {
 // InfoTo prints an informational message to the specified writer.
 func InfoTo(w io.Writer, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(w, theme.StatusInfo().Render("ℹ")+" "+msg)
+	writelnQuietly(w, theme.StatusInfo().Render("→")+" "+msg)
 }
 
 // SuccessTo prints a success message to the specified writer.

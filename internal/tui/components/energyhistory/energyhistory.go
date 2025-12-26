@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Sparkline characters for different heights (0-7).
@@ -88,12 +89,58 @@ func (m Model) Init() tea.Cmd {
 // Update handles messages for the energy history.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if updateMsg, ok := msg.(cache.DeviceUpdateMsg); ok {
-		// Record power data when device is updated
-		if updateMsg.Data != nil && updateMsg.Data.Online && updateMsg.Data.Power != 0 {
+		// Record power data when device is updated (for PM-capable devices)
+		if updateMsg.Data != nil && updateMsg.Data.Online && hasPMCapability(updateMsg.Data) {
 			m.addDataPoint(updateMsg.Name, updateMsg.Data.Power)
 		}
 	}
 	return m, nil
+}
+
+// hasPMCapability checks if a device has power monitoring capability.
+func hasPMCapability(d *cache.DeviceData) bool {
+	// Check snapshot for actual PM components
+	if d.Snapshot != nil && (len(d.Snapshot.PM) > 0 || len(d.Snapshot.EM) > 0 || len(d.Snapshot.EM1) > 0) {
+		return true
+	}
+
+	// Fallback: check device model for PM capability
+	model := d.Device.Type
+	if model == "" {
+		model = d.Device.Model
+	}
+
+	return modelHasPM(model)
+}
+
+// modelHasPM checks if a device model code indicates power monitoring capability.
+func modelHasPM(model string) bool {
+	// Gen1 PM devices: SHSW-PM
+	if strings.Contains(model, "-PM") {
+		return true
+	}
+
+	// Gen2/Gen3 PM devices: SNSW-xxxPxxxx (P at position 8)
+	if strings.HasPrefix(model, "SNSW-") && len(model) >= 9 && model[8] == 'P' {
+		return true
+	}
+
+	// Gen2/Gen3 Pro PM devices: SPSW-xxxPxxxxx (P at position 8)
+	if strings.HasPrefix(model, "SPSW-") && len(model) >= 9 && model[8] == 'P' {
+		return true
+	}
+
+	// Dimmers have power monitoring: SNDM-xxxx
+	if strings.HasPrefix(model, "SNDM-") {
+		return true
+	}
+
+	// Energy meters: SPEM (Pro EM), SNEM (Plus EM)
+	if strings.HasPrefix(model, "SPEM-") || strings.HasPrefix(model, "SNEM-") {
+		return true
+	}
+
+	return false
 }
 
 func (m Model) addDataPoint(deviceName string, power float64) {
@@ -129,11 +176,8 @@ func (m Model) View() string {
 
 	var content strings.Builder
 
-	// Header
-	content.WriteString(m.styles.Header.Render("Energy History (5min)") + "\n\n")
-
-	// Sparkline width
-	sparkWidth := m.width - 36 // Label (16) + Value (12) + padding
+	// Sparkline width - account for border (2) and padding
+	sparkWidth := m.width - 42 // Label (16) + Value (12) + border/padding (14)
 	if sparkWidth < 10 {
 		sparkWidth = 10
 	}
@@ -157,10 +201,12 @@ func (m Model) View() string {
 		return m.renderNoData()
 	}
 
-	return m.styles.Container.
-		Width(m.width).
-		Height(m.height).
-		Render(content.String())
+	// Use rendering package for consistent embedded title styling
+	r := rendering.New(m.width, m.height).
+		SetTitle("Energy History (5min)").
+		SetFocused(false)
+
+	return r.SetContent(content.String()).Render()
 }
 
 func (m Model) renderDeviceSparkline(name string, history []DataPoint, width int) string {
@@ -235,19 +281,27 @@ func (m Model) generateSparkline(history []DataPoint, width int) string {
 }
 
 func (m Model) renderEmpty() string {
-	return m.styles.Container.
-		Width(m.width).
-		Height(m.height).
+	r := rendering.New(m.width, m.height).
+		SetTitle("Energy History (5min)").
+		SetFocused(false)
+	centered := lipgloss.NewStyle().
+		Width(m.width-4).
+		Height(m.height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No devices online")
+	return r.SetContent(centered).Render()
 }
 
 func (m Model) renderNoData() string {
-	return m.styles.Container.
-		Width(m.width).
-		Height(m.height).
+	r := rendering.New(m.width, m.height).
+		SetTitle("Energy History (5min)").
+		SetFocused(false)
+	centered := lipgloss.NewStyle().
+		Width(m.width-4).
+		Height(m.height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("Collecting energy data...\nHistory will appear after a few updates.")
+	return r.SetContent(centered).Render()
 }
 
 // formatValue formats a power value with appropriate units.

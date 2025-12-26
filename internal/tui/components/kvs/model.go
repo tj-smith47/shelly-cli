@@ -329,7 +329,14 @@ func (m Model) View() string {
 	}
 
 	if m.err != nil {
-		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		errMsg := m.err.Error()
+		// Detect Gen1 or unsupported device errors and show a friendly message
+		if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
+			strings.Contains(errMsg, "not found") {
+			r.SetContent(m.styles.Muted.Render("KVS not supported on this device"))
+		} else {
+			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
+		}
 		return r.Render()
 	}
 

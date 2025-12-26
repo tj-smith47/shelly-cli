@@ -16,6 +16,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // EMStatus represents the status of an Energy Monitor (EM) component.
@@ -453,10 +454,30 @@ func (s *Service) GetMonitoringSnapshot(ctx context.Context, device string) (*Mo
 }
 
 // GetMonitoringSnapshotAuto returns monitoring data for a device, auto-detecting generation.
-// It first tries Gen2 RPC calls, then falls back to Gen1 REST API if that fails.
+// If generation is known from config, it tries that generation first for efficiency.
+// Otherwise it tries Gen2 first (more common), then falls back to Gen1 REST API if that fails.
 // Use this for TUI/energy dashboard where we need to handle all device types.
 func (s *Service) GetMonitoringSnapshotAuto(ctx context.Context, device string) (*MonitoringSnapshot, error) {
-	// Try Gen2 first (more common)
+	// First resolve to check if we have a stored generation
+	// Error is intentionally ignored - if resolution fails, we try Gen2 first
+	resolvedDevice, err := s.ResolveWithGeneration(ctx, device)
+
+	// If we know it's Gen1, try Gen1 first to avoid wasting time on Gen2
+	if err == nil && resolvedDevice.Generation == 1 {
+		gen1Snapshot, gen1Err := s.getGen1MonitoringSnapshot(ctx, device)
+		if gen1Err == nil {
+			return gen1Snapshot, nil
+		}
+		// Gen1 failed unexpectedly, try Gen2 as fallback
+		snapshot, err := s.GetMonitoringSnapshot(ctx, device)
+		if err == nil && (len(snapshot.PM) > 0 || len(snapshot.EM) > 0 || len(snapshot.EM1) > 0) {
+			return snapshot, nil
+		}
+		// Return empty snapshot for Gen1 devices without meters
+		return &MonitoringSnapshot{Device: device, Timestamp: time.Now(), Online: true}, nil
+	}
+
+	// Gen2+ or unknown: Try Gen2 first (more common)
 	snapshot, err := s.GetMonitoringSnapshot(ctx, device)
 	if err == nil && (len(snapshot.PM) > 0 || len(snapshot.EM) > 0 || len(snapshot.EM1) > 0) {
 		return snapshot, nil
@@ -625,6 +646,50 @@ func (s *Service) collectPMStatus(ctx context.Context, device string) []PMStatus
 			}
 		}
 	}
+	// Collect power data from switches with integrated power monitoring (e.g., Shelly Plus 1PM)
+	// These devices have switches with Power/Voltage/Current fields but no dedicated PM component
+	result = append(result, s.collectSwitchPowerStatus(ctx, device)...)
+	return result
+}
+
+// collectSwitchPowerStatus collects power data from switches with integrated power monitoring.
+// Devices like Shelly Plus 1PM have power monitoring built into the switch component.
+func (s *Service) collectSwitchPowerStatus(ctx context.Context, device string) []PMStatus {
+	var result []PMStatus
+	connErr := s.WithConnection(ctx, device, func(conn *client.Client) error {
+		components, err := conn.FilterComponents(ctx, model.ComponentSwitch)
+		if err != nil {
+			// Log error but don't fail - device may not support component listing
+			iostreams.DebugErrCat(iostreams.CategoryDevice, "list switches for power", err)
+			return err
+		}
+		for _, comp := range components {
+			status, err := conn.Switch(comp.ID).GetStatus(ctx)
+			if err != nil {
+				continue
+			}
+			// Only include switches that have power monitoring capability (Power field is set)
+			// The power value can be 0 if the switch is off, but we still want to track it
+			if status.Power != nil {
+				pm := PMStatus{
+					ID:     100 + comp.ID, // Offset to differentiate from dedicated PM components
+					APower: *status.Power,
+				}
+				if status.Voltage != nil {
+					pm.Voltage = *status.Voltage
+				}
+				if status.Current != nil {
+					pm.Current = *status.Current
+				}
+				result = append(result, pm)
+			}
+		}
+		return nil
+	})
+	if connErr != nil {
+		// Connection/component error is logged but not propagated - device may be Gen1 or offline
+		iostreams.DebugErrCat(iostreams.CategoryNetwork, "switch power collection", connErr)
+	}
 	return result
 }
 
@@ -652,14 +717,18 @@ func (s *Service) SubscribeEvents(ctx context.Context, device string, handler Ev
 
 	// Subscribe to notifications
 	notifyHandler := func(msg json.RawMessage) {
+		iostreams.DebugCat(iostreams.CategoryNetwork, "WebSocket notification received: %s", string(msg))
+
 		var notif struct {
 			Method string         `json:"method"`
 			Params map[string]any `json:"params,omitempty"`
 		}
 		if err := json.Unmarshal(msg, &notif); err != nil {
+			iostreams.DebugErrCat(iostreams.CategoryNetwork, "failed to parse notification", err)
 			return
 		}
 
+		iostreams.DebugCat(iostreams.CategoryNetwork, "Parsed notification method: %s", notif.Method)
 		event := parseNotification(device, notif.Method, notif.Params)
 
 		// Handler errors are logged but don't stop event streaming

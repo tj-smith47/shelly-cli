@@ -22,6 +22,7 @@ func DisplayDiscoveredDevices(ios *iostreams.IOStreams, devices []discovery.Disc
 		return
 	}
 	printTable(ios, table)
+	ios.Println("")
 	ios.Count("device", len(devices))
 }
 

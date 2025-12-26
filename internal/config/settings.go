@@ -43,12 +43,28 @@ func KnownSettingKeys() []string {
 		"defaults.timeout",
 		"defaults.output",
 		"defaults.concurrent",
+		"editor",
 		"theme.name",
 		"theme.colors",
 		"theme.file",
 		"log.json",
 		"log.categories",
 	}
+}
+
+// GetEditor returns the configured editor command.
+// Returns empty string if not configured (caller should fall back to env vars).
+func GetEditor() string {
+	if cfg := Get(); cfg != nil && cfg.Editor != "" {
+		return cfg.Editor
+	}
+	// Fallback to viper setting if not in Config struct
+	if val, ok := GetSetting("editor"); ok {
+		if cmd, isStr := val.(string); isStr && cmd != "" {
+			return cmd
+		}
+	}
+	return ""
 }
 
 // FilterSettingKeys filters known keys by prefix for completion.

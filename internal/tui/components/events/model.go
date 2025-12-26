@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,7 +70,11 @@ type sharedState struct {
 	events        []Event
 	subscriptions map[string]context.CancelFunc
 	connStatus    map[string]bool
+	lastEventTime time.Time // Track when last event was added for refresh detection
 }
+
+// RefreshTickMsg triggers a check for new events.
+type RefreshTickMsg struct{}
 
 // Model holds the events state.
 type Model struct {
@@ -84,6 +89,7 @@ type Model struct {
 	scrollOffset int
 	cursor       int
 	paused       bool
+	autoScroll   bool // Auto-scroll to bottom when new events arrive
 }
 
 // Styles for the events component.
@@ -157,11 +163,12 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		ios:      deps.IOS,
-		maxItems: 100,
-		styles:   DefaultStyles(),
+		ctx:        deps.Ctx,
+		svc:        deps.Svc,
+		ios:        deps.IOS,
+		maxItems:   100,
+		autoScroll: true, // Start with auto-scroll enabled (tail-f behavior)
+		styles:     DefaultStyles(),
 		state: &sharedState{
 			events:        []Event{},
 			subscriptions: make(map[string]context.CancelFunc),
@@ -172,7 +179,17 @@ func New(deps Deps) Model {
 
 // Init returns the initial command for events.
 func (m Model) Init() tea.Cmd {
-	return m.subscribeToAllDevices()
+	return tea.Batch(
+		m.subscribeToAllDevices(),
+		m.scheduleRefresh(),
+	)
+}
+
+// scheduleRefresh schedules the next refresh tick to check for new events.
+func (m Model) scheduleRefresh() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg {
+		return RefreshTickMsg{}
+	})
 }
 
 // subscribeToAllDevices creates WebSocket subscriptions for all registered devices.
@@ -218,6 +235,9 @@ func (m Model) subscribeToDevice(device model.Device) {
 	m.state.mu.Unlock()
 
 	handler := func(evt shelly.DeviceEvent) error {
+		m.ios.DebugCat(iostreams.CategoryNetwork, "events: received device event: %s %s %s",
+			device.Name, evt.Component, evt.Event)
+
 		event := Event{
 			Timestamp:   evt.Timestamp,
 			Device:      device.Name,
@@ -235,6 +255,8 @@ func (m Model) subscribeToDevice(device model.Device) {
 
 		// Add event to the list
 		m.addEvent(event)
+		m.ios.DebugCat(iostreams.CategoryNetwork, "events: added event, total count: %d",
+			len(m.state.events))
 		return nil
 	}
 
@@ -274,10 +296,13 @@ func (m Model) addEvent(e Event) {
 	}
 	m.state.mu.Lock()
 	defer m.state.mu.Unlock()
-	m.state.events = append([]Event{e}, m.state.events...)
+	// Append new events at the end (tail-f style: newest at bottom)
+	m.state.events = append(m.state.events, e)
 	if len(m.state.events) > m.maxItems {
-		m.state.events = m.state.events[:m.maxItems]
+		// Remove oldest events from the beginning
+		m.state.events = m.state.events[len(m.state.events)-m.maxItems:]
 	}
+	m.state.lastEventTime = time.Now()
 }
 
 // categorizeEvent determines the event type category.
@@ -314,6 +339,23 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.addEvent(e)
 		}
 		return m, nil
+
+	case RefreshTickMsg:
+		// Auto-scroll to bottom if enabled (tail-f behavior)
+		if m.autoScroll {
+			count := m.eventCount()
+			visibleRows := m.visibleRows()
+			if count > visibleRows {
+				m.scrollOffset = count - visibleRows
+				m.cursor = count - 1
+			} else {
+				m.scrollOffset = 0
+				m.cursor = max(0, count-1)
+			}
+		}
+		// Reschedule next refresh - the tick itself triggers a re-render
+		// which will pick up any events added by background goroutines
+		return m, m.scheduleRefresh()
 
 	case SubscriptionStatusMsg:
 		return m.handleSubscriptionStatus(msg), nil
@@ -356,12 +398,15 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	case "g":
 		m.cursor = 0
 		m.scrollOffset = 0
+		m.autoScroll = false // User scrolled to top, disable auto-scroll
 	case "G":
 		m = m.cursorToBottom()
+		m.autoScroll = true // User went to bottom, enable auto-scroll
 	case "c":
 		m.Clear()
 		m.cursor = 0
 		m.scrollOffset = 0
+		m.autoScroll = true // After clear, re-enable auto-scroll
 	case "p":
 		m = m.togglePause()
 	}
@@ -380,12 +425,15 @@ func (m Model) cursorDown() Model {
 	if m.cursor >= m.scrollOffset+visibleRows {
 		m.scrollOffset = m.cursor - visibleRows + 1
 	}
+	// Re-enable auto-scroll if at bottom
+	m.autoScroll = m.cursor >= count-1
 	return m
 }
 
 func (m Model) cursorUp() Model {
 	if m.cursor > 0 {
 		m.cursor--
+		m.autoScroll = false // User is scrolling up, disable auto-scroll
 	}
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
@@ -404,6 +452,7 @@ func (m Model) cursorToBottom() Model {
 		}
 		m.scrollOffset = maxOffset
 	}
+	m.autoScroll = true // Going to bottom enables auto-scroll
 	return m
 }
 
@@ -427,6 +476,8 @@ func (m Model) pageDown() Model {
 	if m.scrollOffset > maxOffset {
 		m.scrollOffset = maxOffset
 	}
+	// Re-enable auto-scroll if at bottom
+	m.autoScroll = m.cursor >= count-1
 	return m
 }
 
@@ -439,6 +490,7 @@ func (m Model) pageUp() Model {
 	if m.cursor < m.scrollOffset {
 		m.scrollOffset = m.cursor
 	}
+	m.autoScroll = false // User is scrolling up, disable auto-scroll
 	return m
 }
 
@@ -455,8 +507,9 @@ func (m Model) eventCount() int {
 }
 
 // visibleRows calculates how many rows can be displayed.
+// Overhead: header(1) + header margin(1) + footer(1) = 3 lines.
 func (m Model) visibleRows() int {
-	availableHeight := m.height - 6
+	availableHeight := m.height - 3
 	if availableHeight < 1 {
 		return 10
 	}
@@ -533,53 +586,7 @@ func (m Model) View() string {
 	for i, e := range eventsToShow {
 		actualIdx := startIdx + i
 		isSelected := actualIdx == m.cursor
-
-		// Build each column with fixed width and proper padding
-		timeVal := e.Timestamp.Format("15:04:05")
-		timeStr := m.styles.Time.Render(output.PadRight(timeVal, colTime))
-
-		deviceVal := output.Truncate(e.Device, colDevice-2)
-		deviceStr := m.styles.Device.Render(output.PadRight(deviceVal, colDevice))
-
-		var compVal string
-		if e.Component != "" {
-			if e.ComponentID > 0 {
-				compVal = fmt.Sprintf("%s:%d", e.Component, e.ComponentID)
-			} else {
-				compVal = e.Component
-			}
-		} else {
-			compVal = "-"
-		}
-		compVal = output.Truncate(compVal, colComp-2)
-		compStr := m.styles.Component.Render(output.PadRight(compVal, colComp))
-
-		var typeStyle lipgloss.Style
-		switch e.Type {
-		case "error":
-			typeStyle = m.styles.Error
-		case "warning":
-			typeStyle = m.styles.Warning
-		default:
-			typeStyle = m.styles.Info
-		}
-		typeVal := output.Truncate(e.Type, colType-2)
-		typeStr := m.styles.Type.Inherit(typeStyle).Render(output.PadRight(typeVal, colType))
-
-		// Calculate remaining width for description (panel width minus other columns and padding)
-		descWidth := m.width - colTime - colDevice - colComp - colType - 6 // 6 for borders/padding
-		if descWidth < 20 {
-			descWidth = 20 // Minimum readable width
-		}
-		descStr := m.styles.Description.Render(output.Truncate(e.Description, descWidth))
-
-		row := timeStr + deviceStr + compStr + typeStr + descStr
-
-		if isSelected {
-			rows += m.styles.SelectedRow.Render(row) + "\n"
-		} else {
-			rows += m.styles.Event.Render(row) + "\n"
-		}
+		rows += m.renderEventRow(e, isSelected, colTime, colDevice, colComp, colType)
 	}
 
 	// Footer with scroll info
@@ -589,8 +596,66 @@ func (m Model) View() string {
 	}
 	footer := m.styles.Footer.Render(fmt.Sprintf("j/k: scroll  PgUp/PgDn: page  g/G: top/bottom  p: pause  c: clear%s", scrollInfo))
 
+	// Trim trailing newline from rows to avoid extra blank line before footer
+	rows = strings.TrimSuffix(rows, "\n")
+
 	content := lipgloss.JoinVertical(lipgloss.Left, header, rows, footer)
 	return m.styles.Container.Width(m.width - 4).Render(content)
+}
+
+// renderEventRow renders a single event row with fixed-width columns.
+func (m Model) renderEventRow(e Event, isSelected bool, colTime, colDevice, colComp, colType int) string {
+	// Build each column with fixed width and proper padding
+	timeVal := e.Timestamp.Format("15:04:05")
+	timeStr := m.styles.Time.Render(output.PadRight(timeVal, colTime))
+
+	deviceVal := output.Truncate(e.Device, colDevice-2)
+	deviceStr := m.styles.Device.Render(output.PadRight(deviceVal, colDevice))
+
+	compVal := m.formatComponent(e)
+	compVal = output.Truncate(compVal, colComp-2)
+	compStr := m.styles.Component.Render(output.PadRight(compVal, colComp))
+
+	typeStyle := m.getTypeStyle(e.Type)
+	typeVal := output.Truncate(e.Type, colType-2)
+	typeStr := m.styles.Type.Inherit(typeStyle).Render(output.PadRight(typeVal, colType))
+
+	// Calculate remaining width for description (panel width minus other columns and padding)
+	descWidth := m.width - colTime - colDevice - colComp - colType - 6 // 6 for borders/padding
+	if descWidth < 20 {
+		descWidth = 20 // Minimum readable width
+	}
+	descStr := m.styles.Description.Render(output.Truncate(e.Description, descWidth))
+
+	row := timeStr + deviceStr + compStr + typeStr + descStr
+
+	if isSelected {
+		return m.styles.SelectedRow.Render(row) + "\n"
+	}
+	return m.styles.Event.Render(row) + "\n"
+}
+
+// formatComponent formats the component field for display.
+func (m Model) formatComponent(e Event) string {
+	if e.Component == "" {
+		return "-"
+	}
+	if e.ComponentID > 0 {
+		return fmt.Sprintf("%s:%d", e.Component, e.ComponentID)
+	}
+	return e.Component
+}
+
+// getTypeStyle returns the style for an event type.
+func (m Model) getTypeStyle(eventType string) lipgloss.Style {
+	switch eventType {
+	case "error":
+		return m.styles.Error
+	case "warning":
+		return m.styles.Warning
+	default:
+		return m.styles.Info
+	}
 }
 
 // EventCount returns the number of events.

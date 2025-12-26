@@ -28,8 +28,8 @@ func TestIOStreams_Info(t *testing.T) {
 	if !strings.Contains(output, "Test message 123") {
 		t.Errorf("Info() should contain message, got %q", output)
 	}
-	if !strings.Contains(output, "ℹ") {
-		t.Errorf("Info() should contain info icon, got %q", output)
+	if !strings.Contains(output, "→") {
+		t.Errorf("Info() should contain info arrow, got %q", output)
 	}
 }
 

@@ -240,9 +240,11 @@ func (m Model) View() string {
 	}
 
 	content := strings.Join(tabs, divider)
-	// Use full width for the separator line
+	// Use full width for the separator line and ensure full clearing
 	if m.width > 0 {
-		return m.styles.Container.Width(m.width).Render(content)
+		// Pad content to full width to clear any leftover characters from previous renders
+		style := m.styles.Container.Width(m.width)
+		return style.Render(content)
 	}
 	return m.styles.Container.Render(content)
 }

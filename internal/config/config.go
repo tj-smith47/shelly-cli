@@ -32,6 +32,7 @@ type Config struct {
 	APIMode string `mapstructure:"api_mode"`
 	Verbose bool   `mapstructure:"verbose"`
 	Quiet   bool   `mapstructure:"quiet"`
+	Editor  string `mapstructure:"editor"` // Preferred editor command (falls back to $EDITOR, $VISUAL, then nano)
 
 	// Discovery settings
 	Discovery DiscoveryConfig `mapstructure:"discovery"`
@@ -440,6 +441,15 @@ func (c *Config) GetTUIThemeConfig() *ThemeConfig {
 		return nil
 	}
 	return c.TUI.Theme
+}
+
+// GetEditor returns the configured editor command.
+// Returns empty string if not configured (caller should fall back to env vars).
+func (c *Config) GetEditor() string {
+	if c == nil {
+		return ""
+	}
+	return c.Editor
 }
 
 // DefaultAliases are built-in aliases provided out of the box.

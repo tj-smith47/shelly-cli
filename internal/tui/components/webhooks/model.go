@@ -361,33 +361,60 @@ func (m Model) View() string {
 		SetTitle("Webhooks").
 		SetFocused(m.focused)
 
-	// Add footer with keybindings when focused
-	if m.focused && m.device != "" && len(m.webhooks) > 0 {
+	m.setFooter(r)
+
+	// Handle early return states
+	if content, done := m.getStateContent(); done {
+		r.SetContent(content)
+		return r.Render()
+	}
+
+	// Render webhook list
+	r.SetContent(m.renderWebhookList())
+	return r.Render()
+}
+
+// setFooter adds the appropriate keybinding footer.
+func (m Model) setFooter(r *rendering.Renderer) {
+	if !m.focused || m.device == "" {
+		return
+	}
+	if len(m.webhooks) > 0 {
 		r.SetFooter("t:toggle d:del n:new r:refresh")
-	} else if m.focused && m.device != "" {
+	} else {
 		r.SetFooter("n:new r:refresh")
 	}
+}
 
+// getStateContent returns content for non-list states and whether to use it.
+func (m Model) getStateContent() (string, bool) {
 	if m.device == "" {
-		r.SetContent(m.styles.Muted.Render("No device selected"))
-		return r.Render()
+		return m.styles.Muted.Render("No device selected"), true
 	}
-
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading webhooks..."))
-		return r.Render()
+		return m.styles.Muted.Render("Loading webhooks..."), true
 	}
-
 	if m.err != nil {
-		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
-		return r.Render()
+		return m.getErrorContent(), true
 	}
-
 	if len(m.webhooks) == 0 {
-		r.SetContent(m.styles.Muted.Render("No webhooks configured"))
-		return r.Render()
+		return m.styles.Muted.Render("No webhooks configured"), true
 	}
+	return "", false
+}
 
+// getErrorContent returns the appropriate error message.
+func (m Model) getErrorContent() string {
+	errMsg := m.err.Error()
+	if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
+		strings.Contains(errMsg, "not found") {
+		return m.styles.Muted.Render("Webhooks not supported on this device")
+	}
+	return m.styles.Error.Render("Error: " + errMsg)
+}
+
+// renderWebhookList renders the list of webhooks.
+func (m Model) renderWebhookList() string {
 	var content strings.Builder
 	visible := m.visibleRows()
 	endIdx := m.scroll + visible
@@ -412,8 +439,7 @@ func (m Model) View() string {
 		))
 	}
 
-	r.SetContent(content.String())
-	return r.Render()
+	return content.String()
 }
 
 func (m Model) renderWebhookLine(webhook Webhook, isSelected bool) string {

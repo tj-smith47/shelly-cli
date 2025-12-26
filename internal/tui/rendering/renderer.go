@@ -16,6 +16,7 @@ type Renderer struct {
 	width      int
 	height     int
 	title      string
+	badge      string // Separate badge section in title bar (superfile style)
 	footer     string
 	focused    bool
 	sections   []section
@@ -46,6 +47,13 @@ func New(width, height int) *Renderer {
 // Title appears as: ├─ Title ─┤.
 func (r *Renderer) SetTitle(title string) *Renderer {
 	r.title = title
+	return r
+}
+
+// SetBadge sets a badge that appears in a separate section after the title.
+// Badge appears as: ├─ Title ─┼─ Badge ─┤ (superfile style).
+func (r *Renderer) SetBadge(badge string) *Renderer {
+	r.badge = badge
 	return r
 }
 
@@ -113,8 +121,13 @@ func (r *Renderer) Render() string {
 	// Build lines with estimated capacity (top + content + bottom)
 	lines := make([]string, 0, r.height)
 
-	// Top border with embedded title
-	topBorder := BuildTopBorder(r.width, r.title, r.border)
+	// Top border with embedded title (and optional badge in superfile style)
+	var topBorder string
+	if r.badge != "" {
+		topBorder = BuildTopBorderWithBadge(r.width, r.title, r.badge, r.border)
+	} else {
+		topBorder = BuildTopBorder(r.width, r.title, r.border)
+	}
 	lines = append(lines, borderStyle.Render(topBorder))
 
 	// Build content lines with estimated capacity

@@ -2,8 +2,10 @@
 package energybars
 
 import (
+	"cmp"
 	"fmt"
 	"image/color"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Bar represents a single energy bar.
@@ -114,17 +117,14 @@ func (m Model) View() string {
 
 	var content strings.Builder
 
-	// Header
-	content.WriteString(m.styles.Header.Render("Power Consumption") + "\n\n")
-
 	// Find max value for scaling
 	maxVal := m.findMaxValue()
 	if maxVal < 100 {
 		maxVal = 100 // Minimum scale for visibility
 	}
 
-	// Render each bar
-	barWidth := m.width - 34 // Label (16) + Value (10) + padding
+	// Render each bar - account for border (2) and padding (4) in width calculation
+	barWidth := m.width - 40 // Label (16) + Value (10) + border/padding (14)
 	if barWidth < 10 {
 		barWidth = 10
 	}
@@ -140,16 +140,21 @@ func (m Model) View() string {
 		content.WriteString("\n" + m.renderTotal(totalPower))
 	}
 
-	return m.styles.Container.
-		Width(m.width).
-		Height(m.height).
-		Render(content.String())
+	// Use rendering package for consistent embedded title styling
+	r := rendering.New(m.width, m.height).
+		SetTitle("Power Consumption").
+		SetFocused(false)
+
+	return r.SetContent(content.String()).Render()
 }
 
 func (m Model) collectBars(devices []*cache.DeviceData) []Bar {
 	var bars []Bar
 	for _, d := range devices {
-		if d.Power != 0 {
+		// Show all devices with power monitoring capability, even if power is 0
+		// Check snapshot for PM/EM/EM1 components, or check model for PM capability
+		hasPM := hasPMCapability(d)
+		if hasPM {
 			bars = append(bars, Bar{
 				Label:  d.Device.Name,
 				Value:  d.Power,
@@ -159,7 +164,61 @@ func (m Model) collectBars(devices []*cache.DeviceData) []Bar {
 			})
 		}
 	}
+
+	// Sort by power value descending (highest power first)
+	slices.SortFunc(bars, func(a, b Bar) int {
+		return cmp.Compare(b.Value, a.Value) // Reversed for descending
+	})
+
 	return bars
+}
+
+// hasPMCapability checks if a device has power monitoring capability.
+// This checks both the snapshot (if PM/EM/EM1 components exist) and the model code.
+func hasPMCapability(d *cache.DeviceData) bool {
+	// Check snapshot for actual PM components
+	if d.Snapshot != nil && (len(d.Snapshot.PM) > 0 || len(d.Snapshot.EM) > 0 || len(d.Snapshot.EM1) > 0) {
+		return true
+	}
+
+	// Fallback: check device model for PM capability
+	model := d.Device.Type // Use Type (raw model code) not Model (display name)
+	if model == "" {
+		model = d.Device.Model
+	}
+
+	return modelHasPM(model)
+}
+
+// modelHasPM checks if a device model code indicates power monitoring capability.
+func modelHasPM(model string) bool {
+	// Gen1 PM devices: SHSW-PM
+	if strings.Contains(model, "-PM") {
+		return true
+	}
+
+	// Gen2/Gen3 PM devices: SNSW-xxxPxxxx (P at position 8)
+	// Examples: SNSW-001P16EU (Plus 1PM), SNSW-102P16EU (Plus 2PM)
+	if strings.HasPrefix(model, "SNSW-") && len(model) >= 9 && model[8] == 'P' {
+		return true
+	}
+
+	// Gen2/Gen3 Pro PM devices: SPSW-xxxPxxxxx (P at position 8)
+	if strings.HasPrefix(model, "SPSW-") && len(model) >= 9 && model[8] == 'P' {
+		return true
+	}
+
+	// Dimmers have power monitoring: SNDM-xxxx
+	if strings.HasPrefix(model, "SNDM-") {
+		return true
+	}
+
+	// Energy meters: SPEM (Pro EM), SNEM (Plus EM)
+	if strings.HasPrefix(model, "SPEM-") || strings.HasPrefix(model, "SNEM-") {
+		return true
+	}
+
+	return false
 }
 
 func (m Model) findMaxValue() float64 {
@@ -213,19 +272,27 @@ func (m Model) renderTotal(total float64) string {
 }
 
 func (m Model) renderEmpty() string {
-	return m.styles.Container.
-		Width(m.width).
-		Height(m.height).
+	r := rendering.New(m.width, m.height).
+		SetTitle("Power Consumption").
+		SetFocused(false)
+	centered := lipgloss.NewStyle().
+		Width(m.width-4).
+		Height(m.height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No devices online")
+	return r.SetContent(centered).Render()
 }
 
 func (m Model) renderNoData() string {
-	return m.styles.Container.
-		Width(m.width).
-		Height(m.height).
+	r := rendering.New(m.width, m.height).
+		SetTitle("Power Consumption").
+		SetFocused(false)
+	centered := lipgloss.NewStyle().
+		Width(m.width-4).
+		Height(m.height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No power data available")
+	return r.SetContent(centered).Render()
 }
 
 // formatValue formats a power/energy value with appropriate units.

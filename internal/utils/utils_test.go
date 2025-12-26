@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-go/discovery"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -30,8 +31,13 @@ func TestDiscoveredDeviceToConfig_Basic(t *testing.T) {
 	if cfg.Generation != int(d.Generation) {
 		t.Errorf("Generation = %d, want %d", cfg.Generation, d.Generation)
 	}
-	if cfg.Model != d.Model {
-		t.Errorf("Model = %q, want %q", cfg.Model, d.Model)
+	// Type is the raw model code, Model is the human-readable name
+	if cfg.Type != d.Model {
+		t.Errorf("Type = %q, want %q", cfg.Type, d.Model)
+	}
+	wantModel := types.ModelDisplayName(d.Model)
+	if cfg.Model != wantModel {
+		t.Errorf("Model = %q, want %q", cfg.Model, wantModel)
 	}
 }
 
@@ -189,7 +195,7 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 				Address:    "10.0.0.1",
 				Generation: 1,
 				Type:       "SHSW-1",
-				Model:      "SHSW-1",
+				Model:      types.ModelDisplayName("SHSW-1"), // Human-readable name
 			},
 		},
 		{
@@ -198,14 +204,14 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 				ID:         "shellypro1pm-AABBCC",
 				Address:    net.ParseIP("10.0.0.2"),
 				Generation: 2,
-				Model:      "SPSW-001P16EU",
+				Model:      "SPSW-001PE16EU",
 			},
 			want: model.Device{
 				Name:       "shellypro1pm-AABBCC",
 				Address:    "10.0.0.2",
 				Generation: 2,
-				Type:       "SPSW-001P16EU",
-				Model:      "SPSW-001P16EU",
+				Type:       "SPSW-001PE16EU",
+				Model:      types.ModelDisplayName("SPSW-001PE16EU"), // Human-readable name
 			},
 		},
 		{
@@ -221,7 +227,7 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 				Address:    "10.0.0.3",
 				Generation: 3,
 				Type:       "S3PM-001PCEU16",
-				Model:      "S3PM-001PCEU16",
+				Model:      types.ModelDisplayName("S3PM-001PCEU16"), // Falls back to code if no mapping
 			},
 		},
 	}

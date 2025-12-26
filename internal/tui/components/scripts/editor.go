@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -352,7 +353,14 @@ func (m EditorModel) View() string {
 	}
 
 	if m.err != nil {
-		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		errMsg := m.err.Error()
+		// Detect Gen1 or unsupported device errors and show a friendly message
+		if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
+			strings.Contains(errMsg, "not found") {
+			r.SetContent(m.styles.Muted.Render("Scripts not supported on this device"))
+		} else {
+			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
+		}
 		return r.Render()
 	}
 
@@ -499,16 +507,19 @@ func (m EditorModel) Edit() tea.Cmd {
 	tmpPath := tmpFile.Name()
 
 	if _, err := tmpFile.WriteString(code); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		tmpFile.Close()    //nolint:errcheck // Best-effort cleanup on error path
+		os.Remove(tmpPath) //nolint:errcheck // Best-effort cleanup on error path
 		return func() tea.Msg {
 			return EditorFinishedMsg{Device: device, ScriptID: scriptID, Err: err}
 		}
 	}
-	tmpFile.Close()
+	tmpFile.Close() //nolint:errcheck // Close before external editor opens
 
-	// Get editor from environment
-	editor := os.Getenv("EDITOR")
+	// Get editor: config setting > EDITOR env > VISUAL env > nano
+	editor := config.GetEditor()
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
 	if editor == "" {
 		editor = os.Getenv("VISUAL")
 	}
@@ -519,14 +530,17 @@ func (m EditorModel) Edit() tea.Cmd {
 	// Split editor command into parts (handles "vim -u NONE" etc.)
 	parts := strings.Fields(editor)
 	editorCmd := parts[0]
-	args := append(parts[1:], tmpPath)
+	editorArgs := make([]string, len(parts)-1, len(parts))
+	copy(editorArgs, parts[1:])
+	editorArgs = append(editorArgs, tmpPath)
 
-	c := exec.Command(editorCmd, args...)
+	//nolint:gosec,noctx // G204: User's EDITOR env var; context N/A for tea.ExecProcess
+	c := exec.Command(editorCmd, editorArgs...)
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
-		// Read modified code
+		//nolint:gosec // G304: Reading temp file we created - safe and expected
 		modifiedCode, readErr := os.ReadFile(tmpPath)
-		os.Remove(tmpPath)
+		os.Remove(tmpPath) //nolint:errcheck // Best-effort temp file cleanup
 
 		if err != nil {
 			return EditorFinishedMsg{Device: device, ScriptID: scriptID, Err: err}

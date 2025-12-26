@@ -35,16 +35,14 @@ func NewSpinner(message string, opts ...SpinnerOption) *Spinner {
 
 // NewSpinnerWithWriter creates a new spinner with a custom writer.
 func NewSpinnerWithWriter(message string, w io.Writer, opts ...SpinnerOption) *Spinner {
-	// Use a nice character set that works across terminals
-	charSet := spinner.CharSets[14] // ⣾⣽⣻⢿⡿⣟⣯⣷
-
+	// Use braille dot pattern spinner (CharSets[11])
 	s := &Spinner{
-		s:      spinner.New(charSet, 100*time.Millisecond, spinner.WithWriter(w)),
+		s:      spinner.New(spinner.CharSets[11], 100*time.Millisecond, spinner.WithWriter(w)),
 		writer: w,
 	}
 
-	// Apply theme color - best-effort, log errors in verbose mode
-	setSpinnerColorQuietly(s.s, "cyan")
+	// Apply blue color for spinners
+	setSpinnerColorQuietly(s.s, "blue")
 
 	// Set message
 	s.s.Suffix = " " + message

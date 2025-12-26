@@ -203,7 +203,16 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 		t.Errorf("after tab = %v, want %v", newM.focusedPanel, PanelDetail)
 	}
 
-	// Tab should wrap back to DeviceList (2-panel cycle: Detail -> DeviceList)
+	// Tab to Events (3-panel cycle: Detail -> Events)
+	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
+	if !handled {
+		t.Error("tab should be handled")
+	}
+	if newM.focusedPanel != PanelEvents {
+		t.Errorf("after second tab = %v, want %v", newM.focusedPanel, PanelEvents)
+	}
+
+	// Tab should wrap back to DeviceList (Events -> DeviceList)
 	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
 	if !handled {
 		t.Error("tab should be handled")
@@ -219,14 +228,32 @@ func TestModel_ShiftTabReversesFocus(t *testing.T) {
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
-	// Shift+Tab from DeviceList should go to Detail (reverse cycle in 2-panel mode)
+	// Shift+Tab from DeviceList should go to Events (reverse cycle in 3-panel mode)
 	msg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	newM, _, handled := m.handlePanelSwitch(msg)
 	if !handled {
 		t.Error("shift+tab should be handled")
 	}
+	if newM.focusedPanel != PanelEvents {
+		t.Errorf("after shift+tab = %v, want %v", newM.focusedPanel, PanelEvents)
+	}
+
+	// Shift+Tab from Events should go to Detail
+	newM, _, handled = newM.handlePanelSwitch(msg)
+	if !handled {
+		t.Error("shift+tab should be handled")
+	}
 	if newM.focusedPanel != PanelDetail {
-		t.Errorf("after shift+tab = %v, want %v", newM.focusedPanel, PanelDetail)
+		t.Errorf("after second shift+tab = %v, want %v", newM.focusedPanel, PanelDetail)
+	}
+
+	// Shift+Tab from Detail should go to DeviceList
+	newM, _, handled = newM.handlePanelSwitch(msg)
+	if !handled {
+		t.Error("shift+tab should be handled")
+	}
+	if newM.focusedPanel != PanelDeviceList {
+		t.Errorf("after third shift+tab = %v, want %v", newM.focusedPanel, PanelDeviceList)
 	}
 }
 

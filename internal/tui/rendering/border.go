@@ -67,14 +67,12 @@ func BuildTopBorder(width int, title string, border lipgloss.Border) string {
 		availableForFill = width - topLeftW - topRightW - minTitleWidth
 	}
 
-	// Distribute fill space: more on right side for visual balance
-	leftFillCount := availableForFill / topW / 3
-	rightFillCount := (availableForFill / topW) - leftFillCount
+	// Distribute fill space: minimal left padding to keep title near corner
+	// Pattern: ╭─├─ Title ─┤────────────────────────╮
+	totalFill := availableForFill / topW
+	leftFillCount := 1 // Single dash before title for visual balance
+	rightFillCount := totalFill - leftFillCount
 
-	if leftFillCount < 1 {
-		leftFillCount = 1
-		rightFillCount = (availableForFill / topW) - leftFillCount
-	}
 	if rightFillCount < 0 {
 		rightFillCount = 0
 	}
@@ -82,6 +80,65 @@ func BuildTopBorder(width int, title string, border lipgloss.Border) string {
 	return topLeft +
 		strings.Repeat(top, leftFillCount) +
 		midLeft + top + titleText + top + midRight +
+		strings.Repeat(top, rightFillCount) +
+		topRight
+}
+
+// BuildTopBorderWithBadge creates a top border with a title and a separate badge section.
+// Example output: "╭─├─ Devices ─┼─ 17/18 ─┤────╮" (superfile style).
+func BuildTopBorderWithBadge(width int, title, badge string, border lipgloss.Border) string {
+	if width < 5 {
+		return ""
+	}
+
+	// If no badge, fall back to regular title border
+	if badge == "" {
+		return BuildTopBorder(width, title, border)
+	}
+
+	topLeft := border.TopLeft
+	topRight := border.TopRight
+	top := border.Top
+	midLeft := border.MiddleLeft
+	midRight := border.MiddleRight
+	middle := border.Middle // ┼ for separator between title and badge
+
+	topLeftW := charWidth(topLeft)
+	topRightW := charWidth(topRight)
+	topW := charWidth(top)
+	midLeftW := charWidth(midLeft)
+	midRightW := charWidth(midRight)
+	middleW := charWidth(middle)
+
+	// Title section: ├─ Title ─┼
+	titleText := " " + title + " "
+	titleWidth := charWidth(titleText)
+
+	// Badge section: ─ badge ─┤
+	badgeText := " " + badge + " "
+	badgeWidth := charWidth(badgeText)
+
+	// Total structure: TopLeft + fill + midLeft + ─ + title + ─ + middle + ─ + badge + ─ + midRight + fill + TopRight
+	minWidth := midLeftW + topW + titleWidth + topW + middleW + topW + badgeWidth + topW + midRightW
+	availableForFill := width - topLeftW - topRightW - minWidth
+
+	if availableForFill < 0 {
+		// Not enough space for badge, fall back to title only
+		return BuildTopBorder(width, title+" "+badge, border)
+	}
+
+	// Minimal left padding, rest on right
+	totalFill := availableForFill / topW
+	leftFillCount := 1
+	rightFillCount := totalFill - leftFillCount
+
+	if rightFillCount < 0 {
+		rightFillCount = 0
+	}
+
+	return topLeft +
+		strings.Repeat(top, leftFillCount) +
+		midLeft + top + titleText + top + middle + top + badgeText + top + midRight +
 		strings.Repeat(top, rightFillCount) +
 		topRight
 }

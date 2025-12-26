@@ -23,9 +23,10 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long: `Open the Shelly CLI configuration file in your default editor.
 
 The editor is determined by:
-  1. $EDITOR environment variable
-  2. $VISUAL environment variable
-  3. Falls back to 'vi' on Unix, 'notepad' on Windows
+  1. 'editor' setting in config file
+  2. $EDITOR environment variable
+  3. $VISUAL environment variable
+  4. Falls back to common editors (nano, vim, vi)
 
 This allows you to directly edit the configuration file, including
 devices, aliases, groups, scenes, and other settings.`,
@@ -57,10 +58,13 @@ func run(ctx context.Context, f *cmdutil.Factory) error {
 		return fmt.Errorf("config file not found: %s\nRun 'shelly init' to create it", configPath)
 	}
 
-	// Find editor
-	editor := utils.GetEditor()
+	// Find editor: config setting > EDITOR env > VISUAL env > common editors
+	editor := config.GetEditor()
 	if editor == "" {
-		return fmt.Errorf("no editor found. Set $EDITOR or $VISUAL environment variable")
+		editor = utils.GetEditor()
+	}
+	if editor == "" {
+		return fmt.Errorf("no editor found. Set 'editor' in config or $EDITOR/$VISUAL environment variable")
 	}
 
 	ios.Info("Opening %s with %s...", configPath, editor)

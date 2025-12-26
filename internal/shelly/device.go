@@ -85,15 +85,36 @@ func (s *Service) DeviceStatus(ctx context.Context, identifier string) (*DeviceS
 }
 
 // DevicePing checks if the device is reachable by attempting to connect.
+// Uses DeviceInfoAuto to support both Gen1 and Gen2 devices.
 func (s *Service) DevicePing(ctx context.Context, identifier string) (*DeviceInfo, error) {
-	return s.DeviceInfo(ctx, identifier)
+	return s.DeviceInfoAuto(ctx, identifier)
 }
 
 // DeviceInfoAuto returns device info, auto-detecting generation (Gen1 vs Gen2).
-// It first tries Gen2, then falls back to Gen1 if Gen2 fails.
+// If generation is known from config, it tries that generation first for efficiency.
+// Otherwise it tries Gen2 first (more common), then falls back to Gen1 if Gen2 fails.
 // Use this for TUI/cache where we need to handle all device types.
 func (s *Service) DeviceInfoAuto(ctx context.Context, identifier string) (*DeviceInfo, error) {
-	// Try Gen2 first (more common)
+	// First resolve to check if we have a stored generation
+	// Error is intentionally ignored - if resolution fails, we try Gen2 first
+	device, err := s.ResolveWithGeneration(ctx, identifier)
+
+	// If we know it's Gen1, try Gen1 first to avoid wasting time on Gen2
+	if err == nil && device.Generation == 1 {
+		gen1Result, gen1Err := s.DeviceInfoGen1(ctx, identifier)
+		if gen1Err == nil {
+			return gen1Result, nil
+		}
+		// Gen1 failed unexpectedly, try Gen2 as fallback
+		result, err := s.DeviceInfo(ctx, identifier)
+		if err == nil {
+			return result, nil
+		}
+		// Both failed, return Gen1 error since we knew it was Gen1
+		return nil, gen1Err
+	}
+
+	// Gen2+ or unknown: Try Gen2 first (more common)
 	result, err := s.DeviceInfo(ctx, identifier)
 	if err == nil {
 		return result, nil

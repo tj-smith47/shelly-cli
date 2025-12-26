@@ -12,11 +12,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tj-smith47/shelly-go/discovery"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/branding"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
@@ -186,7 +188,7 @@ func runSetupSteps(ctx context.Context, f *Factory, rootCmd *cobra.Command, opts
 	discoveredDevices := runDiscoveryStepIfNeeded(ctx, ios, opts)
 	runRegistrationStep(f, opts, discoveredDevices)
 	runCompletionsStep(ios, rootCmd, opts)
-	runCloudStep(ios, opts)
+	runCloudStep(ctx, ios, opts)
 
 	PrintSummary(ios)
 	return nil
@@ -230,14 +232,14 @@ func runCompletionsStep(ios *iostreams.IOStreams, rootCmd *cobra.Command, opts *
 	}
 }
 
-func runCloudStep(ios *iostreams.IOStreams, opts *InitOptions) {
+func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *InitOptions) {
 	var err error
 	if opts.IsNonInteractive() {
 		if opts.WantsCloudSetup() {
-			err = stepCloudNonInteractive(ios, opts)
+			err = stepCloudNonInteractive(ctx, ios, opts)
 		}
 	} else {
-		err = stepCloud(ios)
+		err = stepCloud(ctx, ios)
 	}
 	if err != nil {
 		ios.Warning("Cloud setup failed: %v", err)
@@ -644,6 +646,7 @@ func stepRegistration(f *Factory, opts *InitOptions, devices []discovery.Discove
 	ios.Println("")
 
 	registered := 0
+	skipped := 0
 	for _, d := range devices {
 		defaultName := SanitizeDeviceName(d.ID)
 		if d.Name != "" {
@@ -667,11 +670,12 @@ func stepRegistration(f *Factory, opts *InitOptions, devices []discovery.Discove
 		}
 
 		if f.GetDevice(name) != nil {
-			ios.Info("Device %q already registered, skipping", name)
+			skipped++
 			continue
 		}
 
-		err := config.RegisterDevice(name, d.Address.String(), int(d.Generation), d.Model, d.Model, nil)
+		// Type is the raw model code, Model is the human-readable name
+		err := config.RegisterDevice(name, d.Address.String(), int(d.Generation), d.Model, types.ModelDisplayName(d.Model), nil)
 		if err != nil {
 			ios.Warning("Failed to register %q: %v", name, err)
 			continue
@@ -682,6 +686,12 @@ func stepRegistration(f *Factory, opts *InitOptions, devices []discovery.Discove
 	ios.Println("")
 	if registered > 0 {
 		ios.Success("Registered %d device(s)", registered)
+	}
+	if skipped > 0 {
+		ios.Info("Skipped %d already registered device(s)", skipped)
+	}
+	if registered == 0 && skipped == 0 {
+		ios.Info("No devices registered")
 	}
 	ios.Println("")
 	return nil
@@ -757,7 +767,7 @@ func stepCompletionsNonInteractive(ios *iostreams.IOStreams, rootCmd *cobra.Comm
 	return nil
 }
 
-func stepCloud(ios *iostreams.IOStreams) error {
+func stepCloud(ctx context.Context, ios *iostreams.IOStreams) error {
 	ios.Println(theme.Bold().Render("Step 4/4: Cloud Access (Optional)"))
 	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
 	ios.Println("")
@@ -773,29 +783,85 @@ func stepCloud(ios *iostreams.IOStreams) error {
 		return nil
 	}
 
-	ios.Info("Run 'shelly cloud login' to authenticate with Shelly Cloud")
+	ios.Println("")
+
+	// Prompt for email
+	email, err := ios.Input("Shelly Cloud email:", "")
+	if err != nil {
+		return fmt.Errorf("failed to read email: %w", err)
+	}
+	if email == "" {
+		ios.Warning("Email is required for cloud login")
+		ios.Info("You can set up cloud access later with: shelly cloud login")
+		ios.Println("")
+		return nil
+	}
+
+	// Prompt for password
+	password, err := iostreams.Password("Shelly Cloud password:")
+	if err != nil {
+		return fmt.Errorf("failed to read password: %w", err)
+	}
+	if password == "" {
+		ios.Warning("Password is required for cloud login")
+		ios.Info("You can set up cloud access later with: shelly cloud login")
+		ios.Println("")
+		return nil
+	}
+
+	// Perform the actual login
+	ios.StartProgress("Authenticating with Shelly Cloud...")
+	_, result, err := shelly.NewCloudClientWithCredentials(ctx, email, password)
+	ios.StopProgress()
+
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Save credentials to config
+	cfg := config.Get()
+	cfg.Cloud.Enabled = true
+	cfg.Cloud.Email = email
+	cfg.Cloud.AccessToken = result.Token
+	cfg.Cloud.ServerURL = result.UserAPIURL
+
+	if err := config.Save(); err != nil {
+		return fmt.Errorf("failed to save credentials: %w", err)
+	}
+
+	ios.Success("Logged in as %s", email)
 	ios.Println("")
 	return nil
 }
 
-func stepCloudNonInteractive(ios *iostreams.IOStreams, opts *InitOptions) error {
+func stepCloudNonInteractive(ctx context.Context, ios *iostreams.IOStreams, opts *InitOptions) error {
 	if opts.CloudEmail == "" || opts.CloudPassword == "" {
 		ios.Warning("Cloud setup requires both --cloud-email and --cloud-password")
 		ios.Info("You can set up cloud access later with: shelly cloud login")
 		return nil
 	}
 
-	cfg := config.Get()
-	cfg.Cloud.Email = opts.CloudEmail
+	// Perform the actual login
+	ios.StartProgress("Authenticating with Shelly Cloud...")
+	_, result, err := shelly.NewCloudClientWithCredentials(ctx, opts.CloudEmail, opts.CloudPassword)
+	ios.StopProgress()
 
-	viper.Set("cloud.email", opts.CloudEmail)
-
-	if err := config.Save(); err != nil {
-		return fmt.Errorf("failed to save cloud config: %w", err)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	ios.Success("Cloud credentials configured for %s", opts.CloudEmail)
-	ios.Info("Run 'shelly cloud login' to complete authentication")
+	// Save credentials to config
+	cfg := config.Get()
+	cfg.Cloud.Enabled = true
+	cfg.Cloud.Email = opts.CloudEmail
+	cfg.Cloud.AccessToken = result.Token
+	cfg.Cloud.ServerURL = result.UserAPIURL
+
+	if err := config.Save(); err != nil {
+		return fmt.Errorf("failed to save credentials: %w", err)
+	}
+
+	ios.Success("Logged in as %s", opts.CloudEmail)
 	ios.Println("")
 	return nil
 }

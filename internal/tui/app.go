@@ -51,6 +51,8 @@ const (
 	PanelDeviceList PanelFocus = iota
 	// PanelDetail is the device info column.
 	PanelDetail
+	// PanelEvents is the events panel.
+	PanelEvents
 	// PanelEndpoints means endpoint is selected, JSON overlay visible.
 	PanelEndpoints
 )
@@ -295,30 +297,19 @@ func (m Model) layoutMode() LayoutMode {
 }
 
 // calculateOptimalWidths determines panel widths based on content.
-// It balances content needs with available space and min/max constraints.
+// New layout: Device List (left) | Device Info + Events stacked (right)
+// Events and DeviceInfo share the right column width (stacked vertically).
 func (m Model) calculateOptimalWidths() PanelWidths {
 	totalWidth := m.width
 
-	// Get content-based optimal widths from components
-	eventsOptimal := m.events.OptimalWidth()
+	// Get content-based optimal width for device list
 	deviceListOptimal := m.deviceList.OptimalWidth()
 
 	// Define constraints as percentages
-	eventsMin := totalWidth * 25 / 100
-	eventsMax := totalWidth * 45 / 100
 	deviceListMin := totalWidth * 15 / 100
-	deviceListMax := totalWidth * 40 / 100
-	deviceInfoMin := totalWidth * 25 / 100
+	deviceListMax := totalWidth * 35 / 100 // Don't let device list take more than 35%
 
-	// Apply constraints to optimal values
-	eventsWidth := eventsOptimal
-	if eventsWidth < eventsMin {
-		eventsWidth = eventsMin
-	}
-	if eventsWidth > eventsMax {
-		eventsWidth = eventsMax
-	}
-
+	// Apply constraints to device list width
 	deviceListWidth := deviceListOptimal
 	if deviceListWidth < deviceListMin {
 		deviceListWidth = deviceListMin
@@ -327,47 +318,22 @@ func (m Model) calculateOptimalWidths() PanelWidths {
 		deviceListWidth = deviceListMax
 	}
 
-	// Calculate remaining space for device info
-	gaps := 2 // Two 1-char gaps between panels
-	deviceInfoWidth := totalWidth - eventsWidth - deviceListWidth - gaps
+	// Minimum absolute width for device list
+	if deviceListWidth < 25 {
+		deviceListWidth = 25
+	}
 
-	// Ensure device info meets minimum by shrinking other panels if needed
-	deviceInfoWidth = m.adjustPanelWidths(&eventsWidth, &deviceListWidth, deviceInfoWidth,
-		deviceInfoMin, eventsMin, deviceListMin, totalWidth, gaps)
+	// Right column gets the rest (device info + events are stacked vertically)
+	gap := 1
+	rightColWidth := totalWidth - deviceListWidth - gap
 
+	// Events and DeviceInfo share the rightColWidth (they're stacked, not side by side)
+	// So we set Events = DeviceInfo = rightColWidth for the PanelWidths struct
 	return PanelWidths{
-		Events:     eventsWidth,
+		Events:     rightColWidth, // Events uses full right column width
 		DeviceList: deviceListWidth,
-		DeviceInfo: deviceInfoWidth,
+		DeviceInfo: rightColWidth, // DeviceInfo uses full right column width
 	}
-}
-
-// adjustPanelWidths shrinks events and deviceList panels to ensure deviceInfo meets minimum.
-func (m Model) adjustPanelWidths(eventsWidth, deviceListWidth *int, deviceInfoWidth int,
-	deviceInfoMin, eventsMin, deviceListMin, totalWidth, gaps int) int {
-	if deviceInfoWidth >= deviceInfoMin {
-		return deviceInfoWidth
-	}
-
-	deficit := deviceInfoMin - deviceInfoWidth
-
-	// Take from events first (it adapts better with truncation)
-	eventsReduction := deficit
-	if *eventsWidth-eventsReduction < eventsMin {
-		eventsReduction = *eventsWidth - eventsMin
-	}
-	*eventsWidth -= eventsReduction
-	deficit -= eventsReduction
-
-	// Take remainder from device list
-	if deficit > 0 {
-		*deviceListWidth -= deficit
-		if *deviceListWidth < deviceListMin {
-			*deviceListWidth = deviceListMin
-		}
-	}
-
-	return totalWidth - *eventsWidth - *deviceListWidth - gaps
 }
 
 // Init initializes the TUI and returns the first command to run.
@@ -776,7 +742,20 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 		return newModel, cmd, true
 	}
 
-	// If NOT on Dashboard, forward keys to the active view
+	// Device actions work on any tab with a device list (Dashboard, Monitor, Automation, Config)
+	// Try device actions BEFORE forwarding to views so t/o/f/r keys work everywhere
+	if m.hasDeviceList() {
+		if newModel, cmd, handled := m.handleDeviceActionKey(msg); handled {
+			return newModel, cmd, true
+		}
+	}
+
+	// For tabs with device list (Automation, Config, Monitor), handle focus management
+	if m.hasDeviceList() && !m.isDashboardActive() {
+		return m.handleDeviceListTabKeyPress(msg)
+	}
+
+	// If NOT on Dashboard and NOT a device-list tab, forward all keys to view
 	if !m.isDashboardActive() {
 		cmd := m.viewManager.Update(msg)
 		return m, cmd, true
@@ -794,11 +773,40 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 		return newModel, cmd, true
 	}
 
-	// Device actions
-	if newModel, cmd, handled := m.handleDeviceActionKey(msg); handled {
-		return newModel, cmd, true
+	return m, nil, false
+}
+
+// handleDeviceListTabKeyPress handles key presses for tabs with device list (Automation, Config, Monitor).
+func (m Model) handleDeviceListTabKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	// When device list is focused, handle all keys here
+	if m.focusedPanel == PanelDeviceList {
+		return m.handleDeviceListFocusedKeys(msg)
 	}
 
+	// When focused on view (PanelDetail), forward ALL keys to the view
+	// The view handles its own internal panel cycling via Tab/Shift+Tab
+	// Escape returns to device list
+	if msg.String() == "escape" {
+		m.focusedPanel = PanelDeviceList
+		return m, nil, true
+	}
+	cmd := m.viewManager.Update(msg)
+	return m, cmd, true
+}
+
+// handleDeviceListFocusedKeys handles keys when device list panel is focused.
+func (m Model) handleDeviceListFocusedKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.String() {
+	case "tab", "shift+tab":
+		// Both Tab and Shift+Tab move focus to the view
+		m.focusedPanel = PanelDetail
+		return m, nil, true
+	}
+	// Navigation keys for device list
+	if newModel, cmd, handled := m.handleNavigation(msg); handled {
+		return newModel, cmd, true
+	}
+	// Other keys still go to device list
 	return m, nil, false
 }
 
@@ -823,20 +831,28 @@ func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// nextPanel returns the next panel in the cycle: DeviceList -> Detail -> DeviceList.
+// nextPanel returns the next panel in the cycle: DeviceList -> Detail -> Events -> DeviceList.
 func (m Model) nextPanel() PanelFocus {
-	if m.focusedPanel == PanelDeviceList {
+	switch m.focusedPanel {
+	case PanelDeviceList:
 		return PanelDetail
-	}
-	return PanelDeviceList
-}
-
-// prevPanel returns the previous panel in the cycle: Detail -> DeviceList -> Detail.
-func (m Model) prevPanel() PanelFocus {
-	if m.focusedPanel == PanelDetail {
+	case PanelDetail:
+		return PanelEvents
+	default:
 		return PanelDeviceList
 	}
-	return PanelDetail
+}
+
+// prevPanel returns the previous panel in the cycle: Events -> Detail -> DeviceList -> Events.
+func (m Model) prevPanel() PanelFocus {
+	switch m.focusedPanel {
+	case PanelEvents:
+		return PanelDetail
+	case PanelDetail:
+		return PanelDeviceList
+	default:
+		return PanelEvents
+	}
 }
 
 // openJSONViewer opens the JSON viewer for the selected device if on Detail panel.
@@ -896,6 +912,9 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 		m.cmdMode, cmd = m.cmdMode.Activate()
 		m = m.updateViewManagerSize()
 		return m, cmd, true
+	case key.Matches(msg, m.keys.Refresh):
+		// Trigger a full cache refresh by sending RefreshTickMsg
+		return m, func() tea.Msg { return cache.RefreshTickMsg{} }, true
 	case key.Matches(msg, m.keys.Escape):
 		if m.filter != "" {
 			m.filter = ""
@@ -906,18 +925,22 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 		}
 	case key.Matches(msg, m.keys.View1):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabDashboard)
+		m.focusedPanel = PanelDeviceList // Reset focus to device list
 		return m, m.viewManager.SetActive(views.ViewDashboard), true
 	case key.Matches(msg, m.keys.View2):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabAutomation)
+		m.focusedPanel = PanelDeviceList // Reset focus to device list for sidebar layout
 		return m, m.viewManager.SetActive(views.ViewAutomation), true
 	case key.Matches(msg, m.keys.View3):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabConfig)
+		m.focusedPanel = PanelDeviceList // Reset focus to device list for sidebar layout
 		return m, m.viewManager.SetActive(views.ViewConfig), true
 	case key.Matches(msg, m.keys.View4):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabManage)
 		return m, m.viewManager.SetActive(views.ViewManage), true
 	case key.Matches(msg, m.keys.View5):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabMonitor)
+		m.focusedPanel = PanelDeviceList // Reset focus to device list
 		return m, m.viewManager.SetActive(views.ViewMonitor), true
 	case key.Matches(msg, m.keys.View6):
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabFleet)
@@ -967,6 +990,13 @@ func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if m.focusedPanel == PanelDetail {
 		var cmd tea.Cmd
 		m.deviceInfo, cmd = m.deviceInfo.Update(msg)
+		return m, cmd, true
+	}
+
+	// When PanelEvents is focused, forward navigation to events component
+	if m.focusedPanel == PanelEvents {
+		var cmd tea.Cmd
+		m.events, cmd = m.events.Update(msg)
 		return m, cmd, true
 	}
 
@@ -1164,13 +1194,43 @@ func (m Model) View() tea.View {
 
 	// Render content based on active view
 	var content string
-	if m.isDashboardActive() {
+	switch m.tabBar.ActiveTabID() {
+	case tabs.TabDashboard:
 		// Dashboard uses the multi-panel layout rendered by app.go
 		content = m.renderMultiPanelLayout(contentHeight)
-	} else {
-		// Other views render themselves
-		content = m.viewManager.View()
+	case tabs.TabMonitor:
+		// Monitor tab shows monitor component + energy panels
+		content = m.renderMonitorLayout(contentHeight)
+	case tabs.TabAutomation, tabs.TabConfig:
+		// Automation and Config views include device list on left for persistence
+		content = m.renderWithDeviceList(contentHeight)
+	default:
+		// Other views render themselves full-width
+		// Set size on view before rendering, then enforce width
+		m.viewManager.SetSize(m.width, contentHeight)
+		content = lipgloss.NewStyle().Width(m.width).Render(m.viewManager.View())
 	}
+
+	// Ensure content fills the entire content area to prevent rendering artifacts
+	// This clears any old content when switching tabs
+	// Split content into lines and pad each line to full width, then pad to full height
+	contentLines := strings.Split(content, "\n")
+	paddedLines := make([]string, contentHeight)
+	emptyLine := strings.Repeat(" ", m.width)
+	for i := range contentHeight {
+		if i < len(contentLines) {
+			line := contentLines[i]
+			// Pad each line to full width to clear any leftover characters
+			lineWidth := lipgloss.Width(line)
+			if lineWidth < m.width {
+				line += strings.Repeat(" ", m.width-lineWidth)
+			}
+			paddedLines[i] = line
+		} else {
+			paddedLines[i] = emptyLine
+		}
+	}
+	content = strings.Join(paddedLines, "\n")
 
 	// Help overlay - overlay on content when visible
 	if m.help.Visible() {
@@ -1239,6 +1299,8 @@ func (m Model) focusedPanelName() string {
 		return "DeviceList"
 	case PanelDetail:
 		return "Detail"
+	case PanelEvents:
+		return "Events"
 	case PanelEndpoints:
 		return "Endpoints"
 	default:
@@ -1259,15 +1321,28 @@ func (m Model) isDashboardActive() bool {
 	return false
 }
 
+// hasDeviceList returns true if the current tab has a device list for device actions.
+// This includes Dashboard, Monitor, Automation, and Config tabs.
+func (m Model) hasDeviceList() bool {
+	switch m.tabBar.ActiveTabID() {
+	case tabs.TabDashboard, tabs.TabMonitor, tabs.TabAutomation, tabs.TabConfig:
+		return true
+	default:
+		return false
+	}
+}
+
 // renderMultiPanelLayout renders panels horizontally or vertically based on width.
+// Layout: Device List (left) | Device Info (top-right) / Events (bottom-right)
+// Energy bars at bottom spanning full width.
 func (m Model) renderMultiPanelLayout(height int) string {
 	// Narrow mode: stack panels vertically
 	if m.layoutMode() == LayoutNarrow {
 		return m.renderNarrowLayout(height)
 	}
 
-	// Split height: top 75% for panels, bottom 25% for energy bars
-	topHeight := height * 75 / 100
+	// Split height: top 70% for panels, bottom 30% for energy bars
+	topHeight := height * 70 / 100
 	energyHeight := height - topHeight - 1 // -1 for gap
 
 	if topHeight < 10 {
@@ -1280,25 +1355,38 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	// Calculate dynamic panel widths based on content
 	widths := m.calculateOptimalWidths()
 
-	// Render events column
-	eventsCol := m.renderEventsColumn(widths.Events, topHeight)
+	// Device list on the left (persists across views)
+	deviceListCol := m.renderDeviceListColumn(widths.DeviceList, topHeight)
 
-	// Use calculated widths for device list and info panels
-	listWidth := widths.DeviceList
-	infoWidth := widths.DeviceInfo
+	// Right column width = total - device list - gap
+	rightColWidth := m.width - widths.DeviceList - 1
 
-	// Render device list with consistent border styling
-	deviceListCol := m.renderDeviceListColumn(listWidth, topHeight)
+	// Split right column vertically: device info (top 30%) and events (bottom 70%)
+	// Total must equal topHeight so right column matches device list height
+	infoHeight := topHeight * 30 / 100
+	eventsHeight := topHeight - infoHeight // No gap - JoinVertical stacks directly
 
-	// Render device info component (detail panel)
-	m.deviceInfo = m.deviceInfo.SetSize(infoWidth, topHeight)
+	if infoHeight < 6 {
+		infoHeight = 6
+		eventsHeight = topHeight - infoHeight
+	}
+	if eventsHeight < 12 {
+		eventsHeight = 12
+	}
+
+	// Render device info component (top-right)
+	m.deviceInfo = m.deviceInfo.SetSize(rightColWidth, infoHeight)
 	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail)
-	deviceInfoCol := m.deviceInfo.View()
+	deviceInfoPanel := m.deviceInfo.View()
 
-	// Combine list and info panels
-	devicePanels := lipgloss.JoinHorizontal(lipgloss.Top, deviceListCol, " ", deviceInfoCol)
+	// Render events (bottom-right) - now gets much more horizontal space
+	eventsPanel := m.renderEventsColumn(rightColWidth, eventsHeight)
 
-	topContent := lipgloss.JoinHorizontal(lipgloss.Top, eventsCol, " ", devicePanels)
+	// Stack info and events vertically
+	rightCol := lipgloss.JoinVertical(lipgloss.Left, deviceInfoPanel, eventsPanel)
+
+	// Combine left and right columns
+	topContent := lipgloss.JoinHorizontal(lipgloss.Top, deviceListCol, " ", rightCol)
 
 	// Ensure topContent fills the full width
 	topContentStyle := lipgloss.NewStyle().Width(m.width)
@@ -1326,11 +1414,95 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	return content
 }
 
+// renderMonitorLayout renders the Monitor tab with energy panels.
+// Layout: Monitor component on top (70%), Energy panels on bottom (30%).
+func (m Model) renderMonitorLayout(height int) string {
+	// Split height: top 70% for monitor, bottom 30% for energy panels
+	monitorHeight := height * 70 / 100
+	energyHeight := height - monitorHeight - 1 // -1 for gap
+
+	if monitorHeight < 10 {
+		monitorHeight = 10
+	}
+	if energyHeight < 5 {
+		energyHeight = 5
+	}
+
+	// Render monitor component from view manager
+	m.viewManager.SetSize(m.width, monitorHeight)
+	monitorView := m.viewManager.View()
+
+	// Render energy panels at bottom
+	energyPanel := m.renderEnergyPanel(m.width, energyHeight)
+
+	// Combine top and bottom sections
+	content := lipgloss.JoinVertical(lipgloss.Left, monitorView, energyPanel)
+
+	return content
+}
+
+// renderWithDeviceList wraps a view with the device list on the left for device persistence.
+// Used for Automation and Config tabs to allow device switching while on those views.
+func (m Model) renderWithDeviceList(height int) string {
+	widths := m.calculateOptimalWidths()
+
+	// Device list on the left (persists across views)
+	deviceListCol := m.renderDeviceListColumn(widths.DeviceList, height)
+
+	// Right column width = total - device list - gap
+	rightColWidth := m.width - widths.DeviceList - 1
+
+	// Get the view content from view manager
+	// Resize the view to fit the available space
+	m.viewManager.SetSize(rightColWidth, height)
+	viewContent := m.viewManager.View()
+
+	// Combine left device list and right view content
+	content := lipgloss.JoinHorizontal(lipgloss.Top, deviceListCol, " ", viewContent)
+
+	// Ensure content fills the full width
+	contentStyle := lipgloss.NewStyle().Width(m.width)
+	content = contentStyle.Render(content)
+
+	// JSON viewer overlay (centered on top of content when active)
+	if m.jsonViewer.Visible() {
+		jsonOverlay := m.jsonViewer.View()
+		return lipgloss.Place(
+			m.width,
+			height,
+			lipgloss.Center,
+			lipgloss.Center,
+			jsonOverlay,
+			lipgloss.WithWhitespaceChars(" "),
+		)
+	}
+
+	return content
+}
+
 // renderEnergyPanel renders the energy consumption bars with sparkline history.
 func (m Model) renderEnergyPanel(width, height int) string {
+	// Guard against too-small dimensions that would cause title overlap
+	if width < 40 || height < 3 {
+		return ""
+	}
+
 	// Split width between bars and history
 	barsWidth := width * 60 / 100
 	historyWidth := width - barsWidth - 1
+
+	// Ensure minimum widths for each panel (title needs at least ~25 chars)
+	if barsWidth < 30 {
+		barsWidth = 30
+	}
+	if historyWidth < 30 {
+		historyWidth = width - barsWidth - 1
+		if historyWidth < 10 {
+			// Not enough space, render only bars
+			m.energyBars = m.energyBars.SetSize(width, height)
+			return m.energyBars.View()
+		}
+	}
 
 	m.energyBars = m.energyBars.SetSize(barsWidth, height)
 	m.energyHistory = m.energyHistory.SetSize(historyWidth, height)
@@ -1400,10 +1572,10 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 
 	deviceCount := m.cache.DeviceCount()
 	onlineCount := m.cache.OnlineCount()
-	title := fmt.Sprintf("Devices (%d/%d)", onlineCount, deviceCount)
 
 	r := rendering.New(width, height).
-		SetTitle(title).
+		SetTitle("Devices").
+		SetBadge(fmt.Sprintf("%d/%d", onlineCount, deviceCount)).
 		SetFocused(focused)
 
 	return r.SetContent(m.deviceList.View()).Render()
@@ -1411,20 +1583,24 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 
 // renderEventsColumn renders the events column with embedded title.
 func (m Model) renderEventsColumn(width, height int) string {
-	colors := theme.GetSemanticColors()
 	orangeBorder := theme.Orange()
 
 	eventCount := m.events.EventCount()
-	title := fmt.Sprintf("Events (%d)", eventCount)
+	focused := m.focusedPanel == PanelEvents
 
 	r := rendering.New(width, height).
-		SetTitle(title).
-		SetFocused(false).
+		SetTitle("Events").
+		SetBadge(fmt.Sprintf("%d", eventCount)).
+		SetFocused(focused).
 		SetFocusColor(orangeBorder).
 		SetBlurColor(orangeBorder)
 
+	// Resize events model to fit inside the border box
+	// ContentHeight/Width account for border (2 chars each side)
+	m.events = m.events.SetSize(r.ContentWidth(), r.ContentHeight())
 	eventsView := m.events.View()
 	if eventsView == "" {
+		colors := theme.GetSemanticColors()
 		eventsView = lipgloss.NewStyle().Foreground(colors.Muted).Italic(true).Render("Waiting...")
 	}
 

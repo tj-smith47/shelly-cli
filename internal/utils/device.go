@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tj-smith47/shelly-go/discovery"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -16,6 +17,8 @@ import (
 
 // DiscoveredDeviceToConfig converts a discovered device to a model.Device.
 // Discovered devices are always native Shelly devices (platform: shelly).
+// Type is set to the model code (e.g., "SPSW-001PE16EU").
+// Model is set to the human-readable name (e.g., "Shelly Pro 1PM").
 func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 	name := d.ID
 	if d.Name != "" {
@@ -27,13 +30,14 @@ func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 		Address:    d.Address.String(),
 		Platform:   model.PlatformShelly,
 		Generation: int(d.Generation),
-		Type:       d.Model,
-		Model:      d.Model,
+		Type:       d.Model,                         // Model code/SKU
+		Model:      types.ModelDisplayName(d.Model), // Human-readable name
 	}
 }
 
 // RegisterDiscoveredDevices adds discovered devices to the registry.
 // Returns the number of devices added and any error.
+// Type is set to the model code, Model is set to the human-readable name.
 func RegisterDiscoveredDevices(devices []discovery.DiscoveredDevice, skipExisting bool) (int, error) {
 	added := 0
 
@@ -54,8 +58,8 @@ func RegisterDiscoveredDevices(devices []discovery.DiscoveredDevice, skipExistin
 			name,
 			d.Address.String(),
 			int(d.Generation),
-			d.Model,
-			d.Model,
+			d.Model,                         // deviceType: model code/SKU
+			types.ModelDisplayName(d.Model), // deviceModel: human-readable name
 			nil,
 		)
 		if err != nil {
@@ -264,6 +268,7 @@ func ListRegisteredDevices() map[string]model.Device {
 
 // PluginDetectionResultToConfig converts a plugin detection result to a model.Device.
 // The address parameter is used since the detection result may not have the IP address.
+// For plugin devices, Model is typically already human-readable from the plugin.
 func PluginDetectionResultToConfig(result *plugins.DeviceDetectionResult, address string) model.Device {
 	name := result.DeviceName
 	if name == "" {
@@ -273,13 +278,17 @@ func PluginDetectionResultToConfig(result *plugins.DeviceDetectionResult, addres
 		name = address
 	}
 
+	// For plugin devices, the Model from plugin is usually already human-readable
+	// But still apply display name mapping in case it's a Shelly code
+	displayModel := types.ModelDisplayName(result.Model)
+
 	return model.Device{
 		Name:       name,
 		Address:    address,
 		Platform:   result.Platform,
-		Generation: 0, // Plugin devices don't have Shelly generations
-		Type:       result.Model,
-		Model:      result.Model,
+		Generation: 0,            // Plugin devices don't have Shelly generations
+		Type:       result.Model, // Model code
+		Model:      displayModel, // Human-readable name
 	}
 }
 

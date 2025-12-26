@@ -56,7 +56,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	var info *shelly.DeviceInfo
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting device info...", func(ctx context.Context) error {
 		var err error
-		info, err = svc.DeviceInfo(ctx, device)
+		// Use DeviceInfoAuto to support both Gen1 and Gen2 devices
+		info, err = svc.DeviceInfoAuto(ctx, device)
 		return err
 	})
 	if err != nil {

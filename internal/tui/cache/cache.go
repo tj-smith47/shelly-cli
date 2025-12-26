@@ -388,7 +388,8 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		defer cancel()
 
 		// Get device info first (auto-detects Gen1 vs Gen2)
-		info, err := c.svc.DeviceInfoAuto(ctx, device.Address)
+		// Pass device name (not address) so resolver finds stored generation
+		info, err := c.svc.DeviceInfoAuto(ctx, name)
 		if err != nil {
 			data.Error = err
 			data.Online = false
@@ -398,14 +399,19 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		data.Info = info
 		data.Online = true
 
-		// Populate device model from DeviceInfo if not already set
-		// Use human-readable product name if available (e.g., "Shelly Pro 1PM")
-		if data.Device.Model == "" && info.Model != "" {
-			data.Device.Model = types.ModelDisplayName(info.Model)
-		}
-		// Type is the model code/SKU (e.g., "SPSW-001PE16EU") for reference
-		if data.Device.Type == "" && info.Model != "" {
-			data.Device.Type = info.Model
+		// Populate device model from DeviceInfo
+		// Model = human-readable product name (e.g., "Shelly Pro 1PM")
+		// Type = model code/SKU (e.g., "SPSW-001PE16EU")
+		if info.Model != "" {
+			displayName := types.ModelDisplayName(info.Model)
+			// Always update Model to display name if empty or if Model==Type (old bug)
+			if data.Device.Model == "" || data.Device.Model == data.Device.Type {
+				data.Device.Model = displayName
+			}
+			// Always update Type to raw code if empty
+			if data.Device.Type == "" {
+				data.Device.Type = info.Model
+			}
 		}
 		// Update generation if not set
 		if data.Device.Generation == 0 && info.Generation > 0 {
@@ -414,7 +420,7 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 
 		// Get switch states (Gen2+ only - Gen1 uses different relay API)
 		if info.Generation > 1 {
-			switches, err := c.svc.SwitchList(ctx, device.Address)
+			switches, err := c.svc.SwitchList(ctx, name)
 			if err == nil {
 				for _, sw := range switches {
 					data.Switches = append(data.Switches, SwitchState{
@@ -426,7 +432,7 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		}
 
 		// Get monitoring snapshot for power metrics (auto-detects Gen1 vs Gen2)
-		snapshot, err := c.svc.GetMonitoringSnapshotAuto(ctx, device.Address)
+		snapshot, err := c.svc.GetMonitoringSnapshotAuto(ctx, name)
 		if err != nil {
 			// Device is online but couldn't get snapshot - that's OK for non-metering devices
 			c.ios.DebugErr("cache snapshot "+name, err)
@@ -450,20 +456,8 @@ func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
 		return nil // Stale response, discard
 	}
 
-	// If refresh failed but we have existing good data, preserve it
-	// Only update the error/online status, keep cached info
-	if msg.Data.Error != nil && existing != nil && existing.Fetched && existing.Info != nil {
-		// Preserve the existing cached data, just mark offline
-		existing.Online = false
-		existing.Error = msg.Data.Error
-		existing.UpdatedAt = msg.Data.UpdatedAt
-		existing.lastRequestID = msg.RequestID
-		// Keep existing.Info, Snapshot, Power, etc. - don't clear good data
-		c.devices[msg.Name] = existing
-	} else {
-		// Normal update - new data or first fetch
-		c.devices[msg.Name] = msg.Data
-	}
+	// Apply update with preservation logic
+	c.applyDeviceUpdate(msg, existing)
 	c.deviceRefreshTimes[msg.Name] = time.Now()
 	c.pendingCount--
 	allDone := c.pendingCount <= 0 && c.initialLoad
@@ -484,6 +478,46 @@ func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
 		return cmds[0]
 	}
 	return tea.Batch(cmds...)
+}
+
+// applyDeviceUpdate applies the update, preserving existing data where appropriate.
+// Must be called with c.mu held.
+func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) {
+	// If refresh failed but we have existing good data, preserve it
+	if shouldPreserveExisting(msg.Data, existing) {
+		existing.Online = false
+		existing.Error = msg.Data.Error
+		existing.UpdatedAt = msg.Data.UpdatedAt
+		existing.lastRequestID = msg.RequestID
+		c.devices[msg.Name] = existing
+		return
+	}
+
+	// Normal update - preserve snapshot if new one is nil
+	preserveSnapshotFromExisting(msg.Data, existing)
+	c.devices[msg.Name] = msg.Data
+}
+
+// shouldPreserveExisting returns true if the existing data should be preserved.
+func shouldPreserveExisting(newData, existing *DeviceData) bool {
+	return newData.Error != nil && existing != nil && existing.Fetched && existing.Info != nil
+}
+
+// preserveSnapshotFromExisting copies snapshot data from existing to new if new is nil or empty.
+func preserveSnapshotFromExisting(newData, existing *DeviceData) {
+	if existing == nil || existing.Snapshot == nil {
+		return
+	}
+	// Preserve if new snapshot is nil OR empty (no PM/EM/EM1 data)
+	newIsEmpty := newData.Snapshot == nil || (len(newData.Snapshot.PM) == 0 && len(newData.Snapshot.EM) == 0 && len(newData.Snapshot.EM1) == 0)
+	existingHasData := len(existing.Snapshot.PM) > 0 || len(existing.Snapshot.EM) > 0 || len(existing.Snapshot.EM1) > 0
+
+	if newIsEmpty && existingHasData {
+		newData.Snapshot = existing.Snapshot
+		if newData.Power == 0 && existing.Power != 0 {
+			newData.Power = existing.Power
+		}
+	}
 }
 
 // aggregateMetrics extracts metrics from the monitoring snapshot.
