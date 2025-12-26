@@ -71,8 +71,8 @@ func TestCursorDown(t *testing.T) {
 
 	t.Run("adjusts scroll when cursor below visible", func(t *testing.T) {
 		t.Parallel()
-		m := createTestModel(20)
-		m.height = 20 // Small height for fewer visible rows
+		m := createTestModel(30) // More events than visible rows
+		m.height = 10            // Small height so 10 visible rows
 		m.cursor = m.visibleRows() - 1
 		m.scrollOffset = 0
 
@@ -153,8 +153,8 @@ func TestCursorToBottom(t *testing.T) {
 
 	t.Run("adjusts scrollOffset", func(t *testing.T) {
 		t.Parallel()
-		m := createTestModel(20)
-		m.height = 20 // Small height
+		m := createTestModel(30) // More events than visible rows
+		m.height = 10            // Small height so 10 visible rows
 		m.scrollOffset = 0
 
 		m = m.cursorToBottom()

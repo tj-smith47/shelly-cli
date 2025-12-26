@@ -37,7 +37,7 @@ func MappingFromTheme() SemanticColors {
 		Text:          Fg(),
 		AltText:       BrightBlack(),
 		Success:       Green(),
-		Warning:       Yellow(),
+		Warning:       Orange(), // Orange for warnings per Dracula UI spec
 		Error:         Red(),
 		Info:          Cyan(),
 		Background:    Bg(),
@@ -63,7 +63,7 @@ func DraculaSemanticMapping() SemanticColors {
 		Text:          lipgloss.Color("#f8f8f2"), // Foreground
 		AltText:       lipgloss.Color("#6272a4"), // Dimmed
 		Success:       lipgloss.Color("#50fa7b"), // Green
-		Warning:       lipgloss.Color("#f1fa8c"), // Yellow
+		Warning:       lipgloss.Color("#ffb86c"), // Orange (per Dracula UI spec)
 		Error:         lipgloss.Color("#ff5555"), // Red
 		Info:          lipgloss.Color("#8be9fd"), // Cyan
 		Background:    lipgloss.Color("#282a36"), // Background

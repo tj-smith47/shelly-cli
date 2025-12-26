@@ -262,6 +262,15 @@ func (es *EventStream) ConnectedDevices() []string {
 	return names
 }
 
+// Publish publishes a synthetic event to the event stream.
+// This is used to emit events not originating from device connections,
+// such as offline events from HTTP polling failures.
+func (es *EventStream) Publish(evt events.Event) {
+	if es.bus != nil {
+		es.bus.Publish(evt)
+	}
+}
+
 func closeWS(ws *transport.WebSocket) {
 	if err := ws.Close(); err != nil {
 		iostreams.DebugErrCat(iostreams.CategoryNetwork, "closing websocket", err)

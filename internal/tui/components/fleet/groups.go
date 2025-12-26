@@ -79,7 +79,7 @@ func DefaultGroupsStyles() GroupsStyles {
 			Bold(true),
 		Selected: lipgloss.NewStyle().
 			Background(colors.Highlight).
-			Foreground(colors.Background),
+			Foreground(colors.Primary),
 	}
 }
 

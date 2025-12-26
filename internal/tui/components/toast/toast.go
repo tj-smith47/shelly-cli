@@ -77,10 +77,10 @@ func DefaultStyles() Styles {
 			Foreground(colors.Text).
 			Background(colors.Info),
 		Success: baseStyle.
-			Foreground(colors.Background).
+			Foreground(colors.Primary).
 			Background(colors.Success),
 		Warning: baseStyle.
-			Foreground(colors.Background).
+			Foreground(colors.Primary).
 			Background(colors.Warning),
 		Error: baseStyle.
 			Foreground(colors.Text).

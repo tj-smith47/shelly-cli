@@ -506,6 +506,11 @@ func (m Model) handleDeviceUpdate(msg cache.DeviceUpdateMsg) (tea.Model, tea.Cmd
 	var historyCmd tea.Cmd
 	m.energyHistory, historyCmd = m.energyHistory.Update(msg)
 	m = m.updateStatusBarContext()
+
+	// Sync device info panel with updated cache data
+	// This ensures the panel reflects any state changes from toggle/on/off actions
+	m = m.syncDeviceInfo()
+
 	cmds := []tea.Cmd{cacheCmd, historyCmd}
 
 	// Emit initial selection when first device becomes available
@@ -710,18 +715,36 @@ func (m Model) updateViewManagerSize() Model {
 // handleDeviceAction handles device action results.
 func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
 	var statusCmd tea.Cmd
+	var eventLevel, eventDesc string
+
 	if msg.Err != nil {
 		statusCmd = statusbar.SetMessage(
 			msg.Device+": "+msg.Action+" failed - "+msg.Err.Error(),
 			statusbar.MessageError,
 		)
+		eventLevel = "error"
+		eventDesc = msg.Action + " failed: " + msg.Err.Error()
 	} else {
 		statusCmd = statusbar.SetMessage(
 			msg.Device+": "+msg.Action+" success",
 			statusbar.MessageSuccess,
 		)
+		eventLevel = "info"
+		eventDesc = msg.Action + " executed successfully"
 	}
-	return m, statusCmd
+
+	// Emit event to events panel for visibility
+	evt := events.Event{
+		Timestamp:   time.Now(),
+		Device:      msg.Device,
+		Component:   "command",
+		Type:        eventLevel,
+		Description: eventDesc,
+	}
+	var evtCmd tea.Cmd
+	m.events, evtCmd = m.events.Update(events.EventMsg{Events: []events.Event{evt}})
+
+	return m, tea.Batch(statusCmd, evtCmd)
 }
 
 // updateStatusBarContext updates the status bar with context-specific items.
@@ -2016,26 +2039,30 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 // renderEventsColumn renders the events column with embedded title.
 func (m Model) renderEventsColumn(width, height int) string {
 	orangeBorder := theme.Orange()
-
-	eventCount := m.events.EventCount()
 	focused := m.focusedPanel == PanelEvents
+
+	// Build badge with status info (count, paused, filtered)
+	badge := m.events.StatusBadge()
+
+	// Build footer with keybindings and scroll info
+	footer := m.events.FooterText()
+	if scrollInfo := m.events.ScrollInfo(); scrollInfo != "" {
+		footer = footer + " " + scrollInfo
+	}
 
 	r := rendering.New(width, height).
 		SetTitle("Events").
-		SetBadge(fmt.Sprintf("%d", eventCount)).
+		SetBadge(badge).
+		SetFooter(footer).
 		SetFocused(focused).
 		SetPanelIndex(3).
 		SetFocusColor(orangeBorder).
 		SetBlurColor(orangeBorder)
 
 	// Resize events model to fit inside the border box
-	// ContentHeight/Width account for border (2 chars each side)
+	// Footer is embedded in border, not a separate line
 	m.events = m.events.SetSize(r.ContentWidth(), r.ContentHeight())
 	eventsView := m.events.View()
-	if eventsView == "" {
-		colors := theme.GetSemanticColors()
-		eventsView = lipgloss.NewStyle().Foreground(colors.Muted).Italic(true).Render("Waiting...")
-	}
 
 	return r.SetContent(eventsView).Render()
 }

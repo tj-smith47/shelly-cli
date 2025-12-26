@@ -93,7 +93,7 @@ func DefaultStyles() Styles {
 			Foreground(colors.Muted),
 		Selected: lipgloss.NewStyle().
 			Background(colors.Highlight).
-			Foreground(colors.Background),
+			Foreground(colors.Primary),
 		Muted: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		Power: lipgloss.NewStyle().
@@ -231,13 +231,13 @@ func (m Model) View() string {
 		SetTitle("Device Info").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
-		SetFocusColor(colors.Highlight).
-		SetBlurColor(colors.TableBorder)
+		SetFocusColor(borderColor).
+		SetBlurColor(colors.TableBorder).
+		SetFooter(m.FooterText())
 
 	content := m.buildContent()
 
 	return r.
-		SetFocusColor(borderColor).
 		SetContent(content).
 		Render()
 }
@@ -320,12 +320,7 @@ func (m Model) writeMetricsSection(content *strings.Builder) {
 }
 
 func (m Model) writeNavigationHint(content *strings.Builder, components []ComponentInfo) {
-	if !m.focused || len(components) == 0 {
-		return
-	}
-	content.WriteString("\n")
-	hint := m.styles.Muted.Render("h/l: select component  a: toggle all  Enter: view JSON")
-	content.WriteString(hint)
+	// Footer is now shown via FooterText() - don't inline it
 }
 
 func (m Model) renderEmpty() string {
@@ -526,6 +521,21 @@ func (m Model) SelectedEndpoint() string {
 // Device returns the current device data.
 func (m Model) Device() *cache.DeviceData {
 	return m.device
+}
+
+// FooterText returns keybinding hints for the footer.
+func (m Model) FooterText() string {
+	if m.device == nil {
+		return ""
+	}
+	components := m.getComponents()
+	if len(components) == 0 {
+		return ""
+	}
+	if len(components) == 1 {
+		return "space:toggle enter:json"
+	}
+	return "h/l:select a:all space:toggle enter:json"
 }
 
 // formatPower formats a power value with appropriate units.

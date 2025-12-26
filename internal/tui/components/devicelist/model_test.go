@@ -132,10 +132,11 @@ func TestCursorNavigation(t *testing.T) {
 		t.Errorf("expected cursor=1 after k, got %d", m.Cursor())
 	}
 
-	// Go to start
+	// Go to start (gg pattern)
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'g'})
 	m, _ = m.Update(tea.KeyPressMsg{Code: 'g'})
 	if m.Cursor() != 0 {
-		t.Errorf("expected cursor=0 after g, got %d", m.Cursor())
+		t.Errorf("expected cursor=0 after gg, got %d", m.Cursor())
 	}
 
 	// Go to end

@@ -5,7 +5,9 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"math/rand/v2"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -137,6 +139,9 @@ type Cache struct {
 
 	// Request ID tracking for stale response handling
 	requestCounter uint64
+
+	// Event stream for publishing synthetic events (e.g., offline from HTTP failure)
+	eventStream *shelly.EventStream
 }
 
 // New creates a new shared cache.
@@ -175,7 +180,9 @@ func (c *Cache) Init() tea.Cmd {
 // SubscribeToEvents subscribes to a shared EventStream for real-time updates.
 // This allows the cache to update device status in real-time when events arrive
 // via WebSocket (Gen2+) or polling (Gen1).
+// Also stores the event stream to publish synthetic events (e.g., offline from HTTP failure).
 func (c *Cache) SubscribeToEvents(es *shelly.EventStream) {
+	c.eventStream = es
 	es.Subscribe(func(evt events.Event) {
 		c.handleDeviceEvent(evt)
 	})
@@ -235,11 +242,21 @@ func (c *Cache) updateFromStatusChange(data *DeviceData, evt *events.StatusChang
 		return
 	}
 
-	c.applyStatusChangeMetrics(data, &status)
+	// Extract switch ID from component name (e.g., "switch:0" -> 0)
+	switchID := -1
+	if strings.HasPrefix(evt.Component, "switch:") {
+		idStr := strings.TrimPrefix(evt.Component, "switch:")
+		if id, err := strconv.Atoi(idStr); err == nil {
+			switchID = id
+		}
+	}
+
+	c.applyStatusChangeMetrics(data, &status, switchID)
 }
 
 // applyStatusChangeMetrics applies parsed metrics to device data.
-func (c *Cache) applyStatusChangeMetrics(data *DeviceData, status *statusChangeData) {
+// switchID is -1 if not a switch component, otherwise the switch ID (0, 1, etc.).
+func (c *Cache) applyStatusChangeMetrics(data *DeviceData, status *statusChangeData, switchID int) {
 	if status.Apower != nil {
 		data.Power = *status.Apower
 	}
@@ -256,8 +273,16 @@ func (c *Cache) applyStatusChangeMetrics(data *DeviceData, status *statusChangeD
 		data.Temperature = status.Temp.TC
 	}
 	// Update switch states if this is a switch component
-	if status.Output != nil && len(data.Switches) > 0 {
-		data.Switches[0].On = *status.Output
+	if status.Output != nil && switchID >= 0 {
+		// Find and update the correct switch by ID
+		for i := range data.Switches {
+			if data.Switches[i].ID == switchID {
+				data.Switches[i].On = *status.Output
+				return
+			}
+		}
+		// Switch not found - add it (shouldn't normally happen, but handles edge cases)
+		data.Switches = append(data.Switches, SwitchState{ID: switchID, On: *status.Output})
 	}
 }
 
@@ -502,9 +527,13 @@ func (c *Cache) scheduleRefresh() tea.Cmd {
 }
 
 // scheduleDeviceRefresh schedules refresh for a single device based on its state.
+// Adds random jitter (0-50% of interval) to prevent all devices refreshing simultaneously.
 func (c *Cache) scheduleDeviceRefresh(name string, data *DeviceData) tea.Cmd {
 	interval := c.getRefreshInterval(data)
-	return tea.Tick(interval, func(time.Time) tea.Msg {
+	// Add 0-50% jitter to stagger requests and prevent rate limiter congestion
+	// #nosec G404 - cryptographic randomness not needed for request jittering
+	jitter := time.Duration(rand.Int64N(int64(interval / 2)))
+	return tea.Tick(interval+jitter, func(time.Time) tea.Msg {
 		return DeviceRefreshMsg{Name: name}
 	})
 }
@@ -738,9 +767,16 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 				data.Device.Type = info.Model
 			}
 		}
-		// Update generation if not set
+		// Update generation if not set and persist to config for faster subsequent operations
 		if data.Device.Generation == 0 && info.Generation > 0 {
 			data.Device.Generation = info.Generation
+			// Persist generation to config to avoid re-detection on toggle commands
+			if err := config.RegisterDevice(
+				name, data.Device.Address, info.Generation,
+				data.Device.Type, data.Device.Model, data.Device.Auth,
+			); err != nil {
+				c.ios.DebugErr("persist device generation", err)
+			}
 		}
 
 		// Get switch states (Gen2+ only - Gen1 uses different relay API)
@@ -810,11 +846,24 @@ func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
 func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) {
 	// If refresh failed but we have existing good data, preserve it
 	if shouldPreserveExisting(msg.Data, existing) {
+		wasOnline := existing.Online
 		existing.Online = false
 		existing.Error = msg.Data.Error
 		existing.UpdatedAt = msg.Data.UpdatedAt
 		existing.lastRequestID = msg.RequestID
 		c.devices[msg.Name] = existing
+
+		// Emit synthetic offline event if device was previously online
+		if wasOnline && c.eventStream != nil {
+			reason := "HTTP polling failed"
+			if msg.Data.Error != nil {
+				reason = msg.Data.Error.Error()
+			}
+			offlineEvt := events.NewDeviceOfflineEvent(msg.Name).
+				WithReason(reason).
+				WithSource(events.EventSourceLocal)
+			c.eventStream.Publish(offlineEvt)
+		}
 		return
 	}
 

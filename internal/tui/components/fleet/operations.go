@@ -98,7 +98,7 @@ func DefaultOperationsStyles() OperationsStyles {
 		ButtonActive: lipgloss.NewStyle().
 			Padding(0, 2).
 			Background(colors.Highlight).
-			Foreground(colors.Background).
+			Foreground(colors.Primary).
 			Bold(true),
 		Success: lipgloss.NewStyle().
 			Foreground(colors.Online),
