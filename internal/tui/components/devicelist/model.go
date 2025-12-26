@@ -20,6 +20,11 @@ type DeviceSelectedMsg struct {
 	Address string
 }
 
+// OpenBrowserMsg is sent when the user wants to open a device's web UI in browser.
+type OpenBrowserMsg struct {
+	Address string
+}
+
 // Model holds the device list state.
 type Model struct {
 	cache        *cache.Cache // Shared device cache
@@ -28,6 +33,8 @@ type Model struct {
 	scrollOffset int          // Scroll offset for list
 	focused      bool         // Whether this component has focus
 	listOnly     bool         // When true, only render list panel (detail rendered separately)
+	gPressed     bool         // Tracks if 'g' was just pressed (for vim-style gx, gg commands)
+	panelIndex   int
 	width        int
 	height       int
 	styles       Styles
@@ -136,25 +143,51 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		oldCursor := m.cursor
-		m = m.handleKeyPress(keyMsg)
-		// Emit selection change if cursor moved
-		if m.cursor != oldCursor {
+		var cmd tea.Cmd
+		m, cmd = m.handleKeyPress(keyMsg)
+		// Emit selection change if cursor moved (unless a command is already being returned)
+		if m.cursor != oldCursor && cmd == nil {
 			return m, m.emitSelection()
 		}
+		return m, cmd
 	}
 	return m, nil
 }
 
-func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	devices := m.getFilteredDevices()
-	switch msg.String() {
+	key := msg.String()
+
+	// Handle g-prefix commands (gx for browser, gg for top)
+	if m.gPressed {
+		m.gPressed = false
+		switch key {
+		case "x":
+			// gx: open device web UI in browser
+			if d := m.SelectedDevice(); d != nil {
+				return m, func() tea.Msg {
+					return OpenBrowserMsg{Address: d.Device.Address}
+				}
+			}
+			return m, nil
+		case "g":
+			// gg: go to top
+			m.cursor = 0
+			m.scrollOffset = 0
+			return m, nil
+		}
+		// Other keys after g: just process normally
+	}
+
+	switch key {
 	case "j", "down":
 		m = m.cursorDown(devices)
 	case "k", "up":
 		m = m.cursorUp()
 	case "g":
-		m.cursor = 0
-		m.scrollOffset = 0
+		// Start g-prefix mode (for gg, gx commands)
+		m.gPressed = true
+		return m, nil
 	case "G":
 		m = m.cursorToEnd(devices)
 	case "pgdown", "ctrl+d":
@@ -162,7 +195,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	case "pgup", "ctrl+u":
 		m = m.pageUp()
 	}
-	return m
+	return m, nil
 }
 
 func (m Model) cursorDown(devices []*cache.DeviceData) Model {
@@ -283,6 +316,12 @@ func (m Model) SetFilter(filter string) Model {
 // SetFocused sets whether this component has focus.
 func (m Model) SetFocused(focused bool) Model {
 	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
 	return m
 }
 

@@ -62,6 +62,15 @@ const (
 	ActionTab3
 	ActionTab4
 	ActionTab5
+	ActionPanel1
+	ActionPanel2
+	ActionPanel3
+	ActionPanel4
+	ActionPanel5
+	ActionPanel6
+	ActionPanel7
+	ActionPanel8
+	ActionPanel9
 )
 
 // KeyBinding represents a key and its description.
@@ -99,6 +108,15 @@ func (m *ContextMap) initDefaults() {
 		"3":         ActionTab3,
 		"4":         ActionTab4,
 		"5":         ActionTab5,
+		"shift+1":   ActionPanel1,
+		"shift+2":   ActionPanel2,
+		"shift+3":   ActionPanel3,
+		"shift+4":   ActionPanel4,
+		"shift+5":   ActionPanel5,
+		"shift+6":   ActionPanel6,
+		"shift+7":   ActionPanel7,
+		"shift+8":   ActionPanel8,
+		"shift+9":   ActionPanel9,
 		"ctrl+c":    ActionQuit,
 	}
 
@@ -341,6 +359,15 @@ var actionDescriptions = map[Action]string{
 	ActionTab3:      "Config tab",
 	ActionTab4:      "Manage tab",
 	ActionTab5:      "Fleet tab",
+	ActionPanel1:    "Jump to panel 1",
+	ActionPanel2:    "Jump to panel 2",
+	ActionPanel3:    "Jump to panel 3",
+	ActionPanel4:    "Jump to panel 4",
+	ActionPanel5:    "Jump to panel 5",
+	ActionPanel6:    "Jump to panel 6",
+	ActionPanel7:    "Jump to panel 7",
+	ActionPanel8:    "Jump to panel 8",
+	ActionPanel9:    "Jump to panel 9",
 }
 
 // contextActionDescriptions overrides action descriptions for specific contexts.

@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/fleet"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -266,6 +267,18 @@ func (f *Fleet) handleKeyPress(msg tea.KeyPressMsg) {
 		f.focusNext()
 	case keyShiftTab:
 		f.focusPrev()
+	case keyconst.Shift1:
+		f.focusedPanel = FleetPanelDevices
+		f.updateFocusStates()
+	case keyconst.Shift2:
+		f.focusedPanel = FleetPanelGroups
+		f.updateFocusStates()
+	case keyconst.Shift3:
+		f.focusedPanel = FleetPanelHealth
+		f.updateFocusStates()
+	case keyconst.Shift4:
+		f.focusedPanel = FleetPanelOperations
+		f.updateFocusStates()
 	case "c":
 		// Connect/disconnect
 		if f.fleetConn == nil && !f.connecting {
@@ -299,10 +312,10 @@ func (f *Fleet) focusPrev() {
 }
 
 func (f *Fleet) updateFocusStates() {
-	f.devices = f.devices.SetFocused(f.focusedPanel == FleetPanelDevices)
-	f.groups = f.groups.SetFocused(f.focusedPanel == FleetPanelGroups)
-	f.health = f.health.SetFocused(f.focusedPanel == FleetPanelHealth)
-	f.operations = f.operations.SetFocused(f.focusedPanel == FleetPanelOperations)
+	f.devices = f.devices.SetFocused(f.focusedPanel == FleetPanelDevices).SetPanelIndex(1)
+	f.groups = f.groups.SetFocused(f.focusedPanel == FleetPanelGroups).SetPanelIndex(2)
+	f.health = f.health.SetFocused(f.focusedPanel == FleetPanelHealth).SetPanelIndex(3)
+	f.operations = f.operations.SetFocused(f.focusedPanel == FleetPanelOperations).SetPanelIndex(4)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if f.layoutCalc != nil && f.width > 0 && f.height > 0 {

@@ -21,6 +21,7 @@ type Service struct {
 	resolver       DeviceResolver
 	rateLimiter    *ratelimit.DeviceRateLimiter
 	pluginRegistry *plugins.Registry
+	firmwareCache  *FirmwareCache
 }
 
 // DeviceResolver resolves device identifiers to device configurations.
@@ -97,7 +98,10 @@ func WithPluginRegistry(registry *plugins.Registry) ServiceOption {
 
 // New creates a new Shelly service with optional configuration.
 func New(resolver DeviceResolver, opts ...ServiceOption) *Service {
-	svc := &Service{resolver: resolver}
+	svc := &Service{
+		resolver:      resolver,
+		firmwareCache: NewFirmwareCache(),
+	}
 	for _, opt := range opts {
 		opt(svc)
 	}

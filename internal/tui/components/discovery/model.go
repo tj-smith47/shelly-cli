@@ -47,18 +47,19 @@ type DeviceAddedMsg struct {
 
 // Model displays device discovery.
 type Model struct {
-	ctx      context.Context
-	svc      *shelly.Service
-	devices  []shelly.DiscoveredDevice
-	cursor   int
-	scroll   int
-	scanning bool
-	method   shelly.DiscoveryMethod
-	err      error
-	width    int
-	height   int
-	focused  bool
-	styles   Styles
+	ctx        context.Context
+	svc        *shelly.Service
+	devices    []shelly.DiscoveredDevice
+	cursor     int
+	scroll     int
+	scanning   bool
+	method     shelly.DiscoveryMethod
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int
+	styles     Styles
 }
 
 // Styles holds styles for the Discovery component.
@@ -135,6 +136,12 @@ func (m Model) SetSize(width, height int) Model {
 // SetFocused sets the focus state.
 func (m Model) SetFocused(focused bool) Model {
 	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
 	return m
 }
 
@@ -278,11 +285,12 @@ func (m Model) addSelectedDevice() (Model, tea.Cmd) {
 func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Discovery").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("s:scan a:add 1-3:method")
+		r.SetFooter("s:scan a:add p:provision 1-3:method")
 	}
 
 	var content strings.Builder

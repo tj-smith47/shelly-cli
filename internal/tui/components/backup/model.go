@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -117,6 +118,7 @@ type Model struct {
 	width       int
 	height      int
 	focused     bool
+	panelIndex  int
 	styles      Styles
 }
 
@@ -278,6 +280,12 @@ func (m Model) SetFocused(focused bool) Model {
 	return m
 }
 
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
+	return m
+}
+
 // SetBackupDir sets the backup directory.
 func (m Model) SetBackupDir(dir string) Model {
 	m.backupDir = dir
@@ -379,7 +387,8 @@ func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
 		}
 
 		if err := g.Wait(); err != nil {
-			_ = err // Individual errors captured per device
+			// Individual errors are captured per device in results
+			iostreams.DebugErr("backup export batch", err)
 		}
 
 		return ExportCompleteMsg{Results: results}
@@ -624,7 +633,8 @@ func (m Model) selectedDevices() []DeviceBackup {
 func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Backup & Restore").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {

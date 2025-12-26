@@ -293,3 +293,109 @@ func BuildDivider(width int, name string, border lipgloss.Border) string {
 func BuildSideBorders(border lipgloss.Border) (left, right string) {
 	return border.Left, border.Right
 }
+
+// BuildBottomBorderWithHint creates a bottom border with a hint on the right side.
+// Example output: "╰─────────────────────├─ ⇧1 ─┤╯".
+func BuildBottomBorderWithHint(width int, hint string, border lipgloss.Border) string {
+	if width < 5 || hint == "" {
+		return BuildBottomBorder(width, border)
+	}
+
+	bottomLeft := border.BottomLeft
+	bottomRight := border.BottomRight
+	bottom := border.Bottom
+	midLeft := border.MiddleLeft
+	midRight := border.MiddleRight
+
+	bottomLeftW := charWidth(bottomLeft)
+	bottomRightW := charWidth(bottomRight)
+	bottomW := charWidth(bottom)
+	midLeftW := charWidth(midLeft)
+	midRightW := charWidth(midRight)
+
+	// Hint with padding: ├─ hint ─┤
+	hintText := " " + hint + " "
+	hintWidth := charWidth(hintText)
+
+	// Structure: BottomLeft + fill + midLeft + ─ + hintText + ─ + midRight + BottomRight
+	// Hint goes on the right side
+	minHintWidth := midLeftW + bottomW + hintWidth + bottomW + midRightW
+	availableForFill := width - bottomLeftW - bottomRightW - minHintWidth
+
+	if availableForFill < 0 {
+		// Not enough space for hint
+		return BuildBottomBorder(width, border)
+	}
+
+	// All fill goes on the left side (hint is right-aligned)
+	leftFillCount := availableForFill / bottomW
+
+	return bottomLeft +
+		strings.Repeat(bottom, leftFillCount) +
+		midLeft + bottom + hintText + bottom + midRight +
+		bottomRight
+}
+
+// BuildBottomBorderWithFooterAndHint creates a bottom border with footer on left and hint on right.
+// Example output: "╰─├─ footer ─┤─────────├─ ⇧1 ─┤╯".
+func BuildBottomBorderWithFooterAndHint(width int, footer, hint string, border lipgloss.Border) string {
+	if width < 5 {
+		return ""
+	}
+
+	// Handle degenerate cases
+	if footer == "" && hint == "" {
+		return BuildBottomBorder(width, border)
+	}
+	if footer == "" {
+		return BuildBottomBorderWithHint(width, hint, border)
+	}
+	if hint == "" {
+		return BuildBottomBorderWithFooter(width, footer, border)
+	}
+
+	bottomLeft := border.BottomLeft
+	bottomRight := border.BottomRight
+	bottom := border.Bottom
+	midLeft := border.MiddleLeft
+	midRight := border.MiddleRight
+
+	bottomLeftW := charWidth(bottomLeft)
+	bottomRightW := charWidth(bottomRight)
+	bottomW := charWidth(bottom)
+	midLeftW := charWidth(midLeft)
+	midRightW := charWidth(midRight)
+
+	// Footer section: ├─ footer ─┤
+	footerText := " " + footer + " "
+	footerWidth := charWidth(footerText)
+
+	// Hint section: ├─ hint ─┤
+	hintText := " " + hint + " "
+	hintWidth := charWidth(hintText)
+
+	// Structure: BottomLeft + fill + midLeft + ─ + footer + ─ + midRight + fill + midLeft + ─ + hint + ─ + midRight + BottomRight
+	minFooterWidth := midLeftW + bottomW + footerWidth + bottomW + midRightW
+	minHintWidth := midLeftW + bottomW + hintWidth + bottomW + midRightW
+	availableForFill := width - bottomLeftW - bottomRightW - minFooterWidth - minHintWidth
+
+	if availableForFill < 2 {
+		// Not enough space for both, prioritize hint
+		return BuildBottomBorderWithHint(width, hint, border)
+	}
+
+	// Minimal left fill (1), rest between footer and hint
+	leftFillCount := 1
+	midFillCount := (availableForFill / bottomW) - leftFillCount
+
+	if midFillCount < 0 {
+		midFillCount = 0
+	}
+
+	return bottomLeft +
+		strings.Repeat(bottom, leftFillCount) +
+		midLeft + bottom + footerText + bottom + midRight +
+		strings.Repeat(bottom, midFillCount) +
+		midLeft + bottom + hintText + bottom + midRight +
+		bottomRight
+}

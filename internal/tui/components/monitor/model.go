@@ -3,12 +3,15 @@ package monitor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/tj-smith47/shelly-go/events"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -42,16 +45,17 @@ func (d Deps) validate() error {
 
 // DeviceStatus represents the real-time status of a device.
 type DeviceStatus struct {
-	Name      string
-	Address   string
-	Type      string
-	Online    bool
-	Power     float64
-	Voltage   float64
-	Current   float64
-	Frequency float64
-	UpdatedAt time.Time
-	Error     error
+	Name        string
+	Address     string
+	Type        string
+	Online      bool
+	Power       float64
+	Voltage     float64
+	Current     float64
+	Frequency   float64
+	TotalEnergy float64 // Total energy consumption in Wh
+	UpdatedAt   time.Time
+	Error       error
 }
 
 // StatusUpdateMsg is sent when device status is updated.
@@ -60,8 +64,13 @@ type StatusUpdateMsg struct {
 	Err      error
 }
 
-// RefreshTickMsg triggers periodic refresh.
+// RefreshTickMsg triggers periodic refresh (fallback for Gen1 devices).
 type RefreshTickMsg struct{}
+
+// DeviceEventMsg wraps WebSocket events from devices.
+type DeviceEventMsg struct {
+	Event events.Event
+}
 
 // Model holds the monitor state.
 type Model struct {
@@ -69,7 +78,12 @@ type Model struct {
 	svc             *shelly.Service
 	ios             *iostreams.IOStreams
 	statuses        []DeviceStatus
-	loading         bool
+	statusMap       map[string]*DeviceStatus // For O(1) updates by device name
+	initialLoad     bool                     // True only on first load (shows loading screen)
+	refreshing      bool                     // True during background refresh (shows indicator, keeps data)
+	useWebSocket    bool                     // True if using WebSocket for updates
+	eventStream     *shelly.EventStream      // WebSocket event stream
+	eventChan       chan events.Event        // Channel for WebSocket events
 	err             error
 	width           int
 	height          int
@@ -97,6 +111,9 @@ type Styles struct {
 	Value        lipgloss.Style
 	LastUpdated  lipgloss.Style
 	Separator    lipgloss.Style
+	SummaryCard  lipgloss.Style
+	SummaryValue lipgloss.Style
+	Energy       lipgloss.Style
 }
 
 // DefaultStyles returns default styles for the monitor.
@@ -105,9 +122,7 @@ func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
 		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(1, 2),
+			Padding(0, 1), // No border - wrapper adds border with title
 		Header: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Highlight).
@@ -148,6 +163,16 @@ func DefaultStyles() Styles {
 			Italic(true),
 		Separator: lipgloss.NewStyle().
 			Foreground(colors.Muted),
+		SummaryCard: lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(colors.TableBorder).
+			Padding(0, 1).
+			MarginRight(1),
+		SummaryValue: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colors.Highlight),
+		Energy: lipgloss.NewStyle().
+			Foreground(colors.Success),
 	}
 }
 
@@ -159,15 +184,34 @@ func New(deps Deps) Model {
 
 	refreshInterval := deps.RefreshInterval
 	if refreshInterval == 0 {
-		refreshInterval = 10 * time.Second // Increased from 5s to reduce load
+		refreshInterval = 10 * time.Second // Fallback polling interval for Gen1
 	}
+
+	// Create event stream for WebSocket connections
+	eventStream := shelly.NewEventStream(deps.Svc)
+	eventChan := make(chan events.Event, 100)
+
+	// Subscribe to all events and forward to channel
+	eventStream.Subscribe(func(evt events.Event) {
+		select {
+		case eventChan <- evt:
+		default:
+			// Channel full, drop event (shouldn't happen with buffer)
+			deps.IOS.DebugErr("monitor event channel full", nil)
+		}
+	})
 
 	return Model{
 		ctx:             deps.Ctx,
 		svc:             deps.Svc,
 		ios:             deps.IOS,
 		statuses:        []DeviceStatus{},
-		loading:         true,
+		statusMap:       make(map[string]*DeviceStatus),
+		initialLoad:     true,
+		refreshing:      false,
+		useWebSocket:    true,
+		eventStream:     eventStream,
+		eventChan:       eventChan,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
 	}
@@ -175,10 +219,41 @@ func New(deps Deps) Model {
 
 // Init returns the initial command for the monitor.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.fetchStatuses(),
-		m.scheduleRefresh(),
-	)
+	cmds := []tea.Cmd{
+		m.fetchStatuses(), // Initial HTTP fetch for immediate data
+	}
+
+	if m.useWebSocket {
+		// Start WebSocket connections and event listener
+		cmds = append(cmds, m.startEventStream(), m.listenForEvents())
+	} else {
+		// Fallback to polling
+		cmds = append(cmds, m.scheduleRefresh())
+	}
+
+	return tea.Batch(cmds...)
+}
+
+// startEventStream starts WebSocket connections to all devices.
+func (m Model) startEventStream() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.eventStream.Start(); err != nil {
+			m.ios.DebugErr("start event stream", err)
+		}
+		return nil
+	}
+}
+
+// listenForEvents returns a command that listens for events from the channel.
+func (m Model) listenForEvents() tea.Cmd {
+	return func() tea.Msg {
+		select {
+		case <-m.ctx.Done():
+			return nil
+		case evt := <-m.eventChan:
+			return DeviceEventMsg{Event: evt}
+		}
+	}
 }
 
 // scheduleRefresh schedules the next refresh tick.
@@ -277,6 +352,9 @@ func aggregateStatusFromPM(status *DeviceStatus, pms []shelly.PMStatus) {
 		if pm.Freq != nil && status.Frequency == 0 {
 			status.Frequency = *pm.Freq
 		}
+		if pm.AEnergy != nil {
+			status.TotalEnergy += pm.AEnergy.Total
+		}
 	}
 }
 
@@ -319,20 +397,36 @@ func (m Model) Refresh() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case StatusUpdateMsg:
-		m.loading = false
+		m.initialLoad = false
+		m.refreshing = false
 		if msg.Err != nil {
 			m.err = msg.Err
 			return m, nil
 		}
 		m.statuses = msg.Statuses
+		// Build status map for O(1) updates
+		m.statusMap = make(map[string]*DeviceStatus, len(m.statuses))
+		for i := range m.statuses {
+			m.statusMap[m.statuses[i].Name] = &m.statuses[i]
+		}
 		return m, nil
 
+	case DeviceEventMsg:
+		// Handle WebSocket event - update status in place
+		m.handleDeviceEvent(msg.Event)
+		// Continue listening for more events
+		return m, m.listenForEvents()
+
 	case RefreshTickMsg:
-		// Skip refresh if already loading to prevent overlap
-		if m.loading {
+		// Skip refresh if using WebSocket (except for initial load)
+		if m.useWebSocket && !m.initialLoad {
 			return m, m.scheduleRefresh()
 		}
-		m.loading = true
+		// Skip refresh if already refreshing to prevent overlap
+		if m.refreshing {
+			return m, m.scheduleRefresh()
+		}
+		m.refreshing = true
 		return m, tea.Batch(
 			m.fetchStatuses(),
 			m.scheduleRefresh(),
@@ -343,6 +437,82 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleDeviceEvent processes a WebSocket event and updates device status.
+func (m Model) handleDeviceEvent(evt events.Event) {
+	deviceID := evt.DeviceID()
+
+	switch e := evt.(type) {
+	case *events.StatusChangeEvent:
+		// Update power/energy data from status change
+		if status, ok := m.statusMap[deviceID]; ok {
+			status.UpdatedAt = e.Timestamp()
+			m.parseStatusChange(status, e.Component, e.Status)
+		}
+
+	case *events.FullStatusEvent:
+		// Full status update - parse all data
+		if status, ok := m.statusMap[deviceID]; ok {
+			status.UpdatedAt = e.Timestamp()
+			m.parseFullStatus(status, e.Status)
+		}
+
+	case *events.DeviceOnlineEvent:
+		if status, ok := m.statusMap[deviceID]; ok {
+			status.Online = true
+			status.Error = nil
+			status.UpdatedAt = e.Timestamp()
+		}
+
+	case *events.DeviceOfflineEvent:
+		if status, ok := m.statusMap[deviceID]; ok {
+			status.Online = false
+			if e.Reason != "" {
+				status.Error = fmt.Errorf("%s", e.Reason)
+			}
+			status.UpdatedAt = e.Timestamp()
+		}
+	}
+}
+
+// parseStatusChange parses a status change event for a component.
+func (m Model) parseStatusChange(status *DeviceStatus, component string, data json.RawMessage) {
+	// Parse component status (switch, pm, em, etc.)
+	var statusData map[string]any
+	if err := json.Unmarshal(data, &statusData); err != nil {
+		m.ios.DebugErr(fmt.Sprintf("parse status change for %s", component), err)
+		return
+	}
+
+	// Extract power data from switch/pm components
+	if power, ok := statusData["apower"].(float64); ok {
+		status.Power = power
+	}
+	if voltage, ok := statusData["voltage"].(float64); ok {
+		status.Voltage = voltage
+	}
+	if current, ok := statusData["current"].(float64); ok {
+		status.Current = current
+	}
+}
+
+// parseFullStatus parses a full device status event.
+func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
+	var fullStatus shelly.MonitoringSnapshot
+	if err := json.Unmarshal(data, &fullStatus); err != nil {
+		return
+	}
+
+	status.Online = fullStatus.Online
+	status.Power = 0
+	status.Voltage = 0
+	status.Current = 0
+	status.TotalEnergy = 0
+
+	aggregateStatusFromPM(status, fullStatus.PM)
+	aggregateStatusFromEM(status, fullStatus.EM)
+	aggregateStatusFromEM1(status, fullStatus.EM1)
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
@@ -444,8 +614,8 @@ func (m Model) SetSize(width, height int) Model {
 // visibleRows calculates how many device rows can be displayed.
 // Each device card takes 3 lines (2 content + margin) + 1 separator = 4 lines total.
 func (m Model) visibleRows() int {
-	// Account for: header (2), footer (2), container padding (2) = 6 lines overhead
-	availableHeight := m.height - 6
+	// Account for: header (2), summary (4), empty line (1), footer (2), container padding (2) = 11 lines overhead
+	availableHeight := m.height - 11
 	// Each card: 2 lines content + 1 margin + 1 separator = 4 lines
 	// Last card has no separator, so for N cards: 4N - 1 lines
 	// Solving for N: N = (availableHeight + 1) / 4
@@ -459,7 +629,7 @@ func (m Model) visibleRows() int {
 
 // View renders the monitor.
 func (m Model) View() string {
-	if m.loading {
+	if m.initialLoad {
 		loadingText := m.styles.UpdatingIcon.Render("◐ ") + "Fetching device statuses..."
 		return m.styles.Container.
 			Width(m.width).
@@ -482,8 +652,25 @@ func (m Model) View() string {
 			Render("No devices to monitor.\nUse 'shelly device add' to add devices.")
 	}
 
-	// Build the monitor view
-	header := m.styles.Header.Render("Real-Time Device Monitor")
+	// Calculate totals for summary
+	var totalPower, totalEnergy float64
+	var onlineCount, offlineCount int
+	for _, s := range m.statuses {
+		if s.Online {
+			onlineCount++
+			totalPower += s.Power
+			totalEnergy += s.TotalEnergy
+		} else {
+			offlineCount++
+		}
+	}
+
+	// Summary cards row
+	summary := lipgloss.JoinHorizontal(lipgloss.Top,
+		m.renderSummaryCard("Power", m.formatPower(totalPower)),
+		m.renderSummaryCard("Energy", m.formatEnergy(totalEnergy)),
+		m.renderSummaryCard("Devices", fmt.Sprintf("%d/%d online", onlineCount, len(m.statuses))),
+	)
 
 	// Calculate visible rows
 	visibleRows := m.visibleRows()
@@ -495,13 +682,17 @@ func (m Model) View() string {
 		endIdx = len(m.statuses)
 	}
 
+	// Calculate content width (container width minus padding)
+	contentWidth := m.width - 6 // 2 padding + 2 border on each side
+
 	var rows string
 	for i := startIdx; i < endIdx; i++ {
 		s := m.statuses[i]
 		isSelected := i == m.cursor
 		rows += m.renderDeviceCard(s, isSelected)
 		if i < endIdx-1 {
-			rows += m.styles.Separator.Render("─────────────────────────────────────────") + "\n"
+			separator := m.styles.Separator.Render(strings.Repeat("─", contentWidth))
+			rows += separator + "\n"
 		}
 	}
 
@@ -517,8 +708,36 @@ func (m Model) View() string {
 		fmt.Sprintf("Last updated: %s", time.Now().Format("15:04:05")),
 	) + scrollInfo
 
-	content := lipgloss.JoinVertical(lipgloss.Left, header, rows, footer)
-	return m.styles.Container.Width(m.width).Render(content)
+	content := lipgloss.JoinVertical(lipgloss.Left, summary, "", rows, footer)
+	return m.styles.Container.Width(m.width).Height(m.height).Render(content)
+}
+
+// renderSummaryCard renders a summary card with label and value.
+func (m Model) renderSummaryCard(label, value string) string {
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		m.styles.Label.Render(label),
+		m.styles.SummaryValue.Render(value),
+	)
+	return m.styles.SummaryCard.Width(20).Render(content)
+}
+
+// formatPower formats watts for display.
+func (m Model) formatPower(watts float64) string {
+	if watts >= 1000 || watts <= -1000 {
+		return fmt.Sprintf("%.2f kW", watts/1000)
+	}
+	return fmt.Sprintf("%.1f W", watts)
+}
+
+// formatEnergy formats watt-hours for display.
+func (m Model) formatEnergy(wh float64) string {
+	if wh >= 1000000 {
+		return fmt.Sprintf("%.2f MWh", wh/1000000)
+	}
+	if wh >= 1000 {
+		return fmt.Sprintf("%.2f kWh", wh/1000)
+	}
+	return fmt.Sprintf("%.1f Wh", wh)
 }
 
 // renderDeviceCard renders a single device status card.
@@ -562,6 +781,30 @@ func (m Model) renderDeviceCard(s DeviceStatus, isSelected bool) string {
 	}
 
 	// Second line: metrics
+	line2 := "    " + m.buildMetricsLine(s)
+
+	return rowStyle.Render(line1+"\n"+line2) + "\n"
+}
+
+// buildMetricsLine builds the metrics display line for a device.
+func (m Model) buildMetricsLine(s DeviceStatus) string {
+	metrics := m.collectMetrics(s)
+	if len(metrics) == 0 {
+		return m.styles.LastUpdated.Render("no power data")
+	}
+
+	result := ""
+	for i, metric := range metrics {
+		if i > 0 {
+			result += m.styles.Separator.Render(" │ ")
+		}
+		result += metric
+	}
+	return result
+}
+
+// collectMetrics collects all available metrics for a device.
+func (m Model) collectMetrics(s DeviceStatus) []string {
 	metrics := []string{}
 
 	if s.Power > 0 || s.Power < 0 {
@@ -576,20 +819,11 @@ func (m Model) renderDeviceCard(s DeviceStatus, isSelected bool) string {
 	if s.Frequency > 0 {
 		metrics = append(metrics, m.styles.Value.Render(fmt.Sprintf("%.1fHz", s.Frequency)))
 	}
-
-	line2 := "    "
-	if len(metrics) > 0 {
-		for i, metric := range metrics {
-			if i > 0 {
-				line2 += m.styles.Separator.Render(" │ ")
-			}
-			line2 += metric
-		}
-	} else {
-		line2 += m.styles.LastUpdated.Render("no power data")
+	if s.TotalEnergy > 0 {
+		metrics = append(metrics, m.styles.Energy.Render(m.formatEnergy(s.TotalEnergy)))
 	}
 
-	return rowStyle.Render(line1+"\n"+line2) + "\n"
+	return metrics
 }
 
 // StatusCount returns the count of online/offline devices.
@@ -618,4 +852,14 @@ func (m Model) SelectedDevice() *DeviceStatus {
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
 	return m.cursor
+}
+
+// IsRefreshing returns true if the monitor is currently refreshing.
+func (m Model) IsRefreshing() bool {
+	return m.refreshing
+}
+
+// IsLoading returns true if the initial load is in progress.
+func (m Model) IsLoading() bool {
+	return m.initialLoad
 }

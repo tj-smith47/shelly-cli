@@ -25,6 +25,7 @@ type RequestJSONMsg struct {
 type Model struct {
 	device          *cache.DeviceData
 	focused         bool
+	panelIndex      int
 	componentCursor int // -1 = all, >=0 = specific component
 	endpointCursor  int // Selected endpoint for JSON viewer
 	scrollOffset    int
@@ -229,6 +230,7 @@ func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Device Info").
 		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex).
 		SetFocusColor(colors.Highlight).
 		SetBlurColor(colors.TableBorder)
 
@@ -331,6 +333,7 @@ func (m Model) renderEmpty() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Device Info").
 		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex).
 		SetFocusColor(colors.Highlight).
 		SetBlurColor(colors.TableBorder).
 		SetContent(m.styles.Muted.Render("Select a device to view details"))
@@ -498,6 +501,12 @@ func (m Model) SetFocused(focused bool) Model {
 // Focused returns whether the component is focused.
 func (m Model) Focused() bool {
 	return m.focused
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
+	return m
 }
 
 // SelectedComponent returns the selected component index (-1 = all).

@@ -72,6 +72,7 @@ type OperationsModel struct {
 	width       int
 	height      int
 	focused     bool
+	panelIndex  int
 	styles      OperationsStyles
 }
 
@@ -147,6 +148,12 @@ func (m OperationsModel) SetSize(width, height int) OperationsModel {
 // SetFocused sets the focus state.
 func (m OperationsModel) SetFocused(focused bool) OperationsModel {
 	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m OperationsModel) SetPanelIndex(index int) OperationsModel {
+	m.panelIndex = index
 	return m
 }
 
@@ -233,7 +240,8 @@ func (m OperationsModel) executeOperation() tea.Cmd {
 func (m OperationsModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Batch Operations").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {

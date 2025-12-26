@@ -12,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -78,6 +79,7 @@ type EditorModel struct {
 	width            int
 	height           int
 	focused          bool
+	panelIndex       int // 1-based panel index for Shift+N hotkey hint
 	showNumbers      bool
 	styles           EditorStyles
 }
@@ -224,6 +226,12 @@ func (m EditorModel) SetFocused(focused bool) EditorModel {
 	return m
 }
 
+// SetPanelIndex sets the 1-based panel index for Shift+N hotkey hint.
+func (m EditorModel) SetPanelIndex(index int) EditorModel {
+	m.panelIndex = index
+	return m
+}
+
 // Update handles messages.
 func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -340,7 +348,8 @@ func (m EditorModel) maxScroll() int {
 func (m EditorModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Code").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	if m.scriptID == 0 {
 		r.SetContent(m.styles.Muted.Render("No script selected"))
@@ -507,13 +516,13 @@ func (m EditorModel) Edit() tea.Cmd {
 	tmpPath := tmpFile.Name()
 
 	if _, err := tmpFile.WriteString(code); err != nil {
-		tmpFile.Close()    //nolint:errcheck // Best-effort cleanup on error path
+		iostreams.CloseWithDebug("closing temp file on error", tmpFile)
 		os.Remove(tmpPath) //nolint:errcheck // Best-effort cleanup on error path
 		return func() tea.Msg {
 			return EditorFinishedMsg{Device: device, ScriptID: scriptID, Err: err}
 		}
 	}
-	tmpFile.Close() //nolint:errcheck // Close before external editor opens
+	iostreams.CloseWithDebug("closing temp file before editor", tmpFile)
 
 	// Get editor: config setting > EDITOR env > VISUAL env > nano
 	editor := config.GetEditor()

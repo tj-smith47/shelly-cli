@@ -70,18 +70,19 @@ type CreateScriptMsg struct {
 
 // ListModel displays scripts for a device.
 type ListModel struct {
-	ctx     context.Context
-	svc     *shelly.Service
-	device  string
-	scripts []Script
-	cursor  int
-	scroll  int
-	loading bool
-	err     error
-	width   int
-	height  int
-	focused bool
-	styles  ListStyles
+	ctx        context.Context
+	svc        *shelly.Service
+	device     string
+	scripts    []Script
+	cursor     int
+	scroll     int
+	loading    bool
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int // 1-based panel index for Shift+N hotkey hint
+	styles     ListStyles
 }
 
 // ListStyles holds styles for the list component.
@@ -192,6 +193,12 @@ func (m ListModel) SetSize(width, height int) ListModel {
 // SetFocused sets the focus state.
 func (m ListModel) SetFocused(focused bool) ListModel {
 	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the 1-based panel index for Shift+N hotkey hint.
+func (m ListModel) SetPanelIndex(index int) ListModel {
+	m.panelIndex = index
 	return m
 }
 
@@ -393,7 +400,8 @@ func (m ListModel) createScript() tea.Cmd {
 func (m ListModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Scripts").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused && m.device != "" && len(m.scripts) > 0 {

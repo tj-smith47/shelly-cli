@@ -191,7 +191,7 @@ func TestConfig_FocusPrev(t *testing.T) {
 func TestConfig_FocusWrap(t *testing.T) {
 	t.Parallel()
 	c := newTestConfig()
-	c.focusedPanel = PanelSecurity // Last panel in the list
+	c.focusedPanel = PanelSmartHome // Last panel in the list
 
 	// Focus next should wrap to PanelWiFi
 	c.focusNext()

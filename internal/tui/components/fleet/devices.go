@@ -37,17 +37,18 @@ type DevicesLoadedMsg struct {
 
 // DevicesModel displays cloud devices from the fleet manager.
 type DevicesModel struct {
-	ctx       context.Context
-	fleet     *integrator.FleetManager
-	devices   []integrator.AccountDevice
-	cursor    int
-	loading   bool
-	err       error
-	width     int
-	height    int
-	focused   bool
-	styles    DevicesStyles
-	lastFetch time.Time
+	ctx        context.Context
+	fleet      *integrator.FleetManager
+	devices    []integrator.AccountDevice
+	cursor     int
+	loading    bool
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int
+	styles     DevicesStyles
+	lastFetch  time.Time
 }
 
 // DevicesStyles holds styles for the Devices component.
@@ -147,6 +148,12 @@ func (m DevicesModel) SetFocused(focused bool) DevicesModel {
 	return m
 }
 
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m DevicesModel) SetPanelIndex(index int) DevicesModel {
+	m.panelIndex = index
+	return m
+}
+
 // Update handles messages.
 func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -203,7 +210,8 @@ func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
 func (m DevicesModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Cloud Devices").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {

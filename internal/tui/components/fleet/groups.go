@@ -34,16 +34,17 @@ type GroupsLoadedMsg struct {
 
 // GroupsModel displays and manages device groups.
 type GroupsModel struct {
-	ctx     context.Context
-	fleet   *integrator.FleetManager
-	groups  []*integrator.DeviceGroup
-	cursor  int
-	loading bool
-	err     error
-	width   int
-	height  int
-	focused bool
-	styles  GroupsStyles
+	ctx        context.Context
+	fleet      *integrator.FleetManager
+	groups     []*integrator.DeviceGroup
+	cursor     int
+	loading    bool
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int
+	styles     GroupsStyles
 }
 
 // GroupsStyles holds styles for the Groups component.
@@ -133,6 +134,12 @@ func (m GroupsModel) SetFocused(focused bool) GroupsModel {
 	return m
 }
 
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m GroupsModel) SetPanelIndex(index int) GroupsModel {
+	m.panelIndex = index
+	return m
+}
+
 // Update handles messages.
 func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -183,7 +190,8 @@ func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 func (m GroupsModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Device Groups").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {

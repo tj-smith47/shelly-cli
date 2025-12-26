@@ -361,8 +361,6 @@ func getCachedSchedules(device string) []scheduleEntry {
 }
 
 // fetchScripts fetches scripts from a device with a short timeout.
-// NOTE: Uses context.Background() and shelly.NewService() because completion
-// functions don't have access to cmd.Context() or Factory.
 func fetchScripts(device string) []scriptEntry {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -388,8 +386,6 @@ func fetchScripts(device string) []scriptEntry {
 }
 
 // fetchSchedules fetches schedules from a device with a short timeout.
-// NOTE: Uses context.Background() and shelly.NewService() because completion
-// functions don't have access to cmd.Context() or Factory.
 func fetchSchedules(device string) []scheduleEntry {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

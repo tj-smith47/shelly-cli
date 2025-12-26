@@ -62,18 +62,19 @@ type ActionMsg struct {
 
 // Model displays virtual components for a device.
 type Model struct {
-	ctx      context.Context
-	svc      *shelly.Service
-	device   string
-	virtuals []Virtual
-	cursor   int
-	scroll   int
-	loading  bool
-	err      error
-	width    int
-	height   int
-	focused  bool
-	styles   Styles
+	ctx        context.Context
+	svc        *shelly.Service
+	device     string
+	virtuals   []Virtual
+	cursor     int
+	scroll     int
+	loading    bool
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int // 1-based panel index for Shift+N hotkey hint
+	styles     Styles
 }
 
 // Styles holds styles for the virtual components list.
@@ -200,6 +201,12 @@ func (m Model) SetSize(width, height int) Model {
 // SetFocused sets the focus state.
 func (m Model) SetFocused(focused bool) Model {
 	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the 1-based panel index for Shift+N hotkey hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
 	return m
 }
 
@@ -398,7 +405,8 @@ func (m Model) deleteVirtual() tea.Cmd {
 func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Virtual Components").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	if m.device == "" {
 		r.SetContent(m.styles.Muted.Render("No device selected"))

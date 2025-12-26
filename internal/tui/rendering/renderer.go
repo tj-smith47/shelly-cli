@@ -2,6 +2,7 @@
 package rendering
 
 import (
+	"fmt"
 	"image/color"
 	"strings"
 
@@ -18,6 +19,7 @@ type Renderer struct {
 	title      string
 	badge      string // Separate badge section in title bar (superfile style)
 	footer     string
+	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	focused    bool
 	sections   []section
 	content    string
@@ -101,6 +103,13 @@ func (r *Renderer) SetFooter(footer string) *Renderer {
 	return r
 }
 
+// SetPanelIndex sets the 1-based panel index for Shift+N hotkey hint.
+// When the panel is not focused, shows "Shift+N" in the bottom-right corner.
+func (r *Renderer) SetPanelIndex(index int) *Renderer {
+	r.panelIndex = index
+	return r
+}
+
 // Render produces the final bordered output.
 func (r *Renderer) Render() string {
 	if r.width < 5 || r.height < 3 {
@@ -171,10 +180,11 @@ func (r *Renderer) Render() string {
 		lines = append(lines, leftBorder+line+rightBorder)
 	}
 
-	// Bottom border with optional footer
+	// Bottom border with optional footer and panel hint
 	var bottomBorder string
-	if r.footer != "" {
-		bottomBorder = BuildBottomBorderWithFooter(r.width, r.footer, r.border)
+	hint := r.buildPanelHint()
+	if r.footer != "" || hint != "" {
+		bottomBorder = BuildBottomBorderWithFooterAndHint(r.width, r.footer, hint, r.border)
 	} else {
 		bottomBorder = BuildBottomBorder(r.width, r.border)
 	}
@@ -209,4 +219,13 @@ func (r *Renderer) ContentWidth() int {
 // ContentHeight returns the usable content height inside the borders.
 func (r *Renderer) ContentHeight() int {
 	return r.height - 2
+}
+
+// buildPanelHint returns the Shift+N hint string if applicable.
+// Only shows hint when panel is not focused and has a valid index.
+func (r *Renderer) buildPanelHint() string {
+	if r.focused || r.panelIndex < 1 || r.panelIndex > 9 {
+		return ""
+	}
+	return fmt.Sprintf("⇧%d", r.panelIndex)
 }

@@ -26,132 +26,132 @@ type ThemeConfig struct {
 // Config holds all CLI configuration.
 type Config struct {
 	// Global settings
-	Output  string `mapstructure:"output"`
-	Color   bool   `mapstructure:"color"`
-	Theme   any    `mapstructure:"theme"` // Can be string or ThemeConfig
-	APIMode string `mapstructure:"api_mode"`
-	Verbose bool   `mapstructure:"verbose"`
-	Quiet   bool   `mapstructure:"quiet"`
-	Editor  string `mapstructure:"editor"` // Preferred editor command (falls back to $EDITOR, $VISUAL, then nano)
+	Output  string `mapstructure:"output" yaml:"output,omitempty"`
+	Color   bool   `mapstructure:"color" yaml:"color,omitempty"`
+	Theme   any    `mapstructure:"theme" yaml:"theme,omitempty"` // Can be string or ThemeConfig
+	APIMode string `mapstructure:"api_mode" yaml:"api_mode,omitempty"`
+	Verbose bool   `mapstructure:"verbose" yaml:"verbose,omitempty"`
+	Quiet   bool   `mapstructure:"quiet" yaml:"quiet,omitempty"`
+	Editor  string `mapstructure:"editor" yaml:"editor,omitempty"` // Preferred editor command (falls back to $EDITOR, $VISUAL, then nano)
 
 	// Discovery settings
-	Discovery DiscoveryConfig `mapstructure:"discovery"`
+	Discovery DiscoveryConfig `mapstructure:"discovery" yaml:"discovery,omitempty"`
 
 	// Cloud settings
-	Cloud CloudConfig `mapstructure:"cloud"`
+	Cloud CloudConfig `mapstructure:"cloud" yaml:"cloud,omitempty"`
 
 	// Integrator settings
-	Integrator IntegratorConfig `mapstructure:"integrator"`
+	Integrator IntegratorConfig `mapstructure:"integrator" yaml:"integrator,omitempty"`
 
 	// Device registry
-	Devices map[string]model.Device `mapstructure:"devices"`
+	Devices map[string]model.Device `mapstructure:"devices" yaml:"devices,omitempty"`
 
 	// Aliases
-	Aliases map[string]Alias `mapstructure:"aliases"`
+	Aliases map[string]Alias `mapstructure:"aliases" yaml:"aliases,omitempty"`
 
 	// Groups
-	Groups map[string]Group `mapstructure:"groups"`
+	Groups map[string]Group `mapstructure:"groups" yaml:"groups,omitempty"`
 
 	// Scenes
-	Scenes map[string]Scene `mapstructure:"scenes"`
+	Scenes map[string]Scene `mapstructure:"scenes" yaml:"scenes,omitempty"`
 
 	// Templates
-	Templates map[string]Template `mapstructure:"templates"`
+	Templates map[string]Template `mapstructure:"templates" yaml:"templates,omitempty"`
 
 	// Alerts
-	Alerts map[string]Alert `mapstructure:"alerts"`
+	Alerts map[string]Alert `mapstructure:"alerts" yaml:"alerts,omitempty"`
 
 	// Plugin settings
-	Plugins PluginsConfig `mapstructure:"plugins"`
+	Plugins PluginsConfig `mapstructure:"plugins" yaml:"plugins,omitempty"`
 
 	// Rate limiting settings
-	RateLimit RateLimitConfig `mapstructure:"ratelimit"`
+	RateLimit RateLimitConfig `mapstructure:"ratelimit" yaml:"ratelimit,omitempty"`
 
 	// TUI settings
-	TUI TUIConfig `mapstructure:"tui"`
+	TUI TUIConfig `mapstructure:"tui" yaml:"tui,omitempty"`
 }
 
 // TUIConfig holds TUI dashboard settings.
 type TUIConfig struct {
-	RefreshInterval int               `mapstructure:"refresh_interval"` // Legacy: global refresh interval in seconds (deprecated, use Refresh)
-	Refresh         TUIRefreshConfig  `mapstructure:"refresh"`          // Adaptive refresh intervals per generation
-	Keybindings     KeybindingsConfig `mapstructure:"keybindings"`
-	Theme           *ThemeConfig      `mapstructure:"theme"` // Independent TUI theme (replaces main theme when set)
+	RefreshInterval int               `mapstructure:"refresh_interval" yaml:"refresh_interval,omitempty"` // Legacy: global refresh interval in seconds (deprecated, use Refresh)
+	Refresh         TUIRefreshConfig  `mapstructure:"refresh" yaml:"refresh,omitempty"`                   // Adaptive refresh intervals per generation
+	Keybindings     KeybindingsConfig `mapstructure:"keybindings" yaml:"keybindings,omitempty"`
+	Theme           *ThemeConfig      `mapstructure:"theme" yaml:"theme,omitempty"` // Independent TUI theme (replaces main theme when set)
 }
 
 // KeybindingsConfig holds customizable keybindings for the TUI.
 type KeybindingsConfig struct {
 	// Navigation
-	Up       []string `mapstructure:"up"`
-	Down     []string `mapstructure:"down"`
-	Left     []string `mapstructure:"left"`
-	Right    []string `mapstructure:"right"`
-	PageUp   []string `mapstructure:"page_up"`
-	PageDown []string `mapstructure:"page_down"`
-	Home     []string `mapstructure:"home"`
-	End      []string `mapstructure:"end"`
+	Up       []string `mapstructure:"up" yaml:"up,omitempty"`
+	Down     []string `mapstructure:"down" yaml:"down,omitempty"`
+	Left     []string `mapstructure:"left" yaml:"left,omitempty"`
+	Right    []string `mapstructure:"right" yaml:"right,omitempty"`
+	PageUp   []string `mapstructure:"page_up" yaml:"page_up,omitempty"`
+	PageDown []string `mapstructure:"page_down" yaml:"page_down,omitempty"`
+	Home     []string `mapstructure:"home" yaml:"home,omitempty"`
+	End      []string `mapstructure:"end" yaml:"end,omitempty"`
 
 	// Actions
-	Enter   []string `mapstructure:"enter"`
-	Escape  []string `mapstructure:"escape"`
-	Refresh []string `mapstructure:"refresh"`
-	Filter  []string `mapstructure:"filter"`
-	Command []string `mapstructure:"command"`
-	Help    []string `mapstructure:"help"`
-	Quit    []string `mapstructure:"quit"`
+	Enter   []string `mapstructure:"enter" yaml:"enter,omitempty"`
+	Escape  []string `mapstructure:"escape" yaml:"escape,omitempty"`
+	Refresh []string `mapstructure:"refresh" yaml:"refresh,omitempty"`
+	Filter  []string `mapstructure:"filter" yaml:"filter,omitempty"`
+	Command []string `mapstructure:"command" yaml:"command,omitempty"`
+	Help    []string `mapstructure:"help" yaml:"help,omitempty"`
+	Quit    []string `mapstructure:"quit" yaml:"quit,omitempty"`
 
 	// Device actions
-	Toggle  []string `mapstructure:"toggle"`
-	TurnOn  []string `mapstructure:"turn_on"`
-	TurnOff []string `mapstructure:"turn_off"`
-	Reboot  []string `mapstructure:"reboot"`
+	Toggle  []string `mapstructure:"toggle" yaml:"toggle,omitempty"`
+	TurnOn  []string `mapstructure:"turn_on" yaml:"turn_on,omitempty"`
+	TurnOff []string `mapstructure:"turn_off" yaml:"turn_off,omitempty"`
+	Reboot  []string `mapstructure:"reboot" yaml:"reboot,omitempty"`
 
 	// View switching
-	Tab      []string `mapstructure:"tab"`
-	ShiftTab []string `mapstructure:"shift_tab"`
-	View1    []string `mapstructure:"view1"`
-	View2    []string `mapstructure:"view2"`
-	View3    []string `mapstructure:"view3"`
-	View4    []string `mapstructure:"view4"`
-	View5    []string `mapstructure:"view5"`
-	View6    []string `mapstructure:"view6"`
+	Tab      []string `mapstructure:"tab" yaml:"tab,omitempty"`
+	ShiftTab []string `mapstructure:"shift_tab" yaml:"shift_tab,omitempty"`
+	View1    []string `mapstructure:"view1" yaml:"view1,omitempty"`
+	View2    []string `mapstructure:"view2" yaml:"view2,omitempty"`
+	View3    []string `mapstructure:"view3" yaml:"view3,omitempty"`
+	View4    []string `mapstructure:"view4" yaml:"view4,omitempty"`
+	View5    []string `mapstructure:"view5" yaml:"view5,omitempty"`
+	View6    []string `mapstructure:"view6" yaml:"view6,omitempty"`
 }
 
 // DiscoveryConfig holds device discovery settings.
 type DiscoveryConfig struct {
-	Timeout time.Duration `mapstructure:"timeout"`
-	MDNS    bool          `mapstructure:"mdns"`
-	BLE     bool          `mapstructure:"ble"`
-	CoIoT   bool          `mapstructure:"coiot"`
-	Network string        `mapstructure:"network"` // Default subnet for scanning
+	Timeout time.Duration `mapstructure:"timeout" yaml:"timeout,omitempty"`
+	MDNS    bool          `mapstructure:"mdns" yaml:"mdns,omitempty"`
+	BLE     bool          `mapstructure:"ble" yaml:"ble,omitempty"`
+	CoIoT   bool          `mapstructure:"coiot" yaml:"coiot,omitempty"`
+	Network string        `mapstructure:"network" yaml:"network,omitempty"` // Default subnet for scanning
 }
 
 // CloudConfig holds Shelly Cloud API settings.
 type CloudConfig struct {
-	Enabled      bool   `mapstructure:"enabled"`
-	Email        string `mapstructure:"email"`
-	AccessToken  string `mapstructure:"access_token"`
-	RefreshToken string `mapstructure:"refresh_token"`
-	ServerURL    string `mapstructure:"server_url"`
+	Enabled      bool   `mapstructure:"enabled" yaml:"enabled,omitempty"`
+	Email        string `mapstructure:"email" yaml:"email,omitempty"`
+	AccessToken  string `mapstructure:"access_token" yaml:"access_token,omitempty"`
+	RefreshToken string `mapstructure:"refresh_token" yaml:"refresh_token,omitempty"`
+	ServerURL    string `mapstructure:"server_url" yaml:"server_url,omitempty"`
 }
 
 // IntegratorConfig holds Shelly Integrator API settings.
 type IntegratorConfig struct {
-	Tag   string `mapstructure:"tag"`
-	Token string `mapstructure:"token"`
+	Tag   string `mapstructure:"tag" yaml:"tag,omitempty"`
+	Token string `mapstructure:"token" yaml:"token,omitempty"`
 }
 
 // Alias represents a command alias.
 type Alias struct {
-	Name    string `mapstructure:"name"`
-	Command string `mapstructure:"command"`
-	Shell   bool   `mapstructure:"shell"` // If true, execute via shell
+	Name    string `mapstructure:"name" yaml:"name,omitempty"`
+	Command string `mapstructure:"command" yaml:"command,omitempty"`
+	Shell   bool   `mapstructure:"shell" yaml:"shell,omitempty"` // If true, execute via shell
 }
 
 // Group represents a device group.
 type Group struct {
-	Name    string   `mapstructure:"name"`
-	Devices []string `mapstructure:"devices"`
+	Name    string   `mapstructure:"name" yaml:"name,omitempty"`
+	Devices []string `mapstructure:"devices" yaml:"devices,omitempty"`
 }
 
 // Scene represents a saved device state configuration.
@@ -182,8 +182,8 @@ type Template struct {
 
 // PluginsConfig holds plugin system settings.
 type PluginsConfig struct {
-	Enabled bool     `mapstructure:"enabled"`
-	Path    []string `mapstructure:"path"` // Additional plugin search paths
+	Enabled bool     `mapstructure:"enabled" yaml:"enabled,omitempty"`
+	Path    []string `mapstructure:"path" yaml:"path,omitempty"` // Additional plugin search paths
 }
 
 // RateLimitConfig holds rate limiting settings to prevent overloading Shelly devices.
@@ -191,23 +191,23 @@ type PluginsConfig struct {
 //   - Gen1 (ESP8266): MAX 2 concurrent HTTP connections
 //   - Gen2 (ESP32): MAX 5 concurrent HTTP transactions
 type RateLimitConfig struct {
-	Gen1   GenerationRateLimitConfig `mapstructure:"gen1"`
-	Gen2   GenerationRateLimitConfig `mapstructure:"gen2"`
-	Global GlobalRateLimitConfig     `mapstructure:"global"`
+	Gen1   GenerationRateLimitConfig `mapstructure:"gen1" yaml:"gen1,omitempty"`
+	Gen2   GenerationRateLimitConfig `mapstructure:"gen2" yaml:"gen2,omitempty"`
+	Global GlobalRateLimitConfig     `mapstructure:"global" yaml:"global,omitempty"`
 }
 
 // GenerationRateLimitConfig holds rate limiting settings for a specific device generation.
 type GenerationRateLimitConfig struct {
-	MinInterval      time.Duration `mapstructure:"min_interval"`      // Min time between requests to same device
-	MaxConcurrent    int           `mapstructure:"max_concurrent"`    // Max in-flight requests per device
-	CircuitThreshold int           `mapstructure:"circuit_threshold"` // Failures before circuit opens
+	MinInterval      time.Duration `mapstructure:"min_interval" yaml:"min_interval,omitempty"`           // Min time between requests to same device
+	MaxConcurrent    int           `mapstructure:"max_concurrent" yaml:"max_concurrent,omitempty"`       // Max in-flight requests per device
+	CircuitThreshold int           `mapstructure:"circuit_threshold" yaml:"circuit_threshold,omitempty"` // Failures before circuit opens
 }
 
 // GlobalRateLimitConfig holds global rate limiting settings.
 type GlobalRateLimitConfig struct {
-	MaxConcurrent           int           `mapstructure:"max_concurrent"`            // Total concurrent requests across all devices
-	CircuitOpenDuration     time.Duration `mapstructure:"circuit_open_duration"`     // How long circuit stays open
-	CircuitSuccessThreshold int           `mapstructure:"circuit_success_threshold"` // Successes to close circuit
+	MaxConcurrent           int           `mapstructure:"max_concurrent" yaml:"max_concurrent,omitempty"`                       // Total concurrent requests across all devices
+	CircuitOpenDuration     time.Duration `mapstructure:"circuit_open_duration" yaml:"circuit_open_duration,omitempty"`         // How long circuit stays open
+	CircuitSuccessThreshold int           `mapstructure:"circuit_success_threshold" yaml:"circuit_success_threshold,omitempty"` // Successes to close circuit
 }
 
 // DefaultRateLimitConfig returns sensible defaults based on Shelly hardware constraints.
@@ -233,11 +233,11 @@ func DefaultRateLimitConfig() RateLimitConfig {
 
 // TUIRefreshConfig holds adaptive refresh interval settings for the TUI.
 type TUIRefreshConfig struct {
-	Gen1Online   time.Duration `mapstructure:"gen1_online"`   // Refresh for online Gen1 devices
-	Gen1Offline  time.Duration `mapstructure:"gen1_offline"`  // Refresh for offline Gen1 devices
-	Gen2Online   time.Duration `mapstructure:"gen2_online"`   // Refresh for online Gen2 devices
-	Gen2Offline  time.Duration `mapstructure:"gen2_offline"`  // Refresh for offline Gen2 devices
-	FocusedBoost time.Duration `mapstructure:"focused_boost"` // Refresh for focused device
+	Gen1Online   time.Duration `mapstructure:"gen1_online" yaml:"gen1_online,omitempty"`     // Refresh for online Gen1 devices
+	Gen1Offline  time.Duration `mapstructure:"gen1_offline" yaml:"gen1_offline,omitempty"`   // Refresh for offline Gen1 devices
+	Gen2Online   time.Duration `mapstructure:"gen2_online" yaml:"gen2_online,omitempty"`     // Refresh for online Gen2 devices
+	Gen2Offline  time.Duration `mapstructure:"gen2_offline" yaml:"gen2_offline,omitempty"`   // Refresh for offline Gen2 devices
+	FocusedBoost time.Duration `mapstructure:"focused_boost" yaml:"focused_boost,omitempty"` // Refresh for focused device
 }
 
 // DefaultTUIRefreshConfig returns sensible defaults for TUI refresh intervals.

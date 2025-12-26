@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -87,19 +88,20 @@ type CompleteMsg struct {
 
 // Model displays batch operations.
 type Model struct {
-	ctx       context.Context
-	svc       *shelly.Service
-	devices   []DeviceSelection
-	cursor    int
-	scroll    int
-	operation Operation
-	executing bool
-	results   []OperationResult
-	err       error
-	width     int
-	height    int
-	focused   bool
-	styles    Styles
+	ctx        context.Context
+	svc        *shelly.Service
+	devices    []DeviceSelection
+	cursor     int
+	scroll     int
+	operation  Operation
+	executing  bool
+	results    []OperationResult
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int
+	styles     Styles
 }
 
 // Styles holds styles for the Batch component.
@@ -191,6 +193,12 @@ func (m Model) SetSize(width, height int) Model {
 // SetFocused sets the focus state.
 func (m Model) SetFocused(focused bool) Model {
 	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
 	return m
 }
 
@@ -371,7 +379,7 @@ func (m Model) executeOperation(devices []DeviceSelection) tea.Cmd {
 
 		if err := g.Wait(); err != nil {
 			// This shouldn't happen since we return nil from each goroutine
-			_ = err
+			iostreams.DebugErr("batch operation", err)
 		}
 
 		return CompleteMsg{Results: results}
@@ -382,7 +390,8 @@ func (m Model) executeOperation(devices []DeviceSelection) tea.Cmd {
 func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Batch Operations").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {

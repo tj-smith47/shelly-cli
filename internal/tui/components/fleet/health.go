@@ -35,16 +35,17 @@ type HealthLoadedMsg struct {
 
 // HealthModel displays fleet health and statistics.
 type HealthModel struct {
-	ctx       context.Context
-	fleet     *integrator.FleetManager
-	stats     *integrator.FleetStats
-	loading   bool
-	err       error
-	width     int
-	height    int
-	focused   bool
-	styles    HealthStyles
-	lastFetch time.Time
+	ctx        context.Context
+	fleet      *integrator.FleetManager
+	stats      *integrator.FleetStats
+	loading    bool
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int
+	styles     HealthStyles
+	lastFetch  time.Time
 }
 
 // HealthStyles holds styles for the Health component.
@@ -141,6 +142,12 @@ func (m HealthModel) SetFocused(focused bool) HealthModel {
 	return m
 }
 
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m HealthModel) SetPanelIndex(index int) HealthModel {
+	m.panelIndex = index
+	return m
+}
+
 // Update handles messages.
 func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -178,7 +185,8 @@ func (m HealthModel) handleKey(msg tea.KeyPressMsg) (HealthModel, tea.Cmd) {
 func (m HealthModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Fleet Health").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {

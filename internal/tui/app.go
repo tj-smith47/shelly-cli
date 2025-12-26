@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/branding"
+	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -30,6 +31,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
@@ -68,6 +70,9 @@ const (
 	// LayoutWide for > 120 cols - extra detail space.
 	LayoutWide
 )
+
+// horizontalPadding is the left/right padding for tab content.
+const horizontalPadding = 1
 
 // PanelWidths holds calculated panel widths for the dashboard layout.
 type PanelWidths struct {
@@ -300,7 +305,7 @@ func (m Model) layoutMode() LayoutMode {
 // New layout: Device List (left) | Device Info + Events stacked (right)
 // Events and DeviceInfo share the right column width (stacked vertically).
 func (m Model) calculateOptimalWidths() PanelWidths {
-	totalWidth := m.width
+	totalWidth := m.contentWidth()
 
 	// Get content-based optimal width for device list
 	deviceListOptimal := m.deviceList.OptimalWidth()
@@ -418,6 +423,9 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		// Sync cursor from deviceList to app.go
 		m.cursor = m.deviceList.Cursor()
 		return m, m.viewManager.PropagateDevice(msg.Name), true
+	case devicelist.OpenBrowserMsg:
+		// Open device web UI in browser
+		return m, m.openDeviceBrowser(msg.Address), true
 	case jsonviewer.CloseMsg:
 		m.focusedPanel = PanelDetail
 		return m, nil, true
@@ -796,11 +804,26 @@ func (m Model) handleDeviceListTabKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd,
 
 // handleDeviceListFocusedKeys handles keys when device list panel is focused.
 func (m Model) handleDeviceListFocusedKeys(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
-	switch msg.String() {
+	keyStr := msg.String()
+	switch keyStr {
 	case "tab", "shift+tab":
 		// Both Tab and Shift+Tab move focus to the view
 		m.focusedPanel = PanelDetail
 		return m, nil, true
+	}
+	// Shift+1 keeps focus on device list (panel 1 on all tabs with device list)
+	if keyStr == keyconst.Shift1 {
+		m.focusedPanel = PanelDeviceList
+		return m, nil, true
+	}
+	// Shift+2-9 switch focus to view and forward the key for panel selection
+	if strings.HasPrefix(keyStr, "shift+") && len(keyStr) == 7 {
+		digit := keyStr[6]
+		if digit >= '2' && digit <= '9' {
+			m.focusedPanel = PanelDetail
+			cmd := m.viewManager.Update(msg)
+			return m, cmd, true
+		}
 	}
 	// Navigation keys for device list
 	if newModel, cmd, handled := m.handleNavigation(msg); handled {
@@ -810,7 +833,7 @@ func (m Model) handleDeviceListFocusedKeys(msg tea.KeyPressMsg) (Model, tea.Cmd,
 	return m, nil, false
 }
 
-// handlePanelSwitch handles Tab/Shift+Tab for switching panels and Enter for JSON overlay.
+// handlePanelSwitch handles Tab/Shift+Tab for switching panels, Shift+N for direct jump, and Enter for JSON overlay.
 func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "tab":
@@ -818,6 +841,15 @@ func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m, nil, true
 	case "shift+tab":
 		m.focusedPanel = m.prevPanel()
+		return m, nil, true
+	case keyconst.Shift1:
+		m.focusedPanel = PanelDeviceList
+		return m, nil, true
+	case keyconst.Shift2:
+		m.focusedPanel = PanelDetail
+		return m, nil, true
+	case keyconst.Shift3:
+		m.focusedPanel = PanelEvents
 		return m, nil, true
 	case "enter":
 		return m.openJSONViewer()
@@ -1053,8 +1085,8 @@ func (m Model) syncDeviceInfo() Model {
 		m.deviceInfo = m.deviceInfo.SetDevice(nil)
 	}
 
-	// Update focus state
-	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail)
+	// Update focus state and panel index
+	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail).SetPanelIndex(2)
 
 	return m
 }
@@ -1168,128 +1200,124 @@ func (m Model) View() tea.View {
 		return v
 	}
 
-	// Header with metadata on left, banner on right
+	// Render all view components
 	headerBanner := m.renderHeader()
-
-	// Tab bar
 	tabBarView := m.tabBar.View()
+	inputBar := m.renderInputBar()
+	contentHeight := m.calculateContentHeight(inputBar)
+	content := m.renderTabContent(contentHeight)
+	content = m.padContent(content, contentHeight)
 
-	// Input bar (search or command mode)
-	var inputBar string
-	if m.search.IsActive() {
-		inputBar = m.search.View()
-	} else if m.cmdMode.IsActive() {
-		inputBar = m.cmdMode.View()
-	}
-
-	// Calculate content area
-	bannerHeight := branding.BannerHeight()
-	tabBarHeight := 1
-	footerHeight := 2
-	inputHeight := 0
-	if inputBar != "" {
-		inputHeight = 3 // Input bar has top border, content, bottom border
-	}
-	contentHeight := m.height - bannerHeight - tabBarHeight - footerHeight - inputHeight
-
-	// Render content based on active view
-	var content string
-	switch m.tabBar.ActiveTabID() {
-	case tabs.TabDashboard:
-		// Dashboard uses the multi-panel layout rendered by app.go
-		content = m.renderMultiPanelLayout(contentHeight)
-	case tabs.TabMonitor:
-		// Monitor tab shows monitor component + energy panels
-		content = m.renderMonitorLayout(contentHeight)
-	case tabs.TabAutomation, tabs.TabConfig:
-		// Automation and Config views include device list on left for persistence
-		content = m.renderWithDeviceList(contentHeight)
-	default:
-		// Other views render themselves full-width
-		// Set size on view before rendering, then enforce width
-		m.viewManager.SetSize(m.width, contentHeight)
-		content = lipgloss.NewStyle().Width(m.width).Render(m.viewManager.View())
-	}
-
-	// Ensure content fills the entire content area to prevent rendering artifacts
-	// This clears any old content when switching tabs
-	// Split content into lines and pad each line to full width, then pad to full height
-	contentLines := strings.Split(content, "\n")
-	paddedLines := make([]string, contentHeight)
-	emptyLine := strings.Repeat(" ", m.width)
-	for i := range contentHeight {
-		if i < len(contentLines) {
-			line := contentLines[i]
-			// Pad each line to full width to clear any leftover characters
-			lineWidth := lipgloss.Width(line)
-			if lineWidth < m.width {
-				line += strings.Repeat(" ", m.width-lineWidth)
-			}
-			paddedLines[i] = line
-		} else {
-			paddedLines[i] = emptyLine
-		}
-	}
-	content = strings.Join(paddedLines, "\n")
-
-	// Help overlay - overlay on content when visible
 	if m.help.Visible() {
 		content = m.renderWithHelpOverlay(content, contentHeight)
 	}
 
-	// Footer (status bar)
-	footer := m.statusBar.View()
-
 	// Compose the layout
-	var result string
-	if inputBar != "" {
-		result = lipgloss.JoinVertical(lipgloss.Left,
-			headerBanner, tabBarView, inputBar, content, footer,
-		)
-	} else {
-		result = lipgloss.JoinVertical(lipgloss.Left,
-			headerBanner, tabBarView, content, footer,
-		)
-	}
+	result := m.composeLayout(headerBanner, tabBarView, inputBar, content)
+	result = m.applyOverlays(result)
 
-	// Add toast overlay (now a no-op)
-	if m.toast.HasToasts() {
-		result = m.toast.Overlay(result)
-	}
-
-	// Add confirm dialog overlay
-	if m.confirm.Visible() {
-		confirmView := m.confirm.View()
-		result = lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			confirmView,
-			lipgloss.WithWhitespaceChars(" "),
-		)
-	}
-
-	// Add device detail overlay
-	if m.deviceDetail.Visible() {
-		detailView := m.deviceDetail.View()
-		result = lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			detailView,
-			lipgloss.WithWhitespaceChars(" "),
-		)
-	}
-
-	// Debug logging (if enabled)
 	m.debugLogger.Log(m.tabBar.ActiveTabID().String(), m.focusedPanelName(), m.width, m.height, result)
 
 	v := tea.NewView(result)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
+}
+
+// renderInputBar renders the search or command mode input bar.
+func (m Model) renderInputBar() string {
+	if m.search.IsActive() {
+		return m.search.View()
+	}
+	if m.cmdMode.IsActive() {
+		return m.cmdMode.View()
+	}
+	return ""
+}
+
+// calculateContentHeight calculates the available height for main content.
+func (m Model) calculateContentHeight(inputBar string) int {
+	bannerHeight := branding.BannerHeight()
+	tabBarHeight := 1
+	footerHeight := 2
+	inputHeight := 0
+	if inputBar != "" {
+		inputHeight = 3
+	}
+	return m.height - bannerHeight - tabBarHeight - footerHeight - inputHeight
+}
+
+// renderTabContent renders content based on active tab.
+func (m Model) renderTabContent(contentHeight int) string {
+	cw := m.contentWidth()
+	switch m.tabBar.ActiveTabID() {
+	case tabs.TabDashboard:
+		return m.renderMultiPanelLayout(contentHeight)
+	case tabs.TabMonitor:
+		return m.renderMonitorLayout(contentHeight)
+	case tabs.TabAutomation, tabs.TabConfig:
+		return m.renderWithDeviceList(contentHeight)
+	default:
+		m.viewManager.SetSize(cw, contentHeight)
+		return lipgloss.NewStyle().Width(cw).Render(m.viewManager.View())
+	}
+}
+
+// padContent pads content to fill the entire content area with horizontal padding.
+func (m Model) padContent(content string, contentHeight int) string {
+	cw := m.contentWidth()
+	pad := strings.Repeat(" ", horizontalPadding)
+	contentLines := strings.Split(content, "\n")
+	paddedLines := make([]string, contentHeight)
+	emptyLine := strings.Repeat(" ", m.width)
+	for i := range contentHeight {
+		if i < len(contentLines) {
+			line := contentLines[i]
+			lineWidth := lipgloss.Width(line)
+			if lineWidth < cw {
+				line += strings.Repeat(" ", cw-lineWidth)
+			}
+			paddedLines[i] = pad + line + pad
+		} else {
+			paddedLines[i] = emptyLine
+		}
+	}
+	return strings.Join(paddedLines, "\n")
+}
+
+// composeLayout joins header, tabs, input, content, and footer.
+func (m Model) composeLayout(header, tabBar, inputBar, content string) string {
+	footer := m.statusBar.View()
+	if inputBar != "" {
+		return lipgloss.JoinVertical(lipgloss.Left, header, tabBar, inputBar, content, footer)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, header, tabBar, content, footer)
+}
+
+// applyOverlays applies toast, confirm, and device detail overlays.
+func (m Model) applyOverlays(result string) string {
+	if m.toast.HasToasts() {
+		result = m.toast.Overlay(result)
+	}
+	if m.confirm.Visible() {
+		result = m.centerOverlay(m.confirm.View())
+	}
+	if m.deviceDetail.Visible() {
+		result = m.centerOverlay(m.deviceDetail.View())
+	}
+	return result
+}
+
+// centerOverlay centers an overlay on the screen.
+func (m Model) centerOverlay(overlay string) string {
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		overlay,
+		lipgloss.WithWhitespaceChars(" "),
+	)
 }
 
 // focusedPanelName returns a human-readable name for the currently focused panel.
@@ -1319,6 +1347,11 @@ func (m Model) isDashboardActive() bool {
 		return d.IsDashboardView()
 	}
 	return false
+}
+
+// contentWidth returns the width available for tab content (accounting for horizontal padding).
+func (m Model) contentWidth() int {
+	return m.width - (2 * horizontalPadding)
 }
 
 // hasDeviceList returns true if the current tab has a device list for device actions.
@@ -1353,13 +1386,14 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	}
 
 	// Calculate dynamic panel widths based on content
+	cw := m.contentWidth()
 	widths := m.calculateOptimalWidths()
 
 	// Device list on the left (persists across views)
 	deviceListCol := m.renderDeviceListColumn(widths.DeviceList, topHeight)
 
 	// Right column width = total - device list - gap
-	rightColWidth := m.width - widths.DeviceList - 1
+	rightColWidth := cw - widths.DeviceList - 1
 
 	// Split right column vertically: device info (top 30%) and events (bottom 70%)
 	// Total must equal topHeight so right column matches device list height
@@ -1376,7 +1410,7 @@ func (m Model) renderMultiPanelLayout(height int) string {
 
 	// Render device info component (top-right)
 	m.deviceInfo = m.deviceInfo.SetSize(rightColWidth, infoHeight)
-	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail)
+	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail).SetPanelIndex(2)
 	deviceInfoPanel := m.deviceInfo.View()
 
 	// Render events (bottom-right) - now gets much more horizontal space
@@ -1389,11 +1423,11 @@ func (m Model) renderMultiPanelLayout(height int) string {
 	topContent := lipgloss.JoinHorizontal(lipgloss.Top, deviceListCol, " ", rightCol)
 
 	// Ensure topContent fills the full width
-	topContentStyle := lipgloss.NewStyle().Width(m.width)
+	topContentStyle := lipgloss.NewStyle().Width(cw)
 	topContent = topContentStyle.Render(topContent)
 
 	// Energy bars panel at bottom (full width)
-	energyPanel := m.renderEnergyPanel(m.width, energyHeight)
+	energyPanel := m.renderEnergyPanel(cw, energyHeight)
 
 	// Combine top and bottom sections
 	content := lipgloss.JoinVertical(lipgloss.Left, topContent, energyPanel)
@@ -1415,42 +1449,53 @@ func (m Model) renderMultiPanelLayout(height int) string {
 }
 
 // renderMonitorLayout renders the Monitor tab with energy panels.
-// Layout: Monitor component on top (70%), Energy panels on bottom (30%).
+// Layout: Monitor component on top (60%), Energy panels on bottom (40%).
 func (m Model) renderMonitorLayout(height int) string {
-	// Split height: top 70% for monitor, bottom 30% for energy panels
-	monitorHeight := height * 70 / 100
-	energyHeight := height - monitorHeight - 1 // -1 for gap
+	cw := m.contentWidth()
+
+	// Split height: top 60% for monitor, bottom 40% for energy panels
+	monitorHeight := height * 60 / 100
+	energyHeight := height - monitorHeight
 
 	if monitorHeight < 10 {
 		monitorHeight = 10
 	}
-	if energyHeight < 5 {
-		energyHeight = 5
+	if energyHeight < 8 {
+		energyHeight = 8
 	}
 
-	// Render monitor component from view manager
-	m.viewManager.SetSize(m.width, monitorHeight)
-	monitorView := m.viewManager.View()
+	// Get monitor view and wrap with rendering.New() for embedded title
+	// Content area is 2 less in each dimension to account for border
+	contentWidth := cw - 2
+	contentHeight := monitorHeight - 2
+	m.viewManager.SetSize(contentWidth, contentHeight)
+	monitorContent := m.viewManager.View()
+
+	// Wrap with rendering.New() for superfile-style embedded title
+	r := rendering.New(cw, monitorHeight).
+		SetTitle("Monitor").
+		SetContent(monitorContent).
+		SetFocused(true) // Monitor panel is always focused when on Monitor tab
+	monitorView := r.Render()
 
 	// Render energy panels at bottom
-	energyPanel := m.renderEnergyPanel(m.width, energyHeight)
+	energyPanel := m.renderEnergyPanel(cw, energyHeight)
 
 	// Combine top and bottom sections
-	content := lipgloss.JoinVertical(lipgloss.Left, monitorView, energyPanel)
-
-	return content
+	return lipgloss.JoinVertical(lipgloss.Left, monitorView, energyPanel)
 }
 
 // renderWithDeviceList wraps a view with the device list on the left for device persistence.
 // Used for Automation and Config tabs to allow device switching while on those views.
 func (m Model) renderWithDeviceList(height int) string {
+	cw := m.contentWidth()
 	widths := m.calculateOptimalWidths()
 
 	// Device list on the left (persists across views)
 	deviceListCol := m.renderDeviceListColumn(widths.DeviceList, height)
 
 	// Right column width = total - device list - gap
-	rightColWidth := m.width - widths.DeviceList - 1
+	rightColWidth := cw - widths.DeviceList - 1
 
 	// Get the view content from view manager
 	// Resize the view to fit the available space
@@ -1461,7 +1506,7 @@ func (m Model) renderWithDeviceList(height int) string {
 	content := lipgloss.JoinHorizontal(lipgloss.Top, deviceListCol, " ", viewContent)
 
 	// Ensure content fills the full width
-	contentStyle := lipgloss.NewStyle().Width(m.width)
+	contentStyle := lipgloss.NewStyle().Width(cw)
 	content = contentStyle.Render(content)
 
 	// JSON viewer overlay (centered on top of content when active)
@@ -1515,7 +1560,8 @@ func (m Model) renderEnergyPanel(width, height int) string {
 
 // renderNarrowLayout renders panels stacked vertically for narrow terminals.
 func (m Model) renderNarrowLayout(height int) string {
-	panelWidth := m.width - 2 // Full width minus borders
+	cw := m.contentWidth()
+	panelWidth := cw - 2 // Content width minus borders
 
 	// Divide height into 2 parts: events (25%), deviceList (75%)
 	eventsHeight := height * 25 / 100
@@ -1535,7 +1581,7 @@ func (m Model) renderNarrowLayout(height int) string {
 	// Row 2: Device List (list only) + Device Info stacked in narrow mode
 	// In narrow mode, we keep devicelist's internal split pane for compactness
 	m.deviceList = m.deviceList.SetSize(panelWidth, deviceListHeight)
-	m.deviceList = m.deviceList.SetFocused(m.focusedPanel == PanelDeviceList)
+	m.deviceList = m.deviceList.SetFocused(m.focusedPanel == PanelDeviceList).SetPanelIndex(1)
 	m.deviceList = m.deviceList.SetListOnly(false) // Use split pane in narrow mode
 	deviceListRow := m.deviceList.View()
 
@@ -1567,7 +1613,7 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 	innerHeight := height - 2 // top + bottom border
 
 	m.deviceList = m.deviceList.SetSize(innerWidth, innerHeight)
-	m.deviceList = m.deviceList.SetFocused(focused)
+	m.deviceList = m.deviceList.SetFocused(focused).SetPanelIndex(1)
 	m.deviceList = m.deviceList.SetListOnly(true)
 
 	deviceCount := m.cache.DeviceCount()
@@ -1576,7 +1622,8 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 	r := rendering.New(width, height).
 		SetTitle("Devices").
 		SetBadge(fmt.Sprintf("%d/%d", onlineCount, deviceCount)).
-		SetFocused(focused)
+		SetFocused(focused).
+		SetPanelIndex(1)
 
 	return r.SetContent(m.deviceList.View()).Render()
 }
@@ -1592,6 +1639,7 @@ func (m Model) renderEventsColumn(width, height int) string {
 		SetTitle("Events").
 		SetBadge(fmt.Sprintf("%d", eventCount)).
 		SetFocused(focused).
+		SetPanelIndex(3).
 		SetFocusColor(orangeBorder).
 		SetBlurColor(orangeBorder)
 
@@ -1733,6 +1781,26 @@ func Run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
 	)
 	_, err := p.Run()
 	return err
+}
+
+// openDeviceBrowser opens the device's web UI in the default browser.
+func (m Model) openDeviceBrowser(address string) tea.Cmd {
+	return func() tea.Msg {
+		url := "http://" + address
+		b := browser.New()
+		if err := b.Browse(m.ctx, url); err != nil {
+			return DeviceActionMsg{
+				Device: address,
+				Action: "open browser",
+				Err:    err,
+			}
+		}
+		return DeviceActionMsg{
+			Device: address,
+			Action: "open browser",
+			Err:    nil,
+		}
+	}
 }
 
 func (m Model) getDeviceMethods(d *cache.DeviceData) []string {

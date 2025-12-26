@@ -92,6 +92,7 @@ type Model struct {
 	width          int
 	height         int
 	focused        bool
+	panelIndex     int // 1-based panel index for Shift+N hotkey hint
 	styles         Styles
 }
 
@@ -286,6 +287,12 @@ func (m Model) SetFocused(focused bool) Model {
 	return m
 }
 
+// SetPanelIndex sets the 1-based panel index for Shift+N hotkey hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
+	return m
+}
+
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -360,7 +367,8 @@ func (m Model) prevProtocol() Model {
 func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Protocols").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	if m.device == "" {
 		r.SetContent(m.styles.Muted.Render("No device selected"))

@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -63,18 +64,19 @@ type UpdateCompleteMsg struct {
 
 // Model displays firmware management.
 type Model struct {
-	ctx      context.Context
-	svc      *shelly.Service
-	devices  []DeviceFirmware
-	cursor   int
-	scroll   int
-	checking bool
-	updating bool
-	err      error
-	width    int
-	height   int
-	focused  bool
-	styles   Styles
+	ctx        context.Context
+	svc        *shelly.Service
+	devices    []DeviceFirmware
+	cursor     int
+	scroll     int
+	checking   bool
+	updating   bool
+	err        error
+	width      int
+	height     int
+	focused    bool
+	panelIndex int
+	styles     Styles
 }
 
 // Styles holds styles for the Firmware component.
@@ -174,6 +176,12 @@ func (m Model) SetFocused(focused bool) Model {
 	return m
 }
 
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
+	return m
+}
+
 // CheckAll starts a firmware check on all devices.
 func (m Model) CheckAll() (Model, tea.Cmd) {
 	if m.checking || len(m.devices) == 0 {
@@ -221,7 +229,8 @@ func (m Model) checkAllDevices() tea.Cmd {
 		}
 
 		if err := g.Wait(); err != nil {
-			_ = err // Individual errors captured per device
+			// Individual errors are captured per device in results
+			iostreams.DebugErr("firmware check batch", err)
 		}
 
 		return CheckCompleteMsg{Results: results}
@@ -265,8 +274,10 @@ func (m Model) updateDevices(devices []DeviceFirmware) tea.Cmd {
 			}
 
 			err := m.svc.UpdateFirmwareStable(ctx, dev.Name)
-			// We send individual updates - though for TUI we'll just send final result
-			_ = err
+			if err != nil {
+				// Log but continue with remaining devices
+				iostreams.DebugErr("firmware update "+dev.Name, err)
+			}
 		}
 
 		// Return a message indicating updates are done
@@ -417,7 +428,8 @@ func (m Model) selectedDevices() []DeviceFirmware {
 func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Firmware").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings when focused
 	if m.focused {

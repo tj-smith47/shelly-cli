@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/discovery"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/provisioning"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -235,6 +236,22 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 		m.focusNext()
 	case keyShiftTab:
 		m.focusPrev()
+	case keyconst.Shift1:
+		m.focusedPanel = ManagePanelDiscovery
+		m.updateFocusStates()
+	case keyconst.Shift2:
+		m.focusedPanel = ManagePanelBatch
+		m.updateFocusStates()
+	case keyconst.Shift3:
+		m.focusedPanel = ManagePanelFirmware
+		m.updateFocusStates()
+	case keyconst.Shift4:
+		m.focusedPanel = ManagePanelBackup
+		m.updateFocusStates()
+	case keyconst.Shift5:
+		m.focusedPanel = ManagePanelProvisioning
+		m.showProvisioning = true
+		m.updateFocusStates()
 	case "p":
 		// Toggle provisioning wizard when pressing 'p' from Discovery panel
 		if m.focusedPanel == ManagePanelDiscovery {
@@ -283,11 +300,11 @@ func (m *Manage) focusPrev() {
 }
 
 func (m *Manage) updateFocusStates() {
-	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !m.showProvisioning)
-	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning)
-	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning)
-	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning)
-	m.provisioning = m.provisioning.SetFocused(m.showProvisioning)
+	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !m.showProvisioning).SetPanelIndex(1)
+	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(2)
+	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning).SetPanelIndex(3)
+	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning).SetPanelIndex(4)
+	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(5)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if m.layoutCalc != nil && m.width > 0 && m.height > 0 {

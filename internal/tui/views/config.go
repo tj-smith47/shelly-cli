@@ -13,8 +13,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/inputs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/protocols"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/security"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/smarthome"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/system"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/wifi"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -31,6 +33,7 @@ const (
 	PanelBLE
 	PanelProtocols
 	PanelSecurity
+	PanelSmartHome
 )
 
 // configLoadPhase tracks which component is being loaded.
@@ -45,6 +48,7 @@ const (
 	configLoadBLE
 	configLoadProtocols
 	configLoadSecurity
+	configLoadSmartHome
 )
 
 // configLoadNextMsg triggers loading the next component in sequence.
@@ -69,7 +73,7 @@ func (d ConfigDeps) Validate() error {
 	return nil
 }
 
-// Config is the config view that composes WiFi, System, Cloud, Inputs, BLE, Protocols, and Security.
+// Config is the config view that composes WiFi, System, Cloud, Inputs, BLE, Protocols, Security, and SmartHome.
 type Config struct {
 	ctx context.Context
 	svc *shelly.Service
@@ -83,6 +87,7 @@ type Config struct {
 	ble       ble.Model
 	protocols protocols.Model
 	security  security.Model
+	smarthome smarthome.Model
 
 	// State
 	device       string
@@ -135,6 +140,7 @@ func NewConfig(deps ConfigDeps) *Config {
 	bleDeps := ble.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	protocolsDeps := protocols.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	securityDeps := security.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
+	smarthomeDeps := smarthome.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
 	// Create flexible layout with 50/50 column split
 	layoutCalc := layout.NewTwoColumnLayout(0.5, 1)
@@ -146,12 +152,13 @@ func NewConfig(deps ConfigDeps) *Config {
 		{ID: layout.PanelID(PanelBLE), MinHeight: 5, ExpandOnFocus: true},
 	}
 
-	// Configure right column panels (Cloud, Inputs, Protocols, Security)
+	// Configure right column panels (Cloud, Inputs, Protocols, Security, SmartHome)
 	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(PanelCloud), MinHeight: 4, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelInputs), MinHeight: 4, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelProtocols), MinHeight: 4, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelSecurity), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelSmartHome), MinHeight: 4, ExpandOnFocus: true},
 	}
 
 	c := &Config{
@@ -165,6 +172,7 @@ func NewConfig(deps ConfigDeps) *Config {
 		ble:          ble.New(bleDeps),
 		protocols:    protocols.New(protocolsDeps),
 		security:     security.New(securityDeps),
+		smarthome:    smarthome.New(smarthomeDeps),
 		focusedPanel: PanelWiFi,
 		styles:       DefaultConfigStyles(),
 		layoutCalc:   layoutCalc,
@@ -186,6 +194,7 @@ func (c *Config) Init() tea.Cmd {
 		c.ble.Init(),
 		c.protocols.Init(),
 		c.security.Init(),
+		c.smarthome.Init(),
 	)
 }
 
@@ -210,6 +219,7 @@ func (c *Config) SetDevice(device string) tea.Cmd {
 	c.ble, _ = c.ble.SetDevice("")
 	c.protocols, _ = c.protocols.SetDevice("")
 	c.security, _ = c.security.SetDevice("")
+	c.smarthome, _ = c.smarthome.SetDevice("")
 
 	// Start sequential loading with first component
 	c.loadPhase = configLoadWifi
@@ -249,6 +259,10 @@ func (c *Config) loadNextComponent() tea.Cmd {
 		newSecurity, cmd := c.security.SetDevice(c.device)
 		c.security = newSecurity
 		return cmd
+	case configLoadSmartHome:
+		newSmartHome, cmd := c.smarthome.SetDevice(c.device)
+		c.smarthome = newSmartHome
+		return cmd
 	default:
 		return nil
 	}
@@ -270,6 +284,8 @@ func (c *Config) advanceLoadPhase() tea.Cmd {
 	case configLoadProtocols:
 		c.loadPhase = configLoadSecurity
 	case configLoadSecurity:
+		c.loadPhase = configLoadSmartHome
+	case configLoadSmartHome:
 		c.loadPhase = configLoadIdle
 		return nil // All done
 	default:
@@ -314,52 +330,74 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 
 // handleComponentLoaded checks for component completion messages and advances loading.
 func (c *Config) handleComponentLoaded(msg tea.Msg) tea.Cmd {
-	switch msg.(type) {
-	case wifi.StatusLoadedMsg:
-		if c.loadPhase == configLoadWifi {
-			return c.advanceLoadPhase()
-		}
-	case system.StatusLoadedMsg:
-		if c.loadPhase == configLoadSystem {
-			return c.advanceLoadPhase()
-		}
-	case cloud.StatusLoadedMsg:
-		if c.loadPhase == configLoadCloud {
-			return c.advanceLoadPhase()
-		}
-	case inputs.LoadedMsg:
-		if c.loadPhase == configLoadInputs {
-			return c.advanceLoadPhase()
-		}
-	case ble.StatusLoadedMsg:
-		if c.loadPhase == configLoadBLE {
-			return c.advanceLoadPhase()
-		}
-	case protocols.StatusLoadedMsg:
-		if c.loadPhase == configLoadProtocols {
-			return c.advanceLoadPhase()
-		}
-	case security.StatusLoadedMsg:
-		if c.loadPhase == configLoadSecurity {
-			return c.advanceLoadPhase()
-		}
+	expectedPhase := c.phaseForMessage(msg)
+	if expectedPhase != configLoadIdle && c.loadPhase == expectedPhase {
+		return c.advanceLoadPhase()
 	}
 	return nil
 }
 
+// phaseForMessage returns the load phase that corresponds to a message type.
+func (c *Config) phaseForMessage(msg tea.Msg) configLoadPhase {
+	switch msg.(type) {
+	case wifi.StatusLoadedMsg:
+		return configLoadWifi
+	case system.StatusLoadedMsg:
+		return configLoadSystem
+	case cloud.StatusLoadedMsg:
+		return configLoadCloud
+	case inputs.LoadedMsg:
+		return configLoadInputs
+	case ble.StatusLoadedMsg:
+		return configLoadBLE
+	case protocols.StatusLoadedMsg:
+		return configLoadProtocols
+	case security.StatusLoadedMsg:
+		return configLoadSecurity
+	case smarthome.StatusLoadedMsg:
+		return configLoadSmartHome
+	default:
+		return configLoadIdle
+	}
+}
+
 func (c *Config) handleKeyPress(msg tea.KeyPressMsg) {
 	switch msg.String() {
-	case "tab":
+	case keyTab:
 		c.focusNext()
-	case "shift+tab":
+	case keyShiftTab:
 		c.focusPrev()
+	case keyconst.Shift2:
+		c.focusedPanel = PanelWiFi
+		c.updateFocusStates()
+	case keyconst.Shift3:
+		c.focusedPanel = PanelSystem
+		c.updateFocusStates()
+	case keyconst.Shift4:
+		c.focusedPanel = PanelCloud
+		c.updateFocusStates()
+	case keyconst.Shift5:
+		c.focusedPanel = PanelInputs
+		c.updateFocusStates()
+	case keyconst.Shift6:
+		c.focusedPanel = PanelBLE
+		c.updateFocusStates()
+	case keyconst.Shift7:
+		c.focusedPanel = PanelProtocols
+		c.updateFocusStates()
+	case keyconst.Shift8:
+		c.focusedPanel = PanelSecurity
+		c.updateFocusStates()
+	case keyconst.Shift9:
+		c.focusedPanel = PanelSmartHome
+		c.updateFocusStates()
 	}
 }
 
 func (c *Config) focusNext() {
 	panels := []ConfigPanel{
 		PanelWiFi, PanelSystem, PanelBLE,
-		PanelCloud, PanelInputs, PanelProtocols, PanelSecurity,
+		PanelCloud, PanelInputs, PanelProtocols, PanelSecurity, PanelSmartHome,
 	}
 	for i, p := range panels {
 		if p == c.focusedPanel {
@@ -373,7 +411,7 @@ func (c *Config) focusNext() {
 func (c *Config) focusPrev() {
 	panels := []ConfigPanel{
 		PanelWiFi, PanelSystem, PanelBLE,
-		PanelCloud, PanelInputs, PanelProtocols, PanelSecurity,
+		PanelCloud, PanelInputs, PanelProtocols, PanelSecurity, PanelSmartHome,
 	}
 	for i, p := range panels {
 		if p == c.focusedPanel {
@@ -386,13 +424,14 @@ func (c *Config) focusPrev() {
 }
 
 func (c *Config) updateFocusStates() {
-	c.wifi = c.wifi.SetFocused(c.focusedPanel == PanelWiFi)
-	c.system = c.system.SetFocused(c.focusedPanel == PanelSystem)
-	c.cloud = c.cloud.SetFocused(c.focusedPanel == PanelCloud)
-	c.inputs = c.inputs.SetFocused(c.focusedPanel == PanelInputs)
-	c.ble = c.ble.SetFocused(c.focusedPanel == PanelBLE)
-	c.protocols = c.protocols.SetFocused(c.focusedPanel == PanelProtocols)
-	c.security = c.security.SetFocused(c.focusedPanel == PanelSecurity)
+	c.wifi = c.wifi.SetFocused(c.focusedPanel == PanelWiFi).SetPanelIndex(1)
+	c.system = c.system.SetFocused(c.focusedPanel == PanelSystem).SetPanelIndex(2)
+	c.cloud = c.cloud.SetFocused(c.focusedPanel == PanelCloud).SetPanelIndex(3)
+	c.inputs = c.inputs.SetFocused(c.focusedPanel == PanelInputs).SetPanelIndex(4)
+	c.ble = c.ble.SetFocused(c.focusedPanel == PanelBLE).SetPanelIndex(5)
+	c.protocols = c.protocols.SetFocused(c.focusedPanel == PanelProtocols).SetPanelIndex(6)
+	c.security = c.security.SetFocused(c.focusedPanel == PanelSecurity).SetPanelIndex(7)
+	c.smarthome = c.smarthome.SetFocused(c.focusedPanel == PanelSmartHome).SetPanelIndex(8)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if c.layoutCalc != nil && c.width > 0 && c.height > 0 {
@@ -417,6 +456,8 @@ func (c *Config) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 		c.protocols, cmd = c.protocols.Update(msg)
 	case PanelSecurity:
 		c.security, cmd = c.security.Update(msg)
+	case PanelSmartHome:
+		c.smarthome, cmd = c.smarthome.Update(msg)
 	}
 	return cmd
 }
@@ -424,7 +465,7 @@ func (c *Config) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 func (c *Config) updateAllComponents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
-	var wifiCmd, systemCmd, cloudCmd, inputsCmd, bleCmd, protocolsCmd, securityCmd tea.Cmd
+	var wifiCmd, systemCmd, cloudCmd, inputsCmd, bleCmd, protocolsCmd, securityCmd, smarthomeCmd tea.Cmd
 	c.wifi, wifiCmd = c.wifi.Update(msg)
 	c.system, systemCmd = c.system.Update(msg)
 	c.cloud, cloudCmd = c.cloud.Update(msg)
@@ -432,8 +473,9 @@ func (c *Config) updateAllComponents(msg tea.Msg) tea.Cmd {
 	c.ble, bleCmd = c.ble.Update(msg)
 	c.protocols, protocolsCmd = c.protocols.Update(msg)
 	c.security, securityCmd = c.security.Update(msg)
+	c.smarthome, smarthomeCmd = c.smarthome.Update(msg)
 
-	cmds = append(cmds, wifiCmd, systemCmd, cloudCmd, inputsCmd, bleCmd, protocolsCmd, securityCmd)
+	cmds = append(cmds, wifiCmd, systemCmd, cloudCmd, inputsCmd, bleCmd, protocolsCmd, securityCmd, smarthomeCmd)
 	return tea.Batch(cmds...)
 }
 
@@ -473,6 +515,8 @@ func (c *Config) renderNarrowLayout() string {
 		return c.protocols.View()
 	case PanelSecurity:
 		return c.security.View()
+	case PanelSmartHome:
+		return c.smarthome.View()
 	default:
 		return c.wifi.View()
 	}
@@ -487,12 +531,13 @@ func (c *Config) renderStandardLayout() string {
 		c.ble.View(),
 	}
 
-	// Right column: Cloud, Inputs, Protocols, Security
+	// Right column: Cloud, Inputs, Protocols, Security, SmartHome
 	rightPanels := []string{
 		c.cloud.View(),
 		c.inputs.View(),
 		c.protocols.View(),
 		c.security.View(),
+		c.smarthome.View(),
 	}
 
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
@@ -518,6 +563,7 @@ func (c *Config) SetSize(width, height int) View {
 		c.ble = c.ble.SetSize(contentWidth, contentHeight)
 		c.protocols = c.protocols.SetSize(contentWidth, contentHeight)
 		c.security = c.security.SetSize(contentWidth, contentHeight)
+		c.smarthome = c.smarthome.SetSize(contentWidth, contentHeight)
 		return c
 	}
 
@@ -540,7 +586,7 @@ func (c *Config) SetSize(width, height int) View {
 		c.ble = c.ble.SetSize(d.Width, d.Height)
 	}
 
-	// Apply sizes to right column components (Cloud, Inputs, Protocols, Security)
+	// Apply sizes to right column components (Cloud, Inputs, Protocols, Security, SmartHome)
 	if d, ok := dims[layout.PanelID(PanelCloud)]; ok {
 		c.cloud = c.cloud.SetSize(d.Width, d.Height)
 	}
@@ -552,6 +598,9 @@ func (c *Config) SetSize(width, height int) View {
 	}
 	if d, ok := dims[layout.PanelID(PanelSecurity)]; ok {
 		c.security = c.security.SetSize(d.Width, d.Height)
+	}
+	if d, ok := dims[layout.PanelID(PanelSmartHome)]; ok {
+		c.smarthome = c.smarthome.SetSize(d.Width, d.Height)
 	}
 
 	return c

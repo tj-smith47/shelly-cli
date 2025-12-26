@@ -88,6 +88,7 @@ type Model struct {
 	width      int
 	height     int
 	focused    bool
+	panelIndex int
 	polling    bool
 	styles     Styles
 }
@@ -178,6 +179,12 @@ func (m Model) SetSize(width, height int) Model {
 // SetFocused sets the focus state.
 func (m Model) SetFocused(focused bool) Model {
 	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
 	return m
 }
 
@@ -330,7 +337,8 @@ func (m Model) configureDevice() tea.Cmd {
 func (m Model) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Setup New Device").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	var content strings.Builder
 

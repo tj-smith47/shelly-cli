@@ -79,7 +79,7 @@ func AddOverwriteFlag(cmd *cobra.Command, target *bool) {
 	cmd.Flags().BoolVar(target, "overwrite", false, "Overwrite existing resource")
 }
 
-// BatchFlags holds the common flags used for batch operations.
+// BatchFlags holds common flags for batch operations targeting multiple devices.
 type BatchFlags struct {
 	GroupName  string
 	All        bool
@@ -107,7 +107,7 @@ func SetBatchDefaults(flags *BatchFlags) {
 	flags.SwitchID = DefaultComponentID
 }
 
-// SceneFlags holds the common flags used for scene operations.
+// SceneFlags holds common flags for scene activation operations.
 type SceneFlags struct {
 	Timeout    time.Duration
 	Concurrent int

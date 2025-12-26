@@ -15,12 +15,13 @@ import (
 
 // EditorModel displays schedule details.
 type EditorModel struct {
-	schedule *Schedule
-	scroll   int
-	width    int
-	height   int
-	focused  bool
-	styles   EditorStyles
+	schedule   *Schedule
+	scroll     int
+	width      int
+	height     int
+	focused    bool
+	panelIndex int // 1-based panel index for Shift+N hotkey hint
+	styles     EditorStyles
 }
 
 // EditorStyles holds styles for the editor component.
@@ -103,6 +104,12 @@ func (m EditorModel) SetFocused(focused bool) EditorModel {
 	return m
 }
 
+// SetPanelIndex sets the 1-based panel index for Shift+N hotkey hint.
+func (m EditorModel) SetPanelIndex(index int) EditorModel {
+	m.panelIndex = index
+	return m
+}
+
 // Update handles messages.
 func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
@@ -175,7 +182,8 @@ func (m EditorModel) maxScroll() int {
 func (m EditorModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Schedule Details").
-		SetFocused(m.focused)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
 
 	if m.schedule == nil {
 		r.SetContent(m.styles.Muted.Render("No schedule selected"))

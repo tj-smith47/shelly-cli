@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/scripts"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/virtuals"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/webhooks"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -362,6 +363,27 @@ func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) {
 		a.focusNext()
 	case keyShiftTab:
 		a.focusPrev()
+	case keyconst.Shift2:
+		a.focusedPanel = PanelScripts
+		a.updateFocusStates()
+	case keyconst.Shift3:
+		a.focusedPanel = PanelScriptEditor
+		a.updateFocusStates()
+	case keyconst.Shift4:
+		a.focusedPanel = PanelSchedules
+		a.updateFocusStates()
+	case keyconst.Shift5:
+		a.focusedPanel = PanelScheduleEditor
+		a.updateFocusStates()
+	case keyconst.Shift6:
+		a.focusedPanel = PanelWebhooks
+		a.updateFocusStates()
+	case keyconst.Shift7:
+		a.focusedPanel = PanelVirtuals
+		a.updateFocusStates()
+	case keyconst.Shift8:
+		a.focusedPanel = PanelKVS
+		a.updateFocusStates()
 	}
 }
 
@@ -399,13 +421,13 @@ func (a *Automation) focusPrev() {
 }
 
 func (a *Automation) updateFocusStates() {
-	a.scripts = a.scripts.SetFocused(a.focusedPanel == PanelScripts)
-	a.scriptEditor = a.scriptEditor.SetFocused(a.focusedPanel == PanelScriptEditor)
-	a.schedules = a.schedules.SetFocused(a.focusedPanel == PanelSchedules)
-	a.scheduleEditor = a.scheduleEditor.SetFocused(a.focusedPanel == PanelScheduleEditor)
-	a.webhooks = a.webhooks.SetFocused(a.focusedPanel == PanelWebhooks)
-	a.virtuals = a.virtuals.SetFocused(a.focusedPanel == PanelVirtuals)
-	a.kvs = a.kvs.SetFocused(a.focusedPanel == PanelKVS)
+	a.scripts = a.scripts.SetFocused(a.focusedPanel == PanelScripts).SetPanelIndex(1)
+	a.scriptEditor = a.scriptEditor.SetFocused(a.focusedPanel == PanelScriptEditor).SetPanelIndex(2)
+	a.schedules = a.schedules.SetFocused(a.focusedPanel == PanelSchedules).SetPanelIndex(3)
+	a.scheduleEditor = a.scheduleEditor.SetFocused(a.focusedPanel == PanelScheduleEditor).SetPanelIndex(4)
+	a.webhooks = a.webhooks.SetFocused(a.focusedPanel == PanelWebhooks).SetPanelIndex(5)
+	a.virtuals = a.virtuals.SetFocused(a.focusedPanel == PanelVirtuals).SetPanelIndex(6)
+	a.kvs = a.kvs.SetFocused(a.focusedPanel == PanelKVS).SetPanelIndex(7)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if a.layout != nil && a.width > 0 && a.height > 0 {
