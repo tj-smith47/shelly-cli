@@ -13,9 +13,10 @@ import (
 
 // MonitorDeps holds dependencies for the monitor view.
 type MonitorDeps struct {
-	Ctx context.Context
-	Svc *shelly.Service
-	IOS *iostreams.IOStreams
+	Ctx         context.Context
+	Svc         *shelly.Service
+	IOS         *iostreams.IOStreams
+	EventStream *shelly.EventStream // Shared event stream
 }
 
 // Validate ensures all required dependencies are set.
@@ -28,6 +29,9 @@ func (d MonitorDeps) Validate() error {
 	}
 	if d.IOS == nil {
 		return errNilIOStreams
+	}
+	if d.EventStream == nil {
+		return errNilEventStream
 	}
 	return nil
 }
@@ -53,9 +57,10 @@ func NewMonitor(deps MonitorDeps) *Monitor {
 		ctx: deps.Ctx,
 		id:  tabs.TabMonitor,
 		monitor: monitor.New(monitor.Deps{
-			Ctx: deps.Ctx,
-			Svc: deps.Svc,
-			IOS: deps.IOS,
+			Ctx:         deps.Ctx,
+			Svc:         deps.Svc,
+			IOS:         deps.IOS,
+			EventStream: deps.EventStream,
 		}),
 	}
 }

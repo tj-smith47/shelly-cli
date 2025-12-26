@@ -3,7 +3,6 @@ package events
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,10 +10,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/tj-smith47/shelly-go/events"
 
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -22,9 +20,10 @@ import (
 
 // Deps holds the dependencies for the events component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
-	IOS *iostreams.IOStreams
+	Ctx         context.Context
+	Svc         *shelly.Service
+	IOS         *iostreams.IOStreams
+	EventStream *shelly.EventStream // Shared event stream (WebSocket for Gen2+, polling for Gen1)
 }
 
 // validate ensures all required dependencies are set.
@@ -37,6 +36,9 @@ func (d Deps) validate() error {
 	}
 	if d.IOS == nil {
 		return fmt.Errorf("iostreams is required")
+	}
+	if d.EventStream == nil {
+		return fmt.Errorf("event stream is required")
 	}
 	return nil
 }
@@ -81,6 +83,7 @@ type Model struct {
 	ctx          context.Context
 	svc          *shelly.Service
 	ios          *iostreams.IOStreams
+	eventStream  *shelly.EventStream
 	state        *sharedState
 	maxItems     int
 	width        int
@@ -90,6 +93,10 @@ type Model struct {
 	cursor       int
 	paused       bool
 	autoScroll   bool // Auto-scroll to bottom when new events arrive
+
+	// Filtering
+	filterByDevice bool   // When true, only show events for selectedDevice
+	selectedDevice string // Device name to filter by (when filterByDevice is true)
 }
 
 // Styles for the events component.
@@ -163,12 +170,13 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:        deps.Ctx,
-		svc:        deps.Svc,
-		ios:        deps.IOS,
-		maxItems:   100,
-		autoScroll: true, // Start with auto-scroll enabled (tail-f behavior)
-		styles:     DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		ios:         deps.IOS,
+		eventStream: deps.EventStream,
+		maxItems:    100,
+		autoScroll:  true, // Start with auto-scroll enabled (tail-f behavior)
+		styles:      DefaultStyles(),
 		state: &sharedState{
 			events:        []Event{},
 			subscriptions: make(map[string]context.CancelFunc),
@@ -179,10 +187,18 @@ func New(deps Deps) Model {
 
 // Init returns the initial command for events.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.subscribeToAllDevices(),
-		m.scheduleRefresh(),
-	)
+	// Subscribe to the shared EventStream
+	m.eventStream.Subscribe(m.handleStreamEvent)
+
+	// Add initial "subscribed" event
+	m.addEvent(Event{
+		Timestamp:   time.Now(),
+		Device:      "system",
+		Type:        "info",
+		Description: "Subscribed to event stream",
+	})
+
+	return m.scheduleRefresh()
 }
 
 // scheduleRefresh schedules the next refresh tick to check for new events.
@@ -192,102 +208,80 @@ func (m Model) scheduleRefresh() tea.Cmd {
 	})
 }
 
-// subscribeToAllDevices creates WebSocket subscriptions for all registered devices.
-// Note: Gen1 devices are skipped as they don't support WebSocket events.
-func (m Model) subscribeToAllDevices() tea.Cmd {
-	return func() tea.Msg {
-		deviceMap := config.ListDevices()
-		if len(deviceMap) == 0 {
-			return nil
-		}
-
-		var events []Event
-		for _, d := range deviceMap {
-			// Skip Gen1 devices - they don't support WebSocket events
-			if d.Generation == 1 {
-				continue
-			}
-			// Start subscription in background
-			go m.subscribeToDevice(d)
-			// Add connection event
-			events = append(events, Event{
-				Timestamp:   time.Now(),
-				Device:      d.Name,
-				Type:        "info",
-				Description: "Connecting to WebSocket...",
-			})
-		}
-
-		return EventMsg{Events: events}
+// handleStreamEvent converts shelly-go events to our internal Event type.
+// It is called by the shared EventStream when events arrive.
+func (m Model) handleStreamEvent(evt events.Event) {
+	// Apply device filter if enabled
+	if m.filterByDevice && evt.DeviceID() != m.selectedDevice {
+		return
 	}
-}
 
-// subscribeToDevice creates a WebSocket subscription for a single device.
-func (m Model) subscribeToDevice(device model.Device) {
-	m.state.mu.Lock()
-	// Cancel existing subscription if any
-	if cancel, exists := m.state.subscriptions[device.Address]; exists {
-		cancel()
-	}
-	// Create new cancellable context
-	ctx, cancel := context.WithCancel(m.ctx)
-	m.state.subscriptions[device.Address] = cancel
-	m.state.mu.Unlock()
+	var event Event
+	event.Timestamp = evt.Timestamp()
+	event.Device = evt.DeviceID()
 
-	handler := func(evt shelly.DeviceEvent) error {
-		m.ios.DebugCat(iostreams.CategoryNetwork, "events: received device event: %s %s %s",
-			device.Name, evt.Component, evt.Event)
-
-		event := Event{
-			Timestamp:   evt.Timestamp,
-			Device:      device.Name,
-			Component:   evt.Component,
-			ComponentID: evt.ComponentID,
-			Type:        categorizeEvent(evt.Event),
-			Description: formatEventDescription(evt),
-			Data:        evt.Data,
-		}
-
+	switch e := evt.(type) {
+	case *events.StatusChangeEvent:
+		event.Component = e.Component
+		event.Type = "status"
+		event.Description = fmt.Sprintf("%s changed", e.Component)
+	case *events.NotifyEvent:
+		event.Component = e.Component
+		event.Type = categorizeEvent(e.Event)
+		event.Description = fmt.Sprintf("%s: %s", e.Component, e.Event)
+	case *events.FullStatusEvent:
+		event.Type = "full_status"
+		event.Description = "Full status update"
+	case *events.DeviceOnlineEvent:
+		event.Type = "info"
+		event.Description = "Device online"
 		// Update connection status
 		m.state.mu.Lock()
-		m.state.connStatus[device.Address] = true
+		m.state.connStatus[evt.DeviceID()] = true
 		m.state.mu.Unlock()
-
-		// Add event to the list
-		m.addEvent(event)
-		m.ios.DebugCat(iostreams.CategoryNetwork, "events: added event, total count: %d",
-			len(m.state.events))
-		return nil
+	case *events.DeviceOfflineEvent:
+		event.Type = "warning"
+		event.Description = "Device offline"
+		// Update connection status
+		m.state.mu.Lock()
+		m.state.connStatus[evt.DeviceID()] = false
+		m.state.mu.Unlock()
+	case *events.ScriptEvent:
+		event.Type = "script"
+		event.Description = fmt.Sprintf("Script output: %s", e.Output)
+	case *events.ErrorEvent:
+		event.Type = "error"
+		event.Description = e.Message
+	default:
+		event.Type = string(evt.Type())
+		event.Description = fmt.Sprintf("Event: %s", evt.Type())
 	}
 
-	// Mark as connected when subscription starts successfully
-	m.state.mu.Lock()
-	m.state.connStatus[device.Address] = true
-	m.state.mu.Unlock()
+	m.addEvent(event)
+	m.ios.DebugCat(iostreams.CategoryNetwork, "events: received %s event from %s",
+		event.Type, event.Device)
+}
 
-	m.addEvent(Event{
-		Timestamp:   time.Now(),
-		Device:      device.Name,
-		Type:        "info",
-		Description: "WebSocket connected",
-	})
+// SetSelectedDevice sets the device to filter events by.
+func (m Model) SetSelectedDevice(name string) Model {
+	m.selectedDevice = name
+	return m
+}
 
-	// This blocks until context is cancelled or error occurs
-	err := m.svc.SubscribeEvents(ctx, device.Address, handler)
+// ToggleFilter toggles the device filter on/off.
+func (m Model) ToggleFilter() Model {
+	m.filterByDevice = !m.filterByDevice
+	return m
+}
 
-	// Mark as disconnected on exit
-	m.state.mu.Lock()
-	m.state.connStatus[device.Address] = false
-	m.state.mu.Unlock()
+// IsFiltering returns whether device filtering is active.
+func (m Model) IsFiltering() bool {
+	return m.filterByDevice
+}
 
-	if err != nil && !errors.Is(err, context.Canceled) {
-		m.addEvent(Event{
-			Timestamp:   time.Now(),
-			Device:      device.Name,
-			Type:        "error",
-			Description: fmt.Sprintf("WebSocket disconnected: %v", err),
-		})
-	}
+// FilteredDevice returns the device being filtered by.
+func (m Model) FilteredDevice() string {
+	return m.selectedDevice
 }
 
 func (m Model) addEvent(e Event) {
@@ -318,17 +312,6 @@ func categorizeEvent(eventName string) string {
 		}
 		return "info"
 	}
-}
-
-// formatEventDescription creates a human-readable description of an event.
-func formatEventDescription(evt shelly.DeviceEvent) string {
-	if evt.Component != "" {
-		if evt.ComponentID > 0 {
-			return fmt.Sprintf("%s:%d %s", evt.Component, evt.ComponentID, evt.Event)
-		}
-		return fmt.Sprintf("%s %s", evt.Component, evt.Event)
-	}
-	return evt.Event
 }
 
 // Update handles messages for events.
@@ -409,6 +392,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 		m.autoScroll = true // After clear, re-enable auto-scroll
 	case "p":
 		m = m.togglePause()
+	case "f":
+		m = m.ToggleFilter()
 	}
 	return m
 }
@@ -526,15 +511,15 @@ func (m Model) SetSize(width, height int) Model {
 // View renders the events.
 func (m Model) View() string {
 	m.state.mu.Lock()
-	events := make([]Event, len(m.state.events))
-	copy(events, m.state.events)
+	eventList := make([]Event, len(m.state.events))
+	copy(eventList, m.state.events)
 	connStatus := make(map[string]bool)
 	for k, v := range m.state.connStatus {
 		connStatus[k] = v
 	}
 	m.state.mu.Unlock()
 
-	if len(events) == 0 {
+	if len(eventList) == 0 {
 		return m.styles.Container.
 			Width(m.width-4).
 			Height(m.height).
@@ -562,17 +547,22 @@ func (m Model) View() string {
 		pauseStr = "  " + m.styles.Warning.Render("[PAUSED]")
 	}
 
-	header := m.styles.Header.Render("Event Stream") + "  " + statusStr + pauseStr
+	filterStr := ""
+	if m.filterByDevice {
+		filterStr = "  " + m.styles.Info.Render(fmt.Sprintf("[Filter: %s]", m.selectedDevice))
+	}
+
+	header := m.styles.Header.Render("Event Stream") + "  " + statusStr + pauseStr + filterStr
 
 	// Calculate visible events
 	visibleRows := m.visibleRows()
 	startIdx := m.scrollOffset
 	endIdx := startIdx + visibleRows
-	if endIdx > len(events) {
-		endIdx = len(events)
+	if endIdx > len(eventList) {
+		endIdx = len(eventList)
 	}
 
-	eventsToShow := events[startIdx:endIdx]
+	eventsToShow := eventList[startIdx:endIdx]
 
 	// Column widths for fixed-width layout (compact to maximize description)
 	const (
@@ -591,8 +581,8 @@ func (m Model) View() string {
 
 	// Footer with scroll info
 	scrollInfo := ""
-	if len(events) > visibleRows {
-		scrollInfo = fmt.Sprintf(" [%d-%d of %d]", startIdx+1, endIdx, len(events))
+	if len(eventList) > visibleRows {
+		scrollInfo = fmt.Sprintf(" [%d-%d of %d]", startIdx+1, endIdx, len(eventList))
 	}
 	footer := m.styles.Footer.Render(fmt.Sprintf("j/k: scroll  PgUp/PgDn: page  g/G: top/bottom  p: pause  c: clear%s", scrollInfo))
 
@@ -697,18 +687,18 @@ func (m Model) OptimalWidth() int {
 
 	// Get events safely with locking
 	m.state.mu.Lock()
-	events := make([]Event, len(m.state.events))
-	copy(events, m.state.events)
+	eventList := make([]Event, len(m.state.events))
+	copy(eventList, m.state.events)
 	m.state.mu.Unlock()
 
-	if len(events) == 0 {
+	if len(eventList) == 0 {
 		return fixedWidth + 30 // Default description width
 	}
 
 	// Use median description length for optimal width
 	totalDescLen := 0
 	maxDescLen := 0
-	for _, e := range events {
+	for _, e := range eventList {
 		descLen := len(e.Description)
 		totalDescLen += descLen
 		if descLen > maxDescLen {
@@ -716,7 +706,7 @@ func (m Model) OptimalWidth() int {
 		}
 	}
 
-	avgDescLen := totalDescLen / len(events)
+	avgDescLen := totalDescLen / len(eventList)
 
 	// Use 75th percentile: average + 25% of difference to max
 	optimalDescWidth := avgDescLen + (maxDescLen-avgDescLen)/4
@@ -741,12 +731,12 @@ func (m Model) MinWidth() int {
 // MaxDescriptionLen returns the length of the longest event description.
 func (m Model) MaxDescriptionLen() int {
 	m.state.mu.Lock()
-	events := make([]Event, len(m.state.events))
-	copy(events, m.state.events)
+	eventList := make([]Event, len(m.state.events))
+	copy(eventList, m.state.events)
 	m.state.mu.Unlock()
 
 	maxLen := 0
-	for _, e := range events {
+	for _, e := range eventList {
 		if len(e.Description) > maxLen {
 			maxLen = len(e.Description)
 		}

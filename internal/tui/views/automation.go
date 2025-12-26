@@ -23,9 +23,10 @@ import (
 
 // Error variables for validation.
 var (
-	errNilContext   = errors.New("context is required")
-	errNilService   = errors.New("service is required")
-	errNilIOStreams = errors.New("iostreams is required")
+	errNilContext     = errors.New("context is required")
+	errNilService     = errors.New("service is required")
+	errNilIOStreams   = errors.New("iostreams is required")
+	errNilEventStream = errors.New("event stream is required")
 )
 
 // AutomationPanel identifies which panel is focused.
@@ -107,6 +108,7 @@ type Automation struct {
 	// State
 	device       string
 	focusedPanel AutomationPanel
+	viewFocused  bool // Whether the view content has focus (vs device list)
 	width        int
 	height       int
 	styles       AutomationStyles
@@ -304,87 +306,123 @@ func (a *Automation) advanceLoadPhase() tea.Cmd {
 
 // Update handles messages.
 func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
-	var cmds []tea.Cmd
+	// Handle view focus changes from app.go
+	if focusMsg, ok := msg.(ViewFocusChangedMsg); ok {
+		a.viewFocused = focusMsg.Focused
+		a.updateFocusStates()
+		return a, nil
+	}
 
 	// Handle sequential loading messages
 	if loadMsg, ok := msg.(automationLoadNextMsg); ok {
 		if loadMsg.phase == a.loadPhase {
 			cmd := a.loadNextComponent()
-			cmds = append(cmds, cmd)
+			return a, cmd
 		}
-		return a, tea.Batch(cmds...)
+		return a, nil
 	}
 
+	var cmds []tea.Cmd
+
 	// Check for component completion to advance sequential loading
-	switch msg.(type) {
-	case scripts.LoadedMsg:
-		if a.loadPhase == automationLoadScripts {
-			cmds = append(cmds, a.advanceLoadPhase())
-		}
-	case schedules.LoadedMsg:
-		if a.loadPhase == automationLoadSchedules {
-			cmds = append(cmds, a.advanceLoadPhase())
-		}
-	case webhooks.LoadedMsg:
-		if a.loadPhase == automationLoadWebhooks {
-			cmds = append(cmds, a.advanceLoadPhase())
-		}
-	case virtuals.LoadedMsg:
-		if a.loadPhase == automationLoadVirtuals {
-			cmds = append(cmds, a.advanceLoadPhase())
-		}
-	case kvs.LoadedMsg:
-		if a.loadPhase == automationLoadKVS {
-			cmds = append(cmds, a.advanceLoadPhase())
-		}
+	if cmd := a.handleComponentLoaded(msg); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 
 	// Handle keyboard input - only update focused component for key messages
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
-		a.handleKeyPress(keyMsg)
-		cmd := a.updateFocusedComponent(msg)
-		cmds = append(cmds, cmd)
+		if cmd := a.handleKeyPress(keyMsg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		cmds = append(cmds, a.updateFocusedComponent(msg))
 	} else {
 		// For non-key messages (async results), update ALL components
-		cmd := a.updateAllComponents(msg)
-		cmds = append(cmds, cmd)
+		cmds = append(cmds, a.updateAllComponents(msg))
 	}
 
 	// Handle cross-component messages
-	cmd := a.handleComponentMessages(msg)
-	cmds = append(cmds, cmd)
+	cmds = append(cmds, a.handleComponentMessages(msg))
 
 	return a, tea.Batch(cmds...)
 }
 
-func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) {
+// handleComponentLoaded checks for component completion messages and advances loading.
+func (a *Automation) handleComponentLoaded(msg tea.Msg) tea.Cmd {
+	expectedPhase := a.phaseForMessage(msg)
+	if expectedPhase != automationLoadIdle && a.loadPhase == expectedPhase {
+		return a.advanceLoadPhase()
+	}
+	return nil
+}
+
+// phaseForMessage returns the load phase that corresponds to a message type.
+func (a *Automation) phaseForMessage(msg tea.Msg) automationLoadPhase {
+	switch msg.(type) {
+	case scripts.LoadedMsg:
+		return automationLoadScripts
+	case schedules.LoadedMsg:
+		return automationLoadSchedules
+	case webhooks.LoadedMsg:
+		return automationLoadWebhooks
+	case virtuals.LoadedMsg:
+		return automationLoadVirtuals
+	case kvs.LoadedMsg:
+		return automationLoadKVS
+	default:
+		return automationLoadIdle
+	}
+}
+
+func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case keyTab:
+		// If on last panel, return focus to device list
+		if a.focusedPanel == PanelKVS {
+			a.viewFocused = false
+			a.updateFocusStates()
+			return func() tea.Msg { return ReturnFocusMsg{} }
+		}
+		a.viewFocused = true // View has focus when cycling panels
 		a.focusNext()
 	case keyShiftTab:
+		// If on first panel, return focus to device list
+		if a.focusedPanel == PanelScripts {
+			a.viewFocused = false
+			a.updateFocusStates()
+			return func() tea.Msg { return ReturnFocusMsg{} }
+		}
+		a.viewFocused = true // View has focus when cycling panels
 		a.focusPrev()
 	case keyconst.Shift2:
+		a.viewFocused = true
 		a.focusedPanel = PanelScripts
 		a.updateFocusStates()
 	case keyconst.Shift3:
+		a.viewFocused = true
 		a.focusedPanel = PanelScriptEditor
 		a.updateFocusStates()
 	case keyconst.Shift4:
+		a.viewFocused = true
 		a.focusedPanel = PanelSchedules
 		a.updateFocusStates()
 	case keyconst.Shift5:
+		a.viewFocused = true
 		a.focusedPanel = PanelScheduleEditor
 		a.updateFocusStates()
 	case keyconst.Shift6:
+		a.viewFocused = true
 		a.focusedPanel = PanelWebhooks
 		a.updateFocusStates()
 	case keyconst.Shift7:
+		a.viewFocused = true
 		a.focusedPanel = PanelVirtuals
 		a.updateFocusStates()
 	case keyconst.Shift8:
+		a.viewFocused = true
 		a.focusedPanel = PanelKVS
 		a.updateFocusStates()
 	}
+	return nil
 }
 
 func (a *Automation) focusNext() {
@@ -421,13 +459,15 @@ func (a *Automation) focusPrev() {
 }
 
 func (a *Automation) updateFocusStates() {
-	a.scripts = a.scripts.SetFocused(a.focusedPanel == PanelScripts).SetPanelIndex(1)
-	a.scriptEditor = a.scriptEditor.SetFocused(a.focusedPanel == PanelScriptEditor).SetPanelIndex(2)
-	a.schedules = a.schedules.SetFocused(a.focusedPanel == PanelSchedules).SetPanelIndex(3)
-	a.scheduleEditor = a.scheduleEditor.SetFocused(a.focusedPanel == PanelScheduleEditor).SetPanelIndex(4)
-	a.webhooks = a.webhooks.SetFocused(a.focusedPanel == PanelWebhooks).SetPanelIndex(5)
-	a.virtuals = a.virtuals.SetFocused(a.focusedPanel == PanelVirtuals).SetPanelIndex(6)
-	a.kvs = a.kvs.SetFocused(a.focusedPanel == PanelKVS).SetPanelIndex(7)
+	// Panels only show focused when the view has overall focus AND it's the active panel
+	// Panel indices: Device list is 1 (handled by app), view panels start at 2
+	a.scripts = a.scripts.SetFocused(a.viewFocused && a.focusedPanel == PanelScripts).SetPanelIndex(2)
+	a.scriptEditor = a.scriptEditor.SetFocused(a.viewFocused && a.focusedPanel == PanelScriptEditor).SetPanelIndex(3)
+	a.schedules = a.schedules.SetFocused(a.viewFocused && a.focusedPanel == PanelSchedules).SetPanelIndex(4)
+	a.scheduleEditor = a.scheduleEditor.SetFocused(a.viewFocused && a.focusedPanel == PanelScheduleEditor).SetPanelIndex(5)
+	a.webhooks = a.webhooks.SetFocused(a.viewFocused && a.focusedPanel == PanelWebhooks).SetPanelIndex(6)
+	a.virtuals = a.virtuals.SetFocused(a.viewFocused && a.focusedPanel == PanelVirtuals).SetPanelIndex(7)
+	a.kvs = a.kvs.SetFocused(a.viewFocused && a.focusedPanel == PanelKVS).SetPanelIndex(8)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if a.layout != nil && a.width > 0 && a.height > 0 {
@@ -676,6 +716,14 @@ func (a *Automation) FocusedPanel() AutomationPanel {
 // SetFocusedPanel sets the focused panel.
 func (a *Automation) SetFocusedPanel(panel AutomationPanel) *Automation {
 	a.focusedPanel = panel
+	a.updateFocusStates()
+	return a
+}
+
+// SetViewFocused sets whether the view has overall focus (vs device list).
+// When false, all panels show as unfocused.
+func (a *Automation) SetViewFocused(focused bool) *Automation {
+	a.viewFocused = focused
 	a.updateFocusStates()
 	return a
 }

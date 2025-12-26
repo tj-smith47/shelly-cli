@@ -92,6 +92,7 @@ type Config struct {
 	// State
 	device       string
 	focusedPanel ConfigPanel
+	viewFocused  bool // Whether the view content has focus (vs device list)
 	width        int
 	height       int
 	styles       ConfigStyles
@@ -300,6 +301,13 @@ func (c *Config) advanceLoadPhase() tea.Cmd {
 func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 	var cmds []tea.Cmd
 
+	// Handle view focus changes from app.go
+	if focusMsg, ok := msg.(ViewFocusChangedMsg); ok {
+		c.viewFocused = focusMsg.Focused
+		c.updateFocusStates()
+		return c, nil
+	}
+
 	// Handle sequential loading messages
 	if loadMsg, ok := msg.(configLoadNextMsg); ok {
 		if loadMsg.phase == c.loadPhase {
@@ -316,7 +324,9 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 
 	// Handle keyboard input - only update focused component for key messages
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
-		c.handleKeyPress(keyMsg)
+		if cmd := c.handleKeyPress(keyMsg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 		cmd := c.updateFocusedComponent(msg)
 		cmds = append(cmds, cmd)
 	} else {
@@ -361,37 +371,60 @@ func (c *Config) phaseForMessage(msg tea.Msg) configLoadPhase {
 	}
 }
 
-func (c *Config) handleKeyPress(msg tea.KeyPressMsg) {
+func (c *Config) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case keyTab:
+		// If on last panel, return focus to device list
+		if c.focusedPanel == PanelSmartHome {
+			c.viewFocused = false
+			c.updateFocusStates()
+			return func() tea.Msg { return ReturnFocusMsg{} }
+		}
+		c.viewFocused = true // View has focus when cycling panels
 		c.focusNext()
 	case keyShiftTab:
+		// If on first panel, return focus to device list
+		if c.focusedPanel == PanelWiFi {
+			c.viewFocused = false
+			c.updateFocusStates()
+			return func() tea.Msg { return ReturnFocusMsg{} }
+		}
+		c.viewFocused = true // View has focus when cycling panels
 		c.focusPrev()
 	case keyconst.Shift2:
+		c.viewFocused = true
 		c.focusedPanel = PanelWiFi
 		c.updateFocusStates()
 	case keyconst.Shift3:
+		c.viewFocused = true
 		c.focusedPanel = PanelSystem
 		c.updateFocusStates()
 	case keyconst.Shift4:
+		c.viewFocused = true
 		c.focusedPanel = PanelCloud
 		c.updateFocusStates()
 	case keyconst.Shift5:
+		c.viewFocused = true
 		c.focusedPanel = PanelInputs
 		c.updateFocusStates()
 	case keyconst.Shift6:
+		c.viewFocused = true
 		c.focusedPanel = PanelBLE
 		c.updateFocusStates()
 	case keyconst.Shift7:
+		c.viewFocused = true
 		c.focusedPanel = PanelProtocols
 		c.updateFocusStates()
 	case keyconst.Shift8:
+		c.viewFocused = true
 		c.focusedPanel = PanelSecurity
 		c.updateFocusStates()
 	case keyconst.Shift9:
+		c.viewFocused = true
 		c.focusedPanel = PanelSmartHome
 		c.updateFocusStates()
 	}
+	return nil
 }
 
 func (c *Config) focusNext() {
@@ -424,14 +457,16 @@ func (c *Config) focusPrev() {
 }
 
 func (c *Config) updateFocusStates() {
-	c.wifi = c.wifi.SetFocused(c.focusedPanel == PanelWiFi).SetPanelIndex(1)
-	c.system = c.system.SetFocused(c.focusedPanel == PanelSystem).SetPanelIndex(2)
-	c.cloud = c.cloud.SetFocused(c.focusedPanel == PanelCloud).SetPanelIndex(3)
-	c.inputs = c.inputs.SetFocused(c.focusedPanel == PanelInputs).SetPanelIndex(4)
-	c.ble = c.ble.SetFocused(c.focusedPanel == PanelBLE).SetPanelIndex(5)
-	c.protocols = c.protocols.SetFocused(c.focusedPanel == PanelProtocols).SetPanelIndex(6)
-	c.security = c.security.SetFocused(c.focusedPanel == PanelSecurity).SetPanelIndex(7)
-	c.smarthome = c.smarthome.SetFocused(c.focusedPanel == PanelSmartHome).SetPanelIndex(8)
+	// Panels only show focused when the view has overall focus AND it's the active panel
+	// Panel indices: Device list is 1 (handled by app), view panels start at 2
+	c.wifi = c.wifi.SetFocused(c.viewFocused && c.focusedPanel == PanelWiFi).SetPanelIndex(2)
+	c.system = c.system.SetFocused(c.viewFocused && c.focusedPanel == PanelSystem).SetPanelIndex(3)
+	c.cloud = c.cloud.SetFocused(c.viewFocused && c.focusedPanel == PanelCloud).SetPanelIndex(4)
+	c.inputs = c.inputs.SetFocused(c.viewFocused && c.focusedPanel == PanelInputs).SetPanelIndex(5)
+	c.ble = c.ble.SetFocused(c.viewFocused && c.focusedPanel == PanelBLE).SetPanelIndex(6)
+	c.protocols = c.protocols.SetFocused(c.viewFocused && c.focusedPanel == PanelProtocols).SetPanelIndex(7)
+	c.security = c.security.SetFocused(c.viewFocused && c.focusedPanel == PanelSecurity).SetPanelIndex(8)
+	c.smarthome = c.smarthome.SetFocused(c.viewFocused && c.focusedPanel == PanelSmartHome).SetPanelIndex(9)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if c.layoutCalc != nil && c.width > 0 && c.height > 0 {
@@ -619,6 +654,14 @@ func (c *Config) FocusedPanel() ConfigPanel {
 // SetFocusedPanel sets the focused panel.
 func (c *Config) SetFocusedPanel(panel ConfigPanel) *Config {
 	c.focusedPanel = panel
+	c.updateFocusStates()
+	return c
+}
+
+// SetViewFocused sets whether the view has overall focus (vs device list).
+// When false, all panels show as unfocused.
+func (c *Config) SetViewFocused(focused bool) *Config {
+	c.viewFocused = focused
 	c.updateFocusStates()
 	return c
 }

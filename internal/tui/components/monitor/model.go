@@ -27,6 +27,7 @@ type Deps struct {
 	Svc             *shelly.Service
 	IOS             *iostreams.IOStreams
 	RefreshInterval time.Duration
+	EventStream     *shelly.EventStream // Shared event stream (optional - creates one if nil)
 }
 
 // validate ensures all required dependencies are set.
@@ -82,7 +83,8 @@ type Model struct {
 	initialLoad     bool                     // True only on first load (shows loading screen)
 	refreshing      bool                     // True during background refresh (shows indicator, keeps data)
 	useWebSocket    bool                     // True if using WebSocket for updates
-	eventStream     *shelly.EventStream      // WebSocket event stream
+	eventStream     *shelly.EventStream      // WebSocket event stream (may be shared)
+	ownsEventStream bool                     // True if we created the event stream (so we should stop it)
 	eventChan       chan events.Event        // Channel for WebSocket events
 	err             error
 	width           int
@@ -187,8 +189,14 @@ func New(deps Deps) Model {
 		refreshInterval = 10 * time.Second // Fallback polling interval for Gen1
 	}
 
-	// Create event stream for WebSocket connections
-	eventStream := shelly.NewEventStream(deps.Svc)
+	// Use shared EventStream if provided, otherwise create our own
+	eventStream := deps.EventStream
+	ownsEventStream := false
+	if eventStream == nil {
+		eventStream = shelly.NewEventStream(deps.Svc)
+		ownsEventStream = true
+	}
+
 	eventChan := make(chan events.Event, 100)
 
 	// Subscribe to all events and forward to channel
@@ -211,6 +219,7 @@ func New(deps Deps) Model {
 		refreshing:      false,
 		useWebSocket:    true,
 		eventStream:     eventStream,
+		ownsEventStream: ownsEventStream,
 		eventChan:       eventChan,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
@@ -224,8 +233,12 @@ func (m Model) Init() tea.Cmd {
 	}
 
 	if m.useWebSocket {
-		// Start WebSocket connections and event listener
-		cmds = append(cmds, m.startEventStream(), m.listenForEvents())
+		// Only start event stream if we own it (not shared from app.go)
+		if m.ownsEventStream {
+			cmds = append(cmds, m.startEventStream())
+		}
+		// Always listen for events (shared or owned)
+		cmds = append(cmds, m.listenForEvents())
 	} else {
 		// Fallback to polling
 		cmds = append(cmds, m.scheduleRefresh())

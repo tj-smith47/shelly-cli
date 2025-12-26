@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
@@ -31,6 +32,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/statusbar"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -88,6 +90,14 @@ type PanelConstraints struct {
 	MinChars   int // Minimum absolute character width
 }
 
+// EventStreamStartedMsg is sent when the event stream starts successfully.
+type EventStreamStartedMsg struct{}
+
+// EventStreamErrorMsg is sent when the event stream fails to start.
+type EventStreamErrorMsg struct {
+	Err error
+}
+
 // Model is the main TUI application model.
 type Model struct {
 	// Core
@@ -103,6 +113,13 @@ type Model struct {
 
 	// Shared device cache
 	cache *cache.Cache
+
+	// Shared event stream (WebSocket for Gen2+, polling for Gen1)
+	eventStream *shelly.EventStream
+
+	// Unified focus and keybinding management
+	focusManager *focus.Manager
+	contextMap   *keys.ContextMap
 
 	// State
 	ready                   bool
@@ -172,14 +189,32 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Create shared cache
 	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams(), opts.RefreshInterval)
 
+	// Create shared event stream (WebSocket for Gen2+, polling for Gen1)
+	eventStream := shelly.NewEventStream(f.ShellyService())
+
+	// Subscribe cache to event stream for real-time updates
+	deviceCache.SubscribeToEvents(eventStream)
+
+	// Create focus manager for Dashboard panels
+	focusMgr := focus.New(
+		focus.PanelEvents,
+		focus.PanelDeviceList,
+		focus.PanelDeviceInfo,
+		focus.PanelEnergy,
+	)
+
+	// Create context-sensitive keybinding map
+	contextKeyMap := keys.NewContextMap()
+
 	// Create search component with initial filter
 	searchModel := search.NewWithFilter(opts.Filter)
 
 	// Create events component for real-time event stream
 	eventsModel := events.New(events.Deps{
-		Ctx: ctx,
-		Svc: f.ShellyService(),
-		IOS: f.IOStreams(),
+		Ctx:         ctx,
+		Svc:         f.ShellyService(),
+		IOS:         f.IOStreams(),
+		EventStream: eventStream,
 	})
 
 	// Create energy bars component
@@ -233,9 +268,10 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 	// Register Monitor view
 	monitorView := views.NewMonitor(views.MonitorDeps{
-		Ctx: ctx,
-		Svc: f.ShellyService(),
-		IOS: f.IOStreams(),
+		Ctx:         ctx,
+		Svc:         f.ShellyService(),
+		IOS:         f.IOStreams(),
+		EventStream: eventStream,
 	})
 	vm.Register(monitorView)
 
@@ -263,6 +299,9 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		viewManager:     vm,
 		tabBar:          tabBar,
 		cache:           deviceCache,
+		eventStream:     eventStream,
+		focusManager:    focusMgr,
+		contextMap:      contextKeyMap,
 		refreshInterval: opts.RefreshInterval,
 		filter:          opts.Filter,
 		componentCursor: -1, // -1 means "all components"
@@ -286,6 +325,10 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 // Close cleans up resources used by the TUI.
 func (m Model) Close() {
+	// Stop the event stream and close all WebSocket connections
+	if m.eventStream != nil {
+		m.eventStream.Stop()
+	}
 	if err := m.debugLogger.Close(); err != nil {
 		iostreams.DebugErr("close debug logger", err)
 	}
@@ -346,11 +389,22 @@ func (m Model) calculateOptimalWidths() PanelWidths {
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.cache.Init(),
+		m.startEventStream(),
 		m.statusBar.Init(),
 		m.toast.Init(),
 		m.events.Init(),
 		m.viewManager.Init(),
 	)
+}
+
+// startEventStream starts the shared WebSocket event stream.
+func (m Model) startEventStream() tea.Cmd {
+	return func() tea.Msg {
+		if err := m.eventStream.Start(); err != nil {
+			return EventStreamErrorMsg{Err: err}
+		}
+		return EventStreamStartedMsg{}
+	}
 }
 
 // Update handles messages and returns the updated model.
@@ -376,27 +430,7 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		newModel, cmd := m.handleDeviceAction(msg)
 		return newModel, cmd, true
 	case cache.DeviceUpdateMsg:
-		// Forward to cache AND energyHistory (to record power history)
-		cacheCmd := m.cache.Update(msg)
-		var historyCmd tea.Cmd
-		m.energyHistory, historyCmd = m.energyHistory.Update(msg)
-		m = m.updateStatusBarContext()
-		cmds := []tea.Cmd{cacheCmd, historyCmd}
-		// Emit initial selection when first device becomes available
-		if !m.initialSelectionEmitted {
-			devices := m.getFilteredDevices()
-			if len(devices) > 0 && m.cursor < len(devices) {
-				m.initialSelectionEmitted = true
-				d := devices[m.cursor]
-				cmds = append(cmds, func() tea.Msg {
-					return views.DeviceSelectedMsg{
-						Device:  d.Device.Name,
-						Address: d.Device.Address,
-					}
-				})
-			}
-		}
-		return m, tea.Batch(cmds...), true
+		return m.handleDeviceUpdate(msg)
 	case cache.RefreshTickMsg, cache.WaveMsg, cache.DeviceRefreshMsg:
 		return m, m.cache.Update(msg), true
 	case cache.AllDevicesLoadedMsg:
@@ -457,8 +491,47 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		var cmd tea.Cmd
 		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
 		return m, cmd, true
+	case views.ReturnFocusMsg:
+		// View is returning focus to device list (Tab/Shift+Tab past first/last panel)
+		m.focusedPanel = PanelDeviceList
+		return m, nil, true
 	}
 	return m, nil, false
+}
+
+// handleDeviceUpdate handles cache.DeviceUpdateMsg by forwarding to cache and energy history.
+func (m Model) handleDeviceUpdate(msg cache.DeviceUpdateMsg) (tea.Model, tea.Cmd, bool) {
+	// Forward to cache AND energyHistory (to record power history)
+	cacheCmd := m.cache.Update(msg)
+	var historyCmd tea.Cmd
+	m.energyHistory, historyCmd = m.energyHistory.Update(msg)
+	m = m.updateStatusBarContext()
+	cmds := []tea.Cmd{cacheCmd, historyCmd}
+
+	// Emit initial selection when first device becomes available
+	if !m.initialSelectionEmitted {
+		if selectionCmd, emitted := m.emitInitialSelection(); emitted {
+			m.initialSelectionEmitted = true
+			cmds = append(cmds, selectionCmd)
+		}
+	}
+	return m, tea.Batch(cmds...), true
+}
+
+// emitInitialSelection emits a DeviceSelectedMsg for the first device if available.
+// Returns the command and true if selection was emitted, nil and false otherwise.
+func (m Model) emitInitialSelection() (tea.Cmd, bool) {
+	devices := m.getFilteredDevices()
+	if len(devices) == 0 || m.cursor >= len(devices) {
+		return nil, false
+	}
+	d := devices[m.cursor]
+	return func() tea.Msg {
+		return views.DeviceSelectedMsg{
+			Device:  d.Device.Name,
+			Address: d.Device.Address,
+		}
+	}, true
 }
 
 // handleAllDevicesLoaded handles the AllDevicesLoadedMsg and emits initial selection.
@@ -759,8 +832,21 @@ func (m Model) getFilteredDevices() []*cache.DeviceData {
 	return filtered
 }
 
-// handleKeyPress handles global key presses.
+// handleKeyPress handles global key presses using the context-sensitive keybinding system.
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	// Get current context based on focused panel and active view
+	ctx := m.getCurrentKeyContext()
+
+	// Try context-sensitive keybinding system first
+	action := m.contextMap.Match(ctx, msg)
+	if action != keys.ActionNone {
+		newModel, cmd, handled := m.dispatchAction(action)
+		if handled {
+			return newModel, cmd, true
+		}
+	}
+
+	// Fall back to legacy handlers for actions not handled by dispatchAction
 	// Global actions (view switching, quit, help, etc.)
 	if newModel, cmd, handled := m.handleGlobalKeys(msg); handled {
 		return newModel, cmd, true
@@ -776,7 +862,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 
 	// For tabs with device list (Automation, Config, Monitor), handle focus management
 	if m.hasDeviceList() && !m.isDashboardActive() {
-		return m.handleDeviceListTabKeyPress(msg)
+		newModel, cmd := m.handleDeviceListTabKeyPress(msg)
+		return newModel, cmd, true
 	}
 
 	// If NOT on Dashboard and NOT a device-list tab, forward all keys to view
@@ -800,22 +887,79 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
+// getCurrentKeyContext returns the appropriate keybinding context based on current state.
+func (m Model) getCurrentKeyContext() keys.Context {
+	// Check view-specific context first
+	switch m.tabBar.ActiveTabID() {
+	case tabs.TabDashboard:
+		// Dashboard uses panel-based context
+		return m.panelToContext(m.focusedPanel)
+	case tabs.TabAutomation:
+		return keys.ContextAutomation
+	case tabs.TabConfig:
+		return keys.ContextConfig
+	case tabs.TabManage:
+		return keys.ContextManage
+	case tabs.TabFleet:
+		return keys.ContextFleet
+	case tabs.TabMonitor:
+		return keys.ContextDevices // Monitor uses device-like navigation
+	default:
+		return m.panelToContext(m.focusedPanel)
+	}
+}
+
+// panelToContext converts a PanelFocus to a keys.Context.
+func (m Model) panelToContext(panel PanelFocus) keys.Context {
+	switch panel {
+	case PanelEvents:
+		return keys.ContextEvents
+	case PanelDeviceList:
+		return keys.ContextDevices
+	case PanelDetail:
+		return keys.ContextInfo
+	case PanelEndpoints:
+		return keys.ContextJSON
+	default:
+		return keys.ContextGlobal
+	}
+}
+
 // handleDeviceListTabKeyPress handles key presses for tabs with device list (Automation, Config, Monitor).
-func (m Model) handleDeviceListTabKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
-	// When device list is focused, handle all keys here
-	if m.focusedPanel == PanelDeviceList {
-		return m.handleDeviceListFocusedKeys(msg)
+// Always handles the key (caller returns handled=true).
+func (m Model) handleDeviceListTabKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	keyStr := msg.String()
+
+	// Shift+1 (!) ALWAYS returns focus to device list, regardless of current focus
+	if keyStr == keyconst.Shift1 {
+		m.focusedPanel = PanelDeviceList
+		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: false})
+		return m, cmd
 	}
 
-	// When focused on view (PanelDetail), forward ALL keys to the view
-	// The view handles its own internal panel cycling via Tab/Shift+Tab
-	// Escape returns to device list
-	if msg.String() == "escape" {
+	// Escape ALWAYS returns focus to device list
+	if keyStr == "esc" {
 		m.focusedPanel = PanelDeviceList
-		return m, nil, true
+		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: false})
+		return m, cmd
 	}
+
+	// When device list is focused, try to handle navigation keys here
+	if m.focusedPanel == PanelDeviceList {
+		newModel, cmd, handled := m.handleDeviceListFocusedKeys(msg)
+		if handled {
+			return newModel, cmd
+		}
+		// Non-navigation keys (Enter, e, d, etc.) should go to the view
+		// so actions like "edit script" work even when device list is focused
+		cmd = m.viewManager.Update(msg)
+		return m, cmd
+	}
+
+	// When focused on view (PanelDetail), forward keys to the view
+	// The view handles its own internal panel cycling via Tab/Shift+Tab
 	cmd := m.viewManager.Update(msg)
-	return m, cmd, true
+	return m, cmd
 }
 
 // handleDeviceListFocusedKeys handles keys when device list panel is focused.
@@ -825,21 +969,22 @@ func (m Model) handleDeviceListFocusedKeys(msg tea.KeyPressMsg) (Model, tea.Cmd,
 	case "tab", "shift+tab":
 		// Both Tab and Shift+Tab move focus to the view
 		m.focusedPanel = PanelDetail
-		return m, nil, true
+		// Tell the view it now has focus
+		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: true})
+		return m, cmd, true
 	}
-	// Shift+1 keeps focus on device list (panel 1 on all tabs with device list)
+	// Shift+1 (!) keeps focus on device list (panel 1 on all tabs with device list)
 	if keyStr == keyconst.Shift1 {
 		m.focusedPanel = PanelDeviceList
-		return m, nil, true
+		// Tell the view it no longer has focus
+		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: false})
+		return m, cmd, true
 	}
-	// Shift+2-9 switch focus to view and forward the key for panel selection
-	if strings.HasPrefix(keyStr, "shift+") && len(keyStr) == 7 {
-		digit := keyStr[6]
-		if digit >= '2' && digit <= '9' {
-			m.focusedPanel = PanelDetail
-			cmd := m.viewManager.Update(msg)
-			return m, cmd, true
-		}
+	// Shift+2-9 (@, #, $, %, ^, &, *, () switch focus to view and forward the key for panel selection
+	if isShiftNumberKey(keyStr) && keyStr != keyconst.Shift1 {
+		m.focusedPanel = PanelDetail
+		cmd := m.viewManager.Update(msg)
+		return m, cmd, true
 	}
 	// Navigation keys for device list
 	if newModel, cmd, handled := m.handleNavigation(msg); handled {
@@ -869,7 +1014,7 @@ func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m, nil, true
 	case "enter":
 		return m.openJSONViewer()
-	case "escape":
+	case "esc":
 		if m.jsonViewer.Visible() {
 			m.jsonViewer = m.jsonViewer.Close()
 			m.focusedPanel = PanelDetail
@@ -997,6 +1142,203 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 	return m, nil, false
 }
 
+// dispatchAction handles an action from the context-sensitive keybinding system.
+// Returns the updated model, command, and whether the action was handled.
+func (m Model) dispatchAction(action keys.Action) (Model, tea.Cmd, bool) {
+	// Handle global actions first
+	if newModel, cmd, handled := m.dispatchGlobalAction(action); handled {
+		return newModel, cmd, true
+	}
+
+	// Handle tab switching actions
+	if newModel, cmd, handled := m.dispatchTabAction(action); handled {
+		return newModel, cmd, true
+	}
+
+	// Handle panel jump actions
+	if newModel, cmd, handled := m.dispatchPanelAction(action); handled {
+		return newModel, cmd, true
+	}
+
+	// Handle device actions
+	if newModel, cmd, handled := m.dispatchDeviceKeyAction(action); handled {
+		return newModel, cmd, true
+	}
+
+	// Actions not directly handled - let existing handlers deal with them
+	// This includes: ActionNone, navigation, events panel actions, etc.
+	return m, nil, false
+}
+
+// dispatchGlobalAction handles global actions like quit, help, filter, command mode.
+func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
+	switch action {
+	case keys.ActionQuit:
+		m.quitting = true
+		return m, tea.Quit, true
+
+	case keys.ActionHelp:
+		m.help = m.help.SetSize(m.width, m.height)
+		m.help = m.help.SetContext(m.getHelpContext())
+		m.help = m.help.Toggle()
+		return m, nil, true
+
+	case keys.ActionFilter:
+		var cmd tea.Cmd
+		m.search, cmd = m.search.Activate()
+		m = m.updateViewManagerSize()
+		return m, cmd, true
+
+	case keys.ActionCommand:
+		var cmd tea.Cmd
+		m.cmdMode, cmd = m.cmdMode.Activate()
+		m = m.updateViewManagerSize()
+		return m, cmd, true
+
+	case keys.ActionRefresh:
+		return m, func() tea.Msg { return cache.RefreshTickMsg{} }, true
+
+	case keys.ActionNextPanel:
+		// Only handle panel cycling for Dashboard - other tabs handle it in their views
+		if m.isDashboardActive() {
+			m.focusedPanel = m.nextPanel()
+			return m, nil, true
+		}
+		return m, nil, false // Let views handle Tab for their internal panels
+
+	case keys.ActionPrevPanel:
+		// Only handle panel cycling for Dashboard - other tabs handle it in their views
+		if m.isDashboardActive() {
+			m.focusedPanel = m.prevPanel()
+			return m, nil, true
+		}
+		return m, nil, false // Let views handle Shift+Tab for their internal panels
+
+	case keys.ActionEscape:
+		if m.filter != "" {
+			m.filter = ""
+			m.cursor = 0
+			m.deviceList = m.deviceList.SetFilter("")
+			m.deviceList = m.deviceList.SetCursor(0)
+			return m, nil, true
+		}
+		return m, nil, false
+
+	default:
+		return m, nil, false
+	}
+}
+
+// dispatchTabAction handles tab switching actions (1-5).
+func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
+	switch action {
+	case keys.ActionTab1:
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabDashboard)
+		m.focusedPanel = PanelDeviceList
+		return m, m.viewManager.SetActive(views.ViewDashboard), true
+
+	case keys.ActionTab2:
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabAutomation)
+		m.focusedPanel = PanelDeviceList
+		// View starts unfocused (device list has focus)
+		return m, tea.Batch(
+			m.viewManager.SetActive(views.ViewAutomation),
+			func() tea.Msg { return views.ViewFocusChangedMsg{Focused: false} },
+		), true
+
+	case keys.ActionTab3:
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabConfig)
+		m.focusedPanel = PanelDeviceList
+		// View starts unfocused (device list has focus)
+		return m, tea.Batch(
+			m.viewManager.SetActive(views.ViewConfig),
+			func() tea.Msg { return views.ViewFocusChangedMsg{Focused: false} },
+		), true
+
+	case keys.ActionTab4:
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabManage)
+		return m, m.viewManager.SetActive(views.ViewManage), true
+
+	case keys.ActionTab5:
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabMonitor)
+		m.focusedPanel = PanelDeviceList
+		return m, m.viewManager.SetActive(views.ViewMonitor), true
+
+	default:
+		return m, nil, false
+	}
+}
+
+// dispatchPanelAction handles panel jumping actions (Shift+1-9).
+// Only handles for Dashboard - other tabs have their own panel numbering.
+//
+//nolint:unparam // tea.Cmd is nil but kept for consistent dispatch function signature
+func (m Model) dispatchPanelAction(action keys.Action) (Model, tea.Cmd, bool) {
+	// Only handle panel jumps for Dashboard - other tabs handle Shift+N in their views
+	if !m.isDashboardActive() {
+		return m, nil, false
+	}
+
+	switch action {
+	case keys.ActionPanel1:
+		m.focusedPanel = PanelDeviceList
+		return m, nil, true
+	case keys.ActionPanel2:
+		m.focusedPanel = PanelDetail
+		return m, nil, true
+	case keys.ActionPanel3:
+		m.focusedPanel = PanelEvents
+		return m, nil, true
+	case keys.ActionPanel4, keys.ActionPanel5, keys.ActionPanel6,
+		keys.ActionPanel7, keys.ActionPanel8, keys.ActionPanel9:
+		// Panel 4-9 not mapped in Dashboard layout
+		return m, nil, false
+	default:
+		return m, nil, false
+	}
+}
+
+// dispatchDeviceKeyAction handles device control actions (toggle, on, off, reboot, enter).
+func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool) {
+	switch action {
+	case keys.ActionToggle:
+		return m.dispatchDeviceAction("toggle")
+	case keys.ActionOn:
+		return m.dispatchDeviceAction("on")
+	case keys.ActionOff:
+		return m.dispatchDeviceAction("off")
+	case keys.ActionReboot:
+		return m.dispatchDeviceAction("reboot")
+	case keys.ActionEnter:
+		return m.dispatchEnterAction()
+	default:
+		return m, nil, false
+	}
+}
+
+// dispatchDeviceAction executes a device action on the selected device.
+func (m Model) dispatchDeviceAction(action string) (Model, tea.Cmd, bool) {
+	if !m.hasDeviceList() {
+		return m, nil, false
+	}
+	cmd := m.executeDeviceAction(action)
+	return m, cmd, true
+}
+
+// dispatchEnterAction handles the Enter key action based on context.
+// Only handles Enter on Dashboard - other tabs forward to their views.
+func (m Model) dispatchEnterAction() (Model, tea.Cmd, bool) {
+	// Only handle Enter for Dashboard tab
+	if !m.isDashboardActive() {
+		return m, nil, false
+	}
+	if m.focusedPanel == PanelDetail {
+		return m.openJSONViewer()
+	}
+	// Default: forward to view
+	return m, nil, false
+}
+
 // navDirection represents a navigation direction for cursor movement.
 type navDirection int
 
@@ -1023,10 +1365,37 @@ func parseNavDirection(keyStr string) (navDirection, bool) {
 	}
 }
 
+// isNavigationKey returns true if the key is a navigation key that should be
+// handled by list components (device list, scripts list, etc.).
+func isNavigationKey(keyStr string) bool {
+	switch keyStr {
+	case "j", "k", "up", "down", "g", "G", "pgdown", "pgup", "ctrl+d", "ctrl+u":
+		return true
+	default:
+		return false
+	}
+}
+
+// isShiftNumberKey returns true if the key is a Shift+Number key (!, @, #, etc.).
+func isShiftNumberKey(keyStr string) bool {
+	switch keyStr {
+	case keyconst.Shift1, keyconst.Shift2, keyconst.Shift3,
+		keyconst.Shift4, keyconst.Shift5, keyconst.Shift6,
+		keyconst.Shift7, keyconst.Shift8, keyconst.Shift9:
+		return true
+	default:
+		return false
+	}
+}
+
 // handleNavigation handles j/k/g/G/h/l navigation keys based on focused panel.
 func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
-	// When PanelDeviceList is focused, forward navigation to deviceList component
+	// When PanelDeviceList is focused, only forward NAVIGATION keys to deviceList
 	if m.focusedPanel == PanelDeviceList {
+		// Only handle actual navigation keys - other keys should fall through
+		if !isNavigationKey(msg.String()) {
+			return m, nil, false
+		}
 		var cmd tea.Cmd
 		m.deviceList, cmd = m.deviceList.Update(msg)
 		// Sync cursor from deviceList

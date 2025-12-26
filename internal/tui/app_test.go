@@ -38,7 +38,10 @@ func newTestModel(t *testing.T) Model {
 	return New(ctx, f, opts)
 }
 
-const testFilterKitchen = "kitchen"
+const (
+	testFilterKitchen = "kitchen"
+	keyDown           = "down"
+)
 
 // applyWindowSize applies a window size message and returns the updated model.
 func applyWindowSize(m Model, width, height int) Model {
@@ -622,7 +625,7 @@ func TestModel_NavigationKeys(t *testing.T) {
 		wantDelta int
 	}{
 		{"j moves down", "j", 1},
-		{"down moves down", "down", 1},
+		{"down moves down", keyDown, 1},
 		{"k moves up", "k", -1},
 		{"up moves up", "up", -1},
 	}
@@ -639,7 +642,7 @@ func TestModel_NavigationKeys(t *testing.T) {
 			switch tt.key {
 			case "j", "k":
 				msg = tea.KeyPressMsg{Code: rune(tt.key[0])}
-			case "down":
+			case keyDown:
 				msg = tea.KeyPressMsg{Code: tea.KeyDown}
 			case "up":
 				msg = tea.KeyPressMsg{Code: tea.KeyUp}

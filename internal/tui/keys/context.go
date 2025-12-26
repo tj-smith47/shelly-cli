@@ -57,6 +57,7 @@ const (
 	ActionSort
 	ActionExpand
 	ActionRefresh
+	ActionFilterToggle
 	ActionTab1
 	ActionTab2
 	ActionTab3
@@ -108,15 +109,15 @@ func (m *ContextMap) initDefaults() {
 		"3":         ActionTab3,
 		"4":         ActionTab4,
 		"5":         ActionTab5,
-		"shift+1":   ActionPanel1,
-		"shift+2":   ActionPanel2,
-		"shift+3":   ActionPanel3,
-		"shift+4":   ActionPanel4,
-		"shift+5":   ActionPanel5,
-		"shift+6":   ActionPanel6,
-		"shift+7":   ActionPanel7,
-		"shift+8":   ActionPanel8,
-		"shift+9":   ActionPanel9,
+		"!":         ActionPanel1, // Shift+1
+		"@":         ActionPanel2, // Shift+2
+		"#":         ActionPanel3, // Shift+3
+		"$":         ActionPanel4, // Shift+4
+		"%":         ActionPanel5, // Shift+5
+		"^":         ActionPanel6, // Shift+6
+		"&":         ActionPanel7, // Shift+7
+		"*":         ActionPanel8, // Shift+8
+		"(":         ActionPanel9, // Shift+9
 		"ctrl+c":    ActionQuit,
 	}
 
@@ -128,6 +129,7 @@ func (m *ContextMap) initDefaults() {
 		"up":     ActionUp,
 		"space":  ActionPause,
 		"c":      ActionClear,
+		"f":      ActionFilterToggle,
 		"pgdown": ActionPageDown,
 		"pgup":   ActionPageUp,
 		"g":      ActionHome,
@@ -201,26 +203,22 @@ func (m *ContextMap) initDefaults() {
 		"G":      ActionEnd,
 	}
 
-	// Automation context
+	// Automation context - navigation only; views handle action keys (e/d/n) directly
 	m.bindings[ContextAutomation] = map[string]Action{
 		"j":     ActionDown,
 		"k":     ActionUp,
 		"down":  ActionDown,
 		"up":    ActionUp,
 		"enter": ActionEnter,
-		"e":     ActionEnter,  // Edit
-		"d":     ActionClear,  // Delete
-		"n":     ActionExpand, // New
 	}
 
-	// Config context
+	// Config context - navigation only; views handle action keys directly
 	m.bindings[ContextConfig] = map[string]Action{
 		"j":     ActionDown,
 		"k":     ActionUp,
 		"down":  ActionDown,
 		"up":    ActionUp,
 		"enter": ActionEnter,
-		"e":     ActionEnter,
 	}
 
 	// Manage context
@@ -328,58 +326,59 @@ func keyString(msg tea.KeyPressMsg) string {
 
 // actionDescriptions maps actions to their human-readable descriptions.
 var actionDescriptions = map[Action]string{
-	ActionQuit:      "Quit",
-	ActionHelp:      "Show help",
-	ActionFilter:    "Filter",
-	ActionCommand:   "Command mode",
-	ActionNextPanel: "Next panel",
-	ActionPrevPanel: "Previous panel",
-	ActionUp:        "Move up",
-	ActionDown:      "Move down",
-	ActionLeft:      "Move left",
-	ActionRight:     "Move right",
-	ActionToggle:    "Toggle",
-	ActionOn:        "Turn on",
-	ActionOff:       "Turn off",
-	ActionReboot:    "Reboot device",
-	ActionEnter:     "Select/Enter",
-	ActionEscape:    "Close/Cancel",
-	ActionPageUp:    "Page up",
-	ActionPageDown:  "Page down",
-	ActionHome:      "Go to top",
-	ActionEnd:       "Go to bottom",
-	ActionCopy:      "Copy",
-	ActionPause:     "Pause",
-	ActionClear:     "Clear",
-	ActionSort:      "Sort",
-	ActionExpand:    "Expand/Toggle all",
-	ActionRefresh:   "Refresh",
-	ActionTab1:      "Dashboard tab",
-	ActionTab2:      "Automation tab",
-	ActionTab3:      "Config tab",
-	ActionTab4:      "Manage tab",
-	ActionTab5:      "Fleet tab",
-	ActionPanel1:    "Jump to panel 1",
-	ActionPanel2:    "Jump to panel 2",
-	ActionPanel3:    "Jump to panel 3",
-	ActionPanel4:    "Jump to panel 4",
-	ActionPanel5:    "Jump to panel 5",
-	ActionPanel6:    "Jump to panel 6",
-	ActionPanel7:    "Jump to panel 7",
-	ActionPanel8:    "Jump to panel 8",
-	ActionPanel9:    "Jump to panel 9",
+	ActionQuit:         "Quit",
+	ActionHelp:         "Show help",
+	ActionFilter:       "Filter",
+	ActionCommand:      "Command mode",
+	ActionNextPanel:    "Next panel",
+	ActionPrevPanel:    "Previous panel",
+	ActionUp:           "Move up",
+	ActionDown:         "Move down",
+	ActionLeft:         "Move left",
+	ActionRight:        "Move right",
+	ActionToggle:       "Toggle",
+	ActionOn:           "Turn on",
+	ActionOff:          "Turn off",
+	ActionReboot:       "Reboot device",
+	ActionEnter:        "Select/Enter",
+	ActionEscape:       "Close/Cancel",
+	ActionPageUp:       "Page up",
+	ActionPageDown:     "Page down",
+	ActionHome:         "Go to top",
+	ActionEnd:          "Go to bottom",
+	ActionCopy:         "Copy",
+	ActionPause:        "Pause",
+	ActionClear:        "Clear",
+	ActionSort:         "Sort",
+	ActionExpand:       "Expand/Toggle all",
+	ActionRefresh:      "Refresh",
+	ActionFilterToggle: "Toggle filter",
+	ActionTab1:         "Dashboard tab",
+	ActionTab2:         "Automation tab",
+	ActionTab3:         "Config tab",
+	ActionTab4:         "Manage tab",
+	ActionTab5:         "Fleet tab",
+	ActionPanel1:       "Jump to panel 1",
+	ActionPanel2:       "Jump to panel 2",
+	ActionPanel3:       "Jump to panel 3",
+	ActionPanel4:       "Jump to panel 4",
+	ActionPanel5:       "Jump to panel 5",
+	ActionPanel6:       "Jump to panel 6",
+	ActionPanel7:       "Jump to panel 7",
+	ActionPanel8:       "Jump to panel 8",
+	ActionPanel9:       "Jump to panel 9",
 }
 
 // contextActionDescriptions overrides action descriptions for specific contexts.
+// Note: Action keys like e/d/n are handled directly by views (scripts, schedules).
 var contextActionDescriptions = map[Context]map[Action]string{
 	ContextAutomation: {
-		ActionEnter:  "Edit script",
-		ActionClear:  "Delete",
-		ActionExpand: "New script",
+		ActionEnter: "View script",
 	},
 	ContextEvents: {
-		ActionPause: "Pause events",
-		ActionClear: "Clear events",
+		ActionPause:        "Pause events",
+		ActionClear:        "Clear events",
+		ActionFilterToggle: "Filter by device",
 	},
 	ContextDevices: {
 		ActionEnter:   "View details",
