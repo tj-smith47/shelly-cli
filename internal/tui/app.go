@@ -105,13 +105,14 @@ type Model struct {
 	cache *cache.Cache
 
 	// State
-	ready           bool
-	quitting        bool
-	cursor          int        // Selected device index
-	componentCursor int        // Selected component within device (-1 = all)
-	filter          string     // Device name filter
-	focusedPanel    PanelFocus // Which panel is currently focused
-	endpointCursor  int        // Selected endpoint in JSON panel
+	ready                   bool
+	quitting                bool
+	cursor                  int        // Selected device index
+	componentCursor         int        // Selected component within device (-1 = all)
+	filter                  string     // Device name filter
+	focusedPanel            PanelFocus // Which panel is currently focused
+	endpointCursor          int        // Selected endpoint in JSON panel
+	initialSelectionEmitted bool       // Whether initial device selection has been emitted
 
 	// Dimensions
 	width  int
@@ -380,7 +381,22 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		var historyCmd tea.Cmd
 		m.energyHistory, historyCmd = m.energyHistory.Update(msg)
 		m = m.updateStatusBarContext()
-		return m, tea.Batch(cacheCmd, historyCmd), true
+		cmds := []tea.Cmd{cacheCmd, historyCmd}
+		// Emit initial selection when first device becomes available
+		if !m.initialSelectionEmitted {
+			devices := m.getFilteredDevices()
+			if len(devices) > 0 && m.cursor < len(devices) {
+				m.initialSelectionEmitted = true
+				d := devices[m.cursor]
+				cmds = append(cmds, func() tea.Msg {
+					return views.DeviceSelectedMsg{
+						Device:  d.Device.Name,
+						Address: d.Device.Address,
+					}
+				})
+			}
+		}
+		return m, tea.Batch(cmds...), true
 	case cache.RefreshTickMsg, cache.WaveMsg, cache.DeviceRefreshMsg:
 		return m, m.cache.Update(msg), true
 	case cache.AllDevicesLoadedMsg:
