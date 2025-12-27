@@ -137,8 +137,7 @@ func BuildTopBorderWithBadge(width int, title, badge string, border lipgloss.Bor
 		rightFillCount = 0
 	}
 
-	// Build border in parts: style parts before badge, include badge as-is,
-	// then re-apply style to parts after badge (in case badge contains styled text)
+	// Build border in parts
 	beforeBadge := topLeft +
 		strings.Repeat(top, leftFillCount) +
 		midLeft + top + titleText + top + middle + top
@@ -146,7 +145,15 @@ func BuildTopBorderWithBadge(width int, title, badge string, border lipgloss.Bor
 		strings.Repeat(top, rightFillCount) +
 		topRight
 
-	return borderStyle.Render(beforeBadge) + badgeText + borderStyle.Render(afterBadge)
+	// Style badge text: if it already contains ANSI codes (styled), leave as-is;
+	// otherwise apply border style so it's not white
+	styledBadge := badgeText
+	if !strings.Contains(badge, "\x1b[") {
+		styledBadge = borderStyle.Render(badgeText)
+	}
+
+	// Re-apply border style after badge in case badge has styled text that resets colors
+	return borderStyle.Render(beforeBadge) + styledBadge + borderStyle.Render(afterBadge)
 }
 
 // BuildBottomBorder creates a bottom border.

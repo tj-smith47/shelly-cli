@@ -24,12 +24,6 @@ type Column struct {
 // When a panel is focused and has ExpandOnFocus=true, it gets maximum space.
 // Other panels shrink to their MinHeight.
 func (c *Column) CalculatePanelHeights() map[PanelID]int {
-	return c.CalculatePanelHeightsWithMax(len(c.Panels))
-}
-
-// CalculatePanelHeightsWithMax distributes available height using a specified max panel count.
-// This allows balancing heights across multiple columns with different panel counts.
-func (c *Column) CalculatePanelHeightsWithMax(maxPanels int) map[PanelID]int {
 	if len(c.Panels) == 0 {
 		return make(map[PanelID]int)
 	}
@@ -37,8 +31,8 @@ func (c *Column) CalculatePanelHeightsWithMax(maxPanels int) map[PanelID]int {
 	// Find which panel should expand
 	expandingPanel := c.findExpandingPanel()
 	if expandingPanel == -1 {
-		// No panel is expanding - distribute evenly based on max panels
-		return c.distributeEvenlyWithMax(maxPanels)
+		// No panel is expanding - distribute evenly
+		return c.distributeEvenly()
 	}
 
 	return c.distributeWithExpansion(expandingPanel)
@@ -163,42 +157,26 @@ func (c *Column) distributeRemaining(heights map[PanelID]int, expandingID PanelI
 	}
 }
 
-// distributeEvenlyWithMax gives each panel equal height based on a max panel count.
-// This enables balanced heights across columns with different panel counts.
-// Panels get height based on maxPanels, with remaining space distributed evenly.
-func (c *Column) distributeEvenlyWithMax(maxPanels int) map[PanelID]int {
+// distributeEvenly gives each panel equal height.
+// Any remainder is distributed to the last panels (1 extra line each).
+func (c *Column) distributeEvenly() map[PanelID]int {
 	heights := make(map[PanelID]int)
-	if len(c.Panels) == 0 {
+	n := len(c.Panels)
+	if n == 0 {
 		return heights
 	}
 
-	// Use the larger of maxPanels or actual panel count
-	if maxPanels < len(c.Panels) {
-		maxPanels = len(c.Panels)
-	}
+	// Each panel gets TotalHeight / numPanels
+	baseHeight := c.TotalHeight / n
+	remainder := c.TotalHeight % n
 
-	// Calculate base height per "slot" using max panels
-	baseHeight := c.TotalHeight / maxPanels
-
-	// Each panel gets the base height
-	for _, p := range c.Panels {
-		heights[p.ID] = baseHeight
-	}
-
-	// Distribute remaining space (unused slots + remainder) evenly among actual panels
-	usedHeight := baseHeight * len(c.Panels)
-	remaining := c.TotalHeight - usedHeight
-	if remaining > 0 {
-		perPanel := remaining / len(c.Panels)
-		extraRemainder := remaining % len(c.Panels)
-
-		for i, p := range c.Panels {
-			heights[p.ID] += perPanel
-			// Give extra pixels to last panels
-			if i >= len(c.Panels)-extraRemainder {
-				heights[p.ID]++
-			}
+	for i, p := range c.Panels {
+		h := baseHeight
+		// Distribute remainder to last panels
+		if i >= n-remainder {
+			h++
 		}
+		heights[p.ID] = h
 	}
 
 	return heights
@@ -272,15 +250,14 @@ func (l *TwoColumnLayout) SetFocus(panelID PanelID) {
 }
 
 // Calculate returns the width and height for each panel.
-// Heights are balanced across columns using the max panel count from either column.
+// Each column distributes height independently based on focus state.
 func (l *TwoColumnLayout) Calculate() map[PanelID]PanelDimensions {
 	result := make(map[PanelID]PanelDimensions)
 
-	// Use max panel count for balanced heights across columns
-	maxPanels := max(len(l.LeftColumn.Panels), len(l.RightColumn.Panels))
-
-	leftHeights := l.LeftColumn.CalculatePanelHeightsWithMax(maxPanels)
-	rightHeights := l.RightColumn.CalculatePanelHeightsWithMax(maxPanels)
+	// Each column calculates heights based on its own panels
+	// When a panel is focused, it expands; otherwise panels are evenly distributed
+	leftHeights := l.LeftColumn.CalculatePanelHeights()
+	rightHeights := l.RightColumn.CalculatePanelHeights()
 
 	for id, h := range leftHeights {
 		result[id] = PanelDimensions{
