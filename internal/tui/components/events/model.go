@@ -30,7 +30,7 @@ const (
 	levelScript     = "script"
 
 	// Minimum width to show dual columns.
-	dualColumnMinWidth = 100
+	dualColumnMinWidth = 80 // Lowered to fit in dashboard right column
 )
 
 // Deps holds the dependencies for the events component.
