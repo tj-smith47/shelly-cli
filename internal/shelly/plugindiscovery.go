@@ -113,3 +113,109 @@ func ToPluginDiscoveredDevice(result *PluginDetectionResult, added bool) PluginD
 		Components: result.Detection.Components,
 	}
 }
+
+// RunPluginDetection scans a subnet for plugin-managed devices.
+// Returns discovered devices. The isRegistered function checks if an address is already registered.
+func RunPluginDetection(ctx context.Context, registry *plugins.Registry, subnet string, isRegistered func(string) bool) []PluginDiscoveredDevice {
+	// Get detection-capable plugins
+	capablePlugins, err := registry.ListDetectionCapable()
+	if err != nil || len(capablePlugins) == 0 {
+		return nil
+	}
+
+	addresses := generateSubnetAddresses(subnet)
+	if len(addresses) == 0 {
+		return nil
+	}
+
+	pluginDiscoverer := NewPluginDiscoverer(registry)
+	var pluginDevices []PluginDiscoveredDevice
+
+	for _, addr := range addresses {
+		if ctx.Err() != nil {
+			break
+		}
+
+		result, detectErr := pluginDiscoverer.DetectWithPlugins(ctx, addr, nil)
+		if detectErr == nil && result != nil {
+			added := isRegistered(result.Address)
+			pluginDevices = append(pluginDevices, ToPluginDiscoveredDevice(result, added))
+		}
+	}
+
+	return pluginDevices
+}
+
+// RunPluginPlatformDiscovery scans a subnet for devices of a specific platform.
+// Returns discovered devices.
+func RunPluginPlatformDiscovery(ctx context.Context, registry *plugins.Registry, platform, subnet string, isRegistered func(string) bool) []PluginDiscoveredDevice {
+	addresses := generateSubnetAddresses(subnet)
+	if len(addresses) == 0 {
+		return nil
+	}
+
+	pluginDiscoverer := NewPluginDiscoverer(registry)
+	var pluginDevices []PluginDiscoveredDevice
+
+	for _, addr := range addresses {
+		if ctx.Err() != nil {
+			break
+		}
+
+		result, detectErr := pluginDiscoverer.DetectWithPlatform(ctx, addr, nil, platform)
+		if detectErr == nil && result != nil {
+			added := isRegistered(result.Address)
+			pluginDevices = append(pluginDevices, ToPluginDiscoveredDevice(result, added))
+		}
+	}
+
+	return pluginDevices
+}
+
+// generateSubnetAddresses generates all host addresses in a CIDR subnet.
+func generateSubnetAddresses(subnet string) []string {
+	_, ipNet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return nil
+	}
+
+	var addresses []string
+	for ip := ipNet.IP.Mask(ipNet.Mask); ipNet.Contains(ip); incIP(ip) {
+		// Skip network and broadcast addresses for /24 and larger
+		if isNetworkOrBroadcast(ip, ipNet) {
+			continue
+		}
+		addresses = append(addresses, ip.String())
+	}
+	return addresses
+}
+
+// incIP increments an IP address by 1.
+func incIP(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
+}
+
+// isNetworkOrBroadcast checks if an IP is a network or broadcast address.
+func isNetworkOrBroadcast(ip net.IP, ipNet *net.IPNet) bool {
+	ones, bits := ipNet.Mask.Size()
+	if bits-ones < 2 {
+		return false // /31 or /32 don't have network/broadcast
+	}
+
+	network := ipNet.IP.Mask(ipNet.Mask)
+	if ip.Equal(network) {
+		return true
+	}
+
+	// Calculate broadcast
+	broadcast := make(net.IP, len(ip))
+	for i := range ip {
+		broadcast[i] = ip[i] | ^ipNet.Mask[i]
+	}
+	return ip.Equal(broadcast)
+}

@@ -79,18 +79,24 @@ func (s *Service) DiscoverDevices(ctx context.Context, opts DiscoveryOptions) ([
 	return enrichDiscoveredDevices(ctx, rawDevices), nil
 }
 
-func discoverMDNS(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+// DiscoverMDNS performs mDNS/Zeroconf discovery and returns raw discovered devices.
+// Caller is responsible for timeout handling and cleanup.
+func DiscoverMDNS(timeout time.Duration) ([]discovery.DiscoveredDevice, func(), error) {
 	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
-	defer func() {
+	cleanup := func() {
 		if err := mdnsDiscoverer.Stop(); err != nil {
 			iostreams.DebugErr("stopping mDNS discoverer", err)
 		}
-	}()
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	}
 
 	devices, err := mdnsDiscoverer.Discover(timeout)
+	return devices, cleanup, err
+}
+
+func discoverMDNS(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+	devices, cleanup, err := DiscoverMDNS(timeout)
+	defer cleanup()
+
 	if err != nil && ctx.Err() != nil {
 		// Context cancelled, not an error
 		return devices, nil
@@ -127,34 +133,52 @@ func discoverHTTP(ctx context.Context, opts DiscoveryOptions) ([]discovery.Disco
 	return discovery.ProbeAddresses(ctx, addresses), nil
 }
 
-func discoverCoIoT(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+// DiscoverCoIoT performs CoIoT/CoAP discovery and returns raw discovered devices.
+// Caller is responsible for timeout handling and cleanup.
+func DiscoverCoIoT(timeout time.Duration) ([]discovery.DiscoveredDevice, func(), error) {
 	coiotDiscoverer := discovery.NewCoIoTDiscoverer()
-	defer func() {
+	cleanup := func() {
 		if err := coiotDiscoverer.Stop(); err != nil {
 			iostreams.DebugErr("stopping CoIoT discoverer", err)
 		}
-	}()
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	}
 
 	devices, err := coiotDiscoverer.Discover(timeout)
+	return devices, cleanup, err
+}
+
+func discoverCoIoT(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+	devices, cleanup, err := DiscoverCoIoT(timeout)
+	defer cleanup()
+
 	if err != nil && ctx.Err() != nil {
 		return devices, nil
 	}
 	return devices, err
 }
 
-func discoverBLE(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+// DiscoverBLE performs BLE discovery and returns raw discovered devices.
+// Returns nil, nil, error if BLE is not available on the system.
+// Caller is responsible for cleanup.
+func DiscoverBLE() (*discovery.BLEDiscoverer, func(), error) {
 	bleDiscoverer, err := discovery.NewBLEDiscoverer()
 	if err != nil {
-		return nil, fmt.Errorf("BLE not available: %w", err)
+		return nil, nil, fmt.Errorf("BLE not available: %w", err)
 	}
-	defer func() {
+	cleanup := func() {
 		if stopErr := bleDiscoverer.Stop(); stopErr != nil {
 			iostreams.DebugErr("stopping BLE discoverer", stopErr)
 		}
-	}()
+	}
+	return bleDiscoverer, cleanup, nil
+}
+
+func discoverBLE(ctx context.Context, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
+	bleDiscoverer, cleanup, err := DiscoverBLE()
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

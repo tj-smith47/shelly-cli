@@ -569,3 +569,79 @@ func (s *Service) GenerateBackupFilename(deviceName, deviceID string, encrypted 
 
 	return fmt.Sprintf("backup-%s-%s%s", safeName, timestamp, suffix)
 }
+
+// MigrationSource represents where a migration backup came from.
+type MigrationSource string
+
+// Migration source constants.
+const (
+	MigrationSourceFile   MigrationSource = "file"
+	MigrationSourceDevice MigrationSource = "device"
+)
+
+// LoadMigrationSource loads a backup from either a file or device.
+// Returns the backup, source type, and any error.
+func (s *Service) LoadMigrationSource(ctx context.Context, source string) (*DeviceBackup, MigrationSource, error) {
+	if IsBackupFile(source) {
+		bkp, err := s.loadBackupFromFile(source)
+		if err != nil {
+			return nil, "", err
+		}
+		return bkp, MigrationSourceFile, nil
+	}
+	bkp, err := s.CreateBackup(ctx, source, BackupOptions{})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read source device: %w", err)
+	}
+	return bkp, MigrationSourceDevice, nil
+}
+
+// loadBackupFromFile loads a DeviceBackup from a file.
+func (s *Service) loadBackupFromFile(source string) (*DeviceBackup, error) {
+	data, err := os.ReadFile(source) //nolint:gosec // G304: source is user-provided CLI argument
+	if err != nil {
+		return nil, fmt.Errorf("failed to read backup file: %w", err)
+	}
+	bkp, err := ValidateBackup(data)
+	if err != nil {
+		return nil, fmt.Errorf("invalid backup file: %w", err)
+	}
+	return bkp, nil
+}
+
+// IsBackupFile checks if the path looks like a backup file (exists and is a file).
+func IsBackupFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
+}
+
+// CheckMigrationCompatibility checks if the backup is compatible with the target device.
+// Returns an error describing the incompatibility if force is false and devices don't match.
+func (s *Service) CheckMigrationCompatibility(ctx context.Context, bkp *DeviceBackup, target string, force bool) error {
+	targetInfo, err := s.DeviceInfo(ctx, target)
+	if err != nil {
+		return fmt.Errorf("failed to get target device info: %w", err)
+	}
+
+	if !force && bkp.Device().Model != targetInfo.Model {
+		return &MigrationCompatibilityError{
+			SourceModel: bkp.Device().Model,
+			TargetModel: targetInfo.Model,
+		}
+	}
+	return nil
+}
+
+// MigrationCompatibilityError represents a device type mismatch during migration.
+type MigrationCompatibilityError struct {
+	SourceModel string
+	TargetModel string
+}
+
+// Error implements error interface.
+func (e *MigrationCompatibilityError) Error() string {
+	return "device type mismatch"
+}

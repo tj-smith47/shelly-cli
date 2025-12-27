@@ -332,3 +332,54 @@ func RegisterPluginDiscoveredDevice(result *plugins.DeviceDetectionResult, addre
 
 	return true, nil
 }
+
+// PluginDevice represents a plugin-discovered device for batch registration.
+type PluginDevice struct {
+	Address  string
+	Platform string
+	ID       string
+	Name     string
+	Model    string
+	Firmware string
+}
+
+// RegisterPluginDiscoveredDevices registers multiple plugin-discovered devices.
+// Returns the number of devices added.
+func RegisterPluginDiscoveredDevices(devices []PluginDevice, skipExisting bool) int {
+	added := 0
+	for _, d := range devices {
+		if d.Address == "" {
+			continue
+		}
+
+		// Convert to DeviceDetectionResult for registration
+		result := &plugins.DeviceDetectionResult{
+			Detected:   true,
+			Platform:   d.Platform,
+			DeviceID:   d.ID,
+			DeviceName: d.Name,
+			Model:      d.Model,
+			Firmware:   d.Firmware,
+		}
+
+		wasAdded, err := RegisterPluginDiscoveredDevice(result, d.Address, skipExisting)
+		if err != nil {
+			continue
+		}
+		if wasAdded {
+			added++
+		}
+	}
+	return added
+}
+
+// IsPluginDeviceRegistered checks if a device at the given address is registered.
+func IsPluginDeviceRegistered(address string) bool {
+	devices := ListRegisteredDevices()
+	for _, dev := range devices {
+		if dev.Address == address {
+			return true
+		}
+	}
+	return false
+}

@@ -130,3 +130,67 @@ func displayGen1Info(ctx context.Context, ios *iostreams.IOStreams, d discovery.
 		ios.Printf("    Status:  %s\n", theme.StatusOK().Render("available"))
 	}
 }
+
+// DisplayPluginDiscoveredDevices prints a list of plugin-discovered devices.
+func DisplayPluginDiscoveredDevices(ios *iostreams.IOStreams, devices []PluginDiscoveredDevice) {
+	if len(devices) == 0 {
+		return
+	}
+
+	ios.Println()
+	ios.Title("Plugin-managed Devices")
+
+	for _, d := range devices {
+		name := d.Name
+		if name == "" {
+			name = d.ID
+		}
+		if name == "" && d.Address != "" {
+			name = d.Address
+		}
+
+		ios.Printf("  %s\n", name)
+		if d.Address != "" {
+			ios.Printf("    Address:  %s\n", d.Address)
+		}
+		ios.Printf("    Platform: %s\n", d.Platform)
+		if d.Model != "" {
+			ios.Printf("    Model:    %s\n", d.Model)
+		}
+		if d.Firmware != "" {
+			ios.Printf("    Firmware: %s\n", d.Firmware)
+		}
+		if len(d.Components) > 0 {
+			ios.Printf("    Components:\n")
+			for _, c := range d.Components {
+				if c.Name != "" {
+					ios.Printf("      - %s:%d (%s)\n", c.Type, c.ID, c.Name)
+				} else {
+					ios.Printf("      - %s:%d\n", c.Type, c.ID)
+				}
+			}
+		}
+		ios.Println()
+	}
+
+	ios.Count(devices[0].Platform+" device", len(devices))
+}
+
+// PluginDiscoveredDevice represents a device discovered by a plugin.
+// This is a display-oriented type used by term functions.
+type PluginDiscoveredDevice struct {
+	ID         string
+	Name       string
+	Model      string
+	Address    string
+	Platform   string
+	Firmware   string
+	Components []PluginComponentInfo
+}
+
+// PluginComponentInfo represents component info from plugin detection.
+type PluginComponentInfo struct {
+	Type string
+	ID   int
+	Name string
+}

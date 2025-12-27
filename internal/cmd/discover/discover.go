@@ -27,8 +27,8 @@ import (
 // DefaultScanTimeout is the default timeout for HTTP subnet scanning.
 const DefaultScanTimeout = 2 * time.Minute
 
-// discoverOptions holds all discovery options.
-type discoverOptions struct {
+// Options holds all discovery options.
+type Options struct {
 	timeout      time.Duration
 	register     bool
 	skipExisting bool
@@ -40,7 +40,7 @@ type discoverOptions struct {
 
 // NewCommand creates the discover command group.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &discoverOptions{}
+	opts := &Options{}
 
 	cmd := &cobra.Command{
 		Use:     "discover",
@@ -106,13 +106,13 @@ plugin detection, or --platform to filter by specific platform.`,
 // run runs device discovery using the selected method.
 //
 //nolint:gocyclo // Complexity from handling multiple discovery methods and plugin integration
-func run(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
 
 	// If platform is specified (and not "shelly"), skip native Shelly discovery
 	// and only run plugin detection for that platform
 	if opts.platform != "" && opts.platform != model.PlatformShelly {
-		return runPluginOnlyDiscovery(ctx, f, opts)
+		return runPluginOnlyDiscovery(ctx, f, ios, opts)
 	}
 
 	var shellyDevices []discovery.DiscoveredDevice
@@ -120,13 +120,13 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
 
 	switch opts.method {
 	case "http", "scan", "":
-		shellyDevices, err = runHTTP(ctx, f, opts.timeout, opts.subnet)
+		shellyDevices, err = runHTTPDiscovery(ctx, ios, opts.timeout, opts.subnet)
 	case "mdns":
-		shellyDevices, err = runMDNS(ctx, f, opts.timeout)
+		shellyDevices, err = runMDNSDiscovery(ctx, ios, opts.timeout)
 	case "coiot":
-		shellyDevices, err = runCoIoT(ctx, f, opts.timeout)
+		shellyDevices, err = runCoIoTDiscovery(ctx, ios, opts.timeout)
 	case "ble":
-		shellyDevices, err = runBLE(ctx, f, opts.timeout)
+		shellyDevices, err = runBLEDiscovery(ctx, ios, opts.timeout)
 	default:
 		return fmt.Errorf("unknown discovery method: %s (valid: http, mdns, ble, coiot)", opts.method)
 	}
@@ -136,10 +136,10 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
 	}
 
 	// Run plugin detection if not skipped
-	var pluginDevices []shelly.PluginDiscoveredDevice
+	var pluginDevices []term.PluginDiscoveredDevice
 	if !opts.skipPlugins && opts.method == "http" {
 		// Plugin detection only works with HTTP scan since we need to probe addresses
-		pluginDevices = runPluginDetection(ctx, f, opts)
+		pluginDevices = runPluginDetection(ctx, ios, opts.subnet)
 	}
 
 	// Display results
@@ -156,7 +156,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
 
 	// Display plugin-discovered devices
 	if len(pluginDevices) > 0 {
-		displayPluginDiscoveredDevices(ios, pluginDevices)
+		term.DisplayPluginDiscoveredDevices(ios, pluginDevices)
 	}
 
 	// Save discovered addresses to completion cache
@@ -165,8 +165,8 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
 		addresses = append(addresses, d.Address.String())
 	}
 	for _, d := range pluginDevices {
-		if d.Address != nil {
-			addresses = append(addresses, d.Address.String())
+		if d.Address != "" {
+			addresses = append(addresses, d.Address)
 		}
 	}
 	if err := completion.SaveDiscoveryCache(addresses); err != nil {
@@ -180,7 +180,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
 			ios.Warning("Registration error: %v", regErr)
 		}
 
-		addedPlugin := registerPluginDevices(ios, pluginDevices, opts.skipExisting)
+		addedPlugin := registerPluginDevices(pluginDevices, opts.skipExisting)
 		totalAdded := addedShelly + addedPlugin
 		ios.Added("device", totalAdded)
 	}
@@ -189,9 +189,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
 }
 
 // runPluginOnlyDiscovery runs discovery for a specific platform only.
-func runPluginOnlyDiscovery(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) error {
-	ios := f.IOStreams()
-
+func runPluginOnlyDiscovery(ctx context.Context, _ *cmdutil.Factory, ios *iostreams.IOStreams, opts *Options) error {
 	// Get plugin registry
 	registry, err := plugins.NewRegistry()
 	if err != nil {
@@ -239,7 +237,7 @@ func runPluginOnlyDiscovery(ctx context.Context, f *cmdutil.Factory, opts *disco
 
 	// Create plugin discoverer and scan
 	pluginDiscoverer := shelly.NewPluginDiscoverer(registry)
-	var pluginDevices []shelly.PluginDiscoveredDevice
+	var pluginDevices []term.PluginDiscoveredDevice
 	var foundCount int
 
 	for i, addr := range addresses {
@@ -249,8 +247,7 @@ func runPluginOnlyDiscovery(ctx context.Context, f *cmdutil.Factory, opts *disco
 
 		result, detectErr := pluginDiscoverer.DetectWithPlatform(ctx, addr, nil, opts.platform)
 		if detectErr == nil && result != nil {
-			added := isPluginDeviceRegistered(result.Address)
-			pluginDevices = append(pluginDevices, shelly.ToPluginDiscoveredDevice(result, added))
+			pluginDevices = append(pluginDevices, toTermPluginDevice(result))
 			foundCount++
 			mw.UpdateLine("scan", iostreams.StatusRunning,
 				fmt.Sprintf("%d/%d - found %s (%s)", i+1, len(addresses), result.Detection.DeviceName, result.Detection.Model))
@@ -271,10 +268,10 @@ func runPluginOnlyDiscovery(ctx context.Context, f *cmdutil.Factory, opts *disco
 		return nil
 	}
 
-	displayPluginDiscoveredDevices(ios, pluginDevices)
+	term.DisplayPluginDiscoveredDevices(ios, pluginDevices)
 
 	if opts.register {
-		added := registerPluginDevices(ios, pluginDevices, opts.skipExisting)
+		added := registerPluginDevices(pluginDevices, opts.skipExisting)
 		ios.Added("device", added)
 	}
 
@@ -282,9 +279,7 @@ func runPluginOnlyDiscovery(ctx context.Context, f *cmdutil.Factory, opts *disco
 }
 
 // runPluginDetection runs plugin detection on addresses that Shelly detection may have missed.
-func runPluginDetection(ctx context.Context, f *cmdutil.Factory, opts *discoverOptions) []shelly.PluginDiscoveredDevice {
-	ios := f.IOStreams()
-
+func runPluginDetection(ctx context.Context, ios *iostreams.IOStreams, subnet string) []term.PluginDiscoveredDevice {
 	// Get plugin registry
 	registry, err := plugins.NewRegistry()
 	if err != nil {
@@ -304,9 +299,6 @@ func runPluginDetection(ctx context.Context, f *cmdutil.Factory, opts *discoverO
 	}
 
 	// Get addresses to probe for plugin detection
-	// For now, we'll re-scan the subnet for plugin devices
-	// In the future, we could track addresses that failed Shelly detection
-	subnet := opts.subnet
 	if subnet == "" {
 		var detectErr error
 		subnet, detectErr = utils.DetectSubnet()
@@ -323,7 +315,7 @@ func runPluginDetection(ctx context.Context, f *cmdutil.Factory, opts *discoverO
 	ios.Info("Checking for plugin-managed devices...")
 
 	pluginDiscoverer := shelly.NewPluginDiscoverer(registry)
-	var pluginDevices []shelly.PluginDiscoveredDevice
+	var pluginDevices []term.PluginDiscoveredDevice
 
 	// Create a short timeout context for plugin detection
 	pluginCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -336,104 +328,52 @@ func runPluginDetection(ctx context.Context, f *cmdutil.Factory, opts *discoverO
 
 		result, detectErr := pluginDiscoverer.DetectWithPlugins(pluginCtx, addr, nil)
 		if detectErr == nil && result != nil {
-			added := isPluginDeviceRegistered(result.Address)
-			pluginDevices = append(pluginDevices, shelly.ToPluginDiscoveredDevice(result, added))
+			pluginDevices = append(pluginDevices, toTermPluginDevice(result))
 		}
 	}
 
 	return pluginDevices
 }
 
-// displayPluginDiscoveredDevices prints a table of plugin-discovered devices.
-func displayPluginDiscoveredDevices(ios *iostreams.IOStreams, devices []shelly.PluginDiscoveredDevice) {
-	if len(devices) == 0 {
-		return
+// toTermPluginDevice converts a shelly plugin detection result to term display type.
+func toTermPluginDevice(result *shelly.PluginDetectionResult) term.PluginDiscoveredDevice {
+	components := make([]term.PluginComponentInfo, len(result.Detection.Components))
+	for i, c := range result.Detection.Components {
+		components[i] = term.PluginComponentInfo{
+			Type: c.Type,
+			ID:   c.ID,
+			Name: c.Name,
+		}
 	}
-
-	ios.Println()
-	ios.Title("Plugin-managed Devices")
-
-	for _, d := range devices {
-		name := d.Name
-		if name == "" {
-			name = d.ID
-		}
-		if name == "" && d.Address != nil {
-			name = d.Address.String()
-		}
-
-		ios.Printf("  %s\n", name)
-		if d.Address != nil {
-			ios.Printf("    Address:  %s\n", d.Address)
-		}
-		ios.Printf("    Platform: %s\n", d.Platform)
-		if d.Model != "" {
-			ios.Printf("    Model:    %s\n", d.Model)
-		}
-		if d.Firmware != "" {
-			ios.Printf("    Firmware: %s\n", d.Firmware)
-		}
-		if len(d.Components) > 0 {
-			ios.Printf("    Components:\n")
-			for _, c := range d.Components {
-				if c.Name != "" {
-					ios.Printf("      - %s:%d (%s)\n", c.Type, c.ID, c.Name)
-				} else {
-					ios.Printf("      - %s:%d\n", c.Type, c.ID)
-				}
-			}
-		}
-		ios.Println()
+	return term.PluginDiscoveredDevice{
+		ID:         result.Detection.DeviceID,
+		Name:       result.Detection.DeviceName,
+		Model:      result.Detection.Model,
+		Address:    result.Address,
+		Platform:   result.Detection.Platform,
+		Firmware:   result.Detection.Firmware,
+		Components: components,
 	}
-
-	ios.Count(devices[0].Platform+" device", len(devices))
 }
 
 // registerPluginDevices registers plugin-detected devices.
-func registerPluginDevices(ios *iostreams.IOStreams, devices []shelly.PluginDiscoveredDevice, skipExisting bool) int {
-	added := 0
-	for _, d := range devices {
-		if d.Address == nil {
-			continue
-		}
-
-		// Convert to DeviceDetectionResult for registration
-		result := &plugins.DeviceDetectionResult{
-			Detected:   true,
-			Platform:   d.Platform,
-			DeviceID:   d.ID,
-			DeviceName: d.Name,
-			Model:      d.Model,
-			Firmware:   d.Firmware,
-		}
-
-		wasAdded, err := utils.RegisterPluginDiscoveredDevice(result, d.Address.String(), skipExisting)
-		if err != nil {
-			ios.DebugErr("registering plugin device", err)
-			continue
-		}
-		if wasAdded {
-			added++
+func registerPluginDevices(devices []term.PluginDiscoveredDevice, skipExisting bool) int {
+	pluginDevices := make([]utils.PluginDevice, len(devices))
+	for i, d := range devices {
+		pluginDevices[i] = utils.PluginDevice{
+			Address:  d.Address,
+			Platform: d.Platform,
+			ID:       d.ID,
+			Name:     d.Name,
+			Model:    d.Model,
+			Firmware: d.Firmware,
 		}
 	}
-	return added
+	return utils.RegisterPluginDiscoveredDevices(pluginDevices, skipExisting)
 }
 
-// isPluginDeviceRegistered checks if a plugin device is already registered.
-func isPluginDeviceRegistered(address string) bool {
-	devices := utils.ListRegisteredDevices()
-	for _, dev := range devices {
-		if dev.Address == address {
-			return true
-		}
-	}
-	return false
-}
-
-// runHTTP performs HTTP subnet scanning discovery.
-func runHTTP(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, subnet string) ([]discovery.DiscoveredDevice, error) {
-	ios := f.IOStreams()
-
+// runHTTPDiscovery performs HTTP subnet scanning discovery.
+func runHTTPDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration, subnet string) ([]discovery.DiscoveredDevice, error) {
 	if timeout == 0 {
 		timeout = DefaultScanTimeout
 	}
@@ -486,76 +426,56 @@ func runHTTP(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, sub
 	return devices, nil
 }
 
-// runMDNS performs mDNS/Zeroconf discovery.
-func runMDNS(ctx context.Context, f *cmdutil.Factory, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	ios := f.IOStreams()
-
+// runMDNSDiscovery performs mDNS/Zeroconf discovery.
+func runMDNSDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
 	if timeout == 0 {
 		timeout = 10 * time.Second
 	}
-
-	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
-	defer func() {
-		if err := mdnsDiscoverer.Stop(); err != nil {
-			ios.DebugErr("stopping mDNS discoverer", err)
-		}
-	}()
 
 	var devices []discovery.DiscoveredDevice
 	err := cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via mDNS...", func(_ context.Context) error {
 		var discoverErr error
-		devices, discoverErr = mdnsDiscoverer.Discover(timeout)
+		var cleanup func()
+		devices, cleanup, discoverErr = shelly.DiscoverMDNS(timeout)
+		defer cleanup()
 		return discoverErr
 	})
 
 	return devices, err
 }
 
-// runCoIoT performs CoIoT/CoAP discovery.
-func runCoIoT(ctx context.Context, f *cmdutil.Factory, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	ios := f.IOStreams()
-
+// runCoIoTDiscovery performs CoIoT/CoAP discovery.
+func runCoIoTDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
 	if timeout == 0 {
 		timeout = 10 * time.Second
 	}
 
-	coiotDiscoverer := discovery.NewCoIoTDiscoverer()
-	defer func() {
-		if err := coiotDiscoverer.Stop(); err != nil {
-			ios.DebugErr("stopping CoIoT discoverer", err)
-		}
-	}()
-
 	var devices []discovery.DiscoveredDevice
 	err := cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via CoIoT...", func(_ context.Context) error {
 		var discoverErr error
-		devices, discoverErr = coiotDiscoverer.Discover(timeout)
+		var cleanup func()
+		devices, cleanup, discoverErr = shelly.DiscoverCoIoT(timeout)
+		defer cleanup()
 		return discoverErr
 	})
 
 	return devices, err
 }
 
-// runBLE performs Bluetooth Low Energy discovery.
-func runBLE(ctx context.Context, f *cmdutil.Factory, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
-	ios := f.IOStreams()
-
+// runBLEDiscovery performs Bluetooth Low Energy discovery.
+func runBLEDiscovery(ctx context.Context, ios *iostreams.IOStreams, timeout time.Duration) ([]discovery.DiscoveredDevice, error) {
 	if timeout == 0 {
 		timeout = 15 * time.Second
 	}
 
-	bleDiscoverer, err := discovery.NewBLEDiscoverer()
+	bleDiscoverer, cleanup, err := shelly.DiscoverBLE()
 	if err != nil {
 		ios.Error("BLE discovery is not available on this system")
 		ios.Hint("Ensure you have a Bluetooth adapter and it is enabled")
 		ios.Hint("On Linux, you may need to run with elevated privileges")
 		return nil, nil
 	}
-	defer func() {
-		if stopErr := bleDiscoverer.Stop(); stopErr != nil {
-			ios.DebugErr("stopping BLE discoverer", stopErr)
-		}
-	}()
+	defer cleanup()
 
 	var devices []discovery.DiscoveredDevice
 	err = cmdutil.RunWithSpinner(ctx, ios, "Discovering devices via BLE...", func(ctx context.Context) error {
