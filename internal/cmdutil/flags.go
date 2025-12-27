@@ -5,124 +5,141 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 )
 
-// Default values for common flags.
+// Default flag values re-exported from flags package.
 const (
-	DefaultTimeout     = 10 * time.Second
-	DefaultConcurrency = 5
-	DefaultComponentID = 0
+	// DefaultTimeout is the default timeout for device operations.
+	DefaultTimeout = flags.DefaultTimeout
+	// DefaultConcurrency is the default max concurrent operations.
+	DefaultConcurrency = flags.DefaultConcurrency
+	// DefaultComponentID is the default component ID (0).
+	DefaultComponentID = flags.DefaultComponentID
 )
 
-// AddComponentIDFlag adds a component ID flag (--id/-i) to a command.
-// The componentName is used in the help text (e.g., "Switch", "Light", "Cover").
+// BatchFlags holds common flags for batch operations.
+// Re-exported from flags package for compatibility.
+type BatchFlags = flags.BatchFlags
+
+// SceneFlags holds common flags for scene operations.
+// Re-exported from flags package for compatibility.
+type SceneFlags = flags.SceneFlags
+
+// ComponentFlags holds flags for targeting specific components.
+// Re-exported from flags package for compatibility.
+type ComponentFlags = flags.ComponentFlags
+
+// OutputFlags holds flags for controlling output format.
+// Re-exported from flags package for compatibility.
+type OutputFlags = flags.OutputFlags
+
+// ConfirmFlags holds flags for confirmation handling.
+// Re-exported from flags package for compatibility.
+type ConfirmFlags = flags.ConfirmFlags
+
+// AddComponentIDFlag adds a component ID flag. See flags.AddComponentIDFlag.
 func AddComponentIDFlag(cmd *cobra.Command, target *int, componentName string) {
-	cmd.Flags().IntVarP(target, "id", "i", DefaultComponentID,
-		componentName+" component ID (default 0)")
+	flags.AddComponentIDFlag(cmd, target, componentName)
 }
 
-// AddSwitchIDFlag adds a switch component ID flag (--switch/-s) to a command.
-// This is used for batch operations that target switch components.
+// AddSwitchIDFlag adds a switch ID flag. See flags.AddSwitchIDFlag.
 func AddSwitchIDFlag(cmd *cobra.Command, target *int) {
-	cmd.Flags().IntVarP(target, "switch", "s", DefaultComponentID, "Switch component ID")
+	flags.AddSwitchIDFlag(cmd, target)
 }
 
-// AddTimeoutFlag adds a timeout flag (--timeout/-t) to a command.
+// AddTimeoutFlag adds a timeout flag. See flags.AddTimeoutFlag.
 func AddTimeoutFlag(cmd *cobra.Command, target *time.Duration) {
-	cmd.Flags().DurationVarP(target, "timeout", "t", DefaultTimeout, "Timeout per device")
+	flags.AddTimeoutFlag(cmd, target)
 }
 
-// AddConcurrencyFlag adds a concurrency flag (--concurrent/-c) to a command.
+// AddConcurrencyFlag adds a concurrency flag. See flags.AddConcurrencyFlag.
 func AddConcurrencyFlag(cmd *cobra.Command, target *int) {
-	cmd.Flags().IntVarP(target, "concurrent", "c", DefaultConcurrency, "Max concurrent operations")
+	flags.AddConcurrencyFlag(cmd, target)
 }
 
-// AddOutputFormatFlag adds an output format flag (--output/-o) to a command.
-// Supports: table, json, yaml.
+// AddOutputFormatFlag adds an output format flag. See flags.AddOutputFormatFlag.
 func AddOutputFormatFlag(cmd *cobra.Command, target *string) {
-	cmd.Flags().StringVarP(target, "output", "o", "table", "Output format: table, json, yaml")
+	flags.AddOutputFormatFlag(cmd, target)
 }
 
-// AddYesFlag adds a confirmation bypass flag (--yes/-y) to a command.
+// AddYesFlag adds a yes flag. See flags.AddYesFlag.
 func AddYesFlag(cmd *cobra.Command, target *bool) {
-	cmd.Flags().BoolVarP(target, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesFlag(cmd, target)
 }
 
-// AddConfirmFlag adds a double-confirmation flag (--confirm) to a command.
-// Used for destructive operations like factory reset.
+// AddConfirmFlag adds a confirm flag. See flags.AddConfirmFlag.
 func AddConfirmFlag(cmd *cobra.Command, target *bool) {
-	cmd.Flags().BoolVar(target, "confirm", false, "Double-confirm destructive operation")
+	flags.AddConfirmFlag(cmd, target)
 }
 
-// AddDryRunFlag adds a dry-run flag (--dry-run) to a command.
+// AddDryRunFlag adds a dry-run flag. See flags.AddDryRunFlag.
 func AddDryRunFlag(cmd *cobra.Command, target *bool) {
-	cmd.Flags().BoolVar(target, "dry-run", false, "Preview actions without executing")
+	flags.AddDryRunFlag(cmd, target)
 }
 
-// AddGroupFlag adds a device group flag (--group/-g) to a command.
+// AddGroupFlag adds a group flag. See flags.AddGroupFlag.
 func AddGroupFlag(cmd *cobra.Command, target *string) {
-	cmd.Flags().StringVarP(target, "group", "g", "", "Target device group")
+	flags.AddGroupFlag(cmd, target)
 }
 
-// AddAllFlag adds an all-devices flag (--all/-a) to a command.
+// AddAllFlag adds an all flag. See flags.AddAllFlag.
 func AddAllFlag(cmd *cobra.Command, target *bool) {
-	cmd.Flags().BoolVarP(target, "all", "a", false, "Target all registered devices")
+	flags.AddAllFlag(cmd, target)
 }
 
-// AddNameFlag adds a name override flag (--name/-n) to a command.
+// AddNameFlag adds a name flag. See flags.AddNameFlag.
 func AddNameFlag(cmd *cobra.Command, target *string, usage string) {
-	cmd.Flags().StringVarP(target, "name", "n", "", usage)
+	flags.AddNameFlag(cmd, target, usage)
 }
 
-// AddOverwriteFlag adds an overwrite flag (--overwrite) to a command.
+// AddOverwriteFlag adds an overwrite flag. See flags.AddOverwriteFlag.
 func AddOverwriteFlag(cmd *cobra.Command, target *bool) {
-	cmd.Flags().BoolVar(target, "overwrite", false, "Overwrite existing resource")
+	flags.AddOverwriteFlag(cmd, target)
 }
 
-// BatchFlags holds common flags for batch operations targeting multiple devices.
-type BatchFlags struct {
-	GroupName  string
-	All        bool
-	Timeout    time.Duration
-	SwitchID   int
-	Concurrent int
+// AddBatchFlags adds batch operation flags. See flags.AddBatchFlags.
+func AddBatchFlags(cmd *cobra.Command, f *BatchFlags) {
+	flags.AddBatchFlags(cmd, f)
 }
 
-// AddBatchFlags adds all standard batch operation flags to a command.
-// This is a convenience function for commands that support batch operations
-// targeting multiple devices via groups or the --all flag.
-func AddBatchFlags(cmd *cobra.Command, flags *BatchFlags) {
-	AddGroupFlag(cmd, &flags.GroupName)
-	AddAllFlag(cmd, &flags.All)
-	AddTimeoutFlag(cmd, &flags.Timeout)
-	AddSwitchIDFlag(cmd, &flags.SwitchID)
-	AddConcurrencyFlag(cmd, &flags.Concurrent)
+// SetBatchDefaults sets batch flag defaults. See flags.SetBatchDefaults.
+func SetBatchDefaults(f *BatchFlags) {
+	flags.SetBatchDefaults(f)
 }
 
-// SetBatchDefaults sets default values for batch flags.
-// Call this after AddBatchFlags if the flags struct was not zero-initialized.
-func SetBatchDefaults(flags *BatchFlags) {
-	flags.Timeout = DefaultTimeout
-	flags.Concurrent = DefaultConcurrency
-	flags.SwitchID = DefaultComponentID
+// AddSceneFlags adds scene operation flags. See flags.AddSceneFlags.
+func AddSceneFlags(cmd *cobra.Command, f *SceneFlags) {
+	flags.AddSceneFlags(cmd, f)
 }
 
-// SceneFlags holds common flags for scene activation operations.
-type SceneFlags struct {
-	Timeout    time.Duration
-	Concurrent int
-	DryRun     bool
+// SetSceneDefaults sets scene flag defaults. See flags.SetSceneDefaults.
+func SetSceneDefaults(f *SceneFlags) {
+	flags.SetSceneDefaults(f)
 }
 
-// AddSceneFlags adds all standard scene operation flags to a command.
-func AddSceneFlags(cmd *cobra.Command, flags *SceneFlags) {
-	AddTimeoutFlag(cmd, &flags.Timeout)
-	AddConcurrencyFlag(cmd, &flags.Concurrent)
-	AddDryRunFlag(cmd, &flags.DryRun)
+// AddComponentFlags adds component flags. See flags.AddComponentFlags.
+func AddComponentFlags(cmd *cobra.Command, f *ComponentFlags, componentName string) {
+	flags.AddComponentFlags(cmd, f, componentName)
 }
 
-// SetSceneDefaults sets default values for scene flags.
-func SetSceneDefaults(flags *SceneFlags) {
-	flags.Timeout = DefaultTimeout
-	flags.Concurrent = DefaultConcurrency
+// AddOutputFlags adds output flags. See flags.AddOutputFlags.
+func AddOutputFlags(cmd *cobra.Command, f *OutputFlags) {
+	flags.AddOutputFlags(cmd, f)
+}
+
+// SetOutputDefaults sets output flag defaults. See flags.SetOutputDefaults.
+func SetOutputDefaults(f *OutputFlags) {
+	flags.SetOutputDefaults(f)
+}
+
+// AddConfirmFlags adds confirmation flags. See flags.AddConfirmFlags.
+func AddConfirmFlags(cmd *cobra.Command, f *ConfirmFlags) {
+	flags.AddConfirmFlags(cmd, f)
+}
+
+// AddYesOnlyFlag adds only the yes flag. See flags.AddYesOnlyFlag.
+func AddYesOnlyFlag(cmd *cobra.Command, f *ConfirmFlags) {
+	flags.AddYesOnlyFlag(cmd, f)
 }

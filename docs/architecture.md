@@ -80,11 +80,21 @@ internal/
 │   │                   #   RunStatus[T](), RunList[T]()
 │   │                   #   PrintResult[T](), PrintListResult[T]()
 │   │
-│   ├── flags.go        # Flag helpers
-│   │                   #   AddComponentIDFlag(), AddBatchFlags()
-│   │                   #   AddOutputFormatFlag(), AddTimeoutFlag()
+│   ├── flags.go        # Flag re-exports from flags/ subpackage
+│   │                   #   BatchFlags, SceneFlags, ComponentFlags, etc.
+│   │
+│   ├── helpers.go      # Cobra helpers
+│   │                   #   AddCommandsToGroup()
 │   │
 │   ├── log.go          # Logging utilities
+│   │
+│   ├── flags/          # Embeddable flag structs (subpackage)
+│   │   ├── flags.go      # Core flag adders (AddTimeoutFlag, etc.)
+│   │   ├── batch.go      # BatchFlags, AddBatchFlags()
+│   │   ├── scene.go      # SceneFlags, AddSceneFlags()
+│   │   ├── component.go  # ComponentFlags, AddComponentFlags()
+│   │   ├── output.go     # OutputFlags, AddOutputFlags()
+│   │   └── confirm.go    # ConfirmFlags, AddConfirmFlags()
 │   │
 │   └── factories/      # Generic command factories
 │       ├── component.go  # NewComponentCommand (switch/light/rgb on/off/toggle)
@@ -103,6 +113,7 @@ internal/
 │   ├── manager.go      # Manager - config mutations
 │   ├── devices.go      # Device registry
 │   ├── aliases.go      # Alias management
+│   │                   #   ExpandAliasArgs(), ExecuteShellAlias()
 │   ├── scenes.go       # Scene management, ParseSceneFile()
 │   ├── template.go     # Template management
 │   ├── alerts.go       # Alert configuration
@@ -113,8 +124,9 @@ internal/
 │
 ├── utils/              # Shared utilities (batch, device conversion)
 │   ├── batch.go        # ResolveBatchTargets() - args/stdin/group/all
-│   └── device.go       # DiscoveredDeviceToConfig(), RegisterDiscoveredDevices()
-│                       # UnmarshalJSON() - RPC response helper
+│   ├── device.go       # DiscoveredDeviceToConfig(), RegisterDiscoveredDevices()
+│   │                   # UnmarshalJSON() - RPC response helper
+│   └── must.go         # Must() - panic on error for init-time failures
 │
 ├── iostreams/          # I/O abstraction
 │   ├── iostreams.go    # IOStreams struct
@@ -273,8 +285,10 @@ internal/
 │       └── cmdmode/      # Command mode
 │
 └── version/            # Build-time version info
-    └── version.go      # Version, Commit, Date variables
-                        # Get(), Short(), Long(), String()
+    ├── version.go      # Version, Commit, Date variables
+    │                   # Get(), Short(), Long(), String()
+    ├── cache.go        # ReadCachedVersion() - version cache management
+    └── notification.go # ShowUpdateNotification() - update availability
 ```
 
 ---
@@ -375,6 +389,37 @@ Available factories:
 - `NewBatchComponentCommand()` - batch operations
 - `NewCoverCommand()` - cover open/close/stop
 - `NewConfigDeleteCommand()`, `NewConfigListCommand()`
+
+### Embeddable Flag Structs
+
+Flag structs in `cmdutil/flags/` reduce Options boilerplate:
+
+```go
+import "github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
+
+type Options struct {
+    flags.BatchFlags     // Embed common batch flags
+    flags.ComponentFlags // Embed component ID flag
+    Factory *cmdutil.Factory
+}
+
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+    opts := &Options{Factory: f}
+    cmd := &cobra.Command{...}
+    flags.AddBatchFlags(cmd, &opts.BatchFlags)
+    flags.AddComponentFlags(cmd, &opts.ComponentFlags, "Switch")
+    return cmd
+}
+```
+
+Available embeddable structs:
+- `BatchFlags` - GroupName, All, Timeout, SwitchID, Concurrent
+- `SceneFlags` - Timeout, Concurrent, DryRun
+- `ComponentFlags` - ID
+- `OutputFlags` - Format
+- `ConfirmFlags` - Yes, Confirm
+
+**Note:** For backward compatibility, these are also re-exported from `cmdutil` directly (e.g., `cmdutil.BatchFlags`). New code should import from `cmdutil/flags` directly.
 
 ### shelly/export/ Placement
 
