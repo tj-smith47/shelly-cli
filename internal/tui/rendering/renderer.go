@@ -220,11 +220,13 @@ func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth,
 		return lines
 	}
 
-	// For 3-line content areas, show content with top padding only
-	if contentHeight == 3 {
+	// For medium content areas (3-4 lines), show content with top padding only
+	// This avoids extra blank lines when content is minimal
+	if contentHeight <= 4 {
 		lines := make([]string, 0, contentHeight)
 		lines = append(lines, emptyLine) // top padding only
-		for i := range 2 {
+		innerHeight := contentHeight - 1
+		for i := range innerHeight {
 			line := ""
 			if i < len(contentLines) {
 				line = contentLines[i]
@@ -235,7 +237,7 @@ func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth,
 		return lines
 	}
 
-	// Normal case (4+ lines): top padding (1) + content lines + bottom padding (1)
+	// Normal case (5+ lines): top padding (1) + content lines + bottom padding (1)
 	lines := make([]string, 0, contentHeight)
 	lines = append(lines, emptyLine) // top padding
 

@@ -277,7 +277,8 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 }
 
 func (m *Manage) focusNext() {
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelBatch, ManagePanelFirmware, ManagePanelBackup}
+	// Column-by-column: left column (Discovery, Firmware, Backup), then right (Batch)
+	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelBatch}
 	for i, p := range panels {
 		if p == m.focusedPanel {
 			m.focusedPanel = panels[(i+1)%len(panels)]
@@ -288,7 +289,8 @@ func (m *Manage) focusNext() {
 }
 
 func (m *Manage) focusPrev() {
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelBatch, ManagePanelFirmware, ManagePanelBackup}
+	// Column-by-column: left column (Discovery, Firmware, Backup), then right (Batch)
+	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelBatch}
 	for i, p := range panels {
 		if p == m.focusedPanel {
 			prevIdx := (i - 1 + len(panels)) % len(panels)
@@ -300,10 +302,11 @@ func (m *Manage) focusPrev() {
 }
 
 func (m *Manage) updateFocusStates() {
+	// Panel indices match column-by-column cycling order: left (1-3), right (4)
 	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !m.showProvisioning).SetPanelIndex(1)
-	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(2)
-	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning).SetPanelIndex(3)
-	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning).SetPanelIndex(4)
+	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning).SetPanelIndex(2)
+	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning).SetPanelIndex(3)
+	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(4)
 	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(5)
 
 	// Recalculate layout with new focus (panels resize on focus change)
