@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
@@ -207,4 +210,23 @@ func ParseKVSValue(valueStr string) any {
 	}
 	// Fall back to string
 	return valueStr
+}
+
+// ParseKVSImportFile reads and parses a KVS import file (JSON or YAML).
+func ParseKVSImportFile(file string) (*KVSExport, error) {
+	//nolint:gosec // G304: file path is from user command line argument
+	content, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var data KVSExport
+	if err := json.Unmarshal(content, &data); err != nil {
+		// Try YAML
+		if yamlErr := yaml.Unmarshal(content, &data); yamlErr != nil {
+			return nil, fmt.Errorf("failed to parse file (tried JSON and YAML): %w", err)
+		}
+	}
+
+	return &data, nil
 }

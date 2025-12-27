@@ -2,6 +2,8 @@ package term
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -67,4 +69,40 @@ func DisplayKVSItems(ios *iostreams.IOStreams, items []shelly.KVSItem) {
 	printTable(ios, table)
 
 	ios.Printf("\n%d key(s)\n", len(items))
+}
+
+// DisplayKVSImportPreview shows items that will be imported.
+func DisplayKVSImportPreview(ios *iostreams.IOStreams, data *shelly.KVSExport) {
+	ios.Printf("Found %d key(s) to import:\n", len(data.Items))
+	for _, item := range data.Items {
+		ios.Printf("  - %s = %s\n", item.Key, output.FormatDisplayValue(item.Value))
+	}
+	ios.Println()
+}
+
+// DisplayKVSDryRun shows what would be imported without making changes.
+func DisplayKVSDryRun(ios *iostreams.IOStreams, count int, overwrite bool) {
+	if overwrite {
+		ios.Info("Would import %d key(s) (overwrite enabled)", count)
+	} else {
+		ios.Info("Would import up to %d key(s) (existing keys skipped)", count)
+	}
+}
+
+// DisplayKVSImportResults shows the results of a KVS import operation.
+func DisplayKVSImportResults(ios *iostreams.IOStreams, imported, skipped int) {
+	var msgs []string
+	if imported > 0 {
+		msgs = append(msgs, fmt.Sprintf("%d imported", imported))
+	}
+	if skipped > 0 {
+		msgs = append(msgs, fmt.Sprintf("%d skipped (already exist)", skipped))
+	}
+
+	result := strings.Join(msgs, ", ")
+	if imported > 0 {
+		ios.Success("%s", result)
+	} else {
+		ios.Info("%s", result)
+	}
 }

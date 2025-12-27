@@ -4,39 +4,14 @@ package bulk
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
-
-// Config represents the bulk provisioning configuration file.
-type Config struct {
-	WiFi    *WiFiConfig    `yaml:"wifi,omitempty"`
-	Devices []DeviceConfig `yaml:"devices"`
-}
-
-// WiFiConfig represents shared WiFi settings.
-type WiFiConfig struct {
-	SSID     string `yaml:"ssid"`
-	Password string `yaml:"password"`
-}
-
-// DeviceConfig represents per-device settings.
-type DeviceConfig struct {
-	Name    string      `yaml:"name"`
-	Address string      `yaml:"address,omitempty"`
-	WiFi    *WiFiConfig `yaml:"wifi,omitempty"`
-	DevName string      `yaml:"device_name,omitempty"`
-}
 
 // Options holds command options.
 type Options struct {
@@ -94,16 +69,12 @@ Config file format:
 
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Load config file
-	data, err := os.ReadFile(opts.ConfigFile)
+	cfg, err := shelly.ParseBulkProvisionFile(opts.ConfigFile)
 	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return fmt.Errorf("failed to parse config file: %w", err)
+		return err
 	}
 
 	if len(cfg.Devices) == 0 {
@@ -111,126 +82,31 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Validate all device names before starting
-	if err := validateDeviceNames(opts.Factory, &cfg); err != nil {
+	isRegistered := func(name string) bool {
+		return opts.Factory.GetDevice(name) != nil
+	}
+	if err := shelly.ValidateBulkProvisionConfig(cfg, isRegistered); err != nil {
 		return err
 	}
 
 	ios.Info("Found %d devices to provision", len(cfg.Devices))
 
 	if opts.DryRun {
-		ios.Info("Dry run - validating configuration:")
-		for _, d := range cfg.Devices {
-			wifi := cfg.WiFi
-			if d.WiFi != nil {
-				wifi = d.WiFi
-			}
-			if wifi == nil {
-				ios.Warning("  %s: no WiFi config", d.Name)
-			} else {
-				ios.Info("  %s: SSID=%s", d.Name, wifi.SSID)
-			}
-		}
+		term.DisplayBulkProvisionDryRun(ios, cfg)
 		return nil
 	}
 
-	// Provision devices in parallel
-	return provisionDevices(ctx, ios, opts, &cfg)
-}
-
-func provisionDevices(ctx context.Context, ios *iostreams.IOStreams, opts *Options, cfg *Config) error {
 	// Add timeout for entire bulk operation
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	svc := opts.Factory.ShellyService()
+	// Provision devices in parallel
+	results := svc.ProvisionDevices(ctx, cfg, opts.Parallel)
 
-	type result struct {
-		Device string
-		Err    error
-	}
-
-	results := make(chan result, len(cfg.Devices))
-	sem := make(chan struct{}, opts.Parallel)
-
-	var wg sync.WaitGroup
-	for _, device := range cfg.Devices {
-		wg.Go(func() {
-			// Acquire semaphore
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			err := provisionDevice(ctx, svc, cfg, device)
-			results <- result{Device: device.Name, Err: err}
-		})
-	}
-
-	// Wait for all to complete
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	// Collect results
-	var failed []string
-	for r := range results {
-		if r.Err != nil {
-			ios.Error("Failed to provision %s: %v", r.Device, r.Err)
-			failed = append(failed, r.Device)
-		} else {
-			ios.Success("Provisioned %s", r.Device)
-		}
-	}
-
-	if len(failed) > 0 {
-		return fmt.Errorf("%d devices failed to provision", len(failed))
-	}
-
-	ios.Success("All %d devices provisioned successfully", len(cfg.Devices))
-	return nil
-}
-
-func provisionDevice(ctx context.Context, svc *shelly.Service, cfg *Config, device DeviceConfig) error {
-	// Get WiFi config (device-specific or global)
-	wifi := cfg.WiFi
-	if device.WiFi != nil {
-		wifi = device.WiFi
-	}
-
-	if wifi == nil {
-		return fmt.Errorf("no WiFi configuration")
-	}
-
-	// Apply WiFi settings
-	enable := true
-	if err := svc.SetWiFiConfig(ctx, device.Name, wifi.SSID, wifi.Password, &enable); err != nil {
-		return fmt.Errorf("failed to set WiFi: %w", err)
-	}
-
-	return nil
-}
-
-// validateDeviceNames validates all device names in the config before starting.
-// For devices without an explicit address, the name must be a registered device.
-func validateDeviceNames(f *cmdutil.Factory, cfg *Config) error {
-	var errors []string
-
-	for _, d := range cfg.Devices {
-		// Validate device name format
-		if err := config.ValidateDeviceName(d.Name); err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", d.Name, err))
-			continue
-		}
-
-		// If no address specified, device must be registered
-		if d.Address == "" {
-			if f.GetDevice(d.Name) == nil {
-				errors = append(errors, fmt.Sprintf("%s: not a registered device and no address specified", d.Name))
-			}
-		}
-	}
-
-	if len(errors) > 0 {
-		return fmt.Errorf("invalid device configuration:\n  %s", strings.Join(errors, "\n  "))
+	// Display results
+	failed := term.DisplayBulkProvisionResults(ios, results, len(cfg.Devices))
+	if failed > 0 {
+		return fmt.Errorf("%d devices failed to provision", failed)
 	}
 
 	return nil
