@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -79,7 +80,7 @@ func run(ctx context.Context, f *cmdutil.Factory, dir string) error {
 		Directory:  dir,
 		Format:     formatFlag,
 		Parallel:   parallelFlag,
-		BackupOpts: shelly.BackupOptions{},
+		BackupOpts: backup.Options{},
 	}
 
 	results := exporter.ExportAll(ctx, cfg.Devices, opts)

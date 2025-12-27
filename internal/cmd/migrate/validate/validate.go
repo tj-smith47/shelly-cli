@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
 // NewCommand creates the migrate validate command.
@@ -42,7 +42,7 @@ func run(f *cmdutil.Factory, filePath string) error {
 	}
 
 	// Validate backup
-	backup, err := shelly.ValidateBackup(data)
+	bkp, err := backup.Validate(data)
 	if err != nil {
 		ios.Error("Validation failed: %v", err)
 		return err
@@ -50,16 +50,16 @@ func run(f *cmdutil.Factory, filePath string) error {
 
 	ios.Success("Backup file is valid")
 	ios.Println()
-	ios.Printf("  Version:   %d\n", backup.Version)
-	ios.Printf("  Device:    %s (%s)\n", backup.Device().ID, backup.Device().Model)
-	ios.Printf("  Firmware:  %s\n", backup.Device().FWVersion)
-	ios.Printf("  Created:   %s\n", backup.CreatedAt.Format("2006-01-02 15:04:05"))
-	ios.Printf("  Config:    %d keys\n", len(backup.Config))
-	ios.Printf("  Scripts:   %d\n", len(backup.Scripts))
-	ios.Printf("  Schedules: %d\n", len(backup.Schedules))
-	ios.Printf("  Webhooks:  %d\n", len(backup.Webhooks))
+	ios.Printf("  Version:   %d\n", bkp.Version)
+	ios.Printf("  Device:    %s (%s)\n", bkp.Device().ID, bkp.Device().Model)
+	ios.Printf("  Firmware:  %s\n", bkp.Device().FWVersion)
+	ios.Printf("  Created:   %s\n", bkp.CreatedAt.Format("2006-01-02 15:04:05"))
+	ios.Printf("  Config:    %d keys\n", len(bkp.Config))
+	ios.Printf("  Scripts:   %d\n", len(bkp.Scripts))
+	ios.Printf("  Schedules: %d\n", len(bkp.Schedules))
+	ios.Printf("  Webhooks:  %d\n", len(bkp.Webhooks))
 
-	if backup.Encrypted() {
+	if bkp.Encrypted() {
 		ios.Printf("  Encrypted: yes\n")
 	}
 

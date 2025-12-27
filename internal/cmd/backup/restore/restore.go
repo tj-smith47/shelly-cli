@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -78,17 +79,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Validate backup
-	backup, err := shelly.ValidateBackup(data)
+	bkp, err := backup.Validate(data)
 	if err != nil {
 		return fmt.Errorf("invalid backup file: %w", err)
 	}
 
 	// Check encryption
-	if backup.Encrypted() && decryptFlag == "" {
+	if bkp.Encrypted() && decryptFlag == "" {
 		return fmt.Errorf("backup is encrypted, use --decrypt to provide password")
 	}
 
-	opts := shelly.RestoreOptions{
+	opts := backup.RestoreOptions{
 		DryRun:        dryRunFlag,
 		SkipNetwork:   skipNetworkFlag,
 		SkipScripts:   skipScriptsFlag,
@@ -100,15 +101,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	if dryRunFlag {
 		ios.Title("Dry run - Restore preview")
 		ios.Println()
-		term.DisplayRestorePreview(ios, backup, opts)
+		term.DisplayRestorePreview(ios, bkp, opts)
 		return nil
 	}
 
 	svc := f.ShellyService()
-	var result *shelly.RestoreResult
+	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Restoring backup...", func(ctx context.Context) error {
 		var restoreErr error
-		result, restoreErr = svc.RestoreBackup(ctx, device, backup, opts)
+		result, restoreErr = svc.RestoreBackup(ctx, device, bkp, opts)
 		return restoreErr
 	})
 	if err != nil {

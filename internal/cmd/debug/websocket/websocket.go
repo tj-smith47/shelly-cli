@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/transport"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -88,7 +88,12 @@ func run(ctx context.Context, opts *Options) error { //nolint:gocyclo // will fi
 	ios.Println(theme.Bold().Render("WebSocket Configuration:"))
 	ios.Println()
 
-	err = svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
+	err = svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("WebSocket is only supported on Gen2+ devices (this is Gen1)")
+		}
+
+		conn := dev.Gen2()
 		info := conn.Info()
 		deviceInfo.ID = info.ID
 		deviceInfo.Model = info.Model
@@ -97,10 +102,6 @@ func run(ctx context.Context, opts *Options) error { //nolint:gocyclo // will fi
 		ios.Printf("  Device: %s (%s)\n", info.Model, info.ID)
 		ios.Printf("  Generation: %d\n", info.Generation)
 		ios.Println()
-
-		if info.Generation < 2 {
-			return fmt.Errorf("WebSocket is only supported on Gen2+ devices (this is Gen%d)", info.Generation)
-		}
 
 		// Get WebSocket config
 		result, wsErr := conn.Call(ctx, "Ws.GetConfig", nil)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -78,35 +78,42 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	conn, err := svc.Connect(ctx, opts.Device)
+	var thermostats []model.ThermostatInfo
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
+
+		conn := dev.Gen2()
+
+		// Get full device status to find thermostats
+		result, callErr := conn.Call(ctx, "Shelly.GetStatus", nil)
+		if callErr != nil {
+			return fmt.Errorf("failed to get device status: %w", callErr)
+		}
+
+		// Parse status to find thermostat components
+		jsonBytes, marshalErr := json.Marshal(result)
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal result: %w", marshalErr)
+		}
+
+		var fullStatus map[string]json.RawMessage
+		if unmarshalErr := json.Unmarshal(jsonBytes, &fullStatus); unmarshalErr != nil {
+			return fmt.Errorf("failed to parse status: %w", unmarshalErr)
+		}
+
+		thermostats = shelly.CollectThermostats(fullStatus)
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
+		return err
 	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
-
-	// Get full device status to find thermostats
-	result, err := conn.Call(ctx, "Shelly.GetStatus", nil)
-	if err != nil {
-		return fmt.Errorf("failed to get device status: %w", err)
-	}
-
-	// Parse status to find thermostat components
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		return fmt.Errorf("failed to marshal result: %w", err)
-	}
-
-	var fullStatus map[string]json.RawMessage
-	if err := json.Unmarshal(jsonBytes, &fullStatus); err != nil {
-		return fmt.Errorf("failed to parse status: %w", err)
-	}
-
-	thermostats := shelly.CollectThermostats(fullStatus)
 
 	if opts.JSON {
-		jsonBytes, err := json.MarshalIndent(thermostats, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
+		jsonBytes, jsonErr := json.MarshalIndent(thermostats, "", "  ")
+		if jsonErr != nil {
+			return fmt.Errorf("failed to format JSON: %w", jsonErr)
 		}
 		ios.Println(string(jsonBytes))
 		return nil

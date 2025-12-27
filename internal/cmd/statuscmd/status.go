@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -70,7 +69,19 @@ func runSingleDevice(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.
 	var componentStates []term.ComponentState
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting status...", func(ctx context.Context) error {
-		return svc.WithConnection(ctx, device, func(conn *client.Client) error {
+		return svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+			if dev.IsGen1() {
+				// Gen1 devices have limited status info
+				devInfo := dev.Gen1().Info()
+				info = &term.QuickDeviceInfo{
+					Model:      devInfo.Model,
+					Generation: devInfo.Generation,
+					Firmware:   devInfo.Firmware,
+				}
+				return nil
+			}
+
+			conn := dev.Gen2()
 			devInfo := conn.Info()
 			info = &term.QuickDeviceInfo{
 				Model:      devInfo.Model,
@@ -120,8 +131,8 @@ func runAllDevices(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Se
 		for _, name := range names {
 			ds := term.QuickDeviceStatus{Name: name}
 
-			connErr := svc.WithConnection(ctx, name, func(conn *client.Client) error {
-				devInfo := conn.Info()
+			connErr := svc.WithDevice(ctx, name, func(dev *shelly.DeviceClient) error {
+				devInfo := dev.Info()
 				ds.Model = devInfo.Model
 				ds.Online = true
 				return nil

@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -62,35 +63,41 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	conn, err := svc.Connect(ctx, opts.Device)
+	var data *model.SensorData
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("sensor status not supported on Gen1 devices")
+		}
+
+		// Get full device status
+		result, callErr := dev.Gen2().Call(ctx, "Shelly.GetStatus", nil)
+		if callErr != nil {
+			return fmt.Errorf("failed to get device status: %w", callErr)
+		}
+
+		// Marshal result to JSON for parsing
+		jsonBytes, marshalErr := json.Marshal(result)
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal result: %w", marshalErr)
+		}
+
+		var fullStatus map[string]json.RawMessage
+		if unmarshalErr := json.Unmarshal(jsonBytes, &fullStatus); unmarshalErr != nil {
+			return fmt.Errorf("failed to parse status: %w", unmarshalErr)
+		}
+
+		// Collect sensor data using service layer
+		data = shelly.CollectSensorData(fullStatus)
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
+		return err
 	}
-
-	// Get full device status
-	result, err := conn.Call(ctx, "Shelly.GetStatus", nil)
-	if err != nil {
-		return fmt.Errorf("failed to get device status: %w", err)
-	}
-
-	// Marshal result to JSON for parsing
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		return fmt.Errorf("failed to marshal result: %w", err)
-	}
-
-	var fullStatus map[string]json.RawMessage
-	if err := json.Unmarshal(jsonBytes, &fullStatus); err != nil {
-		return fmt.Errorf("failed to parse status: %w", err)
-	}
-
-	// Collect sensor data using service layer
-	data := shelly.CollectSensorData(fullStatus)
 
 	if opts.JSON {
-		jsonOut, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
+		jsonOut, jsonErr := json.MarshalIndent(data, "", "  ")
+		if jsonErr != nil {
+			return fmt.Errorf("failed to format JSON: %w", jsonErr)
 		}
 		ios.Println(string(jsonOut))
 		return nil

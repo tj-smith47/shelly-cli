@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/browser"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -203,10 +204,10 @@ func (f *Factory) WithTimeout(ctx context.Context, d time.Duration) (context.Con
 	return context.WithTimeout(ctx, d)
 }
 
-// WithDefaultTimeout creates a child context with DefaultTimeout (10s).
+// WithDefaultTimeout creates a child context with flags.DefaultTimeout (10s).
 // Useful for standard device operations.
 func (f *Factory) WithDefaultTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, DefaultTimeout)
+	return context.WithTimeout(ctx, flags.DefaultTimeout)
 }
 
 // =============================================================================

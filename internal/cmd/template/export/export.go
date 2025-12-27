@@ -58,7 +58,7 @@ Format is auto-detected from file extension, or can be specified with --format.`
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Format, "format", "yaml", "Output format (json, yaml)")
+	cmd.Flags().StringVarP(&opts.Format, "format", "f", "yaml", "File format (json, yaml)")
 
 	return cmd
 }

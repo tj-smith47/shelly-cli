@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -76,17 +77,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	opts := shelly.BackupOptions{
+	opts := backup.Options{
 		SkipScripts:   skipScriptsFlag,
 		SkipSchedules: skipSchedulesFlag,
 		SkipWebhooks:  skipWebhooksFlag,
 		Password:      encryptFlag,
 	}
 
-	var backup *shelly.DeviceBackup
+	var bkp *backup.DeviceBackup
 	err := cmdutil.RunWithSpinner(ctx, ios, "Creating backup...", func(ctx context.Context) error {
 		var err error
-		backup, err = svc.CreateBackup(ctx, device, opts)
+		bkp, err = svc.CreateBackup(ctx, device, opts)
 		return err
 	})
 	if err != nil {
@@ -94,7 +95,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Format the output
-	data, err := export.MarshalBackup(backup, formatFlag)
+	data, err := export.MarshalBackup(bkp, formatFlag)
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
@@ -107,7 +108,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 			return fmt.Errorf("failed to write backup file: %w", err)
 		}
 		ios.Success("Backup created: %s", filePath)
-		term.DisplayBackupSummary(ios, backup)
+		term.DisplayBackupSummary(ios, bkp)
 	}
 
 	return nil

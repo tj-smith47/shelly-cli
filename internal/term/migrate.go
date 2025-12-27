@@ -3,7 +3,7 @@ package term
 import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
 // DisplayMigrationPreview shows what would be migrated in a dry run.
@@ -32,7 +32,7 @@ func DisplayMigrationDiff(ios *iostreams.IOStreams, d *model.BackupDiff) {
 }
 
 // DisplayMigrationResult shows the result of a migration.
-func DisplayMigrationResult(ios *iostreams.IOStreams, result *shelly.RestoreResult) {
+func DisplayMigrationResult(ios *iostreams.IOStreams, result *backup.RestoreResult) {
 	ios.Println()
 	if result.ConfigRestored {
 		ios.Printf("  Config:    migrated\n")

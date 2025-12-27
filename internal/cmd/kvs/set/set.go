@@ -10,7 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 )
 
 // Options holds command options.
@@ -91,7 +91,7 @@ func run(ctx context.Context, opts *Options) error {
 	if opts.Null {
 		value = nil
 	} else {
-		value = shelly.ParseKVSValue(opts.Value)
+		value = kvs.ParseValue(opts.Value)
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Setting %q...", opts.Key), func(ctx context.Context) error {

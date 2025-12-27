@@ -1,4 +1,4 @@
-package cmdutil_test
+package flags_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 )
 
 const (
@@ -25,7 +25,7 @@ func TestAddComponentIDFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var id int
 
-	cmdutil.AddComponentIDFlag(cmd, &id, "Light")
+	flags.AddComponentIDFlag(cmd, &id, "Light")
 
 	flag := cmd.Flags().Lookup("id")
 	if flag == nil {
@@ -48,7 +48,7 @@ func TestAddSwitchIDFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var id int
 
-	cmdutil.AddSwitchIDFlag(cmd, &id)
+	flags.AddSwitchIDFlag(cmd, &id)
 
 	flag := cmd.Flags().Lookup("switch")
 	if flag == nil {
@@ -68,7 +68,7 @@ func TestAddTimeoutFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var timeout time.Duration
 
-	cmdutil.AddTimeoutFlag(cmd, &timeout)
+	flags.AddTimeoutFlag(cmd, &timeout)
 
 	flag := cmd.Flags().Lookup("timeout")
 	if flag == nil {
@@ -88,7 +88,7 @@ func TestAddConcurrencyFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var concurrent int
 
-	cmdutil.AddConcurrencyFlag(cmd, &concurrent)
+	flags.AddConcurrencyFlag(cmd, &concurrent)
 
 	flag := cmd.Flags().Lookup("concurrent")
 	if flag == nil {
@@ -108,7 +108,7 @@ func TestAddOutputFormatFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var format string
 
-	cmdutil.AddOutputFormatFlag(cmd, &format)
+	flags.AddOutputFormatFlag(cmd, &format)
 
 	flag := cmd.Flags().Lookup("output")
 	if flag == nil {
@@ -128,7 +128,7 @@ func TestAddYesFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var yes bool
 
-	cmdutil.AddYesFlag(cmd, &yes)
+	flags.AddYesFlag(cmd, &yes)
 
 	flag := cmd.Flags().Lookup("yes")
 	if flag == nil {
@@ -148,7 +148,7 @@ func TestAddConfirmFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var confirm bool
 
-	cmdutil.AddConfirmFlag(cmd, &confirm)
+	flags.AddConfirmFlag(cmd, &confirm)
 
 	flag := cmd.Flags().Lookup("confirm")
 	if flag == nil {
@@ -165,7 +165,7 @@ func TestAddDryRunFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var dryRun bool
 
-	cmdutil.AddDryRunFlag(cmd, &dryRun)
+	flags.AddDryRunFlag(cmd, &dryRun)
 
 	flag := cmd.Flags().Lookup("dry-run")
 	if flag == nil {
@@ -182,7 +182,7 @@ func TestAddGroupFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var group string
 
-	cmdutil.AddGroupFlag(cmd, &group)
+	flags.AddGroupFlag(cmd, &group)
 
 	flag := cmd.Flags().Lookup("group")
 	if flag == nil {
@@ -202,7 +202,7 @@ func TestAddAllFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var all bool
 
-	cmdutil.AddAllFlag(cmd, &all)
+	flags.AddAllFlag(cmd, &all)
 
 	flag := cmd.Flags().Lookup("all")
 	if flag == nil {
@@ -222,7 +222,7 @@ func TestAddNameFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var name string
 
-	cmdutil.AddNameFlag(cmd, &name, "Override name")
+	flags.AddNameFlag(cmd, &name, "Override name")
 
 	flag := cmd.Flags().Lookup("name")
 	if flag == nil {
@@ -242,7 +242,7 @@ func TestAddOverwriteFlag(t *testing.T) {
 	cmd := newTestCommand()
 	var overwrite bool
 
-	cmdutil.AddOverwriteFlag(cmd, &overwrite)
+	flags.AddOverwriteFlag(cmd, &overwrite)
 
 	flag := cmd.Flags().Lookup("overwrite")
 	if flag == nil {
@@ -257,9 +257,9 @@ func TestAddBatchFlags(t *testing.T) {
 	t.Parallel()
 
 	cmd := newTestCommand()
-	flags := &cmdutil.BatchFlags{}
+	f := &flags.BatchFlags{}
 
-	cmdutil.AddBatchFlags(cmd, flags)
+	flags.AddBatchFlags(cmd, f)
 
 	// Check all batch flags are present
 	expectedFlags := []struct {
@@ -288,22 +288,22 @@ func TestAddBatchFlags(t *testing.T) {
 func TestSetBatchDefaults(t *testing.T) {
 	t.Parallel()
 
-	flags := &cmdutil.BatchFlags{
+	f := &flags.BatchFlags{
 		Timeout:    5 * time.Second,
 		Concurrent: 10,
 		SwitchID:   1,
 	}
 
-	cmdutil.SetBatchDefaults(flags)
+	flags.SetBatchDefaults(f)
 
-	if flags.Timeout != cmdutil.DefaultTimeout {
-		t.Errorf("Timeout = %v, want %v", flags.Timeout, cmdutil.DefaultTimeout)
+	if f.Timeout != flags.DefaultTimeout {
+		t.Errorf("Timeout = %v, want %v", f.Timeout, flags.DefaultTimeout)
 	}
-	if flags.Concurrent != cmdutil.DefaultConcurrency {
-		t.Errorf("Concurrent = %d, want %d", flags.Concurrent, cmdutil.DefaultConcurrency)
+	if f.Concurrent != flags.DefaultConcurrency {
+		t.Errorf("Concurrent = %d, want %d", f.Concurrent, flags.DefaultConcurrency)
 	}
-	if flags.SwitchID != cmdutil.DefaultComponentID {
-		t.Errorf("SwitchID = %d, want %d", flags.SwitchID, cmdutil.DefaultComponentID)
+	if f.SwitchID != flags.DefaultComponentID {
+		t.Errorf("SwitchID = %d, want %d", f.SwitchID, flags.DefaultComponentID)
 	}
 }
 
@@ -311,9 +311,9 @@ func TestAddSceneFlags(t *testing.T) {
 	t.Parallel()
 
 	cmd := newTestCommand()
-	flags := &cmdutil.SceneFlags{}
+	f := &flags.SceneFlags{}
 
-	cmdutil.AddSceneFlags(cmd, flags)
+	flags.AddSceneFlags(cmd, f)
 
 	// Check all scene flags are present
 	expectedFlags := []string{"timeout", "concurrent", "dry-run"}
@@ -329,31 +329,31 @@ func TestAddSceneFlags(t *testing.T) {
 func TestSetSceneDefaults(t *testing.T) {
 	t.Parallel()
 
-	flags := &cmdutil.SceneFlags{
+	f := &flags.SceneFlags{
 		Timeout:    5 * time.Second,
 		Concurrent: 10,
 	}
 
-	cmdutil.SetSceneDefaults(flags)
+	flags.SetSceneDefaults(f)
 
-	if flags.Timeout != cmdutil.DefaultTimeout {
-		t.Errorf("Timeout = %v, want %v", flags.Timeout, cmdutil.DefaultTimeout)
+	if f.Timeout != flags.DefaultTimeout {
+		t.Errorf("Timeout = %v, want %v", f.Timeout, flags.DefaultTimeout)
 	}
-	if flags.Concurrent != cmdutil.DefaultConcurrency {
-		t.Errorf("Concurrent = %d, want %d", flags.Concurrent, cmdutil.DefaultConcurrency)
+	if f.Concurrent != flags.DefaultConcurrency {
+		t.Errorf("Concurrent = %d, want %d", f.Concurrent, flags.DefaultConcurrency)
 	}
 }
 
 func TestDefaultConstants(t *testing.T) {
 	t.Parallel()
 
-	if cmdutil.DefaultTimeout != 10*time.Second {
-		t.Errorf("DefaultTimeout = %v, want 10s", cmdutil.DefaultTimeout)
+	if flags.DefaultTimeout != 10*time.Second {
+		t.Errorf("DefaultTimeout = %v, want 10s", flags.DefaultTimeout)
 	}
-	if cmdutil.DefaultConcurrency != 5 {
-		t.Errorf("DefaultConcurrency = %d, want 5", cmdutil.DefaultConcurrency)
+	if flags.DefaultConcurrency != 5 {
+		t.Errorf("DefaultConcurrency = %d, want 5", flags.DefaultConcurrency)
 	}
-	if cmdutil.DefaultComponentID != 0 {
-		t.Errorf("DefaultComponentID = %d, want 0", cmdutil.DefaultComponentID)
+	if flags.DefaultComponentID != 0 {
+		t.Errorf("DefaultComponentID = %d, want 0", flags.DefaultComponentID)
 	}
 }

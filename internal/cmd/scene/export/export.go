@@ -38,7 +38,7 @@ Format is auto-detected from file extension (.json, .yaml, .yml).`,
   shelly scene export movie-night
 
   # Export to stdout as JSON
-  shelly scene export movie-night --output json`,
+  shelly scene export movie-night --format json`,
 		Args:              cobra.RangeArgs(1, 2),
 		ValidArgsFunction: completion.SceneNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -51,7 +51,7 @@ Format is auto-detected from file extension (.json, .yaml, .yml).`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "yaml", "Output format: json, yaml")
+	cmd.Flags().StringVarP(&outputFormat, "format", "f", "yaml", "File format: json, yaml")
 
 	return cmd
 }

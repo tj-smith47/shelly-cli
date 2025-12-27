@@ -11,7 +11,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -67,38 +66,45 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
+	var thermostatSchedules []shelly.ThermostatSchedule
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
 
-	var result any
-	err = cmdutil.RunWithSpinner(ctx, ios, "Getting schedules...", func(ctx context.Context) error {
-		var callErr error
-		result, callErr = conn.Call(ctx, "Schedule.List", nil)
-		return callErr
+		conn := dev.Gen2()
+
+		var result any
+		spinnerErr := cmdutil.RunWithSpinner(ctx, ios, "Getting schedules...", func(ctx context.Context) error {
+			var callErr error
+			result, callErr = conn.Call(ctx, "Schedule.List", nil)
+			return callErr
+		})
+		if spinnerErr != nil {
+			return fmt.Errorf("failed to list schedules: %w", spinnerErr)
+		}
+
+		jsonBytes, marshalErr := json.Marshal(result)
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal result: %w", marshalErr)
+		}
+
+		var scheduleResp components.ScheduleListResponse
+		if unmarshalErr := json.Unmarshal(jsonBytes, &scheduleResp); unmarshalErr != nil {
+			return fmt.Errorf("failed to parse schedules: %w", unmarshalErr)
+		}
+
+		thermostatSchedules = shelly.FilterThermostatSchedules(scheduleResp.Jobs, opts.ThermostatID, opts.All)
+		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to list schedules: %w", err)
+		return err
 	}
-
-	jsonBytes, err := json.Marshal(result)
-	if err != nil {
-		return fmt.Errorf("failed to marshal result: %w", err)
-	}
-
-	var scheduleResp components.ScheduleListResponse
-	if err := json.Unmarshal(jsonBytes, &scheduleResp); err != nil {
-		return fmt.Errorf("failed to parse schedules: %w", err)
-	}
-
-	thermostatSchedules := shelly.FilterThermostatSchedules(scheduleResp.Jobs, opts.ThermostatID, opts.All)
 
 	if opts.JSON {
-		jsonBytes, err := json.MarshalIndent(thermostatSchedules, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
+		jsonBytes, jsonErr := json.MarshalIndent(thermostatSchedules, "", "  ")
+		if jsonErr != nil {
+			return fmt.Errorf("failed to format JSON: %w", jsonErr)
 		}
 		ios.Println(string(jsonBytes))
 		return nil

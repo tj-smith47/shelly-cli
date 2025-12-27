@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tj-smith47/shelly-go/backup"
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
 // MigrationOptions configures migration between devices.
@@ -59,8 +60,8 @@ func DefaultMigrationOptions() *MigrationOptions {
 }
 
 // toMigrationOptions converts to shelly-go migration options.
-func (o *MigrationOptions) toMigrationOptions() *backup.MigrationOptions {
-	return &backup.MigrationOptions{
+func (o *MigrationOptions) toMigrationOptions() *shellybackup.MigrationOptions {
+	return &shellybackup.MigrationOptions{
 		IncludeWiFi:      o.IncludeWiFi,
 		IncludeCloud:     o.IncludeCloud,
 		IncludeMQTT:      o.IncludeMQTT,
@@ -76,8 +77,8 @@ func (o *MigrationOptions) toMigrationOptions() *backup.MigrationOptions {
 
 // MigrationResult contains the result of a migration operation.
 type MigrationResult struct {
-	SourceDevice       *BackupDeviceInfo
-	TargetDevice       *BackupDeviceInfo
+	SourceDevice       *backup.DeviceInfo
+	TargetDevice       *backup.DeviceInfo
 	ComponentsMigrated []string
 	Warnings           []string
 	Errors             []error
@@ -114,7 +115,7 @@ func (s *Service) Migrate(ctx context.Context, sourceIdentifier, targetIdentifie
 	}
 
 	// Create migrator
-	migrator := backup.NewMigrator(sourceConn.RPCClient(), targetConn.RPCClient())
+	migrator := shellybackup.NewMigrator(sourceConn.RPCClient(), targetConn.RPCClient())
 	migrator.AllowDifferentModels = opts.AllowDifferentModels
 	migrator.AllowDifferentGenerations = opts.AllowDifferentGenerations
 
@@ -141,7 +142,7 @@ func (s *Service) Migrate(ctx context.Context, sourceIdentifier, targetIdentifie
 
 	// Convert device info
 	if migResult.SourceDevice != nil {
-		result.SourceDevice = &BackupDeviceInfo{
+		result.SourceDevice = &backup.DeviceInfo{
 			ID:         migResult.SourceDevice.ID,
 			Name:       migResult.SourceDevice.Name,
 			Model:      migResult.SourceDevice.Model,
@@ -151,7 +152,7 @@ func (s *Service) Migrate(ctx context.Context, sourceIdentifier, targetIdentifie
 		}
 	}
 	if migResult.TargetDevice != nil {
-		result.TargetDevice = &BackupDeviceInfo{
+		result.TargetDevice = &backup.DeviceInfo{
 			ID:         migResult.TargetDevice.ID,
 			Name:       migResult.TargetDevice.Name,
 			Model:      migResult.TargetDevice.Model,
@@ -166,8 +167,8 @@ func (s *Service) Migrate(ctx context.Context, sourceIdentifier, targetIdentifie
 
 // MigrationValidation contains migration validation results.
 type MigrationValidation struct {
-	SourceDevice *BackupDeviceInfo
-	TargetDevice *BackupDeviceInfo
+	SourceDevice *backup.DeviceInfo
+	TargetDevice *backup.DeviceInfo
 	Warnings     []string
 	Errors       []string
 	Valid        bool
@@ -200,7 +201,7 @@ func (s *Service) ValidateMigration(ctx context.Context, sourceIdentifier, targe
 	}
 
 	// Create migrator
-	migrator := backup.NewMigrator(sourceConn.RPCClient(), targetConn.RPCClient())
+	migrator := shellybackup.NewMigrator(sourceConn.RPCClient(), targetConn.RPCClient())
 	migrator.AllowDifferentModels = opts.AllowDifferentModels
 	migrator.AllowDifferentGenerations = opts.AllowDifferentGenerations
 
@@ -219,7 +220,7 @@ func (s *Service) ValidateMigration(ctx context.Context, sourceIdentifier, targe
 
 	// Convert device info
 	if validation.SourceDevice != nil {
-		result.SourceDevice = &BackupDeviceInfo{
+		result.SourceDevice = &backup.DeviceInfo{
 			ID:         validation.SourceDevice.ID,
 			Name:       validation.SourceDevice.Name,
 			Model:      validation.SourceDevice.Model,
@@ -229,7 +230,7 @@ func (s *Service) ValidateMigration(ctx context.Context, sourceIdentifier, targe
 		}
 	}
 	if validation.TargetDevice != nil {
-		result.TargetDevice = &BackupDeviceInfo{
+		result.TargetDevice = &backup.DeviceInfo{
 			ID:         validation.TargetDevice.ID,
 			Name:       validation.TargetDevice.Name,
 			Model:      validation.TargetDevice.Model,
@@ -243,9 +244,9 @@ func (s *Service) ValidateMigration(ctx context.Context, sourceIdentifier, targe
 }
 
 // MigrateFromBackup migrates configuration from a backup file to a device.
-func (s *Service) MigrateFromBackup(ctx context.Context, backupData []byte, targetIdentifier string, opts *RestoreOptions) (*RestoreResult, error) {
+func (s *Service) MigrateFromBackup(ctx context.Context, backupData []byte, targetIdentifier string, opts *backup.RestoreOptions) (*backup.RestoreResult, error) {
 	// Parse backup
-	bkup, err := ValidateBackup(backupData)
+	bkup, err := backup.Validate(backupData)
 	if err != nil {
 		return nil, fmt.Errorf("invalid backup: %w", err)
 	}
@@ -255,7 +256,7 @@ func (s *Service) MigrateFromBackup(ctx context.Context, backupData []byte, targ
 }
 
 // DiffBackups compares two backups and returns differences.
-func (s *Service) DiffBackups(backup1, backup2 *DeviceBackup) (*model.BackupDiff, error) {
+func (s *Service) DiffBackups(backup1, backup2 *backup.DeviceBackup) (*model.BackupDiff, error) {
 	diff := &model.BackupDiff{}
 
 	// Parse configs
@@ -296,15 +297,15 @@ func (s *Service) DiffBackups(backup1, backup2 *DeviceBackup) (*model.BackupDiff
 
 // Helper comparison functions for backup-to-backup comparisons
 
-func compareScripts2(scripts1, scripts2 []BackupScript) []model.ScriptDiff {
+func compareScripts2(scripts1, scripts2 []backup.Script) []model.ScriptDiff {
 	var diffs []model.ScriptDiff
 
-	map1 := make(map[string]BackupScript)
+	map1 := make(map[string]backup.Script)
 	for _, s := range scripts1 {
 		map1[s.Name] = s
 	}
 
-	map2 := make(map[string]BackupScript)
+	map2 := make(map[string]backup.Script)
 	for _, s := range scripts2 {
 		map2[s.Name] = s
 	}
@@ -340,7 +341,7 @@ func compareScripts2(scripts1, scripts2 []BackupScript) []model.ScriptDiff {
 	return diffs
 }
 
-func compareSchedules2(schedules1, schedules2 []BackupSchedule) []model.ScheduleDiff {
+func compareSchedules2(schedules1, schedules2 []backup.Schedule) []model.ScheduleDiff {
 	var diffs []model.ScheduleDiff
 
 	timespecs1 := make(map[string]bool)

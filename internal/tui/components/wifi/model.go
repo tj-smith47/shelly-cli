@@ -35,14 +35,14 @@ func (d Deps) Validate() error {
 
 // StatusLoadedMsg signals that WiFi status was loaded.
 type StatusLoadedMsg struct {
-	Status *shelly.WifiStatus
-	Config *shelly.WifiConfig
+	Status *shelly.WiFiStatusFull
+	Config *shelly.WiFiConfigFull
 	Err    error
 }
 
 // ScanResultMsg signals that WiFi scan completed.
 type ScanResultMsg struct {
-	Networks []shelly.WifiNetwork
+	Networks []shelly.WiFiNetworkFull
 	Err      error
 }
 
@@ -51,9 +51,9 @@ type Model struct {
 	ctx        context.Context
 	svc        *shelly.Service
 	device     string
-	status     *shelly.WifiStatus
-	config     *shelly.WifiConfig
-	networks   []shelly.WifiNetwork
+	status     *shelly.WiFiStatusFull
+	config     *shelly.WiFiConfigFull
+	networks   []shelly.WiFiNetworkFull
 	scroller   *panel.Scroller
 	loading    bool
 	scanning   bool
@@ -152,12 +152,12 @@ func (m Model) fetchStatus() tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
-		status, err := m.svc.GetWifiStatus(ctx, m.device)
+		status, err := m.svc.GetWiFiStatusFull(ctx, m.device)
 		if err != nil {
 			return StatusLoadedMsg{Err: err}
 		}
 
-		config, configErr := m.svc.GetWifiConfig(ctx, m.device)
+		config, configErr := m.svc.GetWiFiConfigFull(ctx, m.device)
 		if configErr != nil {
 			return StatusLoadedMsg{Status: status, Err: configErr}
 		}
@@ -171,7 +171,7 @@ func (m Model) scanNetworks() tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 15*time.Second)
 		defer cancel()
 
-		networks, err := m.svc.ScanWifiNetworks(ctx, m.device)
+		networks, err := m.svc.ScanWiFiNetworksFull(ctx, m.device)
 		return ScanResultMsg{Networks: networks, Err: err}
 	}
 }
@@ -444,7 +444,7 @@ func (m Model) renderNetworks() string {
 	return content.String()
 }
 
-func (m Model) renderNetworkLine(network shelly.WifiNetwork, isSelected bool) string {
+func (m Model) renderNetworkLine(network shelly.WiFiNetworkFull, isSelected bool) string {
 	selector := "  "
 	if isSelected {
 		selector = "▶ "
@@ -478,17 +478,17 @@ func (m Model) renderNetworkLine(network shelly.WifiNetwork, isSelected bool) st
 }
 
 // Status returns the current WiFi status.
-func (m Model) Status() *shelly.WifiStatus {
+func (m Model) Status() *shelly.WiFiStatusFull {
 	return m.status
 }
 
 // Config returns the current WiFi config.
-func (m Model) Config() *shelly.WifiConfig {
+func (m Model) Config() *shelly.WiFiConfigFull {
 	return m.config
 }
 
 // Networks returns the scanned networks.
-func (m Model) Networks() []shelly.WifiNetwork {
+func (m Model) Networks() []shelly.WiFiNetworkFull {
 	return m.networks
 }
 

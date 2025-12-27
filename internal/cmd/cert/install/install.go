@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds the command options.
@@ -101,32 +102,30 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	installedClient := false
 
 	err = cmdutil.RunWithSpinner(ctx, ios, "Installing certificate...", func(ctx context.Context) error {
-		conn, connErr := svc.Connect(ctx, device)
-		if connErr != nil {
-			return fmt.Errorf("connect: %w", connErr)
-		}
-		defer func() {
-			if closeErr := conn.Close(); closeErr != nil {
-				ios.DebugErr("close connection", closeErr)
+		return svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+			if dev.IsGen1() {
+				return fmt.Errorf("certificate installation is only supported on Gen2+ devices")
 			}
-		}()
 
-		if len(data.CAData) > 0 {
-			if _, callErr := conn.Call(ctx, "Shelly.PutUserCA", map[string]any{"data": string(data.CAData)}); callErr != nil {
-				return fmt.Errorf("install CA: %w", callErr)
+			conn := dev.Gen2()
+
+			if len(data.CAData) > 0 {
+				if _, callErr := conn.Call(ctx, "Shelly.PutUserCA", map[string]any{"data": string(data.CAData)}); callErr != nil {
+					return fmt.Errorf("install CA: %w", callErr)
+				}
+				installedCA = true
 			}
-			installedCA = true
-		}
 
-		if len(data.CertData) > 0 {
-			params := map[string]any{"data": string(data.CertData), "key": string(data.KeyData)}
-			if _, callErr := conn.Call(ctx, "Shelly.PutTLSClientCert", params); callErr != nil {
-				return fmt.Errorf("install client cert: %w", callErr)
+			if len(data.CertData) > 0 {
+				params := map[string]any{"data": string(data.CertData), "key": string(data.KeyData)}
+				if _, callErr := conn.Call(ctx, "Shelly.PutTLSClientCert", params); callErr != nil {
+					return fmt.Errorf("install client cert: %w", callErr)
+				}
+				installedClient = true
 			}
-			installedClient = true
-		}
 
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		return err

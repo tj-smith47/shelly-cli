@@ -9,7 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -54,21 +54,21 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
 
-	thermostat := conn.Thermostat(opts.ID)
+		thermostat := dev.Gen2().Thermostat(opts.ID)
 
-	err = cmdutil.RunWithSpinner(ctx, ios, "Disabling thermostat...", func(ctx context.Context) error {
-		return thermostat.Enable(ctx, false)
+		err := cmdutil.RunWithSpinner(ctx, ios, "Disabling thermostat...", func(ctx context.Context) error {
+			return thermostat.Enable(ctx, false)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to disable thermostat: %w", err)
+		}
+
+		ios.Success("Thermostat %d disabled", opts.ID)
+		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed to disable thermostat: %w", err)
-	}
-
-	ios.Success("Thermostat %d disabled", opts.ID)
-	return nil
 }

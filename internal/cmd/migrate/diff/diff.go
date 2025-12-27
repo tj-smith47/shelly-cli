@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -46,7 +47,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}
 
-	backup, err := shelly.ValidateBackup(data)
+	bkp, err := backup.Validate(data)
 	if err != nil {
 		return fmt.Errorf("invalid backup file: %w", err)
 	}
@@ -56,7 +57,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	var d *model.BackupDiff
 	err = cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
 		var cmpErr error
-		d, cmpErr = svc.CompareBackup(ctx, device, backup)
+		d, cmpErr = svc.CompareBackup(ctx, device, bkp)
 		return cmpErr
 	})
 	if err != nil {
@@ -67,7 +68,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	ios.Title("Configuration Differences")
 	ios.Println()
 	ios.Printf("Device: %s\n", device)
-	ios.Printf("Backup: %s (%s, %s)\n", filePath, backup.Device().ID, backup.Device().Model)
+	ios.Printf("Backup: %s (%s, %s)\n", filePath, bkp.Device().ID, bkp.Device().Model)
 	ios.Println()
 
 	if !d.HasDifferences() {

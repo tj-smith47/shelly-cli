@@ -9,13 +9,14 @@ import (
 	"github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	backuppkg "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
 func TestBackupDeviceInfo_Fields(t *testing.T) {
 	t.Parallel()
 
-	info := BackupDeviceInfo{
+	info := backuppkg.DeviceInfo{
 		ID:         "shellypro1pm-123456",
 		Name:       "Living Room",
 		Model:      "SNSW-001P16EU",
@@ -54,7 +55,7 @@ func TestDeviceBackup_WrapperMethods(t *testing.T) {
 		KVS:       map[string]json.RawMessage{},
 	}
 
-	wrapped := &DeviceBackup{Backup: bkup}
+	wrapped := &backuppkg.DeviceBackup{Backup: bkup}
 
 	// Test Device() method
 	device := wrapped.Device()
@@ -74,27 +75,27 @@ func TestBackupOptions_ToExportOptions(t *testing.T) {
 
 	tests := []struct {
 		name string
-		opts BackupOptions
+		opts backuppkg.Options
 	}{
 		{
 			name: "default options",
-			opts: BackupOptions{},
+			opts: backuppkg.Options{},
 		},
 		{
 			name: "skip scripts",
-			opts: BackupOptions{SkipScripts: true},
+			opts: backuppkg.Options{SkipScripts: true},
 		},
 		{
 			name: "skip schedules",
-			opts: BackupOptions{SkipSchedules: true},
+			opts: backuppkg.Options{SkipSchedules: true},
 		},
 		{
 			name: "skip webhooks",
-			opts: BackupOptions{SkipWebhooks: true},
+			opts: backuppkg.Options{SkipWebhooks: true},
 		},
 		{
 			name: "skip all",
-			opts: BackupOptions{
+			opts: backuppkg.Options{
 				SkipScripts:   true,
 				SkipSchedules: true,
 				SkipWebhooks:  true,
@@ -102,14 +103,14 @@ func TestBackupOptions_ToExportOptions(t *testing.T) {
 		},
 		{
 			name: "with password",
-			opts: BackupOptions{Password: "secret123"},
+			opts: backuppkg.Options{Password: "secret123"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.opts.toExportOptions()
+			got := tt.opts.ToExportOptions()
 			// Verify we got a non-nil result
 			if got == nil {
 				t.Error("expected non-nil ExportOptions")
@@ -123,27 +124,27 @@ func TestRestoreOptions_ToRestoreOptions(t *testing.T) {
 
 	tests := []struct {
 		name string
-		opts RestoreOptions
+		opts backuppkg.RestoreOptions
 	}{
 		{
 			name: "default options",
-			opts: RestoreOptions{},
+			opts: backuppkg.RestoreOptions{},
 		},
 		{
 			name: "dry run",
-			opts: RestoreOptions{DryRun: true},
+			opts: backuppkg.RestoreOptions{DryRun: true},
 		},
 		{
 			name: "skip network",
-			opts: RestoreOptions{SkipNetwork: true},
+			opts: backuppkg.RestoreOptions{SkipNetwork: true},
 		},
 		{
 			name: "skip scripts",
-			opts: RestoreOptions{SkipScripts: true},
+			opts: backuppkg.RestoreOptions{SkipScripts: true},
 		},
 		{
 			name: "skip all",
-			opts: RestoreOptions{
+			opts: backuppkg.RestoreOptions{
 				SkipNetwork:   true,
 				SkipScripts:   true,
 				SkipSchedules: true,
@@ -155,7 +156,7 @@ func TestRestoreOptions_ToRestoreOptions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := tt.opts.toRestoreOptions()
+			got := tt.opts.ToRestoreOptions()
 			// Verify we got a non-nil result
 			if got == nil {
 				t.Error("expected non-nil RestoreOptions")
@@ -190,7 +191,7 @@ func TestValidateBackup_ValidJSON(t *testing.T) {
 	testutil.AssertNil(t, err)
 
 	// Validate the backup
-	validated, err := ValidateBackup(data)
+	validated, err := backuppkg.Validate(data)
 	testutil.AssertNil(t, err)
 	testutil.AssertEqual(t, validated.Device().ID, "shellyplus1-123456")
 }
@@ -200,7 +201,7 @@ func TestValidateBackup_InvalidJSON(t *testing.T) {
 
 	data := []byte(`{invalid json`)
 
-	_, err := ValidateBackup(data)
+	_, err := backuppkg.Validate(data)
 	testutil.AssertError(t, err)
 }
 
@@ -209,14 +210,14 @@ func TestValidateBackup_EmptyData(t *testing.T) {
 
 	data := []byte(``)
 
-	_, err := ValidateBackup(data)
+	_, err := backuppkg.Validate(data)
 	testutil.AssertError(t, err)
 }
 
 func TestBackupScript_Fields(t *testing.T) {
 	t.Parallel()
 
-	script := BackupScript{
+	script := backuppkg.Script{
 		Name:   "test_script",
 		Code:   "console.log('test');",
 		Enable: true,
@@ -230,10 +231,10 @@ func TestBackupScript_Fields(t *testing.T) {
 func TestBackupSchedule_Fields(t *testing.T) {
 	t.Parallel()
 
-	schedule := BackupSchedule{
+	schedule := backuppkg.Schedule{
 		Enable:   true,
 		Timespec: "0 0 * * *",
-		Calls: []ScheduleCall{
+		Calls: []backuppkg.ScheduleCall{
 			{
 				Method: "Switch.Set",
 				Params: map[string]any{"id": 0, "on": true},
@@ -271,7 +272,7 @@ func TestWebhookInfo_Fields(t *testing.T) {
 func TestRestoreResult_Fields(t *testing.T) {
 	t.Parallel()
 
-	result := RestoreResult{
+	result := backuppkg.RestoreResult{
 		Success:           true,
 		ConfigRestored:    true,
 		ScriptsRestored:   5,
@@ -322,7 +323,7 @@ func TestService_CreateBackup_ContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	svc := NewService()
-	_, err := svc.CreateBackup(ctx, "test-device", BackupOptions{})
+	_, err := svc.CreateBackup(ctx, "test-device", backuppkg.Options{})
 
 	testutil.AssertError(t, err)
 	testutil.AssertErrorContains(t, err, "context canceled")
@@ -336,12 +337,12 @@ func TestService_RestoreBackup_ContextCancellation(t *testing.T) {
 	cancel() // Cancel immediately
 
 	svc := NewService()
-	bkup := &DeviceBackup{
+	bkup := &backuppkg.DeviceBackup{
 		Backup: &backup.Backup{
 			Version: 1,
 		},
 	}
-	_, err := svc.RestoreBackup(ctx, "test-device", bkup, RestoreOptions{})
+	_, err := svc.RestoreBackup(ctx, "test-device", bkup, backuppkg.RestoreOptions{})
 
 	testutil.AssertError(t, err)
 	testutil.AssertErrorContains(t, err, "context canceled")

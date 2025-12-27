@@ -9,7 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds delete command options.
@@ -61,37 +61,39 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("either --id or --all must be specified")
 	}
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
 
-	if opts.All {
-		err = cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
-			_, callErr := conn.Call(ctx, "Schedule.DeleteAll", nil)
+		conn := dev.Gen2()
+
+		if opts.All {
+			err := cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
+				_, callErr := conn.Call(ctx, "Schedule.DeleteAll", nil)
+				return callErr
+			})
+			if err != nil {
+				return fmt.Errorf("failed to delete all schedules: %w", err)
+			}
+
+			ios.Success("Deleted all schedules from %s", opts.Device)
+			return nil
+		}
+
+		params := map[string]any{
+			"id": opts.ScheduleID,
+		}
+
+		err := cmdutil.RunWithSpinner(ctx, ios, "Deleting schedule...", func(ctx context.Context) error {
+			_, callErr := conn.Call(ctx, "Schedule.Delete", params)
 			return callErr
 		})
 		if err != nil {
-			return fmt.Errorf("failed to delete all schedules: %w", err)
+			return fmt.Errorf("failed to delete schedule %d: %w", opts.ScheduleID, err)
 		}
 
-		ios.Success("Deleted all schedules from %s", opts.Device)
+		ios.Success("Deleted schedule %d from %s", opts.ScheduleID, opts.Device)
 		return nil
-	}
-
-	params := map[string]any{
-		"id": opts.ScheduleID,
-	}
-
-	err = cmdutil.RunWithSpinner(ctx, ios, "Deleting schedule...", func(ctx context.Context) error {
-		_, callErr := conn.Call(ctx, "Schedule.Delete", params)
-		return callErr
 	})
-	if err != nil {
-		return fmt.Errorf("failed to delete schedule %d: %w", opts.ScheduleID, err)
-	}
-
-	ios.Success("Deleted schedule %d from %s", opts.ScheduleID, opts.Device)
-	return nil
 }

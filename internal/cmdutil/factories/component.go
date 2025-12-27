@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -109,7 +110,7 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		},
 	}
 
-	cmdutil.AddComponentIDFlag(cmd, &componentID, opts.Component)
+	flags.AddComponentIDFlag(cmd, &componentID, opts.Component)
 
 	return cmd
 }

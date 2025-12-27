@@ -9,7 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -84,20 +84,22 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Connect to device
 	ios.Info("Connecting to %s...", opts.Device)
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", opts.Device, err)
-	}
-	defer iostreams.CloseWithDebug("closing device shell connection", conn)
 
-	info := conn.Info()
-	ios.Println()
-	ios.Println(theme.Bold().Render(fmt.Sprintf("Connected to %s", info.Model)))
-	ios.Printf("  ID: %s | MAC: %s | FW: %s\n", info.ID, info.MAC, info.Firmware)
-	ios.Info("Type 'help' for commands, 'methods' to list RPC methods, 'exit' to quit")
-	ios.Println()
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("interactive shell is only supported on Gen2+ devices")
+		}
 
-	session := term.NewShellSession(ios, conn, opts.Device)
+		conn := dev.Gen2()
+		info := conn.Info()
+		ios.Println()
+		ios.Println(theme.Bold().Render(fmt.Sprintf("Connected to %s", info.Model)))
+		ios.Printf("  ID: %s | MAC: %s | FW: %s\n", info.ID, info.MAC, info.Firmware)
+		ios.Info("Type 'help' for commands, 'methods' to list RPC methods, 'exit' to quit")
+		ios.Println()
 
-	return session.RunShellLoop(ctx)
+		session := term.NewShellSession(ios, conn, opts.Device)
+
+		return session.RunShellLoop(ctx)
+	})
 }

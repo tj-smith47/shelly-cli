@@ -8,8 +8,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
-// WifiStatus represents the current WiFi status.
-type WifiStatus struct {
+// WiFiStatusFull represents the current WiFi status with full details.
+type WiFiStatusFull struct {
 	Status        string
 	StaIP         string
 	SSID          string
@@ -17,15 +17,15 @@ type WifiStatus struct {
 	APClientCount int
 }
 
-// WifiConfig represents WiFi configuration.
-type WifiConfig struct {
-	STA  *WifiStationConfig
-	STA1 *WifiStationConfig
-	AP   *WifiAPConfig
+// WiFiConfigFull represents WiFi configuration with full details.
+type WiFiConfigFull struct {
+	STA  *WiFiStationFull
+	STA1 *WiFiStationFull
+	AP   *WiFiAPFull
 }
 
-// WifiStationConfig represents station configuration.
-type WifiStationConfig struct {
+// WiFiStationFull represents station configuration details.
+type WiFiStationFull struct {
 	SSID     string
 	Enabled  bool
 	IsOpen   bool
@@ -35,16 +35,16 @@ type WifiStationConfig struct {
 	Gateway  string
 }
 
-// WifiAPConfig represents access point configuration.
-type WifiAPConfig struct {
+// WiFiAPFull represents access point configuration details.
+type WiFiAPFull struct {
 	SSID          string
 	Enabled       bool
 	IsOpen        bool
 	RangeExtender bool
 }
 
-// WifiNetwork represents a scanned network.
-type WifiNetwork struct {
+// WiFiNetworkFull represents a scanned network with full details.
+type WiFiNetworkFull struct {
 	SSID    string
 	BSSID   string
 	Auth    string
@@ -52,9 +52,9 @@ type WifiNetwork struct {
 	RSSI    float64
 }
 
-// GetWifiStatus gets the WiFi status from a device.
-func (s *Service) GetWifiStatus(ctx context.Context, identifier string) (*WifiStatus, error) {
-	var result *WifiStatus
+// GetWiFiStatusFull gets the full WiFi status from a device.
+func (s *Service) GetWiFiStatusFull(ctx context.Context, identifier string) (*WiFiStatusFull, error) {
+	var result *WiFiStatusFull
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		wifi := components.NewWiFi(conn.RPCClient())
 		status, err := wifi.GetStatus(ctx)
@@ -62,7 +62,7 @@ func (s *Service) GetWifiStatus(ctx context.Context, identifier string) (*WifiSt
 			return err
 		}
 
-		result = &WifiStatus{
+		result = &WiFiStatusFull{
 			Status: status.Status,
 		}
 		if status.StaIP != nil {
@@ -82,9 +82,9 @@ func (s *Service) GetWifiStatus(ctx context.Context, identifier string) (*WifiSt
 	return result, err
 }
 
-// GetWifiConfig gets the WiFi configuration from a device.
-func (s *Service) GetWifiConfig(ctx context.Context, identifier string) (*WifiConfig, error) {
-	var result *WifiConfig
+// GetWiFiConfigFull gets the full WiFi configuration from a device.
+func (s *Service) GetWiFiConfigFull(ctx context.Context, identifier string) (*WiFiConfigFull, error) {
+	var result *WiFiConfigFull
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		wifi := components.NewWiFi(conn.RPCClient())
 		cfg, err := wifi.GetConfig(ctx)
@@ -92,23 +92,23 @@ func (s *Service) GetWifiConfig(ctx context.Context, identifier string) (*WifiCo
 			return err
 		}
 
-		result = &WifiConfig{}
+		result = &WiFiConfigFull{}
 		if cfg.STA != nil {
-			result.STA = convertStationConfig(cfg.STA)
+			result.STA = convertStationFull(cfg.STA)
 		}
 		if cfg.STA1 != nil {
-			result.STA1 = convertStationConfig(cfg.STA1)
+			result.STA1 = convertStationFull(cfg.STA1)
 		}
 		if cfg.AP != nil {
-			result.AP = convertAPConfig(cfg.AP)
+			result.AP = convertAPFull(cfg.AP)
 		}
 		return nil
 	})
 	return result, err
 }
 
-func convertStationConfig(sta *components.WiFiStationConfig) *WifiStationConfig {
-	result := &WifiStationConfig{}
+func convertStationFull(sta *components.WiFiStationConfig) *WiFiStationFull {
+	result := &WiFiStationFull{}
 	if sta.SSID != nil {
 		result.SSID = *sta.SSID
 	}
@@ -133,8 +133,8 @@ func convertStationConfig(sta *components.WiFiStationConfig) *WifiStationConfig 
 	return result
 }
 
-func convertAPConfig(ap *components.WiFiAPConfig) *WifiAPConfig {
-	result := &WifiAPConfig{}
+func convertAPFull(ap *components.WiFiAPConfig) *WiFiAPFull {
+	result := &WiFiAPFull{}
 	if ap.SSID != nil {
 		result.SSID = *ap.SSID
 	}
@@ -150,9 +150,9 @@ func convertAPConfig(ap *components.WiFiAPConfig) *WifiAPConfig {
 	return result
 }
 
-// ScanWifiNetworks scans for available WiFi networks.
-func (s *Service) ScanWifiNetworks(ctx context.Context, identifier string) ([]WifiNetwork, error) {
-	var result []WifiNetwork
+// ScanWiFiNetworksFull scans for available WiFi networks with full details.
+func (s *Service) ScanWiFiNetworksFull(ctx context.Context, identifier string) ([]WiFiNetworkFull, error) {
+	var result []WiFiNetworkFull
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		wifi := components.NewWiFi(conn.RPCClient())
 		scan, err := wifi.Scan(ctx)
@@ -160,9 +160,9 @@ func (s *Service) ScanWifiNetworks(ctx context.Context, identifier string) ([]Wi
 			return err
 		}
 
-		result = make([]WifiNetwork, 0, len(scan.Results))
+		result = make([]WiFiNetworkFull, 0, len(scan.Results))
 		for _, r := range scan.Results {
-			network := WifiNetwork{}
+			network := WiFiNetworkFull{}
 			if r.SSID != nil {
 				network.SSID = *r.SSID
 			}
@@ -185,8 +185,8 @@ func (s *Service) ScanWifiNetworks(ctx context.Context, identifier string) ([]Wi
 	return result, err
 }
 
-// SetWifiStation configures the primary WiFi station.
-func (s *Service) SetWifiStation(ctx context.Context, identifier, ssid, password string, enable bool) error {
+// SetWiFiStation configures the primary WiFi station.
+func (s *Service) SetWiFiStation(ctx context.Context, identifier, ssid, password string, enable bool) error {
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		wifi := components.NewWiFi(conn.RPCClient())
 		cfg := &components.WiFiConfig{
@@ -200,8 +200,8 @@ func (s *Service) SetWifiStation(ctx context.Context, identifier, ssid, password
 	})
 }
 
-// SetWifiAP configures the access point.
-func (s *Service) SetWifiAP(ctx context.Context, identifier, ssid, password string, enable bool) error {
+// SetWiFiAP configures the access point.
+func (s *Service) SetWiFiAP(ctx context.Context, identifier, ssid, password string, enable bool) error {
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		wifi := components.NewWiFi(conn.RPCClient())
 		cfg := &components.WiFiConfig{

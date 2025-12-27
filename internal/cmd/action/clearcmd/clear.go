@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/gen1"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -73,27 +73,20 @@ func run(ctx context.Context, opts *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	// Check if device is Gen1
-	isGen1, _, err := svc.IsGen1Device(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", opts.Device, err)
-	}
-
-	if !isGen1 {
-		ios.Warning("Device %s is not a Gen1 device", opts.Device)
-		ios.Info("Gen2+ devices use webhooks. Try: shelly webhook delete %s", opts.Device)
-		return fmt.Errorf("action URLs only available for Gen1 devices")
-	}
-
 	// Parse the event type
 	event := gen1.ActionEvent(opts.Event)
 
 	// Clear the action
-	err = svc.WithGen1Connection(ctx, opts.Device, func(conn *client.Gen1Client) error {
-		return conn.ClearAction(ctx, opts.Index, event)
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if !dev.IsGen1() {
+			ios.Warning("Device %s is not a Gen1 device", opts.Device)
+			ios.Info("Gen2+ devices use webhooks. Try: shelly webhook delete %s", opts.Device)
+			return fmt.Errorf("action URLs only available for Gen1 devices")
+		}
+		return dev.Gen1().ClearAction(ctx, opts.Index, event)
 	})
 	if err != nil {
-		return fmt.Errorf("failed to clear action: %w", err)
+		return err
 	}
 
 	ios.Success("Action %s cleared on %s", opts.Event, opts.Device)

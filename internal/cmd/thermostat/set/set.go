@@ -10,7 +10,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -85,14 +84,6 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
-
-	thermostat := conn.Thermostat(opts.ID)
-
 	// Build config
 	config := &components.ThermostatConfig{}
 	changes := []string{}
@@ -119,17 +110,25 @@ func run(ctx context.Context, opts *Options) error {
 		changes = append(changes, "enabled: false")
 	}
 
-	err = cmdutil.RunWithSpinner(ctx, ios, "Updating thermostat configuration...", func(ctx context.Context) error {
-		return thermostat.SetConfig(ctx, config)
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
+
+		thermostat := dev.Gen2().Thermostat(opts.ID)
+
+		err := cmdutil.RunWithSpinner(ctx, ios, "Updating thermostat configuration...", func(ctx context.Context) error {
+			return thermostat.SetConfig(ctx, config)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to set thermostat config: %w", err)
+		}
+
+		ios.Success("Thermostat %d configuration updated", opts.ID)
+		for _, change := range changes {
+			ios.Printf("  • %s\n", change)
+		}
+
+		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed to set thermostat config: %w", err)
-	}
-
-	ios.Success("Thermostat %d configuration updated", opts.ID)
-	for _, change := range changes {
-		ios.Printf("  • %s\n", change)
-	}
-
-	return nil
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds the command options.
@@ -70,53 +70,53 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 
 	ios.Info("Testing authentication for %s...", device)
 
-	// Try to connect and get device info
-	conn, err := svc.Connect(ctx, device)
-	if err != nil {
-		ios.Error("Connection failed: %v", err)
-		return fmt.Errorf("authentication test failed")
-	}
-	defer iostreams.CloseWithDebug("closing auth test connection", conn)
-
-	// Try to make an authenticated call
-	rawResult, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-	if err != nil {
-		ios.Error("Authentication failed: %v", err)
-		return fmt.Errorf("authentication test failed")
-	}
-
-	// Parse result
-	jsonBytes, err := json.Marshal(rawResult)
-	if err != nil {
-		return fmt.Errorf("failed to marshal result: %w", err)
-	}
-
-	var result struct {
-		ID     string  `json:"id"`
-		MAC    string  `json:"mac"`
-		Auth   bool    `json:"auth_en"`
-		Domain *string `json:"auth_domain"`
-	}
-	if err := json.Unmarshal(jsonBytes, &result); err != nil {
-		return fmt.Errorf("failed to parse result: %w", err)
-	}
-
-	// Success
-	ios.Success("Authentication successful!")
-	ios.Println("")
-
-	ios.Printf("Device: %s\n", device)
-	ios.Printf("ID: %s\n", result.ID)
-	ios.Printf("MAC: %s\n", result.MAC)
-
-	if result.Auth {
-		ios.Info("Authentication is enabled on this device")
-		if result.Domain != nil && *result.Domain != "" {
-			ios.Printf("Auth domain: %s\n", *result.Domain)
+	return svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("auth test is only supported on Gen2+ devices")
 		}
-	} else {
-		ios.Warning("Authentication is not enabled on this device")
-	}
 
-	return nil
+		conn := dev.Gen2()
+
+		// Try to make an authenticated call
+		rawResult, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+		if err != nil {
+			ios.Error("Authentication failed: %v", err)
+			return fmt.Errorf("authentication test failed")
+		}
+
+		// Parse result
+		jsonBytes, err := json.Marshal(rawResult)
+		if err != nil {
+			return fmt.Errorf("failed to marshal result: %w", err)
+		}
+
+		var result struct {
+			ID     string  `json:"id"`
+			MAC    string  `json:"mac"`
+			Auth   bool    `json:"auth_en"`
+			Domain *string `json:"auth_domain"`
+		}
+		if err := json.Unmarshal(jsonBytes, &result); err != nil {
+			return fmt.Errorf("failed to parse result: %w", err)
+		}
+
+		// Success
+		ios.Success("Authentication successful!")
+		ios.Println("")
+
+		ios.Printf("Device: %s\n", device)
+		ios.Printf("ID: %s\n", result.ID)
+		ios.Printf("MAC: %s\n", result.MAC)
+
+		if result.Auth {
+			ios.Info("Authentication is enabled on this device")
+			if result.Domain != nil && *result.Domain != "" {
+				ios.Printf("Auth domain: %s\n", *result.Domain)
+			}
+		} else {
+			ios.Warning("Authentication is not enabled on this device")
+		}
+
+		return nil
+	})
 }

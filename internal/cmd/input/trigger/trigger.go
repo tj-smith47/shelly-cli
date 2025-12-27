@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
@@ -48,7 +49,7 @@ Event types:
 		},
 	}
 
-	cmdutil.AddComponentIDFlag(cmd, &inputID, "Input")
+	flags.AddComponentIDFlag(cmd, &inputID, "Input")
 	cmd.Flags().StringVarP(&event, "event", "e", EventSinglePush, "Event type (single_push, double_push, long_push)")
 
 	return cmd

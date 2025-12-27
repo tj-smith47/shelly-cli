@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -66,34 +65,34 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
-
-	thermostat := conn.Thermostat(opts.ID)
-
-	err = cmdutil.RunWithSpinner(ctx, ios, "Enabling thermostat...", func(ctx context.Context) error {
-		if enableErr := thermostat.Enable(ctx, true); enableErr != nil {
-			return fmt.Errorf("failed to enable thermostat: %w", enableErr)
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
 		}
-		if opts.Mode != "" {
-			if modeErr := thermostat.SetMode(ctx, opts.Mode); modeErr != nil {
-				return fmt.Errorf("failed to set thermostat mode: %w", modeErr)
+
+		thermostat := dev.Gen2().Thermostat(opts.ID)
+
+		err := cmdutil.RunWithSpinner(ctx, ios, "Enabling thermostat...", func(ctx context.Context) error {
+			if enableErr := thermostat.Enable(ctx, true); enableErr != nil {
+				return fmt.Errorf("failed to enable thermostat: %w", enableErr)
 			}
+			if opts.Mode != "" {
+				if modeErr := thermostat.SetMode(ctx, opts.Mode); modeErr != nil {
+					return fmt.Errorf("failed to set thermostat mode: %w", modeErr)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
 		}
+
+		if opts.Mode != "" {
+			ios.Success("Thermostat %d enabled in %s mode", opts.ID, opts.Mode)
+		} else {
+			ios.Success("Thermostat %d enabled", opts.ID)
+		}
+
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	if opts.Mode != "" {
-		ios.Success("Thermostat %d enabled in %s mode", opts.ID, opts.Mode)
-	} else {
-		ios.Success("Thermostat %d enabled", opts.ID)
-	}
-
-	return nil
 }

@@ -7,21 +7,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.DeviceListFlags
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the device list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		generation   int
-		deviceType   string
-		platform     string
-		updatesFirst bool
-		showVersion  bool
-	)
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -72,21 +73,17 @@ Columns: Name, Address, Platform, Type, Model, Generation, Auth`,
   # Short form
   shelly dev ls`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, generation, deviceType, platform, updatesFirst, showVersion)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().IntVarP(&generation, "generation", "g", 0, "Filter by generation (1, 2, or 3)")
-	cmd.Flags().StringVarP(&deviceType, "type", "t", "", "Filter by device type")
-	cmd.Flags().StringVarP(&platform, "platform", "p", "", "Filter by platform (e.g., shelly, tasmota)")
-	cmd.Flags().BoolVarP(&updatesFirst, "updates-first", "u", false, "Sort devices with available updates first")
-	cmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Show firmware version information")
+	flags.AddDeviceListFlags(cmd, &opts.DeviceListFlags)
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, generation int, deviceType, platform string, updatesFirst, showVersion bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 	devices := config.ListDevices()
 
 	if len(devices) == 0 {
@@ -97,9 +94,9 @@ func run(ctx context.Context, f *cmdutil.Factory, generation int, deviceType, pl
 
 	// Apply filters and build sorted list
 	filterOpts := shelly.DeviceListFilterOptions{
-		Generation: generation,
-		DeviceType: deviceType,
-		Platform:   platform,
+		Generation: opts.Generation,
+		DeviceType: opts.DeviceType,
+		Platform:   opts.Platform,
 	}
 	filtered, platforms := shelly.FilterDeviceList(devices, filterOpts)
 
@@ -109,13 +106,13 @@ func run(ctx context.Context, f *cmdutil.Factory, generation int, deviceType, pl
 	}
 
 	// Populate firmware info if version display or updates-first sorting is requested
-	if showVersion || updatesFirst {
-		svc := f.ShellyService()
+	if opts.ShowVersion || opts.UpdatesFirst {
+		svc := opts.Factory.ShellyService()
 		svc.PopulateDeviceListFirmware(ctx, filtered)
 	}
 
 	// Sort: updates first if requested, then by name
-	shelly.SortDeviceList(filtered, updatesFirst)
+	shelly.SortDeviceList(filtered, opts.UpdatesFirst)
 
 	// Handle structured output (JSON/YAML)
 	if output.WantsStructured() {
@@ -124,7 +121,7 @@ func run(ctx context.Context, f *cmdutil.Factory, generation int, deviceType, pl
 
 	// Show Platform column only when there are multiple platforms
 	showPlatform := len(platforms) > 1
-	term.DisplayDeviceList(ios, filtered, showPlatform, showVersion)
+	term.DisplayDeviceList(ios, filtered, showPlatform, opts.ShowVersion)
 
 	return nil
 }

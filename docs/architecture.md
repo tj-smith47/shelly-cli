@@ -190,6 +190,9 @@ internal/
 │   │                   #   Connect(), WithConnection(), RawRPC()
 │   │                   #   ResolveWithGeneration() - Gen1/Gen2 detection
 │   │
+│   ├── connection.go   # Connection management helpers
+│   │                   #   DeviceClient, WithDevice(), WithDevices()
+│   │
 │   ├── resolver.go     # DeviceResolver interface
 │   ├── device.go       # Device operations
 │   ├── devicedata.go   # DeviceData collection
@@ -203,19 +206,28 @@ internal/
 │   ├── energy.go       # Energy meter operations
 │   ├── quick.go        # QuickOn(), QuickOff(), QuickToggle()
 │   ├── config.go       # Config get/set operations
-│   ├── backup.go       # Backup/restore operations
+│   ├── wifi.go         # WiFi operations (WiFiStatusFull, WiFiConfigFull, etc.)
+│   ├── backup.go       # Service methods using backup/ types
 │   ├── schedule.go     # Schedule operations
 │   ├── script.go       # Script operations
 │   ├── firmware.go     # Firmware operations
 │   ├── cloud.go        # Cloud operations
 │   ├── monitoring.go   # MonitoringSnapshot, FetchAllSnapshots()
-│   ├── kvs.go          # KVS operations
+│   ├── kvs.go          # Service methods using kvs/ types
 │   ├── template.go     # Template operations
 │   ├── zigbee.go       # Zigbee operations
 │   ├── bthome.go       # BTHome operations
 │   ├── lora.go         # LoRa operations
 │   ├── matter.go       # Matter operations
 │   ├── migrate.go      # Migration operations
+│   │
+│   ├── backup/         # Backup domain types
+│   │   └── types.go      # DeviceBackup, Options, RestoreOptions, DeviceInfo
+│   │                     # Validate(), LoadAndValidate(), IsFile()
+│   │
+│   ├── kvs/            # KVS domain types
+│   │   └── types.go      # Item, ListResult, GetResult, Export
+│   │                     # ParseValue(), ParseImportFile()
 │   │
 │   └── export/         # Export format builders
 │       ├── ansible.go    # BuildAnsibleInventory(), AnsibleInventory

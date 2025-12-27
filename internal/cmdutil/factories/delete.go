@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -90,7 +91,7 @@ func NewDeviceDeleteCommand(f *cmdutil.Factory, opts DeviceDeleteOpts) *cobra.Co
 		cmd.ValidArgsFunction = opts.ValidArgsFunc
 	}
 
-	cmdutil.AddYesFlag(cmd, &yesFlag)
+	flags.AddYesFlag(cmd, &yesFlag)
 
 	return cmd
 }

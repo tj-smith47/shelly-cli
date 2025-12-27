@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -93,7 +94,7 @@ func run(ctx context.Context, opts *Options) error {
 		return cmdutil.RunList(ctx, ios, svc, opts.Device,
 			"Getting KVS data...",
 			"No keys found",
-			func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.KVSItem, error) {
+			func(ctx context.Context, svc *shelly.Service, device string) ([]kvs.Item, error) {
 				return svc.GetManyKVS(ctx, device, match)
 			},
 			term.DisplayKVSItems)
@@ -102,7 +103,7 @@ func run(ctx context.Context, opts *Options) error {
 	// Default: just list keys
 	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Device,
 		"Getting KVS keys...",
-		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.KVSListResult, error) {
+		func(ctx context.Context, svc *shelly.Service, device string) (*kvs.ListResult, error) {
 			return svc.ListKVS(ctx, device)
 		},
 		term.DisplayKVSKeys)

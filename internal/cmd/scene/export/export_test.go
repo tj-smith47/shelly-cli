@@ -50,14 +50,14 @@ func TestNewCommand_Flags(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	outputFlag := cmd.Flags().Lookup("output")
-	if outputFlag == nil {
-		t.Fatal("output flag not found")
+	formatFlag := cmd.Flags().Lookup("format")
+	if formatFlag == nil {
+		t.Fatal("format flag not found")
 	}
-	if outputFlag.Shorthand != "o" {
-		t.Errorf("output shorthand = %q, want o", outputFlag.Shorthand)
+	if formatFlag.Shorthand != "f" {
+		t.Errorf("format shorthand = %q, want f", formatFlag.Shorthand)
 	}
-	if outputFlag.DefValue != "yaml" {
-		t.Errorf("output default = %q, want yaml", outputFlag.DefValue)
+	if formatFlag.DefValue != "yaml" {
+		t.Errorf("format default = %q, want yaml", formatFlag.DefValue)
 	}
 }

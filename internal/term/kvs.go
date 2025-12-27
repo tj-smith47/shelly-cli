@@ -7,12 +7,12 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // DisplayKVSRaw prints just the raw value from a KVS result.
-func DisplayKVSRaw(ios *iostreams.IOStreams, result *shelly.KVSGetResult) {
+func DisplayKVSRaw(ios *iostreams.IOStreams, result *kvs.GetResult) {
 	switch v := result.Value.(type) {
 	case string:
 		ios.Println(v)
@@ -30,7 +30,7 @@ func DisplayKVSRaw(ios *iostreams.IOStreams, result *shelly.KVSGetResult) {
 }
 
 // DisplayKVSResult prints a formatted KVS get result.
-func DisplayKVSResult(ios *iostreams.IOStreams, key string, result *shelly.KVSGetResult) {
+func DisplayKVSResult(ios *iostreams.IOStreams, key string, result *kvs.GetResult) {
 	label := theme.Highlight()
 	ios.Printf("%s: %s\n", label.Render("Key"), key)
 	ios.Printf("%s: %s\n", label.Render("Value"), output.FormatJSONValue(result.Value))
@@ -39,7 +39,7 @@ func DisplayKVSResult(ios *iostreams.IOStreams, key string, result *shelly.KVSGe
 }
 
 // DisplayKVSKeys prints a table of KVS keys.
-func DisplayKVSKeys(ios *iostreams.IOStreams, result *shelly.KVSListResult) {
+func DisplayKVSKeys(ios *iostreams.IOStreams, result *kvs.ListResult) {
 	if len(result.Keys) == 0 {
 		ios.NoResults("No keys stored")
 		return
@@ -58,7 +58,7 @@ func DisplayKVSKeys(ios *iostreams.IOStreams, result *shelly.KVSListResult) {
 }
 
 // DisplayKVSItems prints a table of KVS key-value pairs.
-func DisplayKVSItems(ios *iostreams.IOStreams, items []shelly.KVSItem) {
+func DisplayKVSItems(ios *iostreams.IOStreams, items []kvs.Item) {
 	ios.Title("KVS Data")
 	ios.Println()
 
@@ -72,7 +72,7 @@ func DisplayKVSItems(ios *iostreams.IOStreams, items []shelly.KVSItem) {
 }
 
 // DisplayKVSImportPreview shows items that will be imported.
-func DisplayKVSImportPreview(ios *iostreams.IOStreams, data *shelly.KVSExport) {
+func DisplayKVSImportPreview(ios *iostreams.IOStreams, data *kvs.Export) {
 	ios.Printf("Found %d key(s) to import:\n", len(data.Items))
 	for _, item := range data.Items {
 		ios.Printf("  - %s = %s\n", item.Key, output.FormatDisplayValue(item.Value))

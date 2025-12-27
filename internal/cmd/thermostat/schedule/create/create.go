@@ -9,7 +9,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
@@ -104,12 +103,6 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
-
 	schedParams := shelly.ThermostatScheduleParams{
 		ThermostatID: opts.ThermostatID,
 		Timespec:     opts.Timespec,
@@ -130,17 +123,28 @@ func run(ctx context.Context, opts *Options) error {
 
 	params := shelly.BuildThermostatScheduleCall(schedParams)
 
-	var result any
-	err = cmdutil.RunWithSpinner(ctx, ios, "Creating schedule...", func(ctx context.Context) error {
-		var callErr error
-		result, callErr = conn.Call(ctx, "Schedule.Create", params)
-		return callErr
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create schedule: %w", err)
-	}
+	var resp shelly.ScheduleCreateResult
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
 
-	resp, err := shelly.ParseScheduleCreateResponse(result)
+		conn := dev.Gen2()
+
+		var result any
+		spinnerErr := cmdutil.RunWithSpinner(ctx, ios, "Creating schedule...", func(ctx context.Context) error {
+			var callErr error
+			result, callErr = conn.Call(ctx, "Schedule.Create", params)
+			return callErr
+		})
+		if spinnerErr != nil {
+			return fmt.Errorf("failed to create schedule: %w", spinnerErr)
+		}
+
+		var parseErr error
+		resp, parseErr = shelly.ParseScheduleCreateResponse(result)
+		return parseErr
+	})
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
 // BackupExportOptions configures the backup export operation.
@@ -27,7 +28,7 @@ type BackupExportOptions struct {
 	// Parallel is the number of concurrent backup operations.
 	Parallel int
 	// BackupOpts are passed to the underlying CreateBackup call.
-	BackupOpts shelly.BackupOptions
+	BackupOpts backup.Options
 }
 
 // BackupResult represents the result of a single device backup.
@@ -96,7 +97,7 @@ func (e *BackupExporter) exportDevice(ctx context.Context, name, addr string, op
 		Address:    addr,
 	}
 
-	backup, err := e.svc.CreateBackup(ctx, addr, opts.BackupOpts)
+	bkp, err := e.svc.CreateBackup(ctx, addr, opts.BackupOpts)
 	if err != nil {
 		result.Error = err
 		return result
@@ -106,7 +107,7 @@ func (e *BackupExporter) exportDevice(ctx context.Context, name, addr string, op
 	filename := SanitizeFilename(name) + "." + opts.Format
 	filePath := filepath.Join(opts.Directory, filename)
 
-	if err := WriteBackupFile(backup, filePath, opts.Format); err != nil {
+	if err := WriteBackupFile(bkp, filePath, opts.Format); err != nil {
 		result.Error = err
 		return result
 	}
@@ -134,15 +135,15 @@ func SanitizeFilename(name string) string {
 }
 
 // WriteBackupFile writes a backup to a file in the specified format.
-func WriteBackupFile(backup *shelly.DeviceBackup, filePath, format string) error {
+func WriteBackupFile(bkp *backup.DeviceBackup, filePath, format string) error {
 	var data []byte
 	var err error
 
 	switch format {
 	case "yaml", "yml":
-		data, err = yaml.Marshal(backup)
+		data, err = yaml.Marshal(bkp)
 	default:
-		data, err = json.MarshalIndent(backup, "", "  ")
+		data, err = json.MarshalIndent(bkp, "", "  ")
 	}
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup: %w", err)
@@ -220,7 +221,7 @@ func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 		return info, err
 	}
 
-	backup, err := shelly.ValidateBackup(data)
+	bkp, err := backup.Validate(data)
 	if err != nil {
 		return info, err
 	}
@@ -230,22 +231,22 @@ func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 		return info, err
 	}
 
-	info.DeviceID = backup.Device().ID
-	info.DeviceModel = backup.Device().Model
-	info.FWVersion = backup.Device().FWVersion
-	info.CreatedAt = backup.CreatedAt
-	info.Encrypted = backup.Encrypted()
+	info.DeviceID = bkp.Device().ID
+	info.DeviceModel = bkp.Device().Model
+	info.FWVersion = bkp.Device().FWVersion
+	info.CreatedAt = bkp.CreatedAt
+	info.Encrypted = bkp.Encrypted()
 	info.Size = stat.Size()
 
 	return info, nil
 }
 
 // MarshalBackup serializes a backup to the specified format.
-func MarshalBackup(backup *shelly.DeviceBackup, format string) ([]byte, error) {
+func MarshalBackup(bkp *backup.DeviceBackup, format string) ([]byte, error) {
 	switch format {
 	case "yaml", "yml":
-		return yaml.Marshal(backup)
+		return yaml.Marshal(bkp)
 	default:
-		return json.MarshalIndent(backup, "", "  ")
+		return json.MarshalIndent(bkp, "", "  ")
 	}
 }

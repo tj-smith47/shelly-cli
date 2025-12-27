@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -102,7 +103,7 @@ func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
 		},
 	}
 
-	cmdutil.AddComponentIDFlag(cmd, &coverID, "Cover")
+	flags.AddComponentIDFlag(cmd, &coverID, "Cover")
 	if hasDuration {
 		cmd.Flags().IntVarP(&duration, "duration", "d", 0, fmt.Sprintf("Duration in seconds (0 = full %s)", actionStr))
 	}

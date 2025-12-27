@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/gen1"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -72,24 +71,18 @@ func run(ctx context.Context, opts *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	// Check if device is Gen1
-	isGen1, _, err := svc.IsGen1Device(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", opts.Device, err)
-	}
-
-	if !isGen1 {
-		ios.Warning("Device %s is not a Gen1 device", opts.Device)
-		ios.Info("Gen2+ devices use webhooks. Try: shelly webhook test %s", opts.Device)
-		return fmt.Errorf("action test only available for Gen1 devices")
-	}
-
 	event := gen1.ActionEvent(opts.Event)
 
 	// Trigger the action by changing device state
 	var actionTaken string
-	err = svc.WithGen1Connection(ctx, opts.Device, func(conn *client.Gen1Client) error {
-		relay, relayErr := conn.Relay(opts.Index)
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if !dev.IsGen1() {
+			ios.Warning("Device %s is not a Gen1 device", opts.Device)
+			ios.Info("Gen2+ devices use webhooks. Try: shelly webhook test %s", opts.Device)
+			return fmt.Errorf("action test only available for Gen1 devices")
+		}
+
+		relay, relayErr := dev.Gen1().Relay(opts.Index)
 		if relayErr != nil {
 			return relayErr
 		}
@@ -120,7 +113,7 @@ func run(ctx context.Context, opts *Options) error {
 		}
 	})
 	if err != nil {
-		return fmt.Errorf("failed to trigger action: %w", err)
+		return err
 	}
 
 	if actionTaken != "" {

@@ -173,14 +173,14 @@ func TestModel_Update_StatusLoaded(t *testing.T) {
 	m := newTestModel()
 	m.loading = true
 	msg := StatusLoadedMsg{
-		Status: &shelly.WifiStatus{
+		Status: &shelly.WiFiStatusFull{
 			Status: "got ip",
 			StaIP:  "192.168.1.50",
 			SSID:   "MyNetwork",
 			RSSI:   -45,
 		},
-		Config: &shelly.WifiConfig{
-			STA: &shelly.WifiStationConfig{
+		Config: &shelly.WiFiConfigFull{
+			STA: &shelly.WiFiStationFull{
 				SSID:    "MyNetwork",
 				Enabled: true,
 			},
@@ -227,7 +227,7 @@ func TestModel_Update_ScanResult(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.scanning = true
-	networks := []shelly.WifiNetwork{
+	networks := []shelly.WiFiNetworkFull{
 		{SSID: "Network1", RSSI: -50},
 		{SSID: "Network2", RSSI: -70},
 	}
@@ -264,7 +264,7 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
-	m.networks = []shelly.WifiNetwork{
+	m.networks = []shelly.WiFiNetworkFull{
 		{SSID: "Network1"},
 		{SSID: "Network2"},
 		{SSID: "Network3"},
@@ -327,7 +327,7 @@ func TestModel_HandleKey_NotFocused(t *testing.T) {
 	m := newTestModel()
 	m.focused = false
 	m.device = testDevice
-	m.networks = []shelly.WifiNetwork{{SSID: "Network1"}}
+	m.networks = []shelly.WiFiNetworkFull{{SSID: "Network1"}}
 	m.scroller.SetItemCount(len(m.networks))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
@@ -341,7 +341,7 @@ func TestModel_ScrollerCursorBounds(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.focused = true
-	m.networks = []shelly.WifiNetwork{
+	m.networks = []shelly.WiFiNetworkFull{
 		{SSID: "Network1"},
 		{SSID: "Network2"},
 	}
@@ -421,19 +421,19 @@ func TestModel_View_WithStatus(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.device = testDevice
-	m.status = &shelly.WifiStatus{
+	m.status = &shelly.WiFiStatusFull{
 		Status:        "got ip",
 		StaIP:         "192.168.1.50",
 		SSID:          "MyNetwork",
 		RSSI:          -45,
 		APClientCount: 2,
 	}
-	m.config = &shelly.WifiConfig{
-		STA: &shelly.WifiStationConfig{
+	m.config = &shelly.WiFiConfigFull{
+		STA: &shelly.WiFiStationFull{
 			SSID:    "MyNetwork",
 			Enabled: true,
 		},
-		AP: &shelly.WifiAPConfig{
+		AP: &shelly.WiFiAPFull{
 			SSID:    "Shelly-AP",
 			Enabled: false,
 		},
@@ -451,8 +451,8 @@ func TestModel_View_WithNetworks(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.device = testDevice
-	m.status = &shelly.WifiStatus{Status: "got ip"}
-	m.networks = []shelly.WifiNetwork{
+	m.status = &shelly.WiFiStatusFull{Status: "got ip"}
+	m.networks = []shelly.WiFiNetworkFull{
 		{SSID: "Network1", RSSI: -40, Auth: "wpa2"},
 		{SSID: "Network2", RSSI: -55, Auth: "wpa2"},
 		{SSID: "OpenNetwork", RSSI: -65, Auth: "open"},
@@ -471,7 +471,7 @@ func TestModel_View_Scanning(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.device = testDevice
-	m.status = &shelly.WifiStatus{Status: "got ip"}
+	m.status = &shelly.WiFiStatusFull{Status: "got ip"}
 	m.scanning = true
 	m = m.SetSize(80, 24)
 
@@ -486,9 +486,9 @@ func TestModel_Accessors(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.device = testDevice
-	m.status = &shelly.WifiStatus{SSID: "Test"}
-	m.config = &shelly.WifiConfig{}
-	m.networks = []shelly.WifiNetwork{{SSID: "Net1"}}
+	m.status = &shelly.WiFiStatusFull{SSID: "Test"}
+	m.config = &shelly.WiFiConfigFull{}
+	m.networks = []shelly.WiFiNetworkFull{{SSID: "Net1"}}
 	m.loading = true
 	m.scanning = true
 	m.err = errors.New("test error")
@@ -592,7 +592,7 @@ func TestModel_GetSignalIconAndStyle(t *testing.T) {
 func TestModel_RenderNetworkLine_LongSSID(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	network := shelly.WifiNetwork{
+	network := shelly.WiFiNetworkFull{
 		SSID: "This Is A Very Long Network Name That Should Be Truncated",
 		RSSI: -50,
 		Auth: "wpa2",
@@ -608,7 +608,7 @@ func TestModel_RenderNetworkLine_LongSSID(t *testing.T) {
 func TestModel_RenderNetworkLine_Selected(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	network := shelly.WifiNetwork{SSID: "TestNetwork", RSSI: -50, Auth: "wpa2"}
+	network := shelly.WiFiNetworkFull{SSID: "TestNetwork", RSSI: -50, Auth: "wpa2"}
 
 	line := m.renderNetworkLine(network, true)
 
@@ -620,7 +620,7 @@ func TestModel_RenderNetworkLine_Selected(t *testing.T) {
 func TestModel_RenderNetworkLine_OpenNetwork(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	network := shelly.WifiNetwork{SSID: "OpenWifi", RSSI: -60, Auth: "open"}
+	network := shelly.WiFiNetworkFull{SSID: "OpenWifi", RSSI: -60, Auth: "open"}
 
 	line := m.renderNetworkLine(network, false)
 
@@ -649,9 +649,9 @@ func TestDefaultStyles(t *testing.T) {
 func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	m.networks = make([]shelly.WifiNetwork, 20)
+	m.networks = make([]shelly.WiFiNetworkFull, 20)
 	for i := range m.networks {
-		m.networks[i] = shelly.WifiNetwork{SSID: "Network"}
+		m.networks[i] = shelly.WiFiNetworkFull{SSID: "Network"}
 	}
 	m.scroller.SetItemCount(20)
 	m = m.SetSize(80, 20) // Sets visibleRows = 20 - 12 = 8

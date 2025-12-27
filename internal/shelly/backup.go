@@ -5,139 +5,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 
-	"github.com/tj-smith47/shelly-go/backup"
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
-// DeviceBackup wraps the shelly-go backup.Backup for backward compatibility.
-type DeviceBackup struct {
-	// Backup is the underlying shelly-go backup
-	*backup.Backup
-}
-
-// Device returns device info for backward compatibility with existing commands.
-func (b *DeviceBackup) Device() BackupDeviceInfo {
-	if b.DeviceInfo == nil {
-		return BackupDeviceInfo{}
-	}
-	return BackupDeviceInfo{
-		ID:         b.DeviceInfo.ID,
-		Name:       b.DeviceInfo.Name,
-		Model:      b.DeviceInfo.Model,
-		Generation: b.DeviceInfo.Generation,
-		FWVersion:  b.DeviceInfo.Version,
-		MAC:        b.DeviceInfo.MAC,
-	}
-}
-
-// Encrypted returns true if backup is encrypted (always false for regular backups).
-func (b *DeviceBackup) Encrypted() bool {
-	return false
-}
-
-// BackupDeviceInfo contains device identification for backward compatibility.
-type BackupDeviceInfo struct {
-	ID         string
-	Name       string
-	Model      string
-	Generation int
-	FWVersion  string
-	MAC        string
-}
-
-// BackupOptions configures backup creation.
-type BackupOptions struct {
-	// SkipScripts excludes scripts from backup.
-	SkipScripts bool
-	// SkipSchedules excludes schedules from backup.
-	SkipSchedules bool
-	// SkipWebhooks excludes webhooks from backup.
-	SkipWebhooks bool
-	// SkipKVS excludes KVS data from backup.
-	SkipKVS bool
-	// SkipWiFi excludes WiFi configuration from backup (security).
-	SkipWiFi bool
-	// Password for encryption (empty = no encryption).
-	Password string
-}
-
-// toExportOptions converts BackupOptions to shelly-go ExportOptions.
-func (o *BackupOptions) toExportOptions() *backup.ExportOptions {
-	return &backup.ExportOptions{
-		IncludeWiFi:       !o.SkipWiFi,
-		IncludeCloud:      true,
-		IncludeAuth:       true, // Auth metadata only, no passwords
-		IncludeBLE:        true,
-		IncludeMQTT:       true,
-		IncludeWebhooks:   !o.SkipWebhooks,
-		IncludeSchedules:  !o.SkipSchedules,
-		IncludeScripts:    !o.SkipScripts,
-		IncludeKVS:        !o.SkipKVS,
-		IncludeComponents: true,
-	}
-}
-
-// RestoreOptions configures backup restoration.
-type RestoreOptions struct {
-	// DryRun shows what would be changed without applying.
-	DryRun bool
-	// SkipNetwork skips WiFi/Ethernet configuration.
-	SkipNetwork bool
-	// SkipScripts skips script restoration.
-	SkipScripts bool
-	// SkipSchedules skips schedule restoration.
-	SkipSchedules bool
-	// SkipWebhooks skips webhook restoration.
-	SkipWebhooks bool
-	// SkipKVS skips KVS data restoration.
-	SkipKVS bool
-	// Password for decryption (required if backup is encrypted).
-	Password string
-}
-
-// toRestoreOptions converts RestoreOptions to shelly-go RestoreOptions.
-func (o *RestoreOptions) toRestoreOptions() *backup.RestoreOptions {
-	return &backup.RestoreOptions{
-		RestoreWiFi:       !o.SkipNetwork,
-		RestoreCloud:      true,
-		RestoreAuth:       false, // Never auto-restore auth for security
-		RestoreBLE:        true,
-		RestoreMQTT:       true,
-		RestoreWebhooks:   !o.SkipWebhooks,
-		RestoreSchedules:  !o.SkipSchedules,
-		RestoreScripts:    !o.SkipScripts,
-		RestoreKVS:        !o.SkipKVS,
-		RestoreComponents: true,
-		DryRun:            o.DryRun,
-		StopScripts:       true,
-	}
-}
-
-// RestoreResult contains the result of a restore operation.
-type RestoreResult struct {
-	Success           bool
-	ConfigRestored    bool
-	ScriptsRestored   int
-	SchedulesRestored int
-	WebhooksRestored  int
-	RestartRequired   bool
-	Warnings          []string
-}
-
 // CreateBackup creates a complete backup of a device using shelly-go backup.Manager.
-func (s *Service) CreateBackup(ctx context.Context, identifier string, opts BackupOptions) (*DeviceBackup, error) {
-	var result *DeviceBackup
+func (s *Service) CreateBackup(ctx context.Context, identifier string, opts backup.Options) (*backup.DeviceBackup, error) {
+	var result *backup.DeviceBackup
 
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		mgr := backup.New(conn.RPCClient())
+		mgr := shellybackup.New(conn.RPCClient())
 
 		// Handle encrypted vs. regular backup
 		if opts.Password != "" {
@@ -147,18 +29,18 @@ func (s *Service) CreateBackup(ctx context.Context, identifier string, opts Back
 		}
 
 		// Create regular backup
-		data, err := mgr.Export(ctx, opts.toExportOptions())
+		data, err := mgr.Export(ctx, opts.ToExportOptions())
 		if err != nil {
 			return fmt.Errorf("failed to export backup: %w", err)
 		}
 
 		// Parse the backup
-		var bkp backup.Backup
+		var bkp shellybackup.Backup
 		if err := json.Unmarshal(data, &bkp); err != nil {
 			return fmt.Errorf("failed to parse backup: %w", err)
 		}
 
-		result = &DeviceBackup{Backup: &bkp}
+		result = &backup.DeviceBackup{Backup: &bkp}
 		return nil
 	})
 
@@ -166,11 +48,11 @@ func (s *Service) CreateBackup(ctx context.Context, identifier string, opts Back
 }
 
 // RestoreBackup restores a backup to a device using shelly-go backup.Manager.
-func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBackup *DeviceBackup, opts RestoreOptions) (*RestoreResult, error) {
-	var result *RestoreResult
+func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup, opts backup.RestoreOptions) (*backup.RestoreResult, error) {
+	var result *backup.RestoreResult
 
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		mgr := backup.New(conn.RPCClient())
+		mgr := shellybackup.New(conn.RPCClient())
 
 		// Serialize the backup
 		data, err := json.Marshal(deviceBackup.Backup)
@@ -179,13 +61,13 @@ func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBa
 		}
 
 		// Restore using shelly-go
-		restoreResult, err := mgr.Restore(ctx, data, opts.toRestoreOptions())
+		restoreResult, err := mgr.Restore(ctx, data, opts.ToRestoreOptions())
 		if err != nil {
 			return fmt.Errorf("failed to restore backup: %w", err)
 		}
 
 		// Convert result
-		result = &RestoreResult{
+		result = &backup.RestoreResult{
 			Success:         restoreResult.Success,
 			RestartRequired: restoreResult.RestartRequired,
 			Warnings:        restoreResult.Warnings,
@@ -193,7 +75,7 @@ func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBa
 
 		// Count restored items from backup
 		if restoreResult.Success {
-			updateRestoreResultCounts(result, deviceBackup.Backup)
+			backup.UpdateResultCounts(result, deviceBackup.Backup)
 		}
 
 		return nil
@@ -202,58 +84,8 @@ func (s *Service) RestoreBackup(ctx context.Context, identifier string, deviceBa
 	return result, err
 }
 
-// updateRestoreResultCounts updates the RestoreResult with counts from the backup.
-func updateRestoreResultCounts(result *RestoreResult, deviceBackup *backup.Backup) {
-	result.ConfigRestored = true
-
-	// Count scripts
-	if deviceBackup.Scripts != nil {
-		result.ScriptsRestored = len(deviceBackup.Scripts)
-	}
-
-	// Parse and count schedules
-	if deviceBackup.Schedules != nil {
-		var schedData struct {
-			Jobs []json.RawMessage `json:"jobs"`
-		}
-		if err := json.Unmarshal(deviceBackup.Schedules, &schedData); err == nil {
-			result.SchedulesRestored = len(schedData.Jobs)
-		}
-	}
-
-	// Parse and count webhooks
-	if deviceBackup.Webhooks != nil {
-		var whData struct {
-			Hooks []json.RawMessage `json:"hooks"`
-		}
-		if err := json.Unmarshal(deviceBackup.Webhooks, &whData); err == nil {
-			result.WebhooksRestored = len(whData.Hooks)
-		}
-	}
-}
-
-// ValidateBackup validates a backup file structure.
-func ValidateBackup(data []byte) (*DeviceBackup, error) {
-	var bkp backup.Backup
-	if err := json.Unmarshal(data, &bkp); err != nil {
-		return nil, fmt.Errorf("invalid backup format: %w", err)
-	}
-
-	if bkp.Version == 0 {
-		return nil, fmt.Errorf("missing or invalid backup version")
-	}
-	if bkp.DeviceInfo == nil {
-		return nil, fmt.Errorf("missing device information")
-	}
-	if bkp.Config == nil {
-		return nil, fmt.Errorf("missing configuration data")
-	}
-
-	return &DeviceBackup{Backup: &bkp}, nil
-}
-
 // CompareBackup compares a backup with a device's current state.
-func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBackup *DeviceBackup) (*model.BackupDiff, error) {
+func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBackup *backup.DeviceBackup) (*model.BackupDiff, error) {
 	diff := &model.BackupDiff{}
 
 	// Get current configuration
@@ -309,10 +141,10 @@ func (s *Service) CompareBackup(ctx context.Context, identifier string, deviceBa
 
 // Helper functions for converting backup data structures
 
-func convertBackupScripts(scripts []*backup.Script) []BackupScript {
-	result := make([]BackupScript, len(scripts))
+func convertBackupScripts(scripts []*shellybackup.Script) []backup.Script {
+	result := make([]backup.Script, len(scripts))
 	for i, s := range scripts {
-		result[i] = BackupScript{
+		result[i] = backup.Script{
 			ID:     s.ID,
 			Name:   s.Name,
 			Enable: s.Enable,
@@ -322,42 +154,27 @@ func convertBackupScripts(scripts []*backup.Script) []BackupScript {
 	return result
 }
 
-// BackupScript is a compatibility type.
-type BackupScript struct {
-	ID     int
-	Name   string
-	Enable bool
-	Code   string
-}
-
-func convertBackupSchedules(data json.RawMessage) []BackupSchedule {
+func convertBackupSchedules(data json.RawMessage) []backup.Schedule {
 	var schedData struct {
 		Jobs []struct {
-			Enable   bool           `json:"enable"`
-			Timespec string         `json:"timespec"`
-			Calls    []ScheduleCall `json:"calls"`
+			Enable   bool                  `json:"enable"`
+			Timespec string                `json:"timespec"`
+			Calls    []backup.ScheduleCall `json:"calls"`
 		} `json:"jobs"`
 	}
 	if err := json.Unmarshal(data, &schedData); err != nil {
 		return nil
 	}
 
-	result := make([]BackupSchedule, len(schedData.Jobs))
+	result := make([]backup.Schedule, len(schedData.Jobs))
 	for i, j := range schedData.Jobs {
-		result[i] = BackupSchedule{
+		result[i] = backup.Schedule{
 			Enable:   j.Enable,
 			Timespec: j.Timespec,
 			Calls:    j.Calls,
 		}
 	}
 	return result
-}
-
-// BackupSchedule is a compatibility type.
-type BackupSchedule struct {
-	Enable   bool
-	Timespec string
-	Calls    []ScheduleCall
 }
 
 func convertBackupWebhooks(data json.RawMessage) []WebhookInfo {
@@ -408,7 +225,7 @@ func compareConfigs(current, bkup map[string]any) []model.ConfigDiff {
 	return diffs
 }
 
-func compareScripts(current []ScriptInfo, bkup []BackupScript) []model.ScriptDiff {
+func compareScripts(current []ScriptInfo, bkup []backup.Script) []model.ScriptDiff {
 	var diffs []model.ScriptDiff
 
 	currentMap := make(map[string]ScriptInfo)
@@ -416,7 +233,7 @@ func compareScripts(current []ScriptInfo, bkup []BackupScript) []model.ScriptDif
 		currentMap[s.Name] = s
 	}
 
-	backupMap := make(map[string]BackupScript)
+	backupMap := make(map[string]backup.Script)
 	for _, s := range bkup {
 		backupMap[s.Name] = s
 	}
@@ -452,7 +269,7 @@ func compareScripts(current []ScriptInfo, bkup []BackupScript) []model.ScriptDif
 	return diffs
 }
 
-func compareSchedules(current []ScheduleJob, bkup []BackupSchedule) []model.ScheduleDiff {
+func compareSchedules(current []ScheduleJob, bkup []backup.Schedule) []model.ScheduleDiff {
 	var diffs []model.ScheduleDiff
 
 	// Simple comparison by timespec
@@ -529,119 +346,36 @@ func compareWebhooks(current, bkup []WebhookInfo) []model.WebhookDiff {
 	return diffs
 }
 
-// SaveBackupToFile saves backup data to a file.
-func (s *Service) SaveBackupToFile(data []byte, filePath string) error {
-	// Ensure directory exists
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	// Write file
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write backup file: %w", err)
-	}
-
-	return nil
-}
-
-// LoadBackupFromFile loads backup data from a file.
-func (s *Service) LoadBackupFromFile(filePath string) ([]byte, error) {
-	data, err := os.ReadFile(filePath) //nolint:gosec // User-provided file path
-	if err != nil {
-		return nil, fmt.Errorf("failed to read backup file: %w", err)
-	}
-	return data, nil
-}
-
-// GenerateBackupFilename generates a backup filename based on device info and timestamp.
-func (s *Service) GenerateBackupFilename(deviceName, deviceID string, encrypted bool) string {
-	timestamp := time.Now().Format("20060102-150405")
-	safeName := strings.ReplaceAll(deviceName, " ", "-")
-	if safeName == "" {
-		safeName = deviceID
-	}
-
-	suffix := ".json"
-	if encrypted {
-		suffix = ".enc.json"
-	}
-
-	return fmt.Sprintf("backup-%s-%s%s", safeName, timestamp, suffix)
-}
-
-// MigrationSource represents where a migration backup came from.
-type MigrationSource string
-
-// Migration source constants.
-const (
-	MigrationSourceFile   MigrationSource = "file"
-	MigrationSourceDevice MigrationSource = "device"
-)
-
 // LoadMigrationSource loads a backup from either a file or device.
 // Returns the backup, source type, and any error.
-func (s *Service) LoadMigrationSource(ctx context.Context, source string) (*DeviceBackup, MigrationSource, error) {
-	if IsBackupFile(source) {
-		bkp, err := s.loadBackupFromFile(source)
+func (s *Service) LoadMigrationSource(ctx context.Context, source string) (bkp *backup.DeviceBackup, sourceType backup.MigrationSource, err error) {
+	if backup.IsFile(source) {
+		bkp, err = backup.LoadAndValidate(source)
 		if err != nil {
 			return nil, "", err
 		}
-		return bkp, MigrationSourceFile, nil
+		return bkp, backup.SourceFile, nil
 	}
-	bkp, err := s.CreateBackup(ctx, source, BackupOptions{})
+	bkp, err = s.CreateBackup(ctx, source, backup.Options{})
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read source device: %w", err)
 	}
-	return bkp, MigrationSourceDevice, nil
-}
-
-// loadBackupFromFile loads a DeviceBackup from a file.
-func (s *Service) loadBackupFromFile(source string) (*DeviceBackup, error) {
-	data, err := os.ReadFile(source) //nolint:gosec // G304: source is user-provided CLI argument
-	if err != nil {
-		return nil, fmt.Errorf("failed to read backup file: %w", err)
-	}
-	bkp, err := ValidateBackup(data)
-	if err != nil {
-		return nil, fmt.Errorf("invalid backup file: %w", err)
-	}
-	return bkp, nil
-}
-
-// IsBackupFile checks if the path looks like a backup file (exists and is a file).
-func IsBackupFile(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
+	return bkp, backup.SourceDevice, nil
 }
 
 // CheckMigrationCompatibility checks if the backup is compatible with the target device.
 // Returns an error describing the incompatibility if force is false and devices don't match.
-func (s *Service) CheckMigrationCompatibility(ctx context.Context, bkp *DeviceBackup, target string, force bool) error {
+func (s *Service) CheckMigrationCompatibility(ctx context.Context, bkp *backup.DeviceBackup, target string, force bool) error {
 	targetInfo, err := s.DeviceInfo(ctx, target)
 	if err != nil {
 		return fmt.Errorf("failed to get target device info: %w", err)
 	}
 
 	if !force && bkp.Device().Model != targetInfo.Model {
-		return &MigrationCompatibilityError{
+		return &backup.CompatibilityError{
 			SourceModel: bkp.Device().Model,
 			TargetModel: targetInfo.Model,
 		}
 	}
 	return nil
-}
-
-// MigrationCompatibilityError represents a device type mismatch during migration.
-type MigrationCompatibilityError struct {
-	SourceModel string
-	TargetModel string
-}
-
-// Error implements error interface.
-func (e *MigrationCompatibilityError) Error() string {
-	return "device type mismatch"
 }

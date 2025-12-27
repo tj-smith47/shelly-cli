@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -66,7 +66,13 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	var coiotStatus map[string]any
-	err := svc.WithConnection(ctx, opts.Device, func(conn *client.Client) error {
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("CoIoT status via RPC is only supported on Gen2+ devices")
+		}
+
+		conn := dev.Gen2()
+
 		// Try to get CoIoT config via Sys.GetConfig for Gen2+
 		result, err := conn.Call(ctx, "Sys.GetConfig", nil)
 		if err != nil {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/backup"
 
+	backuppkg "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/testutil"
 )
 
@@ -144,7 +145,7 @@ func TestMigrationResult_Fields(t *testing.T) {
 	t.Parallel()
 
 	result := MigrationResult{
-		SourceDevice: &BackupDeviceInfo{
+		SourceDevice: &backuppkg.DeviceInfo{
 			ID:         "source-123",
 			Name:       "Source Device",
 			Model:      "SNSW-001P16EU",
@@ -152,7 +153,7 @@ func TestMigrationResult_Fields(t *testing.T) {
 			FWVersion:  "1.0.0",
 			MAC:        "AA:BB:CC:DD:EE:01",
 		},
-		TargetDevice: &BackupDeviceInfo{
+		TargetDevice: &backuppkg.DeviceInfo{
 			ID:         "target-456",
 			Name:       "Target Device",
 			Model:      "SNSW-001P16EU",
@@ -183,12 +184,12 @@ func TestMigrationValidation_Fields(t *testing.T) {
 	t.Parallel()
 
 	validation := MigrationValidation{
-		SourceDevice: &BackupDeviceInfo{
+		SourceDevice: &backuppkg.DeviceInfo{
 			ID:         "source-123",
 			Model:      "SNSW-001P16EU",
 			Generation: 2,
 		},
-		TargetDevice: &BackupDeviceInfo{
+		TargetDevice: &backuppkg.DeviceInfo{
 			ID:         "target-456",
 			Model:      "SNSW-001P16EU",
 			Generation: 2,
@@ -216,8 +217,8 @@ func TestMigrationValidation_InvalidCases(t *testing.T) {
 		{
 			name: "different models without allow flag",
 			validation: MigrationValidation{
-				SourceDevice: &BackupDeviceInfo{Model: "SNSW-001P16EU"},
-				TargetDevice: &BackupDeviceInfo{Model: "SNSW-002P16EU"},
+				SourceDevice: &backuppkg.DeviceInfo{Model: "SNSW-001P16EU"},
+				TargetDevice: &backuppkg.DeviceInfo{Model: "SNSW-002P16EU"},
 				Errors:       []string{"Model mismatch"},
 				Valid:        false,
 			},
@@ -226,8 +227,8 @@ func TestMigrationValidation_InvalidCases(t *testing.T) {
 		{
 			name: "different generations without allow flag",
 			validation: MigrationValidation{
-				SourceDevice: &BackupDeviceInfo{Generation: 1},
-				TargetDevice: &BackupDeviceInfo{Generation: 2},
+				SourceDevice: &backuppkg.DeviceInfo{Generation: 1},
+				TargetDevice: &backuppkg.DeviceInfo{Generation: 2},
 				Errors:       []string{"Generation mismatch"},
 				Valid:        false,
 			},
@@ -236,8 +237,8 @@ func TestMigrationValidation_InvalidCases(t *testing.T) {
 		{
 			name: "valid same model and generation",
 			validation: MigrationValidation{
-				SourceDevice: &BackupDeviceInfo{Model: "SNSW-001P16EU", Generation: 2},
-				TargetDevice: &BackupDeviceInfo{Model: "SNSW-001P16EU", Generation: 2},
+				SourceDevice: &backuppkg.DeviceInfo{Model: "SNSW-001P16EU", Generation: 2},
+				TargetDevice: &backuppkg.DeviceInfo{Model: "SNSW-001P16EU", Generation: 2},
 				Errors:       []string{},
 				Valid:        true,
 			},
@@ -290,35 +291,35 @@ func TestCompareScripts2(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		scripts1 []BackupScript
-		scripts2 []BackupScript
+		scripts1 []backuppkg.Script
+		scripts2 []backuppkg.Script
 		wantLen  int
 	}{
 		{
 			name:     "identical scripts",
-			scripts1: []BackupScript{{Name: "script1", Enable: true}},
-			scripts2: []BackupScript{{Name: "script1", Enable: true}},
+			scripts1: []backuppkg.Script{{Name: "script1", Enable: true}},
+			scripts2: []backuppkg.Script{{Name: "script1", Enable: true}},
 			wantLen:  1, // Still shows as "changed"
 		},
 		{
 			name:     "added script",
-			scripts1: []BackupScript{},
-			scripts2: []BackupScript{{Name: "script1", Enable: true}},
+			scripts1: []backuppkg.Script{},
+			scripts2: []backuppkg.Script{{Name: "script1", Enable: true}},
 			wantLen:  1,
 		},
 		{
 			name:     "removed script",
-			scripts1: []BackupScript{{Name: "script1", Enable: true}},
-			scripts2: []BackupScript{},
+			scripts1: []backuppkg.Script{{Name: "script1", Enable: true}},
+			scripts2: []backuppkg.Script{},
 			wantLen:  1,
 		},
 		{
 			name: "multiple changes",
-			scripts1: []BackupScript{
+			scripts1: []backuppkg.Script{
 				{Name: "script1", Enable: true},
 				{Name: "script2", Enable: false},
 			},
-			scripts2: []BackupScript{
+			scripts2: []backuppkg.Script{
 				{Name: "script1", Enable: false},
 				{Name: "script3", Enable: true},
 			},
@@ -340,35 +341,35 @@ func TestCompareSchedules2(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		schedules1 []BackupSchedule
-		schedules2 []BackupSchedule
+		schedules1 []backuppkg.Schedule
+		schedules2 []backuppkg.Schedule
 		wantLen    int
 	}{
 		{
 			name:       "identical schedules",
-			schedules1: []BackupSchedule{{Timespec: "0 0 * * *", Enable: true}},
-			schedules2: []BackupSchedule{{Timespec: "0 0 * * *", Enable: true}},
+			schedules1: []backuppkg.Schedule{{Timespec: "0 0 * * *", Enable: true}},
+			schedules2: []backuppkg.Schedule{{Timespec: "0 0 * * *", Enable: true}},
 			wantLen:    0,
 		},
 		{
 			name:       "added schedule",
-			schedules1: []BackupSchedule{},
-			schedules2: []BackupSchedule{{Timespec: "0 0 * * *", Enable: true}},
+			schedules1: []backuppkg.Schedule{},
+			schedules2: []backuppkg.Schedule{{Timespec: "0 0 * * *", Enable: true}},
 			wantLen:    1,
 		},
 		{
 			name:       "removed schedule",
-			schedules1: []BackupSchedule{{Timespec: "0 0 * * *", Enable: true}},
-			schedules2: []BackupSchedule{},
+			schedules1: []backuppkg.Schedule{{Timespec: "0 0 * * *", Enable: true}},
+			schedules2: []backuppkg.Schedule{},
 			wantLen:    1,
 		},
 		{
 			name: "multiple changes",
-			schedules1: []BackupSchedule{
+			schedules1: []backuppkg.Schedule{
 				{Timespec: "0 0 * * *", Enable: true},
 				{Timespec: "0 12 * * *", Enable: false},
 			},
-			schedules2: []BackupSchedule{
+			schedules2: []backuppkg.Schedule{
 				{Timespec: "0 0 * * *", Enable: false},
 				{Timespec: "0 6 * * *", Enable: true},
 			},

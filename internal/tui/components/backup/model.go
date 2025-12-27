@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	shellybackup "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -255,12 +256,12 @@ func (m Model) LoadBackupFiles() Model {
 			continue
 		}
 
-		backup, err := shelly.ValidateBackup(data)
+		bkp, err := shellybackup.Validate(data)
 		if err != nil {
 			continue
 		}
 
-		deviceInfo := backup.Device()
+		deviceInfo := bkp.Device()
 		m.backupFiles = append(m.backupFiles, File{
 			Name:       name,
 			Path:       path,
@@ -362,7 +363,7 @@ func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
 				// Capture results per device rather than failing the group
 				result := ExportResult{Name: device.Name}
 
-				backup, err := m.svc.CreateBackup(gctx, device.Name, shelly.BackupOptions{})
+				bkp, err := m.svc.CreateBackup(gctx, device.Name, shellybackup.Options{})
 				if err != nil {
 					result.Err = err
 					mu.Lock()
@@ -372,12 +373,12 @@ func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
 				}
 
 				// Generate filename
-				deviceInfo := backup.Device()
-				filename := m.svc.GenerateBackupFilename(deviceInfo.Name, deviceInfo.ID, false)
+				deviceInfo := bkp.Device()
+				filename := shellybackup.GenerateFilename(deviceInfo.Name, deviceInfo.ID, false)
 				filePath := filepath.Join(m.backupDir, filename)
 
 				// Save backup
-				data, err := json.MarshalIndent(backup.Backup, "", "  ")
+				data, err := json.MarshalIndent(bkp.Backup, "", "  ")
 				if err != nil {
 					result.Err = fmt.Errorf("failed to serialize backup: %w", err)
 					mu.Lock()
@@ -386,7 +387,7 @@ func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
 					return nil
 				}
 
-				if err := m.svc.SaveBackupToFile(data, filePath); err != nil {
+				if err := shellybackup.SaveToFile(data, filePath); err != nil {
 					result.Err = err
 					mu.Lock()
 					results = append(results, result)
@@ -436,18 +437,8 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 120*time.Second)
 		defer cancel()
 
-		// Load backup file
-		data, err := m.svc.LoadBackupFromFile(backupFile.Path)
-		if err != nil {
-			return ImportCompleteMsg{
-				Name:    backupFile.Name,
-				Success: false,
-				Err:     err,
-			}
-		}
-
-		// Validate backup
-		backup, err := shelly.ValidateBackup(data)
+		// Load and validate backup file
+		bkp, err := shellybackup.LoadAndValidate(backupFile.Path)
 		if err != nil {
 			return ImportCompleteMsg{
 				Name:    backupFile.Name,
@@ -457,7 +448,7 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 		}
 
 		// Find matching device by ID
-		deviceInfo := backup.Device()
+		deviceInfo := bkp.Device()
 		targetDevice := ""
 
 		cfg := config.Get()
@@ -481,7 +472,7 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 		}
 
 		// Restore backup
-		_, err = m.svc.RestoreBackup(ctx, targetDevice, backup, shelly.RestoreOptions{})
+		_, err = m.svc.RestoreBackup(ctx, targetDevice, bkp, shellybackup.RestoreOptions{})
 		if err != nil {
 			return ImportCompleteMsg{
 				Name:    backupFile.Name,

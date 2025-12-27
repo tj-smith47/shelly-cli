@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -35,32 +36,31 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	var result any
+	var config map[string]any
 	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching TLS configuration...", func(ctx context.Context) error {
-		conn, connErr := svc.Connect(ctx, device)
-		if connErr != nil {
-			return fmt.Errorf("connect: %w", connErr)
-		}
-		defer func() {
-			if closeErr := conn.Close(); closeErr != nil {
-				ios.DebugErr("close connection", closeErr)
+		return svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+			if dev.IsGen1() {
+				return fmt.Errorf("TLS configuration is only supported on Gen2+ devices")
 			}
-		}()
 
-		var callErr error
-		result, callErr = conn.Call(ctx, "Shelly.GetConfig", nil)
-		if callErr != nil {
-			return fmt.Errorf("get config: %w", callErr)
-		}
-		return nil
+			conn := dev.Gen2()
+
+			result, callErr := conn.Call(ctx, "Shelly.GetConfig", nil)
+			if callErr != nil {
+				return fmt.Errorf("get config: %w", callErr)
+			}
+
+			var ok bool
+			config, ok = result.(map[string]any)
+			if !ok {
+				return fmt.Errorf("unexpected response type")
+			}
+
+			return nil
+		})
 	})
 	if err != nil {
 		return err
-	}
-
-	config, ok := result.(map[string]any)
-	if !ok {
-		return fmt.Errorf("unexpected response type")
 	}
 
 	ios.Success("TLS Configuration for %s", device)

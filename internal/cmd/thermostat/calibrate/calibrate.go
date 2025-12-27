@@ -9,7 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
@@ -59,25 +59,25 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
 
-	thermostat := conn.Thermostat(opts.ID)
+		thermostat := dev.Gen2().Thermostat(opts.ID)
 
-	err = cmdutil.RunWithSpinner(ctx, ios, "Starting valve calibration...", func(ctx context.Context) error {
-		return thermostat.Calibrate(ctx)
+		err := cmdutil.RunWithSpinner(ctx, ios, "Starting valve calibration...", func(ctx context.Context) error {
+			return thermostat.Calibrate(ctx)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to start calibration: %w", err)
+		}
+
+		ios.Success("Calibration started on thermostat %d", opts.ID)
+		ios.Info("The valve will move through its full range.")
+		ios.Info("This process takes a few minutes to complete.")
+		ios.Info("Check status with: shelly thermostat status %s", opts.Device)
+
+		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed to start calibration: %w", err)
-	}
-
-	ios.Success("Calibration started on thermostat %d", opts.ID)
-	ios.Info("The valve will move through its full range.")
-	ios.Info("This process takes a few minutes to complete.")
-	ios.Info("Check status with: shelly thermostat status %s", opts.Device)
-
-	return nil
 }

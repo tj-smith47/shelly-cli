@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate/validate"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -61,18 +62,18 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	svc := f.ShellyService()
 
 	// Load source backup (from file or device)
-	var backup *shelly.DeviceBackup
-	var sourceType shelly.MigrationSource
+	var bkp *backup.DeviceBackup
+	var sourceType backup.MigrationSource
 	var err error
 
-	if shelly.IsBackupFile(source) {
+	if backup.IsFile(source) {
 		err = cmdutil.RunWithSpinner(ctx, ios, "Reading backup file...", func(_ context.Context) error {
-			backup, sourceType, err = svc.LoadMigrationSource(ctx, source)
+			bkp, sourceType, err = svc.LoadMigrationSource(ctx, source)
 			return err
 		})
 	} else {
 		err = cmdutil.RunWithSpinner(ctx, ios, "Reading source device...", func(ctx context.Context) error {
-			backup, sourceType, err = svc.LoadMigrationSource(ctx, source)
+			bkp, sourceType, err = svc.LoadMigrationSource(ctx, source)
 			return err
 		})
 	}
@@ -81,8 +82,8 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	}
 
 	// Check target device compatibility
-	if err := svc.CheckMigrationCompatibility(ctx, backup, target, forceFlag); err != nil {
-		var compErr *shelly.MigrationCompatibilityError
+	if err := svc.CheckMigrationCompatibility(ctx, bkp, target, forceFlag); err != nil {
+		var compErr *backup.CompatibilityError
 		if errors.As(err, &compErr) {
 			ios.Warning("Source and target are different device types:")
 			ios.Printf("  Source: %s\n", compErr.SourceModel)
@@ -94,7 +95,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	}
 
 	if dryRunFlag {
-		d, err := svc.CompareBackup(ctx, target, backup)
+		d, err := svc.CompareBackup(ctx, target, bkp)
 		if err != nil {
 			return fmt.Errorf("failed to compare: %w", err)
 		}
@@ -103,13 +104,13 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	}
 
 	// Perform migration
-	opts := shelly.RestoreOptions{
+	opts := backup.RestoreOptions{
 		SkipNetwork: true, // Always skip network to prevent disconnection
 	}
-	var result *shelly.RestoreResult
+	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Migrating configuration...", func(ctx context.Context) error {
 		var restoreErr error
-		result, restoreErr = svc.RestoreBackup(ctx, target, backup, opts)
+		result, restoreErr = svc.RestoreBackup(ctx, target, bkp, opts)
 		return restoreErr
 	})
 	if err != nil {

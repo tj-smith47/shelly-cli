@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -68,76 +68,84 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		device, opts.Iterations, opts.Warmup)
 	ios.Println("")
 
-	// Get connection for RPC tests
-	conn, err := svc.Connect(ctx, device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing benchmark connection", conn)
+	var result model.BenchmarkResult
 
-	// Warmup
-	if opts.Warmup > 0 {
-		ios.Info("Warming up...")
-		for range opts.Warmup {
-			if _, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil); err != nil {
-				ios.DebugErr("warmup call", err)
+	err := svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("benchmark is only supported on Gen2+ devices")
+		}
+
+		conn := dev.Gen2()
+
+		// Warmup
+		if opts.Warmup > 0 {
+			ios.Info("Warming up...")
+			for range opts.Warmup {
+				if _, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil); err != nil {
+					ios.DebugErr("warmup call", err)
+				}
 			}
 		}
-	}
 
-	// Benchmark RPC calls
-	ios.Info("Running RPC benchmark...")
-	rpcLatencies := make([]time.Duration, 0, opts.Iterations)
-	rpcErrors := 0
+		// Benchmark RPC calls
+		ios.Info("Running RPC benchmark...")
+		rpcLatencies := make([]time.Duration, 0, opts.Iterations)
+		rpcErrors := 0
 
-	for i := range opts.Iterations {
-		start := time.Now()
-		_, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-		elapsed := time.Since(start)
+		for i := range opts.Iterations {
+			start := time.Now()
+			_, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+			elapsed := time.Since(start)
 
-		if err != nil {
-			rpcErrors++
-			ios.DebugErr("RPC benchmark call", err)
-		} else {
-			rpcLatencies = append(rpcLatencies, elapsed)
+			if err != nil {
+				rpcErrors++
+				ios.DebugErr("RPC benchmark call", err)
+			} else {
+				rpcLatencies = append(rpcLatencies, elapsed)
+			}
+
+			// Show progress (only in table mode)
+			if !output.WantsStructured() && (i+1)%5 == 0 {
+				ios.Printf("  Progress: %d/%d\n", i+1, opts.Iterations)
+			}
 		}
 
-		// Show progress (only in table mode)
-		if !output.WantsStructured() && (i+1)%5 == 0 {
-			ios.Printf("  Progress: %d/%d\n", i+1, opts.Iterations)
+		// Benchmark ping-style calls (lighter weight)
+		ios.Info("Running ping benchmark...")
+		pingLatencies := make([]time.Duration, 0, opts.Iterations)
+		pingErrors := 0
+
+		for range opts.Iterations {
+			start := time.Now()
+			_, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+			elapsed := time.Since(start)
+
+			if err != nil {
+				pingErrors++
+				ios.DebugErr("ping benchmark call", err)
+			} else {
+				pingLatencies = append(pingLatencies, elapsed)
+			}
 		}
-	}
 
-	// Benchmark ping-style calls (lighter weight)
-	ios.Info("Running ping benchmark...")
-	pingLatencies := make([]time.Duration, 0, opts.Iterations)
-	pingErrors := 0
+		// Calculate statistics
+		rpcStats := utils.CalculateLatencyStats(rpcLatencies, rpcErrors)
+		pingStats := utils.CalculateLatencyStats(pingLatencies, pingErrors)
 
-	for range opts.Iterations {
-		start := time.Now()
-		_, err := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-		elapsed := time.Since(start)
-
-		if err != nil {
-			pingErrors++
-			ios.DebugErr("ping benchmark call", err)
-		} else {
-			pingLatencies = append(pingLatencies, elapsed)
+		// Build result
+		result = model.BenchmarkResult{
+			Device:      device,
+			Iterations:  opts.Iterations,
+			PingLatency: pingStats,
+			RPCLatency:  rpcStats,
+			Summary:     output.FormatBenchmarkSummary(rpcStats),
+			Timestamp:   time.Now(),
 		}
-	}
 
-	// Calculate statistics
-	rpcStats := utils.CalculateLatencyStats(rpcLatencies, rpcErrors)
-	pingStats := utils.CalculateLatencyStats(pingLatencies, pingErrors)
-
-	// Build result
-	result := model.BenchmarkResult{
-		Device:      device,
-		Iterations:  opts.Iterations,
-		PingLatency: pingStats,
-		RPCLatency:  rpcStats,
-		Summary:     output.FormatBenchmarkSummary(rpcStats),
-		Timestamp:   time.Now(),
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	if output.WantsStructured() {
@@ -154,10 +162,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	ios.Println("")
 
 	ios.Printf("RPC Latency:\n")
-	term.DisplayLatencyStats(ios, rpcStats)
+	term.DisplayLatencyStats(ios, result.RPCLatency)
 
 	ios.Printf("\nPing Latency:\n")
-	term.DisplayLatencyStats(ios, pingStats)
+	term.DisplayLatencyStats(ios, result.PingLatency)
 
 	ios.Printf("\nSummary: %s\n", result.Summary)
 

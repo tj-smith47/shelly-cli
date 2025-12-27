@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -81,14 +82,6 @@ func DisplayControlResults(ios *iostreams.IOStreams, results []shelly.ComponentC
 	if len(failures) > 0 {
 		ios.Warning("Failed on: %s", strings.Join(failures, ", "))
 	}
-}
-
-// FormatREPLPrompt creates the REPL prompt string.
-func FormatREPLPrompt(activeDevice string) string {
-	if activeDevice != "" {
-		return fmt.Sprintf("shelly [%s]> ", theme.Highlight().Render(activeDevice))
-	}
-	return "shelly> "
 }
 
 // DisplayREPLDeviceStatus displays device status JSON in the REPL.
@@ -346,7 +339,7 @@ func (s *REPLSession) RunREPLLoop(ctx context.Context) error {
 	}
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          FormatREPLPrompt(s.ActiveDevice),
+		Prompt:          output.FormatREPLPrompt(s.ActiveDevice),
 		HistoryFile:     historyFile,
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",
@@ -370,7 +363,7 @@ func (s *REPLSession) RunREPLLoop(ctx context.Context) error {
 		}
 
 		// Update prompt with current device
-		rl.SetPrompt(FormatREPLPrompt(s.ActiveDevice))
+		rl.SetPrompt(output.FormatREPLPrompt(s.ActiveDevice))
 
 		// Read input with readline
 		line, err := rl.Readline()

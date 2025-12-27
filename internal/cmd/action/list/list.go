@@ -8,10 +8,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/gen1"
 
-	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -52,25 +52,20 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	isGen1, _, err := svc.IsGen1Device(ctx, device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", device, err)
-	}
-
-	if !isGen1 {
-		ios.Warning("Device %s is not a Gen1 device", device)
-		ios.Info("Gen2+ devices use webhooks. Try: shelly webhook list %s", device)
-		return fmt.Errorf("action URLs only available for Gen1 devices")
-	}
-
 	var actions *gen1.ActionSettings
-	err = svc.WithGen1Connection(ctx, device, func(conn *client.Gen1Client) error {
+	err := svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+		if !dev.IsGen1() {
+			ios.Warning("Device %s is not a Gen1 device", device)
+			ios.Info("Gen2+ devices use webhooks. Try: shelly webhook list %s", device)
+			return fmt.Errorf("action URLs only available for Gen1 devices")
+		}
+
 		var getErr error
-		actions, getErr = conn.GetActions(ctx)
+		actions, getErr = dev.Gen1().GetActions(ctx)
 		return getErr
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get actions: %w", err)
+		return err
 	}
 
 	if output.WantsStructured() {

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 )
 
 // NewCommand creates the cover position command.
@@ -40,7 +41,7 @@ Position is specified as a percentage from 0 (closed) to 100 (open).`,
 		},
 	}
 
-	cmdutil.AddComponentIDFlag(cmd, &coverID, "Cover")
+	flags.AddComponentIDFlag(cmd, &coverID, "Cover")
 
 	return cmd
 }

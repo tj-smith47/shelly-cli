@@ -9,7 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
@@ -49,25 +49,27 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	conn, err := svc.Connect(ctx, opts.Device)
-	if err != nil {
-		return fmt.Errorf("failed to connect to device: %w", err)
-	}
-	defer iostreams.CloseWithDebug("closing connection", conn)
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
+		if dev.IsGen1() {
+			return fmt.Errorf("thermostat component requires Gen2+ device")
+		}
 
-	params := map[string]any{
-		"id":     opts.ScheduleID,
-		"enable": true,
-	}
+		conn := dev.Gen2()
 
-	err = cmdutil.RunWithSpinner(ctx, ios, "Enabling schedule...", func(ctx context.Context) error {
-		_, callErr := conn.Call(ctx, "Schedule.Update", params)
-		return callErr
+		params := map[string]any{
+			"id":     opts.ScheduleID,
+			"enable": true,
+		}
+
+		err := cmdutil.RunWithSpinner(ctx, ios, "Enabling schedule...", func(ctx context.Context) error {
+			_, callErr := conn.Call(ctx, "Schedule.Update", params)
+			return callErr
+		})
+		if err != nil {
+			return fmt.Errorf("failed to enable schedule %d: %w", opts.ScheduleID, err)
+		}
+
+		ios.Success("Enabled schedule %d", opts.ScheduleID)
+		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed to enable schedule %d: %w", opts.ScheduleID, err)
-	}
-
-	ios.Success("Enabled schedule %d", opts.ScheduleID)
-	return nil
 }

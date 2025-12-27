@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -31,11 +32,6 @@ func NewShellSession(ios *iostreams.IOStreams, conn *client.Client, device strin
 		Conn:   conn,
 		IOS:    ios,
 	}
-}
-
-// FormatShellPrompt creates the shell prompt string.
-func FormatShellPrompt(device string) string {
-	return fmt.Sprintf("%s> ", theme.Highlight().Render(device))
 }
 
 // ExecuteCommand handles a shell command.
@@ -234,7 +230,7 @@ func (s *ShellSession) RunShellLoop(ctx context.Context) error {
 	}
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          FormatShellPrompt(s.Device),
+		Prompt:          output.FormatShellPrompt(s.Device),
 		HistoryFile:     historyFile,
 		InterruptPrompt: "^C",
 		EOFPrompt:       "exit",

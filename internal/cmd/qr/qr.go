@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -78,35 +77,37 @@ func run(ctx context.Context, device string, opts *Options) error {
 	var wifiSSID string
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting device info...", func(ctx context.Context) error {
-		conn, connErr := svc.Connect(ctx, device)
-		if connErr != nil {
-			return fmt.Errorf("failed to connect to device: %w", connErr)
-		}
-		defer iostreams.CloseWithDebug("closing qr connection", conn)
-
-		// Get device info
-		rawResult, callErr := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
-		if callErr != nil {
-			return fmt.Errorf("failed to get device info: %w", callErr)
-		}
-
-		jsonBytes, marshalErr := json.Marshal(rawResult)
-		if marshalErr != nil {
-			return fmt.Errorf("failed to marshal device info: %w", marshalErr)
-		}
-
-		if unmarshalErr := json.Unmarshal(jsonBytes, &deviceInfo); unmarshalErr != nil {
-			return fmt.Errorf("failed to parse device info: %w", unmarshalErr)
-		}
-
-		// Get WiFi config if requested
-		if opts.WiFi {
-			if wifiResult, wifiErr := conn.Call(ctx, "WiFi.GetConfig", nil); wifiErr == nil {
-				wifiSSID = shelly.ExtractWiFiSSID(wifiResult)
+		return svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+			if dev.IsGen1() {
+				return fmt.Errorf("QR code generation is only supported on Gen2+ devices")
 			}
-		}
 
-		return nil
+			conn := dev.Gen2()
+
+			// Get device info
+			rawResult, callErr := conn.Call(ctx, "Shelly.GetDeviceInfo", nil)
+			if callErr != nil {
+				return fmt.Errorf("failed to get device info: %w", callErr)
+			}
+
+			jsonBytes, marshalErr := json.Marshal(rawResult)
+			if marshalErr != nil {
+				return fmt.Errorf("failed to marshal device info: %w", marshalErr)
+			}
+
+			if unmarshalErr := json.Unmarshal(jsonBytes, &deviceInfo); unmarshalErr != nil {
+				return fmt.Errorf("failed to parse device info: %w", unmarshalErr)
+			}
+
+			// Get WiFi config if requested
+			if opts.WiFi {
+				if wifiResult, wifiErr := conn.Call(ctx, "WiFi.GetConfig", nil); wifiErr == nil {
+					wifiSSID = shelly.ExtractWiFiSSID(wifiResult)
+				}
+			}
+
+			return nil
+		})
 	})
 	if err != nil {
 		return err
