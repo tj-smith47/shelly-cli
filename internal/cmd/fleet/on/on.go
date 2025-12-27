@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -79,25 +78,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 	}
 	defer conn.Close()
 
-	// Execute the command based on options
-	var results []integrator.BatchResult
-	switch {
-	case opts.All:
-		results = conn.Manager.AllRelaysOn(ctx)
-	case opts.Group != "":
-		results = conn.Manager.GroupRelaysOn(ctx, opts.Group)
-	default:
-		commands := make([]integrator.BatchCommand, len(devices))
-		for i, deviceID := range devices {
-			commands[i] = integrator.BatchCommand{
-				DeviceID: deviceID,
-				Action:   "relay",
-				Params:   map[string]any{"id": 0, "turn": "on"},
-			}
-		}
-		results = conn.Manager.SendBatchCommands(ctx, commands)
-	}
-
-	// Report results
+	// Execute relay control
+	results := shelly.FleetRelayControl(ctx, conn.Manager, shelly.RelayOn, devices, opts.All, opts.Group)
 	return shelly.ReportBatchResults(ios, results, "turned on")
 }

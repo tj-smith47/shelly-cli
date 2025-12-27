@@ -169,12 +169,22 @@ func (r *Renderer) Render() string {
 		}
 	}
 
-	// Render content within borders with 1 char padding on each side
+	// Render content within borders with 1 char horizontal padding and 1 line vertical padding
 	leftBorder := borderStyle.Render(r.border.Left) + " "
 	rightBorder := " " + borderStyle.Render(r.border.Right)
 	paddedWidth := contentWidth - 2 // Account for the 1-char padding on each side
 
-	for i := range contentHeight {
+	// Add 1 line vertical padding at top and bottom
+	emptyLine := leftBorder + strings.Repeat(" ", paddedWidth) + rightBorder
+	lines = append(lines, emptyLine)
+
+	// Adjust content height for vertical padding (subtract 2 for top and bottom padding lines)
+	innerHeight := contentHeight - 2
+	if innerHeight < 1 {
+		innerHeight = 1
+	}
+
+	for i := range innerHeight {
 		var line string
 		if i < len(contentLines) {
 			line = contentLines[i]
@@ -188,6 +198,9 @@ func (r *Renderer) Render() string {
 		}
 		lines = append(lines, leftBorder+line+rightBorder)
 	}
+
+	// Bottom vertical padding line
+	lines = append(lines, emptyLine)
 
 	// Bottom border with optional footer, footerBadge, and panel hint
 	var bottomBorder string
@@ -225,9 +238,9 @@ func (r *Renderer) ContentWidth() int {
 	return r.width - 4 // -2 for borders, -2 for padding
 }
 
-// ContentHeight returns the usable content height inside the borders.
+// ContentHeight returns the usable content height inside the borders (including padding).
 func (r *Renderer) ContentHeight() int {
-	return r.height - 2
+	return r.height - 4 // -2 for borders, -2 for vertical padding
 }
 
 // buildPanelHint returns the Shift+N hint string if applicable.

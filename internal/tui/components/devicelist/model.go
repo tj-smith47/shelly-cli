@@ -285,9 +285,8 @@ func (m Model) Focused() bool {
 func (m Model) visibleRows() int {
 	var overhead int
 	if m.listOnly {
-		// In listOnly mode, border is handled by app.go's rendering.New()
-		// Only account for scroll indicator (~1 line)
-		overhead = 1
+		// In listOnly mode, renderer handles borders (2) + vertical padding (2) = 4 lines
+		overhead = 4
 	} else {
 		// In split-pane mode, account for panel borders (2), header (~3), padding
 		overhead = 5
@@ -379,23 +378,26 @@ func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 	// Get visible range from scroller
 	startIdx, endIdx := m.scroller.VisibleRange()
 
+	// In list-only mode, renderer adds borders (2) + padding (2) = 4 chars
+	// So content rows should be width - 4 to fit properly
+	rowWidth := width
+	if m.listOnly {
+		rowWidth = width - 4
+	}
+
 	var rows strings.Builder
 	for i := startIdx; i < endIdx; i++ {
 		d := devices[i]
 		isSelected := m.scroller.IsCursorAt(i)
-		row := m.renderListRow(d, isSelected, width-2) // -2 for padding
+		row := m.renderListRow(d, isSelected, rowWidth)
 		rows.WriteString(row + "\n")
 	}
 
 	content := strings.TrimSuffix(rows.String(), "\n")
 
-	// In listOnly mode, just return content (border handled by app.go)
+	// In listOnly mode, just return content (border/padding handled by renderer)
 	if m.listOnly {
-		return lipgloss.NewStyle().
-			Foreground(colors.Text).
-			Width(width).
-			Height(m.height).
-			Render(content)
+		return content
 	}
 
 	// For split-pane mode, use panel styling with header

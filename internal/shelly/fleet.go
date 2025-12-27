@@ -115,3 +115,65 @@ func capitalizeFirst(s string) string {
 	}
 	return s
 }
+
+// RelayAction represents a relay control action.
+type RelayAction string
+
+// Relay control actions.
+const (
+	RelayOn     RelayAction = "on"
+	RelayOff    RelayAction = "off"
+	RelayToggle RelayAction = "toggle"
+)
+
+// FleetRelayControl executes a relay control action on fleet devices.
+// Handles --all, --group, or specific device IDs.
+func FleetRelayControl(ctx context.Context, fm *integrator.FleetManager, action RelayAction, devices []string, all bool, group string) []integrator.BatchResult {
+	params := map[string]any{"id": 0, "turn": string(action)}
+
+	switch {
+	case all:
+		// For on/off, use optimized built-in methods; toggle requires manual batch
+		switch action {
+		case RelayOn:
+			return fm.AllRelaysOn(ctx)
+		case RelayOff:
+			return fm.AllRelaysOff(ctx)
+		default:
+			// Toggle: build commands for all controllable devices
+			allDevices := fm.AccountManager().GetControllableDevices()
+			commands := make([]integrator.BatchCommand, 0, len(allDevices))
+			for i := range allDevices {
+				commands = append(commands, integrator.BatchCommand{
+					DeviceID: allDevices[i].DeviceID,
+					Action:   "relay",
+					Params:   params,
+				})
+			}
+			return fm.SendBatchCommands(ctx, commands)
+		}
+
+	case group != "":
+		// For on/off, use optimized built-in methods
+		switch action {
+		case RelayOn:
+			return fm.GroupRelaysOn(ctx, group)
+		case RelayOff:
+			return fm.GroupRelaysOff(ctx, group)
+		default:
+			return fm.SendGroupCommand(ctx, group, "relay", params)
+		}
+
+	default:
+		// Specific devices
+		commands := make([]integrator.BatchCommand, len(devices))
+		for i, deviceID := range devices {
+			commands[i] = integrator.BatchCommand{
+				DeviceID: deviceID,
+				Action:   "relay",
+				Params:   params,
+			}
+		}
+		return fm.SendBatchCommands(ctx, commands)
+	}
+}
