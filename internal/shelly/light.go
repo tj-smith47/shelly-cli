@@ -56,15 +56,10 @@ func (s *Service) LightOff(ctx context.Context, identifier string, lightID int) 
 // LightToggle toggles a light component and returns the new status.
 // For Gen1 devices, this controls the light/dimmer.
 func (s *Service) LightToggle(ctx context.Context, identifier string, lightID int) (*model.LightStatus, error) {
-	isGen1, _, err := s.IsGen1Device(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if isGen1 {
-		var result *model.LightStatus
-		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-			light, err := conn.Light(lightID)
+	var result *model.LightStatus
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			light, err := dev.Gen1().Light(lightID)
 			if err != nil {
 				return err
 			}
@@ -77,18 +72,15 @@ func (s *Service) LightToggle(ctx context.Context, identifier string, lightID in
 			}
 			result = gen1LightStatusToLight(lightID, status)
 			return nil
-		})
-		return result, err
-	}
+		}
 
-	var result *model.LightStatus
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		_, err := conn.Light(lightID).Toggle(ctx)
-		if err != nil {
+		// Gen2+
+		var err error
+		if _, err = dev.Gen2().Light(lightID).Toggle(ctx); err != nil {
 			return err
 		}
 		// Get current status after toggle.
-		result, err = conn.Light(lightID).GetStatus(ctx)
+		result, err = dev.Gen2().Light(lightID).GetStatus(ctx)
 		return err
 	})
 	return result, err
@@ -114,15 +106,10 @@ func (s *Service) LightBrightness(ctx context.Context, identifier string, lightI
 // LightStatus gets the status of a light component.
 // For Gen1 devices, this returns light/dimmer status.
 func (s *Service) LightStatus(ctx context.Context, identifier string, lightID int) (*model.LightStatus, error) {
-	isGen1, _, err := s.IsGen1Device(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if isGen1 {
-		var result *model.LightStatus
-		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-			light, err := conn.Light(lightID)
+	var result *model.LightStatus
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			light, err := dev.Gen1().Light(lightID)
 			if err != nil {
 				return err
 			}
@@ -132,13 +119,10 @@ func (s *Service) LightStatus(ctx context.Context, identifier string, lightID in
 			}
 			result = gen1LightStatusToLight(lightID, status)
 			return nil
-		})
-		return result, err
-	}
+		}
 
-	var result *model.LightStatus
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		status, err := conn.Light(lightID).GetStatus(ctx)
+		// Gen2+
+		status, err := dev.Gen2().Light(lightID).GetStatus(ctx)
 		if err != nil {
 			return err
 		}

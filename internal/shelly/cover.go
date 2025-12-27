@@ -97,15 +97,10 @@ func (s *Service) CoverPosition(ctx context.Context, identifier string, coverID,
 // CoverStatus gets the status of a cover component.
 // For Gen1 devices, this returns roller status.
 func (s *Service) CoverStatus(ctx context.Context, identifier string, coverID int) (*model.CoverStatus, error) {
-	isGen1, _, err := s.IsGen1Device(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if isGen1 {
-		var result *model.CoverStatus
-		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-			roller, err := conn.Roller(coverID)
+	var result *model.CoverStatus
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			roller, err := dev.Gen1().Roller(coverID)
 			if err != nil {
 				return err
 			}
@@ -115,13 +110,10 @@ func (s *Service) CoverStatus(ctx context.Context, identifier string, coverID in
 			}
 			result = gen1RollerStatusToCover(coverID, status)
 			return nil
-		})
-		return result, err
-	}
+		}
 
-	var result *model.CoverStatus
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		status, err := conn.Cover(coverID).GetStatus(ctx)
+		// Gen2+
+		status, err := dev.Gen2().Cover(coverID).GetStatus(ctx)
 		if err != nil {
 			return err
 		}

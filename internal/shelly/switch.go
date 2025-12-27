@@ -55,15 +55,10 @@ func (s *Service) SwitchOff(ctx context.Context, identifier string, switchID int
 // SwitchToggle toggles a switch component and returns the new status.
 // For Gen1 devices, this controls the relay.
 func (s *Service) SwitchToggle(ctx context.Context, identifier string, switchID int) (*model.SwitchStatus, error) {
-	isGen1, _, err := s.IsGen1Device(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if isGen1 {
-		var result *model.SwitchStatus
-		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-			relay, err := conn.Relay(switchID)
+	var result *model.SwitchStatus
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			relay, err := dev.Gen1().Relay(switchID)
 			if err != nil {
 				return err
 			}
@@ -77,18 +72,15 @@ func (s *Service) SwitchToggle(ctx context.Context, identifier string, switchID 
 			}
 			result = gen1RelayStatusToSwitch(switchID, status)
 			return nil
-		})
-		return result, err
-	}
+		}
 
-	var result *model.SwitchStatus
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		status, err := conn.Switch(switchID).Toggle(ctx)
+		// Gen2+
+		status, err := dev.Gen2().Switch(switchID).Toggle(ctx)
 		if err != nil {
 			return err
 		}
 		// Get current status after toggle.
-		result, err = conn.Switch(switchID).GetStatus(ctx)
+		result, err = dev.Gen2().Switch(switchID).GetStatus(ctx)
 		if err != nil {
 			// Fall back to toggle result.
 			result = status
@@ -101,15 +93,10 @@ func (s *Service) SwitchToggle(ctx context.Context, identifier string, switchID 
 // SwitchStatus gets the status of a switch component.
 // For Gen1 devices, this returns relay status.
 func (s *Service) SwitchStatus(ctx context.Context, identifier string, switchID int) (*model.SwitchStatus, error) {
-	isGen1, _, err := s.IsGen1Device(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if isGen1 {
-		var result *model.SwitchStatus
-		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-			relay, err := conn.Relay(switchID)
+	var result *model.SwitchStatus
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			relay, err := dev.Gen1().Relay(switchID)
 			if err != nil {
 				return err
 			}
@@ -119,13 +106,10 @@ func (s *Service) SwitchStatus(ctx context.Context, identifier string, switchID 
 			}
 			result = gen1RelayStatusToSwitch(switchID, status)
 			return nil
-		})
-		return result, err
-	}
+		}
 
-	var result *model.SwitchStatus
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		status, err := conn.Switch(switchID).GetStatus(ctx)
+		// Gen2+
+		status, err := dev.Gen2().Switch(switchID).GetStatus(ctx)
 		if err != nil {
 			return err
 		}

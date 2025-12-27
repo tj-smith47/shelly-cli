@@ -98,15 +98,10 @@ func (s *Service) RGBOff(ctx context.Context, identifier string, rgbID int) erro
 // RGBToggle toggles an RGB component and returns the new status.
 // For Gen1 devices, this controls the color light.
 func (s *Service) RGBToggle(ctx context.Context, identifier string, rgbID int) (*model.RGBStatus, error) {
-	isGen1, _, err := s.IsGen1Device(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if isGen1 {
-		var result *model.RGBStatus
-		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-			color, err := conn.Color(rgbID)
+	var result *model.RGBStatus
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			color, err := dev.Gen1().Color(rgbID)
 			if err != nil {
 				return err
 			}
@@ -119,18 +114,15 @@ func (s *Service) RGBToggle(ctx context.Context, identifier string, rgbID int) (
 			}
 			result = gen1ColorStatusToRGB(rgbID, status)
 			return nil
-		})
-		return result, err
-	}
+		}
 
-	var result *model.RGBStatus
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		_, err := conn.RGB(rgbID).Toggle(ctx)
-		if err != nil {
+		// Gen2+
+		var err error
+		if _, err = dev.Gen2().RGB(rgbID).Toggle(ctx); err != nil {
 			return err
 		}
 		// Get current status after toggle.
-		result, err = conn.RGB(rgbID).GetStatus(ctx)
+		result, err = dev.Gen2().RGB(rgbID).GetStatus(ctx)
 		return err
 	})
 	return result, err
@@ -191,15 +183,10 @@ func (s *Service) RGBColorAndBrightness(ctx context.Context, identifier string, 
 // RGBStatus gets the status of an RGB component.
 // For Gen1 devices, this returns color light status.
 func (s *Service) RGBStatus(ctx context.Context, identifier string, rgbID int) (*model.RGBStatus, error) {
-	isGen1, _, err := s.IsGen1Device(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-
-	if isGen1 {
-		var result *model.RGBStatus
-		err := s.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
-			color, err := conn.Color(rgbID)
+	var result *model.RGBStatus
+	err := s.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		if dev.IsGen1() {
+			color, err := dev.Gen1().Color(rgbID)
 			if err != nil {
 				return err
 			}
@@ -209,13 +196,10 @@ func (s *Service) RGBStatus(ctx context.Context, identifier string, rgbID int) (
 			}
 			result = gen1ColorStatusToRGB(rgbID, status)
 			return nil
-		})
-		return result, err
-	}
+		}
 
-	var result *model.RGBStatus
-	err = s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		status, err := conn.RGB(rgbID).GetStatus(ctx)
+		// Gen2+
+		status, err := dev.Gen2().RGB(rgbID).GetStatus(ctx)
 		if err != nil {
 			return err
 		}
