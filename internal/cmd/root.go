@@ -6,11 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
@@ -90,6 +88,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
@@ -142,11 +141,11 @@ func execute() int {
 	defer cancel()
 
 	// Expand aliases before cobra processes the command
-	expandedArgs, isShell := expandAlias(os.Args[1:])
+	expandedArgs, isShell := config.ExpandAliasArgs(os.Args[1:])
 
 	// Handle shell aliases by executing in shell
 	if isShell {
-		return executeShellAlias(ctx, expandedArgs)
+		return config.ExecuteShellAlias(ctx, expandedArgs)
 	}
 
 	// Set the expanded args for cobra to process
@@ -162,119 +161,7 @@ func execute() int {
 	}
 
 	// Show update notification if available (from cache)
-	showCachedUpdateNotification()
-
-	return 0
-}
-
-// showCachedUpdateNotification displays a cached update notification if available.
-// This is non-blocking and only reads from the cache file.
-func showCachedUpdateNotification() {
-	// Skip if update check is disabled
-	if os.Getenv("SHELLY_NO_UPDATE_CHECK") != "" {
-		return
-	}
-
-	// Skip for certain commands (they handle their own update info)
-	if len(os.Args) > 1 {
-		cmd := os.Args[1]
-		if cmd == "version" || cmd == "update" || cmd == "completion" || cmd == "help" {
-			return
-		}
-	}
-
-	// Get cache path
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-	cachePath := home + "/.config/shelly/cache/latest-version"
-
-	// Check if cache exists and is recent (within 24 hours)
-	info, err := os.Stat(cachePath)
-	if err != nil {
-		return
-	}
-
-	// Cache expired - skip notification, will be refreshed next version check
-	if info.ModTime().Add(24 * time.Hour).Before(time.Now()) {
-		return
-	}
-
-	data, err := os.ReadFile(cachePath) //nolint:gosec // G304: cachePath is from known config directory
-	if err != nil {
-		return
-	}
-
-	cachedVersion := strings.TrimSpace(string(data))
-	if cachedVersion == "" {
-		return
-	}
-
-	currentVersion := strings.TrimPrefix(version.Version, "v")
-	latestVersion := strings.TrimPrefix(cachedVersion, "v")
-
-	if currentVersion == "dev" || currentVersion == "" {
-		return
-	}
-
-	// Simple semver comparison - if latest is different and "newer"
-	if latestVersion > currentVersion {
-		iostreams.Warning("\nUpdate available: %s -> %s (run 'shelly update' to install)\n", version.Version, cachedVersion)
-	}
-}
-
-// expandAlias checks if the first argument is an alias and expands it.
-// Returns the expanded args and whether it's a shell alias.
-func expandAlias(args []string) (expandedArgs []string, isShell bool) {
-	if len(args) == 0 {
-		return args, false
-	}
-
-	// Check if first arg is an alias
-	aliasObj, ok := config.GetAlias(args[0])
-	if !ok {
-		return args, false
-	}
-
-	// Expand the alias with remaining arguments
-	expanded := config.ExpandAlias(aliasObj, args[1:])
-
-	if aliasObj.Shell {
-		return []string{expanded}, true
-	}
-
-	// Split expanded command into args
-	expandedArgs = strings.Fields(expanded)
-	return expandedArgs, false
-}
-
-// executeShellAlias runs a shell alias command.
-func executeShellAlias(ctx context.Context, args []string) int {
-	if len(args) == 0 {
-		return 0
-	}
-
-	// Execute via shell
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/sh"
-	}
-
-	//nolint:gosec // G204: args are from user-defined aliases in their own config
-	cmd := exec.CommandContext(ctx, shell, "-c", args[0])
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode()
-		}
-		fmt.Fprintf(os.Stderr, "Error executing shell alias: %v\n", err)
-		return 1
-	}
+	version.ShowUpdateNotification()
 
 	return 0
 }
@@ -307,15 +194,15 @@ func init() {
 	rootCmd.PersistentFlags().String("log-categories", "", "Filter logs by category (comma-separated: network,api,device,config,auth,plugin)")
 
 	// Bind to viper - errors indicate programming bugs, panic is appropriate
-	must(viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output")))
-	must(viper.BindPFlag("template", rootCmd.PersistentFlags().Lookup("template")))
-	must(viper.BindPFlag("verbosity", rootCmd.PersistentFlags().Lookup("verbose")))
-	must(viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet")))
-	must(viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color")))
-	must(viper.BindPFlag("plain", rootCmd.PersistentFlags().Lookup("plain")))
-	must(viper.BindPFlag("no-headers", rootCmd.PersistentFlags().Lookup("no-headers")))
-	must(viper.BindPFlag("log.json", rootCmd.PersistentFlags().Lookup("log-json")))
-	must(viper.BindPFlag("log.categories", rootCmd.PersistentFlags().Lookup("log-categories")))
+	utils.Must(viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output")))
+	utils.Must(viper.BindPFlag("template", rootCmd.PersistentFlags().Lookup("template")))
+	utils.Must(viper.BindPFlag("verbosity", rootCmd.PersistentFlags().Lookup("verbose")))
+	utils.Must(viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet")))
+	utils.Must(viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color")))
+	utils.Must(viper.BindPFlag("plain", rootCmd.PersistentFlags().Lookup("plain")))
+	utils.Must(viper.BindPFlag("no-headers", rootCmd.PersistentFlags().Lookup("no-headers")))
+	utils.Must(viper.BindPFlag("log.json", rootCmd.PersistentFlags().Lookup("log-json")))
+	utils.Must(viper.BindPFlag("log.categories", rootCmd.PersistentFlags().Lookup("log-categories")))
 
 	// Define command groups for organized help output
 	rootCmd.AddGroup(
@@ -332,7 +219,7 @@ func init() {
 	f := cmdutil.NewFactory()
 
 	// Quick commands - shortcuts for common operations
-	addCommandsToGroup(rootCmd, groupShortcuts,
+	cmdutil.AddCommandsToGroup(rootCmd, groupShortcuts,
 		on.NewCommand(f),
 		off.NewCommand(f),
 		togglecmd.NewCommand(f),
@@ -344,7 +231,7 @@ func init() {
 	)
 
 	// Control commands - direct device control
-	addCommandsToGroup(rootCmd, groupControl,
+	cmdutil.AddCommandsToGroup(rootCmd, groupControl,
 		switchcmd.NewCommand(f),
 		cover.NewCommand(f),
 		light.NewCommand(f),
@@ -357,7 +244,7 @@ func init() {
 	)
 
 	// Management commands - device and group management
-	addCommandsToGroup(rootCmd, groupManagement,
+	cmdutil.AddCommandsToGroup(rootCmd, groupManagement,
 		device.NewCommand(f),
 		group.NewCommand(f),
 		discover.NewCommand(f),
@@ -370,7 +257,7 @@ func init() {
 	)
 
 	// Configuration commands - device and service configuration
-	addCommandsToGroup(rootCmd, groupConfig,
+	cmdutil.AddCommandsToGroup(rootCmd, groupConfig,
 		configcmd.NewCommand(f),
 		wifi.NewCommand(f),
 		ethernet.NewCommand(f),
@@ -390,7 +277,7 @@ func init() {
 	)
 
 	// Monitoring commands - status and metrics
-	addCommandsToGroup(rootCmd, groupMonitoring,
+	cmdutil.AddCommandsToGroup(rootCmd, groupMonitoring,
 		monitor.NewCommand(f),
 		alert.NewCommand(f),
 		energy.NewCommand(f),
@@ -402,7 +289,7 @@ func init() {
 	)
 
 	// Troubleshooting commands - diagnostics and debugging
-	addCommandsToGroup(rootCmd, groupTroubleshooting,
+	cmdutil.AddCommandsToGroup(rootCmd, groupTroubleshooting,
 		audit.NewCommand(f),
 		benchmark.NewCommand(f),
 		debug.NewCommand(f),
@@ -413,7 +300,7 @@ func init() {
 	)
 
 	// Utility commands - CLI utilities
-	addCommandsToGroup(rootCmd, groupUtility,
+	cmdutil.AddCommandsToGroup(rootCmd, groupUtility,
 		initcmd.NewCommand(f),
 		firmware.NewCommand(f),
 		exportcmd.NewCommand(f),
@@ -427,14 +314,6 @@ func init() {
 		logcmd.NewCommand(f),
 		feedback.NewCommand(f),
 	)
-}
-
-// addCommandsToGroup adds multiple commands to the root and assigns them to a group.
-func addCommandsToGroup(root *cobra.Command, groupID string, cmds ...*cobra.Command) {
-	for _, cmd := range cmds {
-		cmd.GroupID = groupID
-		root.AddCommand(cmd)
-	}
 }
 
 func initializeConfig(_ *cobra.Command, _ []string) error {
@@ -486,7 +365,7 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 
 	// Handle color settings
 	// Priority: --no-color flag > NO_COLOR env > SHELLY_NO_COLOR env
-	if shouldDisableColor() {
+	if iostreams.IsColorDisabled() {
 		lipgloss.Writer.Profile = colorprofile.Ascii
 	}
 
@@ -494,33 +373,4 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 	iostreams.ConfigureLogger()
 
 	return nil
-}
-
-// shouldDisableColor checks if color output should be disabled.
-// Returns true if --no-color or --plain flag is set, or NO_COLOR or SHELLY_NO_COLOR env vars are set.
-func shouldDisableColor() bool {
-	// Check if --no-color or --plain flag was explicitly set
-	if viper.GetBool("no-color") || viper.GetBool("plain") {
-		return true
-	}
-
-	// Check NO_COLOR env var (standard convention: https://no-color.org/)
-	if _, ok := os.LookupEnv("NO_COLOR"); ok {
-		return true
-	}
-
-	// Check SHELLY_NO_COLOR env var (app-specific)
-	if _, ok := os.LookupEnv("SHELLY_NO_COLOR"); ok {
-		return true
-	}
-
-	return false
-}
-
-// must panics if err is not nil.
-// Use for errors that indicate programming bugs, not runtime errors.
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
 }

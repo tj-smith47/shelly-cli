@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
+
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 func TestRootCommandStructure(t *testing.T) {
@@ -94,14 +97,14 @@ func TestMust_NilError(t *testing.T) {
 	// Should not panic with nil error
 	defer func() {
 		if r := recover(); r != nil {
-			t.Errorf("must(nil) panicked: %v", r)
+			t.Errorf("utils.Must(nil) panicked: %v", r)
 		}
 	}()
 
-	must(nil)
+	utils.Must(nil)
 }
 
-func TestShouldDisableColor(t *testing.T) {
+func TestIsColorDisabled(t *testing.T) {
 	// Cannot run in parallel due to env var and viper manipulation
 
 	tests := []struct {
@@ -140,9 +143,9 @@ func TestShouldDisableColor(t *testing.T) {
 			}
 			viper.Set("no-color", tt.viperVal)
 
-			got := shouldDisableColor()
+			got := iostreams.IsColorDisabled()
 			if got != tt.want {
-				t.Errorf("shouldDisableColor() = %v, want %v", got, tt.want)
+				t.Errorf("iostreams.IsColorDisabled() = %v, want %v", got, tt.want)
 			}
 		})
 	}

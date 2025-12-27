@@ -2,7 +2,11 @@
 package config
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -139,4 +143,60 @@ func ImportAliases(filename string, merge bool) (imported, skipped int, err erro
 // ExportAliases exports all aliases to a YAML file or returns YAML string if filename is empty.
 func ExportAliases(filename string) (string, error) {
 	return getDefaultManager().ExportAliases(filename)
+}
+
+// ExpandAliasArgs checks if the first argument is an alias and expands it.
+// Returns the expanded args and whether it's a shell alias.
+func ExpandAliasArgs(args []string) (expandedArgs []string, isShell bool) {
+	if len(args) == 0 {
+		return args, false
+	}
+
+	// Check if first arg is an alias
+	aliasObj, ok := GetAlias(args[0])
+	if !ok {
+		return args, false
+	}
+
+	// Expand the alias with remaining arguments
+	expanded := ExpandAlias(aliasObj, args[1:])
+
+	if aliasObj.Shell {
+		return []string{expanded}, true
+	}
+
+	// Split expanded command into args
+	expandedArgs = strings.Fields(expanded)
+	return expandedArgs, false
+}
+
+// ExecuteShellAlias runs a shell alias command.
+// Returns the exit code from the shell command.
+func ExecuteShellAlias(ctx context.Context, args []string) int {
+	if len(args) == 0 {
+		return 0
+	}
+
+	// Execute via shell
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+
+	//nolint:gosec // G204: args are from user-defined aliases in their own config
+	cmd := exec.CommandContext(ctx, shell, "-c", args[0])
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "Error executing shell alias: %v\n", err)
+		return 1
+	}
+
+	return 0
 }

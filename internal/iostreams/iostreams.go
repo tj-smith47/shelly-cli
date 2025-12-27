@@ -75,7 +75,7 @@ func System() *IOStreams {
 	ios.isStderrTTY = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
 
 	// Determine color settings
-	ios.colorEnabled = ios.isStdoutTTY && !isColorDisabled()
+	ios.colorEnabled = ios.isStdoutTTY && !IsColorDisabled()
 	ios.colorForced = isColorForced()
 	if ios.colorForced {
 		ios.colorEnabled = true
@@ -104,8 +104,10 @@ func Test(in io.Reader, out, errOut io.Writer) *IOStreams {
 	}
 }
 
-// isColorDisabled checks flags and environment variables for color disable settings.
-func isColorDisabled() bool {
+// IsColorDisabled checks flags and environment variables for color disable settings.
+// Returns true if --no-color or --plain flag is set, or NO_COLOR, SHELLY_NO_COLOR,
+// or TERM=dumb env vars are set.
+func IsColorDisabled() bool {
 	// Check --no-color or --plain flags via viper
 	if viper.GetBool("no-color") || viper.GetBool("plain") {
 		return true
