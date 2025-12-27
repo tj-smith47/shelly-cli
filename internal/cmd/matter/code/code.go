@@ -8,9 +8,9 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -56,21 +56,18 @@ label or web UI at http://<device-ip>/matter for the QR code.`,
 	return cmd
 }
 
-// CommissioningInfo holds pairing information.
-type CommissioningInfo struct {
-	ManualCode    string `json:"manual_code,omitempty"`
-	QRCode        string `json:"qr_code,omitempty"`
-	Discriminator int    `json:"discriminator,omitempty"`
-	SetupPINCode  int    `json:"setup_pin_code,omitempty"`
-	Available     bool   `json:"available"`
-}
-
 func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
+
+	// Resolve device IP for display
+	deviceIP := ""
+	if devCfg, ok := opts.Factory.ResolveDevice(opts.Device); ok && devCfg.Address != "" {
+		deviceIP = devCfg.Address
+	}
 
 	// Check if device is commissionable
 	commissionable, err := svc.MatterIsCommissionable(ctx, opts.Device)
@@ -82,83 +79,27 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Warning("Device is not commissionable.")
 		ios.Info("Enable Matter first: shelly matter enable %s", opts.Device)
 		if opts.JSON {
-			return output.JSON(ios.Out, CommissioningInfo{Available: false})
+			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
 		}
 		return nil
 	}
 
 	// Get commissioning code
-	codeInfo, err := svc.MatterGetCommissioningCode(ctx, opts.Device)
+	info, err := svc.MatterGetCommissioningCode(ctx, opts.Device)
 	if err != nil {
 		ios.Debug("failed to get commissioning code: %v", err)
 		// Code not available via API, show instructions
 		if opts.JSON {
-			return output.JSON(ios.Out, CommissioningInfo{Available: false})
+			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
 		}
-		displayNotAvailable(opts.Factory, opts.Device)
+		term.DisplayNotAvailable(ios, deviceIP)
 		return nil
-	}
-
-	info := CommissioningInfo{
-		ManualCode:    codeInfo.ManualCode,
-		QRCode:        codeInfo.QRCode,
-		Discriminator: codeInfo.Discriminator,
-		SetupPINCode:  codeInfo.SetupPINCode,
-		Available:     codeInfo.ManualCode != "",
 	}
 
 	if opts.JSON {
 		return output.JSON(ios.Out, info)
 	}
 
-	displayCommissioningInfo(opts.Factory, info, opts.Device)
+	term.DisplayCommissioningInfo(ios, info, deviceIP)
 	return nil
-}
-
-func displayCommissioningInfo(f *cmdutil.Factory, info CommissioningInfo, device string) {
-	ios := f.IOStreams()
-	if info.Available && info.ManualCode != "" {
-		displayAvailableCode(ios, info)
-		return
-	}
-	displayNotAvailable(f, device)
-}
-
-func displayAvailableCode(ios *iostreams.IOStreams, info CommissioningInfo) {
-	ios.Println(theme.Bold().Render("Matter Pairing Code:"))
-	ios.Println()
-	ios.Printf("  Manual Code: %s\n", theme.Highlight().Render(info.ManualCode))
-	if info.QRCode != "" {
-		ios.Printf("  QR Data: %s\n", info.QRCode)
-	}
-	if info.Discriminator > 0 {
-		ios.Printf("  Discriminator: %d\n", info.Discriminator)
-	}
-	if info.SetupPINCode > 0 {
-		ios.Printf("  Setup PIN: %d\n", info.SetupPINCode)
-	}
-	ios.Println()
-	ios.Info("Use this code in your Matter controller app.")
-}
-
-func displayNotAvailable(f *cmdutil.Factory, device string) {
-	ios := f.IOStreams()
-
-	deviceIP := ""
-	if devCfg, ok := f.ResolveDevice(device); ok && devCfg.Address != "" {
-		deviceIP = devCfg.Address
-	}
-
-	ios.Println(theme.Bold().Render("Matter Pairing Information:"))
-	ios.Println()
-	ios.Info("Pairing code not available via API.")
-	ios.Println()
-	ios.Info("To get the pairing code:")
-	ios.Info("  1. Check the device label for QR code")
-	if deviceIP != "" {
-		ios.Info("  2. Visit: http://%s/matter", deviceIP)
-	} else {
-		ios.Info("  2. Visit the device web UI at /matter")
-	}
-	ios.Info("  3. Use your Matter controller app to scan the QR code")
 }

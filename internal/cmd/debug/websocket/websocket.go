@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -102,14 +103,19 @@ func run(ctx context.Context, opts *Options) error { //nolint:gocyclo // will fi
 		}
 
 		// Get WebSocket config
-		result, err := conn.Call(ctx, "Ws.GetConfig", nil)
-		if err != nil {
-			ios.Debug("Ws.GetConfig failed: %v", err)
+		result, wsErr := conn.Call(ctx, "Ws.GetConfig", nil)
+		if wsErr == nil {
+			term.PrintJSONResult(ios, "WebSocket Config:", result)
+		} else {
+			ios.Debug("Ws.GetConfig failed: %v", wsErr)
 			ios.Warning("WebSocket configuration not available")
 			ios.Println()
-			tryFallbackWsConfig(ctx, conn, ios)
-		} else {
-			term.PrintJSONResult(ios, "WebSocket Config:", result)
+			// Fallback: try to extract ws config from Sys.GetConfig
+			sysResult, sysErr := conn.Call(ctx, "Sys.GetConfig", nil)
+			wsConfig := output.ExtractMapSection(sysResult, "ws")
+			if sysErr == nil && wsConfig != nil {
+				term.DisplayWebSocketFallbackConfig(ios, wsConfig)
+			}
 		}
 
 		// Get WebSocket status
@@ -205,35 +211,4 @@ func run(ctx context.Context, opts *Options) error { //nolint:gocyclo // will fi
 	ios.Success("Received %d events", eventCount)
 
 	return nil
-}
-
-// tryFallbackWsConfig attempts to get WebSocket config from Sys.GetConfig.
-func tryFallbackWsConfig(ctx context.Context, conn *client.Client, ios *iostreams.IOStreams) {
-	sysResult, sysErr := conn.Call(ctx, "Sys.GetConfig", nil)
-	if sysErr != nil {
-		return
-	}
-
-	jsonBytes, err := json.Marshal(sysResult)
-	if err != nil {
-		ios.DebugErr("failed to marshal sys config", err)
-		return
-	}
-
-	var cfg map[string]any
-	if err := json.Unmarshal(jsonBytes, &cfg); err != nil {
-		ios.DebugErr("failed to unmarshal sys config", err)
-		return
-	}
-
-	ws, ok := cfg["ws"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	ios.Println("  " + theme.Highlight().Render("WebSocket (from Sys.GetConfig):"))
-	for k, v := range ws {
-		ios.Printf("    %s: %v\n", k, v)
-	}
-	ios.Println()
 }

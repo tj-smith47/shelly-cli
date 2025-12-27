@@ -744,3 +744,25 @@ func getChromaStyle() *chroma.Style {
 
 	return styles.Fallback
 }
+
+// ExtractMapSection extracts a map section from an RPC result.
+// Useful for extracting subsections like "ws" from Sys.GetConfig results.
+// Returns nil if the section doesn't exist or result isn't a map.
+func ExtractMapSection(result any, key string) map[string]any {
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(jsonBytes, &m); err != nil {
+		return nil
+	}
+
+	section, ok := m[key].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	return section
+}

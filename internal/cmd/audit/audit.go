@@ -44,35 +44,27 @@ Use --all to audit all registered devices.`,
   # Audit all registered devices
   shelly audit --all`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			devices := args
 			if all {
-				return runAll(cmd.Context(), f)
-			}
-			if len(args) == 0 {
+				registered := config.ListDevices()
+				if len(registered) == 0 {
+					f.IOStreams().Warning("No devices registered. Run 'shelly discover mdns --register' first.")
+					return nil
+				}
+				devices = make([]string, 0, len(registered))
+				for name := range registered {
+					devices = append(devices, name)
+				}
+			} else if len(args) == 0 {
 				return fmt.Errorf("specify device(s) or use --all")
 			}
-			return run(cmd.Context(), f, args)
+			return run(cmd.Context(), f, devices)
 		},
 	}
 
 	cmd.Flags().BoolVar(&all, "all", false, "Audit all registered devices")
 
 	return cmd
-}
-
-func runAll(ctx context.Context, f *cmdutil.Factory) error {
-	devices := config.ListDevices()
-	if len(devices) == 0 {
-		ios := f.IOStreams()
-		ios.Warning("No devices registered. Run 'shelly discover mdns --register' first.")
-		return nil
-	}
-
-	deviceList := make([]string, 0, len(devices))
-	for name := range devices {
-		deviceList = append(deviceList, name)
-	}
-
-	return run(ctx, f, deviceList)
 }
 
 func run(ctx context.Context, f *cmdutil.Factory, devices []string) error {

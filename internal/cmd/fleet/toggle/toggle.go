@@ -79,21 +79,15 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 	}
 	defer conn.Close()
 
-	// Execute the command
-	results := executeToggle(ctx, conn.Manager, devices, opts)
-
-	// Report results
-	return shelly.ReportBatchResults(ios, results, "toggled")
-}
-
-func executeToggle(ctx context.Context, fm *integrator.FleetManager, devices []string, opts *Options) []integrator.BatchResult {
+	// Execute the command based on options
 	// Shelly API supports "toggle" as a turn value
 	toggleParams := map[string]any{"id": 0, "turn": "toggle"}
+	var results []integrator.BatchResult
 
 	switch {
 	case opts.All:
 		// Get all controllable devices and build toggle commands
-		allDevices := fm.AccountManager().GetControllableDevices()
+		allDevices := conn.Manager.AccountManager().GetControllableDevices()
 		commands := make([]integrator.BatchCommand, 0, len(allDevices))
 		for i := range allDevices {
 			commands = append(commands, integrator.BatchCommand{
@@ -102,11 +96,9 @@ func executeToggle(ctx context.Context, fm *integrator.FleetManager, devices []s
 				Params:   toggleParams,
 			})
 		}
-		return fm.SendBatchCommands(ctx, commands)
-
+		results = conn.Manager.SendBatchCommands(ctx, commands)
 	case opts.Group != "":
-		return fm.SendGroupCommand(ctx, opts.Group, "relay", toggleParams)
-
+		results = conn.Manager.SendGroupCommand(ctx, opts.Group, "relay", toggleParams)
 	default:
 		commands := make([]integrator.BatchCommand, len(devices))
 		for i, deviceID := range devices {
@@ -116,6 +108,9 @@ func executeToggle(ctx context.Context, fm *integrator.FleetManager, devices []s
 				Params:   toggleParams,
 			}
 		}
-		return fm.SendBatchCommands(ctx, commands)
+		results = conn.Manager.SendBatchCommands(ctx, commands)
 	}
+
+	// Report results
+	return shelly.ReportBatchResults(ios, results, "toggled")
 }

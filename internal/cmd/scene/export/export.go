@@ -56,13 +56,6 @@ Format is auto-detected from file extension (.json, .yaml, .yml).`,
 	return cmd
 }
 
-// Scene represents a scene for export (same as config.Scene but explicit).
-type Scene struct {
-	Name        string               `json:"name" yaml:"name"`
-	Description string               `json:"description,omitempty" yaml:"description,omitempty"`
-	Actions     []config.SceneAction `json:"actions" yaml:"actions"`
-}
-
 func run(f *cmdutil.Factory, name, file, format string) error {
 	ios := f.IOStreams()
 
@@ -71,11 +64,8 @@ func run(f *cmdutil.Factory, name, file, format string) error {
 		return fmt.Errorf("scene %q not found", name)
 	}
 
-	export := Scene{
-		Name:        scene.Name,
-		Description: scene.Description,
-		Actions:     scene.Actions,
-	}
+	// Use config.Scene directly for export (has JSON/YAML tags)
+	export := scene
 
 	// Determine format from file extension if file specified
 	if file != "" {

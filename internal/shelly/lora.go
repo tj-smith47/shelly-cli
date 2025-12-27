@@ -6,23 +6,9 @@ import (
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
-
-// LoRaConfig represents LoRa configuration.
-type LoRaConfig struct {
-	ID   int   `json:"id"`
-	Freq int64 `json:"freq"`
-	BW   int   `json:"bw"`
-	DR   int   `json:"dr"`
-	TxP  int   `json:"txp"`
-}
-
-// LoRaStatus represents LoRa status.
-type LoRaStatus struct {
-	ID   int     `json:"id"`
-	RSSI int     `json:"rssi"`
-	SNR  float64 `json:"snr"`
-}
 
 // LoRaSendBytes sends data over LoRa.
 func (s *Service) LoRaSendBytes(ctx context.Context, identifier string, componentID int, data string) error {
@@ -90,4 +76,63 @@ func (s *Service) LoRaGetStatus(ctx context.Context, identifier string, componen
 		return nil
 	})
 	return status, err
+}
+
+// FetchLoRaFullStatus fetches combined LoRa config and status.
+func (s *Service) FetchLoRaFullStatus(ctx context.Context, device string, componentID int, ios *iostreams.IOStreams) (model.LoRaFullStatus, error) {
+	var full model.LoRaFullStatus
+
+	// Get config
+	cfgMap, err := s.LoRaGetConfig(ctx, device, componentID)
+	if err != nil {
+		ios.Debug("LoRa.GetConfig failed: %v", err)
+		return full, fmt.Errorf("LoRa not available on this device: %w", err)
+	}
+
+	full.Config = parseLoRaConfig(cfgMap)
+
+	// Get status
+	statusMap, err := s.LoRaGetStatus(ctx, device, componentID)
+	if err != nil {
+		ios.Debug("LoRa.GetStatus failed: %v", err)
+		// Config succeeded, status failed - still return partial info
+		return full, nil
+	}
+	full.Status = parseLoRaStatus(statusMap)
+
+	return full, nil
+}
+
+func parseLoRaConfig(cfgMap map[string]any) *model.LoRaConfig {
+	cfg := &model.LoRaConfig{}
+	if id, ok := cfgMap["id"].(float64); ok {
+		cfg.ID = int(id)
+	}
+	if freq, ok := cfgMap["freq"].(float64); ok {
+		cfg.Freq = int64(freq)
+	}
+	if bw, ok := cfgMap["bw"].(float64); ok {
+		cfg.BW = int(bw)
+	}
+	if dr, ok := cfgMap["dr"].(float64); ok {
+		cfg.DR = int(dr)
+	}
+	if txp, ok := cfgMap["txp"].(float64); ok {
+		cfg.TxP = int(txp)
+	}
+	return cfg
+}
+
+func parseLoRaStatus(statusMap map[string]any) *model.LoRaStatus {
+	st := &model.LoRaStatus{}
+	if id, ok := statusMap["id"].(float64); ok {
+		st.ID = int(id)
+	}
+	if rssi, ok := statusMap["rssi"].(float64); ok {
+		st.RSSI = int(rssi)
+	}
+	if snr, ok := statusMap["snr"].(float64); ok {
+		st.SNR = snr
+	}
+	return st
 }

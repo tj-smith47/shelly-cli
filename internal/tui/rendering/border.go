@@ -336,6 +336,106 @@ func BuildBottomBorderWithHint(width int, hint string, border lipgloss.Border) s
 		bottomRight
 }
 
+// BuildBottomBorderWithFooterBadgeAndHint creates a bottom border with footer, badge, and hint sections.
+// Example output: "╰─├─ footer ─┼─ badge ─┤───├─ ⇧1 ─┤╯".
+func BuildBottomBorderWithFooterBadgeAndHint(width int, footer, badge, hint string, border lipgloss.Border) string {
+	if width < 5 {
+		return ""
+	}
+
+	// Handle degenerate cases
+	if badge == "" {
+		return BuildBottomBorderWithFooterAndHint(width, footer, hint, border)
+	}
+	if footer == "" && hint == "" {
+		return BuildBottomBorderWithFooter(width, badge, border)
+	}
+
+	bottomLeft := border.BottomLeft
+	bottomRight := border.BottomRight
+	bottom := border.Bottom
+	midLeft := border.MiddleLeft
+	midRight := border.MiddleRight
+	middle := border.Middle // ┼ for separator between footer and badge
+
+	bottomLeftW := charWidth(bottomLeft)
+	bottomRightW := charWidth(bottomRight)
+	bottomW := charWidth(bottom)
+	midLeftW := charWidth(midLeft)
+	midRightW := charWidth(midRight)
+	middleW := charWidth(middle)
+
+	// Footer section: ├─ footer ─┼
+	footerText := ""
+	footerWidth := 0
+	if footer != "" {
+		footerText = " " + footer + " "
+		footerWidth = charWidth(footerText)
+	}
+
+	// Badge section: ─ badge ─┤
+	badgeText := " " + badge + " "
+	badgeWidth := charWidth(badgeText)
+
+	// Hint section: ├─ hint ─┤
+	hintText := ""
+	hintWidth := 0
+	if hint != "" {
+		hintText = " " + hint + " "
+		hintWidth = charWidth(hintText)
+	}
+
+	// Calculate minimum widths
+	var minWidth int
+	if footer != "" {
+		// Structure with footer: BottomLeft + fill + midLeft + ─ + footer + ─ + middle + ─ + badge + ─ + midRight + fill + [hint section] + BottomRight
+		minWidth = midLeftW + bottomW + footerWidth + bottomW + middleW + bottomW + badgeWidth + bottomW + midRightW
+	} else {
+		// Structure without footer: BottomLeft + fill + midLeft + ─ + badge + ─ + midRight + fill + [hint section] + BottomRight
+		minWidth = midLeftW + bottomW + badgeWidth + bottomW + midRightW
+	}
+
+	if hint != "" {
+		minWidth += midLeftW + bottomW + hintWidth + bottomW + midRightW
+	}
+
+	availableForFill := width - bottomLeftW - bottomRightW - minWidth
+
+	if availableForFill < 2 {
+		// Not enough space, fall back to simpler version
+		return BuildBottomBorderWithFooterAndHint(width, footer+" "+badge, hint, border)
+	}
+
+	// Minimal left fill (1), rest between sections
+	leftFillCount := 1
+	midFillCount := (availableForFill / bottomW) - leftFillCount
+
+	if midFillCount < 0 {
+		midFillCount = 0
+	}
+
+	var result string
+	result = bottomLeft + strings.Repeat(bottom, leftFillCount)
+
+	if footer != "" {
+		// Footer + badge with separator
+		result += midLeft + bottom + footerText + bottom + middle + bottom + badgeText + bottom + midRight
+	} else {
+		// Badge only
+		result += midLeft + bottom + badgeText + bottom + midRight
+	}
+
+	result += strings.Repeat(bottom, midFillCount)
+
+	if hint != "" {
+		result += midLeft + bottom + hintText + bottom + midRight
+	}
+
+	result += bottomRight
+
+	return result
+}
+
 // BuildBottomBorderWithFooterAndHint creates a bottom border with footer on left and hint on right.
 // Example output: "╰─├─ footer ─┤─────────├─ ⇧1 ─┤╯".
 func BuildBottomBorderWithFooterAndHint(width int, footer, hint string, border lipgloss.Border) string {

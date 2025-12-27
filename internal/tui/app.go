@@ -2044,16 +2044,17 @@ func (m Model) renderEventsColumn(width, height int) string {
 	// Build badge with status info (count, paused, filtered)
 	badge := m.events.StatusBadge()
 
-	// Build footer with keybindings and scroll info
+	// Build footer with keybindings
 	footer := m.events.FooterText()
-	if scrollInfo := m.events.ScrollInfo(); scrollInfo != "" {
-		footer = footer + " " + scrollInfo
-	}
+
+	// Scroll info goes in its own section (footerBadge)
+	scrollInfo := m.events.ScrollInfo()
 
 	r := rendering.New(width, height).
 		SetTitle("Events").
 		SetBadge(badge).
 		SetFooter(footer).
+		SetFooterBadge(scrollInfo).
 		SetFocused(focused).
 		SetPanelIndex(3).
 		SetFocusColor(orangeBorder).

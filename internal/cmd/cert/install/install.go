@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // Options holds the command options.
@@ -48,13 +49,6 @@ as well as client certificates for mutual TLS authentication.`,
 	return cmd
 }
 
-// certData holds the certificate data to install.
-type certData struct {
-	caData   []byte
-	certData []byte
-	keyData  []byte
-}
-
 func (opts *Options) validate() error {
 	if opts.CAFile == "" && opts.ClientCert == "" {
 		return fmt.Errorf("specify --ca or --client-cert")
@@ -65,23 +59,23 @@ func (opts *Options) validate() error {
 	return nil
 }
 
-func (opts *Options) loadCertData() (*certData, error) {
-	data := &certData{}
+func (opts *Options) loadCertData() (*model.CertInstallData, error) {
+	data := &model.CertInstallData{}
 	var err error
 
 	if opts.CAFile != "" {
-		data.caData, err = os.ReadFile(opts.CAFile)
+		data.CAData, err = os.ReadFile(opts.CAFile)
 		if err != nil {
 			return nil, fmt.Errorf("read CA file: %w", err)
 		}
 	}
 
 	if opts.ClientCert != "" {
-		data.certData, err = os.ReadFile(opts.ClientCert)
+		data.CertData, err = os.ReadFile(opts.ClientCert)
 		if err != nil {
 			return nil, fmt.Errorf("read client cert: %w", err)
 		}
-		data.keyData, err = os.ReadFile(opts.ClientKey)
+		data.KeyData, err = os.ReadFile(opts.ClientKey)
 		if err != nil {
 			return nil, fmt.Errorf("read client key: %w", err)
 		}
@@ -117,15 +111,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 			}
 		}()
 
-		if len(data.caData) > 0 {
-			if _, callErr := conn.Call(ctx, "Shelly.PutUserCA", map[string]any{"data": string(data.caData)}); callErr != nil {
+		if len(data.CAData) > 0 {
+			if _, callErr := conn.Call(ctx, "Shelly.PutUserCA", map[string]any{"data": string(data.CAData)}); callErr != nil {
 				return fmt.Errorf("install CA: %w", callErr)
 			}
 			installedCA = true
 		}
 
-		if len(data.certData) > 0 {
-			params := map[string]any{"data": string(data.certData), "key": string(data.keyData)}
+		if len(data.CertData) > 0 {
+			params := map[string]any{"data": string(data.CertData), "key": string(data.KeyData)}
 			if _, callErr := conn.Call(ctx, "Shelly.PutTLSClientCert", params); callErr != nil {
 				return fmt.Errorf("install client cert: %w", callErr)
 			}

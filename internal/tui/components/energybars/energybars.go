@@ -141,8 +141,11 @@ func (m Model) View() string {
 	}
 
 	// Use rendering package for consistent embedded title styling
+	// Show PM device count as badge
+	badge := fmt.Sprintf("%d devices", len(m.bars))
 	r := rendering.New(m.width, m.height).
 		SetTitle("Power Consumption").
+		SetBadge(badge).
 		SetFocused(false)
 
 	return r.SetContent(content.String()).Render()

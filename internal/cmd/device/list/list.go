@@ -3,34 +3,15 @@ package list
 
 import (
 	"context"
-	"fmt"
-	"sort"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
-
-// DeviceInfo represents device information for JSON/YAML output.
-type DeviceInfo struct {
-	Name             string `json:"name" yaml:"name"`
-	Address          string `json:"address" yaml:"address"`
-	Platform         string `json:"platform" yaml:"platform"`
-	Model            string `json:"model" yaml:"model"`
-	Type             string `json:"type,omitempty" yaml:"type,omitempty"`
-	Generation       int    `json:"generation" yaml:"generation"`
-	Auth             bool   `json:"auth" yaml:"auth"`
-	CurrentVersion   string `json:"current_version,omitempty" yaml:"current_version,omitempty"`
-	AvailableVersion string `json:"available_version,omitempty" yaml:"available_version,omitempty"`
-	HasUpdate        bool   `json:"has_update,omitempty" yaml:"has_update,omitempty"`
-}
 
 // NewCommand creates the device list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
@@ -115,7 +96,13 @@ func run(ctx context.Context, f *cmdutil.Factory, generation int, deviceType, pl
 	}
 
 	// Apply filters and build sorted list
-	filtered, platforms := filterDevices(devices, generation, deviceType, platform)
+	filterOpts := shelly.DeviceListFilterOptions{
+		Generation: generation,
+		DeviceType: deviceType,
+		Platform:   platform,
+	}
+	filtered, platforms := shelly.FilterDeviceList(devices, filterOpts)
+
 	if len(filtered) == 0 {
 		ios.Info("No devices match the specified filters")
 		return nil
@@ -124,11 +111,11 @@ func run(ctx context.Context, f *cmdutil.Factory, generation int, deviceType, pl
 	// Populate firmware info if version display or updates-first sorting is requested
 	if showVersion || updatesFirst {
 		svc := f.ShellyService()
-		populateFirmwareInfo(ctx, svc, filtered)
+		svc.PopulateDeviceListFirmware(ctx, filtered)
 	}
 
 	// Sort: updates first if requested, then by name
-	sortDevices(filtered, updatesFirst)
+	shelly.SortDeviceList(filtered, updatesFirst)
 
 	// Handle structured output (JSON/YAML)
 	if output.WantsStructured() {
@@ -137,127 +124,7 @@ func run(ctx context.Context, f *cmdutil.Factory, generation int, deviceType, pl
 
 	// Show Platform column only when there are multiple platforms
 	showPlatform := len(platforms) > 1
-	printTable(ios, filtered, showPlatform, showVersion)
+	term.DisplayDeviceList(ios, filtered, showPlatform, showVersion)
 
 	return nil
-}
-
-// filterDevices filters devices based on criteria.
-// Returns filtered devices and set of unique platforms.
-func filterDevices(devices map[string]model.Device, generation int, deviceType, platform string) (filtered []DeviceInfo, platforms map[string]struct{}) {
-	filtered = make([]DeviceInfo, 0, len(devices))
-	platforms = make(map[string]struct{})
-
-	for name, dev := range devices {
-		if !matchesFilters(dev, generation, deviceType, platform) {
-			continue
-		}
-		devPlatform := dev.GetPlatform()
-		platforms[devPlatform] = struct{}{}
-		filtered = append(filtered, DeviceInfo{
-			Name:       name,
-			Address:    dev.Address,
-			Platform:   devPlatform,
-			Model:      dev.Model,
-			Type:       dev.Type,
-			Generation: dev.Generation,
-			Auth:       dev.Auth != nil,
-		})
-	}
-
-	return filtered, platforms
-}
-
-// populateFirmwareInfo fills in firmware version info from the cache.
-// Uses a short cache validity period (5 minutes) so it doesn't trigger network calls during list.
-func populateFirmwareInfo(ctx context.Context, svc *shelly.Service, devices []DeviceInfo) {
-	const cacheMaxAge = 5 * time.Minute
-	for i := range devices {
-		entry := svc.GetCachedFirmware(ctx, devices[i].Name, cacheMaxAge)
-		if entry != nil && entry.Info != nil {
-			devices[i].CurrentVersion = entry.Info.Current
-			devices[i].AvailableVersion = entry.Info.Available
-			devices[i].HasUpdate = entry.Info.HasUpdate
-		}
-	}
-}
-
-// sortDevices sorts the device list. If updatesFirst is true, devices with
-// available updates are sorted to the top. Within each group, devices are sorted by name.
-func sortDevices(devices []DeviceInfo, updatesFirst bool) {
-	sort.Slice(devices, func(i, j int) bool {
-		if updatesFirst {
-			// Updates first
-			if devices[i].HasUpdate != devices[j].HasUpdate {
-				return devices[i].HasUpdate // true sorts before false
-			}
-		}
-		// Then by name
-		return devices[i].Name < devices[j].Name
-	})
-}
-
-// matchesFilters checks if a device matches all filter criteria.
-func matchesFilters(dev model.Device, generation int, deviceType, platform string) bool {
-	if generation > 0 && dev.Generation != generation {
-		return false
-	}
-	if deviceType != "" && dev.Type != deviceType {
-		return false
-	}
-	if platform != "" && dev.GetPlatform() != platform {
-		return false
-	}
-	return true
-}
-
-// printTable renders device list as a table.
-func printTable(ios *iostreams.IOStreams, devices []DeviceInfo, showPlatform, showVersion bool) {
-	var table *output.Table
-
-	// Build headers based on options
-	headers := []string{"#", "Name", "Address"}
-	if showPlatform {
-		headers = append(headers, "Platform")
-	}
-	headers = append(headers, "Type", "Model", "Generation")
-	if showVersion {
-		headers = append(headers, "Version", "Update")
-	}
-	headers = append(headers, "Auth")
-
-	table = output.NewStyledTable(ios, headers...)
-
-	for i, dev := range devices {
-		gen := output.RenderGeneration(dev.Generation)
-		auth := output.RenderAuthRequired(dev.Auth)
-
-		// Build row based on options
-		row := []string{fmt.Sprintf("%d", i+1), dev.Name, dev.Address}
-		if showPlatform {
-			row = append(row, dev.Platform)
-		}
-		row = append(row, dev.Type, dev.Model, gen)
-		if showVersion {
-			version := dev.CurrentVersion
-			if version == "" {
-				version = "-"
-			}
-			update := "-"
-			if dev.HasUpdate && dev.AvailableVersion != "" {
-				update = theme.StatusOK().Render("↑ " + dev.AvailableVersion)
-			}
-			row = append(row, version, update)
-		}
-		row = append(row, auth)
-
-		table.AddRow(row...)
-	}
-
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-	if _, err := fmt.Fprintln(ios.Out); err != nil {
-		ios.DebugErr("print newline", err)
-	}
 }

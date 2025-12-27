@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the power status command.
@@ -68,62 +68,26 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 
 	switch componentType {
 	case shelly.ComponentTypePM, shelly.ComponentTypePM1:
-		// Both PM and PM1 return PMStatus
-		return showPMStatus(ctx, ios, svc, device, id, componentType)
+		var status *shelly.PMStatus
+		var err error
+
+		if componentType == shelly.ComponentTypePM {
+			status, err = svc.GetPMStatus(ctx, device, id)
+		} else {
+			status, err = svc.GetPM1Status(ctx, device, id)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to get %s status: %w", componentType, err)
+		}
+
+		if output.WantsStructured() {
+			return output.FormatOutput(ios.Out, status)
+		}
+
+		term.DisplayPMStatusDetails(ios, status, componentType)
+		return nil
 	default:
 		return fmt.Errorf("no power meter components found")
 	}
-}
-
-func showPMStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string, id int, componentType string) error {
-	var status *shelly.PMStatus
-	var err error
-
-	if componentType == shelly.ComponentTypePM {
-		status, err = svc.GetPMStatus(ctx, device, id)
-	} else {
-		status, err = svc.GetPM1Status(ctx, device, id)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to get %s status: %w", componentType, err)
-	}
-
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, status)
-	}
-
-	// Human-readable format
-	typeLabel := "Power Meter (PM)"
-	if componentType == shelly.ComponentTypePM1 {
-		typeLabel = "Power Meter (PM1)"
-	}
-	ios.Printf("%s #%d\n\n", typeLabel, status.ID)
-	ios.Printf("Voltage: %.2f V\n", status.Voltage)
-	ios.Printf("Current: %.2f A\n", status.Current)
-	ios.Printf("Power:   %.2f W\n", status.APower)
-
-	if status.Freq != nil {
-		ios.Printf("Frequency: %.2f Hz\n", *status.Freq)
-	}
-
-	// Energy counters
-	if status.AEnergy != nil {
-		ios.Printf("\nAccumulated Energy:\n")
-		ios.Printf("  Total: %.2f Wh\n", status.AEnergy.Total)
-		if status.AEnergy.MinuteTs != nil && len(status.AEnergy.ByMinute) > 0 {
-			ios.Printf("  Recent (by minute): %v\n", status.AEnergy.ByMinute[:min(5, len(status.AEnergy.ByMinute))])
-		}
-	}
-
-	if status.RetAEnergy != nil {
-		ios.Printf("\nReturn Energy:\n")
-		ios.Printf("  Total: %.2f Wh\n", status.RetAEnergy.Total)
-	}
-
-	if len(status.Errors) > 0 {
-		ios.Printf("\nErrors: %v\n", status.Errors)
-	}
-
-	return nil
 }

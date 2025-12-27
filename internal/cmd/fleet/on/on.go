@@ -79,21 +79,13 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 	}
 	defer conn.Close()
 
-	// Execute the command
-	results := executeOn(ctx, conn.Manager, devices, opts)
-
-	// Report results
-	return shelly.ReportBatchResults(ios, results, "turned on")
-}
-
-func executeOn(ctx context.Context, fm *integrator.FleetManager, devices []string, opts *Options) []integrator.BatchResult {
+	// Execute the command based on options
+	var results []integrator.BatchResult
 	switch {
 	case opts.All:
-		return fm.AllRelaysOn(ctx)
-
+		results = conn.Manager.AllRelaysOn(ctx)
 	case opts.Group != "":
-		return fm.GroupRelaysOn(ctx, opts.Group)
-
+		results = conn.Manager.GroupRelaysOn(ctx, opts.Group)
 	default:
 		commands := make([]integrator.BatchCommand, len(devices))
 		for i, deviceID := range devices {
@@ -103,6 +95,9 @@ func executeOn(ctx context.Context, fm *integrator.FleetManager, devices []strin
 				Params:   map[string]any{"id": 0, "turn": "on"},
 			}
 		}
-		return fm.SendBatchCommands(ctx, commands)
+		results = conn.Manager.SendBatchCommands(ctx, commands)
 	}
+
+	// Report results
+	return shelly.ReportBatchResults(ios, results, "turned on")
 }

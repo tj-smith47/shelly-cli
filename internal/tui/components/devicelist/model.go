@@ -387,10 +387,7 @@ func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 		rows.WriteString(row + "\n")
 	}
 
-	// Scroll indicator
-	scrollInfo := m.styles.Separator.Render(m.scroller.ScrollInfo())
-
-	content := rows.String() + scrollInfo
+	content := strings.TrimSuffix(rows.String(), "\n")
 
 	// In listOnly mode, just return content (border handled by app.go)
 	if m.listOnly {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -17,18 +16,23 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	filterDeviceFlag string
-	filterEventFlag  string
-	formatFlag       string
-	rawFlag          bool
-)
+// Options holds command options.
+type Options struct {
+	DeviceFilter string
+	EventFilter  string
+	Format       string
+	Raw          bool
+}
 
 // NewCommand creates the cloud events command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{}
+
 	cmd := &cobra.Command{
 		Use:     "events",
 		Aliases: []string{"watch", "subscribe"},
@@ -57,37 +61,19 @@ Event types:
   # Output in JSON format
   shelly cloud events --format json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(f, cmd.Context())
+			return run(cmd.Context(), f, opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&filterDeviceFlag, "device", "", "Filter by device ID")
-	cmd.Flags().StringVar(&filterEventFlag, "event", "", "Filter by event type")
-	cmd.Flags().StringVar(&formatFlag, "format", "text", "Output format (text, json)")
-	cmd.Flags().BoolVar(&rawFlag, "raw", false, "Output raw JSON messages")
+	cmd.Flags().StringVar(&opts.DeviceFilter, "device", "", "Filter by device ID")
+	cmd.Flags().StringVar(&opts.EventFilter, "event", "", "Filter by event type")
+	cmd.Flags().StringVar(&opts.Format, "format", "text", "Output format (text, json)")
+	cmd.Flags().BoolVar(&opts.Raw, "raw", false, "Output raw JSON messages")
 
 	return cmd
 }
 
-// cloudEvent represents a parsed cloud WebSocket event.
-type cloudEvent struct {
-	Event     string          `json:"event"`
-	DeviceID  string          `json:"device_id,omitempty"`
-	Device    string          `json:"device,omitempty"`
-	Status    json.RawMessage `json:"status,omitempty"`
-	Settings  json.RawMessage `json:"settings,omitempty"`
-	Online    *int            `json:"online,omitempty"`
-	Timestamp int64           `json:"ts,omitempty"`
-}
-
-func (e *cloudEvent) getDeviceID() string {
-	if e.DeviceID != "" {
-		return e.DeviceID
-	}
-	return e.Device
-}
-
-func run(f *cmdutil.Factory, ctx context.Context) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
 
 	// Check if logged in
@@ -140,141 +126,40 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	ios.Success("Connected! Listening for events... (Ctrl+C to stop)")
 	ios.Println()
 
-	// Read loop
-	return readEvents(ctx, ios, conn)
-}
+	// Stream events
+	streamOpts := shelly.CloudEventStreamOptions{
+		DeviceFilter: opts.DeviceFilter,
+		EventFilter:  opts.EventFilter,
+		Raw:          opts.Raw,
+	}
 
-func readEvents(ctx context.Context, ios *iostreams.IOStreams, conn *websocket.Conn) error {
-	for {
-		select {
-		case <-ctx.Done():
-			ios.Println()
-			ios.Info("Disconnected")
+	err = shelly.StreamCloudEvents(ctx, conn, streamOpts, func(event *model.CloudEvent, raw []byte) error {
+		// Raw output mode
+		if opts.Raw {
+			ios.Println(string(raw))
 			return nil
+		}
+
+		// Output based on format
+		switch opts.Format {
+		case "json":
+			formatted, jsonErr := json.Marshal(event)
+			if jsonErr != nil {
+				return jsonErr
+			}
+			ios.Println(string(formatted))
 		default:
+			term.DisplayCloudEvent(ios, event)
 		}
 
-		// Set read deadline
-		if err := conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
-			return fmt.Errorf("failed to set read deadline: %w", err)
-		}
-
-		_, message, readErr := conn.ReadMessage()
-		if readErr != nil {
-			return handleReadError(ctx, readErr)
-		}
-
-		// Handle the message
-		if err := handleMessage(ios, message); err != nil {
-			ios.Debug("Error handling message: %v", err)
-		}
-	}
-}
-
-func handleMessage(ios *iostreams.IOStreams, data []byte) error {
-	// Raw output mode
-	if rawFlag {
-		ios.Println(string(data))
 		return nil
-	}
+	})
 
-	// Parse the event
-	var event cloudEvent
-	if err := json.Unmarshal(data, &event); err != nil {
-		return fmt.Errorf("failed to parse message: %w", err)
-	}
-
-	// Apply filters
-	if filterDeviceFlag != "" && event.getDeviceID() != filterDeviceFlag {
-		return nil
-	}
-	if filterEventFlag != "" && !strings.Contains(event.Event, filterEventFlag) {
-		return nil
-	}
-
-	// Output based on format
-	switch formatFlag {
-	case "json":
-		formatted, err := json.Marshal(event)
-		if err != nil {
-			return err
-		}
-		ios.Println(string(formatted))
-	default:
-		displayEvent(ios, &event)
-	}
-
-	return nil
-}
-
-func displayEvent(ios *iostreams.IOStreams, event *cloudEvent) {
-	timestamp := time.Now().Format("15:04:05")
-	if event.Timestamp > 0 {
-		timestamp = time.Unix(event.Timestamp, 0).Format("15:04:05")
-	}
-
-	deviceID := event.getDeviceID()
-	if deviceID == "" {
-		deviceID = "(unknown)"
-	}
-
-	switch event.Event {
-	case "Shelly:Online":
-		status := "offline"
-		if event.Online != nil && *event.Online == 1 {
-			status = "online"
-		}
-		ios.Printf("[%s] %s %s: %s\n", timestamp, event.Event, deviceID, status)
-
-	case "Shelly:StatusOnChange":
-		ios.Printf("[%s] %s %s\n", timestamp, event.Event, deviceID)
-		if len(event.Status) > 0 {
-			printIndentedJSON(ios, event.Status)
-		}
-
-	case "Shelly:Settings":
-		ios.Printf("[%s] %s %s\n", timestamp, event.Event, deviceID)
-		if len(event.Settings) > 0 {
-			printIndentedJSON(ios, event.Settings)
-		}
-
-	default:
-		ios.Printf("[%s] %s %s\n", timestamp, event.Event, deviceID)
-	}
-}
-
-func printIndentedJSON(ios *iostreams.IOStreams, data json.RawMessage) {
-	var parsed any
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		ios.Printf("  %s\n", string(data))
-		return
-	}
-
-	formatted, err := json.MarshalIndent(parsed, "  ", "  ")
 	if err != nil {
-		ios.Printf("  %s\n", string(data))
-		return
+		return err
 	}
 
-	ios.Printf("  %s\n", string(formatted))
-}
-
-// handleReadError processes WebSocket read errors.
-// Returns nil for expected closures (normal close, context cancelled).
-func handleReadError(ctx context.Context, err error) error {
-	// Check for expected closure scenarios
-	if isExpectedClosure(ctx, err) {
-		return nil
-	}
-	return fmt.Errorf("read error: %w", err)
-}
-
-// isExpectedClosure checks if the error represents a normal termination.
-func isExpectedClosure(ctx context.Context, err error) bool {
-	// Normal WebSocket closure
-	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-		return true
-	}
-	// Context was cancelled (user pressed Ctrl+C)
-	return ctx.Err() != nil
+	ios.Println()
+	ios.Info("Disconnected")
+	return nil
 }

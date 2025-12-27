@@ -166,3 +166,9 @@ type InputConfig struct {
 	Type   string
 	Invert bool
 }
+
+// ComponentListItem represents a component in list output (for power/energy list commands).
+type ComponentListItem struct {
+	ID   int    `json:"id"`
+	Type string `json:"type"`
+}

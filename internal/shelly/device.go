@@ -3,8 +3,11 @@ package shelly
 
 import (
 	"context"
+	"sort"
+	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // DeviceInfo holds extended device information.
@@ -147,4 +150,76 @@ func (s *Service) DeviceInfoGen1(ctx context.Context, identifier string) (*Devic
 		return nil
 	})
 	return result, err
+}
+
+// DeviceListFilterOptions holds filter criteria for device lists.
+type DeviceListFilterOptions struct {
+	Generation int
+	DeviceType string
+	Platform   string
+}
+
+// FilterDeviceList filters devices based on criteria and converts to DeviceListItem slice.
+// Returns the filtered list and a set of unique platforms found.
+func FilterDeviceList(devices map[string]model.Device, opts DeviceListFilterOptions) (filtered []model.DeviceListItem, platforms map[string]struct{}) {
+	filtered = make([]model.DeviceListItem, 0, len(devices))
+	platforms = make(map[string]struct{})
+
+	for name, dev := range devices {
+		if !matchesDeviceFilters(dev, opts) {
+			continue
+		}
+		devPlatform := dev.GetPlatform()
+		platforms[devPlatform] = struct{}{}
+		filtered = append(filtered, model.DeviceListItem{
+			Name:       name,
+			Address:    dev.Address,
+			Platform:   devPlatform,
+			Model:      dev.Model,
+			Type:       dev.Type,
+			Generation: dev.Generation,
+			Auth:       dev.Auth != nil,
+		})
+	}
+
+	return filtered, platforms
+}
+
+// matchesDeviceFilters checks if a device matches all filter criteria.
+func matchesDeviceFilters(dev model.Device, opts DeviceListFilterOptions) bool {
+	if opts.Generation > 0 && dev.Generation != opts.Generation {
+		return false
+	}
+	if opts.DeviceType != "" && dev.Type != opts.DeviceType {
+		return false
+	}
+	if opts.Platform != "" && dev.GetPlatform() != opts.Platform {
+		return false
+	}
+	return true
+}
+
+// SortDeviceList sorts a device list. If updatesFirst is true, devices with
+// available updates are sorted to the top. Within each group, devices are sorted by name.
+func SortDeviceList(devices []model.DeviceListItem, updatesFirst bool) {
+	sort.Slice(devices, func(i, j int) bool {
+		if updatesFirst && devices[i].HasUpdate != devices[j].HasUpdate {
+			return devices[i].HasUpdate // true sorts before false
+		}
+		return devices[i].Name < devices[j].Name
+	})
+}
+
+// PopulateDeviceListFirmware fills in firmware version info from the cache.
+// Uses a short cache validity period (5 minutes) so it doesn't trigger network calls during list.
+func (s *Service) PopulateDeviceListFirmware(ctx context.Context, devices []model.DeviceListItem) {
+	const cacheMaxAge = 5 * time.Minute
+	for i := range devices {
+		entry := s.GetCachedFirmware(ctx, devices[i].Name, cacheMaxAge)
+		if entry != nil && entry.Info != nil {
+			devices[i].CurrentVersion = entry.Info.Current
+			devices[i].AvailableVersion = entry.Info.Available
+			devices[i].HasUpdate = entry.Info.HasUpdate
+		}
+	}
 }

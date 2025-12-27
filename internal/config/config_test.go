@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+const testMAC = "AA:BB:CC:DD:EE:FF"
+
 func TestManager_Defaults(t *testing.T) {
 	t.Parallel()
 
@@ -258,6 +260,7 @@ func TestGetTUIThemeConfig(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo // Test functions with many test cases naturally have higher complexity
 func TestManager_UpdateDeviceInfo(t *testing.T) {
 	t.Parallel()
 
@@ -398,8 +401,8 @@ func TestManager_UpdateDeviceInfo_MAC(t *testing.T) {
 	if !ok {
 		t.Fatal("expected device to exist")
 	}
-	if dev.MAC != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("expected MAC 'AA:BB:CC:DD:EE:FF', got %q", dev.MAC)
+	if dev.MAC != testMAC {
+		t.Errorf("expected MAC %q, got %q", testMAC, dev.MAC)
 	}
 
 	// Update with same MAC in different format (should not change)
@@ -414,8 +417,8 @@ func TestManager_UpdateDeviceInfo_MAC(t *testing.T) {
 	if !ok {
 		t.Fatal("expected device to exist after no-change update")
 	}
-	if dev.MAC != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("expected MAC unchanged 'AA:BB:CC:DD:EE:FF', got %q", dev.MAC)
+	if dev.MAC != testMAC {
+		t.Errorf("expected MAC unchanged %q, got %q", testMAC, dev.MAC)
 	}
 
 	// Invalid MAC should be ignored
@@ -430,7 +433,7 @@ func TestManager_UpdateDeviceInfo_MAC(t *testing.T) {
 	if !ok {
 		t.Fatal("expected device to exist after invalid MAC update")
 	}
-	if dev.MAC != "AA:BB:CC:DD:EE:FF" {
+	if dev.MAC != testMAC {
 		t.Errorf("expected MAC unchanged after invalid update, got %q", dev.MAC)
 	}
 }
@@ -450,7 +453,7 @@ func TestManager_ResolveDevice_Enhanced(t *testing.T) {
 	}
 
 	// Update with MAC
-	if err := m.UpdateDeviceInfo("master-bathroom", DeviceUpdates{MAC: "AA:BB:CC:DD:EE:FF"}); err != nil {
+	if err := m.UpdateDeviceInfo("master-bathroom", DeviceUpdates{MAC: testMAC}); err != nil {
 		t.Fatalf("UpdateDeviceInfo() error: %v", err)
 	}
 
@@ -505,7 +508,7 @@ func TestManager_ResolveDevice_Enhanced(t *testing.T) {
 		},
 		{
 			name:       "MAC address match - uppercase",
-			identifier: "AA:BB:CC:DD:EE:FF",
+			identifier: testMAC,
 			wantAddr:   "192.168.1.100",
 			wantFound:  true,
 		},
@@ -583,6 +586,7 @@ func TestValidateDeviceAlias(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo // Test functions with many test cases naturally have higher complexity
 func TestManager_DeviceAliases(t *testing.T) {
 	t.Parallel()
 

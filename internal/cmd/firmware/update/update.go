@@ -66,13 +66,14 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
   shelly firmware update --all --staged 25`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if allFlag {
-				return runAll(cmd.Context(), f)
+			var deviceName string
+			if len(args) > 0 {
+				deviceName = args[0]
 			}
-			if len(args) == 0 {
+			if !allFlag && deviceName == "" {
 				return fmt.Errorf("device name required (or use --all)")
 			}
-			return run(cmd.Context(), f, args[0])
+			return run(cmd.Context(), f, deviceName, allFlag)
 		},
 	}
 
@@ -87,16 +88,72 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, deviceName string) error {
+//nolint:gocyclo,nestif // Complexity from handling both --all batch mode and single device mode in one function
+func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll bool) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	// Resolve device to check if it's plugin-managed
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Handle --all mode
+	if updateAll {
+		if len(cfg.Devices) == 0 {
+			ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
+			return nil
+		}
+
+		// Get device names
+		deviceNames := make([]string, 0, len(cfg.Devices))
+		for name := range cfg.Devices {
+			deviceNames = append(deviceNames, name)
+		}
+
+		// Check all devices for updates
+		toUpdate := svc.CheckDevicesForUpdates(ctx, ios, deviceNames, stagedFlag)
+
+		if len(toUpdate) == 0 {
+			ios.Info("All devices are up to date")
+			return nil
+		}
+
+		// Display devices to update
+		term.DisplayDevicesToUpdate(ios, toUpdate)
+
+		// Confirm
+		confirmed, confirmErr := f.ConfirmAction(fmt.Sprintf("Update %d device(s)?", len(toUpdate)), yesFlag)
+		if confirmErr != nil {
+			return confirmErr
+		}
+		if !confirmed {
+			ios.Warning("Update cancelled")
+			return nil
+		}
+
+		// Perform updates
+		results := svc.UpdateDevices(ctx, ios, toUpdate, shelly.UpdateOpts{
+			Beta:        betaFlag,
+			CustomURL:   urlFlag,
+			Parallelism: parallelism,
+		})
+
+		// Convert to term.UpdateResult for display
+		termResults := make([]term.UpdateResult, len(results))
+		for i, r := range results {
+			termResults[i] = term.UpdateResult{
+				Name:    r.Name,
+				Success: r.Success,
+				Err:     r.Err,
+			}
+		}
+
+		term.DisplayUpdateResults(ios, termResults)
+		return nil
+	}
+
+	// Single device mode
 	device, ok := cfg.Devices[deviceName]
 	if !ok {
 		// Ad-hoc device (IP address) - treat as Shelly
@@ -163,67 +220,4 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string) error {
 		ios.Info("The device will reboot automatically. Use 'shelly firmware status %s' to check progress.", deviceName)
 		return nil
 	})
-}
-
-func runAll(ctx context.Context, f *cmdutil.Factory) error {
-	ios := f.IOStreams()
-
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	if len(cfg.Devices) == 0 {
-		ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
-		return nil
-	}
-
-	// Get device names
-	deviceNames := make([]string, 0, len(cfg.Devices))
-	for name := range cfg.Devices {
-		deviceNames = append(deviceNames, name)
-	}
-
-	svc := f.ShellyService()
-
-	// Check all devices for updates
-	toUpdate := svc.CheckDevicesForUpdates(ctx, ios, deviceNames, stagedFlag)
-
-	if len(toUpdate) == 0 {
-		ios.Info("All devices are up to date")
-		return nil
-	}
-
-	// Display devices to update
-	term.DisplayDevicesToUpdate(ios, toUpdate)
-
-	// Confirm
-	confirmed, confirmErr := f.ConfirmAction(fmt.Sprintf("Update %d device(s)?", len(toUpdate)), yesFlag)
-	if confirmErr != nil {
-		return confirmErr
-	}
-	if !confirmed {
-		ios.Warning("Update cancelled")
-		return nil
-	}
-
-	// Perform updates
-	results := svc.UpdateDevices(ctx, ios, toUpdate, shelly.UpdateOpts{
-		Beta:        betaFlag,
-		CustomURL:   urlFlag,
-		Parallelism: parallelism,
-	})
-
-	// Convert to term.UpdateResult for display
-	termResults := make([]term.UpdateResult, len(results))
-	for i, r := range results {
-		termResults[i] = term.UpdateResult{
-			Name:    r.Name,
-			Success: r.Success,
-			Err:     r.Err,
-		}
-	}
-
-	term.DisplayUpdateResults(ios, termResults)
-	return nil
 }

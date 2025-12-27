@@ -6,17 +6,43 @@ import (
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
+
+// FetchMatterStatus fetches combined Matter config and status.
+func (s *Service) FetchMatterStatus(ctx context.Context, device string, ios *iostreams.IOStreams) (model.MatterStatus, error) {
+	var status model.MatterStatus
+
+	// Get Matter config
+	cfg, err := s.MatterGetConfig(ctx, device)
+	if err != nil {
+		ios.Debug("Matter.GetConfig failed: %v", err)
+		return status, fmt.Errorf("matter not available on this device: %w", err)
+	}
+	status.Enabled = cfg.Enable
+
+	// Get Matter status
+	statusMap, err := s.MatterGetStatus(ctx, device)
+	if err != nil {
+		ios.Debug("Matter.GetStatus failed: %v", err)
+		// Config succeeded, return partial info
+		return status, nil
+	}
+
+	if commissionable, ok := statusMap["commissionable"].(bool); ok {
+		status.Commissionable = commissionable
+	}
+	if fabricsCount, ok := statusMap["fabrics_count"].(float64); ok {
+		status.FabricsCount = int(fabricsCount)
+	}
+
+	return status, nil
+}
 
 // MatterConfig represents Matter configuration.
 type MatterConfig struct {
 	Enable bool `json:"enable"`
-}
-
-// MatterStatus represents Matter status from the device.
-type MatterStatus struct {
-	Commissioned bool   `json:"commissioned"`
-	SetupCode    string `json:"setup_code,omitempty"`
 }
 
 // MatterEnable enables Matter on a device.
@@ -123,17 +149,9 @@ func (s *Service) MatterGetConfig(ctx context.Context, identifier string) (Matte
 	return cfg, err
 }
 
-// MatterCommissioningInfo holds Matter pairing information.
-type MatterCommissioningInfo struct {
-	ManualCode    string `json:"manual_code,omitempty"`
-	QRCode        string `json:"qr_code,omitempty"`
-	Discriminator int    `json:"discriminator,omitempty"`
-	SetupPINCode  int    `json:"setup_pin_code,omitempty"`
-}
-
 // MatterGetCommissioningCode gets the Matter commissioning/pairing code from a device.
-func (s *Service) MatterGetCommissioningCode(ctx context.Context, identifier string) (MatterCommissioningInfo, error) {
-	var info MatterCommissioningInfo
+func (s *Service) MatterGetCommissioningCode(ctx context.Context, identifier string) (model.CommissioningInfo, error) {
+	var info model.CommissioningInfo
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Matter.GetCommissioningCode", nil)
 		if err != nil {
@@ -157,6 +175,7 @@ func (s *Service) MatterGetCommissioningCode(ctx context.Context, identifier str
 		if pin, ok := resultMap["setup_pin_code"].(float64); ok {
 			info.SetupPINCode = int(pin)
 		}
+		info.Available = info.ManualCode != ""
 		return nil
 	})
 	return info, err

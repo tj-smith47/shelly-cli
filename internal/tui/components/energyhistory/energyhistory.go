@@ -203,7 +203,8 @@ func (m Model) View() string {
 
 	// Use rendering package for consistent embedded title styling
 	r := rendering.New(m.width, m.height).
-		SetTitle("Energy History (5min)").
+		SetTitle("Energy History").
+		SetBadge("5 min").
 		SetFocused(false)
 
 	return r.SetContent(content.String()).Render()
@@ -282,7 +283,8 @@ func (m Model) generateSparkline(history []DataPoint, width int) string {
 
 func (m Model) renderEmpty() string {
 	r := rendering.New(m.width, m.height).
-		SetTitle("Energy History (5min)").
+		SetTitle("Energy History").
+		SetBadge("5 min").
 		SetFocused(false)
 	centered := lipgloss.NewStyle().
 		Width(m.width-4).
@@ -294,7 +296,8 @@ func (m Model) renderEmpty() string {
 
 func (m Model) renderNoData() string {
 	r := rendering.New(m.width, m.height).
-		SetTitle("Energy History (5min)").
+		SetTitle("Energy History").
+		SetBadge("5 min").
 		SetFocused(false)
 	centered := lipgloss.NewStyle().
 		Width(m.width-4).

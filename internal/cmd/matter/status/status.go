@@ -3,15 +3,12 @@ package status
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -54,13 +51,6 @@ Displays:
 	return cmd
 }
 
-// MatterStatus represents full Matter status.
-type MatterStatus struct {
-	Enabled        bool `json:"enabled"`
-	Commissionable bool `json:"commissionable"`
-	FabricsCount   int  `json:"fabrics_count"`
-}
-
 func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
@@ -68,57 +58,15 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	var status MatterStatus
-
-	// Get Matter config
-	cfg, err := svc.MatterGetConfig(ctx, opts.Device)
+	status, err := svc.FetchMatterStatus(ctx, opts.Device, ios)
 	if err != nil {
-		ios.Debug("Matter.GetConfig failed: %v", err)
-		return fmt.Errorf("matter not available on this device: %w", err)
-	}
-	status.Enabled = cfg.Enable
-
-	// Get Matter status
-	statusMap, err := svc.MatterGetStatus(ctx, opts.Device)
-	if err != nil {
-		ios.Debug("Matter.GetStatus failed: %v", err)
-		// Config succeeded, show partial info
-	} else {
-		if commissionable, ok := statusMap["commissionable"].(bool); ok {
-			status.Commissionable = commissionable
-		}
-		if fabricsCount, ok := statusMap["fabrics_count"].(float64); ok {
-			status.FabricsCount = int(fabricsCount)
-		}
+		return err
 	}
 
 	if opts.JSON {
-		jsonBytes, err := json.MarshalIndent(status, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(jsonBytes))
-		return nil
+		return term.OutputMatterStatusJSON(ios, status)
 	}
 
-	ios.Println(theme.Bold().Render("Matter Status:"))
-	ios.Println()
-
-	ios.Printf("  Enabled: %s\n", output.RenderEnabledState(status.Enabled))
-
-	if status.Enabled {
-		ios.Printf("  Status: %s\n", output.RenderBoolState(status.Commissionable, "Commissionable", "Not Commissionable"))
-		ios.Printf("  Paired Fabrics: %d\n", status.FabricsCount)
-
-		if status.Commissionable {
-			ios.Println()
-			ios.Info("Device is ready to be added to a Matter fabric.")
-			ios.Info("Use 'shelly matter code %s' to get the pairing code.", opts.Device)
-		}
-	} else {
-		ios.Println()
-		ios.Info("Enable Matter with: shelly matter enable %s", opts.Device)
-	}
-
+	term.DisplayMatterStatus(ios, status, opts.Device)
 	return nil
 }

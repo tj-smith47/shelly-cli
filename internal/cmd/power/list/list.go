@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
@@ -61,11 +62,6 @@ Columns: ID, Type (PM or PM1)`,
 	return cmd
 }
 
-type componentInfo struct {
-	ID   int    `json:"id"`
-	Type string `json:"type"`
-}
-
 func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
@@ -83,15 +79,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	// Combine results
-	components := make([]componentInfo, 0, len(pmIDs)+len(pm1IDs))
+	components := make([]model.ComponentListItem, 0, len(pmIDs)+len(pm1IDs))
 	for _, id := range pmIDs {
-		components = append(components, componentInfo{
+		components = append(components, model.ComponentListItem{
 			ID:   id,
 			Type: "PM",
 		})
 	}
 	for _, id := range pm1IDs {
-		components = append(components, componentInfo{
+		components = append(components, model.ComponentListItem{
 			ID:   id,
 			Type: "PM1",
 		})
@@ -103,7 +99,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	// Output results
-	return cmdutil.PrintListResult(ios, components, func(ios *iostreams.IOStreams, items []componentInfo) {
+	return cmdutil.PrintListResult(ios, components, func(ios *iostreams.IOStreams, items []model.ComponentListItem) {
 		table := output.NewTable("ID", "Type")
 		for _, comp := range items {
 			table.AddRow(fmt.Sprintf("%d", comp.ID), comp.Type)

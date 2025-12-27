@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -21,18 +22,6 @@ type Options struct {
 	NoQR    bool
 	Size    int
 	Factory *cmdutil.Factory
-}
-
-// DeviceQRInfo holds device information for QR code generation.
-type DeviceQRInfo struct {
-	Device    string `json:"device"`
-	IP        string `json:"ip"`
-	MAC       string `json:"mac,omitempty"`
-	Model     string `json:"model,omitempty"`
-	Firmware  string `json:"firmware,omitempty"`
-	WebURL    string `json:"web_url"`
-	WiFiSSID  string `json:"wifi_ssid,omitempty"`
-	QRContent string `json:"qr_content"`
 }
 
 // NewCommand creates the qr command.
@@ -133,7 +122,7 @@ func run(ctx context.Context, device string, opts *Options) error {
 		qrContent = fmt.Sprintf("WIFI:S:%s;T:WPA;;", output.EscapeWiFiQR(wifiSSID))
 	}
 
-	info := DeviceQRInfo{
+	info := model.DeviceQRInfo{
 		Device:    device,
 		IP:        device,
 		MAC:       deviceInfo.MAC,

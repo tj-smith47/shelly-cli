@@ -74,7 +74,7 @@ func (s *Service) ZigbeeGetStatus(ctx context.Context, identifier string) (map[s
 
 // ZigbeeGetConfig gets Zigbee configuration from a device.
 func (s *Service) ZigbeeGetConfig(ctx context.Context, identifier string) (map[string]any, error) {
-	var config map[string]any
+	var cfg map[string]any
 	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Zigbee.GetConfig", nil)
 		if err != nil {
@@ -82,13 +82,13 @@ func (s *Service) ZigbeeGetConfig(ctx context.Context, identifier string) (map[s
 		}
 
 		var ok bool
-		config, ok = result.(map[string]any)
+		cfg, ok = result.(map[string]any)
 		if !ok {
 			return fmt.Errorf("unexpected response type")
 		}
 		return nil
 	})
-	return config, err
+	return cfg, err
 }
 
 // ScanZigbeeDevices scans configured devices for Zigbee support.

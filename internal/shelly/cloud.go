@@ -6,9 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/tj-smith47/shelly-go/cloud"
+
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // CloudDevice represents a device from the Shelly Cloud API.
@@ -261,4 +265,75 @@ func BuildCloudWebSocketURL(serverURL, token string) (string, error) {
 
 	// Build WebSocket URL: wss://{host}:6113/shelly/wss/hk_sock?t={token}
 	return fmt.Sprintf("wss://%s:6113/shelly/wss/hk_sock?t=%s", hostname, url.QueryEscape(token)), nil
+}
+
+// CloudEventStreamOptions configures cloud event streaming.
+type CloudEventStreamOptions struct {
+	DeviceFilter string // Filter events by device ID
+	EventFilter  string // Filter events by event type substring
+	Raw          bool   // Output raw JSON without parsing
+}
+
+// CloudEventHandler is called for each cloud event received.
+// Return an error to stop streaming.
+type CloudEventHandler func(event *model.CloudEvent, raw []byte) error
+
+// StreamCloudEvents reads cloud events from a websocket and calls the handler for each.
+// Blocks until the context is cancelled or an error occurs.
+func StreamCloudEvents(ctx context.Context, conn *websocket.Conn, opts CloudEventStreamOptions, handler CloudEventHandler) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		// Set read deadline
+		if err := conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
+			return fmt.Errorf("failed to set read deadline: %w", err)
+		}
+
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			return handleCloudEventReadError(ctx, err)
+		}
+
+		// Parse the event
+		var event model.CloudEvent
+		if err := json.Unmarshal(message, &event); err != nil {
+			continue // Skip unparseable messages
+		}
+
+		// Apply filters
+		if opts.DeviceFilter != "" && event.GetDeviceID() != opts.DeviceFilter {
+			continue
+		}
+		if opts.EventFilter != "" && !strings.Contains(event.Event, opts.EventFilter) {
+			continue
+		}
+
+		// Call handler
+		if err := handler(&event, message); err != nil {
+			return err
+		}
+	}
+}
+
+// handleCloudEventReadError processes WebSocket read errors.
+// Returns nil for expected closures (normal close, context cancelled).
+func handleCloudEventReadError(ctx context.Context, err error) error {
+	if isExpectedCloudClosure(ctx, err) {
+		return nil
+	}
+	return fmt.Errorf("read error: %w", err)
+}
+
+// isExpectedCloudClosure checks if the error represents a normal termination.
+func isExpectedCloudClosure(ctx context.Context, err error) bool {
+	// Normal WebSocket closure
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+		return true
+	}
+	// Context was cancelled (user pressed Ctrl+C)
+	return ctx.Err() != nil
 }

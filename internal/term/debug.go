@@ -70,6 +70,15 @@ func DisplayWebSocketEvent(ios *iostreams.IOStreams, timestamp string, data []by
 	}
 }
 
+// DisplayWebSocketFallbackConfig displays WebSocket config from Sys.GetConfig fallback.
+func DisplayWebSocketFallbackConfig(ios *iostreams.IOStreams, wsConfig map[string]any) {
+	ios.Println("  " + theme.Highlight().Render("WebSocket (from Sys.GetConfig):"))
+	for k, v := range wsConfig {
+		ios.Printf("    %s: %v\n", k, v)
+	}
+	ios.Println()
+}
+
 // DisplayWebSocketConnectionState displays a WebSocket connection state change.
 func DisplayWebSocketConnectionState(ios *iostreams.IOStreams, state string) {
 	switch state {

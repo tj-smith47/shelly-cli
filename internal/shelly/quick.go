@@ -4,6 +4,7 @@ package shelly
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -373,4 +374,57 @@ func toggleCover(ctx context.Context, cover *client.CoverComponent) error {
 		// If stopped mid-way or unknown, open
 		return cover.Open(ctx, nil)
 	}
+}
+
+// PartyColors defines RGB colors for party mode.
+var PartyColors = []struct{ R, G, B int }{
+	{255, 0, 0},     // Red
+	{0, 255, 0},     // Green
+	{0, 0, 255},     // Blue
+	{255, 255, 0},   // Yellow
+	{255, 0, 255},   // Magenta
+	{0, 255, 255},   // Cyan
+	{255, 128, 0},   // Orange
+	{128, 0, 255},   // Purple
+	{255, 255, 255}, // White
+}
+
+// PartyToggleDevice handles toggling a single device on or off with fallback to switch.
+func (s *Service) PartyToggleDevice(ctx context.Context, ios IOStreamsDebugger, dev string, on bool) {
+	if on {
+		s.PartyToggleOn(ctx, ios, dev)
+	} else {
+		s.PartyToggleOff(ctx, ios, dev)
+	}
+}
+
+// PartyToggleOn turns a device on with light/switch fallback and sets random color.
+func (s *Service) PartyToggleOn(ctx context.Context, ios IOStreamsDebugger, dev string) {
+	if err := s.LightOn(ctx, dev, 0); err != nil {
+		// Try as switch (expected to fail for non-switch devices)
+		if switchErr := s.SwitchOn(ctx, dev, 0); switchErr != nil {
+			ios.DebugErr("party toggle on "+dev, switchErr)
+		}
+	}
+
+	// Try to set random color for RGB lights (expected to fail for non-RGB)
+	color := PartyColors[rand.Intn(len(PartyColors))] //nolint:gosec // Not crypto, just random colors
+	if rgbErr := s.RGBColor(ctx, dev, 0, color.R, color.G, color.B); rgbErr != nil {
+		ios.DebugErr("party RGB "+dev, rgbErr)
+	}
+}
+
+// PartyToggleOff turns a device off with light/switch fallback.
+func (s *Service) PartyToggleOff(ctx context.Context, ios IOStreamsDebugger, dev string) {
+	if err := s.LightOff(ctx, dev, 0); err != nil {
+		// Try as switch (expected to fail for non-switch devices)
+		if switchErr := s.SwitchOff(ctx, dev, 0); switchErr != nil {
+			ios.DebugErr("party toggle off "+dev, switchErr)
+		}
+	}
+}
+
+// IOStreamsDebugger is an interface for debug error logging.
+type IOStreamsDebugger interface {
+	DebugErr(context string, err error)
 }

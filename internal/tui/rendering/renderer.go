@@ -14,18 +14,19 @@ import (
 
 // Renderer creates bordered panels with embedded titles and sections.
 type Renderer struct {
-	width      int
-	height     int
-	title      string
-	badge      string // Separate badge section in title bar (superfile style)
-	footer     string
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	focused    bool
-	sections   []section
-	content    string
-	border     lipgloss.Border
-	focusColor color.Color
-	blurColor  color.Color
+	width       int
+	height      int
+	title       string
+	badge       string // Separate badge section in title bar (superfile style)
+	footer      string
+	footerBadge string // Separate badge section in footer (for cursor/scroll info)
+	panelIndex  int    // 1-based panel index for Shift+N hotkey hint
+	focused     bool
+	sections    []section
+	content     string
+	border      lipgloss.Border
+	focusColor  color.Color
+	blurColor   color.Color
 }
 
 type section struct {
@@ -103,6 +104,13 @@ func (r *Renderer) SetFooter(footer string) *Renderer {
 	return r
 }
 
+// SetFooterBadge sets a badge that appears in a separate section in the footer.
+// FooterBadge appears as: ├─ footer ─┼─ badge ─┤ (between footer and hint).
+func (r *Renderer) SetFooterBadge(badge string) *Renderer {
+	r.footerBadge = badge
+	return r
+}
+
 // SetPanelIndex sets the 1-based panel index for Shift+N hotkey hint.
 // When the panel is not focused, shows "Shift+N" in the bottom-right corner.
 func (r *Renderer) SetPanelIndex(index int) *Renderer {
@@ -161,30 +169,31 @@ func (r *Renderer) Render() string {
 		}
 	}
 
-	// Render content within borders
-	leftBorder := borderStyle.Render(r.border.Left)
-	rightBorder := borderStyle.Render(r.border.Right)
+	// Render content within borders with 1 char padding on each side
+	leftBorder := borderStyle.Render(r.border.Left) + " "
+	rightBorder := " " + borderStyle.Render(r.border.Right)
+	paddedWidth := contentWidth - 2 // Account for the 1-char padding on each side
 
 	for i := range contentHeight {
 		var line string
 		if i < len(contentLines) {
 			line = contentLines[i]
 		}
-		// Pad line to content width
+		// Pad line to padded width
 		lineWidth := ansi.StringWidth(line)
-		if lineWidth < contentWidth {
-			line += strings.Repeat(" ", contentWidth-lineWidth)
-		} else if lineWidth > contentWidth {
-			line = ansi.Truncate(line, contentWidth-3, "...")
+		if lineWidth < paddedWidth {
+			line += strings.Repeat(" ", paddedWidth-lineWidth)
+		} else if lineWidth > paddedWidth {
+			line = ansi.Truncate(line, paddedWidth-3, "...")
 		}
 		lines = append(lines, leftBorder+line+rightBorder)
 	}
 
-	// Bottom border with optional footer and panel hint
+	// Bottom border with optional footer, footerBadge, and panel hint
 	var bottomBorder string
 	hint := r.buildPanelHint()
-	if r.footer != "" || hint != "" {
-		bottomBorder = BuildBottomBorderWithFooterAndHint(r.width, r.footer, hint, r.border)
+	if r.footer != "" || r.footerBadge != "" || hint != "" {
+		bottomBorder = BuildBottomBorderWithFooterBadgeAndHint(r.width, r.footer, r.footerBadge, hint, r.border)
 	} else {
 		bottomBorder = BuildBottomBorder(r.width, r.border)
 	}
@@ -211,9 +220,9 @@ func (r *Renderer) wrapAndTruncate(content string, width int) []string {
 	return result
 }
 
-// ContentWidth returns the usable content width inside the borders.
+// ContentWidth returns the usable content width inside the borders (including padding).
 func (r *Renderer) ContentWidth() int {
-	return r.width - 2
+	return r.width - 4 // -2 for borders, -2 for padding
 }
 
 // ContentHeight returns the usable content height inside the borders.

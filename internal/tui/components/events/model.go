@@ -83,7 +83,8 @@ type SubscriptionStatusMsg struct {
 // sharedState holds mutex-protected state that persists across model copies.
 type sharedState struct {
 	mu            sync.Mutex
-	events        []Event
+	userEvents    []Event // User-relevant events (status changes, errors, etc.)
+	systemEvents  []Event // System events (full_status polling noise)
 	subscriptions map[string]context.CancelFunc
 	connStatus    map[string]bool
 	lastEventTime time.Time // Track when last event was added for refresh detection
@@ -147,7 +148,7 @@ func DefaultStyles() Styles {
 			Background(colors.AltBackground).
 			Bold(true),
 		Time: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(theme.Yellow()).
 			Width(10),
 		Device: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
@@ -188,11 +189,12 @@ func New(deps Deps) Model {
 		ios:         deps.IOS,
 		eventStream: deps.EventStream,
 		scroller:    panel.NewScroller(0, 10), // Will be updated by SetSize
-		maxItems:    100,
-		autoScroll:  true, // Start with auto-scroll enabled (cursor stays at top/newest)
+		maxItems:    50,                       // Per list - each category capped at 50
+		autoScroll:  true,                     // Start with auto-scroll enabled (cursor stays at top/newest)
 		styles:      DefaultStyles(),
 		state: &sharedState{
-			events:        []Event{},
+			userEvents:    []Event{},
+			systemEvents:  []Event{},
 			subscriptions: make(map[string]context.CancelFunc),
 			connStatus:    make(map[string]bool),
 		},
@@ -304,11 +306,18 @@ func (m Model) addEvent(e Event) {
 	}
 	m.state.mu.Lock()
 	defer m.state.mu.Unlock()
-	// Prepend new events at the beginning (newest at top)
-	m.state.events = append([]Event{e}, m.state.events...)
-	if len(m.state.events) > m.maxItems {
-		// Remove oldest events from the end
-		m.state.events = m.state.events[:m.maxItems]
+
+	// Add to appropriate list based on event type
+	if isUserEvent(e) {
+		m.state.userEvents = append([]Event{e}, m.state.userEvents...)
+		if len(m.state.userEvents) > m.maxItems {
+			m.state.userEvents = m.state.userEvents[:m.maxItems]
+		}
+	} else {
+		m.state.systemEvents = append([]Event{e}, m.state.systemEvents...)
+		if len(m.state.systemEvents) > m.maxItems {
+			m.state.systemEvents = m.state.systemEvents[:m.maxItems]
+		}
 	}
 	m.state.lastEventTime = time.Now()
 }
@@ -413,11 +422,11 @@ func (m Model) togglePause() Model {
 	return m
 }
 
-// eventCount returns the number of events (thread-safe).
+// eventCount returns the total number of events (thread-safe).
 func (m Model) eventCount() int {
 	m.state.mu.Lock()
 	defer m.state.mu.Unlock()
-	return len(m.state.events)
+	return len(m.state.userEvents) + len(m.state.systemEvents)
 }
 
 // SetSize sets the component size.
@@ -436,11 +445,13 @@ func (m Model) SetSize(width, height int) Model {
 // View renders the events (content only - wrapper handles title/footer).
 func (m Model) View() string {
 	m.state.mu.Lock()
-	eventList := make([]Event, len(m.state.events))
-	copy(eventList, m.state.events)
+	userEvents := make([]Event, len(m.state.userEvents))
+	copy(userEvents, m.state.userEvents)
+	systemEvents := make([]Event, len(m.state.systemEvents))
+	copy(systemEvents, m.state.systemEvents)
 	m.state.mu.Unlock()
 
-	if len(eventList) == 0 {
+	if len(userEvents) == 0 && len(systemEvents) == 0 {
 		return lipgloss.NewStyle().
 			Width(m.width).
 			Height(m.height).
@@ -451,10 +462,11 @@ func (m Model) View() string {
 
 	// Use dual column layout when width permits
 	if m.width >= dualColumnMinWidth {
-		return m.renderDualColumns(eventList)
+		return m.renderDualColumnsDirect(userEvents, systemEvents)
 	}
 
-	// Single column layout (original behavior)
+	// Single column layout - merge events for display
+	eventList := mergeEventsByTime(userEvents, systemEvents)
 	return m.renderSingleColumn(eventList)
 }
 
@@ -593,7 +605,8 @@ func (m Model) EventCount() int {
 func (m Model) Clear() {
 	m.state.mu.Lock()
 	defer m.state.mu.Unlock()
-	m.state.events = []Event{}
+	m.state.userEvents = []Event{}
+	m.state.systemEvents = []Event{}
 	// Note: scrollOffset is reset by the caller when the model is updated
 }
 
@@ -623,8 +636,7 @@ func (m Model) OptimalWidth() int {
 
 	// Get events safely with locking
 	m.state.mu.Lock()
-	eventList := make([]Event, len(m.state.events))
-	copy(eventList, m.state.events)
+	eventList := mergeEventsByTime(m.state.userEvents, m.state.systemEvents)
 	m.state.mu.Unlock()
 
 	if len(eventList) == 0 {
@@ -667,8 +679,7 @@ func (m Model) MinWidth() int {
 // MaxDescriptionLen returns the length of the longest event description.
 func (m Model) MaxDescriptionLen() int {
 	m.state.mu.Lock()
-	eventList := make([]Event, len(m.state.events))
-	copy(eventList, m.state.events)
+	eventList := mergeEventsByTime(m.state.userEvents, m.state.systemEvents)
 	m.state.mu.Unlock()
 
 	maxLen := 0
@@ -689,7 +700,7 @@ func (m Model) FooterText() string {
 // Returns event count and any active flags (paused, filtered).
 func (m Model) StatusBadge() string {
 	m.state.mu.Lock()
-	eventCount := len(m.state.events)
+	eventCount := len(m.state.userEvents) + len(m.state.systemEvents)
 	m.state.mu.Unlock()
 
 	parts := []string{fmt.Sprintf("%d", eventCount)}
@@ -728,30 +739,40 @@ func isUserEvent(e Event) bool {
 	}
 }
 
-// splitEventsByType splits events into user and system categories.
-func splitEventsByType(eventList []Event) (user, system []Event) {
-	user = make([]Event, 0, len(eventList)/2)
-	system = make([]Event, 0, len(eventList)/2)
-	for _, e := range eventList {
-		if isUserEvent(e) {
-			user = append(user, e)
+// mergeEventsByTime merges user and system events sorted by timestamp (newest first).
+func mergeEventsByTime(user, system []Event) []Event {
+	result := make([]Event, 0, len(user)+len(system))
+	i, j := 0, 0
+
+	for i < len(user) || j < len(system) {
+		if i >= len(user) {
+			result = append(result, system[j:]...)
+			break
+		}
+		if j >= len(system) {
+			result = append(result, user[i:]...)
+			break
+		}
+		// Both slices are sorted newest-first, so compare timestamps
+		if user[i].Timestamp.After(system[j].Timestamp) {
+			result = append(result, user[i])
+			i++
 		} else {
-			system = append(system, e)
+			result = append(result, system[j])
+			j++
 		}
 	}
-	return user, system
+	return result
 }
 
-// renderDualColumns renders events in two columns: User (left) and System (right).
-func (m Model) renderDualColumns(eventList []Event) string {
+// renderDualColumnsDirect renders events in two columns: User (left) and System (right).
+// Takes pre-split user and system event lists.
+func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string {
 	colors := theme.GetSemanticColors()
-
-	// Split events by type
-	userEvents, systemEvents := splitEventsByType(eventList)
 
 	// Calculate column widths
 	colWidth := (m.width - 3) / 2 // -3 for separator (│) and spacing
-	visibleRows := m.height - 2   // -2 for headers
+	visibleRows := m.height - 3   // -3 for header + separator line
 
 	if visibleRows < 1 {
 		visibleRows = 1
@@ -765,10 +786,10 @@ func (m Model) renderDualColumns(eventList []Event) string {
 		systemEvents = systemEvents[:visibleRows]
 	}
 
-	// Build headers
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Highlight)
-	leftHeader := headerStyle.Render("Events")
-	rightHeader := lipgloss.NewStyle().Bold(true).Foreground(colors.Muted).Render("System")
+	// Build headers with underlines
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Highlight).Underline(true)
+	leftHeader := headerStyle.Render("User Events")
+	rightHeader := lipgloss.NewStyle().Bold(true).Foreground(colors.Muted).Underline(true).Render("System Events")
 
 	// Pad headers to column width
 	leftHeader = output.PadRight(leftHeader, colWidth)
@@ -776,9 +797,13 @@ func (m Model) renderDualColumns(eventList []Event) string {
 
 	separator := lipgloss.NewStyle().Foreground(colors.TableBorder).Render("│")
 
-	// Build rows
-	lines := make([]string, 0, visibleRows+1)
+	// Build rows - header row plus content
+	lines := make([]string, 0, visibleRows+2)
 	lines = append(lines, leftHeader+" "+separator+" "+rightHeader)
+	// Add separator line under headers
+	leftSep := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("─", colWidth))
+	rightSep := leftSep
+	lines = append(lines, leftSep+" "+separator+" "+rightSep)
 
 	for i := range visibleRows {
 		leftCell := ""
@@ -803,34 +828,43 @@ func (m Model) renderDualColumns(eventList []Event) string {
 
 // renderCompactEvent renders a single event in compact format for dual columns.
 func (m Model) renderCompactEvent(e Event, maxWidth int) string {
-	// Format: HH:MM:SS device level desc
-	timeStr := m.styles.Time.Render(e.Timestamp.Format("15:04:05"))
+	// Format: TIME DEVICE TYPE DESC
+	// Use fixed widths: time(8) + space + device(12) + space + type(6) + space = 28 chars prefix
+	const (
+		timeWidth   = 8
+		deviceWidth = 12
+		typeWidth   = 6
+		spaces      = 3
+		prefixWidth = timeWidth + deviceWidth + typeWidth + spaces
+	)
 
-	// Truncate device name if needed
+	timeStr := m.styles.Time.Width(timeWidth).Render(e.Timestamp.Format("15:04:05"))
+
+	// Device name - truncate if needed
 	device := e.Device
-	if len(device) > 10 {
-		device = device[:9] + "…"
+	if len(device) > deviceWidth {
+		device = device[:deviceWidth-1] + "…"
 	}
-	deviceStr := m.styles.Device.Render(device)
+	deviceStr := m.styles.Device.Width(deviceWidth).Render(device)
 
 	// Level indicator (short form)
 	levelStyle := m.getTypeStyle(e.Type)
 	levelShort := e.Type
-	if len(levelShort) > 6 {
-		levelShort = levelShort[:6]
+	if len(levelShort) > typeWidth {
+		levelShort = levelShort[:typeWidth]
 	}
-	levelStr := levelStyle.Render(levelShort)
+	levelStr := levelStyle.Width(typeWidth).Render(levelShort)
 
-	prefix := timeStr + " " + deviceStr + " " + levelStr + " "
-	prefixLen := 8 + 1 + min(len(e.Device), 10) + 1 + min(len(e.Type), 6) + 1
-
-	// Description with remaining width
-	descWidth := maxWidth - prefixLen
-	if descWidth < 5 {
-		descWidth = 5
+	// Description gets remaining width - be generous with space
+	descWidth := maxWidth - prefixWidth
+	if descWidth < 10 {
+		descWidth = 10
 	}
-	desc := output.Truncate(e.Description, descWidth)
+	desc := e.Description
+	if len(desc) > descWidth {
+		desc = desc[:descWidth-1] + "…"
+	}
 	descStr := m.styles.Description.Render(desc)
 
-	return prefix + descStr
+	return timeStr + " " + deviceStr + " " + levelStr + " " + descStr
 }

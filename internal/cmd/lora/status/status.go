@@ -3,14 +3,12 @@ package status
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -55,28 +53,6 @@ information from the last received packet.`,
 	return cmd
 }
 
-// LoRaFullStatus combines config and status.
-type LoRaFullStatus struct {
-	Config *LoRaConfig `json:"config,omitempty"`
-	Status *LoRaStatus `json:"status,omitempty"`
-}
-
-// LoRaConfig represents LoRa configuration.
-type LoRaConfig struct {
-	ID   int   `json:"id"`
-	Freq int64 `json:"freq"`
-	BW   int   `json:"bw"`
-	DR   int   `json:"dr"`
-	TxP  int   `json:"txp"`
-}
-
-// LoRaStatus represents LoRa status.
-type LoRaStatus struct {
-	ID   int     `json:"id"`
-	RSSI int     `json:"rssi"`
-	SNR  float64 `json:"snr"`
-}
-
 func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
@@ -84,84 +60,15 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	var full LoRaFullStatus
-
-	// Get config
-	cfgMap, err := svc.LoRaGetConfig(ctx, opts.Device, opts.ID)
+	full, err := svc.FetchLoRaFullStatus(ctx, opts.Device, opts.ID, ios)
 	if err != nil {
-		ios.Debug("LoRa.GetConfig failed: %v", err)
-		return fmt.Errorf("LoRa not available on this device: %w", err)
-	}
-
-	cfg := &LoRaConfig{}
-	if id, ok := cfgMap["id"].(float64); ok {
-		cfg.ID = int(id)
-	}
-	if freq, ok := cfgMap["freq"].(float64); ok {
-		cfg.Freq = int64(freq)
-	}
-	if bw, ok := cfgMap["bw"].(float64); ok {
-		cfg.BW = int(bw)
-	}
-	if dr, ok := cfgMap["dr"].(float64); ok {
-		cfg.DR = int(dr)
-	}
-	if txp, ok := cfgMap["txp"].(float64); ok {
-		cfg.TxP = int(txp)
-	}
-	full.Config = cfg
-
-	// Get status
-	statusMap, err := svc.LoRaGetStatus(ctx, opts.Device, opts.ID)
-	if err != nil {
-		ios.Debug("LoRa.GetStatus failed: %v", err)
-		// Config succeeded, status failed - still show partial info
-	}
-	if err == nil {
-		full.Status = parseLoRaStatus(statusMap)
+		return err
 	}
 
 	if opts.JSON {
-		output, err := json.MarshalIndent(full, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format JSON: %w", err)
-		}
-		ios.Println(string(output))
-		return nil
+		return term.OutputLoRaStatusJSON(ios, full)
 	}
 
-	ios.Println(theme.Bold().Render("LoRa Add-on Status:"))
-	ios.Println()
-
-	if full.Config != nil {
-		ios.Println("  " + theme.Highlight().Render("Configuration:"))
-		ios.Printf("    Component ID: %d\n", full.Config.ID)
-		ios.Printf("    Frequency: %d Hz (%.3f MHz)\n", full.Config.Freq, float64(full.Config.Freq)/1e6)
-		ios.Printf("    Bandwidth: %d\n", full.Config.BW)
-		ios.Printf("    Data Rate (SF): %d\n", full.Config.DR)
-		ios.Printf("    TX Power: %d dBm\n", full.Config.TxP)
-	}
-
-	if full.Status != nil {
-		ios.Println()
-		ios.Println("  " + theme.Highlight().Render("Last Packet:"))
-		ios.Printf("    RSSI: %d dBm\n", full.Status.RSSI)
-		ios.Printf("    SNR: %.1f dB\n", full.Status.SNR)
-	}
-
+	term.DisplayLoRaStatus(ios, full)
 	return nil
-}
-
-func parseLoRaStatus(statusMap map[string]any) *LoRaStatus {
-	st := &LoRaStatus{}
-	if id, ok := statusMap["id"].(float64); ok {
-		st.ID = int(id)
-	}
-	if rssi, ok := statusMap["rssi"].(float64); ok {
-		st.RSSI = int(rssi)
-	}
-	if snr, ok := statusMap["snr"].(float64); ok {
-		st.SNR = snr
-	}
-	return st
 }

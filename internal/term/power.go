@@ -314,3 +314,37 @@ func displayBarChart(ios *iostreams.IOStreams, devices []model.DeviceEnergy, max
 		ios.Printf("  %s │ %s %.2f kWh\n", name, theme.Highlight().Render(bar), dev.Energy)
 	}
 }
+
+// DisplayPMStatusDetails shows detailed power meter status in human-readable format.
+func DisplayPMStatusDetails(ios *iostreams.IOStreams, status *shelly.PMStatus, componentType string) {
+	typeLabel := "Power Meter (PM)"
+	if componentType == shelly.ComponentTypePM1 {
+		typeLabel = "Power Meter (PM1)"
+	}
+	ios.Printf("%s #%d\n\n", typeLabel, status.ID)
+	ios.Printf("Voltage: %.2f V\n", status.Voltage)
+	ios.Printf("Current: %.2f A\n", status.Current)
+	ios.Printf("Power:   %.2f W\n", status.APower)
+
+	if status.Freq != nil {
+		ios.Printf("Frequency: %.2f Hz\n", *status.Freq)
+	}
+
+	// Energy counters
+	if status.AEnergy != nil {
+		ios.Printf("\nAccumulated Energy:\n")
+		ios.Printf("  Total: %.2f Wh\n", status.AEnergy.Total)
+		if status.AEnergy.MinuteTs != nil && len(status.AEnergy.ByMinute) > 0 {
+			ios.Printf("  Recent (by minute): %v\n", status.AEnergy.ByMinute[:min(5, len(status.AEnergy.ByMinute))])
+		}
+	}
+
+	if status.RetAEnergy != nil {
+		ios.Printf("\nReturn Energy:\n")
+		ios.Printf("  Total: %.2f Wh\n", status.RetAEnergy.Total)
+	}
+
+	if len(status.Errors) > 0 {
+		ios.Printf("\nErrors: %v\n", status.Errors)
+	}
+}
