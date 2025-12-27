@@ -50,7 +50,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, file st
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
 	// Read file
 	//nolint:gosec // G304: User-provided file path is intentional for this command

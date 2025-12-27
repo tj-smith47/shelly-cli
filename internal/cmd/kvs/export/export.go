@@ -67,7 +67,7 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	kvsSvc := opts.Factory.KVSService()
 
 	// Validate format
 	switch opts.Format {
@@ -80,7 +80,7 @@ func run(ctx context.Context, opts *Options) error {
 	var data *kvs.Export
 	err := cmdutil.RunWithSpinner(ctx, ios, "Exporting KVS data...", func(ctx context.Context) error {
 		var exportErr error
-		data, exportErr = svc.ExportKVS(ctx, opts.Device)
+		data, exportErr = kvsSvc.Export(ctx, opts.Device)
 		return exportErr
 	})
 	if err != nil {

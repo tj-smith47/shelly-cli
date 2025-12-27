@@ -26,6 +26,37 @@ type LineProtocolWriter struct {
 	ios         *iostreams.IOStreams
 }
 
+// parseTags converts key=value pairs to a map.
+func parseTags(tagPairs []string) map[string]string {
+	tags := make(map[string]string)
+	for _, pair := range tagPairs {
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			tags[parts[0]] = parts[1]
+		}
+	}
+	return tags
+}
+
+// setupOutput opens an output file or returns stdout.
+func setupOutput(ios *iostreams.IOStreams, outputFile string) (io.Writer, func(), error) {
+	if outputFile == "" {
+		return ios.Out, func() {}, nil
+	}
+
+	cleanPath := filepath.Clean(outputFile)
+	file, err := os.Create(cleanPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create output file: %w", err)
+	}
+	cleanup := func() {
+		if cerr := file.Close(); cerr != nil {
+			ios.DebugErr("closing output file", cerr)
+		}
+	}
+	return file, cleanup, nil
+}
+
 // NewCommand creates the InfluxDB metrics command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
@@ -100,31 +131,13 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 	}
 
 	sort.Strings(devices)
+	tags := parseTags(tagPairs)
 
-	// Parse additional tags
-	tags := make(map[string]string)
-	for _, pair := range tagPairs {
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) == 2 {
-			tags[parts[0]] = parts[1]
-		}
+	out, cleanup, err := setupOutput(ios, outputFile)
+	if err != nil {
+		return err
 	}
-
-	// Determine output writer
-	out := ios.Out
-	if outputFile != "" {
-		cleanPath := filepath.Clean(outputFile)
-		file, err := os.Create(cleanPath)
-		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
-		}
-		defer func() {
-			if cerr := file.Close(); cerr != nil {
-				ios.DebugErr("closing output file", cerr)
-			}
-		}()
-		out = file
-	}
+	defer cleanup()
 
 	writer := &LineProtocolWriter{
 		out:         out,
@@ -144,23 +157,26 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 	}
 
 	if continuous {
-		// Stream mode
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-ticker.C:
-				points := svc.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
-				writePoints(points)
-			}
-		}
+		return runContinuous(ctx, svc, devices, measurement, tags, interval, writePoints)
 	}
 
 	// Single shot
 	points := svc.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
 	writePoints(points)
 	return nil
+}
+
+func runContinuous(ctx context.Context, svc *shelly.Service, devices []string, measurement string, tags map[string]string, interval time.Duration, writePoints func([]shelly.InfluxDBPoint)) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			points := svc.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
+			writePoints(points)
+		}
+	}
 }

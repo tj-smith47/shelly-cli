@@ -16,7 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
@@ -116,7 +116,7 @@ type Model struct {
 	cache *cache.Cache
 
 	// Shared event stream (WebSocket for Gen2+, polling for Gen1)
-	eventStream *shelly.EventStream
+	eventStream *automation.EventStream
 
 	// Unified focus and keybinding management
 	focusManager *focus.Manager
@@ -191,7 +191,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams(), opts.RefreshInterval)
 
 	// Create shared event stream (WebSocket for Gen2+, polling for Gen1)
-	eventStream := shelly.NewEventStream(f.ShellyService())
+	eventStream := automation.NewEventStream(f.ShellyService())
 
 	// Subscribe cache to event stream for real-time updates
 	deviceCache.SubscribeToEvents(eventStream)
@@ -249,11 +249,13 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	vm.Register(dashboard)
 
 	// Register Automation view
-	automation := views.NewAutomation(views.AutomationDeps{
-		Ctx: ctx,
-		Svc: f.ShellyService(),
+	automationView := views.NewAutomation(views.AutomationDeps{
+		Ctx:     ctx,
+		Svc:     f.ShellyService(),
+		AutoSvc: f.AutomationService(),
+		KVSSvc:  f.KVSService(),
 	})
-	vm.Register(automation)
+	vm.Register(automationView)
 
 	// Register Config view
 	configView := views.NewConfig(views.ConfigDeps{

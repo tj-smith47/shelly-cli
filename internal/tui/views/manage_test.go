@@ -138,8 +138,9 @@ func TestManage_Update_FocusNext(t *testing.T) {
 		t.Fatal("Update should return *Manage")
 	}
 
-	if manage.focusedPanel != ManagePanelBatch {
-		t.Errorf("focusedPanel after tab = %v, want ManagePanelBatch", manage.focusedPanel)
+	// Panel order: Discovery -> Firmware -> Backup -> Batch
+	if manage.focusedPanel != ManagePanelFirmware {
+		t.Errorf("focusedPanel after tab = %v, want ManagePanelFirmware", manage.focusedPanel)
 	}
 }
 
@@ -155,8 +156,10 @@ func TestManage_Update_FocusPrev(t *testing.T) {
 		t.Fatal("Update should return *Manage")
 	}
 
-	if manage.focusedPanel != ManagePanelDiscovery {
-		t.Errorf("focusedPanel after shift+tab = %v, want ManagePanelDiscovery", manage.focusedPanel)
+	// Panel order: Discovery -> Firmware -> Backup -> Batch
+	// Batch is last, so prev is Backup
+	if manage.focusedPanel != ManagePanelBackup {
+		t.Errorf("focusedPanel after shift+tab = %v, want ManagePanelBackup", manage.focusedPanel)
 	}
 }
 
@@ -169,20 +172,20 @@ func TestManage_FocusCycle(t *testing.T) {
 		t.Fatal("should start at ManagePanelDiscovery")
 	}
 
-	// Cycle through all panels
-	m.focusNext()
-	if m.focusedPanel != ManagePanelBatch {
-		t.Errorf("after 1 focusNext = %v, want ManagePanelBatch", m.focusedPanel)
-	}
-
+	// Panel order: Discovery -> Firmware -> Backup -> Batch
 	m.focusNext()
 	if m.focusedPanel != ManagePanelFirmware {
-		t.Errorf("after 2 focusNext = %v, want ManagePanelFirmware", m.focusedPanel)
+		t.Errorf("after 1 focusNext = %v, want ManagePanelFirmware", m.focusedPanel)
 	}
 
 	m.focusNext()
 	if m.focusedPanel != ManagePanelBackup {
-		t.Errorf("after 3 focusNext = %v, want ManagePanelBackup", m.focusedPanel)
+		t.Errorf("after 2 focusNext = %v, want ManagePanelBackup", m.focusedPanel)
+	}
+
+	m.focusNext()
+	if m.focusedPanel != ManagePanelBatch {
+		t.Errorf("after 3 focusNext = %v, want ManagePanelBatch", m.focusedPanel)
 	}
 
 	m.focusNext()
@@ -198,15 +201,16 @@ func TestManage_FocusPrevCycle(t *testing.T) {
 	// Start at discovery
 	m.focusedPanel = ManagePanelDiscovery
 
-	// Go backwards
+	// Panel order: Discovery -> Firmware -> Backup -> Batch
+	// Go backwards (wrap from Discovery to Batch)
 	m.focusPrev()
-	if m.focusedPanel != ManagePanelBackup {
-		t.Errorf("after 1 focusPrev = %v, want ManagePanelBackup (wrap)", m.focusedPanel)
+	if m.focusedPanel != ManagePanelBatch {
+		t.Errorf("after 1 focusPrev = %v, want ManagePanelBatch (wrap)", m.focusedPanel)
 	}
 
 	m.focusPrev()
-	if m.focusedPanel != ManagePanelFirmware {
-		t.Errorf("after 2 focusPrev = %v, want ManagePanelFirmware", m.focusedPanel)
+	if m.focusedPanel != ManagePanelBackup {
+		t.Errorf("after 2 focusPrev = %v, want ManagePanelBackup", m.focusedPanel)
 	}
 }
 

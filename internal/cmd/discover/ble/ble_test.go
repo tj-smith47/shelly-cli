@@ -9,7 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/wireless"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -75,7 +75,7 @@ func TestDefaultTimeout(t *testing.T) {
 
 func TestIsBLENotSupportedError_NilError(t *testing.T) {
 	t.Parallel()
-	if shelly.IsBLENotSupportedError(nil) {
+	if wireless.IsBLENotSupportedError(nil) {
 		t.Error("IsBLENotSupportedError(nil) = true, want false")
 	}
 }
@@ -83,14 +83,14 @@ func TestIsBLENotSupportedError_NilError(t *testing.T) {
 func TestIsBLENotSupportedError_GenericError(t *testing.T) {
 	t.Parallel()
 	err := errors.New("some other error")
-	if shelly.IsBLENotSupportedError(err) {
+	if wireless.IsBLENotSupportedError(err) {
 		t.Error("IsBLENotSupportedError(generic) = true, want false")
 	}
 }
 
 func TestIsBLENotSupportedError_NotSupportedError(t *testing.T) {
 	t.Parallel()
-	if !shelly.IsBLENotSupportedError(discovery.ErrBLENotSupported) {
+	if !wireless.IsBLENotSupportedError(discovery.ErrBLENotSupported) {
 		t.Error("IsBLENotSupportedError(ErrBLENotSupported) = false, want true")
 	}
 }
@@ -101,7 +101,7 @@ func TestIsBLENotSupportedError_WrappedError(t *testing.T) {
 		Message: "BLE not supported",
 		Err:     discovery.ErrBLENotSupported,
 	}
-	if !shelly.IsBLENotSupportedError(wrappedErr) {
+	if !wireless.IsBLENotSupportedError(wrappedErr) {
 		t.Error("IsBLENotSupportedError(wrapped) = false, want true")
 	}
 }

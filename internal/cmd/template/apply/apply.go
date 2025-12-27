@@ -8,16 +8,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	Template string
 	Device   string
 	DryRun   bool
-	Yes      bool
 	Factory  *cmdutil.Factory
 }
 
@@ -53,7 +54,7 @@ Note: Only devices of the same model/generation are fully compatible.`,
 	}
 
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview changes without applying")
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }

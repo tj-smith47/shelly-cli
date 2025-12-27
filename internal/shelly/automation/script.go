@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package automation provides script, schedule, and event automation for Shelly devices.
+package automation
 
 import (
 	"context"
@@ -37,7 +37,7 @@ type ScriptConfig struct {
 // ListScripts lists all scripts on a device.
 func (s *Service) ListScripts(ctx context.Context, identifier string) ([]ScriptInfo, error) {
 	var result []ScriptInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		resp, err := script.List(ctx)
 		if err != nil {
@@ -65,7 +65,7 @@ func (s *Service) ListScripts(ctx context.Context, identifier string) ([]ScriptI
 // GetScriptStatus gets the status of a specific script.
 func (s *Service) GetScriptStatus(ctx context.Context, identifier string, id int) (*ScriptStatus, error) {
 	var result *ScriptStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		status, err := script.GetStatus(ctx, id)
 		if err != nil {
@@ -94,7 +94,7 @@ func (s *Service) GetScriptStatus(ctx context.Context, identifier string, id int
 // GetScriptConfig gets the configuration of a specific script.
 func (s *Service) GetScriptConfig(ctx context.Context, identifier string, id int) (*ScriptConfig, error) {
 	var result *ScriptConfig
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		config, err := script.GetConfig(ctx, id)
 		if err != nil {
@@ -118,7 +118,7 @@ func (s *Service) GetScriptConfig(ctx context.Context, identifier string, id int
 // GetScriptCode retrieves the source code of a script.
 func (s *Service) GetScriptCode(ctx context.Context, identifier string, id int) (string, error) {
 	var result string
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		resp, err := script.GetCode(ctx, id)
 		if err != nil {
@@ -133,7 +133,7 @@ func (s *Service) GetScriptCode(ctx context.Context, identifier string, id int) 
 // CreateScript creates a new script on a device.
 func (s *Service) CreateScript(ctx context.Context, identifier, name string) (int, error) {
 	var result int
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		var namePtr *string
 		if name != "" {
@@ -151,7 +151,7 @@ func (s *Service) CreateScript(ctx context.Context, identifier, name string) (in
 
 // UpdateScriptCode updates the code of an existing script.
 func (s *Service) UpdateScriptCode(ctx context.Context, identifier string, id int, code string, appendCode bool) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		return script.PutCode(ctx, id, code, appendCode)
 	})
@@ -159,7 +159,7 @@ func (s *Service) UpdateScriptCode(ctx context.Context, identifier string, id in
 
 // UpdateScriptConfig updates the configuration of a script.
 func (s *Service) UpdateScriptConfig(ctx context.Context, identifier string, id int, name *string, enable *bool) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		config := &components.ScriptConfig{
 			Name:   name,
@@ -171,7 +171,7 @@ func (s *Service) UpdateScriptConfig(ctx context.Context, identifier string, id 
 
 // DeleteScript deletes a script from a device.
 func (s *Service) DeleteScript(ctx context.Context, identifier string, id int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		return script.Delete(ctx, id)
 	})
@@ -179,7 +179,7 @@ func (s *Service) DeleteScript(ctx context.Context, identifier string, id int) e
 
 // StartScript starts a script on a device.
 func (s *Service) StartScript(ctx context.Context, identifier string, id int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		return script.Start(ctx, id)
 	})
@@ -187,7 +187,7 @@ func (s *Service) StartScript(ctx context.Context, identifier string, id int) er
 
 // StopScript stops a running script on a device.
 func (s *Service) StopScript(ctx context.Context, identifier string, id int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		return script.Stop(ctx, id)
 	})
@@ -196,7 +196,7 @@ func (s *Service) StopScript(ctx context.Context, identifier string, id int) err
 // EvalScript evaluates a JavaScript expression in the context of a running script.
 func (s *Service) EvalScript(ctx context.Context, identifier string, id int, code string) (any, error) {
 	var result any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		resp, err := script.Eval(ctx, id, code)
 		if err != nil {

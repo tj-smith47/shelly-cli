@@ -7,14 +7,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	Factory *cmdutil.Factory
 	Device  string
-	Yes     bool
 }
 
 // NewCommand creates the matter reset command.
@@ -49,7 +50,7 @@ After reset, the device must be re-commissioned to any Matter fabrics.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
@@ -71,7 +72,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	if err := svc.MatterReset(ctx, opts.Device); err != nil {
+	if err := svc.Wireless().MatterReset(ctx, opts.Device); err != nil {
 		return err
 	}
 

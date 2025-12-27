@@ -8,6 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -17,7 +19,9 @@ func TestNewAutomation(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := AutomationDeps{Ctx: ctx, Svc: svc}
+	autoSvc := automation.New(svc)
+	kvsSvc := kvs.NewService(svc.WithConnection)
+	deps := AutomationDeps{Ctx: ctx, Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 
 	a := NewAutomation(deps)
 
@@ -43,7 +47,10 @@ func TestNewAutomation_PanicOnNilCtx(t *testing.T) {
 		}
 	}()
 
-	deps := AutomationDeps{Ctx: nil, Svc: &shelly.Service{}}
+	svc := &shelly.Service{}
+	autoSvc := automation.New(svc)
+	kvsSvc := kvs.NewService(svc.WithConnection)
+	deps := AutomationDeps{Ctx: nil, Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 	NewAutomation(deps)
 }
 
@@ -55,12 +62,18 @@ func TestNewAutomation_PanicOnNilSvc(t *testing.T) {
 		}
 	}()
 
-	deps := AutomationDeps{Ctx: context.Background(), Svc: nil}
+	svc := &shelly.Service{}
+	autoSvc := automation.New(svc)
+	kvsSvc := kvs.NewService(svc.WithConnection)
+	deps := AutomationDeps{Ctx: context.Background(), Svc: nil, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 	NewAutomation(deps)
 }
 
 func TestAutomationDeps_Validate(t *testing.T) {
 	t.Parallel()
+	svc := &shelly.Service{}
+	autoSvc := automation.New(svc)
+	kvsSvc := kvs.NewService(svc.WithConnection)
 	tests := []struct {
 		name    string
 		deps    AutomationDeps
@@ -68,17 +81,27 @@ func TestAutomationDeps_Validate(t *testing.T) {
 	}{
 		{
 			name:    "valid",
-			deps:    AutomationDeps{Ctx: context.Background(), Svc: &shelly.Service{}},
+			deps:    AutomationDeps{Ctx: context.Background(), Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc},
 			wantErr: false,
 		},
 		{
 			name:    "nil ctx",
-			deps:    AutomationDeps{Ctx: nil, Svc: &shelly.Service{}},
+			deps:    AutomationDeps{Ctx: nil, Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc},
 			wantErr: true,
 		},
 		{
 			name:    "nil svc",
-			deps:    AutomationDeps{Ctx: context.Background(), Svc: nil},
+			deps:    AutomationDeps{Ctx: context.Background(), Svc: nil, AutoSvc: autoSvc, KVSSvc: kvsSvc},
+			wantErr: true,
+		},
+		{
+			name:    "nil auto svc",
+			deps:    AutomationDeps{Ctx: context.Background(), Svc: svc, AutoSvc: nil, KVSSvc: kvsSvc},
+			wantErr: true,
+		},
+		{
+			name:    "nil kvs svc",
+			deps:    AutomationDeps{Ctx: context.Background(), Svc: svc, AutoSvc: autoSvc, KVSSvc: nil},
 			wantErr: true,
 		},
 	}
@@ -159,14 +182,15 @@ func TestAutomation_FocusNext(t *testing.T) {
 		t.Fatalf("initial panel = %v, want PanelScripts", a.focusedPanel)
 	}
 
-	a.focusNext()
-	if a.focusedPanel != PanelScriptEditor {
-		t.Errorf("after focusNext = %v, want PanelScriptEditor", a.focusedPanel)
-	}
-
+	// Panel order: Scripts -> Schedules -> Webhooks -> ScriptEditor -> ScheduleEditor -> Virtuals -> KVS
 	a.focusNext()
 	if a.focusedPanel != PanelSchedules {
 		t.Errorf("after focusNext = %v, want PanelSchedules", a.focusedPanel)
+	}
+
+	a.focusNext()
+	if a.focusedPanel != PanelWebhooks {
+		t.Errorf("after focusNext = %v, want PanelWebhooks", a.focusedPanel)
 	}
 }
 
@@ -175,14 +199,17 @@ func TestAutomation_FocusPrev(t *testing.T) {
 	a := newTestAutomation()
 	a.focusedPanel = PanelSchedules
 
-	a.focusPrev()
-	if a.focusedPanel != PanelScriptEditor {
-		t.Errorf("after focusPrev = %v, want PanelScriptEditor", a.focusedPanel)
-	}
-
+	// Panel order: Scripts -> Schedules -> Webhooks -> ScriptEditor -> ScheduleEditor -> Virtuals -> KVS
+	// Prev from Schedules is Scripts
 	a.focusPrev()
 	if a.focusedPanel != PanelScripts {
 		t.Errorf("after focusPrev = %v, want PanelScripts", a.focusedPanel)
+	}
+
+	// Prev from Scripts wraps to KVS
+	a.focusPrev()
+	if a.focusedPanel != PanelKVS {
+		t.Errorf("after focusPrev = %v, want PanelKVS (wrap)", a.focusedPanel)
 	}
 }
 
@@ -205,8 +232,10 @@ func TestAutomation_HandleKeyPress_Tab(t *testing.T) {
 
 	a.handleKeyPress(msg)
 
-	if a.focusedPanel != PanelScriptEditor {
-		t.Errorf("focusedPanel = %v, want PanelScriptEditor", a.focusedPanel)
+	// Panel order: Scripts -> Schedules -> Webhooks -> ScriptEditor -> ScheduleEditor -> Virtuals -> KVS
+	// Tab from Scripts goes to Schedules
+	if a.focusedPanel != PanelSchedules {
+		t.Errorf("focusedPanel = %v, want PanelSchedules", a.focusedPanel)
 	}
 }
 
@@ -284,10 +313,12 @@ func TestDefaultAutomationStyles(t *testing.T) {
 
 func TestAutomationDeps_Errors(t *testing.T) {
 	t.Parallel()
+	svc := &shelly.Service{}
+	kvsSvc := kvs.NewService(svc.WithConnection)
 
 	t.Run("nil context error", func(t *testing.T) {
 		t.Parallel()
-		deps := AutomationDeps{Ctx: nil, Svc: &shelly.Service{}}
+		deps := AutomationDeps{Ctx: nil, Svc: svc, KVSSvc: kvsSvc}
 		err := deps.Validate()
 		if !errors.Is(err, errNilContext) {
 			t.Errorf("Validate() error = %v, want errNilContext", err)
@@ -296,7 +327,7 @@ func TestAutomationDeps_Errors(t *testing.T) {
 
 	t.Run("nil service error", func(t *testing.T) {
 		t.Parallel()
-		deps := AutomationDeps{Ctx: context.Background(), Svc: nil}
+		deps := AutomationDeps{Ctx: context.Background(), Svc: nil, KVSSvc: kvsSvc}
 		err := deps.Validate()
 		if !errors.Is(err, errNilService) {
 			t.Errorf("Validate() error = %v, want errNilService", err)
@@ -308,6 +339,8 @@ func TestAutomationDeps_Errors(t *testing.T) {
 func newTestAutomation() *Automation {
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	deps := AutomationDeps{Ctx: ctx, Svc: svc}
+	autoSvc := automation.New(svc)
+	kvsSvc := kvs.NewService(svc.WithConnection)
+	deps := AutomationDeps{Ctx: ctx, Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 	return NewAutomation(deps)
 }

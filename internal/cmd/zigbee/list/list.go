@@ -54,7 +54,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	devices, err := svc.ScanZigbeeDevices(ctx, ios)
+	devices, err := svc.Wireless().ScanZigbeeDevices(ctx, ios)
 	if err != nil {
 		return err
 	}

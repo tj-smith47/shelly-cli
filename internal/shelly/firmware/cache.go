@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package firmware provides firmware management for Shelly devices.
+package firmware
 
 import (
 	"context"
@@ -14,31 +14,36 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-// FirmwareCache provides in-memory caching of firmware info for all devices.
-// This is NOT persisted to config - it's populated at startup and refreshed on demand.
-type FirmwareCache struct {
-	mu      sync.RWMutex
-	entries map[string]*FirmwareCacheEntry // keyed by device name
-}
-
-// FirmwareCacheEntry holds cached firmware info for a single device.
-type FirmwareCacheEntry struct {
+// CacheEntry holds cached firmware info for a single device.
+type CacheEntry struct {
 	DeviceName  string
 	Address     string
-	Info        *FirmwareInfo
+	Info        *Info
 	LastChecked time.Time
 	Error       error
 }
 
-// NewFirmwareCache creates a new firmware cache.
-func NewFirmwareCache() *FirmwareCache {
-	return &FirmwareCache{
-		entries: make(map[string]*FirmwareCacheEntry),
+// IsStale returns true if the cache entry is older than the given duration.
+func (e *CacheEntry) IsStale(maxAge time.Duration) bool {
+	return time.Since(e.LastChecked) > maxAge
+}
+
+// Cache provides in-memory caching of firmware info for all devices.
+// This is NOT persisted to config - it's populated at startup and refreshed on demand.
+type Cache struct {
+	mu      sync.RWMutex
+	entries map[string]*CacheEntry // keyed by device name
+}
+
+// NewCache creates a new firmware cache.
+func NewCache() *Cache {
+	return &Cache{
+		entries: make(map[string]*CacheEntry),
 	}
 }
 
 // Get returns cached firmware info for a device.
-func (c *FirmwareCache) Get(deviceName string) (*FirmwareCacheEntry, bool) {
+func (c *Cache) Get(deviceName string) (*CacheEntry, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	entry, ok := c.entries[deviceName]
@@ -46,17 +51,17 @@ func (c *FirmwareCache) Get(deviceName string) (*FirmwareCacheEntry, bool) {
 }
 
 // Set stores firmware info for a device.
-func (c *FirmwareCache) Set(deviceName string, entry *FirmwareCacheEntry) {
+func (c *Cache) Set(deviceName string, entry *CacheEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.entries[deviceName] = entry
 }
 
 // All returns all cached entries.
-func (c *FirmwareCache) All() []*FirmwareCacheEntry {
+func (c *Cache) All() []*CacheEntry {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	result := make([]*FirmwareCacheEntry, 0, len(c.entries))
+	result := make([]*CacheEntry, 0, len(c.entries))
 	for _, entry := range c.entries {
 		result = append(result, entry)
 	}
@@ -64,7 +69,7 @@ func (c *FirmwareCache) All() []*FirmwareCacheEntry {
 }
 
 // AllSorted returns all cached entries, sorted with updates first.
-func (c *FirmwareCache) AllSorted() []*FirmwareCacheEntry {
+func (c *Cache) AllSorted() []*CacheEntry {
 	entries := c.All()
 	sort.Slice(entries, func(i, j int) bool {
 		// Updates first
@@ -80,10 +85,10 @@ func (c *FirmwareCache) AllSorted() []*FirmwareCacheEntry {
 }
 
 // DevicesWithUpdates returns devices that have available updates.
-func (c *FirmwareCache) DevicesWithUpdates() []*FirmwareCacheEntry {
+func (c *Cache) DevicesWithUpdates() []*CacheEntry {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	var result []*FirmwareCacheEntry
+	var result []*CacheEntry
 	for _, entry := range c.entries {
 		if entry.Info != nil && entry.Info.HasUpdate {
 			result = append(result, entry)
@@ -93,25 +98,20 @@ func (c *FirmwareCache) DevicesWithUpdates() []*FirmwareCacheEntry {
 }
 
 // UpdateCount returns the number of devices with available updates.
-func (c *FirmwareCache) UpdateCount() int {
+func (c *Cache) UpdateCount() int {
 	return len(c.DevicesWithUpdates())
 }
 
 // Clear removes all cached entries.
-func (c *FirmwareCache) Clear() {
+func (c *Cache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.entries = make(map[string]*FirmwareCacheEntry)
+	c.entries = make(map[string]*CacheEntry)
 }
 
-// IsStale returns true if the cache entry is older than the given duration.
-func (e *FirmwareCacheEntry) IsStale(maxAge time.Duration) bool {
-	return time.Since(e.LastChecked) > maxAge
-}
-
-// PrefetchFirmwareCache populates the firmware cache for all registered devices.
+// Prefetch populates the firmware cache for all registered devices.
 // This runs concurrently and respects the global rate limit.
-func (s *Service) PrefetchFirmwareCache(ctx context.Context, ios *iostreams.IOStreams) {
+func (s *Service) Prefetch(ctx context.Context, ios *iostreams.IOStreams) {
 	devices := config.ListDevices()
 	if len(devices) == 0 {
 		return
@@ -124,7 +124,7 @@ func (s *Service) PrefetchFirmwareCache(ctx context.Context, ios *iostreams.IOSt
 		deviceName := name
 		dev := device
 		g.Go(func() error {
-			s.prefetchDeviceFirmware(gctx, deviceName, dev)
+			s.prefetchDevice(gctx, deviceName, dev)
 			return nil // Don't fail the whole group on individual errors
 		})
 	}
@@ -134,15 +134,15 @@ func (s *Service) PrefetchFirmwareCache(ctx context.Context, ios *iostreams.IOSt
 	}
 }
 
-// prefetchDeviceFirmware fetches and caches firmware info for a single device.
-func (s *Service) prefetchDeviceFirmware(ctx context.Context, name string, device model.Device) {
-	entry := &FirmwareCacheEntry{
+// prefetchDevice fetches and caches firmware info for a single device.
+func (s *Service) prefetchDevice(ctx context.Context, name string, device model.Device) {
+	entry := &CacheEntry{
 		DeviceName:  name,
 		Address:     device.Address,
 		LastChecked: time.Now(),
 	}
 
-	info, err := s.CheckDeviceFirmware(ctx, device)
+	info, err := s.CheckDevice(ctx, device)
 	if err != nil {
 		entry.Error = err
 		iostreams.DebugErrCat(iostreams.CategoryDevice, "prefetch firmware "+name, err)
@@ -150,14 +150,14 @@ func (s *Service) prefetchDeviceFirmware(ctx context.Context, name string, devic
 		entry.Info = info
 	}
 
-	s.firmwareCache.Set(name, entry)
+	s.cache.Set(name, entry)
 }
 
-// GetCachedFirmware returns cached firmware info, fetching if not cached or stale.
+// GetCached returns cached firmware info, fetching if not cached or stale.
 // Returns the cached entry or nil if the device is not found.
-func (s *Service) GetCachedFirmware(ctx context.Context, deviceName string, maxAge time.Duration) *FirmwareCacheEntry {
+func (s *Service) GetCached(ctx context.Context, deviceName string, maxAge time.Duration) *CacheEntry {
 	// Check cache first
-	if entry, ok := s.firmwareCache.Get(deviceName); ok {
+	if entry, ok := s.cache.Get(deviceName); ok {
 		if !entry.IsStale(maxAge) {
 			return entry
 		}
@@ -169,12 +169,7 @@ func (s *Service) GetCachedFirmware(ctx context.Context, deviceName string, maxA
 		return nil
 	}
 
-	s.prefetchDeviceFirmware(ctx, deviceName, device)
-	entry, _ := s.firmwareCache.Get(deviceName)
+	s.prefetchDevice(ctx, deviceName, device)
+	entry, _ := s.cache.Get(deviceName)
 	return entry
-}
-
-// FirmwareCache returns the firmware cache.
-func (s *Service) FirmwareCache() *FirmwareCache {
-	return s.firmwareCache
 }

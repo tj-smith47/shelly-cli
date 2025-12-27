@@ -8,6 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -108,7 +109,7 @@ func DisplayCloudConnectionStatus(ios *iostreams.IOStreams, status *shelly.Cloud
 }
 
 // DisplayCloudDevice prints cloud device details.
-func DisplayCloudDevice(ios *iostreams.IOStreams, device *shelly.CloudDevice, showStatus bool) {
+func DisplayCloudDevice(ios *iostreams.IOStreams, device *network.CloudDevice, showStatus bool) {
 	ios.Title("Cloud Device")
 	ios.Println()
 
@@ -166,7 +167,7 @@ func printCloudJSON(ios *iostreams.IOStreams, data json.RawMessage) {
 }
 
 // DisplayCloudDevices prints a table of cloud devices.
-func DisplayCloudDevices(ios *iostreams.IOStreams, devices []shelly.CloudDevice) {
+func DisplayCloudDevices(ios *iostreams.IOStreams, devices []network.CloudDevice) {
 	if len(devices) == 0 {
 		ios.Info("No devices found in your Shelly Cloud account")
 		return
@@ -205,14 +206,14 @@ type TokenStatusInfo struct {
 
 // GetTokenStatus checks token validity and returns display info.
 func GetTokenStatus(token string) TokenStatusInfo {
-	if err := shelly.ValidateToken(token); err != nil {
+	if err := network.ValidateToken(token); err != nil {
 		return TokenStatusInfo{
 			Display: output.RenderTokenValidity(false, false),
 			Warning: "Token is invalid. Please run 'shelly cloud login' to re-authenticate.",
 		}
 	}
 
-	if shelly.IsTokenExpired(token) {
+	if network.IsTokenExpired(token) {
 		return TokenStatusInfo{
 			Display: output.RenderTokenValidity(true, true),
 			Warning: "Token has expired. Please run 'shelly cloud login' to re-authenticate.",

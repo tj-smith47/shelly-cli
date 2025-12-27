@@ -56,7 +56,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Enabling Matter...", func(ctx context.Context) error {
-		return svc.MatterEnable(ctx, opts.Device)
+		return svc.Wireless().MatterEnable(ctx, opts.Device)
 	})
 	if err != nil {
 		return err

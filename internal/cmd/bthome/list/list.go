@@ -81,7 +81,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	devices, err := svc.FetchBTHomeDevices(ctx, opts.Device, ios)
+	devices, err := svc.Wireless().FetchBTHomeDevices(ctx, opts.Device, ios)
 	if err != nil {
 		return err
 	}

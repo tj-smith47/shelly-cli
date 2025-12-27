@@ -79,7 +79,7 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	kvsSvc := opts.Factory.KVSService()
 
 	// Validate arguments
 	if !opts.Null && opts.Value == "" {
@@ -95,7 +95,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Setting %q...", opts.Key), func(ctx context.Context) error {
-		if err := svc.SetKVS(ctx, opts.Device, opts.Key, value); err != nil {
+		if err := kvsSvc.Set(ctx, opts.Device, opts.Key, value); err != nil {
 			return err
 		}
 		ios.Success("Key %q set to %v", opts.Key, output.FormatJSONValue(value))

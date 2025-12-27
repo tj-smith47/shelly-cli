@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -17,9 +18,9 @@ import (
 
 // Options holds command options.
 type Options struct {
+	flags.ComponentFlags
 	Factory *cmdutil.Factory
 	Device  string
-	ID      int
 	JSON    bool
 }
 
@@ -56,7 +57,7 @@ Displays:
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.ID, "id", 0, "Thermostat component ID")
+	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "Thermostat")
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON")
 
 	return cmd

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -17,11 +18,11 @@ import (
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	Device    string
 	File      string
 	Overwrite bool
 	DryRun    bool
-	Yes       bool
 	Factory   *cmdutil.Factory
 }
 
@@ -59,7 +60,7 @@ Use --dry-run to see what would be imported without making changes.`,
 
 	cmd.Flags().BoolVar(&opts.Overwrite, "overwrite", false, "Overwrite existing keys")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be imported without making changes")
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
@@ -69,7 +70,7 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	kvsSvc := opts.Factory.KVSService()
 
 	// Parse the import file
 	data, err := kvs.ParseImportFile(opts.File)
@@ -110,7 +111,7 @@ func run(ctx context.Context, opts *Options) error {
 	var imported, skipped int
 	err = cmdutil.RunWithSpinner(ctx, ios, "Importing KVS data...", func(ctx context.Context) error {
 		var importErr error
-		imported, skipped, importErr = svc.ImportKVS(ctx, opts.Device, data, opts.Overwrite)
+		imported, skipped, importErr = kvsSvc.Import(ctx, opts.Device, data, opts.Overwrite)
 		return importErr
 	})
 	if err != nil {

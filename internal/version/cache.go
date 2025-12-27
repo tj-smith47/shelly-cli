@@ -73,7 +73,7 @@ type ReleaseFetcher func(ctx context.Context) (version string, err error)
 // Returns nil result if the check was skipped (dev build).
 func CheckForUpdates(ctx context.Context, currentVersion string, fetch ReleaseFetcher, isNewer func(current, latest string) bool) (*UpdateResult, error) {
 	// Skip for dev versions
-	if currentVersion == "" || currentVersion == "dev" {
+	if currentVersion == "" || currentVersion == DevVersion {
 		return &UpdateResult{SkippedDevBuild: true}, nil
 	}
 

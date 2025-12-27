@@ -66,7 +66,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Enable Zigbee if not already enabled
 	ios.Info("Enabling Zigbee...")
-	if err := svc.ZigbeeEnable(ctx, opts.Device); err != nil {
+	if err := svc.Wireless().ZigbeeEnable(ctx, opts.Device); err != nil {
 		return err
 	}
 
@@ -75,7 +75,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Start network steering
 	ios.Info("Starting network steering...")
-	if err := svc.ZigbeeStartNetworkSteering(ctx, opts.Device); err != nil {
+	if err := svc.Wireless().ZigbeeStartNetworkSteering(ctx, opts.Device); err != nil {
 		return err
 	}
 

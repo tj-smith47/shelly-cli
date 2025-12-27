@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 )
 
 // DeviceDeleteOpts configures a device-based delete command.
@@ -34,8 +35,13 @@ type DeviceDeleteOpts struct {
 	// If nil, no completion is provided.
 	ValidArgsFunc func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective)
 
-	// ServiceFunc is the function that performs the deletion.
+	// ServiceFunc is the function that performs the deletion using shelly.Service.
+	// Use this for webhook and other shelly.Service-based deletions.
 	ServiceFunc func(ctx context.Context, svc *shelly.Service, device string, id int) error
+
+	// AutomationServiceFunc is the function that performs deletion using automation.Service.
+	// Use this for script and schedule deletions.
+	AutomationServiceFunc func(ctx context.Context, svc *automation.Service, device string, id int) error
 
 	// ShowWarning controls whether a warning message is shown before confirmation.
 	// If true, displays "This will delete <resource> <id>." before asking for confirmation.
@@ -118,12 +124,16 @@ func runDeviceDelete(ctx context.Context, f *cmdutil.Factory, opts DeviceDeleteO
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
-
 	resourceCapitalized := capitalize(opts.Resource)
 	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %s...", opts.Resource), func(ctx context.Context) error {
-		if err := opts.ServiceFunc(ctx, svc, device, id); err != nil {
-			return fmt.Errorf("failed to delete %s: %w", opts.Resource, err)
+		var deleteErr error
+		if opts.AutomationServiceFunc != nil {
+			deleteErr = opts.AutomationServiceFunc(ctx, f.AutomationService(), device, id)
+		} else {
+			deleteErr = opts.ServiceFunc(ctx, f.ShellyService(), device, id)
+		}
+		if deleteErr != nil {
+			return fmt.Errorf("failed to delete %s: %w", opts.Resource, deleteErr)
 		}
 		ios.Success("%s %d deleted", resourceCapitalized, id)
 		return nil

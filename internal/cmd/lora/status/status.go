@@ -60,7 +60,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	full, err := svc.FetchLoRaFullStatus(ctx, opts.Device, opts.ID, ios)
+	full, err := svc.Wireless().FetchLoRaFullStatus(ctx, opts.Device, opts.ID, ios)
 	if err != nil {
 		return err
 	}

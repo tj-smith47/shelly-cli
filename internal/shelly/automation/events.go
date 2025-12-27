@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package automation provides script, schedule, and event automation for Shelly devices.
+package automation
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 
 // EventStream manages WebSocket connections to multiple devices for real-time updates.
 type EventStream struct {
-	svc         *Service
+	svc         EventStreamProvider
 	bus         *events.EventBus
 	connections map[string]*deviceConnection
 	mu          sync.RWMutex
@@ -35,7 +35,7 @@ type deviceConnection struct {
 }
 
 // NewEventStream creates a new event stream manager.
-func NewEventStream(svc *Service) *EventStream {
+func NewEventStream(svc EventStreamProvider) *EventStream {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &EventStream{
 		svc:         svc,
@@ -180,16 +180,9 @@ func (es *EventStream) pollGen1Device(ctx context.Context, name, address string)
 }
 
 func (es *EventStream) fetchGen1Status(ctx context.Context, name, address string) {
-	snapshot, err := es.svc.getGen1MonitoringSnapshot(ctx, address)
+	statusJSON, err := es.svc.GetGen1StatusJSON(ctx, address)
 	if err != nil {
 		es.bus.Publish(events.NewDeviceOfflineEvent(name).WithReason(err.Error()))
-		return
-	}
-
-	// Convert snapshot to status change event
-	statusJSON, err := json.Marshal(snapshot)
-	if err != nil {
-		iostreams.DebugErrCat(iostreams.CategoryDevice, "marshal gen1 status", err)
 		return
 	}
 

@@ -13,7 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -26,7 +26,7 @@ type CodeLoadedMsg struct {
 
 // StatusLoadedMsg signals that script status was loaded.
 type StatusLoadedMsg struct {
-	Status *shelly.ScriptStatus
+	Status *automation.ScriptStatus
 	Err    error
 }
 
@@ -48,7 +48,7 @@ type CodeUploadedMsg struct {
 // EditorDeps holds the dependencies for the script editor component.
 type EditorDeps struct {
 	Ctx context.Context
-	Svc *shelly.Service
+	Svc *automation.Service
 }
 
 // Validate ensures all required dependencies are set.
@@ -65,14 +65,14 @@ func (d EditorDeps) Validate() error {
 // EditorModel displays script code with syntax highlighting and status.
 type EditorModel struct {
 	ctx              context.Context
-	svc              *shelly.Service
+	svc              *automation.Service
 	device           string
 	scriptID         int
 	scriptName       string
 	code             string
 	codeLines        []string
 	highlightedLines []string // Chroma-highlighted lines (from theme)
-	status           *shelly.ScriptStatus
+	status           *automation.ScriptStatus
 	scroll           int
 	loading          bool
 	err              error
@@ -481,7 +481,7 @@ func (m EditorModel) Error() error {
 }
 
 // Status returns the current script status.
-func (m EditorModel) Status() *shelly.ScriptStatus {
+func (m EditorModel) Status() *automation.ScriptStatus {
 	return m.status
 }
 

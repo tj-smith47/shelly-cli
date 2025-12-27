@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package automation provides script, schedule, and event automation for Shelly devices.
+package automation
 
 import (
 	"context"
@@ -28,7 +28,7 @@ type ScheduleCall struct {
 // ListSchedules lists all schedules on a device.
 func (s *Service) ListSchedules(ctx context.Context, identifier string) ([]ScheduleJob, error) {
 	var result []ScheduleJob
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 		resp, err := schedule.List(ctx)
 		if err != nil {
@@ -66,7 +66,7 @@ func (s *Service) ListSchedules(ctx context.Context, identifier string) ([]Sched
 // CreateSchedule creates a new schedule on a device.
 func (s *Service) CreateSchedule(ctx context.Context, identifier string, enable bool, timespec string, calls []ScheduleCall) (int, error) {
 	var result int
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 
 		// Convert calls to component format
@@ -96,7 +96,7 @@ func (s *Service) CreateSchedule(ctx context.Context, identifier string, enable 
 
 // UpdateSchedule updates an existing schedule on a device.
 func (s *Service) UpdateSchedule(ctx context.Context, identifier string, id int, enable *bool, timespec *string, calls []ScheduleCall) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 
 		req := &components.ScheduleUpdateRequest{
@@ -123,7 +123,7 @@ func (s *Service) UpdateSchedule(ctx context.Context, identifier string, id int,
 
 // DeleteSchedule deletes a schedule from a device.
 func (s *Service) DeleteSchedule(ctx context.Context, identifier string, id int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 		_, err := schedule.Delete(ctx, id)
 		return err
@@ -132,7 +132,7 @@ func (s *Service) DeleteSchedule(ctx context.Context, identifier string, id int)
 
 // DeleteAllSchedules deletes all schedules from a device.
 func (s *Service) DeleteAllSchedules(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 		_, err := schedule.DeleteAll(ctx)
 		return err

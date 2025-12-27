@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -35,14 +36,14 @@ func (d Deps) Validate() error {
 
 // StatusLoadedMsg signals that WiFi status was loaded.
 type StatusLoadedMsg struct {
-	Status *shelly.WiFiStatusFull
-	Config *shelly.WiFiConfigFull
+	Status *network.WiFiStatusFull
+	Config *network.WiFiConfigFull
 	Err    error
 }
 
 // ScanResultMsg signals that WiFi scan completed.
 type ScanResultMsg struct {
-	Networks []shelly.WiFiNetworkFull
+	Networks []network.WiFiNetworkFull
 	Err      error
 }
 
@@ -51,9 +52,9 @@ type Model struct {
 	ctx        context.Context
 	svc        *shelly.Service
 	device     string
-	status     *shelly.WiFiStatusFull
-	config     *shelly.WiFiConfigFull
-	networks   []shelly.WiFiNetworkFull
+	status     *network.WiFiStatusFull
+	config     *network.WiFiConfigFull
+	networks   []network.WiFiNetworkFull
 	scroller   *panel.Scroller
 	loading    bool
 	scanning   bool
@@ -427,10 +428,10 @@ func (m Model) renderNetworks() string {
 
 	start, end := m.scroller.VisibleRange()
 	for i := start; i < end; i++ {
-		network := m.networks[i]
+		netw := m.networks[i]
 		isSelected := m.scroller.IsCursorAt(i)
 
-		line := m.renderNetworkLine(network, isSelected)
+		line := m.renderNetworkLine(netw, isSelected)
 		content.WriteString(line)
 		if i < end-1 {
 			content.WriteString("\n")
@@ -444,22 +445,22 @@ func (m Model) renderNetworks() string {
 	return content.String()
 }
 
-func (m Model) renderNetworkLine(network shelly.WiFiNetworkFull, isSelected bool) string {
+func (m Model) renderNetworkLine(netw network.WiFiNetworkFull, isSelected bool) string {
 	selector := "  "
 	if isSelected {
 		selector = "▶ "
 	}
 
 	// Signal indicator
-	signalIcon, signalStyle := m.getSignalIconAndStyle(network.RSSI)
+	signalIcon, signalStyle := m.getSignalIconAndStyle(netw.RSSI)
 
 	// Auth indicator
 	authIcon := "🔓"
-	if network.Auth != "open" && network.Auth != "" {
+	if netw.Auth != "open" && netw.Auth != "" {
 		authIcon = "🔒"
 	}
 
-	ssid := network.SSID
+	ssid := netw.SSID
 	if len(ssid) > 20 {
 		ssid = ssid[:17] + "..."
 	}
@@ -478,17 +479,17 @@ func (m Model) renderNetworkLine(network shelly.WiFiNetworkFull, isSelected bool
 }
 
 // Status returns the current WiFi status.
-func (m Model) Status() *shelly.WiFiStatusFull {
+func (m Model) Status() *network.WiFiStatusFull {
 	return m.status
 }
 
 // Config returns the current WiFi config.
-func (m Model) Config() *shelly.WiFiConfigFull {
+func (m Model) Config() *network.WiFiConfigFull {
 	return m.config
 }
 
 // Networks returns the scanned networks.
-func (m Model) Networks() []shelly.WiFiNetworkFull {
+func (m Model) Networks() []network.WiFiNetworkFull {
 	return m.networks
 }
 

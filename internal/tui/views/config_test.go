@@ -156,19 +156,20 @@ func TestConfig_FocusNext(t *testing.T) {
 		t.Fatalf("initial panel = %v, want PanelWiFi", c.focusedPanel)
 	}
 
+	// Panel order: WiFi -> System -> Cloud -> Security -> BLE -> Inputs -> Protocols -> SmartHome
 	c.focusNext()
 	if c.focusedPanel != PanelSystem {
 		t.Errorf("after focusNext = %v, want PanelSystem", c.focusedPanel)
 	}
 
 	c.focusNext()
-	if c.focusedPanel != PanelBLE {
-		t.Errorf("after focusNext = %v, want PanelBLE", c.focusedPanel)
+	if c.focusedPanel != PanelCloud {
+		t.Errorf("after focusNext = %v, want PanelCloud", c.focusedPanel)
 	}
 
 	c.focusNext()
-	if c.focusedPanel != PanelCloud {
-		t.Errorf("after focusNext = %v, want PanelCloud", c.focusedPanel)
+	if c.focusedPanel != PanelSecurity {
+		t.Errorf("after focusNext = %v, want PanelSecurity", c.focusedPanel)
 	}
 }
 
@@ -177,14 +178,15 @@ func TestConfig_FocusPrev(t *testing.T) {
 	c := newTestConfig()
 	c.focusedPanel = PanelCloud
 
-	c.focusPrev()
-	if c.focusedPanel != PanelBLE {
-		t.Errorf("after focusPrev = %v, want PanelBLE", c.focusedPanel)
-	}
-
+	// Panel order: WiFi -> System -> Cloud -> Security -> BLE -> Inputs -> Protocols -> SmartHome
 	c.focusPrev()
 	if c.focusedPanel != PanelSystem {
 		t.Errorf("after focusPrev = %v, want PanelSystem", c.focusedPanel)
+	}
+
+	c.focusPrev()
+	if c.focusedPanel != PanelWiFi {
+		t.Errorf("after focusPrev = %v, want PanelWiFi", c.focusedPanel)
 	}
 }
 

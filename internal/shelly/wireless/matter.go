@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package wireless provides wireless protocol operations for Shelly devices.
+package wireless
 
 import (
 	"context"
@@ -47,7 +47,7 @@ type MatterConfig struct {
 
 // MatterEnable enables Matter on a device.
 func (s *Service) MatterEnable(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Matter.SetConfig", map[string]any{
 			"config": map[string]any{
 				"enable": true,
@@ -62,7 +62,7 @@ func (s *Service) MatterEnable(ctx context.Context, identifier string) error {
 
 // MatterDisable disables Matter on a device.
 func (s *Service) MatterDisable(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Matter.SetConfig", map[string]any{
 			"config": map[string]any{
 				"enable": false,
@@ -77,7 +77,7 @@ func (s *Service) MatterDisable(ctx context.Context, identifier string) error {
 
 // MatterReset performs a factory reset of Matter on a device (decommissions it).
 func (s *Service) MatterReset(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Matter.FactoryReset", nil)
 		if err != nil {
 			return fmt.Errorf("failed to reset Matter: %w", err)
@@ -89,7 +89,7 @@ func (s *Service) MatterReset(ctx context.Context, identifier string) error {
 // MatterGetSetupCode gets the Matter pairing/setup code from a device.
 func (s *Service) MatterGetSetupCode(ctx context.Context, identifier string) (string, error) {
 	var code string
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Matter.GetStatus", nil)
 		if err != nil {
 			return fmt.Errorf("failed to get Matter status: %w", err)
@@ -111,7 +111,7 @@ func (s *Service) MatterGetSetupCode(ctx context.Context, identifier string) (st
 // MatterGetStatus gets the full Matter status from a device.
 func (s *Service) MatterGetStatus(ctx context.Context, identifier string) (map[string]any, error) {
 	var status map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Matter.GetStatus", nil)
 		if err != nil {
 			return fmt.Errorf("failed to get Matter status: %w", err)
@@ -130,7 +130,7 @@ func (s *Service) MatterGetStatus(ctx context.Context, identifier string) (map[s
 // MatterGetConfig gets the Matter configuration from a device.
 func (s *Service) MatterGetConfig(ctx context.Context, identifier string) (MatterConfig, error) {
 	var cfg MatterConfig
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Matter.GetConfig", nil)
 		if err != nil {
 			return fmt.Errorf("failed to get Matter config: %w", err)
@@ -152,7 +152,7 @@ func (s *Service) MatterGetConfig(ctx context.Context, identifier string) (Matte
 // MatterGetCommissioningCode gets the Matter commissioning/pairing code from a device.
 func (s *Service) MatterGetCommissioningCode(ctx context.Context, identifier string) (model.CommissioningInfo, error) {
 	var info model.CommissioningInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Matter.GetCommissioningCode", nil)
 		if err != nil {
 			return fmt.Errorf("failed to get Matter commissioning code: %w", err)

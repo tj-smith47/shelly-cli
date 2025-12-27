@@ -8,7 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 )
 
 func TestSchedule(t *testing.T) {
@@ -17,7 +17,7 @@ func TestSchedule(t *testing.T) {
 		ID:       1,
 		Enable:   true,
 		Timespec: "0 0 9 * * MON-FRI",
-		Calls: []shelly.ScheduleCall{
+		Calls: []automation.ScheduleCall{
 			{Method: "Switch.Set", Params: map[string]any{"on": true}},
 		},
 	}
@@ -316,13 +316,13 @@ func TestListModel_View_WithSchedules(t *testing.T) {
 			ID:       1,
 			Enable:   true,
 			Timespec: "0 0 9 * * MON-FRI",
-			Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
+			Calls:    []automation.ScheduleCall{{Method: "Switch.Set"}},
 		},
 		{
 			ID:       2,
 			Enable:   false,
 			Timespec: "0 0 22 * * *",
-			Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
+			Calls:    []automation.ScheduleCall{{Method: "Switch.Set"}},
 		},
 	}
 	m.scroller.SetItemCount(len(m.schedules))
@@ -349,7 +349,7 @@ func TestListModel_RenderScheduleLine(t *testing.T) {
 				ID:       1,
 				Enable:   true,
 				Timespec: "0 0 9 * * *",
-				Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
+				Calls:    []automation.ScheduleCall{{Method: "Switch.Set"}},
 			},
 			isSelected: true,
 		},
@@ -359,7 +359,7 @@ func TestListModel_RenderScheduleLine(t *testing.T) {
 				ID:       2,
 				Enable:   false,
 				Timespec: "0 0 18 * * *",
-				Calls:    []shelly.ScheduleCall{{Method: "Light.Set"}},
+				Calls:    []automation.ScheduleCall{{Method: "Light.Set"}},
 			},
 			isSelected: false,
 		},
@@ -369,7 +369,7 @@ func TestListModel_RenderScheduleLine(t *testing.T) {
 				ID:       3,
 				Enable:   true,
 				Timespec: "@sunrise",
-				Calls: []shelly.ScheduleCall{
+				Calls: []automation.ScheduleCall{
 					{Method: "Switch.Set"},
 					{Method: "Light.Set"},
 				},
@@ -382,7 +382,7 @@ func TestListModel_RenderScheduleLine(t *testing.T) {
 				ID:       4,
 				Enable:   true,
 				Timespec: "0 30 12 * * *",
-				Calls:    []shelly.ScheduleCall{},
+				Calls:    []automation.ScheduleCall{},
 			},
 			isSelected: false,
 		},
@@ -475,7 +475,7 @@ func TestDefaultListStyles(t *testing.T) {
 
 func newTestListModel() ListModel {
 	ctx := context.Background()
-	svc := &shelly.Service{}
+	svc := &automation.Service{}
 	deps := ListDeps{Ctx: ctx, Svc: svc}
 	return NewList(deps)
 }

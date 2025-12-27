@@ -10,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -62,18 +61,20 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	kvsSvc := opts.Factory.KVSService()
 
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Device,
-		fmt.Sprintf("Getting key %q...", opts.Key),
-		func(ctx context.Context, svc *shelly.Service, device string) (*kvs.GetResult, error) {
-			return svc.GetKVS(ctx, device, opts.Key)
-		},
-		func(ios *iostreams.IOStreams, result *kvs.GetResult) {
-			if opts.Raw {
-				term.DisplayKVSRaw(ios, result)
-			} else {
-				term.DisplayKVSResult(ios, opts.Key, result)
-			}
-		})
+	result, err := cmdutil.RunWithSpinnerResult(ctx, ios, fmt.Sprintf("Getting key %q...", opts.Key), func(ctx context.Context) (*kvs.GetResult, error) {
+		return kvsSvc.Get(ctx, opts.Device, opts.Key)
+	})
+	if err != nil {
+		return err
+	}
+
+	return cmdutil.PrintResult(ios, result, func(ios *iostreams.IOStreams, result *kvs.GetResult) {
+		if opts.Raw {
+			term.DisplayKVSRaw(ios, result)
+		} else {
+			term.DisplayKVSResult(ios, opts.Key, result)
+		}
+	})
 }

@@ -1,4 +1,5 @@
-package shelly
+// Package wireless provides wireless protocol operations for Shelly devices.
+package wireless
 
 import (
 	"errors"

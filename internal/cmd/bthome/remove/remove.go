@@ -9,15 +9,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	Factory *cmdutil.Factory
 	Device  string
 	ID      int
-	Yes     bool
 }
 
 // NewCommand creates the bthome remove command.
@@ -52,7 +53,7 @@ Use 'shelly bthome list' to see device IDs.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
@@ -74,7 +75,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	if err := svc.BTHomeRemoveDevice(ctx, opts.Device, opts.ID); err != nil {
+	if err := svc.Wireless().BTHomeRemoveDevice(ctx, opts.Device, opts.ID); err != nil {
 		return err
 	}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
@@ -71,10 +72,11 @@ func RegisterDiscoveredDevices(devices []discovery.DiscoveredDevice, skipExistin
 
 		// Update MAC if available from discovery
 		if d.MACAddress != "" {
-			// Ignore MAC update errors - registration succeeded
-			_ = config.UpdateDeviceInfo(name, config.DeviceUpdates{
+			if err := config.UpdateDeviceInfo(name, config.DeviceUpdates{
 				MAC: d.MACAddress,
-			})
+			}); err != nil {
+				iostreams.DebugErr("update MAC for "+name, err)
+			}
 		}
 
 		added++

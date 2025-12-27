@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package wireless provides wireless protocol operations for Shelly devices.
+package wireless
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 
 // LoRaSendBytes sends data over LoRa.
 func (s *Service) LoRaSendBytes(ctx context.Context, identifier string, componentID int, data string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		params := map[string]any{
 			"id":   componentID,
 			"data": data,
@@ -27,7 +27,7 @@ func (s *Service) LoRaSendBytes(ctx context.Context, identifier string, componen
 
 // LoRaSetConfig updates LoRa configuration.
 func (s *Service) LoRaSetConfig(ctx context.Context, identifier string, componentID int, config map[string]any) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		params := map[string]any{
 			"id":     componentID,
 			"config": config,
@@ -43,7 +43,7 @@ func (s *Service) LoRaSetConfig(ctx context.Context, identifier string, componen
 // LoRaGetConfig gets LoRa configuration.
 func (s *Service) LoRaGetConfig(ctx context.Context, identifier string, componentID int) (map[string]any, error) {
 	var config map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		params := map[string]any{"id": componentID}
 		result, err := conn.Call(ctx, "LoRa.GetConfig", params)
 		if err != nil {
@@ -62,7 +62,7 @@ func (s *Service) LoRaGetConfig(ctx context.Context, identifier string, componen
 // LoRaGetStatus gets LoRa status.
 func (s *Service) LoRaGetStatus(ctx context.Context, identifier string, componentID int) (map[string]any, error) {
 	var status map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		params := map[string]any{"id": componentID}
 		result, err := conn.Call(ctx, "LoRa.GetStatus", params)
 		if err != nil {

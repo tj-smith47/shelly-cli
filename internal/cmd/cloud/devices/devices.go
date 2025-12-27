@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -50,7 +51,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	}
 
 	// Create cloud client
-	client := shelly.NewCloudClient(cfg.Cloud.AccessToken)
+	client := network.NewCloudClient(cfg.Cloud.AccessToken)
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Fetching devices from cloud...", func(ctx context.Context) error {
 		devices, err := client.GetAllDevices(ctx)

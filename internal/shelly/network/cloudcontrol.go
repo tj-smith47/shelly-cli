@@ -1,5 +1,5 @@
-// Package shelly provides cloud control operations.
-package shelly
+// Package network provides cloud control operations.
+package network
 
 import (
 	"context"

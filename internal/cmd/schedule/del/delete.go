@@ -9,7 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 )
 
 // NewCommand creates the schedule delete command.
@@ -19,7 +19,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long:          "Delete a schedule from a Gen2+ Shelly device.",
 		ShowWarning:   true,
 		ValidArgsFunc: completion.DeviceThenScheduleID(),
-		ServiceFunc: func(ctx context.Context, svc *shelly.Service, device string, id int) error {
+		AutomationServiceFunc: func(ctx context.Context, svc *automation.Service, device string, id int) error {
 			return svc.DeleteSchedule(ctx, device, id)
 		},
 	})

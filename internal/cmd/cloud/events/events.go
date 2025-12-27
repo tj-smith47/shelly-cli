@@ -17,7 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -85,7 +85,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	}
 
 	// Get WebSocket URL
-	wsURL, err := shelly.BuildCloudWebSocketURL(cfg.Cloud.ServerURL, cfg.Cloud.AccessToken)
+	wsURL, err := network.BuildCloudWebSocketURL(cfg.Cloud.ServerURL, cfg.Cloud.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to build WebSocket URL: %w", err)
 	}
@@ -127,13 +127,13 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios.Println()
 
 	// Stream events
-	streamOpts := shelly.CloudEventStreamOptions{
+	streamOpts := network.CloudEventStreamOptions{
 		DeviceFilter: opts.DeviceFilter,
 		EventFilter:  opts.EventFilter,
 		Raw:          opts.Raw,
 	}
 
-	err = shelly.StreamCloudEvents(ctx, conn, streamOpts, func(event *model.CloudEvent, raw []byte) error {
+	err = network.StreamCloudEvents(ctx, conn, streamOpts, func(event *model.CloudEvent, raw []byte) error {
 		// Raw output mode
 		if opts.Raw {
 			ios.Println(string(raw))

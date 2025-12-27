@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -247,7 +247,7 @@ func (m EditorModel) View() string {
 	return r.Render()
 }
 
-func (m EditorModel) renderCall(index int, call shelly.ScheduleCall) string {
+func (m EditorModel) renderCall(index int, call automation.ScheduleCall) string {
 	var sb strings.Builder
 
 	// Method

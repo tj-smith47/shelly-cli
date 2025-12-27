@@ -59,7 +59,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	status, err := svc.FetchZigbeeStatus(ctx, opts.Device, ios)
+	status, err := svc.Wireless().FetchZigbeeStatus(ctx, opts.Device, ios)
 	if err != nil {
 		return err
 	}

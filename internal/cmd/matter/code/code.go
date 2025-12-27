@@ -70,7 +70,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Check if device is commissionable
-	commissionable, err := svc.MatterIsCommissionable(ctx, opts.Device)
+	commissionable, err := svc.Wireless().MatterIsCommissionable(ctx, opts.Device)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Get commissioning code
-	info, err := svc.MatterGetCommissioningCode(ctx, opts.Device)
+	info, err := svc.Wireless().MatterGetCommissioningCode(ctx, opts.Device)
 	if err != nil {
 		ios.Debug("failed to get commissioning code: %v", err)
 		// Code not available via API, show instructions

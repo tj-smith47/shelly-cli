@@ -21,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -365,8 +366,9 @@ func fetchScripts(device string) []scriptEntry {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	svc := shelly.NewService()
-	scripts, err := svc.ListScripts(ctx, device)
+	shellySvc := shelly.NewService()
+	autoSvc := automation.New(shellySvc)
+	scripts, err := autoSvc.ListScripts(ctx, device)
 	if err != nil {
 		return nil
 	}
@@ -390,8 +392,9 @@ func fetchSchedules(device string) []scheduleEntry {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	svc := shelly.NewService()
-	schedules, err := svc.ListSchedules(ctx, device)
+	shellySvc := shelly.NewService()
+	autoSvc := automation.New(shellySvc)
+	schedules, err := autoSvc.ListSchedules(ctx, device)
 	if err != nil {
 		return nil
 	}

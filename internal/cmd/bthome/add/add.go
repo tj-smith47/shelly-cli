@@ -73,7 +73,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// If address provided, add device directly
 	if opts.Addr != "" {
-		result, err := svc.BTHomeAddDevice(ctx, opts.Device, opts.Addr, opts.Name)
+		result, err := svc.Wireless().BTHomeAddDevice(ctx, opts.Device, opts.Addr, opts.Name)
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Start discovery scan
-	if err := svc.BTHomeStartDiscovery(ctx, opts.Device, opts.Duration); err != nil {
+	if err := svc.Wireless().BTHomeStartDiscovery(ctx, opts.Device, opts.Duration); err != nil {
 		return err
 	}
 	term.DisplayBTHomeDiscoveryStarted(ios, opts.Device, opts.Duration)

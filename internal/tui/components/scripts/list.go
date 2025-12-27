@@ -10,7 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -27,7 +27,7 @@ type Script struct {
 // ListDeps holds the dependencies for the scripts list component.
 type ListDeps struct {
 	Ctx context.Context
-	Svc *shelly.Service
+	Svc *automation.Service
 }
 
 // Validate ensures all required dependencies are set.
@@ -72,7 +72,7 @@ type CreateScriptMsg struct {
 // ListModel displays scripts for a device.
 type ListModel struct {
 	ctx        context.Context
-	svc        *shelly.Service
+	svc        *automation.Service
 	device     string
 	scripts    []Script
 	scroller   *panel.Scroller

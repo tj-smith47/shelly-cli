@@ -52,7 +52,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, code st
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Evaluating code...", func(ctx context.Context) error {
 		result, err := svc.EvalScript(ctx, device, id, code)

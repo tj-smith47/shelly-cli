@@ -7,7 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -71,7 +71,7 @@ func run(f *cmdutil.Factory) error {
 	}
 
 	// Show time until expiry
-	remaining := shelly.TimeUntilExpiry(cfg.Cloud.AccessToken)
+	remaining := network.TimeUntilExpiry(cfg.Cloud.AccessToken)
 	if remaining > 0 {
 		ios.Printf("  Expiry: %s\n", output.FormatDuration(remaining))
 	}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 )
 
 func TestNewEditor(t *testing.T) {
@@ -50,7 +50,7 @@ func TestEditorModel_SetSchedule(t *testing.T) {
 		ID:       1,
 		Enable:   true,
 		Timespec: "0 0 9 * * *",
-		Calls:    []shelly.ScheduleCall{{Method: "Switch.Set"}},
+		Calls:    []automation.ScheduleCall{{Method: "Switch.Set"}},
 	}
 
 	m = m.SetSchedule(schedule)
@@ -152,7 +152,7 @@ func TestEditorModel_MaxScroll(t *testing.T) {
 	// With schedule and calls
 	m.schedule = &Schedule{
 		ID: 1,
-		Calls: []shelly.ScheduleCall{
+		Calls: []automation.ScheduleCall{
 			{Method: "Switch.Set"},
 			{Method: "Light.Set"},
 		},
@@ -170,7 +170,7 @@ func TestEditorModel_ScrollNavigation(t *testing.T) {
 		height: 10,
 		schedule: &Schedule{
 			ID:    1,
-			Calls: make([]shelly.ScheduleCall, 10), // Lots of calls for scrolling
+			Calls: make([]automation.ScheduleCall, 10), // Lots of calls for scrolling
 		},
 	}
 
@@ -217,7 +217,7 @@ func TestEditorModel_View_WithSchedule(t *testing.T) {
 		ID:       1,
 		Enable:   true,
 		Timespec: "0 0 9 * * MON-FRI",
-		Calls: []shelly.ScheduleCall{
+		Calls: []automation.ScheduleCall{
 			{Method: "Switch.Set", Params: map[string]any{"on": true}},
 		},
 	})
@@ -238,7 +238,7 @@ func TestEditorModel_View_DisabledSchedule(t *testing.T) {
 		ID:       2,
 		Enable:   false,
 		Timespec: "0 0 18 * * *",
-		Calls:    []shelly.ScheduleCall{},
+		Calls:    []automation.ScheduleCall{},
 	})
 
 	view := m.View()
@@ -289,22 +289,22 @@ func TestEditorModel_RenderCall(t *testing.T) {
 
 	tests := []struct {
 		name string
-		call shelly.ScheduleCall
+		call automation.ScheduleCall
 	}{
 		{
 			name: "simple method",
-			call: shelly.ScheduleCall{Method: "Switch.Set"},
+			call: automation.ScheduleCall{Method: "Switch.Set"},
 		},
 		{
 			name: "with params",
-			call: shelly.ScheduleCall{
+			call: automation.ScheduleCall{
 				Method: "Light.Set",
 				Params: map[string]any{"brightness": 50},
 			},
 		},
 		{
 			name: "no params",
-			call: shelly.ScheduleCall{
+			call: automation.ScheduleCall{
 				Method: "Sys.Reboot",
 				Params: nil,
 			},

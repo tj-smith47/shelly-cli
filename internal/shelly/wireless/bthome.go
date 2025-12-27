@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package wireless provides wireless protocol operations for Shelly devices.
+package wireless
 
 import (
 	"context"
@@ -84,7 +84,7 @@ type BTHomeAddDeviceResult struct {
 // BTHomeAddDevice adds a BTHome device to a Shelly gateway.
 func (s *Service) BTHomeAddDevice(ctx context.Context, identifier, addr, name string) (BTHomeAddDeviceResult, error) {
 	var result BTHomeAddDeviceResult
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		config := map[string]any{
 			"addr": addr,
 		}
@@ -115,7 +115,7 @@ func (s *Service) BTHomeAddDevice(ctx context.Context, identifier, addr, name st
 
 // BTHomeStartDiscovery starts BTHome device discovery on a gateway.
 func (s *Service) BTHomeStartDiscovery(ctx context.Context, identifier string, duration int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		params := map[string]any{
 			"duration": duration,
 		}
@@ -129,7 +129,7 @@ func (s *Service) BTHomeStartDiscovery(ctx context.Context, identifier string, d
 
 // BTHomeRemoveDevice removes a BTHome device from a gateway.
 func (s *Service) BTHomeRemoveDevice(ctx context.Context, identifier string, deviceID int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		params := map[string]any{
 			"id": deviceID,
 		}
@@ -145,7 +145,7 @@ func (s *Service) BTHomeRemoveDevice(ctx context.Context, identifier string, dev
 func (s *Service) FetchBTHomeDevices(ctx context.Context, identifier string, ios *iostreams.IOStreams) ([]model.BTHomeDeviceInfo, error) {
 	var devices []model.BTHomeDeviceInfo
 
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		status, err := getBTHomeDeviceStatus(ctx, conn)
 		if err != nil {
 			return err
@@ -224,7 +224,7 @@ func getBTHomeDeviceConfig(ctx context.Context, conn *client.Client, id int) (na
 func (s *Service) FetchBTHomeComponentStatus(ctx context.Context, identifier string) (model.BTHomeComponentStatus, error) {
 	var status model.BTHomeComponentStatus
 
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "BTHome.GetStatus", nil)
 		if err != nil {
 			return fmt.Errorf("failed to get BTHome status: %w", err)
@@ -249,7 +249,7 @@ func (s *Service) FetchBTHomeDeviceStatus(ctx context.Context, identifier string
 	var status model.BTHomeDeviceStatus
 	params := map[string]any{"id": id}
 
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		var err error
 		status, err = getBTHomeDeviceStatusRPC(ctx, conn, params)
 		if err != nil {

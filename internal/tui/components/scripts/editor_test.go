@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -255,7 +255,7 @@ func TestEditorModel_Getters(t *testing.T) {
 		codeLines:  []string{"line1", "line2", "line3"},
 		loading:    true,
 		err:        context.DeadlineExceeded,
-		status:     &shelly.ScriptStatus{Running: true},
+		status:     &automation.ScriptStatus{Running: true},
 	}
 
 	if m.ScriptID() != 5 {
@@ -369,7 +369,7 @@ func TestEditorModel_View_WithStatus(t *testing.T) {
 		scriptID:   1,
 		scriptName: "running_script",
 		codeLines:  []string{"code"},
-		status: &shelly.ScriptStatus{
+		status: &automation.ScriptStatus{
 			Running:  true,
 			MemUsage: 8192,
 			MemFree:  16384,
@@ -484,7 +484,7 @@ func TestEditorModel_Update_StatusLoadedMsg(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{styles: DefaultEditorStyles()}
 
-	status := &shelly.ScriptStatus{Running: true, MemUsage: 1024}
+	status := &automation.ScriptStatus{Running: true, MemUsage: 1024}
 	m, _ = m.Update(StatusLoadedMsg{Status: status})
 
 	if m.status == nil {

@@ -73,7 +73,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	if opts.HasID {
-		status, err := svc.FetchBTHomeDeviceStatus(ctx, opts.Device, opts.ID)
+		status, err := svc.Wireless().FetchBTHomeDeviceStatus(ctx, opts.Device, opts.ID)
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	status, err := svc.FetchBTHomeComponentStatus(ctx, opts.Device)
+	status, err := svc.Wireless().FetchBTHomeComponentStatus(ctx, opts.Device)
 	if err != nil {
 		return err
 	}

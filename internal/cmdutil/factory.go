@@ -16,6 +16,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 )
 
 // Factory provides dependencies to commands through lazy initialization.
@@ -42,10 +44,12 @@ type Factory struct {
 	Browser func() browser.Browser
 
 	// Cached instances - set after first call to avoid re-initialization.
-	ioStreams     *iostreams.IOStreams
-	cfgMgr        *config.Manager
-	shellyService *shelly.Service
-	browserInst   browser.Browser
+	ioStreams         *iostreams.IOStreams
+	cfgMgr            *config.Manager
+	shellyService     *shelly.Service
+	automationService *automation.Service
+	kvsService        *kvs.Service
+	browserInst       browser.Browser
 }
 
 // NewFactory creates a Factory with production dependencies.
@@ -192,6 +196,25 @@ func (f *Factory) SetBrowser(b browser.Browser) *Factory {
 		return origBrowser()
 	}
 	return f
+}
+
+// KVSService returns the KVS service, lazily initialized.
+// The service is backed by the ShellyService's connection handling.
+func (f *Factory) KVSService() *kvs.Service {
+	if f.kvsService == nil {
+		svc := f.ShellyService()
+		f.kvsService = kvs.NewService(svc.WithConnection)
+	}
+	return f.kvsService
+}
+
+// AutomationService returns the automation service, lazily initialized.
+// Provides script, schedule, and event streaming functionality.
+func (f *Factory) AutomationService() *automation.Service {
+	if f.automationService == nil {
+		f.automationService = automation.New(f.ShellyService())
+	}
+	return f.automationService
 }
 
 // =============================================================================

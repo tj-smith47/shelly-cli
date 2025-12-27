@@ -42,7 +42,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Starting script...", func(ctx context.Context) error {
 		if err := svc.StartScript(ctx, device, id); err != nil {

@@ -10,6 +10,8 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
+	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/schedules"
@@ -74,8 +76,10 @@ const (
 
 // AutomationDeps holds dependencies for the automation view.
 type AutomationDeps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx     context.Context
+	Svc     *shelly.Service
+	AutoSvc *automation.Service
+	KVSSvc  *shellykvs.Service
 }
 
 // Validate ensures all required dependencies are set.
@@ -86,15 +90,22 @@ func (d AutomationDeps) Validate() error {
 	if d.Svc == nil {
 		return errNilService
 	}
+	if d.AutoSvc == nil {
+		return errors.New("automation service is required")
+	}
+	if d.KVSSvc == nil {
+		return errors.New("kvs service is required")
+	}
 	return nil
 }
 
 // Automation is the automation view that composes all automation components.
 type Automation struct {
-	ctx  context.Context
-	svc  *shelly.Service
-	id   ViewID
-	cols automationCols
+	ctx     context.Context
+	svc     *shelly.Service
+	autoSvc *automation.Service
+	id      ViewID
+	cols    automationCols
 
 	// Component models
 	scripts        scripts.ListModel
@@ -157,12 +168,12 @@ func NewAutomation(deps AutomationDeps) *Automation {
 		panic("automation: " + err.Error())
 	}
 
-	scriptListDeps := scripts.ListDeps{Ctx: deps.Ctx, Svc: deps.Svc}
-	scriptEditorDeps := scripts.EditorDeps{Ctx: deps.Ctx, Svc: deps.Svc}
-	schedulesListDeps := schedules.ListDeps{Ctx: deps.Ctx, Svc: deps.Svc}
+	scriptListDeps := scripts.ListDeps{Ctx: deps.Ctx, Svc: deps.AutoSvc}
+	scriptEditorDeps := scripts.EditorDeps{Ctx: deps.Ctx, Svc: deps.AutoSvc}
+	schedulesListDeps := schedules.ListDeps{Ctx: deps.Ctx, Svc: deps.AutoSvc}
 	webhooksDeps := webhooks.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	virtualsDeps := virtuals.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
-	kvsDeps := kvs.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
+	kvsDeps := kvs.Deps{Ctx: deps.Ctx, Svc: deps.KVSSvc}
 
 	// Create flexible layout with 50/50 column split
 	layoutCalc := layout.NewTwoColumnLayout(0.5, 1)
@@ -186,6 +197,7 @@ func NewAutomation(deps AutomationDeps) *Automation {
 	a := &Automation{
 		ctx:            deps.Ctx,
 		svc:            deps.Svc,
+		autoSvc:        deps.AutoSvc,
 		id:             tabs.TabAutomation,
 		scripts:        scripts.NewList(scriptListDeps),
 		scriptEditor:   scripts.NewEditor(scriptEditorDeps),
@@ -584,7 +596,7 @@ func (a *Automation) uploadScriptCode(device string, scriptID int, code string) 
 		ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
 		defer cancel()
 
-		err := a.svc.UpdateScriptCode(ctx, device, scriptID, code, false)
+		err := a.autoSvc.UpdateScriptCode(ctx, device, scriptID, code, false)
 		return scripts.CodeUploadedMsg{Device: device, ScriptID: scriptID, Err: err}
 	}
 }

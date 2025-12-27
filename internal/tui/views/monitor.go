@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -16,7 +17,7 @@ type MonitorDeps struct {
 	Ctx         context.Context
 	Svc         *shelly.Service
 	IOS         *iostreams.IOStreams
-	EventStream *shelly.EventStream // Shared event stream
+	EventStream *automation.EventStream // Shared event stream
 }
 
 // Validate ensures all required dependencies are set.

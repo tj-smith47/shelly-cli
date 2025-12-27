@@ -9,15 +9,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ComponentFlags
 	Factory  *cmdutil.Factory
 	Device   string
-	ID       int
 	Duration time.Duration
 	Cancel   bool
 }
@@ -56,7 +57,7 @@ Use --cancel to cancel an active boost.`,
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.ID, "id", 0, "Thermostat component ID")
+	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "Thermostat")
 	cmd.Flags().DurationVarP(&opts.Duration, "duration", "d", 0, "Boost duration (e.g., 5m, 30m, 1h)")
 	cmd.Flags().BoolVar(&opts.Cancel, "cancel", false, "Cancel active boost")
 

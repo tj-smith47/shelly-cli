@@ -554,6 +554,16 @@ func convertGen1Meters(meters []gen1.MeterStatus) []PMStatus {
 	return result
 }
 
+// GetGen1StatusJSON returns Gen1 device status as JSON for event streaming.
+// This method is used by automation.EventStream to poll Gen1 devices.
+func (s *Service) GetGen1StatusJSON(ctx context.Context, identifier string) (json.RawMessage, error) {
+	snapshot, err := s.getGen1MonitoringSnapshot(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(snapshot)
+}
+
 // DeviceSnapshot holds the latest status for a device in multi-device monitoring.
 type DeviceSnapshot struct {
 	Device   string

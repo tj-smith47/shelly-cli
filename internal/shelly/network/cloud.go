@@ -1,5 +1,5 @@
-// Package shelly provides the cloud service layer for Shelly Cloud API.
-package shelly
+// Package network provides network-related services for Shelly devices.
+package network
 
 import (
 	"context"

@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
 // NewCommand creates the cloud control command.
@@ -71,7 +72,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceID, action string, chann
 	}
 
 	// Create cloud client
-	client := shelly.NewCloudClient(cfg.Cloud.AccessToken)
+	client := network.NewCloudClient(cfg.Cloud.AccessToken)
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Sending command...", func(ctx context.Context) error {
 		result, err := client.ExecuteAction(ctx, deviceID, action, channel)

@@ -42,7 +42,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
 	// Confirm unless --yes
 	ios.Warning("This will delete ALL schedules from the device.")

@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package firmware provides firmware management for Shelly devices.
+package firmware
 
 import (
 	"context"
@@ -18,8 +18,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
-// FirmwareInfo contains firmware update information.
-type FirmwareInfo struct {
+// Info contains firmware update information.
+type Info struct {
 	Current     string
 	Available   string
 	Beta        string
@@ -30,8 +30,8 @@ type FirmwareInfo struct {
 	Platform    string // "shelly", "tasmota", etc.
 }
 
-// FirmwareStatus contains the current firmware status.
-type FirmwareStatus struct {
+// Status contains the current firmware status.
+type Status struct {
 	Status      string
 	HasUpdate   bool
 	NewVersion  string
@@ -39,10 +39,83 @@ type FirmwareStatus struct {
 	CanRollback bool
 }
 
-// CheckFirmware checks for firmware updates on a device.
-func (s *Service) CheckFirmware(ctx context.Context, identifier string) (*FirmwareInfo, error) {
-	var result *FirmwareInfo
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+// CheckResult holds the result of a firmware check for a single device.
+type CheckResult struct {
+	Name string
+	Info *Info
+	Err  error
+}
+
+// DeviceUpdateStatus holds the status of a device for update operations.
+type DeviceUpdateStatus struct {
+	Name      string
+	Info      *Info
+	HasUpdate bool
+}
+
+// UpdateOpts contains options for firmware update operations.
+type UpdateOpts struct {
+	Beta        bool
+	CustomURL   string
+	Parallelism int
+}
+
+// UpdateResult holds the result of a single device update.
+type UpdateResult struct {
+	Name    string
+	Success bool
+	Err     error
+}
+
+// UpdateEntry represents a device with available firmware updates.
+type UpdateEntry struct {
+	Name      string
+	Device    model.Device
+	FwInfo    *Info
+	HasUpdate bool
+	HasBeta   bool
+	Error     error
+}
+
+// ConnectionHandler provides connection management for firmware operations.
+type ConnectionHandler interface {
+	WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error
+}
+
+// DeviceChecker provides device firmware checking capability.
+type DeviceChecker interface {
+	CheckDeviceFirmware(ctx context.Context, device model.Device) (*Info, error)
+}
+
+// Service provides firmware management operations.
+type Service struct {
+	connHandler    ConnectionHandler
+	pluginRegistry *plugins.Registry
+	cache          *Cache
+}
+
+// NewService creates a new firmware service.
+func NewService(connHandler ConnectionHandler) *Service {
+	return &Service{
+		connHandler: connHandler,
+		cache:       NewCache(),
+	}
+}
+
+// SetPluginRegistry sets the plugin registry for plugin-managed device support.
+func (s *Service) SetPluginRegistry(registry *plugins.Registry) {
+	s.pluginRegistry = registry
+}
+
+// Cache returns the firmware cache.
+func (s *Service) Cache() *Cache {
+	return s.cache
+}
+
+// Check checks for firmware updates on a device.
+func (s *Service) Check(ctx context.Context, identifier string) (*Info, error) {
+	var result *Info
+	err := s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 		info, err := mgr.CheckForUpdate(ctx)
 		if err != nil {
@@ -50,7 +123,7 @@ func (s *Service) CheckFirmware(ctx context.Context, identifier string) (*Firmwa
 		}
 
 		deviceInfo := conn.Info()
-		result = &FirmwareInfo{
+		result = &Info{
 			Current:     info.Current,
 			Available:   info.Available,
 			Beta:        info.Beta,
@@ -65,10 +138,10 @@ func (s *Service) CheckFirmware(ctx context.Context, identifier string) (*Firmwa
 	return result, err
 }
 
-// GetFirmwareStatus gets the current firmware status.
-func (s *Service) GetFirmwareStatus(ctx context.Context, identifier string) (*FirmwareStatus, error) {
-	var result *FirmwareStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+// GetStatus gets the current firmware status.
+func (s *Service) GetStatus(ctx context.Context, identifier string) (*Status, error) {
+	var result *Status
+	err := s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 
 		status, err := mgr.GetStatus(ctx)
@@ -82,7 +155,7 @@ func (s *Service) GetFirmwareStatus(ctx context.Context, identifier string) (*Fi
 			canRollback = rollbackStatus.CanRollback
 		}
 
-		result = &FirmwareStatus{
+		result = &Status{
 			Status:      status.Status,
 			HasUpdate:   status.HasUpdate,
 			NewVersion:  status.NewVersion,
@@ -94,41 +167,41 @@ func (s *Service) GetFirmwareStatus(ctx context.Context, identifier string) (*Fi
 	return result, err
 }
 
-// UpdateFirmware starts a firmware update on a device.
-func (s *Service) UpdateFirmware(ctx context.Context, identifier string, opts *firmware.UpdateOptions) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+// Update starts a firmware update on a device.
+func (s *Service) Update(ctx context.Context, identifier string, opts *firmware.UpdateOptions) error {
+	return s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 		return mgr.Update(ctx, opts)
 	})
 }
 
-// UpdateFirmwareStable updates to the latest stable firmware.
-func (s *Service) UpdateFirmwareStable(ctx context.Context, identifier string) error {
-	return s.UpdateFirmware(ctx, identifier, &firmware.UpdateOptions{Stage: "stable"})
+// UpdateStable updates to the latest stable firmware.
+func (s *Service) UpdateStable(ctx context.Context, identifier string) error {
+	return s.Update(ctx, identifier, &firmware.UpdateOptions{Stage: "stable"})
 }
 
-// UpdateFirmwareBeta updates to the latest beta firmware.
-func (s *Service) UpdateFirmwareBeta(ctx context.Context, identifier string) error {
-	return s.UpdateFirmware(ctx, identifier, &firmware.UpdateOptions{Stage: "beta"})
+// UpdateBeta updates to the latest beta firmware.
+func (s *Service) UpdateBeta(ctx context.Context, identifier string) error {
+	return s.Update(ctx, identifier, &firmware.UpdateOptions{Stage: "beta"})
 }
 
-// UpdateFirmwareFromURL updates from a custom firmware URL.
-func (s *Service) UpdateFirmwareFromURL(ctx context.Context, identifier, url string) error {
-	return s.UpdateFirmware(ctx, identifier, &firmware.UpdateOptions{URL: url})
+// UpdateFromURL updates from a custom firmware URL.
+func (s *Service) UpdateFromURL(ctx context.Context, identifier, url string) error {
+	return s.Update(ctx, identifier, &firmware.UpdateOptions{URL: url})
 }
 
-// RollbackFirmware rolls back to the previous firmware version.
-func (s *Service) RollbackFirmware(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+// Rollback rolls back to the previous firmware version.
+func (s *Service) Rollback(ctx context.Context, identifier string) error {
+	return s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 		return mgr.Rollback(ctx)
 	})
 }
 
-// GetFirmwareURL gets the firmware download URL for a device.
-func (s *Service) GetFirmwareURL(ctx context.Context, identifier, stage string) (string, error) {
+// GetURL gets the firmware download URL for a device.
+func (s *Service) GetURL(ctx context.Context, identifier, stage string) (string, error) {
 	var result string
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.connHandler.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		mgr := firmware.New(conn.RPCClient())
 		url, err := mgr.GetFirmwareURL(ctx, stage)
 		if err != nil {
@@ -140,17 +213,10 @@ func (s *Service) GetFirmwareURL(ctx context.Context, identifier, stage string) 
 	return result, err
 }
 
-// FirmwareCheckResult holds the result of a firmware check for a single device.
-type FirmwareCheckResult struct {
-	Name string
-	Info *FirmwareInfo
-	Err  error
-}
-
-// CheckFirmwareAll checks firmware on multiple devices concurrently.
-func (s *Service) CheckFirmwareAll(ctx context.Context, ios *iostreams.IOStreams, devices []string) []FirmwareCheckResult {
+// CheckAll checks firmware on multiple devices concurrently.
+func (s *Service) CheckAll(ctx context.Context, ios *iostreams.IOStreams, devices []string) []CheckResult {
 	var (
-		results []FirmwareCheckResult
+		results []CheckResult
 		mu      sync.Mutex
 	)
 
@@ -163,9 +229,9 @@ func (s *Service) CheckFirmwareAll(ctx context.Context, ios *iostreams.IOStreams
 	for _, name := range devices {
 		deviceName := name
 		g.Go(func() error {
-			info, checkErr := s.CheckFirmware(gctx, deviceName)
+			info, checkErr := s.Check(gctx, deviceName)
 			mu.Lock()
-			results = append(results, FirmwareCheckResult{Name: deviceName, Info: info, Err: checkErr})
+			results = append(results, CheckResult{Name: deviceName, Info: info, Err: checkErr})
 			mu.Unlock()
 			return nil // Don't fail the whole group on individual errors
 		})
@@ -179,11 +245,11 @@ func (s *Service) CheckFirmwareAll(ctx context.Context, ios *iostreams.IOStreams
 	return results
 }
 
-// CheckFirmwareAllPlatforms checks firmware for all devices including plugin-managed ones.
+// CheckAllPlatforms checks firmware for all devices including plugin-managed ones.
 // This is the platform-aware version that uses plugin hooks for non-Shelly devices.
-func (s *Service) CheckFirmwareAllPlatforms(ctx context.Context, ios *iostreams.IOStreams, deviceConfigs map[string]model.Device) []FirmwareCheckResult {
+func (s *Service) CheckAllPlatforms(ctx context.Context, ios *iostreams.IOStreams, deviceConfigs map[string]model.Device) []CheckResult {
 	var (
-		results []FirmwareCheckResult
+		results []CheckResult
 		mu      sync.Mutex
 	)
 
@@ -196,17 +262,17 @@ func (s *Service) CheckFirmwareAllPlatforms(ctx context.Context, ios *iostreams.
 		deviceName := name
 		dev := device
 		g.Go(func() error {
-			var info *FirmwareInfo
+			var info *Info
 			var checkErr error
 
 			if dev.IsPluginManaged() {
 				info, checkErr = s.checkPluginFirmware(gctx, dev)
 			} else {
-				info, checkErr = s.CheckFirmware(gctx, deviceName)
+				info, checkErr = s.Check(gctx, deviceName)
 			}
 
 			mu.Lock()
-			results = append(results, FirmwareCheckResult{Name: deviceName, Info: info, Err: checkErr})
+			results = append(results, CheckResult{Name: deviceName, Info: info, Err: checkErr})
 			mu.Unlock()
 			return nil
 		})
@@ -221,7 +287,7 @@ func (s *Service) CheckFirmwareAllPlatforms(ctx context.Context, ios *iostreams.
 }
 
 // checkPluginFirmware checks firmware updates for a plugin-managed device.
-func (s *Service) checkPluginFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
+func (s *Service) checkPluginFirmware(ctx context.Context, device model.Device) (*Info, error) {
 	if s.pluginRegistry == nil {
 		return nil, fmt.Errorf("plugin registry not configured")
 	}
@@ -240,7 +306,7 @@ func (s *Service) checkPluginFirmware(ctx context.Context, device model.Device) 
 		return nil, err
 	}
 
-	return &FirmwareInfo{
+	return &Info{
 		Current:     result.CurrentVersion,
 		Available:   result.LatestStable,
 		Beta:        result.LatestBeta,
@@ -251,8 +317,14 @@ func (s *Service) checkPluginFirmware(ctx context.Context, device model.Device) 
 	}, nil
 }
 
-// UpdatePluginFirmware applies a firmware update to a plugin-managed device.
-func (s *Service) UpdatePluginFirmware(ctx context.Context, device model.Device, stage, url string) error {
+// CheckPlugin checks for firmware updates on a plugin-managed device.
+// This is the public version of checkPluginFirmware for use by commands.
+func (s *Service) CheckPlugin(ctx context.Context, device model.Device) (*Info, error) {
+	return s.checkPluginFirmware(ctx, device)
+}
+
+// UpdatePlugin applies a firmware update to a plugin-managed device.
+func (s *Service) UpdatePlugin(ctx context.Context, device model.Device, stage, url string) error {
 	if s.pluginRegistry == nil {
 		return fmt.Errorf("plugin registry not configured")
 	}
@@ -282,49 +354,36 @@ func (s *Service) UpdatePluginFirmware(ctx context.Context, device model.Device,
 	return nil
 }
 
-// UpdateDeviceFirmware updates firmware for a device (either plugin-managed or native Shelly).
+// CheckDevice checks firmware for a device (either plugin-managed or native Shelly).
+// This is a unified entry point that handles platform detection and dispatches to the
+// appropriate check method.
+func (s *Service) CheckDevice(ctx context.Context, device model.Device) (*Info, error) {
+	if device.IsPluginManaged() {
+		return s.CheckPlugin(ctx, device)
+	}
+	return s.Check(ctx, device.Name)
+}
+
+// UpdateDevice updates firmware for a device (either plugin-managed or native Shelly).
 // This is a unified entry point that handles platform detection and dispatches to the
 // appropriate update method. Returns nil on success.
-func (s *Service) UpdateDeviceFirmware(ctx context.Context, device model.Device, useBeta bool, customURL string) error {
+func (s *Service) UpdateDevice(ctx context.Context, device model.Device, useBeta bool, customURL string) error {
 	if device.IsPluginManaged() {
 		stage := "stable"
 		if useBeta {
 			stage = "beta"
 		}
-		return s.UpdatePluginFirmware(ctx, device, stage, customURL)
+		return s.UpdatePlugin(ctx, device, stage, customURL)
 	}
 
 	switch {
 	case customURL != "":
-		return s.UpdateFirmwareFromURL(ctx, device.Name, customURL)
+		return s.UpdateFromURL(ctx, device.Name, customURL)
 	case useBeta:
-		return s.UpdateFirmwareBeta(ctx, device.Name)
+		return s.UpdateBeta(ctx, device.Name)
 	default:
-		return s.UpdateFirmwareStable(ctx, device.Name)
+		return s.UpdateStable(ctx, device.Name)
 	}
-}
-
-// CheckDeviceFirmware checks firmware for a device (either plugin-managed or native Shelly).
-// This is a unified entry point that handles platform detection and dispatches to the
-// appropriate check method.
-func (s *Service) CheckDeviceFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
-	if device.IsPluginManaged() {
-		return s.CheckPluginFirmware(ctx, device)
-	}
-	return s.CheckFirmware(ctx, device.Name)
-}
-
-// CheckPluginFirmware checks for firmware updates on a plugin-managed device.
-// This is the public version of checkPluginFirmware for use by commands.
-func (s *Service) CheckPluginFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
-	return s.checkPluginFirmware(ctx, device)
-}
-
-// DeviceUpdateStatus holds the status of a device for update operations.
-type DeviceUpdateStatus struct {
-	Name      string
-	Info      *FirmwareInfo
-	HasUpdate bool
 }
 
 // CheckDevicesForUpdates checks multiple devices for firmware updates and returns those needing updates.
@@ -344,7 +403,7 @@ func (s *Service) CheckDevicesForUpdates(ctx context.Context, ios *iostreams.IOS
 	for _, name := range devices {
 		deviceName := name
 		g.Go(func() error {
-			info, checkErr := s.CheckFirmware(gctx, deviceName)
+			info, checkErr := s.Check(gctx, deviceName)
 			hasUpdate := checkErr == nil && info != nil && info.HasUpdate
 			mu.Lock()
 			statuses = append(statuses, DeviceUpdateStatus{
@@ -382,20 +441,6 @@ func (s *Service) CheckDevicesForUpdates(ctx context.Context, ios *iostreams.IOS
 	return toUpdate
 }
 
-// UpdateOpts contains options for firmware update operations.
-type UpdateOpts struct {
-	Beta        bool
-	CustomURL   string
-	Parallelism int
-}
-
-// UpdateResult holds the result of a single device update.
-type UpdateResult struct {
-	Name    string
-	Success bool
-	Err     error
-}
-
 // UpdateDevices performs firmware updates on multiple devices concurrently.
 func (s *Service) UpdateDevices(ctx context.Context, ios *iostreams.IOStreams, devices []DeviceUpdateStatus, opts UpdateOpts) []UpdateResult {
 	// Cap parallelism to global rate limit
@@ -424,11 +469,11 @@ func (s *Service) UpdateDevices(ctx context.Context, ios *iostreams.IOStreams, d
 			var updateErr error
 			switch {
 			case opts.CustomURL != "":
-				updateErr = s.UpdateFirmwareFromURL(gctx, dev.Name, opts.CustomURL)
+				updateErr = s.UpdateFromURL(gctx, dev.Name, opts.CustomURL)
 			case opts.Beta:
-				updateErr = s.UpdateFirmwareBeta(gctx, dev.Name)
+				updateErr = s.UpdateBeta(gctx, dev.Name)
 			default:
-				updateErr = s.UpdateFirmwareStable(gctx, dev.Name)
+				updateErr = s.UpdateStable(gctx, dev.Name)
 			}
 			mu.Lock()
 			results = append(results, UpdateResult{
@@ -449,22 +494,12 @@ func (s *Service) UpdateDevices(ctx context.Context, ios *iostreams.IOStreams, d
 	return results
 }
 
-// FirmwareUpdateEntry represents a device with available firmware updates.
-type FirmwareUpdateEntry struct {
-	Name      string
-	Device    model.Device
-	FwInfo    *FirmwareInfo
-	HasUpdate bool
-	HasBeta   bool
-	Error     error
-}
-
-// BuildFirmwareUpdateList creates a sorted list of devices that have updates available.
-func BuildFirmwareUpdateList(results []FirmwareCheckResult, devices map[string]model.Device) []FirmwareUpdateEntry {
-	var entries []FirmwareUpdateEntry
+// BuildUpdateList creates a sorted list of devices that have updates available.
+func BuildUpdateList(results []CheckResult, devices map[string]model.Device) []UpdateEntry {
+	var entries []UpdateEntry
 	for _, r := range results {
 		device := devices[r.Name]
-		entry := FirmwareUpdateEntry{
+		entry := UpdateEntry{
 			Name:   r.Name,
 			Device: device,
 			FwInfo: r.Info,
@@ -525,8 +560,8 @@ func FilterDevicesByNameAndPlatform(devices map[string]model.Device, devicesList
 }
 
 // FilterEntriesByStage filters firmware update entries based on the requested stage.
-func FilterEntriesByStage(entries []FirmwareUpdateEntry, beta bool) []FirmwareUpdateEntry {
-	var result []FirmwareUpdateEntry
+func FilterEntriesByStage(entries []UpdateEntry, beta bool) []UpdateEntry {
+	var result []UpdateEntry
 	for _, e := range entries {
 		if beta && e.HasBeta {
 			result = append(result, e)
@@ -538,7 +573,7 @@ func FilterEntriesByStage(entries []FirmwareUpdateEntry, beta bool) []FirmwareUp
 }
 
 // AnyHasBeta returns true if any entry has a beta update available.
-func AnyHasBeta(entries []FirmwareUpdateEntry) bool {
+func AnyHasBeta(entries []UpdateEntry) bool {
 	for _, e := range entries {
 		if e.HasBeta {
 			return true
@@ -548,7 +583,7 @@ func AnyHasBeta(entries []FirmwareUpdateEntry) bool {
 }
 
 // SelectEntriesByStage selects entry indices based on the beta flag and returns the stage name.
-func SelectEntriesByStage(entries []FirmwareUpdateEntry, beta bool) (indices []int, stage string) {
+func SelectEntriesByStage(entries []UpdateEntry, beta bool) (indices []int, stage string) {
 	stage = "stable"
 	if beta {
 		stage = "beta"
@@ -567,8 +602,8 @@ func SelectEntriesByStage(entries []FirmwareUpdateEntry, beta bool) (indices []i
 }
 
 // GetEntriesByIndices returns entries at the specified indices.
-func GetEntriesByIndices(entries []FirmwareUpdateEntry, indices []int) []FirmwareUpdateEntry {
-	var result []FirmwareUpdateEntry
+func GetEntriesByIndices(entries []UpdateEntry, indices []int) []UpdateEntry {
+	var result []UpdateEntry
 	for _, idx := range indices {
 		if idx >= 0 && idx < len(entries) {
 			result = append(result, entries[idx])
@@ -578,7 +613,7 @@ func GetEntriesByIndices(entries []FirmwareUpdateEntry, indices []int) []Firmwar
 }
 
 // ToDeviceUpdateStatuses converts firmware entries to device update statuses.
-func ToDeviceUpdateStatuses(entries []FirmwareUpdateEntry) []DeviceUpdateStatus {
+func ToDeviceUpdateStatuses(entries []UpdateEntry) []DeviceUpdateStatus {
 	result := make([]DeviceUpdateStatus, len(entries))
 	for i, d := range entries {
 		result[i] = DeviceUpdateStatus{

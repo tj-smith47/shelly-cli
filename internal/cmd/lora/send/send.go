@@ -92,7 +92,7 @@ func run(ctx context.Context, opts *Options) error {
 	// Base64 encode for API
 	b64Data := base64.StdEncoding.EncodeToString(data)
 
-	if err := svc.LoRaSendBytes(ctx, opts.Device, opts.ID, b64Data); err != nil {
+	if err := svc.Wireless().LoRaSendBytes(ctx, opts.Device, opts.ID, b64Data); err != nil {
 		return err
 	}
 

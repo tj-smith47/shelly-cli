@@ -21,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 )
 
 // DeviceData holds cached data for a single device.
@@ -141,7 +142,7 @@ type Cache struct {
 	requestCounter uint64
 
 	// Event stream for publishing synthetic events (e.g., offline from HTTP failure)
-	eventStream *shelly.EventStream
+	eventStream *automation.EventStream
 
 	// MAC-to-IP mapping for instant IP remapping (updated on each device fetch)
 	macToIP map[string]string
@@ -186,7 +187,7 @@ func (c *Cache) Init() tea.Cmd {
 // This allows the cache to update device status in real-time when events arrive
 // via WebSocket (Gen2+) or polling (Gen1).
 // Also stores the event stream to publish synthetic events (e.g., offline from HTTP failure).
-func (c *Cache) SubscribeToEvents(es *shelly.EventStream) {
+func (c *Cache) SubscribeToEvents(es *automation.EventStream) {
 	c.eventStream = es
 	es.Subscribe(func(evt events.Event) {
 		c.handleDeviceEvent(evt)

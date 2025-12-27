@@ -10,7 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/wireless"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -70,7 +70,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 
 	bleDiscoverer, err := discovery.NewBLEDiscoverer()
 	if err != nil {
-		if shelly.IsBLENotSupportedError(err) {
+		if wireless.IsBLENotSupportedError(err) {
 			ios.Error("BLE discovery is not available on this system")
 			ios.Hint("Ensure you have a Bluetooth adapter and it is enabled")
 			ios.Hint("On Linux, you may need to run with elevated privileges")

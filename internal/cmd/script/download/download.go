@@ -45,7 +45,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, file st
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Downloading script...", func(ctx context.Context) error {
 		code, err := svc.GetScriptCode(ctx, device, id)

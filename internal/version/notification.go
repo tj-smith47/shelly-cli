@@ -35,7 +35,7 @@ func ShowUpdateNotification() {
 	currentVersion := strings.TrimPrefix(Version, "v")
 	latestVersion := strings.TrimPrefix(cachedVersion, "v")
 
-	if currentVersion == "dev" || currentVersion == "" {
+	if currentVersion == DevVersion || currentVersion == "" {
 		return
 	}
 

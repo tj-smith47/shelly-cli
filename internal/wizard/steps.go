@@ -14,7 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
@@ -445,7 +445,7 @@ func stepCloud(ctx context.Context, ios *iostreams.IOStreams) error {
 
 	// Perform the actual login
 	ios.StartProgress("Authenticating with Shelly Cloud...")
-	_, result, err := shelly.NewCloudClientWithCredentials(ctx, email, password)
+	_, result, err := network.NewCloudClientWithCredentials(ctx, email, password)
 	ios.StopProgress()
 
 	if err != nil {
@@ -477,7 +477,7 @@ func stepCloudNonInteractive(ctx context.Context, ios *iostreams.IOStreams, opts
 
 	// Perform the actual login
 	ios.StartProgress("Authenticating with Shelly Cloud...")
-	_, result, err := shelly.NewCloudClientWithCredentials(ctx, opts.CloudEmail, opts.CloudPassword)
+	_, result, err := network.NewCloudClientWithCredentials(ctx, opts.CloudEmail, opts.CloudPassword)
 	ios.StopProgress()
 
 	if err != nil {

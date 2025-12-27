@@ -6,9 +6,12 @@ import (
 	"runtime"
 )
 
+// DevVersion is the version string used for development builds.
+const DevVersion = "dev"
+
 // Build-time variables set via ldflags.
 var (
-	Version = "dev"
+	Version = DevVersion
 	Commit  = "unknown"
 	Date    = "unknown"
 	BuiltBy = "unknown"
@@ -70,5 +73,5 @@ func String() string {
 
 // IsDevelopment returns true if running a development build.
 func IsDevelopment() bool {
-	return Version == "" || Version == "dev"
+	return Version == "" || Version == DevVersion
 }

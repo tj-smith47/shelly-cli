@@ -7,7 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 )
 
 const testDevice = "192.168.1.100"
@@ -15,7 +15,7 @@ const testDevice = "192.168.1.100"
 func TestNew(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	svc := &shelly.Service{}
+	svc := &kvs.Service{}
 	deps := Deps{Ctx: ctx, Svc: svc}
 
 	m := New(deps)
@@ -42,7 +42,7 @@ func TestNew_PanicOnNilCtx(t *testing.T) {
 		}
 	}()
 
-	deps := Deps{Ctx: nil, Svc: &shelly.Service{}}
+	deps := Deps{Ctx: nil, Svc: &kvs.Service{}}
 	New(deps)
 }
 
@@ -67,12 +67,12 @@ func TestDeps_Validate(t *testing.T) {
 	}{
 		{
 			name:    "valid",
-			deps:    Deps{Ctx: context.Background(), Svc: &shelly.Service{}},
+			deps:    Deps{Ctx: context.Background(), Svc: &kvs.Service{}},
 			wantErr: false,
 		},
 		{
 			name:    "nil ctx",
-			deps:    Deps{Ctx: nil, Svc: &shelly.Service{}},
+			deps:    Deps{Ctx: nil, Svc: &kvs.Service{}},
 			wantErr: true,
 		},
 		{
@@ -95,7 +95,7 @@ func TestDeps_Validate(t *testing.T) {
 
 func TestModel_Init(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	cmd := m.Init()
 
@@ -106,7 +106,7 @@ func TestModel_Init(t *testing.T) {
 
 func TestModel_SetDevice(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	m, cmd := m.SetDevice(testDevice)
 
@@ -123,7 +123,7 @@ func TestModel_SetDevice(t *testing.T) {
 
 func TestModel_SetDevice_Empty(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.device = "old-device"
 
 	m, cmd := m.SetDevice("")
@@ -141,7 +141,7 @@ func TestModel_SetDevice_Empty(t *testing.T) {
 
 func TestModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	m = m.SetSize(80, 24)
 
@@ -155,7 +155,7 @@ func TestModel_SetSize(t *testing.T) {
 
 func TestModel_SetFocused(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	m = m.SetFocused(true)
 
@@ -172,7 +172,7 @@ func TestModel_SetFocused(t *testing.T) {
 
 func TestModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.loading = true
 
 	items := []Item{
@@ -199,7 +199,7 @@ func TestModel_Update_LoadedMsg(t *testing.T) {
 
 func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.loading = true
 
 	testErr := errors.New("test error")
@@ -217,7 +217,7 @@ func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 
 func TestModel_Update_ActionMsg(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.device = testDevice
 	m.items = []Item{{Key: "key1", Value: "value1"}}
 
@@ -235,7 +235,7 @@ func TestModel_Update_ActionMsg(t *testing.T) {
 
 func TestModel_Update_ActionMsg_Error(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	testErr := errors.New("delete failed")
 	msg := ActionMsg{Action: "delete", Key: "key1", Err: testErr}
@@ -249,7 +249,7 @@ func TestModel_Update_ActionMsg_Error(t *testing.T) {
 
 func TestModel_Update_KeyPressMsg_NotFocused(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = false
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}}
 	m.scroller.SetItemCount(len(m.items))
@@ -265,7 +265,7 @@ func TestModel_Update_KeyPressMsg_NotFocused(t *testing.T) {
 
 func TestModel_Update_KeyPressMsg_Navigation(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = true
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}, {Key: "key3"}}
 	m.scroller.SetItemCount(len(m.items))
@@ -302,7 +302,7 @@ func TestModel_Update_KeyPressMsg_Navigation(t *testing.T) {
 
 func TestModel_ScrollerCursorBounds(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}}
 	m.scroller.SetItemCount(len(m.items))
 	m = m.SetSize(80, 20)
@@ -323,7 +323,7 @@ func TestModel_ScrollerCursorBounds(t *testing.T) {
 
 func TestModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m = m.SetSize(40, 10)
 
 	view := m.View()
@@ -335,7 +335,7 @@ func TestModel_View_NoDevice(t *testing.T) {
 
 func TestModel_View_Loading(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.device = testDevice
 	m.loading = true
 	m = m.SetSize(40, 10)
@@ -349,7 +349,7 @@ func TestModel_View_Loading(t *testing.T) {
 
 func TestModel_View_Error(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.device = testDevice
 	m.err = errors.New("test error")
 	m = m.SetSize(40, 10)
@@ -363,7 +363,7 @@ func TestModel_View_Error(t *testing.T) {
 
 func TestModel_View_Empty(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.device = testDevice
 	m.items = []Item{}
 	m = m.SetSize(40, 10)
@@ -377,7 +377,7 @@ func TestModel_View_Empty(t *testing.T) {
 
 func TestModel_View_WithItems(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.device = testDevice
 	m.items = []Item{
 		{Key: "key1", Value: "string value", Etag: "etag1"},
@@ -396,7 +396,7 @@ func TestModel_View_WithItems(t *testing.T) {
 
 func TestModel_FormatValue(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	tests := []struct {
 		name  string
@@ -426,7 +426,7 @@ func TestModel_FormatValue(t *testing.T) {
 
 func TestModel_SelectedItem(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	// No items
 	if m.SelectedItem() != nil {
@@ -452,7 +452,7 @@ func TestModel_SelectedItem(t *testing.T) {
 
 func TestModel_ItemCount(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	if m.ItemCount() != 0 {
 		t.Errorf("ItemCount() = %d, want 0", m.ItemCount())
@@ -467,7 +467,7 @@ func TestModel_ItemCount(t *testing.T) {
 
 func TestModel_Device(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	if m.Device() != "" {
 		t.Errorf("Device() = %q, want empty", m.Device())
@@ -482,7 +482,7 @@ func TestModel_Device(t *testing.T) {
 
 func TestModel_Loading(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	if m.Loading() {
 		t.Error("Loading() should be false initially")
@@ -497,7 +497,7 @@ func TestModel_Loading(t *testing.T) {
 
 func TestModel_Error(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	if m.Error() != nil {
 		t.Error("Error() should be nil initially")
@@ -513,7 +513,7 @@ func TestModel_Error(t *testing.T) {
 
 func TestModel_Refresh(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 
 	// No device - should not refresh
 	m, cmd := m.Refresh()
@@ -535,7 +535,7 @@ func TestModel_Refresh(t *testing.T) {
 
 func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.items = make([]Item, 20)
 	m.scroller.SetItemCount(20)
 
@@ -554,7 +554,7 @@ func TestModel_ScrollerVisibleRows(t *testing.T) {
 
 func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.items = make([]Item, 20)
 	for i := range m.items {
 		m.items[i] = Item{Key: string(rune('a' + i))}
@@ -579,7 +579,7 @@ func TestModel_ScrollerEnsureVisible(t *testing.T) {
 
 func TestModel_SelectItem_Empty(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = true
 
 	cmd := m.selectItem()
@@ -590,7 +590,7 @@ func TestModel_SelectItem_Empty(t *testing.T) {
 
 func TestModel_DeleteItem_Empty(t *testing.T) {
 	t.Parallel()
-	m := New(Deps{Ctx: context.Background(), Svc: &shelly.Service{}})
+	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = true
 
 	cmd := m.deleteItem()

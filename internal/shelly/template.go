@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
@@ -87,7 +88,7 @@ func (s *Service) CompareTemplate(ctx context.Context, identifier string, templa
 			return fmt.Errorf("failed to get device config: %w", err)
 		}
 
-		diffs = compareConfigs(current, templateCfg)
+		diffs = backup.CompareConfigs(current, templateCfg)
 		return nil
 	})
 

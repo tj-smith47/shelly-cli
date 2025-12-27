@@ -9,7 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
@@ -70,10 +70,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
 	// Parse calls JSON
-	calls, err := shelly.ParseScheduleCalls(callsFlag)
+	calls, err := automation.ParseScheduleCalls(callsFlag)
 	if err != nil {
 		return err
 	}

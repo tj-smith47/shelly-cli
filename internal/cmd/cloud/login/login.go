@@ -12,7 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
 var (
@@ -97,7 +97,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Authenticating with Shelly Cloud...", func(ctx context.Context) error {
-		_, result, err := shelly.NewCloudClientWithCredentials(ctx, email, password)
+		_, result, err := network.NewCloudClientWithCredentials(ctx, email, password)
 		if err != nil {
 			return fmt.Errorf("authentication failed: %w", err)
 		}

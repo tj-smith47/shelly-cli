@@ -8,7 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -60,13 +60,19 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
-	return cmdutil.RunList(ctx, ios, svc, device,
-		"Getting schedules...",
-		"schedules",
-		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.ScheduleJob, error) {
-			return svc.ListSchedules(ctx, device)
-		},
-		term.DisplayScheduleList)
+	items, err := cmdutil.RunWithSpinnerResult(ctx, ios, "Getting schedules...", func(ctx context.Context) ([]automation.ScheduleJob, error) {
+		return svc.ListSchedules(ctx, device)
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(items) == 0 {
+		ios.NoResults("schedules")
+		return nil
+	}
+
+	return cmdutil.PrintListResult(ios, items, term.DisplayScheduleList)
 }

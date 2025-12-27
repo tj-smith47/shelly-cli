@@ -67,7 +67,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	defer cancel()
 
 	ios := f.IOStreams()
-	svc := f.ShellyService()
+	svc := f.AutomationService()
 
 	// Get code from file if specified
 	code := codeFlag

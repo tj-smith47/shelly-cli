@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -82,7 +81,7 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	kvsSvc := opts.Factory.KVSService()
 
 	// If values requested or pattern match, use GetMany
 	if opts.Values || opts.Match != "" {
@@ -91,20 +90,28 @@ func run(ctx context.Context, opts *Options) error {
 			match = "*"
 		}
 
-		return cmdutil.RunList(ctx, ios, svc, opts.Device,
-			"Getting KVS data...",
-			"No keys found",
-			func(ctx context.Context, svc *shelly.Service, device string) ([]kvs.Item, error) {
-				return svc.GetManyKVS(ctx, device, match)
-			},
-			term.DisplayKVSItems)
+		items, err := cmdutil.RunWithSpinnerResult(ctx, ios, "Getting KVS data...", func(ctx context.Context) ([]kvs.Item, error) {
+			return kvsSvc.GetMany(ctx, opts.Device, match)
+		})
+		if err != nil {
+			return err
+		}
+
+		if len(items) == 0 {
+			ios.NoResults("No keys found")
+			return nil
+		}
+
+		return cmdutil.PrintListResult(ios, items, term.DisplayKVSItems)
 	}
 
 	// Default: just list keys
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Device,
-		"Getting KVS keys...",
-		func(ctx context.Context, svc *shelly.Service, device string) (*kvs.ListResult, error) {
-			return svc.ListKVS(ctx, device)
-		},
-		term.DisplayKVSKeys)
+	result, err := cmdutil.RunWithSpinnerResult(ctx, ios, "Getting KVS keys...", func(ctx context.Context) (*kvs.ListResult, error) {
+		return kvsSvc.List(ctx, opts.Device)
+	})
+	if err != nil {
+		return err
+	}
+
+	return cmdutil.PrintResult(ios, result, term.DisplayKVSKeys)
 }

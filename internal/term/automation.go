@@ -7,11 +7,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // DisplayScriptList prints a table of scripts.
-func DisplayScriptList(ios *iostreams.IOStreams, scripts []shelly.ScriptInfo) {
+func DisplayScriptList(ios *iostreams.IOStreams, scripts []automation.ScriptInfo) {
 	table := output.NewTable("ID", "Name", "Enabled", "Running")
 	for _, s := range scripts {
 		name := s.Name
@@ -24,7 +25,7 @@ func DisplayScriptList(ios *iostreams.IOStreams, scripts []shelly.ScriptInfo) {
 }
 
 // DisplayScheduleList prints a table of schedules.
-func DisplayScheduleList(ios *iostreams.IOStreams, schedules []shelly.ScheduleJob) {
+func DisplayScheduleList(ios *iostreams.IOStreams, schedules []automation.ScheduleJob) {
 	table := output.NewTable("ID", "Enabled", "Timespec", "Calls")
 	for _, s := range schedules {
 		callsSummary := formatScheduleCallsSummary(s.Calls)
@@ -33,7 +34,7 @@ func DisplayScheduleList(ios *iostreams.IOStreams, schedules []shelly.ScheduleJo
 	printTable(ios, table)
 }
 
-func formatScheduleCallsSummary(calls []shelly.ScheduleCall) string {
+func formatScheduleCallsSummary(calls []automation.ScheduleCall) string {
 	if len(calls) == 0 {
 		return output.FormatPlaceholder("(none)")
 	}

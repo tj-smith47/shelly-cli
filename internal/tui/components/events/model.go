@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
@@ -38,7 +39,7 @@ type Deps struct {
 	Ctx         context.Context
 	Svc         *shelly.Service
 	IOS         *iostreams.IOStreams
-	EventStream *shelly.EventStream // Shared event stream (WebSocket for Gen2+, polling for Gen1)
+	EventStream *automation.EventStream // Shared event stream (WebSocket for Gen2+, polling for Gen1)
 }
 
 // validate ensures all required dependencies are set.
@@ -99,7 +100,7 @@ type Model struct {
 	ctx         context.Context
 	svc         *shelly.Service
 	ios         *iostreams.IOStreams
-	eventStream *shelly.EventStream
+	eventStream *automation.EventStream
 	state       *sharedState
 	scroller    *panel.Scroller
 	maxItems    int
@@ -814,53 +815,55 @@ func mergeEventsByTime(user, system []Event) []Event {
 	return result
 }
 
+// columnLayout holds width calculations for event columns.
+type columnLayout struct {
+	colWidth  int
+	timeW     int
+	levelW    int
+	userDevW  int
+	userCompW int
+	userDescW int
+	sysDevW   int
+	sysDescW  int
+}
+
+// computeColumnLayout calculates column widths based on total width.
+func computeColumnLayout(totalWidth int) columnLayout {
+	const timeW = 8
+	const levelW = 12
+	const minDeviceW, minCompW, minDescW = 10, 8, 8
+	const spacesUser, spacesSys = 4, 3
+
+	colWidth := max(30, (totalWidth-3)/2)
+
+	// User column layout (with COMP)
+	remainingUser := colWidth - timeW - levelW - spacesUser
+	userDeviceW := max(minDeviceW, remainingUser*20/100)
+	userCompW := max(minCompW, remainingUser*20/100)
+	userDescW := max(minDescW, remainingUser-userDeviceW-userCompW)
+
+	// System column layout (no COMP)
+	remainingSys := colWidth - timeW - levelW - spacesSys
+	sysDeviceW := max(minDeviceW, remainingSys*25/100)
+	sysDescW := max(minDescW, remainingSys-sysDeviceW)
+
+	return columnLayout{
+		colWidth:  colWidth,
+		timeW:     timeW,
+		levelW:    levelW,
+		userDevW:  userDeviceW,
+		userCompW: userCompW,
+		userDescW: userDescW,
+		sysDevW:   sysDeviceW,
+		sysDescW:  sysDescW,
+	}
+}
+
 // renderDualColumnsDirect renders events in two columns: User (left) and System (right).
 // Takes pre-split user and system event lists.
 func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string {
 	colors := theme.GetSemanticColors()
-
-	// Calculate column widths - use half minus separator overhead
-	// Total line = leftCol + " │ " + rightCol = 2*colWidth + 3
-	colWidth := (m.width - 3) / 2
-	if colWidth < 30 {
-		colWidth = 30
-	}
-
-	// Calculate dynamic sub-column widths for USER events (has COMP column)
-	// Format: TIME(8) + DEVICE(dynamic) + COMP(dynamic) + LEVEL(12) + DESC(remaining)
-	const timeW = 8
-	const levelW = 12 // Increased to fit "full_status" without truncation
-	const minDeviceW = 10
-	const minCompW = 8
-	const minDescW = 8
-	const spacesUser = 4 // spaces between 5 columns (user)
-	const spacesSys = 3  // spaces between 4 columns (system - no COMP)
-
-	// User column layout (with COMP)
-	remainingUser := colWidth - timeW - levelW - spacesUser
-	userDeviceW := remainingUser * 20 / 100
-	if userDeviceW < minDeviceW {
-		userDeviceW = minDeviceW
-	}
-	userCompW := remainingUser * 20 / 100
-	if userCompW < minCompW {
-		userCompW = minCompW
-	}
-	userDescW := remainingUser - userDeviceW - userCompW
-	if userDescW < minDescW {
-		userDescW = minDescW
-	}
-
-	// System column layout (no COMP column - more space for device/desc)
-	remainingSys := colWidth - timeW - levelW - spacesSys
-	sysDeviceW := remainingSys * 25 / 100
-	if sysDeviceW < minDeviceW {
-		sysDeviceW = minDeviceW
-	}
-	sysDescW := remainingSys - sysDeviceW
-	if sysDescW < minDescW {
-		sysDescW = minDescW
-	}
+	layout := computeColumnLayout(m.width)
 
 	// SetTotalPages takes total items count (not page count) and calculates pages internally
 	m.userPaginator.SetTotalPages(len(userEvents))
@@ -880,26 +883,26 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 	leftTitle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple()).Render("User Events")
 	rightTitle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red()).Render("System Events")
 
-	leftTitle = output.PadRight(leftTitle, colWidth)
-	rightTitle = output.PadRight(rightTitle, colWidth)
+	leftTitle = output.PadRight(leftTitle, layout.colWidth)
+	rightTitle = output.PadRight(rightTitle, layout.colWidth)
 
 	// Build column header row - USER has COMP, SYSTEM does not
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
-	leftColHeader := headerStyle.Render(output.PadRight("TIME", timeW)) + " " +
-		headerStyle.Render(output.PadRight("DEVICE", userDeviceW)) + " " +
-		headerStyle.Render(output.PadRight("COMP", userCompW)) + " " +
-		headerStyle.Render(output.PadRight("LEVEL", levelW)) + " " +
+	leftColHeader := headerStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
+		headerStyle.Render(output.PadRight("DEVICE", layout.userDevW)) + " " +
+		headerStyle.Render(output.PadRight("COMP", layout.userCompW)) + " " +
+		headerStyle.Render(output.PadRight("LEVEL", layout.levelW)) + " " +
 		headerStyle.Render("DESC")
 
 	// System events: no COMP column
 	sysHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red())
-	rightColHeader := sysHeaderStyle.Render(output.PadRight("TIME", timeW)) + " " +
-		sysHeaderStyle.Render(output.PadRight("DEVICE", sysDeviceW)) + " " +
-		sysHeaderStyle.Render(output.PadRight("LEVEL", levelW)) + " " +
+	rightColHeader := sysHeaderStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
+		sysHeaderStyle.Render(output.PadRight("DEVICE", layout.sysDevW)) + " " +
+		sysHeaderStyle.Render(output.PadRight("LEVEL", layout.levelW)) + " " +
 		sysHeaderStyle.Render("DESC")
 
-	leftColHeader = output.PadRight(leftColHeader, colWidth)
-	rightColHeader = output.PadRight(rightColHeader, colWidth)
+	leftColHeader = output.PadRight(leftColHeader, layout.colWidth)
+	rightColHeader = output.PadRight(rightColHeader, layout.colWidth)
 
 	// Build all lines - reserve 1 line for pagination dots at bottom
 	lines := make([]string, 0, m.perPage+4)
@@ -908,51 +911,40 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 		leftColHeader+" "+separator+" "+rightColHeader)
 
 	// Separator line
-	sepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", colWidth))
+	sepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", layout.colWidth))
 	lines = append(lines, sepLine+" "+separator+" "+sepLine)
 
 	// Calculate max lines per user event based on available space and event count
-	// User events can wrap, system events stay single-line
-	availableEventLines := m.perPage
-	userEventCount := len(userPage)
-	maxLinesPerUserEvent := 1
-	if userEventCount > 0 && availableEventLines > userEventCount {
-		// Allow user events to expand - use up to 3 lines each, distributed fairly
-		maxLinesPerUserEvent = availableEventLines / userEventCount
-		if maxLinesPerUserEvent > 3 {
-			maxLinesPerUserEvent = 3 // Cap at 3 lines per event
-		}
-	}
+	maxLinesPerUserEvent := m.calcMaxLinesPerUserEvent(len(userPage))
 
 	linesUsed := 0
 	userIdx := 0
 	sysIdx := 0
-	emptyLeft := output.PadRight("", colWidth)
-	emptyRight := output.PadRight("", colWidth)
+	emptyLeft := output.PadRight("", layout.colWidth)
+	emptyRight := output.PadRight("", layout.colWidth)
 
-	for linesUsed < availableEventLines {
+	for linesUsed < m.perPage {
 		switch {
 		case userIdx < len(userPage):
 			// Render user event with wrapping
-			userLines := m.renderUserEventWrapped(userPage[userIdx], timeW, userDeviceW, userCompW, levelW, userDescW, maxLinesPerUserEvent)
+			userLines := m.renderUserEventWrapped(userPage[userIdx], layout.timeW, layout.userDevW, layout.userCompW, layout.levelW, layout.userDescW, maxLinesPerUserEvent)
 
 			// Get corresponding system event (if any)
 			sysLine := ""
 			if sysIdx < len(sysPage) {
-				sysLine = m.renderSystemEvent(sysPage[sysIdx], timeW, sysDeviceW, levelW, sysDescW)
+				sysLine = m.renderSystemEvent(sysPage[sysIdx], layout.timeW, layout.sysDevW, layout.levelW, layout.sysDescW)
 				sysIdx++
 			}
 
 			// Add all lines for this user event
 			for i, uline := range userLines {
-				if linesUsed >= availableEventLines {
+				if linesUsed >= m.perPage {
 					break
 				}
-				leftCell := output.PadRight(uline, colWidth)
+				leftCell := output.PadRight(uline, layout.colWidth)
 				rightCell := emptyRight
 				if i == 0 {
-					// First line pairs with system event
-					rightCell = output.PadRight(sysLine, colWidth)
+					rightCell = output.PadRight(sysLine, layout.colWidth)
 				}
 				lines = append(lines, leftCell+" "+separator+" "+rightCell)
 				linesUsed++
@@ -960,36 +952,33 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 			userIdx++
 
 		case sysIdx < len(sysPage):
-			// No more user events, show remaining system events
 			leftCell := emptyLeft
-			rightCell := output.PadRight(m.renderSystemEvent(sysPage[sysIdx], timeW, sysDeviceW, levelW, sysDescW), colWidth)
+			rightCell := output.PadRight(m.renderSystemEvent(sysPage[sysIdx], layout.timeW, layout.sysDevW, layout.levelW, layout.sysDescW), layout.colWidth)
 			lines = append(lines, leftCell+" "+separator+" "+rightCell)
 			sysIdx++
 			linesUsed++
 
 		default:
-			// No more events, add empty row to fill space
 			lines = append(lines, emptyLeft+" "+separator+" "+emptyRight)
 			linesUsed++
 		}
 	}
 
-	// Always add pagination dots row at bottom (shows current page position)
-	// Dots already have colors applied from paginator setup
-	userDots := m.userPaginator.View()
-	sysDots := m.systemPaginator.View()
-	// Center the dots in each column (no additional foreground - dots have embedded colors)
-	leftDots := lipgloss.NewStyle().
-		Width(colWidth).
-		Align(lipgloss.Center).
-		Render(userDots)
-	rightDots := lipgloss.NewStyle().
-		Width(colWidth).
-		Align(lipgloss.Center).
-		Render(sysDots)
+	// Pagination dots
+	leftDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.userPaginator.View())
+	rightDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.systemPaginator.View())
 	lines = append(lines, leftDots+" "+separator+" "+rightDots)
 
 	return strings.Join(lines, "\n")
+}
+
+// calcMaxLinesPerUserEvent calculates how many lines each user event can use.
+func (m Model) calcMaxLinesPerUserEvent(userEventCount int) int {
+	if userEventCount > 0 && m.perPage > userEventCount {
+		maxLines := m.perPage / userEventCount
+		return min(3, maxLines) // Cap at 3 lines per event
+	}
+	return 1
 }
 
 // renderUserEventWrapped renders a user event with word-wrapped description.

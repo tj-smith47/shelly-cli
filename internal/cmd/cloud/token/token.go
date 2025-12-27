@@ -9,7 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -48,7 +48,7 @@ func run(f *cmdutil.Factory) error {
 	}
 
 	// Parse the token to get details
-	tokenInfo, err := shelly.ParseToken(cfg.Cloud.AccessToken)
+	tokenInfo, err := network.ParseToken(cfg.Cloud.AccessToken)
 	if err != nil {
 		ios.Error("Token is invalid: %v", err)
 		return err
@@ -83,7 +83,7 @@ func run(f *cmdutil.Factory) error {
 	if !tokenInfo.Expiry.IsZero() {
 		ios.Printf("  Expires:    %s\n", tokenInfo.Expiry.Format("2006-01-02 15:04:05"))
 
-		remaining := shelly.TimeUntilExpiry(cfg.Cloud.AccessToken)
+		remaining := network.TimeUntilExpiry(cfg.Cloud.AccessToken)
 		if remaining > 0 {
 			ios.Printf("  Remaining:  %s\n", output.FormatDuration(remaining))
 		} else {

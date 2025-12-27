@@ -11,7 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -27,7 +27,7 @@ type Item struct {
 // Deps holds the dependencies for the KVS browser component.
 type Deps struct {
 	Ctx context.Context
-	Svc *shelly.Service
+	Svc *shellykvs.Service
 }
 
 // Validate ensures all required dependencies are set.
@@ -62,7 +62,7 @@ type SelectMsg struct {
 // Model displays KVS items for a device.
 type Model struct {
 	ctx        context.Context
-	svc        *shelly.Service
+	svc        *shellykvs.Service
 	device     string
 	items      []Item
 	scroller   *panel.Scroller
@@ -161,7 +161,7 @@ func (m Model) fetchItems() tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
-		kvsItems, err := m.svc.GetAllKVS(ctx, m.device)
+		kvsItems, err := m.svc.GetAll(ctx, m.device)
 		if err != nil {
 			return LoadedMsg{Err: err}
 		}
@@ -283,7 +283,7 @@ func (m Model) deleteItem() tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
 
-		err := m.svc.DeleteKVS(ctx, m.device, item.Key)
+		err := m.svc.Delete(ctx, m.device, item.Key)
 		return ActionMsg{Action: "delete", Key: item.Key, Err: err}
 	}
 }

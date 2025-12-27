@@ -7,14 +7,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	Factory *cmdutil.Factory
 	Device  string
-	Yes     bool
 }
 
 // NewCommand creates the zigbee remove command.
@@ -45,7 +46,7 @@ Note: The device will still be accessible via WiFi/HTTP.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
@@ -68,7 +69,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Disable Zigbee (this also causes the device to leave the network)
-	if err := svc.ZigbeeDisable(ctx, opts.Device); err != nil {
+	if err := svc.Wireless().ZigbeeDisable(ctx, opts.Device); err != nil {
 		return err
 	}
 

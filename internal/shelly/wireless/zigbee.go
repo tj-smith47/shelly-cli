@@ -1,5 +1,5 @@
-// Package shelly provides business logic for Shelly device operations.
-package shelly
+// Package wireless provides wireless protocol operations for Shelly devices.
+package wireless
 
 import (
 	"context"
@@ -7,14 +7,13 @@ import (
 	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // ZigbeeEnable enables Zigbee on a device.
 func (s *Service) ZigbeeEnable(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Zigbee.SetConfig", map[string]any{
 			"config": map[string]any{
 				"enable": true,
@@ -29,7 +28,7 @@ func (s *Service) ZigbeeEnable(ctx context.Context, identifier string) error {
 
 // ZigbeeDisable disables Zigbee on a device.
 func (s *Service) ZigbeeDisable(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Zigbee.SetConfig", map[string]any{
 			"config": map[string]any{
 				"enable": false,
@@ -44,7 +43,7 @@ func (s *Service) ZigbeeDisable(ctx context.Context, identifier string) error {
 
 // ZigbeeStartNetworkSteering starts Zigbee network steering (pairing mode).
 func (s *Service) ZigbeeStartNetworkSteering(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		_, err := conn.Call(ctx, "Zigbee.StartNetworkSteering", nil)
 		if err != nil {
 			return fmt.Errorf("failed to start network steering: %w", err)
@@ -56,7 +55,7 @@ func (s *Service) ZigbeeStartNetworkSteering(ctx context.Context, identifier str
 // ZigbeeGetStatus gets Zigbee status from a device.
 func (s *Service) ZigbeeGetStatus(ctx context.Context, identifier string) (map[string]any, error) {
 	var status map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Zigbee.GetStatus", nil)
 		if err != nil {
 			return fmt.Errorf("failed to get Zigbee status: %w", err)
@@ -75,7 +74,7 @@ func (s *Service) ZigbeeGetStatus(ctx context.Context, identifier string) (map[s
 // ZigbeeGetConfig gets Zigbee configuration from a device.
 func (s *Service) ZigbeeGetConfig(ctx context.Context, identifier string) (map[string]any, error) {
 	var cfg map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		result, err := conn.Call(ctx, "Zigbee.GetConfig", nil)
 		if err != nil {
 			return fmt.Errorf("failed to get Zigbee config: %w", err)
@@ -93,7 +92,7 @@ func (s *Service) ZigbeeGetConfig(ctx context.Context, identifier string) (map[s
 
 // ScanZigbeeDevices scans configured devices for Zigbee support.
 func (s *Service) ScanZigbeeDevices(ctx context.Context, ios *iostreams.IOStreams) ([]model.ZigbeeDevice, error) {
-	cfg := config.Get()
+	cfg := getConfig()
 	if cfg == nil {
 		return nil, fmt.Errorf("no configuration found; run 'shelly init' first")
 	}
@@ -123,7 +122,7 @@ func (s *Service) ScanZigbeeDevices(ctx context.Context, ios *iostreams.IOStream
 }
 
 func (s *Service) checkZigbeeSupport(ctx context.Context, name string, dev model.Device, ios *iostreams.IOStreams) (model.ZigbeeDevice, bool) {
-	result, err := s.RawRPC(ctx, dev.Address, "Zigbee.GetConfig", nil)
+	result, err := s.parent.RawRPC(ctx, dev.Address, "Zigbee.GetConfig", nil)
 	if err != nil {
 		ios.Debug("device %s does not support Zigbee: %v", name, err)
 		return model.ZigbeeDevice{}, false
@@ -150,7 +149,7 @@ func (s *Service) checkZigbeeSupport(ctx context.Context, name string, dev model
 }
 
 func (s *Service) enrichZigbeeStatus(ctx context.Context, address string, device *model.ZigbeeDevice) {
-	statusResult, err := s.RawRPC(ctx, address, "Zigbee.GetStatus", nil)
+	statusResult, err := s.parent.RawRPC(ctx, address, "Zigbee.GetStatus", nil)
 	if err != nil {
 		return
 	}

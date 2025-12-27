@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
@@ -28,7 +29,7 @@ type Deps struct {
 	Svc             *shelly.Service
 	IOS             *iostreams.IOStreams
 	RefreshInterval time.Duration
-	EventStream     *shelly.EventStream // Shared event stream (optional - creates one if nil)
+	EventStream     *automation.EventStream // Shared event stream (optional - creates one if nil)
 }
 
 // validate ensures all required dependencies are set.
@@ -84,7 +85,7 @@ type Model struct {
 	initialLoad     bool                     // True only on first load (shows loading screen)
 	refreshing      bool                     // True during background refresh (shows indicator, keeps data)
 	useWebSocket    bool                     // True if using WebSocket for updates
-	eventStream     *shelly.EventStream      // WebSocket event stream (may be shared)
+	eventStream     *automation.EventStream  // WebSocket event stream (may be shared)
 	ownsEventStream bool                     // True if we created the event stream (so we should stop it)
 	eventChan       chan events.Event        // Channel for WebSocket events
 	err             error
@@ -196,7 +197,7 @@ func New(deps Deps) Model {
 	eventStream := deps.EventStream
 	ownsEventStream := false
 	if eventStream == nil {
-		eventStream = shelly.NewEventStream(deps.Svc)
+		eventStream = automation.NewEventStream(deps.Svc)
 		ownsEventStream = true
 	}
 

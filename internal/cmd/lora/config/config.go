@@ -95,7 +95,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	if err := svc.LoRaSetConfig(ctx, opts.Device, opts.ID, config); err != nil {
+	if err := svc.Wireless().LoRaSetConfig(ctx, opts.Device, opts.ID, config); err != nil {
 		return err
 	}
 

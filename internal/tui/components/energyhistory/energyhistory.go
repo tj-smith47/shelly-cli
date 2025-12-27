@@ -45,7 +45,7 @@ type Styles struct {
 	Container     lipgloss.Style
 	Header        lipgloss.Style
 	Label         lipgloss.Style
-	Sparkline     lipgloss.Style   // Fallback style (unused with gradient)
+	Sparkline     lipgloss.Style    // Fallback style (unused with gradient)
 	SparkGradient [8]lipgloss.Style // Gradient colors for levels 0-7
 	Value         lipgloss.Style
 	Time          lipgloss.Style
@@ -305,16 +305,48 @@ func (m *Model) renderDeviceSparkline(name string, history []DataPoint, width in
 	return labelStr + " " + sparkStr + " " + valueStr
 }
 
+// sparklineParams holds sparkline generation parameters.
+type sparklineParams struct {
+	minVal, maxVal float64
+	flatLine       bool
+	flatLevel      int
+}
+
+// computeSparklineParams calculates min/max and flat line detection.
+func computeSparklineParams(data []DataPoint) sparklineParams {
+	minVal, maxVal := data[0].Value, data[0].Value
+	for _, d := range data {
+		minVal = min(minVal, d.Value)
+		maxVal = max(maxVal, d.Value)
+	}
+
+	p := sparklineParams{minVal: minVal, maxVal: maxVal}
+	valRange := maxVal - minVal
+	if valRange < 0.001 {
+		p.flatLine = true
+		if maxVal < 1.0 {
+			p.flatLevel = 0 // Near zero: show blue (lowest)
+		} else {
+			p.flatLevel = 4 // Non-zero stable: show middle (lime)
+		}
+	}
+	return p
+}
+
+// normalizeToLevel converts a value to a sparkline level (0-7).
+func normalizeToLevel(value float64, p sparklineParams) int {
+	if p.flatLine {
+		return p.flatLevel
+	}
+	valRange := p.maxVal - p.minVal
+	normalized := (value - p.minVal) / valRange * 7
+	return max(0, min(7, int(normalized)))
+}
+
 func (m *Model) generateSparkline(history []DataPoint, width int) string {
 	if len(history) == 0 {
-		// Use lowest bar char for empty data (shows "no data" state)
-		// Apply lowest gradient color for consistency
 		lowestChar := m.styles.SparkGradient[0].Render(string(sparkChars[0]))
-		var spark strings.Builder
-		for range width {
-			spark.WriteString(lowestChar)
-		}
-		return spark.String()
+		return strings.Repeat(lowestChar, width)
 	}
 
 	// Get the last 'width' points
@@ -323,63 +355,24 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 		data = data[len(data)-width:]
 	}
 
-	// Find min/max for scaling
-	minVal, maxVal := data[0].Value, data[0].Value
-	for _, d := range data {
-		if d.Value < minVal {
-			minVal = d.Value
-		}
-		if d.Value > maxVal {
-			maxVal = d.Value
-		}
-	}
+	p := computeSparklineParams(data)
 
-	// Scale calculation
-	valRange := maxVal - minVal
-	flatLine := false
-	flatLevel := 0
-	if valRange < 0.001 {
-		// All values are the same - use appropriate fixed level
-		flatLine = true
-		if maxVal < 1.0 {
-			flatLevel = 0 // Near zero: show blue (lowest)
-		} else {
-			flatLevel = 4 // Non-zero stable: show middle (lime)
-		}
-	}
-
-	// Generate sparkline with gradient colors
 	var spark strings.Builder
 
-	// Pad at the start with lowest bar char if we don't have enough data
-	if len(data) < width {
+	// Pad at the start if we don't have enough data
+	if padCount := width - len(data); padCount > 0 {
 		padLevel := 0
-		if flatLine {
-			padLevel = flatLevel
+		if p.flatLine {
+			padLevel = p.flatLevel
 		}
 		padChar := m.styles.SparkGradient[padLevel].Render(string(sparkChars[padLevel]))
-		for range width - len(data) {
+		for range padCount {
 			spark.WriteString(padChar)
 		}
 	}
 
 	for _, d := range data {
-		var idx int
-		if flatLine {
-			// All values same - use fixed level
-			idx = flatLevel
-		} else {
-			// Normalize to 0-7 range
-			normalized := (d.Value - minVal) / valRange * 7
-			idx = int(normalized)
-			if idx > 7 {
-				idx = 7
-			}
-			if idx < 0 {
-				idx = 0
-			}
-		}
-		// Apply gradient color based on level
+		idx := normalizeToLevel(d.Value, p)
 		spark.WriteString(m.styles.SparkGradient[idx].Render(string(sparkChars[idx])))
 	}
 

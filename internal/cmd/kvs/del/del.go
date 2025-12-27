@@ -8,14 +8,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	Device  string
 	Key     string
-	Yes     bool // Skip confirmation
 	Factory *cmdutil.Factory
 }
 
@@ -44,7 +45,7 @@ This operation is irreversible. Use --yes to skip the confirmation prompt.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
@@ -54,7 +55,7 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
+	kvsSvc := opts.Factory.KVSService()
 
 	// Confirm deletion
 	msg := fmt.Sprintf("Delete key %q from %s?", opts.Key, opts.Device)
@@ -68,7 +69,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %q...", opts.Key), func(ctx context.Context) error {
-		if err := svc.DeleteKVS(ctx, opts.Device, opts.Key); err != nil {
+		if err := kvsSvc.Delete(ctx, opts.Device, opts.Key); err != nil {
 			return err
 		}
 		ios.Success("Key %q deleted", opts.Key)
