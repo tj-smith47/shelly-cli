@@ -195,6 +195,7 @@ func (r *Renderer) buildContentLines(contentWidth int, borderStyle lipgloss.Styl
 
 // renderContentWithBorders wraps content lines with borders and padding.
 // Returns exactly contentHeight lines to ensure panels fit their allocated space.
+// Uses 1-line top padding when space allows, with content starting from top.
 func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth, contentHeight int, borderStyle lipgloss.Style) []string {
 	if contentHeight <= 0 {
 		return []string{}
@@ -206,43 +207,16 @@ func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth,
 
 	emptyLine := leftBorder + strings.Repeat(" ", paddedWidth) + rightBorder
 
-	// For very small content areas (1-2 lines), show content with no padding
-	if contentHeight <= 2 {
-		lines := make([]string, 0, contentHeight)
-		for i := range contentHeight {
-			line := ""
-			if i < len(contentLines) {
-				line = contentLines[i]
-			}
-			line = r.padOrTruncate(line, paddedWidth)
-			lines = append(lines, leftBorder+line+rightBorder)
-		}
-		return lines
-	}
-
-	// For medium content areas (3-4 lines), show content with top padding only
-	// This avoids extra blank lines when content is minimal
-	if contentHeight <= 4 {
-		lines := make([]string, 0, contentHeight)
-		lines = append(lines, emptyLine) // top padding only
-		innerHeight := contentHeight - 1
-		for i := range innerHeight {
-			line := ""
-			if i < len(contentLines) {
-				line = contentLines[i]
-			}
-			line = r.padOrTruncate(line, paddedWidth)
-			lines = append(lines, leftBorder+line+rightBorder)
-		}
-		return lines
-	}
-
-	// Normal case (5+ lines): top padding (1) + content lines + bottom padding (1)
 	lines := make([]string, 0, contentHeight)
-	lines = append(lines, emptyLine) // top padding
 
-	innerHeight := contentHeight - 2
-	for i := range innerHeight {
+	// Add top padding if we have room (at least 2 lines total)
+	if contentHeight >= 2 {
+		lines = append(lines, emptyLine)
+	}
+
+	// Add content lines (fill remaining space)
+	remainingHeight := contentHeight - len(lines)
+	for i := range remainingHeight {
 		line := ""
 		if i < len(contentLines) {
 			line = contentLines[i]
@@ -251,7 +225,6 @@ func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth,
 		lines = append(lines, leftBorder+line+rightBorder)
 	}
 
-	lines = append(lines, emptyLine) // bottom padding
 	return lines
 }
 
