@@ -147,19 +147,20 @@ func NewConfig(deps ConfigDeps) *Config {
 	layoutCalc := layout.NewTwoColumnLayout(0.5, 1)
 
 	// Configure left column panels (WiFi, System, Cloud, Security) with expansion on focus
+	// MinHeight = borders (2) + padding (2) + content (1) = 5 minimum
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(PanelWiFi), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelSystem), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelCloud), MinHeight: 4, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelSecurity), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelCloud), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelSecurity), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	// Configure right column panels (BLE, Inputs, Protocols, SmartHome)
 	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(PanelBLE), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelInputs), MinHeight: 4, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelProtocols), MinHeight: 4, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelSmartHome), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelInputs), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelProtocols), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelSmartHome), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	c := &Config{
