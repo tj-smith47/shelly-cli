@@ -8,29 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
-
-// MetricsOutput represents the JSON output format.
-type MetricsOutput struct {
-	Timestamp time.Time       `json:"timestamp"`
-	Devices   []DeviceMetrics `json:"devices"`
-}
-
-// DeviceMetrics represents metrics for a single device.
-type DeviceMetrics struct {
-	Device     string                    `json:"device"`
-	Online     bool                      `json:"online"`
-	Components []shelly.ComponentReading `json:"components,omitempty"`
-}
 
 // NewCommand creates the JSON metrics command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
@@ -127,8 +110,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 			case <-ctx.Done():
 				return nil
 			case <-ticker.C:
-				metrics := collectMetrics(ctx, svc, devices)
-				if err := encoder.Encode(metrics); err != nil {
+				if err := encoder.Encode(svc.CollectJSONMetrics(ctx, devices)); err != nil {
 					ios.DebugErr("encoding metrics", err)
 				}
 			}
@@ -136,41 +118,5 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 	}
 
 	// Single shot
-	metrics := collectMetrics(ctx, svc, devices)
-	return encoder.Encode(metrics)
-}
-
-func collectMetrics(ctx context.Context, svc *shelly.Service, devices []string) MetricsOutput {
-	output := MetricsOutput{
-		Timestamp: time.Now(),
-		Devices:   make([]DeviceMetrics, len(devices)),
-	}
-
-	g, ctx := errgroup.WithContext(ctx)
-	// Use global rate limit for concurrency (service layer also enforces this)
-	g.SetLimit(config.GetGlobalMaxConcurrent())
-
-	var mu sync.Mutex
-
-	for i, device := range devices {
-		idx := i
-		dev := device
-		g.Go(func() error {
-			readings := svc.CollectComponentReadings(ctx, dev)
-			mu.Lock()
-			output.Devices[idx] = DeviceMetrics{
-				Device:     dev,
-				Online:     len(readings) > 0,
-				Components: readings,
-			}
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return output
-	}
-
-	return output
+	return encoder.Encode(svc.CollectJSONMetrics(ctx, devices))
 }

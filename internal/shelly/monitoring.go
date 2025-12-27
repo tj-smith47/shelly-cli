@@ -13,8 +13,10 @@ import (
 	"github.com/tj-smith47/shelly-go/gen1"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 	"github.com/tj-smith47/shelly-go/transport"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -1415,4 +1417,88 @@ func escapeInfluxTag(s string) string {
 	s = strings.ReplaceAll(s, ",", "\\,")
 	s = strings.ReplaceAll(s, "=", "\\=")
 	return s
+}
+
+// JSONMetricsDevice represents metrics for a single device in JSON output.
+type JSONMetricsDevice struct {
+	Device     string             `json:"device"`
+	Online     bool               `json:"online"`
+	Components []ComponentReading `json:"components,omitempty"`
+}
+
+// JSONMetricsOutput represents the JSON metrics output format.
+type JSONMetricsOutput struct {
+	Timestamp time.Time           `json:"timestamp"`
+	Devices   []JSONMetricsDevice `json:"devices"`
+}
+
+// CollectJSONMetrics collects metrics from multiple devices for JSON output.
+func (s *Service) CollectJSONMetrics(ctx context.Context, devices []string) JSONMetricsOutput {
+	output := JSONMetricsOutput{
+		Timestamp: time.Now(),
+		Devices:   make([]JSONMetricsDevice, len(devices)),
+	}
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
+
+	var mu sync.Mutex
+
+	for i, device := range devices {
+		idx := i
+		dev := device
+		g.Go(func() error {
+			readings := s.CollectComponentReadings(ctx, dev)
+			mu.Lock()
+			output.Devices[idx] = JSONMetricsDevice{
+				Device:     dev,
+				Online:     len(readings) > 0,
+				Components: readings,
+			}
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return output
+	}
+
+	return output
+}
+
+// CollectInfluxDBPointsMulti collects InfluxDB points from multiple devices concurrently.
+// It applies the specified measurement name and additional tags to all points.
+func (s *Service) CollectInfluxDBPointsMulti(ctx context.Context, devices []string, measurement string, tags map[string]string) []InfluxDBPoint {
+	now := time.Now()
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
+
+	var mu sync.Mutex
+	var allPoints []InfluxDBPoint
+
+	for _, device := range devices {
+		dev := device
+		g.Go(func() error {
+			readings := s.CollectComponentReadings(ctx, dev)
+			points := ReadingsToInfluxDBPoints(readings, now)
+			for i := range points {
+				points[i].Measurement = measurement
+				for k, v := range tags {
+					points[i].Tags[k] = v
+				}
+			}
+			mu.Lock()
+			allPoints = append(allPoints, points...)
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return allPoints
+	}
+
+	return allPoints
 }

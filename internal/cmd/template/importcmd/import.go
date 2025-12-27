@@ -2,17 +2,13 @@
 package importcmd
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
@@ -45,7 +41,7 @@ Use --force to overwrite an existing template with the same name.`,
   # Overwrite existing template
   shelly template import template.yaml --force`,
 		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: completeFile(),
+		ValidArgsFunction: completion.FileThenNoComplete(),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.File = args[0]
 			if len(args) > 1 {
@@ -70,7 +66,7 @@ func run(opts *Options) error {
 	}
 
 	// Parse template
-	tpl, err := parseTemplate(opts.File, data)
+	tpl, err := config.ParseTemplateFile(opts.File, data)
 	if err != nil {
 		return err
 	}
@@ -97,58 +93,4 @@ func run(opts *Options) error {
 
 	ios.Success("Template %q imported from %s", tpl.Name, opts.File)
 	return nil
-}
-
-func parseTemplate(filename string, data []byte) (config.Template, error) {
-	var tpl config.Template
-
-	ext := strings.ToLower(filepath.Ext(filename))
-	switch ext {
-	case ".json":
-		if err := json.Unmarshal(data, &tpl); err != nil {
-			return tpl, fmt.Errorf("failed to parse JSON: %w", err)
-		}
-	case ".yaml", ".yml":
-		if err := yaml.Unmarshal(data, &tpl); err != nil {
-			return tpl, fmt.Errorf("failed to parse YAML: %w", err)
-		}
-	default:
-		// Try YAML first, then JSON
-		yamlErr := yaml.Unmarshal(data, &tpl)
-		if yamlErr == nil {
-			break
-		}
-		jsonErr := json.Unmarshal(data, &tpl)
-		if jsonErr != nil {
-			return tpl, fmt.Errorf("failed to parse file: %w", errors.Join(yamlErr, jsonErr))
-		}
-	}
-
-	// Validate required fields
-	if tpl.Name == "" {
-		return tpl, fmt.Errorf("template missing required field: name")
-	}
-	if tpl.Model == "" {
-		return tpl, fmt.Errorf("template missing required field: model")
-	}
-	if tpl.Config == nil {
-		return tpl, fmt.Errorf("template missing required field: config")
-	}
-
-	return tpl, nil
-}
-
-// completeFile provides file completion.
-func completeFile() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: file path
-			return nil, cobra.ShellCompDirectiveDefault
-		}
-		if len(args) == 1 {
-			// Second argument: template name (no completion)
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
 }

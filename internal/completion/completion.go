@@ -639,6 +639,19 @@ func SettingKeysWithEquals() func(*cobra.Command, []string, string) ([]string, c
 	}
 }
 
+// FileThenNoComplete returns a completion function that uses default file
+// completion for the first arg and disables completion for subsequent args.
+func FileThenNoComplete() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// First argument: file path (use default file completion)
+			return nil, cobra.ShellCompDirectiveDefault
+		}
+		// Subsequent arguments: no completion
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // SaveDiscoveryCache saves discovered addresses to the cache file.
 // This should be called by the discover command after a successful scan.
 func SaveDiscoveryCache(addresses []string) error {

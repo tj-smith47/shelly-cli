@@ -9,14 +9,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -136,6 +133,16 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 		ios:         ios,
 	}
 
+	// Write points to output
+	writePoints := func(points []shelly.InfluxDBPoint) {
+		for _, p := range points {
+			line := shelly.FormatInfluxDBPoint(p)
+			if _, err := fmt.Fprintln(writer.out, line); err != nil {
+				writer.ios.DebugErr("writing line", err)
+			}
+		}
+	}
+
 	if continuous {
 		// Stream mode
 		ticker := time.NewTicker(interval)
@@ -146,54 +153,14 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 			case <-ctx.Done():
 				return nil
 			case <-ticker.C:
-				collectAndWrite(ctx, svc, devices, writer)
+				points := svc.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
+				writePoints(points)
 			}
 		}
 	}
 
 	// Single shot
-	collectAndWrite(ctx, svc, devices, writer)
+	points := svc.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
+	writePoints(points)
 	return nil
-}
-
-func collectAndWrite(ctx context.Context, svc *shelly.Service, devices []string, writer *LineProtocolWriter) {
-	now := time.Now()
-
-	g, ctx := errgroup.WithContext(ctx)
-	// Use global rate limit for concurrency (service layer also enforces this)
-	g.SetLimit(config.GetGlobalMaxConcurrent())
-
-	var mu sync.Mutex
-	var allPoints []shelly.InfluxDBPoint
-
-	for _, device := range devices {
-		dev := device
-		g.Go(func() error {
-			readings := svc.CollectComponentReadings(ctx, dev)
-			points := shelly.ReadingsToInfluxDBPoints(readings, now)
-			// Apply custom measurement name and additional tags
-			for i := range points {
-				points[i].Measurement = writer.measurement
-				for k, v := range writer.tags {
-					points[i].Tags[k] = v
-				}
-			}
-			mu.Lock()
-			allPoints = append(allPoints, points...)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return
-	}
-
-	// Write all points
-	for _, p := range allPoints {
-		line := shelly.FormatInfluxDBPoint(p)
-		if _, err := fmt.Fprintln(writer.out, line); err != nil {
-			writer.ios.DebugErr("writing line", err)
-		}
-	}
 }

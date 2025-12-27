@@ -8,9 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -52,7 +49,14 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string) error {
 
 	// Check if this is a plugin-managed device
 	if device.IsPluginManaged() {
-		return runPluginStatus(ctx, ios, svc, device)
+		ios.StartProgress("Getting device status...")
+		status, pluginErr := svc.GetPluginDeviceStatus(ctx, device)
+		ios.StopProgress()
+		if pluginErr != nil {
+			return pluginErr
+		}
+		term.DisplayPluginDeviceStatus(ios, device, status)
+		return nil
 	}
 
 	// Standard Shelly device status
@@ -62,24 +66,4 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string) error {
 			return svc.DeviceStatus(ctx, device)
 		},
 		term.DisplayDeviceStatus)
-}
-
-// runPluginStatus fetches and displays status for a plugin-managed device.
-func runPluginStatus(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device model.Device) error {
-	ios.StartProgress("Getting device status...")
-
-	status, err := svc.GetPluginDeviceStatus(ctx, device)
-	ios.StopProgress()
-
-	if err != nil {
-		return err
-	}
-
-	return printPluginStatus(ios, device, status)
-}
-
-// printPluginStatus displays the plugin device status.
-func printPluginStatus(ios *iostreams.IOStreams, device model.Device, status *plugins.DeviceStatusResult) error {
-	term.DisplayPluginDeviceStatus(ios, device, status)
-	return nil
 }

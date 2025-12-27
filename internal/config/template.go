@@ -1,8 +1,58 @@
 package config
 
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
 // ValidateTemplateName checks if a template name is valid.
 func ValidateTemplateName(name string) error {
 	return ValidateName(name, "template")
+}
+
+// ParseTemplateFile parses a template from file data, detecting format by extension.
+func ParseTemplateFile(filename string, data []byte) (Template, error) {
+	var tpl Template
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".json":
+		if err := json.Unmarshal(data, &tpl); err != nil {
+			return tpl, fmt.Errorf("failed to parse JSON: %w", err)
+		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(data, &tpl); err != nil {
+			return tpl, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+	default:
+		// Try YAML first, then JSON
+		yamlErr := yaml.Unmarshal(data, &tpl)
+		if yamlErr == nil {
+			break
+		}
+		jsonErr := json.Unmarshal(data, &tpl)
+		if jsonErr != nil {
+			return tpl, fmt.Errorf("failed to parse file: %w", errors.Join(yamlErr, jsonErr))
+		}
+	}
+
+	// Validate required fields
+	if tpl.Name == "" {
+		return tpl, fmt.Errorf("template missing required field: name")
+	}
+	if tpl.Model == "" {
+		return tpl, fmt.Errorf("template missing required field: model")
+	}
+	if tpl.Config == nil {
+		return tpl, fmt.Errorf("template missing required field: config")
+	}
+
+	return tpl, nil
 }
 
 // IsCompatibleModel checks if a template is compatible with a device model.
