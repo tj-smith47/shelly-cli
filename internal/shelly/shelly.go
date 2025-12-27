@@ -3,6 +3,8 @@ package shelly
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
@@ -153,14 +155,89 @@ func (s *Service) WithConnection(ctx context.Context, identifier string, fn func
 }
 
 // executeWithConnection performs the actual connection and function execution.
+// Includes automatic IP remapping: if connection fails and device has a MAC,
+// attempts mDNS discovery to find the device's new IP address.
 func (s *Service) executeWithConnection(ctx context.Context, device model.Device, fn func(*client.Client) error) error {
 	conn, err := client.Connect(ctx, device)
 	if err != nil {
-		return err
+		// Try IP remapping if connection failed and we have a MAC address
+		conn, err = s.tryIPRemap(ctx, device, err)
+		if err != nil {
+			return err
+		}
 	}
 	defer iostreams.CloseWithDebug("closing device connection", conn)
 
 	return fn(conn)
+}
+
+// tryIPRemap attempts to remap a device's IP address via mDNS discovery.
+// Returns a new connection if remapping succeeds, or the original error if not.
+func (s *Service) tryIPRemap(ctx context.Context, device model.Device, originalErr error) (*client.Client, error) {
+	// Only attempt remap for connection errors with a known MAC
+	if !isConnectionError(originalErr) || device.MAC == "" {
+		return nil, originalErr
+	}
+
+	iostreams.DebugCat(iostreams.CategoryDevice, "connection failed for %s, attempting MAC discovery...", device.Name)
+
+	// Quick mDNS discovery (~2 seconds)
+	newIP, discoverErr := s.DiscoverByMAC(ctx, device.MAC)
+	if discoverErr != nil {
+		iostreams.DebugErr("MAC discovery failed", discoverErr)
+		return nil, originalErr
+	}
+	if newIP == "" || newIP == device.Address {
+		// Not found or same IP - return original error
+		return nil, originalErr
+	}
+
+	iostreams.DebugCat(iostreams.CategoryDevice, "found new IP %s for MAC %s, verifying...", newIP, device.MAC)
+
+	// Try connecting to new IP
+	deviceCopy := device
+	deviceCopy.Address = newIP
+	conn, retryErr := client.Connect(ctx, deviceCopy)
+	if retryErr != nil {
+		iostreams.DebugErr("connection to new IP failed", retryErr)
+		return nil, originalErr
+	}
+
+	// Verify MAC matches (security check)
+	info := conn.Info()
+	if info == nil || model.NormalizeMAC(info.MAC) != device.NormalizedMAC() {
+		iostreams.DebugCat(iostreams.CategoryDevice, "MAC mismatch: expected %s, got %s", device.NormalizedMAC(), model.NormalizeMAC(info.MAC))
+		iostreams.CloseWithDebug("closing mismatched connection", conn)
+		return nil, originalErr
+	}
+
+	// Success! Update config silently
+	if err := config.UpdateDeviceAddress(device.Name, newIP); err != nil {
+		iostreams.DebugErr("failed to persist new IP", err)
+		// Continue anyway - connection works, just won't persist
+	} else {
+		iostreams.DebugCat(iostreams.CategoryDevice, "remapped %s: %s -> %s", device.Name, device.Address, newIP)
+	}
+
+	return conn, nil
+}
+
+// isConnectionError returns true if the error indicates a connection failure
+// that could be resolved by trying a different IP address.
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, model.ErrConnectionFailed) {
+		return true
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "no route to host") ||
+		strings.Contains(errStr, "i/o timeout") ||
+		strings.Contains(errStr, "network is unreachable") ||
+		strings.Contains(errStr, "no such host") ||
+		strings.Contains(errStr, "dial tcp")
 }
 
 // RawRPC sends a raw RPC command to a device and returns the response.
@@ -245,14 +322,66 @@ func (s *Service) WithGen1Connection(ctx context.Context, identifier string, fn 
 }
 
 // executeWithGen1Connection performs the actual Gen1 connection and function execution.
+// Includes automatic IP remapping: if connection fails and device has a MAC,
+// attempts mDNS discovery to find the device's new IP address.
 func (s *Service) executeWithGen1Connection(ctx context.Context, device model.Device, fn func(*client.Gen1Client) error) error {
 	conn, err := client.ConnectGen1(ctx, device)
 	if err != nil {
-		return err
+		// Try IP remapping if connection failed and we have a MAC address
+		conn, err = s.tryGen1IPRemap(ctx, device, err)
+		if err != nil {
+			return err
+		}
 	}
 	defer iostreams.CloseWithDebug("closing gen1 device connection", conn)
 
 	return fn(conn)
+}
+
+// tryGen1IPRemap attempts to remap a Gen1 device's IP address via mDNS discovery.
+// Returns a new connection if remapping succeeds, or the original error if not.
+func (s *Service) tryGen1IPRemap(ctx context.Context, device model.Device, originalErr error) (*client.Gen1Client, error) {
+	// Only attempt remap for connection errors with a known MAC
+	if !isConnectionError(originalErr) || device.MAC == "" {
+		return nil, originalErr
+	}
+
+	iostreams.DebugCat(iostreams.CategoryDevice, "Gen1 connection failed for %s, attempting MAC discovery...", device.Name)
+
+	// Quick mDNS discovery (~2 seconds)
+	newIP, discoverErr := s.DiscoverByMAC(ctx, device.MAC)
+	if discoverErr != nil {
+		iostreams.DebugErr("MAC discovery failed", discoverErr)
+		return nil, originalErr
+	}
+	if newIP == "" || newIP == device.Address {
+		// Not found or same IP - return original error
+		return nil, originalErr
+	}
+
+	iostreams.DebugCat(iostreams.CategoryDevice, "found new IP %s for MAC %s, verifying...", newIP, device.MAC)
+
+	// Try connecting to new IP
+	deviceCopy := device
+	deviceCopy.Address = newIP
+	conn, retryErr := client.ConnectGen1(ctx, deviceCopy)
+	if retryErr != nil {
+		iostreams.DebugErr("Gen1 connection to new IP failed", retryErr)
+		return nil, originalErr
+	}
+
+	// For Gen1, we can't easily verify MAC from connection info,
+	// but the discovery already matched by MAC, so we trust it
+
+	// Success! Update config silently
+	if err := config.UpdateDeviceAddress(device.Name, newIP); err != nil {
+		iostreams.DebugErr("failed to persist new IP", err)
+		// Continue anyway - connection works, just won't persist
+	} else {
+		iostreams.DebugCat(iostreams.CategoryDevice, "remapped Gen1 %s: %s -> %s", device.Name, device.Address, newIP)
+	}
+
+	return conn, nil
 }
 
 // IsGen1Device checks if a device is Gen1.

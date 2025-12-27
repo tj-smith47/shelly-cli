@@ -142,6 +142,9 @@ type Cache struct {
 
 	// Event stream for publishing synthetic events (e.g., offline from HTTP failure)
 	eventStream *shelly.EventStream
+
+	// MAC-to-IP mapping for instant IP remapping (updated on each device fetch)
+	macToIP map[string]string
 }
 
 // New creates a new shared cache.
@@ -154,6 +157,7 @@ func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, ref
 		refreshConfig:      DefaultRefreshConfig(),
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
+		macToIP:            make(map[string]string),
 		initialLoad:        true,
 	}
 }
@@ -168,6 +172,7 @@ func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostrea
 		refreshConfig:      cfg,
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
+		macToIP:            make(map[string]string),
 		initialLoad:        true,
 	}
 }
@@ -754,10 +759,11 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		data.Online = true
 
 		// Populate missing device info from DeviceInfo response.
-		// When a device is added with just name+address, we discover Type/Model/Generation
+		// When a device is added with just name+address, we discover Type/Model/Generation/MAC
 		// on first fetch and persist them so subsequent sessions don't re-detect.
 		// Model = human-readable product name (e.g., "Shelly Pro 1PM")
 		// Type = model code/SKU (e.g., "SPSW-001PE16EU")
+		// MAC = hardware address for stable device identification
 		var updates config.DeviceUpdates
 		if info.Model != "" {
 			displayName := types.ModelDisplayName(info.Model)
@@ -777,8 +783,13 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 			data.Device.Generation = info.Generation
 			updates.Generation = info.Generation
 		}
+		// Populate MAC if not yet stored (for IP remapping support)
+		if data.Device.MAC == "" && info.MAC != "" {
+			data.Device.MAC = model.NormalizeMAC(info.MAC)
+			updates.MAC = info.MAC
+		}
 		// Persist discovered info to config so it's available immediately on next session
-		if updates.Type != "" || updates.Model != "" || updates.Generation > 0 {
+		if updates.Type != "" || updates.Model != "" || updates.Generation > 0 || updates.MAC != "" {
 			if err := config.UpdateDeviceInfo(name, updates); err != nil {
 				c.ios.DebugErr("persist device info", err)
 			}
@@ -875,6 +886,14 @@ func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) {
 	// Normal update - preserve snapshot if new one is nil
 	preserveSnapshotFromExisting(msg.Data, existing)
 	c.devices[msg.Name] = msg.Data
+
+	// Update MAC-to-IP mapping when device is online and has a MAC
+	if msg.Data.Online && msg.Data.Device.MAC != "" {
+		mac := msg.Data.Device.NormalizedMAC()
+		if mac != "" && msg.Data.Device.Address != "" {
+			c.macToIP[mac] = msg.Data.Device.Address
+		}
+	}
 }
 
 // shouldPreserveExisting returns true if the existing data should be preserved.
@@ -1099,6 +1118,7 @@ func NewForTesting() *Cache {
 	return &Cache{
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
+		macToIP:            make(map[string]string),
 		refreshConfig:      DefaultRefreshConfig(),
 	}
 }
@@ -1123,4 +1143,42 @@ func (c *Cache) SetDeviceForTesting(device model.Device, online bool) {
 		c.order = append(c.order, name)
 	}
 	sortStrings(c.order)
+
+	// Update MAC-to-IP mapping if device has a MAC
+	if mac := device.NormalizedMAC(); mac != "" && device.Address != "" {
+		c.macToIP[mac] = device.Address
+	}
+}
+
+// GetIPByMAC returns the cached IP address for a device with the given MAC address.
+// Returns empty string if the MAC is not in the cache or invalid.
+// This enables instant IP remapping without network discovery for TUI operations.
+func (c *Cache) GetIPByMAC(mac string) string {
+	if mac == "" {
+		return ""
+	}
+	normalized := model.NormalizeMAC(mac)
+	if normalized == "" {
+		return ""
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.macToIP[normalized]
+}
+
+// UpdateMACMapping updates the MAC-to-IP mapping for a device.
+// Called when a device's IP changes (e.g., DHCP reassignment detected via discovery).
+func (c *Cache) UpdateMACMapping(mac, ip string) {
+	if mac == "" || ip == "" {
+		return
+	}
+	normalized := model.NormalizeMAC(mac)
+	if normalized == "" {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.macToIP[normalized] = ip
 }

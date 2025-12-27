@@ -72,6 +72,50 @@ func ValidateGroupName(name string) error {
 	return nil
 }
 
+// deviceAliasRegex validates device alias format: alphanumeric, hyphens, underscores.
+var deviceAliasRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
+
+// ValidateDeviceAlias checks if a device alias is valid.
+// Aliases must be 1-32 characters, starting with alphanumeric,
+// containing only letters, numbers, hyphens, and underscores.
+func ValidateDeviceAlias(alias string) error {
+	if alias == "" {
+		return fmt.Errorf("alias cannot be empty")
+	}
+
+	if len(alias) > 32 {
+		return fmt.Errorf("alias cannot exceed 32 characters")
+	}
+
+	if !deviceAliasRegex.MatchString(alias) {
+		return fmt.Errorf("alias must start with a letter or number and contain only letters, numbers, hyphens, and underscores")
+	}
+
+	return nil
+}
+
+// CheckAliasConflict checks if an alias conflicts with existing device names, keys, or aliases.
+// excludeDevice is the device name to exclude from the check (for updates to existing device).
+// Returns an error describing the conflict, or nil if no conflict.
+func CheckAliasConflict(alias, excludeDevice string) error {
+	return getDefaultManager().CheckAliasConflict(alias, excludeDevice)
+}
+
+// AddDeviceAlias adds an alias to a device.
+func AddDeviceAlias(deviceName, alias string) error {
+	return getDefaultManager().AddDeviceAlias(deviceName, alias)
+}
+
+// RemoveDeviceAlias removes an alias from a device.
+func RemoveDeviceAlias(deviceName, alias string) error {
+	return getDefaultManager().RemoveDeviceAlias(deviceName, alias)
+}
+
+// GetDeviceAliases returns all aliases for a device.
+func GetDeviceAliases(deviceName string) ([]string, error) {
+	return getDefaultManager().GetDeviceAliases(deviceName)
+}
+
 // Package-level functions delegate to the default manager.
 
 // RegisterDevice adds a device to the registry.
@@ -89,6 +133,11 @@ func RegisterDeviceWithPlatform(name, address string, generation int, deviceType
 // Only non-empty/non-zero values are applied; empty values preserve existing data.
 func UpdateDeviceInfo(name string, updates DeviceUpdates) error {
 	return getDefaultManager().UpdateDeviceInfo(name, updates)
+}
+
+// UpdateDeviceAddress updates a device's IP address (for IP remapping).
+func UpdateDeviceAddress(name, newAddress string) error {
+	return getDefaultManager().UpdateDeviceAddress(name, newAddress)
 }
 
 // UnregisterDevice removes a device from the registry.

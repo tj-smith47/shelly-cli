@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -202,6 +203,7 @@ type DeviceUpdates struct {
 	Type       string // Device type/SKU (e.g., "SPSW-001PE16EU")
 	Model      string // Human-readable model name (e.g., "Shelly Pro 1PM")
 	Generation int    // Device generation (1, 2, 3, etc.)
+	MAC        string // Device MAC address (normalized on save)
 }
 
 // UpdateDeviceInfo updates device info fields without requiring full re-registration.
@@ -236,11 +238,45 @@ func (m *Manager) UpdateDeviceInfo(name string, updates DeviceUpdates) error {
 		dev.Generation = updates.Generation
 		changed = true
 	}
+	if updates.MAC != "" {
+		// Normalize MAC address before storing
+		normalizedMAC := model.NormalizeMAC(updates.MAC)
+		if normalizedMAC != "" && dev.MAC != normalizedMAC {
+			dev.MAC = normalizedMAC
+			changed = true
+		}
+	}
 
 	if !changed {
 		return nil // No changes, skip disk write
 	}
 
+	m.config.Devices[key] = dev
+	return m.saveWithoutLock()
+}
+
+// UpdateDeviceAddress updates a device's IP address (for IP remapping).
+// This is a specialized method for silent IP remapping when a device's DHCP address changes.
+func (m *Manager) UpdateDeviceAddress(name, newAddress string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Try exact match first, then normalized
+	key := name
+	dev, ok := m.config.Devices[key]
+	if !ok {
+		key = NormalizeDeviceName(name)
+		dev, ok = m.config.Devices[key]
+		if !ok {
+			return fmt.Errorf("device %q not found", name)
+		}
+	}
+
+	if dev.Address == newAddress {
+		return nil // No change needed
+	}
+
+	dev.Address = newAddress
 	m.config.Devices[key] = dev
 	return m.saveWithoutLock()
 }
@@ -352,14 +388,185 @@ func (m *Manager) RenameDevice(oldName, newName string) error {
 	return m.saveWithoutLock()
 }
 
+// CheckAliasConflict checks if an alias conflicts with existing device names, keys, or aliases.
+// excludeDevice is the device key to exclude from the check (for updates to existing device).
+// Returns an error describing the conflict, or nil if no conflict.
+func (m *Manager) CheckAliasConflict(alias, excludeDevice string) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	aliasLower := strings.ToLower(alias)
+	normalizedAlias := NormalizeDeviceName(alias)
+	excludeKey := NormalizeDeviceName(excludeDevice)
+
+	for key, dev := range m.config.Devices {
+		// Skip the device being updated
+		if key == excludeKey || key == excludeDevice {
+			continue
+		}
+
+		// Check if alias matches device key
+		if key == normalizedAlias || strings.EqualFold(key, alias) {
+			return fmt.Errorf("alias %q conflicts with device key %q", alias, key)
+		}
+
+		// Check if alias matches device name
+		if strings.EqualFold(dev.Name, alias) {
+			return fmt.Errorf("alias %q conflicts with device name %q", alias, dev.Name)
+		}
+
+		// Check if alias matches any existing alias on other devices
+		for _, existingAlias := range dev.Aliases {
+			if strings.EqualFold(existingAlias, aliasLower) {
+				return fmt.Errorf("alias %q already used by device %q", alias, dev.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// AddDeviceAlias adds an alias to a device.
+// Validates the alias format and checks for conflicts with other devices.
+func (m *Manager) AddDeviceAlias(deviceName, alias string) error {
+	// Validate alias format
+	if err := ValidateDeviceAlias(alias); err != nil {
+		return err
+	}
+
+	// Check for conflicts (excluding the target device)
+	if err := m.CheckAliasConflict(alias, deviceName); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Find the device
+	key := deviceName
+	dev, ok := m.config.Devices[key]
+	if !ok {
+		key = NormalizeDeviceName(deviceName)
+		dev, ok = m.config.Devices[key]
+		if !ok {
+			return fmt.Errorf("device %q not found", deviceName)
+		}
+	}
+
+	// Check if alias already exists on this device
+	for _, existing := range dev.Aliases {
+		if strings.EqualFold(existing, alias) {
+			return fmt.Errorf("alias %q already exists on device %q", alias, dev.Name)
+		}
+	}
+
+	dev.Aliases = append(dev.Aliases, alias)
+	m.config.Devices[key] = dev
+	return m.saveWithoutLock()
+}
+
+// RemoveDeviceAlias removes an alias from a device.
+func (m *Manager) RemoveDeviceAlias(deviceName, alias string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Find the device
+	key := deviceName
+	dev, ok := m.config.Devices[key]
+	if !ok {
+		key = NormalizeDeviceName(deviceName)
+		dev, ok = m.config.Devices[key]
+		if !ok {
+			return fmt.Errorf("device %q not found", deviceName)
+		}
+	}
+
+	// Find and remove the alias
+	found := false
+	newAliases := make([]string, 0, len(dev.Aliases))
+	for _, existing := range dev.Aliases {
+		if strings.EqualFold(existing, alias) {
+			found = true
+		} else {
+			newAliases = append(newAliases, existing)
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("alias %q not found on device %q", alias, dev.Name)
+	}
+
+	dev.Aliases = newAliases
+	m.config.Devices[key] = dev
+	return m.saveWithoutLock()
+}
+
+// GetDeviceAliases returns all aliases for a device.
+func (m *Manager) GetDeviceAliases(deviceName string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Find the device
+	dev, ok := m.config.Devices[deviceName]
+	if !ok {
+		dev, ok = m.config.Devices[NormalizeDeviceName(deviceName)]
+		if !ok {
+			return nil, fmt.Errorf("device %q not found", deviceName)
+		}
+	}
+
+	// Return a copy to prevent mutation
+	result := make([]string, len(dev.Aliases))
+	copy(result, dev.Aliases)
+	return result, nil
+}
+
 // ResolveDevice resolves a device identifier to a Device.
-// The identifier can be a device name (from registry) or an address.
+// Resolution order (stops at first match):
+//  1. Exact key match ("master-bathroom")
+//  2. Normalized key match (e.g., "Master Bathroom" → "master-bathroom")
+//  3. Display name match (case-insensitive)
+//  4. Alias match (any in device.Aliases array)
+//  5. MAC address match
+//  6. Fallback: treat as direct address
 func (m *Manager) ResolveDevice(identifier string) (model.Device, error) {
+	// 1-2. Exact or normalized key match (handled by GetDevice)
 	if device, ok := m.GetDevice(identifier); ok {
 		return device, nil
 	}
 
-	// Otherwise, treat it as an address
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Normalize identifier for comparisons
+	identifierLower := strings.ToLower(identifier)
+	normalizedMAC := model.NormalizeMAC(identifier)
+
+	for _, dev := range m.config.Devices {
+		// 3. Display name match (case-insensitive)
+		if strings.EqualFold(dev.Name, identifier) {
+			return dev, nil
+		}
+
+		// 4. Alias match
+		if dev.HasAlias(identifier) {
+			return dev, nil
+		}
+
+		// 5. MAC address match (normalized comparison)
+		if normalizedMAC != "" && dev.MAC != "" {
+			if model.NormalizeMAC(dev.MAC) == normalizedMAC {
+				return dev, nil
+			}
+		}
+
+		// Also check if identifier matches normalized MAC format directly
+		if dev.MAC != "" && strings.EqualFold(dev.MAC, identifierLower) {
+			return dev, nil
+		}
+	}
+
+	// 6. Fallback: treat as direct address
 	return model.Device{
 		Name:    identifier,
 		Address: identifier,

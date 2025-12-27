@@ -209,6 +209,66 @@ func isDeviceRegistered(address string) bool {
 	return false
 }
 
+// DiscoverByMAC performs a quick mDNS scan to find a device's current IP by MAC address.
+// This is used for IP remapping when a device gets a new DHCP address.
+// Returns the IP if found, or empty string if not discoverable within timeout.
+// Default timeout is 2 seconds for quick recovery.
+func (s *Service) DiscoverByMAC(ctx context.Context, mac string) (string, error) {
+	// Normalize MAC for comparison
+	normalizedMAC := normalizeMAC(mac)
+	if normalizedMAC == "" {
+		return "", fmt.Errorf("invalid MAC address: %q", mac)
+	}
+
+	// Quick mDNS scan (2 seconds)
+	timeout := 2 * time.Second
+	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
+	defer func() {
+		if err := mdnsDiscoverer.Stop(); err != nil {
+			iostreams.DebugErrCat(iostreams.CategoryDiscovery, "stopping mDNS discoverer", err)
+		}
+	}()
+
+	devices, err := mdnsDiscoverer.Discover(timeout)
+	if err != nil {
+		return "", fmt.Errorf("mDNS discovery failed: %w", err)
+	}
+
+	// Find device by MAC
+	for _, d := range devices {
+		if normalizeMAC(d.MACAddress) == normalizedMAC {
+			return d.Address.String(), nil
+		}
+	}
+
+	return "", nil // Not found
+}
+
+// normalizeMAC normalizes a MAC address for comparison (uppercase, no separators).
+func normalizeMAC(mac string) string {
+	if mac == "" {
+		return ""
+	}
+
+	// Remove separators and uppercase
+	result := make([]byte, 0, 12)
+	for _, c := range mac {
+		switch {
+		case c >= '0' && c <= '9':
+			result = append(result, byte(c))
+		case c >= 'A' && c <= 'F':
+			result = append(result, byte(c))
+		case c >= 'a' && c <= 'f':
+			result = append(result, byte(c-32)) // Convert to uppercase
+		}
+	}
+
+	if len(result) != 12 {
+		return ""
+	}
+	return string(result)
+}
+
 // RegisterDiscoveredDevice adds a discovered device to the registry.
 func RegisterDiscoveredDevice(ctx context.Context, device DiscoveredDevice, svc *Service) error {
 	// Check if already registered

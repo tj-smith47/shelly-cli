@@ -19,6 +19,7 @@ import (
 // Discovered devices are always native Shelly devices (platform: shelly).
 // Type is set to the model code (e.g., "SPSW-001PE16EU").
 // Model is set to the human-readable name (e.g., "Shelly Pro 1PM").
+// MAC is set from the discovery result if available.
 func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 	name := d.ID
 	if d.Name != "" {
@@ -28,6 +29,7 @@ func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 	return model.Device{
 		Name:       name,
 		Address:    d.Address.String(),
+		MAC:        model.NormalizeMAC(d.MACAddress), // Normalize MAC for storage
 		Platform:   model.PlatformShelly,
 		Generation: int(d.Generation),
 		Type:       d.Model,                         // Model code/SKU
@@ -38,6 +40,7 @@ func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 // RegisterDiscoveredDevices adds discovered devices to the registry.
 // Returns the number of devices added and any error.
 // Type is set to the model code, Model is set to the human-readable name.
+// MAC is populated from discovery data when available.
 func RegisterDiscoveredDevices(devices []discovery.DiscoveredDevice, skipExisting bool) (int, error) {
 	added := 0
 
@@ -65,6 +68,15 @@ func RegisterDiscoveredDevices(devices []discovery.DiscoveredDevice, skipExistin
 		if err != nil {
 			return added, fmt.Errorf("failed to register device %q: %w", name, err)
 		}
+
+		// Update MAC if available from discovery
+		if d.MACAddress != "" {
+			// Ignore MAC update errors - registration succeeded
+			_ = config.UpdateDeviceInfo(name, config.DeviceUpdates{
+				MAC: d.MACAddress,
+			})
+		}
+
 		added++
 	}
 

@@ -313,3 +313,181 @@ func TestDevice_PluginName(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeMAC(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "lowercase colon-separated",
+			input: "aa:bb:cc:dd:ee:ff",
+			want:  "AA:BB:CC:DD:EE:FF",
+		},
+		{
+			name:  "uppercase colon-separated",
+			input: "AA:BB:CC:DD:EE:FF",
+			want:  "AA:BB:CC:DD:EE:FF",
+		},
+		{
+			name:  "mixed case colon-separated",
+			input: "Aa:bB:Cc:dD:Ee:fF",
+			want:  "AA:BB:CC:DD:EE:FF",
+		},
+		{
+			name:  "dash-separated",
+			input: "AA-BB-CC-DD-EE-FF",
+			want:  "AA:BB:CC:DD:EE:FF",
+		},
+		{
+			name:  "dot-separated (Cisco format)",
+			input: "AABB.CCDD.EEFF",
+			want:  "AA:BB:CC:DD:EE:FF",
+		},
+		{
+			name:  "no separators",
+			input: "aabbccddeeff",
+			want:  "AA:BB:CC:DD:EE:FF",
+		},
+		{
+			name:  "too short",
+			input: "aabbcc",
+			want:  "",
+		},
+		{
+			name:  "too long",
+			input: "aabbccddeeff00",
+			want:  "",
+		},
+		{
+			name:  "invalid characters",
+			input: "gg:hh:ii:jj:kk:ll",
+			want:  "",
+		},
+		{
+			name:  "mixed valid and invalid",
+			input: "aa:bb:cc:dd:ee:gg",
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := NormalizeMAC(tt.input)
+			if got != tt.want {
+				t.Errorf("NormalizeMAC(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDevice_NormalizedMAC(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		mac  string
+		want string
+	}{
+		{
+			name: "empty MAC",
+			mac:  "",
+			want: "",
+		},
+		{
+			name: "valid MAC gets normalized",
+			mac:  "aa:bb:cc:dd:ee:ff",
+			want: "AA:BB:CC:DD:EE:FF",
+		},
+		{
+			name: "already normalized MAC",
+			mac:  "AA:BB:CC:DD:EE:FF",
+			want: "AA:BB:CC:DD:EE:FF",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dev := Device{MAC: tt.mac}
+			got := dev.NormalizedMAC()
+			if got != tt.want {
+				t.Errorf("Device.NormalizedMAC() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDevice_HasAlias(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		aliases []string
+		lookup  string
+		want    bool
+	}{
+		{
+			name:    "no aliases",
+			aliases: nil,
+			lookup:  "mb",
+			want:    false,
+		},
+		{
+			name:    "empty aliases",
+			aliases: []string{},
+			lookup:  "mb",
+			want:    false,
+		},
+		{
+			name:    "exact match",
+			aliases: []string{"mb", "bath"},
+			lookup:  "mb",
+			want:    true,
+		},
+		{
+			name:    "case-insensitive match",
+			aliases: []string{"MB", "BATH"},
+			lookup:  "mb",
+			want:    true,
+		},
+		{
+			name:    "case-insensitive match reverse",
+			aliases: []string{"mb", "bath"},
+			lookup:  "MB",
+			want:    true,
+		},
+		{
+			name:    "no match",
+			aliases: []string{"kitchen", "light"},
+			lookup:  "mb",
+			want:    false,
+		},
+		{
+			name:    "partial match is not enough",
+			aliases: []string{"master-bath"},
+			lookup:  "master",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dev := Device{Aliases: tt.aliases}
+			got := dev.HasAlias(tt.lookup)
+			if got != tt.want {
+				t.Errorf("Device.HasAlias(%q) = %v, want %v", tt.lookup, got, tt.want)
+			}
+		})
+	}
+}
