@@ -336,10 +336,16 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 
 	// Scale calculation
 	valRange := maxVal - minVal
+	flatLine := false
+	flatLevel := 0
 	if valRange < 0.001 {
-		// All values are the same - use middle height
-		valRange = 1
-		minVal -= 0.5 // Center the flat line
+		// All values are the same - use appropriate fixed level
+		flatLine = true
+		if maxVal < 1.0 {
+			flatLevel = 0 // Near zero: show blue (lowest)
+		} else {
+			flatLevel = 4 // Non-zero stable: show middle (lime)
+		}
 	}
 
 	// Generate sparkline with gradient colors
@@ -347,21 +353,31 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 
 	// Pad at the start with lowest bar char if we don't have enough data
 	if len(data) < width {
-		lowestChar := m.styles.SparkGradient[0].Render(string(sparkChars[0]))
+		padLevel := 0
+		if flatLine {
+			padLevel = flatLevel
+		}
+		padChar := m.styles.SparkGradient[padLevel].Render(string(sparkChars[padLevel]))
 		for range width - len(data) {
-			spark.WriteString(lowestChar)
+			spark.WriteString(padChar)
 		}
 	}
 
 	for _, d := range data {
-		// Normalize to 0-7 range
-		normalized := (d.Value - minVal) / valRange * 7
-		idx := int(normalized)
-		if idx > 7 {
-			idx = 7
-		}
-		if idx < 0 {
-			idx = 0
+		var idx int
+		if flatLine {
+			// All values same - use fixed level
+			idx = flatLevel
+		} else {
+			// Normalize to 0-7 range
+			normalized := (d.Value - minVal) / valRange * 7
+			idx = int(normalized)
+			if idx > 7 {
+				idx = 7
+			}
+			if idx < 0 {
+				idx = 0
+			}
 		}
 		// Apply gradient color based on level
 		spark.WriteString(m.styles.SparkGradient[idx].Render(string(sparkChars[idx])))
