@@ -8,11 +8,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/wizard"
 )
 
 // NewCommand creates the init command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &cmdutil.InitOptions{}
+	opts := &wizard.Options{}
 
 	cmd := &cobra.Command{
 		Use:     "init",
@@ -101,13 +102,13 @@ Use --check to verify your current setup without making changes.`,
 	return cmd
 }
 
-func run(cmd *cobra.Command, f *cmdutil.Factory, opts *cmdutil.InitOptions) error {
+func run(cmd *cobra.Command, f *cmdutil.Factory, opts *wizard.Options) error {
 	check, err := cmd.Flags().GetBool("check")
 	if err != nil {
 		return fmt.Errorf("failed to read --check flag: %w", err)
 	}
 	if check {
-		return cmdutil.RunInitCheck(f)
+		return wizard.RunCheck(f)
 	}
-	return cmdutil.RunInitWizard(cmd.Context(), f, cmd.Root(), opts)
+	return wizard.Run(cmd.Context(), f, cmd.Root(), opts)
 }
