@@ -125,11 +125,13 @@ func TestRenderer_ContentDimensions(t *testing.T) {
 	t.Parallel()
 	r := New(40, 20)
 
-	if r.ContentWidth() != 38 {
-		t.Errorf("ContentWidth() = %d, want 38", r.ContentWidth())
+	// ContentWidth = width - 4 (2 for borders + 2 for horizontal padding)
+	if r.ContentWidth() != 36 {
+		t.Errorf("ContentWidth() = %d, want 36", r.ContentWidth())
 	}
-	if r.ContentHeight() != 18 {
-		t.Errorf("ContentHeight() = %d, want 18", r.ContentHeight())
+	// ContentHeight = height - 4 (2 for borders + 2 for vertical padding)
+	if r.ContentHeight() != 16 {
+		t.Errorf("ContentHeight() = %d, want 16", r.ContentHeight())
 	}
 }
 

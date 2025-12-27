@@ -2,7 +2,9 @@
 package energyhistory
 
 import (
+	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -26,13 +28,16 @@ type DataPoint struct {
 
 // Model represents the energy history state.
 type Model struct {
-	cache    *cache.Cache
-	mu       *sync.RWMutex
-	history  map[string][]DataPoint // Device name -> history
-	maxItems int                    // Max data points per device
-	width    int
-	height   int
-	styles   Styles
+	cache          *cache.Cache
+	mu             *sync.RWMutex
+	history        map[string][]DataPoint // Device name -> history
+	maxItems       int                    // Max data points per device
+	lastCollection time.Time              // Throttle data collection
+	width          int
+	height         int
+	styles         Styles
+	focused        bool
+	panelIndex     int // For Shift+N hint
 }
 
 // Styles for the energy history component.
@@ -82,19 +87,18 @@ func New(c *cache.Cache) Model {
 }
 
 // Init initializes the energy history.
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
 // Update handles messages for the energy history.
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	if updateMsg, ok := msg.(cache.DeviceUpdateMsg); ok {
-		// Record power data when device is updated (for PM-capable devices)
-		if updateMsg.Data != nil && updateMsg.Data.Online && hasPMCapability(updateMsg.Data) {
-			m.addDataPoint(updateMsg.Name, updateMsg.Data.Power)
-		}
-	}
-	return m, nil
+// Note: We only collect data via collectCurrentPower() at 5-second intervals
+// to maintain the 5-minute window (60 points * 5 seconds = 5 minutes).
+// We don't record on every DeviceUpdateMsg because cache updates can be more frequent.
+func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// We intentionally don't record on DeviceUpdateMsg - see collectCurrentPower()
+	_ = msg
+	return *m, nil
 }
 
 // hasPMCapability checks if a device has power monitoring capability.
@@ -143,7 +147,7 @@ func modelHasPM(model string) bool {
 	return false
 }
 
-func (m Model) addDataPoint(deviceName string, power float64) {
+func (m *Model) addDataPoint(deviceName string, power float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -164,7 +168,7 @@ func (m Model) addDataPoint(deviceName string, power float64) {
 }
 
 // View renders the energy history.
-func (m Model) View() string {
+func (m *Model) View() string {
 	if m.cache == nil {
 		return m.renderEmpty()
 	}
@@ -174,19 +178,38 @@ func (m Model) View() string {
 		return m.renderEmpty()
 	}
 
+	// Collect current power data from online devices with PM capability
+	// This ensures we always record data on each render cycle
+	m.collectCurrentPower(devices)
+
 	var content strings.Builder
 
-	// Sparkline width - account for border (2) and padding
-	sparkWidth := m.width - 42 // Label (16) + Value (12) + border/padding (14)
+	// Calculate label width (same logic as renderDeviceSparkline)
+	labelWidth := 16
+	if m.width < 60 {
+		labelWidth = 12
+	}
+
+	// Sparkline width calculation:
+	// - Borders: 2 (left + right)
+	// - Horizontal padding: 2 (1 each side inside border)
+	// - Label: labelWidth (16 or 12)
+	// - Spaces: 2 (after label, after sparkline)
+	// - Value: 10
+	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = labelWidth + 16
+	sparkWidth := m.width - labelWidth - 16
 	if sparkWidth < 10 {
 		sparkWidth = 10
 	}
-	if sparkWidth > m.maxItems {
-		sparkWidth = m.maxItems
-	}
+	// Don't cap at maxItems - generateSparkline will pad with low bars if we don't have enough data
 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	// Sort devices by power (highest first) to match power consumption order
+	slices.SortFunc(devices, func(a, b *cache.DeviceData) int {
+		return cmp.Compare(b.Power, a.Power) // Descending
+	})
 
 	hasData := false
 	for _, d := range devices {
@@ -204,34 +227,68 @@ func (m Model) View() string {
 	// Use rendering package for consistent embedded title styling
 	r := rendering.New(m.width, m.height).
 		SetTitle("Energy History").
-		SetBadge("5 min").
-		SetFocused(false)
+		SetBadge("Legend: ▁low ▇high").
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex).
+		SetFooter("5m·····now")
+
+	// Use yellow borders for energy panels
+	if m.focused {
+		r.SetFocusColor(theme.Yellow())
+	} else {
+		r.SetBlurColor(theme.Yellow())
+	}
 
 	return r.SetContent(content.String()).Render()
 }
 
-func (m Model) renderDeviceSparkline(name string, history []DataPoint, width int) string {
+// collectCurrentPower records power data from online devices with PM capability.
+// Called during View() to ensure data is always collected on each render.
+// Throttled to collect at most once every 5 seconds.
+func (m *Model) collectCurrentPower(devices []*cache.DeviceData) {
+	// Throttle: only collect every 5 seconds
+	if time.Since(m.lastCollection) < 5*time.Second {
+		return
+	}
+	m.lastCollection = time.Now()
+
+	for _, d := range devices {
+		if d.Online && hasPMCapability(d) {
+			m.addDataPoint(d.Device.Name, d.Power)
+		}
+	}
+}
+
+func (m *Model) renderDeviceSparkline(name string, history []DataPoint, width int) string {
+	// Label width based on available space (max 16, min truncated)
+	labelWidth := 16
+	if m.width < 60 {
+		labelWidth = 12
+	}
+
 	// Truncate/pad label
 	label := name
-	if len(label) > 14 {
-		label = label[:11] + "..."
+	maxLabel := labelWidth - 2 // Leave room for spacing
+	if len(label) > maxLabel {
+		label = label[:maxLabel-3] + "..."
 	}
-	labelStr := m.styles.Label.Render(label)
+	labelStr := m.styles.Label.Width(labelWidth).Render(label)
 
 	// Generate sparkline
 	sparkline := m.generateSparkline(history, width)
 	sparkStr := m.styles.Sparkline.Render(sparkline)
 
-	// Current value
+	// Current value (right-aligned)
 	current := history[len(history)-1].Value
-	valueStr := m.styles.Value.Render(formatValue(current, "W"))
+	valueStr := m.styles.Value.Width(10).Align(lipgloss.Right).Render(formatValue(current, "W"))
 
 	return labelStr + " " + sparkStr + " " + valueStr
 }
 
-func (m Model) generateSparkline(history []DataPoint, width int) string {
+func (m *Model) generateSparkline(history []DataPoint, width int) string {
 	if len(history) == 0 {
-		return strings.Repeat(" ", width)
+		// Use lowest bar char for empty data (shows "no data" state)
+		return strings.Repeat(string(sparkChars[0]), width)
 	}
 
 	// Get the last 'width' points
@@ -251,14 +308,24 @@ func (m Model) generateSparkline(history []DataPoint, width int) string {
 		}
 	}
 
-	// Avoid division by zero
+	// Scale calculation
 	valRange := maxVal - minVal
 	if valRange < 0.001 {
+		// All values are the same - use middle height
 		valRange = 1
+		minVal -= 0.5 // Center the flat line
 	}
 
 	// Generate sparkline string
 	var spark strings.Builder
+
+	// Pad at the start with lowest bar char if we don't have enough data
+	if len(data) < width {
+		for range width - len(data) {
+			spark.WriteRune(sparkChars[0])
+		}
+	}
+
 	for _, d := range data {
 		// Normalize to 0-7 range
 		normalized := (d.Value - minVal) / valRange * 7
@@ -272,16 +339,10 @@ func (m Model) generateSparkline(history []DataPoint, width int) string {
 		spark.WriteRune(sparkChars[idx])
 	}
 
-	// Pad if needed
-	result := spark.String()
-	if len(data) < width {
-		result = strings.Repeat(" ", width-len(data)) + result
-	}
-
-	return result
+	return spark.String()
 }
 
-func (m Model) renderEmpty() string {
+func (m *Model) renderEmpty() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Energy History").
 		SetBadge("5 min").
@@ -294,7 +355,7 @@ func (m Model) renderEmpty() string {
 	return r.SetContent(centered).Render()
 }
 
-func (m Model) renderNoData() string {
+func (m *Model) renderNoData() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Energy History").
 		SetBadge("5 min").
@@ -321,28 +382,28 @@ func formatValue(value float64, unit string) string {
 }
 
 // SetSize sets the component dimensions.
-func (m Model) SetSize(width, height int) Model {
+func (m *Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	return m
+	return *m
 }
 
 // Clear clears all history data.
-func (m Model) Clear() {
+func (m *Model) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	clear(m.history)
 }
 
 // DeviceCount returns the number of devices with history.
-func (m Model) DeviceCount() int {
+func (m *Model) DeviceCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.history)
 }
 
 // HistoryCount returns the total number of data points across all devices.
-func (m Model) HistoryCount() int {
+func (m *Model) HistoryCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	count := 0
@@ -350,4 +411,16 @@ func (m Model) HistoryCount() int {
 		count += len(h)
 	}
 	return count
+}
+
+// SetFocused sets whether this panel has focus.
+func (m *Model) SetFocused(focused bool) Model {
+	m.focused = focused
+	return *m
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m *Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
+	return *m
 }

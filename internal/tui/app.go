@@ -143,7 +143,7 @@ type Model struct {
 	toast         toast.Model
 	events        events.Model
 	energyBars    energybars.Model
-	energyHistory energyhistory.Model
+	energyHistory *energyhistory.Model
 	jsonViewer    jsonviewer.Model
 	confirm       confirm.Model
 	deviceInfo    deviceinfo.Model
@@ -200,7 +200,8 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		focus.PanelEvents,
 		focus.PanelDeviceList,
 		focus.PanelDeviceInfo,
-		focus.PanelEnergy,
+		focus.PanelEnergyBars,
+		focus.PanelEnergyHistory,
 	)
 
 	// Create context-sensitive keybinding map
@@ -221,7 +222,8 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	energyBarsModel := energybars.New(deviceCache)
 
 	// Create energy history sparklines component
-	energyHistoryModel := energyhistory.New(deviceCache)
+	ehm := energyhistory.New(deviceCache)
+	energyHistoryModel := &ehm
 
 	// Create JSON viewer component
 	jsonViewerModel := jsonviewer.New(ctx, f.ShellyService())
@@ -504,7 +506,7 @@ func (m Model) handleDeviceUpdate(msg cache.DeviceUpdateMsg) (tea.Model, tea.Cmd
 	// Forward to cache AND energyHistory (to record power history)
 	cacheCmd := m.cache.Update(msg)
 	var historyCmd tea.Cmd
-	m.energyHistory, historyCmd = m.energyHistory.Update(msg)
+	*m.energyHistory, historyCmd = m.energyHistory.Update(msg)
 	m = m.updateStatusBarContext()
 
 	// Sync device info panel with updated cache data
@@ -1129,7 +1131,6 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 		m = m.updateViewManagerSize()
 		return m, cmd, true
 	case key.Matches(msg, m.keys.Refresh):
-		// Trigger a full cache refresh by sending RefreshTickMsg
 		return m, func() tea.Msg { return cache.RefreshTickMsg{} }, true
 	case key.Matches(msg, m.keys.Escape):
 		if m.filter != "" {
@@ -1139,30 +1140,70 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 			m.deviceList = m.deviceList.SetCursor(0)
 			return m, nil, true
 		}
-	case key.Matches(msg, m.keys.View1):
-		m.tabBar, _ = m.tabBar.SetActive(tabs.TabDashboard)
-		m.focusedPanel = PanelDeviceList // Reset focus to device list
-		return m, m.viewManager.SetActive(views.ViewDashboard), true
-	case key.Matches(msg, m.keys.View2):
-		m.tabBar, _ = m.tabBar.SetActive(tabs.TabAutomation)
-		m.focusedPanel = PanelDeviceList // Reset focus to device list for sidebar layout
-		return m, m.viewManager.SetActive(views.ViewAutomation), true
-	case key.Matches(msg, m.keys.View3):
-		m.tabBar, _ = m.tabBar.SetActive(tabs.TabConfig)
-		m.focusedPanel = PanelDeviceList // Reset focus to device list for sidebar layout
-		return m, m.viewManager.SetActive(views.ViewConfig), true
-	case key.Matches(msg, m.keys.View4):
-		m.tabBar, _ = m.tabBar.SetActive(tabs.TabManage)
-		return m, m.viewManager.SetActive(views.ViewManage), true
-	case key.Matches(msg, m.keys.View5):
-		m.tabBar, _ = m.tabBar.SetActive(tabs.TabMonitor)
-		m.focusedPanel = PanelDeviceList // Reset focus to device list
-		return m, m.viewManager.SetActive(views.ViewMonitor), true
-	case key.Matches(msg, m.keys.View6):
-		m.tabBar, _ = m.tabBar.SetActive(tabs.TabFleet)
-		return m, m.viewManager.SetActive(views.ViewFleet), true
+	}
+
+	// Handle view switching keys
+	if newM, cmd, handled := m.handleViewSwitchKey(msg); handled {
+		return newM, cmd, true
+	}
+
+	// Handle Shift+D for debug session toggle
+	if msg.String() == "D" {
+		return m.handleDebugToggle()
+	}
+
+	return m, nil, false
+}
+
+// handleViewSwitchKey handles number keys for view switching.
+func (m Model) handleViewSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	type viewConfig struct {
+		tab   tabs.TabID
+		view  views.ViewID
+		focus bool
+	}
+	viewMap := map[*key.Binding]viewConfig{
+		&m.keys.View1: {tabs.TabDashboard, views.ViewDashboard, true},
+		&m.keys.View2: {tabs.TabAutomation, views.ViewAutomation, true},
+		&m.keys.View3: {tabs.TabConfig, views.ViewConfig, true},
+		&m.keys.View4: {tabs.TabManage, views.ViewManage, false},
+		&m.keys.View5: {tabs.TabMonitor, views.ViewMonitor, true},
+		&m.keys.View6: {tabs.TabFleet, views.ViewFleet, false},
+	}
+	for binding, cfg := range viewMap {
+		if key.Matches(msg, *binding) {
+			m.tabBar, _ = m.tabBar.SetActive(cfg.tab)
+			if cfg.focus {
+				m.focusedPanel = PanelDeviceList
+			}
+			return m, m.viewManager.SetActive(cfg.view), true
+		}
 	}
 	return m, nil, false
+}
+
+// handleDebugToggle handles Shift+D to toggle debug session.
+func (m Model) handleDebugToggle() (tea.Model, tea.Cmd, bool) {
+	enabled, sessionDir := m.debugLogger.Toggle()
+	var desc string
+	var toastMsg string
+	if enabled {
+		desc = "Debug session started: " + sessionDir
+		toastMsg = "Debug ON: " + sessionDir
+	} else {
+		desc = "Debug session ended"
+		toastMsg = "Debug OFF: session saved"
+	}
+	debugEvent := events.EventMsg{
+		Events: []events.Event{{
+			Timestamp:   time.Now(),
+			Device:      "system",
+			Component:   "debug",
+			Type:        "info",
+			Description: desc,
+		}},
+	}
+	return m, tea.Batch(toast.Success(toastMsg), func() tea.Msg { return debugEvent }), true
 }
 
 // dispatchAction handles an action from the context-sensitive keybinding system.
@@ -1940,25 +1981,32 @@ func (m Model) renderEnergyPanel(width, height int) string {
 		return ""
 	}
 
-	// Split width between bars and history
-	barsWidth := width * 60 / 100
-	historyWidth := width - barsWidth - 1
+	// Split width evenly between bars and history (50/50)
+	// Account for 1 char gap between panels
+	halfWidth := (width - 1) / 2
+	barsWidth := halfWidth
+	historyWidth := width - barsWidth - 1 // Use remaining to avoid off-by-one
 
 	// Ensure minimum widths for each panel (title needs at least ~25 chars)
-	if barsWidth < 30 {
-		barsWidth = 30
-	}
-	if historyWidth < 30 {
-		historyWidth = width - barsWidth - 1
-		if historyWidth < 10 {
-			// Not enough space, render only bars
-			m.energyBars = m.energyBars.SetSize(width, height)
-			return m.energyBars.View()
-		}
+	if barsWidth < 30 || historyWidth < 30 {
+		// Not enough space for both, render only bars at full width
+		barsIdx := m.focusManager.PanelIndex(focus.PanelEnergyBars)
+		m.energyBars = m.energyBars.SetSize(width, height).
+			SetFocused(m.focusManager.IsFocused(focus.PanelEnergyBars)).
+			SetPanelIndex(barsIdx)
+		return m.energyBars.View()
 	}
 
-	m.energyBars = m.energyBars.SetSize(barsWidth, height)
-	m.energyHistory = m.energyHistory.SetSize(historyWidth, height)
+	// Set size and focus state for both panels
+	barsIdx := m.focusManager.PanelIndex(focus.PanelEnergyBars)
+	historyIdx := m.focusManager.PanelIndex(focus.PanelEnergyHistory)
+
+	m.energyBars = m.energyBars.SetSize(barsWidth, height).
+		SetFocused(m.focusManager.IsFocused(focus.PanelEnergyBars)).
+		SetPanelIndex(barsIdx)
+	*m.energyHistory = m.energyHistory.SetSize(historyWidth, height)
+	*m.energyHistory = m.energyHistory.SetFocused(m.focusManager.IsFocused(focus.PanelEnergyHistory))
+	*m.energyHistory = m.energyHistory.SetPanelIndex(historyIdx)
 
 	barsView := m.energyBars.View()
 	historyView := m.energyHistory.View()

@@ -551,7 +551,6 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	return m
 }
 
-
 // SetSize sets the component size.
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
@@ -566,7 +565,6 @@ func (m Model) SetSize(width, height int) Model {
 	m.scroller.SetVisibleRows(visibleRows)
 	return m
 }
-
 
 // View renders the monitor.
 func (m Model) View() string {

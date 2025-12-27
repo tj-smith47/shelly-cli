@@ -38,44 +38,45 @@ type Logger struct {
 	startTime  time.Time
 }
 
-// New creates a new Logger if SHELLY_TUI_DEBUG=1 is set.
-// Creates a timestamped session folder under ~/.config/shelly/debug/.
-// Returns nil if debug logging is disabled.
+// New creates a new Logger.
+// If SHELLY_TUI_DEBUG=1 is set, creates an active session immediately.
+// Otherwise returns a disabled logger that can be toggled on with Shift+D.
 func New() *Logger {
+	l := &Logger{
+		enabled: false, // Start disabled, can be toggled with Shift+D
+	}
+
+	// If env var is set, enable immediately
 	if os.Getenv(EnvKey) != "1" {
-		return nil
+		return l
 	}
 
 	configDir, err := config.Dir()
 	if err != nil {
 		iostreams.DebugErr("get config dir", err)
-		return nil
+		return l // Return disabled logger
 	}
 
 	// Create timestamped session directory
-	startTime := time.Now()
-	sessionName := startTime.Format("2006-01-02_15-04-05")
-	sessionDir := filepath.Join(configDir, DebugDir, sessionName)
+	l.startTime = time.Now()
+	sessionName := l.startTime.Format("2006-01-02_15-04-05")
+	l.sessionDir = filepath.Join(configDir, DebugDir, sessionName)
 
-	if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+	if err := os.MkdirAll(l.sessionDir, 0o700); err != nil {
 		iostreams.DebugErr("create debug session dir", err)
-		return nil
+		return l
 	}
 
-	logPath := filepath.Join(sessionDir, MainLogFile)
+	logPath := filepath.Join(l.sessionDir, MainLogFile)
 	//nolint:gosec // Path constructed from config.Dir() + fixed constants, not user input
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		iostreams.DebugErr("open log file", err)
-		return nil
+		return l
 	}
 
-	l := &Logger{
-		enabled:    true,
-		file:       f,
-		sessionDir: sessionDir,
-		startTime:  startTime,
-	}
+	l.file = f
+	l.enabled = true
 
 	// Write header
 	l.writeHeader()
@@ -172,6 +173,98 @@ func (l *Logger) Close() error {
 // Enabled returns whether debug logging is active.
 func (l *Logger) Enabled() bool {
 	return l != nil && l.enabled
+}
+
+// Toggle enables or disables debug logging dynamically.
+// When enabling, creates a new session directory and log file.
+// When disabling, closes the current session.
+// Returns the new enabled state and session directory (if enabled).
+func (l *Logger) Toggle() (enabled bool, sessionDir string) {
+	if l == nil {
+		return false, ""
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.enabled {
+		// Disable: close current session
+		l.closeSessionLocked()
+		l.enabled = false
+		return false, ""
+	}
+
+	// Enable: create new session
+	configDir, err := config.Dir()
+	if err != nil {
+		iostreams.DebugErr("get config dir for toggle", err)
+		return false, ""
+	}
+
+	// Create timestamped session directory
+	l.startTime = time.Now()
+	sessionName := l.startTime.Format("2006-01-02_15-04-05")
+	l.sessionDir = filepath.Join(configDir, DebugDir, sessionName)
+
+	if err := os.MkdirAll(l.sessionDir, 0o700); err != nil {
+		iostreams.DebugErr("create debug session dir for toggle", err)
+		return false, ""
+	}
+
+	logPath := filepath.Join(l.sessionDir, MainLogFile)
+	//nolint:gosec // Path constructed from config.Dir() + fixed constants, not user input
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		iostreams.DebugErr("open log file for toggle", err)
+		return false, ""
+	}
+
+	l.file = f
+	l.enabled = true
+	l.lastView = "" // Reset to ensure first view is logged
+
+	// Write header
+	l.writeHeaderLocked()
+
+	return true, l.sessionDir
+}
+
+// closeSessionLocked closes the current session without acquiring lock.
+// Must be called with lock held.
+func (l *Logger) closeSessionLocked() {
+	if l.file == nil {
+		return
+	}
+
+	// Write footer with session duration
+	duration := time.Since(l.startTime)
+	footer := fmt.Sprintf("\n%s\nSession Ended (toggle): %s\nDuration: %s\n%s\n",
+		strings.Repeat("=", 60),
+		time.Now().Format(time.RFC3339),
+		duration.Round(time.Second),
+		strings.Repeat("=", 60))
+	if _, err := l.file.WriteString(footer); err != nil {
+		iostreams.DebugErr("write log footer on toggle", err)
+	}
+
+	if err := l.file.Close(); err != nil {
+		iostreams.DebugErr("close log file on toggle", err)
+	}
+	l.file = nil
+}
+
+// writeHeaderLocked writes header without acquiring lock.
+// Must be called with lock held.
+func (l *Logger) writeHeaderLocked() {
+	header := fmt.Sprintf("%s\nTUI Debug Session (toggled on)\n%s\nStarted: %s\nSession: %s\n%s\n\n",
+		strings.Repeat("=", 60),
+		strings.Repeat("=", 60),
+		l.startTime.Format(time.RFC3339),
+		l.sessionDir,
+		strings.Repeat("=", 60))
+	if _, err := l.file.WriteString(header); err != nil {
+		iostreams.DebugErr("write log header on toggle", err)
+	}
 }
 
 // Writer returns an io.Writer that writes to the debug log.

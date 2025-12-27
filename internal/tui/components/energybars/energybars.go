@@ -27,13 +27,15 @@ type Bar struct {
 
 // Model represents the energy bars state.
 type Model struct {
-	bars      []Bar
-	cache     *cache.Cache
-	width     int
-	height    int
-	barHeight int
-	styles    Styles
-	showTotal bool
+	bars       []Bar
+	cache      *cache.Cache
+	width      int
+	height     int
+	barHeight  int
+	styles     Styles
+	showTotal  bool
+	focused    bool
+	panelIndex int // For Shift+N hint
 }
 
 // Styles for the energy bars.
@@ -69,7 +71,7 @@ func DefaultStyles() Styles {
 		BarFill: lipgloss.NewStyle().
 			Foreground(colors.Warning),
 		BarEmpty: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(theme.Orange()), // Orange for empty bars, not black
 		Total: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true),
@@ -123,8 +125,14 @@ func (m Model) View() string {
 		maxVal = 100 // Minimum scale for visibility
 	}
 
-	// Render each bar - account for border (2) and padding (4) in width calculation
-	barWidth := m.width - 40 // Label (16) + Value (10) + border/padding (14)
+	// Bar width calculation:
+	// - Borders: 2 (left + right)
+	// - Horizontal padding: 2 (1 each side inside border)
+	// - Label: 16
+	// - Spaces: 2 (after label, after bar)
+	// - Value: 10
+	// Total overhead = 2 + 2 + 16 + 2 + 10 = 32
+	barWidth := m.width - 32
 	if barWidth < 10 {
 		barWidth = 10
 	}
@@ -135,18 +143,26 @@ func (m Model) View() string {
 		totalPower += bar.Value
 	}
 
-	// Render total if enabled
-	if m.showTotal && len(m.bars) > 1 {
-		content.WriteString("\n" + m.renderTotal(totalPower))
-	}
-
 	// Use rendering package for consistent embedded title styling
-	// Show PM device count as badge
-	badge := fmt.Sprintf("%d devices", len(m.bars))
+	// Show PM device count and legend in badge
+	badge := fmt.Sprintf("%d devices │ Legend: ██high ░░low", len(m.bars))
 	r := rendering.New(m.width, m.height).
 		SetTitle("Power Consumption").
 		SetBadge(badge).
-		SetFocused(false)
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
+
+	// Use yellow borders for energy panels
+	if m.focused {
+		r.SetFocusColor(theme.Yellow())
+	} else {
+		r.SetBlurColor(theme.Yellow())
+	}
+
+	// Show total in footer when enabled and multiple devices
+	if m.showTotal && len(m.bars) > 1 {
+		r.SetFooter(fmt.Sprintf("Total: %s", formatValue(totalPower, "W")))
+	}
 
 	return r.SetContent(content.String()).Render()
 }
@@ -267,13 +283,6 @@ func (m Model) renderBar(bar Bar, maxVal float64, barWidth int) string {
 	return labelStr + " " + fill + empty + " " + valueRender
 }
 
-func (m Model) renderTotal(total float64) string {
-	label := m.styles.Label.Render("Total")
-	valueStr := formatValue(total, "W")
-	value := m.styles.Total.Render(valueStr)
-	return label + " " + value
-}
-
 func (m Model) renderEmpty() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Power Consumption").
@@ -336,4 +345,16 @@ func (m Model) SetBars(bars []Bar) Model {
 // BarCount returns the number of bars.
 func (m Model) BarCount() int {
 	return len(m.bars)
+}
+
+// SetFocused sets whether this panel has focus.
+func (m Model) SetFocused(focused bool) Model {
+	m.focused = focused
+	return m
+}
+
+// SetPanelIndex sets the panel index for Shift+N hint.
+func (m Model) SetPanelIndex(index int) Model {
+	m.panelIndex = index
+	return m
 }

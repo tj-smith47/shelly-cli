@@ -107,7 +107,8 @@ func TestContextFromPanel(t *testing.T) {
 		{focus.PanelDeviceList, ContextDevices},
 		{focus.PanelDeviceInfo, ContextInfo},
 		{focus.PanelJSON, ContextJSON},
-		{focus.PanelEnergy, ContextEnergy},
+		{focus.PanelEnergyBars, ContextEnergy},
+		{focus.PanelEnergyHistory, ContextEnergy},
 		{focus.PanelNone, ContextGlobal},
 	}
 

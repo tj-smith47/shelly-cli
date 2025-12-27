@@ -37,6 +37,9 @@ type KeyMap struct {
 	TurnOff key.Binding
 	Reboot  key.Binding
 
+	// Debug
+	Debug key.Binding
+
 	// View switching
 	Tab      key.Binding
 	ShiftTab key.Binding
@@ -137,6 +140,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("R", "reboot"),
 		),
 
+		// Debug
+		Debug: key.NewBinding(
+			key.WithKeys("D"),
+			key.WithHelp("D", "toggle debug"),
+		),
+
 		// View switching
 		Tab: key.NewBinding(
 			key.WithKeys("tab", "alt+]"),
@@ -186,7 +195,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Enter, k.Escape, k.Refresh, k.Filter},
 		{k.Toggle, k.TurnOn, k.TurnOff, k.Reboot},
 		{k.Tab, k.View1, k.View2, k.View3, k.View4, k.View5, k.View6},
-		{k.Command, k.Help, k.Quit},
+		{k.Command, k.Help, k.Debug, k.Quit},
 	}
 }
 

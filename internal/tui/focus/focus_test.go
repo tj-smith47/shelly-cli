@@ -167,7 +167,8 @@ func TestPanelID_String(t *testing.T) {
 		{PanelDeviceList, "devices"},
 		{PanelDeviceInfo, "info"},
 		{PanelJSON, "json"},
-		{PanelEnergy, "energy"},
+		{PanelEnergyBars, "power"},
+		{PanelEnergyHistory, "history"},
 		{PanelMonitor, "monitor"},
 		{PanelID(99), "unknown"},
 	}

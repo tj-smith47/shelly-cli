@@ -229,19 +229,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Handle navigation keys
+	if m.handleNavKey(msg.String()) {
+		return m, nil
+	}
+
+	// Handle action keys
 	switch msg.String() {
-	case "j", "down":
-		m.scroller.CursorDown()
-	case "k", "up":
-		m.scroller.CursorUp()
-	case "g":
-		m.scroller.CursorToStart()
-	case "G":
-		m.scroller.CursorToEnd()
-	case "ctrl+d", "pgdown":
-		m.scroller.PageDown()
-	case "ctrl+u", "pgup":
-		m.scroller.PageUp()
 	case "space":
 		m = m.toggleSelection()
 	case "a":
@@ -266,6 +260,27 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// handleNavKey handles navigation keys, returns true if handled.
+func (m Model) handleNavKey(key string) bool {
+	switch key {
+	case "j", "down":
+		m.scroller.CursorDown()
+	case "k", "up":
+		m.scroller.CursorUp()
+	case "g":
+		m.scroller.CursorToStart()
+	case "G":
+		m.scroller.CursorToEnd()
+	case "ctrl+d", "pgdown":
+		m.scroller.PageDown()
+	case "ctrl+u", "pgup":
+		m.scroller.PageUp()
+	default:
+		return false
+	}
+	return true
 }
 
 func (m Model) toggleSelection() Model {

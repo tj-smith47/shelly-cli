@@ -18,7 +18,8 @@ func TestNew(t *testing.T) {
 
 func TestModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := New(nil).SetSize(80, 40)
+	m := New(nil)
+	m = m.SetSize(80, 40)
 	if m.width != 80 {
 		t.Errorf("width = %d, want 80", m.width)
 	}
@@ -70,7 +71,8 @@ func TestModel_addDataPoint_MaxItems(t *testing.T) {
 
 func TestModel_View_Empty(t *testing.T) {
 	t.Parallel()
-	m := New(nil).SetSize(80, 20)
+	m := New(nil)
+	m = m.SetSize(80, 20)
 	view := m.View()
 	if view == "" {
 		t.Error("View() returned empty string")

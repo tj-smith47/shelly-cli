@@ -24,8 +24,10 @@ const (
 	PanelDeviceInfo
 	// PanelJSON is the JSON viewer overlay.
 	PanelJSON
-	// PanelEnergy is the energy panel.
-	PanelEnergy
+	// PanelEnergyBars is the power consumption panel.
+	PanelEnergyBars
+	// PanelEnergyHistory is the energy history sparklines panel.
+	PanelEnergyHistory
 	// PanelMonitor is the monitor panel.
 	PanelMonitor
 )
@@ -43,8 +45,10 @@ func (p PanelID) String() string {
 		return "info"
 	case PanelJSON:
 		return "json"
-	case PanelEnergy:
-		return "energy"
+	case PanelEnergyBars:
+		return "power"
+	case PanelEnergyHistory:
+		return "history"
 	case PanelMonitor:
 		return "monitor"
 	default:
@@ -197,6 +201,17 @@ func (m *Manager) Reset() tea.Cmd {
 // PanelCount returns the number of focusable panels.
 func (m *Manager) PanelCount() int {
 	return len(m.panels)
+}
+
+// PanelIndex returns the 1-based index of the given panel for Shift+N navigation hints.
+// Returns 0 if the panel is not in the list.
+func (m *Manager) PanelIndex(panel PanelID) int {
+	for i, p := range m.panels {
+		if p == panel {
+			return i + 1 // 1-based for display
+		}
+	}
+	return 0
 }
 
 // Panels returns the ordered list of focusable panels.

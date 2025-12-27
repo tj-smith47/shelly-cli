@@ -17,11 +17,12 @@ func TestNew_DisabledByDefault(t *testing.T) {
 	}
 
 	l := New()
-	if l != nil {
-		t.Error("expected nil logger when SHELLY_TUI_DEBUG is not set")
-		if err := l.Close(); err != nil {
-			t.Logf("warning: close: %v", err)
-		}
+	// Logger is now always returned (for Shift+D toggle), but should be disabled
+	if l == nil {
+		t.Fatal("expected non-nil logger even when SHELLY_TUI_DEBUG is not set")
+	}
+	if l.Enabled() {
+		t.Error("expected logger to be disabled when SHELLY_TUI_DEBUG is not set")
 	}
 }
 
@@ -269,5 +270,76 @@ func TestLogger_Writer(t *testing.T) {
 	}
 	if n != 4 {
 		t.Errorf("expected 4 bytes written, got %d", n)
+	}
+}
+
+//nolint:paralleltest // Tests modify environment variables
+func TestLogger_Toggle(t *testing.T) {
+	// Use temp dir for HOME
+	tmpDir := t.TempDir()
+	homeDir := os.Getenv("HOME")
+	if err := os.Setenv("HOME", tmpDir); err != nil {
+		t.Fatalf("setenv HOME: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("HOME", homeDir); err != nil {
+			t.Logf("warning: restore HOME: %v", err)
+		}
+	}()
+
+	// Ensure env is not set - start disabled
+	if err := os.Unsetenv(EnvKey); err != nil {
+		t.Logf("warning: unsetenv: %v", err)
+	}
+
+	l := New()
+	if l == nil {
+		t.Fatal("expected non-nil logger")
+	}
+
+	// Initially disabled
+	if l.Enabled() {
+		t.Error("expected logger to be disabled initially")
+	}
+
+	// Toggle ON
+	enabled, sessionDir := l.Toggle()
+	if !enabled {
+		t.Error("expected Toggle to enable logging")
+	}
+	if sessionDir == "" {
+		t.Error("expected Toggle to return session directory")
+	}
+	if !l.Enabled() {
+		t.Error("expected logger to be enabled after Toggle")
+	}
+
+	// Log something
+	l.Log("Test", "Panel", 80, 24, "test content")
+
+	// Toggle OFF
+	enabled, sessionDir = l.Toggle()
+	if enabled {
+		t.Error("expected Toggle to disable logging")
+	}
+	if sessionDir != "" {
+		t.Error("expected Toggle to return empty session directory when disabling")
+	}
+	if l.Enabled() {
+		t.Error("expected logger to be disabled after second Toggle")
+	}
+
+	// Toggle ON again - creates new session
+	enabled, newSessionDir := l.Toggle()
+	if !enabled {
+		t.Error("expected Toggle to enable logging again")
+	}
+	if newSessionDir == "" {
+		t.Error("expected new session directory")
+	}
+
+	// Clean up
+	if err := l.Close(); err != nil {
+		t.Logf("warning: close: %v", err)
 	}
 }

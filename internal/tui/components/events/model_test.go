@@ -12,7 +12,8 @@ import (
 func createTestModel(eventCount int) Model {
 	m := Model{
 		state: &sharedState{
-			events:        make([]Event, eventCount),
+			userEvents:    make([]Event, eventCount),
+			systemEvents:  make([]Event, 0),
 			subscriptions: make(map[string]context.CancelFunc),
 			connStatus:    make(map[string]bool),
 		},
@@ -24,7 +25,7 @@ func createTestModel(eventCount int) Model {
 	}
 	// Create test events
 	for i := range eventCount {
-		m.state.events[i] = Event{
+		m.state.userEvents[i] = Event{
 			Timestamp:   time.Now(),
 			Device:      "test-device",
 			Type:        "info",

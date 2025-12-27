@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"charm.land/bubbles/v2/paginator"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/tj-smith47/shelly-go/events"
@@ -82,7 +83,7 @@ type SubscriptionStatusMsg struct {
 
 // sharedState holds mutex-protected state that persists across model copies.
 type sharedState struct {
-	mu            sync.Mutex
+	mu            sync.RWMutex
 	userEvents    []Event // User-relevant events (status changes, errors, etc.)
 	systemEvents  []Event // System events (full_status polling noise)
 	subscriptions map[string]context.CancelFunc
@@ -107,6 +108,11 @@ type Model struct {
 	styles      Styles
 	paused      bool
 	autoScroll  bool // Auto-scroll to top when new events arrive (newest at top)
+
+	// Paginators for dual column view
+	userPaginator   paginator.Model
+	systemPaginator paginator.Model
+	perPage         int // Events per page (calculated from height)
 
 	// Filtering
 	filterByDevice bool   // When true, only show events for selectedDevice
@@ -183,15 +189,32 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("events: invalid deps: %v", err))
 	}
 
+	// Create paginators with Dots style (filled/empty dots)
+	// Use bright colors for visibility
+	userPag := paginator.New()
+	userPag.Type = paginator.Dots
+	userPag.PerPage = 10 // Will be updated by SetSize
+	userPag.ActiveDot = lipgloss.NewStyle().Foreground(theme.Purple()).Bold(true).Render("●")
+	userPag.InactiveDot = lipgloss.NewStyle().Foreground(theme.Purple()).Render("○")
+
+	sysPag := paginator.New()
+	sysPag.Type = paginator.Dots
+	sysPag.PerPage = 10
+	sysPag.ActiveDot = lipgloss.NewStyle().Foreground(theme.Red()).Bold(true).Render("●")
+	sysPag.InactiveDot = lipgloss.NewStyle().Foreground(theme.Red()).Render("○")
+
 	return Model{
-		ctx:         deps.Ctx,
-		svc:         deps.Svc,
-		ios:         deps.IOS,
-		eventStream: deps.EventStream,
-		scroller:    panel.NewScroller(0, 10), // Will be updated by SetSize
-		maxItems:    50,                       // Per list - each category capped at 50
-		autoScroll:  true,                     // Start with auto-scroll enabled (cursor stays at top/newest)
-		styles:      DefaultStyles(),
+		ctx:             deps.Ctx,
+		svc:             deps.Svc,
+		ios:             deps.IOS,
+		eventStream:     deps.EventStream,
+		scroller:        panel.NewScroller(0, 10), // Will be updated by SetSize
+		maxItems:        50,                       // Per list - each category capped at 50
+		autoScroll:      true,                     // Start with auto-scroll enabled (cursor stays at top/newest)
+		perPage:         10,                       // Will be updated by SetSize
+		userPaginator:   userPag,
+		systemPaginator: sysPag,
+		styles:          DefaultStyles(),
 		state: &sharedState{
 			userEvents:    []Event{},
 			systemEvents:  []Event{},
@@ -384,7 +407,7 @@ func (m Model) handleSubscriptionStatus(msg SubscriptionStatusMsg) Model {
 	return m
 }
 
-// handleKeyPress handles keyboard input for scrolling and clearing.
+// handleKeyPress handles keyboard input for scrolling, pagination, and clearing.
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	switch msg.String() {
 	case "j", "down":
@@ -393,20 +416,34 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	case "k", "up":
 		m.scroller.CursorUp()
 		m.autoScroll = m.scroller.Cursor() == 0
-	case "pgdown", "ctrl+d":
+	case "n", "pgdown", "ctrl+d":
+		// Next page for both paginators (dual column)
+		m.userPaginator.NextPage()
+		m.systemPaginator.NextPage()
 		m.scroller.PageDown()
 		m.autoScroll = false
-	case "pgup", "ctrl+u":
+	case "N", "pgup", "ctrl+u":
+		// Previous page for both paginators (dual column)
+		m.userPaginator.PrevPage()
+		m.systemPaginator.PrevPage()
 		m.scroller.PageUp()
 		m.autoScroll = m.scroller.Cursor() == 0
 	case "g":
+		// Go to first page
+		m.userPaginator.Page = 0
+		m.systemPaginator.Page = 0
 		m.scroller.CursorToStart()
 		m.autoScroll = true // User went to top (newest), enable auto-scroll
 	case "G":
+		// Go to last page
+		m.userPaginator.Page = m.userPaginator.TotalPages - 1
+		m.systemPaginator.Page = m.systemPaginator.TotalPages - 1
 		m.scroller.CursorToEnd()
 		m.autoScroll = false // User went to bottom (oldest), disable auto-scroll
 	case "c":
 		m.Clear()
+		m.userPaginator.Page = 0
+		m.systemPaginator.Page = 0
 		m.scroller.SetItemCount(0)
 		m.autoScroll = true // After clear, re-enable auto-scroll
 	case "p":
@@ -424,8 +461,8 @@ func (m Model) togglePause() Model {
 
 // eventCount returns the total number of events (thread-safe).
 func (m Model) eventCount() int {
-	m.state.mu.Lock()
-	defer m.state.mu.Unlock()
+	m.state.mu.RLock()
+	defer m.state.mu.RUnlock()
 	return len(m.state.userEvents) + len(m.state.systemEvents)
 }
 
@@ -433,7 +470,19 @@ func (m Model) eventCount() int {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	// Reserve 1 row for header
+
+	// For dual columns: 3 header lines (title + column headers + separator)
+	// Calculate events per page
+	m.perPage = height - 3
+	if m.perPage < 1 {
+		m.perPage = 1
+	}
+
+	// Update paginators
+	m.userPaginator.PerPage = m.perPage
+	m.systemPaginator.PerPage = m.perPage
+
+	// Reserve 1 row for header (single column mode)
 	visibleRows := height - 1
 	if visibleRows < 1 {
 		visibleRows = 1
@@ -444,12 +493,12 @@ func (m Model) SetSize(width, height int) Model {
 
 // View renders the events (content only - wrapper handles title/footer).
 func (m Model) View() string {
-	m.state.mu.Lock()
+	m.state.mu.RLock()
 	userEvents := make([]Event, len(m.state.userEvents))
 	copy(userEvents, m.state.userEvents)
 	systemEvents := make([]Event, len(m.state.systemEvents))
 	copy(systemEvents, m.state.systemEvents)
-	m.state.mu.Unlock()
+	m.state.mu.RUnlock()
 
 	if len(userEvents) == 0 && len(systemEvents) == 0 {
 		return lipgloss.NewStyle().
@@ -634,10 +683,10 @@ func (m Model) OptimalWidth() int {
 
 	fixedWidth := colTime + colDevice + colComp + colType + overhead
 
-	// Get events safely with locking
-	m.state.mu.Lock()
+	// Get events safely with read locking
+	m.state.mu.RLock()
 	eventList := mergeEventsByTime(m.state.userEvents, m.state.systemEvents)
-	m.state.mu.Unlock()
+	m.state.mu.RUnlock()
 
 	if len(eventList) == 0 {
 		return fixedWidth + 30 // Default description width
@@ -678,9 +727,9 @@ func (m Model) MinWidth() int {
 
 // MaxDescriptionLen returns the length of the longest event description.
 func (m Model) MaxDescriptionLen() int {
-	m.state.mu.Lock()
+	m.state.mu.RLock()
 	eventList := mergeEventsByTime(m.state.userEvents, m.state.systemEvents)
-	m.state.mu.Unlock()
+	m.state.mu.RUnlock()
 
 	maxLen := 0
 	for _, e := range eventList {
@@ -693,15 +742,15 @@ func (m Model) MaxDescriptionLen() int {
 
 // FooterText returns the keybindings for the wrapper to display.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:new/old p:pause c:clear"
+	return "n/N:page g/G:first/last p:pause c:clear"
 }
 
 // StatusBadge returns status indicators for the wrapper to display.
 // Returns event count and any active flags (paused, filtered).
 func (m Model) StatusBadge() string {
-	m.state.mu.Lock()
+	m.state.mu.RLock()
 	eventCount := len(m.state.userEvents) + len(m.state.systemEvents)
-	m.state.mu.Unlock()
+	m.state.mu.RUnlock()
 
 	parts := []string{fmt.Sprintf("%d", eventCount)}
 
@@ -770,50 +819,107 @@ func mergeEventsByTime(user, system []Event) []Event {
 func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string {
 	colors := theme.GetSemanticColors()
 
-	// Calculate column widths
-	colWidth := (m.width - 3) / 2 // -3 for separator (│) and spacing
-	visibleRows := m.height - 3   // -3 for header + separator line
-
-	if visibleRows < 1 {
-		visibleRows = 1
+	// Calculate column widths - use half minus separator overhead
+	// Total line = leftCol + " │ " + rightCol = 2*colWidth + 3
+	colWidth := (m.width - 3) / 2
+	if colWidth < 30 {
+		colWidth = 30
 	}
 
-	// Limit events to visible rows
-	if len(userEvents) > visibleRows {
-		userEvents = userEvents[:visibleRows]
+	// Calculate dynamic sub-column widths for USER events (has COMP column)
+	// Format: TIME(8) + DEVICE(dynamic) + COMP(dynamic) + LEVEL(12) + DESC(remaining)
+	const timeW = 8
+	const levelW = 12 // Increased to fit "full_status" without truncation
+	const minDeviceW = 10
+	const minCompW = 8
+	const minDescW = 8
+	const spacesUser = 4 // spaces between 5 columns (user)
+	const spacesSys = 3  // spaces between 4 columns (system - no COMP)
+
+	// User column layout (with COMP)
+	remainingUser := colWidth - timeW - levelW - spacesUser
+	userDeviceW := remainingUser * 20 / 100
+	if userDeviceW < minDeviceW {
+		userDeviceW = minDeviceW
 	}
-	if len(systemEvents) > visibleRows {
-		systemEvents = systemEvents[:visibleRows]
+	userCompW := remainingUser * 20 / 100
+	if userCompW < minCompW {
+		userCompW = minCompW
+	}
+	userDescW := remainingUser - userDeviceW - userCompW
+	if userDescW < minDescW {
+		userDescW = minDescW
 	}
 
-	// Build headers with underlines
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Highlight).Underline(true)
-	leftHeader := headerStyle.Render("User Events")
-	rightHeader := lipgloss.NewStyle().Bold(true).Foreground(colors.Muted).Underline(true).Render("System Events")
+	// System column layout (no COMP column - more space for device/desc)
+	remainingSys := colWidth - timeW - levelW - spacesSys
+	sysDeviceW := remainingSys * 25 / 100
+	if sysDeviceW < minDeviceW {
+		sysDeviceW = minDeviceW
+	}
+	sysDescW := remainingSys - sysDeviceW
+	if sysDescW < minDescW {
+		sysDescW = minDescW
+	}
 
-	// Pad headers to column width
-	leftHeader = output.PadRight(leftHeader, colWidth)
-	rightHeader = output.PadRight(rightHeader, colWidth)
+	// SetTotalPages takes total items count (not page count) and calculates pages internally
+	m.userPaginator.SetTotalPages(len(userEvents))
+	m.systemPaginator.SetTotalPages(len(systemEvents))
 
+	// Get page slices using paginator bounds
+	userStart, userEnd := m.userPaginator.GetSliceBounds(len(userEvents))
+	sysStart, sysEnd := m.systemPaginator.GetSliceBounds(len(systemEvents))
+
+	userPage := userEvents[userStart:userEnd]
+	sysPage := systemEvents[sysStart:sysEnd]
+
+	// Separator style (vertical bar)
 	separator := lipgloss.NewStyle().Foreground(colors.TableBorder).Render("│")
 
-	// Build rows - header row plus content
-	lines := make([]string, 0, visibleRows+2)
-	lines = append(lines, leftHeader+" "+separator+" "+rightHeader)
-	// Add separator line under headers
-	leftSep := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("─", colWidth))
-	rightSep := leftSep
-	lines = append(lines, leftSep+" "+separator+" "+rightSep)
+	// Build section title row (no pagination in title)
+	leftTitle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple()).Render("User Events")
+	rightTitle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red()).Render("System Events")
 
-	for i := range visibleRows {
+	leftTitle = output.PadRight(leftTitle, colWidth)
+	rightTitle = output.PadRight(rightTitle, colWidth)
+
+	// Build column header row - USER has COMP, SYSTEM does not
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
+	leftColHeader := headerStyle.Render(output.PadRight("TIME", timeW)) + " " +
+		headerStyle.Render(output.PadRight("DEVICE", userDeviceW)) + " " +
+		headerStyle.Render(output.PadRight("COMP", userCompW)) + " " +
+		headerStyle.Render(output.PadRight("LEVEL", levelW)) + " " +
+		headerStyle.Render("DESC")
+
+	// System events: no COMP column
+	sysHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red())
+	rightColHeader := sysHeaderStyle.Render(output.PadRight("TIME", timeW)) + " " +
+		sysHeaderStyle.Render(output.PadRight("DEVICE", sysDeviceW)) + " " +
+		sysHeaderStyle.Render(output.PadRight("LEVEL", levelW)) + " " +
+		sysHeaderStyle.Render("DESC")
+
+	leftColHeader = output.PadRight(leftColHeader, colWidth)
+	rightColHeader = output.PadRight(rightColHeader, colWidth)
+
+	// Build all lines - reserve 1 line for pagination dots at bottom
+	lines := make([]string, 0, m.perPage+4)
+	lines = append(lines,
+		leftTitle+" "+separator+" "+rightTitle,
+		leftColHeader+" "+separator+" "+rightColHeader)
+
+	// Separator line
+	sepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", colWidth))
+	lines = append(lines, sepLine+" "+separator+" "+sepLine)
+
+	for i := range m.perPage {
 		leftCell := ""
 		rightCell := ""
 
-		if i < len(userEvents) {
-			leftCell = m.renderCompactEvent(userEvents[i], colWidth)
+		if i < len(userPage) {
+			leftCell = m.renderUserEvent(userPage[i], timeW, userDeviceW, userCompW, levelW, userDescW)
 		}
-		if i < len(systemEvents) {
-			rightCell = m.renderCompactEvent(systemEvents[i], colWidth)
+		if i < len(sysPage) {
+			rightCell = m.renderSystemEvent(sysPage[i], timeW, sysDeviceW, levelW, sysDescW)
 		}
 
 		// Pad cells to column width
@@ -823,46 +929,77 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 		lines = append(lines, leftCell+" "+separator+" "+rightCell)
 	}
 
+	// Always add pagination dots row at bottom (shows current page position)
+	// Dots already have colors applied from paginator setup
+	userDots := m.userPaginator.View()
+	sysDots := m.systemPaginator.View()
+	// Center the dots in each column (no additional foreground - dots have embedded colors)
+	leftDots := lipgloss.NewStyle().
+		Width(colWidth).
+		Align(lipgloss.Center).
+		Render(userDots)
+	rightDots := lipgloss.NewStyle().
+		Width(colWidth).
+		Align(lipgloss.Center).
+		Render(sysDots)
+	lines = append(lines, leftDots+" "+separator+" "+rightDots)
+
 	return strings.Join(lines, "\n")
 }
 
-// renderCompactEvent renders a single event in compact format for dual columns.
-func (m Model) renderCompactEvent(e Event, maxWidth int) string {
-	// Format: TIME DEVICE TYPE DESC
-	// Use fixed widths: time(8) + space + device(12) + space + type(6) + space = 28 chars prefix
-	const (
-		timeWidth   = 8
-		deviceWidth = 12
-		typeWidth   = 6
-		spaces      = 3
-		prefixWidth = timeWidth + deviceWidth + typeWidth + spaces
-	)
+// renderUserEvent renders a user event row (with COMP column).
+func (m Model) renderUserEvent(e Event, timeW, deviceW, compW, levelW, descW int) string {
+	// Time column
+	timeStr := m.styles.Time.Width(timeW).Render(e.Timestamp.Format("15:04:05"))
 
-	timeStr := m.styles.Time.Width(timeWidth).Render(e.Timestamp.Format("15:04:05"))
-
-	// Device name - truncate if needed
+	// Device column - truncate if needed
 	device := e.Device
-	if len(device) > deviceWidth {
-		device = device[:deviceWidth-1] + "…"
+	if len(device) > deviceW {
+		device = device[:deviceW-1] + "…"
 	}
-	deviceStr := m.styles.Device.Width(deviceWidth).Render(device)
+	deviceStr := m.styles.Device.Width(deviceW).Render(device)
 
-	// Level indicator (short form)
+	// Component column
+	comp := m.formatComponent(e)
+	if len(comp) > compW {
+		comp = comp[:compW-1] + "…"
+	}
+	compStr := m.styles.Component.Width(compW).Render(comp)
+
+	// Level column - no truncation needed now that levelW is 12
 	levelStyle := m.getTypeStyle(e.Type)
-	levelShort := e.Type
-	if len(levelShort) > typeWidth {
-		levelShort = levelShort[:typeWidth]
-	}
-	levelStr := levelStyle.Width(typeWidth).Render(levelShort)
+	levelStr := levelStyle.Width(levelW).Render(e.Type)
 
-	// Description gets remaining width - be generous with space
-	descWidth := maxWidth - prefixWidth
-	if descWidth < 10 {
-		descWidth = 10
-	}
+	// Description column
 	desc := e.Description
-	if len(desc) > descWidth {
-		desc = desc[:descWidth-1] + "…"
+	if len(desc) > descW {
+		desc = desc[:descW-1] + "…"
+	}
+	descStr := m.styles.Description.Render(desc)
+
+	return timeStr + " " + deviceStr + " " + compStr + " " + levelStr + " " + descStr
+}
+
+// renderSystemEvent renders a system event row (no COMP column).
+func (m Model) renderSystemEvent(e Event, timeW, deviceW, levelW, descW int) string {
+	// Time column
+	timeStr := m.styles.Time.Width(timeW).Render(e.Timestamp.Format("15:04:05"))
+
+	// Device column - truncate if needed
+	device := e.Device
+	if len(device) > deviceW {
+		device = device[:deviceW-1] + "…"
+	}
+	deviceStr := m.styles.Device.Width(deviceW).Render(device)
+
+	// Level column - no truncation needed now that levelW is 12
+	levelStyle := m.getTypeStyle(e.Type)
+	levelStr := levelStyle.Width(levelW).Render(e.Type)
+
+	// Description column
+	desc := e.Description
+	if len(desc) > descW {
+		desc = desc[:descW-1] + "…"
 	}
 	descStr := m.styles.Description.Render(desc)
 

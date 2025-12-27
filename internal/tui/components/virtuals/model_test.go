@@ -11,6 +11,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+const testDeviceAddr = "192.168.1.100"
+
 func TestVirtual(t *testing.T) {
 	t.Parallel()
 	boolVal := true
@@ -231,9 +233,9 @@ func TestModel_VirtualCount(t *testing.T) {
 func TestModel_Device(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	m.device = "192.168.1.100"
-	if got := m.Device(); got != "192.168.1.100" {
-		t.Errorf("Device() = %q, want %q", got, "192.168.1.100")
+	m.device = testDeviceAddr
+	if got := m.Device(); got != testDeviceAddr {
+		t.Errorf("Device() = %q, want %q", got, testDeviceAddr)
 	}
 }
 
@@ -279,7 +281,7 @@ func TestModel_View_NoDevice(t *testing.T) {
 func TestModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	m.device = "192.168.1.100"
+	m.device = testDeviceAddr
 	m.loading = true
 	m = m.SetSize(40, 10)
 
@@ -292,7 +294,7 @@ func TestModel_View_Loading(t *testing.T) {
 func TestModel_View_NoVirtuals(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
-	m.device = "192.168.1.100"
+	m.device = testDeviceAddr
 	m.loading = false
 	m.virtuals = []Virtual{}
 	m = m.SetSize(40, 10)
@@ -309,7 +311,7 @@ func TestModel_View_WithVirtuals(t *testing.T) {
 	numVal := 22.5
 
 	m := newTestModel()
-	m.device = "192.168.1.100"
+	m.device = testDeviceAddr
 	m.loading = false
 	m.virtuals = []Virtual{
 		{

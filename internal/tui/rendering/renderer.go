@@ -124,95 +124,110 @@ func (r *Renderer) Render() string {
 		return ""
 	}
 
+	borderStyle := r.getBorderStyle()
+	contentWidth := r.width - 2
+	contentHeight := r.height - 2
+
+	lines := make([]string, 0, r.height)
+
+	// Top border
+	lines = append(lines, borderStyle.Render(r.buildTopBorder()))
+
+	// Content with borders and padding
+	contentLines := r.buildContentLines(contentWidth, borderStyle)
+	lines = append(lines, r.renderContentWithBorders(contentLines, contentWidth, contentHeight, borderStyle)...)
+
+	// Bottom border
+	lines = append(lines, borderStyle.Render(r.buildBottomBorder()))
+
+	return strings.Join(lines, "\n")
+}
+
+// getBorderStyle returns the appropriate border style based on focus.
+func (r *Renderer) getBorderStyle() lipgloss.Style {
 	borderColor := r.blurColor
 	if r.focused {
 		borderColor = r.focusColor
 	}
+	return lipgloss.NewStyle().Foreground(borderColor)
+}
 
-	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-
-	// Content area dimensions
-	contentWidth := r.width - 2   // Account for left and right borders
-	contentHeight := r.height - 2 // Account for top and bottom borders
-
-	// Build lines with estimated capacity (top + content + bottom)
-	lines := make([]string, 0, r.height)
-
-	// Top border with embedded title (and optional badge in superfile style)
-	var topBorder string
+// buildTopBorder constructs the top border with optional title and badge.
+func (r *Renderer) buildTopBorder() string {
 	if r.badge != "" {
-		topBorder = BuildTopBorderWithBadge(r.width, r.title, r.badge, r.border)
-	} else {
-		topBorder = BuildTopBorder(r.width, r.title, r.border)
+		return BuildTopBorderWithBadge(r.width, r.title, r.badge, r.border)
 	}
-	lines = append(lines, borderStyle.Render(topBorder))
+	return BuildTopBorder(r.width, r.title, r.border)
+}
 
-	// Build content lines with estimated capacity
-	contentLines := make([]string, 0, contentHeight)
+// buildBottomBorder constructs the bottom border with optional footer and hint.
+func (r *Renderer) buildBottomBorder() string {
+	hint := r.buildPanelHint()
+	if r.footer != "" || r.footerBadge != "" || hint != "" {
+		return BuildBottomBorderWithFooterBadgeAndHint(r.width, r.footer, r.footerBadge, hint, r.border)
+	}
+	return BuildBottomBorder(r.width, r.border)
+}
 
-	// Add main content if set
+// buildContentLines assembles the main content and sections.
+func (r *Renderer) buildContentLines(contentWidth int, borderStyle lipgloss.Style) []string {
+	lines := make([]string, 0)
+
 	if r.content != "" {
-		contentLines = append(contentLines, r.wrapAndTruncate(r.content, contentWidth)...)
+		lines = append(lines, r.wrapAndTruncate(r.content, contentWidth)...)
 	}
 
-	// Add sections
 	for _, sec := range r.sections {
-		if len(contentLines) > 0 {
-			contentLines = append(contentLines, "") // Empty line before section
+		if len(lines) > 0 {
+			lines = append(lines, "")
 		}
-		// Section divider
 		divider := BuildDivider(r.width, sec.name, r.border)
-		contentLines = append(contentLines, borderStyle.Render(divider[1:len(divider)-1])) // Remove border chars for inline
-		// Section content
+		lines = append(lines, borderStyle.Render(divider[1:len(divider)-1]))
 		if sec.content != "" {
-			contentLines = append(contentLines, r.wrapAndTruncate(sec.content, contentWidth)...)
+			lines = append(lines, r.wrapAndTruncate(sec.content, contentWidth)...)
 		}
 	}
 
-	// Render content within borders with 1 char horizontal padding and 1 line vertical padding
+	return lines
+}
+
+// renderContentWithBorders wraps content lines with borders and padding.
+func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth, contentHeight int, borderStyle lipgloss.Style) []string {
 	leftBorder := borderStyle.Render(r.border.Left) + " "
 	rightBorder := " " + borderStyle.Render(r.border.Right)
-	paddedWidth := contentWidth - 2 // Account for the 1-char padding on each side
+	paddedWidth := contentWidth - 2
 
-	// Add 1 line vertical padding at top and bottom
 	emptyLine := leftBorder + strings.Repeat(" ", paddedWidth) + rightBorder
-	lines = append(lines, emptyLine)
+	lines := []string{emptyLine}
 
-	// Adjust content height for vertical padding (subtract 2 for top and bottom padding lines)
 	innerHeight := contentHeight - 2
 	if innerHeight < 1 {
 		innerHeight = 1
 	}
 
 	for i := range innerHeight {
-		var line string
+		line := ""
 		if i < len(contentLines) {
 			line = contentLines[i]
 		}
-		// Pad line to padded width
-		lineWidth := ansi.StringWidth(line)
-		if lineWidth < paddedWidth {
-			line += strings.Repeat(" ", paddedWidth-lineWidth)
-		} else if lineWidth > paddedWidth {
-			line = ansi.Truncate(line, paddedWidth-3, "...")
-		}
+		line = r.padOrTruncate(line, paddedWidth)
 		lines = append(lines, leftBorder+line+rightBorder)
 	}
 
-	// Bottom vertical padding line
 	lines = append(lines, emptyLine)
+	return lines
+}
 
-	// Bottom border with optional footer, footerBadge, and panel hint
-	var bottomBorder string
-	hint := r.buildPanelHint()
-	if r.footer != "" || r.footerBadge != "" || hint != "" {
-		bottomBorder = BuildBottomBorderWithFooterBadgeAndHint(r.width, r.footer, r.footerBadge, hint, r.border)
-	} else {
-		bottomBorder = BuildBottomBorder(r.width, r.border)
+// padOrTruncate adjusts line to exact width.
+func (r *Renderer) padOrTruncate(line string, width int) string {
+	lineWidth := ansi.StringWidth(line)
+	if lineWidth < width {
+		return line + strings.Repeat(" ", width-lineWidth)
 	}
-	lines = append(lines, borderStyle.Render(bottomBorder))
-
-	return strings.Join(lines, "\n")
+	if lineWidth > width {
+		return ansi.Truncate(line, width-3, "...")
+	}
+	return line
 }
 
 // wrapAndTruncate splits content into lines and truncates each to fit width.

@@ -201,7 +201,6 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-
 // emitSelection returns a command that emits a DeviceSelectedMsg for the current selection.
 func (m Model) emitSelection() tea.Cmd {
 	devices := m.getFilteredDevices()

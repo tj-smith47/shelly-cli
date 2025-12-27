@@ -310,7 +310,7 @@ func ContextFromPanel(p focus.PanelID) Context {
 		return ContextInfo
 	case focus.PanelJSON:
 		return ContextJSON
-	case focus.PanelEnergy:
+	case focus.PanelEnergyBars, focus.PanelEnergyHistory:
 		return ContextEnergy
 	case focus.PanelMonitor:
 		return ContextDevices // Monitor uses device-like navigation

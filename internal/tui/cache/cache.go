@@ -734,20 +734,10 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 			lastRequestID: requestID,
 		}
 
-		// Per-device timeout based on known generation.
-		// Gen1 (ESP8266) needs more time than Gen2 (ESP32).
-		// Unknown generation uses 15s to allow for Gen2->Gen1 fallback in DeviceInfoAuto.
-		timeout := 15 * time.Second
-		if device.Generation == 1 {
-			timeout = 20 * time.Second // Gen1 is slower
-		} else if device.Generation >= 2 {
-			timeout = 10 * time.Second // Gen2+ is faster
-		}
-		ctx, cancel := context.WithTimeout(c.ctx, timeout)
+		ctx, cancel := context.WithTimeout(c.ctx, c.deviceTimeout(device.Generation))
 		defer cancel()
 
 		// Get device info first (auto-detects Gen1 vs Gen2)
-		// Pass device name (not address) so resolver finds stored generation
 		info, err := c.svc.DeviceInfoAuto(ctx, name)
 		if err != nil {
 			data.Error = err
@@ -758,68 +748,87 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		data.Info = info
 		data.Online = true
 
-		// Populate missing device info from DeviceInfo response.
-		// When a device is added with just name+address, we discover Type/Model/Generation/MAC
-		// on first fetch and persist them so subsequent sessions don't re-detect.
-		// Model = human-readable product name (e.g., "Shelly Pro 1PM")
-		// Type = model code/SKU (e.g., "SPSW-001PE16EU")
-		// MAC = hardware address for stable device identification
-		var updates config.DeviceUpdates
-		if info.Model != "" {
-			displayName := types.ModelDisplayName(info.Model)
-			// Populate Model if empty or if Model==Type (old bug where both had same value)
-			if data.Device.Model == "" || data.Device.Model == data.Device.Type {
-				data.Device.Model = displayName
-				updates.Model = displayName
-			}
-			// Populate Type if empty
-			if data.Device.Type == "" {
-				data.Device.Type = info.Model
-				updates.Type = info.Model
-			}
-		}
-		// Populate generation if not yet known (0 = unset)
-		if data.Device.Generation == 0 && info.Generation > 0 {
-			data.Device.Generation = info.Generation
-			updates.Generation = info.Generation
-		}
-		// Populate MAC if not yet stored (for IP remapping support)
-		if data.Device.MAC == "" && info.MAC != "" {
-			data.Device.MAC = model.NormalizeMAC(info.MAC)
-			updates.MAC = info.MAC
-		}
-		// Persist discovered info to config so it's available immediately on next session
-		if updates.Type != "" || updates.Model != "" || updates.Generation > 0 || updates.MAC != "" {
-			if err := config.UpdateDeviceInfo(name, updates); err != nil {
-				c.ios.DebugErr("persist device info", err)
-			}
-		}
+		// Populate and persist discovered device info
+		c.populateDeviceInfo(name, data, info)
 
 		// Get switch states (Gen2+ only - Gen1 uses different relay API)
 		if info.Generation > 1 {
-			switches, err := c.svc.SwitchList(ctx, name)
-			if err == nil {
-				for _, sw := range switches {
-					data.Switches = append(data.Switches, SwitchState{
-						ID: sw.ID,
-						On: sw.Output,
-					})
-				}
-			}
+			c.fetchSwitchStates(ctx, name, data)
 		}
 
-		// Get monitoring snapshot for power metrics (auto-detects Gen1 vs Gen2)
-		snapshot, err := c.svc.GetMonitoringSnapshotAuto(ctx, name)
-		if err != nil {
-			// Device is online but couldn't get snapshot - that's OK for non-metering devices
-			c.ios.DebugErr("cache snapshot "+name, err)
-		} else {
-			data.Snapshot = snapshot
-			c.aggregateMetrics(data, snapshot)
-		}
+		// Get monitoring snapshot for power metrics
+		c.fetchMonitoringSnapshot(ctx, name, data)
 
 		return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
 	}
+}
+
+// deviceTimeout returns the appropriate timeout for a device generation.
+func (c *Cache) deviceTimeout(generation int) time.Duration {
+	switch generation {
+	case 1:
+		return 20 * time.Second // Gen1 (ESP8266) is slower
+	case 2, 3:
+		return 10 * time.Second // Gen2+ (ESP32) is faster
+	default:
+		return 15 * time.Second // Unknown - allow for fallback detection
+	}
+}
+
+// populateDeviceInfo fills in missing device info and persists to config.
+func (c *Cache) populateDeviceInfo(name string, data *DeviceData, info *shelly.DeviceInfo) {
+	var updates config.DeviceUpdates
+
+	if info.Model != "" {
+		displayName := types.ModelDisplayName(info.Model)
+		if data.Device.Model == "" || data.Device.Model == data.Device.Type {
+			data.Device.Model = displayName
+			updates.Model = displayName
+		}
+		if data.Device.Type == "" {
+			data.Device.Type = info.Model
+			updates.Type = info.Model
+		}
+	}
+	if data.Device.Generation == 0 && info.Generation > 0 {
+		data.Device.Generation = info.Generation
+		updates.Generation = info.Generation
+	}
+	if data.Device.MAC == "" && info.MAC != "" {
+		data.Device.MAC = model.NormalizeMAC(info.MAC)
+		updates.MAC = info.MAC
+	}
+
+	if updates.Type != "" || updates.Model != "" || updates.Generation > 0 || updates.MAC != "" {
+		if err := config.UpdateDeviceInfo(name, updates); err != nil {
+			c.ios.DebugErr("persist device info", err)
+		}
+	}
+}
+
+// fetchSwitchStates fetches switch states for Gen2+ devices.
+func (c *Cache) fetchSwitchStates(ctx context.Context, name string, data *DeviceData) {
+	switches, err := c.svc.SwitchList(ctx, name)
+	if err != nil {
+		return
+	}
+	for _, sw := range switches {
+		data.Switches = append(data.Switches, SwitchState{
+			ID: sw.ID,
+			On: sw.Output,
+		})
+	}
+}
+
+// fetchMonitoringSnapshot fetches power metrics snapshot.
+func (c *Cache) fetchMonitoringSnapshot(ctx context.Context, name string, data *DeviceData) {
+	snapshot, err := c.svc.GetMonitoringSnapshotAuto(ctx, name)
+	if err != nil {
+		c.ios.DebugErr("cache snapshot "+name, err)
+		return
+	}
+	data.Snapshot = snapshot
+	c.aggregateMetrics(data, snapshot)
 }
 
 // handleDeviceUpdate processes a device update message.
