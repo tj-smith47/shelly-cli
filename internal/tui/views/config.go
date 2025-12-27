@@ -146,19 +146,19 @@ func NewConfig(deps ConfigDeps) *Config {
 	// Create flexible layout with 50/50 column split
 	layoutCalc := layout.NewTwoColumnLayout(0.5, 1)
 
-	// Configure left column panels (WiFi, System, BLE) with expansion on focus
+	// Configure left column panels (WiFi, System, Cloud, Security) with expansion on focus
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(PanelWiFi), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelSystem), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelBLE), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelCloud), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelSecurity), MinHeight: 4, ExpandOnFocus: true},
 	}
 
-	// Configure right column panels (Cloud, Inputs, Protocols, Security, SmartHome)
+	// Configure right column panels (BLE, Inputs, Protocols, SmartHome)
 	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
-		{ID: layout.PanelID(PanelCloud), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelBLE), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelInputs), MinHeight: 4, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelProtocols), MinHeight: 4, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelSecurity), MinHeight: 4, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelSmartHome), MinHeight: 4, ExpandOnFocus: true},
 	}
 
@@ -395,6 +395,7 @@ func (c *Config) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		c.viewFocused = true // View has focus when cycling panels
 		c.focusPrev()
+	// Shift+N hotkeys match column-by-column order: left column (2-5), right column (6-9)
 	case keyconst.Shift2:
 		c.viewFocused = true
 		c.focusedPanel = PanelWiFi
@@ -409,7 +410,7 @@ func (c *Config) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		c.updateFocusStates()
 	case keyconst.Shift5:
 		c.viewFocused = true
-		c.focusedPanel = PanelInputs
+		c.focusedPanel = PanelSecurity
 		c.updateFocusStates()
 	case keyconst.Shift6:
 		c.viewFocused = true
@@ -417,11 +418,11 @@ func (c *Config) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		c.updateFocusStates()
 	case keyconst.Shift7:
 		c.viewFocused = true
-		c.focusedPanel = PanelProtocols
+		c.focusedPanel = PanelInputs
 		c.updateFocusStates()
 	case keyconst.Shift8:
 		c.viewFocused = true
-		c.focusedPanel = PanelSecurity
+		c.focusedPanel = PanelProtocols
 		c.updateFocusStates()
 	case keyconst.Shift9:
 		c.viewFocused = true
@@ -432,9 +433,10 @@ func (c *Config) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func (c *Config) focusNext() {
+	// Column-by-column: left column top-to-bottom, then right column top-to-bottom
 	panels := []ConfigPanel{
-		PanelWiFi, PanelSystem, PanelBLE,
-		PanelCloud, PanelInputs, PanelProtocols, PanelSecurity, PanelSmartHome,
+		PanelWiFi, PanelSystem, PanelCloud, PanelSecurity, // Left column
+		PanelBLE, PanelInputs, PanelProtocols, PanelSmartHome, // Right column
 	}
 	for i, p := range panels {
 		if p == c.focusedPanel {
@@ -446,9 +448,10 @@ func (c *Config) focusNext() {
 }
 
 func (c *Config) focusPrev() {
+	// Column-by-column: left column top-to-bottom, then right column top-to-bottom
 	panels := []ConfigPanel{
-		PanelWiFi, PanelSystem, PanelBLE,
-		PanelCloud, PanelInputs, PanelProtocols, PanelSecurity, PanelSmartHome,
+		PanelWiFi, PanelSystem, PanelCloud, PanelSecurity, // Left column
+		PanelBLE, PanelInputs, PanelProtocols, PanelSmartHome, // Right column
 	}
 	for i, p := range panels {
 		if p == c.focusedPanel {
@@ -462,14 +465,14 @@ func (c *Config) focusPrev() {
 
 func (c *Config) updateFocusStates() {
 	// Panels only show focused when the view has overall focus AND it's the active panel
-	// Panel indices: Device list is 1 (handled by app), view panels start at 2
+	// Panel indices match column-by-column order: left column (2-5), right column (6-9)
 	c.wifi = c.wifi.SetFocused(c.viewFocused && c.focusedPanel == PanelWiFi).SetPanelIndex(2)
 	c.system = c.system.SetFocused(c.viewFocused && c.focusedPanel == PanelSystem).SetPanelIndex(3)
 	c.cloud = c.cloud.SetFocused(c.viewFocused && c.focusedPanel == PanelCloud).SetPanelIndex(4)
-	c.inputs = c.inputs.SetFocused(c.viewFocused && c.focusedPanel == PanelInputs).SetPanelIndex(5)
+	c.security = c.security.SetFocused(c.viewFocused && c.focusedPanel == PanelSecurity).SetPanelIndex(5)
 	c.ble = c.ble.SetFocused(c.viewFocused && c.focusedPanel == PanelBLE).SetPanelIndex(6)
-	c.protocols = c.protocols.SetFocused(c.viewFocused && c.focusedPanel == PanelProtocols).SetPanelIndex(7)
-	c.security = c.security.SetFocused(c.viewFocused && c.focusedPanel == PanelSecurity).SetPanelIndex(8)
+	c.inputs = c.inputs.SetFocused(c.viewFocused && c.focusedPanel == PanelInputs).SetPanelIndex(7)
+	c.protocols = c.protocols.SetFocused(c.viewFocused && c.focusedPanel == PanelProtocols).SetPanelIndex(8)
 	c.smarthome = c.smarthome.SetFocused(c.viewFocused && c.focusedPanel == PanelSmartHome).SetPanelIndex(9)
 
 	// Recalculate layout with new focus (panels resize on focus change)
@@ -563,19 +566,19 @@ func (c *Config) renderNarrowLayout() string {
 
 func (c *Config) renderStandardLayout() string {
 	// Render panels (components already have embedded titles)
-	// Left column: WiFi, System, BLE
+	// Left column: WiFi, System, Cloud, Security
 	leftPanels := []string{
 		c.wifi.View(),
 		c.system.View(),
-		c.ble.View(),
+		c.cloud.View(),
+		c.security.View(),
 	}
 
-	// Right column: Cloud, Inputs, Protocols, Security, SmartHome
+	// Right column: BLE, Inputs, Protocols, SmartHome
 	rightPanels := []string{
-		c.cloud.View(),
+		c.ble.View(),
 		c.inputs.View(),
 		c.protocols.View(),
-		c.security.View(),
 		c.smarthome.View(),
 	}
 
@@ -618,7 +621,7 @@ func (c *Config) SetSize(width, height int) View {
 	// Calculate panel dimensions using flexible layout
 	dims := c.layoutCalc.Calculate()
 
-	// Apply sizes to left column components (WiFi, System, BLE)
+	// Apply sizes to left column components (WiFi, System, Cloud, Security)
 	// Pass full panel dimensions - components handle their own borders via rendering.New()
 	if d, ok := dims[layout.PanelID(PanelWiFi)]; ok {
 		c.wifi = c.wifi.SetSize(d.Width, d.Height)
@@ -626,22 +629,22 @@ func (c *Config) SetSize(width, height int) View {
 	if d, ok := dims[layout.PanelID(PanelSystem)]; ok {
 		c.system = c.system.SetSize(d.Width, d.Height)
 	}
-	if d, ok := dims[layout.PanelID(PanelBLE)]; ok {
-		c.ble = c.ble.SetSize(d.Width, d.Height)
-	}
-
-	// Apply sizes to right column components (Cloud, Inputs, Protocols, Security, SmartHome)
 	if d, ok := dims[layout.PanelID(PanelCloud)]; ok {
 		c.cloud = c.cloud.SetSize(d.Width, d.Height)
+	}
+	if d, ok := dims[layout.PanelID(PanelSecurity)]; ok {
+		c.security = c.security.SetSize(d.Width, d.Height)
+	}
+
+	// Apply sizes to right column components (BLE, Inputs, Protocols, SmartHome)
+	if d, ok := dims[layout.PanelID(PanelBLE)]; ok {
+		c.ble = c.ble.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelInputs)]; ok {
 		c.inputs = c.inputs.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelProtocols)]; ok {
 		c.protocols = c.protocols.SetSize(d.Width, d.Height)
-	}
-	if d, ok := dims[layout.PanelID(PanelSecurity)]; ok {
-		c.security = c.security.SetSize(d.Width, d.Height)
 	}
 	if d, ok := dims[layout.PanelID(PanelSmartHome)]; ok {
 		c.smarthome = c.smarthome.SetSize(d.Width, d.Height)

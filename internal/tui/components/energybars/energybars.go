@@ -145,7 +145,7 @@ func (m Model) View() string {
 
 	// Use rendering package for consistent embedded title styling
 	// Show PM device count and legend in badge
-	badge := fmt.Sprintf("%d devices │ Legend: ██high ░░low", len(m.bars))
+	badge := fmt.Sprintf("%d devices │ Legend: ██ high ░░ low", len(m.bars))
 	r := rendering.New(m.width, m.height).
 		SetTitle("Power Consumption").
 		SetBadge(badge).

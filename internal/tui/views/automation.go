@@ -397,25 +397,26 @@ func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		a.viewFocused = true // View has focus when cycling panels
 		a.focusPrev()
+	// Shift+N hotkeys match column-by-column order: left column (2-4), right column (5-8)
 	case keyconst.Shift2:
 		a.viewFocused = true
 		a.focusedPanel = PanelScripts
 		a.updateFocusStates()
 	case keyconst.Shift3:
 		a.viewFocused = true
-		a.focusedPanel = PanelScriptEditor
+		a.focusedPanel = PanelSchedules
 		a.updateFocusStates()
 	case keyconst.Shift4:
 		a.viewFocused = true
-		a.focusedPanel = PanelSchedules
+		a.focusedPanel = PanelWebhooks
 		a.updateFocusStates()
 	case keyconst.Shift5:
 		a.viewFocused = true
-		a.focusedPanel = PanelScheduleEditor
+		a.focusedPanel = PanelScriptEditor
 		a.updateFocusStates()
 	case keyconst.Shift6:
 		a.viewFocused = true
-		a.focusedPanel = PanelWebhooks
+		a.focusedPanel = PanelScheduleEditor
 		a.updateFocusStates()
 	case keyconst.Shift7:
 		a.viewFocused = true
@@ -430,11 +431,10 @@ func (a *Automation) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func (a *Automation) focusNext() {
+	// Column-by-column: left column top-to-bottom, then right column top-to-bottom
 	panels := []AutomationPanel{
-		PanelScripts, PanelScriptEditor,
-		PanelSchedules, PanelScheduleEditor,
-		PanelWebhooks,
-		PanelVirtuals, PanelKVS,
+		PanelScripts, PanelSchedules, PanelWebhooks, // Left column
+		PanelScriptEditor, PanelScheduleEditor, PanelVirtuals, PanelKVS, // Right column
 	}
 	for i, p := range panels {
 		if p == a.focusedPanel {
@@ -446,11 +446,10 @@ func (a *Automation) focusNext() {
 }
 
 func (a *Automation) focusPrev() {
+	// Column-by-column: left column top-to-bottom, then right column top-to-bottom
 	panels := []AutomationPanel{
-		PanelScripts, PanelScriptEditor,
-		PanelSchedules, PanelScheduleEditor,
-		PanelWebhooks,
-		PanelVirtuals, PanelKVS,
+		PanelScripts, PanelSchedules, PanelWebhooks, // Left column
+		PanelScriptEditor, PanelScheduleEditor, PanelVirtuals, PanelKVS, // Right column
 	}
 	for i, p := range panels {
 		if p == a.focusedPanel {
@@ -464,12 +463,12 @@ func (a *Automation) focusPrev() {
 
 func (a *Automation) updateFocusStates() {
 	// Panels only show focused when the view has overall focus AND it's the active panel
-	// Panel indices: Device list is 1 (handled by app), view panels start at 2
+	// Panel indices match column-by-column order: left column (2-4), right column (5-8)
 	a.scripts = a.scripts.SetFocused(a.viewFocused && a.focusedPanel == PanelScripts).SetPanelIndex(2)
-	a.scriptEditor = a.scriptEditor.SetFocused(a.viewFocused && a.focusedPanel == PanelScriptEditor).SetPanelIndex(3)
-	a.schedules = a.schedules.SetFocused(a.viewFocused && a.focusedPanel == PanelSchedules).SetPanelIndex(4)
-	a.scheduleEditor = a.scheduleEditor.SetFocused(a.viewFocused && a.focusedPanel == PanelScheduleEditor).SetPanelIndex(5)
-	a.webhooks = a.webhooks.SetFocused(a.viewFocused && a.focusedPanel == PanelWebhooks).SetPanelIndex(6)
+	a.schedules = a.schedules.SetFocused(a.viewFocused && a.focusedPanel == PanelSchedules).SetPanelIndex(3)
+	a.webhooks = a.webhooks.SetFocused(a.viewFocused && a.focusedPanel == PanelWebhooks).SetPanelIndex(4)
+	a.scriptEditor = a.scriptEditor.SetFocused(a.viewFocused && a.focusedPanel == PanelScriptEditor).SetPanelIndex(5)
+	a.scheduleEditor = a.scheduleEditor.SetFocused(a.viewFocused && a.focusedPanel == PanelScheduleEditor).SetPanelIndex(6)
 	a.virtuals = a.virtuals.SetFocused(a.viewFocused && a.focusedPanel == PanelVirtuals).SetPanelIndex(7)
 	a.kvs = a.kvs.SetFocused(a.viewFocused && a.focusedPanel == PanelKVS).SetPanelIndex(8)
 

@@ -130,8 +130,8 @@ func (r *Renderer) Render() string {
 
 	lines := make([]string, 0, r.height)
 
-	// Top border
-	lines = append(lines, borderStyle.Render(r.buildTopBorder()))
+	// Top border - pass border style to handle styled badges properly
+	lines = append(lines, r.buildTopBorder(borderStyle))
 
 	// Content with borders and padding
 	contentLines := r.buildContentLines(contentWidth, borderStyle)
@@ -153,11 +153,13 @@ func (r *Renderer) getBorderStyle() lipgloss.Style {
 }
 
 // buildTopBorder constructs the top border with optional title and badge.
-func (r *Renderer) buildTopBorder() string {
+// When a badge contains styled text, the border style is needed to re-color
+// the border parts after the badge.
+func (r *Renderer) buildTopBorder(borderStyle lipgloss.Style) string {
 	if r.badge != "" {
-		return BuildTopBorderWithBadge(r.width, r.title, r.badge, r.border)
+		return BuildTopBorderWithBadge(r.width, r.title, r.badge, r.border, borderStyle)
 	}
-	return BuildTopBorder(r.width, r.title, r.border)
+	return borderStyle.Render(BuildTopBorder(r.width, r.title, r.border))
 }
 
 // buildBottomBorder constructs the bottom border with optional footer and hint.
@@ -192,19 +194,52 @@ func (r *Renderer) buildContentLines(contentWidth int, borderStyle lipgloss.Styl
 }
 
 // renderContentWithBorders wraps content lines with borders and padding.
+// Returns exactly contentHeight lines to ensure panels fit their allocated space.
 func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth, contentHeight int, borderStyle lipgloss.Style) []string {
+	if contentHeight <= 0 {
+		return []string{}
+	}
+
 	leftBorder := borderStyle.Render(r.border.Left) + " "
 	rightBorder := " " + borderStyle.Render(r.border.Right)
 	paddedWidth := contentWidth - 2
 
 	emptyLine := leftBorder + strings.Repeat(" ", paddedWidth) + rightBorder
-	lines := []string{emptyLine}
 
-	innerHeight := contentHeight - 2
-	if innerHeight < 1 {
-		innerHeight = 1
+	// For very small content areas (1-2 lines), show content with no padding
+	if contentHeight <= 2 {
+		lines := make([]string, 0, contentHeight)
+		for i := range contentHeight {
+			line := ""
+			if i < len(contentLines) {
+				line = contentLines[i]
+			}
+			line = r.padOrTruncate(line, paddedWidth)
+			lines = append(lines, leftBorder+line+rightBorder)
+		}
+		return lines
 	}
 
+	// For 3-line content areas, show content with top padding only
+	if contentHeight == 3 {
+		lines := make([]string, 0, contentHeight)
+		lines = append(lines, emptyLine) // top padding only
+		for i := range 2 {
+			line := ""
+			if i < len(contentLines) {
+				line = contentLines[i]
+			}
+			line = r.padOrTruncate(line, paddedWidth)
+			lines = append(lines, leftBorder+line+rightBorder)
+		}
+		return lines
+	}
+
+	// Normal case (4+ lines): top padding (1) + content lines + bottom padding (1)
+	lines := make([]string, 0, contentHeight)
+	lines = append(lines, emptyLine) // top padding
+
+	innerHeight := contentHeight - 2
 	for i := range innerHeight {
 		line := ""
 		if i < len(contentLines) {
@@ -214,7 +249,7 @@ func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth,
 		lines = append(lines, leftBorder+line+rightBorder)
 	}
 
-	lines = append(lines, emptyLine)
+	lines = append(lines, emptyLine) // bottom padding
 	return lines
 }
 

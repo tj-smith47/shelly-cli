@@ -86,14 +86,15 @@ func BuildTopBorder(width int, title string, border lipgloss.Border) string {
 
 // BuildTopBorderWithBadge creates a top border with a title and a separate badge section.
 // Example output: "╭─├─ Devices ─┼─ 17/18 ─┤────╮" (superfile style).
-func BuildTopBorderWithBadge(width int, title, badge string, border lipgloss.Border) string {
+// The borderStyle is used to properly color border parts after styled badge text.
+func BuildTopBorderWithBadge(width int, title, badge string, border lipgloss.Border, borderStyle lipgloss.Style) string {
 	if width < 5 {
 		return ""
 	}
 
 	// If no badge, fall back to regular title border
 	if badge == "" {
-		return BuildTopBorder(width, title, border)
+		return borderStyle.Render(BuildTopBorder(width, title, border))
 	}
 
 	topLeft := border.TopLeft
@@ -124,7 +125,7 @@ func BuildTopBorderWithBadge(width int, title, badge string, border lipgloss.Bor
 
 	if availableForFill < 0 {
 		// Not enough space for badge, fall back to title only
-		return BuildTopBorder(width, title+" "+badge, border)
+		return borderStyle.Render(BuildTopBorder(width, title+" "+badge, border))
 	}
 
 	// Minimal left padding, rest on right
@@ -136,11 +137,16 @@ func BuildTopBorderWithBadge(width int, title, badge string, border lipgloss.Bor
 		rightFillCount = 0
 	}
 
-	return topLeft +
+	// Build border in parts: style parts before badge, include badge as-is,
+	// then re-apply style to parts after badge (in case badge contains styled text)
+	beforeBadge := topLeft +
 		strings.Repeat(top, leftFillCount) +
-		midLeft + top + titleText + top + middle + top + badgeText + top + midRight +
+		midLeft + top + titleText + top + middle + top
+	afterBadge := top + midRight +
 		strings.Repeat(top, rightFillCount) +
 		topRight
+
+	return borderStyle.Render(beforeBadge) + badgeText + borderStyle.Render(afterBadge)
 }
 
 // BuildBottomBorder creates a bottom border.
