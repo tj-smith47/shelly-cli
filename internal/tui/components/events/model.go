@@ -471,9 +471,9 @@ func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
 
-	// For dual columns: 3 header lines (title + column headers + separator)
+	// For dual columns: 4 reserved lines (title + column headers + separator + pagination dots)
 	// Calculate events per page
-	m.perPage = height - 3
+	m.perPage = height - 4
 	if m.perPage < 1 {
 		m.perPage = 1
 	}

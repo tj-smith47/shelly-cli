@@ -148,4 +148,43 @@ func TestDefaultStyles(t *testing.T) {
 	_ = styles.Success
 	_ = styles.Error
 	_ = styles.Warning
+	_ = styles.Debug
+}
+
+func TestModel_SetDebugActive(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	if m.IsDebugActive() {
+		t.Error("debug should be inactive by default")
+	}
+
+	m = m.SetDebugActive(true)
+	if !m.IsDebugActive() {
+		t.Error("debug should be active after SetDebugActive(true)")
+	}
+
+	m = m.SetDebugActive(false)
+	if m.IsDebugActive() {
+		t.Error("debug should be inactive after SetDebugActive(false)")
+	}
+}
+
+func TestModel_View_DebugIndicator(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetWidth(120)
+	m = m.SetDebugActive(true)
+
+	view := m.View()
+	if !strings.Contains(view, "Debug active") {
+		t.Errorf("View() should contain 'Debug active' when debug is enabled in full tier, got: %q", view)
+	}
+
+	// Test compact tier
+	m = m.SetWidth(80)
+	view = m.View()
+	if !strings.Contains(view, "REC") {
+		t.Errorf("View() should contain 'REC' when debug is enabled in compact tier, got: %q", view)
+	}
 }

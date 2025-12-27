@@ -604,7 +604,12 @@ func (c *Config) SetSize(width, height int) View {
 
 	// Update layout with new dimensions and focus
 	c.layoutCalc.SetSize(width, height)
-	c.layoutCalc.SetFocus(layout.PanelID(c.focusedPanel))
+	// Only expand panels when view has focus, otherwise distribute evenly
+	if c.viewFocused {
+		c.layoutCalc.SetFocus(layout.PanelID(c.focusedPanel))
+	} else {
+		c.layoutCalc.SetFocus(-1) // No expansion when device list is focused
+	}
 
 	// Calculate panel dimensions using flexible layout
 	dims := c.layoutCalc.Calculate()

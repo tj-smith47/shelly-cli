@@ -273,6 +273,59 @@ func TestLogger_Writer(t *testing.T) {
 	}
 }
 
+func TestCleanupOldSessions(t *testing.T) {
+	t.Parallel()
+
+	// Create temp debug directory with 30 sessions
+	tmpDir := t.TempDir()
+	debugDir := filepath.Join(tmpDir, DebugDir)
+	if err := os.MkdirAll(debugDir, 0o700); err != nil {
+		t.Fatalf("mkdir debug dir: %v", err)
+	}
+
+	// Create 30 session directories with timestamped names (format: 2025-01-DD_12-00-00)
+	for i := range 30 {
+		sessionName := "2025-01-" + string(rune('0'+i/10)) + string(rune('0'+i%10)) + "_12-00-00"
+		sessionPath := filepath.Join(debugDir, sessionName)
+		if err := os.MkdirAll(sessionPath, 0o700); err != nil {
+			t.Fatalf("mkdir session %d: %v", i, err)
+		}
+	}
+
+	// Verify we have 30 sessions
+	entries, err := os.ReadDir(debugDir)
+	if err != nil {
+		t.Fatalf("read debug dir: %v", err)
+	}
+	if len(entries) != 30 {
+		t.Fatalf("expected 30 sessions, got %d", len(entries))
+	}
+
+	// Run cleanup
+	cleanupOldSessions(debugDir)
+
+	// Verify we now have MaxSessions
+	entries, err = os.ReadDir(debugDir)
+	if err != nil {
+		t.Fatalf("read debug dir after cleanup: %v", err)
+	}
+	if len(entries) != MaxSessions {
+		t.Errorf("expected %d sessions after cleanup, got %d", MaxSessions, len(entries))
+	}
+
+	// Verify oldest sessions (days 00-04) were removed and newest (days 05-29) remain
+	for _, e := range entries {
+		name := e.Name()
+		// Extract day number (format: 2025-01-DD_12-00-00)
+		if len(name) >= 10 {
+			day := name[8:10]
+			if day < "05" {
+				t.Errorf("expected old session %s to be removed", name)
+			}
+		}
+	}
+}
+
 //nolint:paralleltest // Tests modify environment variables
 func TestLogger_Toggle(t *testing.T) {
 	// Use temp dir for HOME

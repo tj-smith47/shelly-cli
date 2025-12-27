@@ -192,7 +192,15 @@ func (l *TwoColumnLayout) SetSize(width, height int) {
 }
 
 // SetFocus updates which panel is focused.
+// Pass -1 to clear focus from all panels (equal distribution).
 func (l *TwoColumnLayout) SetFocus(panelID PanelID) {
+	// Clear focus when -1 is passed
+	if panelID == -1 {
+		l.LeftColumn.FocusedID = -1
+		l.RightColumn.FocusedID = -1
+		return
+	}
+
 	// Check if panel is in left or right column
 	for _, p := range l.LeftColumn.Panels {
 		if p.ID == panelID {

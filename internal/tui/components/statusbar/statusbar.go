@@ -30,6 +30,7 @@ type Model struct {
 	lastUpdate  time.Time
 	styles      Styles
 	items       []StatusItem
+	debugActive bool
 }
 
 // MessageType indicates the type of status message.
@@ -57,6 +58,7 @@ type Styles struct {
 	Warning lipgloss.Style
 	Version lipgloss.Style
 	Time    lipgloss.Style
+	Debug   lipgloss.Style
 }
 
 // DefaultStyles returns default styles for the status bar.
@@ -83,6 +85,9 @@ func DefaultStyles() Styles {
 			Foreground(colors.Muted),
 		Time: lipgloss.NewStyle().
 			Foreground(colors.Info),
+		Debug: lipgloss.NewStyle().
+			Foreground(colors.Error).
+			Bold(true),
 	}
 }
 
@@ -164,6 +169,17 @@ func (m Model) ClearItems() Model {
 	return m
 }
 
+// SetDebugActive sets whether a debug session is active.
+func (m Model) SetDebugActive(active bool) Model {
+	m.debugActive = active
+	return m
+}
+
+// IsDebugActive returns whether a debug session is active.
+func (m Model) IsDebugActive() bool {
+	return m.debugActive
+}
+
 // Tier represents the status bar display tier.
 type Tier int
 
@@ -204,6 +220,15 @@ func (m Model) View() string {
 		msgStyle = m.styles.Normal
 	}
 	left := msgStyle.Render(m.message)
+
+	// Debug indicator (recording dot + text)
+	if m.debugActive {
+		debugText := "REC"
+		if tier == TierFull {
+			debugText = "Debug active"
+		}
+		left += "  " + m.styles.Debug.Render("● "+debugText)
+	}
 
 	// Middle: context-specific items (if any)
 	middle := m.renderItems(tier)

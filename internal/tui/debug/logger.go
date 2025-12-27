@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,8 @@ const (
 	DebugDir = "debug"
 	// MainLogFile is the main log file name.
 	MainLogFile = "tui.log"
+	// MaxSessions is the maximum number of debug sessions to keep.
+	MaxSessions = 25
 )
 
 // Logger writes TUI debug information to a log file.
@@ -60,12 +63,16 @@ func New() *Logger {
 	// Create timestamped session directory
 	l.startTime = time.Now()
 	sessionName := l.startTime.Format("2006-01-02_15-04-05")
-	l.sessionDir = filepath.Join(configDir, DebugDir, sessionName)
+	debugDir := filepath.Join(configDir, DebugDir)
+	l.sessionDir = filepath.Join(debugDir, sessionName)
 
 	if err := os.MkdirAll(l.sessionDir, 0o700); err != nil {
 		iostreams.DebugErr("create debug session dir", err)
 		return l
 	}
+
+	// Clean up old sessions
+	cleanupOldSessions(debugDir)
 
 	logPath := filepath.Join(l.sessionDir, MainLogFile)
 	//nolint:gosec // Path constructed from config.Dir() + fixed constants, not user input
@@ -204,12 +211,16 @@ func (l *Logger) Toggle() (enabled bool, sessionDir string) {
 	// Create timestamped session directory
 	l.startTime = time.Now()
 	sessionName := l.startTime.Format("2006-01-02_15-04-05")
-	l.sessionDir = filepath.Join(configDir, DebugDir, sessionName)
+	debugDir := filepath.Join(configDir, DebugDir)
+	l.sessionDir = filepath.Join(debugDir, sessionName)
 
 	if err := os.MkdirAll(l.sessionDir, 0o700); err != nil {
 		iostreams.DebugErr("create debug session dir for toggle", err)
 		return false, ""
 	}
+
+	// Clean up old sessions
+	cleanupOldSessions(debugDir)
 
 	logPath := filepath.Join(l.sessionDir, MainLogFile)
 	//nolint:gosec // Path constructed from config.Dir() + fixed constants, not user input
@@ -274,4 +285,38 @@ func (l *Logger) Writer() io.Writer {
 		return io.Discard
 	}
 	return l.file
+}
+
+// cleanupOldSessions removes debug sessions beyond MaxSessions.
+// Sessions are sorted by name (timestamp-based) and oldest are removed.
+func cleanupOldSessions(debugDir string) {
+	entries, err := os.ReadDir(debugDir)
+	if err != nil {
+		iostreams.DebugErr("read debug dir for cleanup", err)
+		return
+	}
+
+	// Filter to directories only (session folders)
+	var sessions []string
+	for _, e := range entries {
+		if e.IsDir() {
+			sessions = append(sessions, e.Name())
+		}
+	}
+
+	if len(sessions) <= MaxSessions {
+		return
+	}
+
+	// Sort ascending (oldest first) - timestamp format ensures alphabetical = chronological
+	slices.Sort(sessions)
+
+	// Remove oldest sessions beyond limit
+	toRemove := len(sessions) - MaxSessions
+	for i := range toRemove {
+		sessionPath := filepath.Join(debugDir, sessions[i])
+		if err := os.RemoveAll(sessionPath); err != nil {
+			iostreams.DebugErr("remove old debug session", err)
+		}
+	}
 }

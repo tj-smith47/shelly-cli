@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/tj-smith47/shelly-cli/internal/branding"
 	"github.com/tj-smith47/shelly-cli/internal/browser"
@@ -1203,6 +1204,8 @@ func (m Model) handleDebugToggle() (tea.Model, tea.Cmd, bool) {
 			Description: desc,
 		}},
 	}
+	// Update status bar debug indicator
+	m.statusBar = m.statusBar.SetDebugActive(enabled)
 	return m, tea.Batch(toast.Success(toastMsg), func() tea.Msg { return debugEvent }), true
 }
 
@@ -1713,6 +1716,8 @@ func (m Model) renderTabContent(contentHeight int) string {
 }
 
 // padContent pads content to fill the entire content area with horizontal padding.
+// Ensures every line is exactly m.width visible characters to prevent ghosting
+// when switching tabs (old content showing through).
 func (m Model) padContent(content string, contentHeight int) string {
 	cw := m.contentWidth()
 	pad := strings.Repeat(" ", horizontalPadding)
@@ -1722,8 +1727,14 @@ func (m Model) padContent(content string, contentHeight int) string {
 	for i := range contentHeight {
 		if i < len(contentLines) {
 			line := contentLines[i]
-			lineWidth := lipgloss.Width(line)
+			lineWidth := ansi.StringWidth(line)
+			if lineWidth > cw {
+				// Truncate lines that are too wide
+				line = ansi.Truncate(line, cw, "")
+				lineWidth = cw
+			}
 			if lineWidth < cw {
+				// Pad lines that are too narrow
 				line += strings.Repeat(" ", cw-lineWidth)
 			}
 			paddedLines[i] = pad + line + pad
