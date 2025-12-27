@@ -1474,6 +1474,7 @@ type PrometheusCollector struct {
 
 	mu      sync.RWMutex
 	metrics map[string]*PrometheusMetrics
+	errors  map[string]error
 }
 
 // NewPrometheusCollector creates a new Prometheus metrics collector.
@@ -1482,12 +1483,14 @@ func NewPrometheusCollector(svc *Service, devices []string) *PrometheusCollector
 		svc:     svc,
 		devices: devices,
 		metrics: make(map[string]*PrometheusMetrics),
+		errors:  make(map[string]error),
 	}
 }
 
 // Collect fetches metrics from all configured devices concurrently.
 func (c *PrometheusCollector) Collect(ctx context.Context) {
 	newMetrics := make(map[string]*PrometheusMetrics)
+	newErrors := make(map[string]error)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(config.GetGlobalMaxConcurrent())
@@ -1497,19 +1500,40 @@ func (c *PrometheusCollector) Collect(ctx context.Context) {
 	for _, device := range c.devices {
 		dev := device
 		g.Go(func() error {
-			m, _ := c.svc.CollectPrometheusMetrics(ctx, dev)
+			m, err := c.svc.CollectPrometheusMetrics(ctx, dev)
 			mu.Lock()
-			newMetrics[dev] = m
+			if err != nil {
+				newErrors[dev] = err
+			} else {
+				newMetrics[dev] = m
+			}
 			mu.Unlock()
-			return nil
+			return nil // Don't propagate errors - collect from remaining devices
 		})
 	}
 
-	_ = g.Wait()
+	// All goroutines return nil, so Wait() never returns an error.
+	// We must still call it to wait for completion.
+	if err := g.Wait(); err != nil {
+		// This should never happen since all goroutines return nil
+		panic("unexpected error from errgroup: " + err.Error())
+	}
 
 	c.mu.Lock()
 	c.metrics = newMetrics
+	c.errors = newErrors
 	c.mu.Unlock()
+}
+
+// Errors returns any collection errors from the last Collect call.
+func (c *PrometheusCollector) Errors() map[string]error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	result := make(map[string]error, len(c.errors))
+	for k, v := range c.errors {
+		result[k] = v
+	}
+	return result
 }
 
 // FormatMetrics returns the collected metrics in Prometheus exposition format.

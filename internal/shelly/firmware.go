@@ -4,6 +4,8 @@ package shelly
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/tj-smith47/shelly-go/firmware"
@@ -445,4 +447,145 @@ func (s *Service) UpdateDevices(ctx context.Context, ios *iostreams.IOStreams, d
 	ios.StopProgress()
 
 	return results
+}
+
+// FirmwareUpdateEntry represents a device with available firmware updates.
+type FirmwareUpdateEntry struct {
+	Name      string
+	Device    model.Device
+	FwInfo    *FirmwareInfo
+	HasUpdate bool
+	HasBeta   bool
+	Error     error
+}
+
+// BuildFirmwareUpdateList creates a sorted list of devices that have updates available.
+func BuildFirmwareUpdateList(results []FirmwareCheckResult, devices map[string]model.Device) []FirmwareUpdateEntry {
+	var entries []FirmwareUpdateEntry
+	for _, r := range results {
+		device := devices[r.Name]
+		entry := FirmwareUpdateEntry{
+			Name:   r.Name,
+			Device: device,
+			FwInfo: r.Info,
+		}
+		if r.Err != nil {
+			entry.Error = r.Err
+		} else if r.Info != nil {
+			entry.HasUpdate = r.Info.HasUpdate
+			entry.HasBeta = r.Info.Beta != "" && r.Info.Beta != r.Info.Current
+		}
+		if entry.HasUpdate || entry.HasBeta {
+			entries = append(entries, entry)
+		}
+	}
+
+	// Sort by device name
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name < entries[j].Name
+	})
+
+	return entries
+}
+
+// FilterDevicesByNameAndPlatform filters devices based on device name list and platform.
+func FilterDevicesByNameAndPlatform(devices map[string]model.Device, devicesList, platform string) map[string]model.Device {
+	result := make(map[string]model.Device)
+
+	// If devicesList is specified, filter by names
+	var selectedNames map[string]bool
+	if devicesList != "" {
+		selectedNames = make(map[string]bool)
+		for _, name := range strings.Split(devicesList, ",") {
+			selectedNames[strings.TrimSpace(name)] = true
+		}
+	}
+
+	for name, device := range devices {
+		// Filter by name if devicesList specified
+		if selectedNames != nil && !selectedNames[name] {
+			continue
+		}
+
+		// Filter by platform if specified
+		if platform != "" {
+			devicePlatform := device.Platform
+			if devicePlatform == "" {
+				devicePlatform = "shelly"
+			}
+			if devicePlatform != platform {
+				continue
+			}
+		}
+
+		result[name] = device
+	}
+
+	return result
+}
+
+// FilterEntriesByStage filters firmware update entries based on the requested stage.
+func FilterEntriesByStage(entries []FirmwareUpdateEntry, beta bool) []FirmwareUpdateEntry {
+	var result []FirmwareUpdateEntry
+	for _, e := range entries {
+		if beta && e.HasBeta {
+			result = append(result, e)
+		} else if e.HasUpdate {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+// AnyHasBeta returns true if any entry has a beta update available.
+func AnyHasBeta(entries []FirmwareUpdateEntry) bool {
+	for _, e := range entries {
+		if e.HasBeta {
+			return true
+		}
+	}
+	return false
+}
+
+// SelectEntriesByStage selects entry indices based on the beta flag and returns the stage name.
+func SelectEntriesByStage(entries []FirmwareUpdateEntry, beta bool) (indices []int, stage string) {
+	stage = "stable"
+	if beta {
+		stage = "beta"
+	}
+	filtered := FilterEntriesByStage(entries, beta)
+	nameSet := make(map[string]bool, len(filtered))
+	for _, f := range filtered {
+		nameSet[f.Name] = true
+	}
+	for i, e := range entries {
+		if nameSet[e.Name] {
+			indices = append(indices, i)
+		}
+	}
+	return indices, stage
+}
+
+// GetEntriesByIndices returns entries at the specified indices.
+func GetEntriesByIndices(entries []FirmwareUpdateEntry, indices []int) []FirmwareUpdateEntry {
+	var result []FirmwareUpdateEntry
+	for _, idx := range indices {
+		if idx >= 0 && idx < len(entries) {
+			result = append(result, entries[idx])
+		}
+	}
+	return result
+}
+
+// ToDeviceUpdateStatuses converts firmware entries to device update statuses.
+func ToDeviceUpdateStatuses(entries []FirmwareUpdateEntry) []DeviceUpdateStatus {
+	result := make([]DeviceUpdateStatus, len(entries))
+	for i, d := range entries {
+		result[i] = DeviceUpdateStatus{
+			Name:      d.Name,
+			Info:      d.FwInfo,
+			HasUpdate: d.HasUpdate,
+		}
+	}
+	return result
 }

@@ -6,25 +6,13 @@ package updates
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
-)
-
-// Release stage constants.
-const (
-	stageStable = "stable"
-	stageBeta   = "beta"
 )
 
 // NewCommand creates the firmware updates command.
@@ -68,14 +56,14 @@ Supports both native Shelly devices and plugin-managed devices (Tasmota, etc.).`
   shelly firmware updates --devices=kitchen,bedroom`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts := runOptions{
-				all:      allFlag,
-				stable:   stableFlag,
-				beta:     betaFlag,
-				devices:  devicesFlag,
-				platform: platformFlag,
-				yes:      yesFlag,
-				parallel: parallelFlag,
+			opts := Options{
+				All:      allFlag,
+				Stable:   stableFlag,
+				Beta:     betaFlag,
+				Devices:  devicesFlag,
+				Platform: platformFlag,
+				Yes:      yesFlag,
+				Parallel: parallelFlag,
 			}
 			return run(cmd.Context(), f, opts)
 		},
@@ -92,117 +80,66 @@ Supports both native Shelly devices and plugin-managed devices (Tasmota, etc.).`
 	return cmd
 }
 
-type runOptions struct {
-	all      bool
-	stable   bool
-	beta     bool
-	devices  string
-	platform string
-	yes      bool
-	parallel int
+// Options holds command options.
+type Options struct {
+	All      bool
+	Stable   bool
+	Beta     bool
+	Devices  string
+	Platform string
+	Yes      bool
+	Parallel int
 }
 
-// deviceUpdateInfo holds information about a device's firmware update status.
-type deviceUpdateInfo struct {
-	Name        string
-	Device      model.Device
-	FwInfo      *shelly.FirmwareInfo
-	HasUpdate   bool
-	HasBeta     bool
-	UpdateError error
-}
-
-func run(ctx context.Context, f *cmdutil.Factory, opts runOptions) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	// Load and filter devices
-	deviceConfigs, err := loadAndFilterDevices(ios, opts)
-	if err != nil {
-		return err
-	}
-	if len(deviceConfigs) == 0 {
-		return nil // Warning already shown
-	}
-
-	// Check all devices for updates using platform-aware checking
-	results := svc.CheckFirmwareAllPlatforms(ctx, ios, deviceConfigs)
-
-	// Build list of devices with updates
-	devicesWithUpdates := buildUpdateList(results, deviceConfigs)
-	if len(devicesWithUpdates) == 0 {
-		ios.Info("All devices are up to date")
-		return nil
-	}
-
-	// Display devices with available updates
-	displayUpdatesTable(ios, devicesWithUpdates)
-
-	// Determine which devices to update and what stage
-	toUpdate, stage := selectDevicesForUpdate(ios, devicesWithUpdates, opts)
-	if len(toUpdate) == 0 {
-		ios.Info("No devices selected for update")
-		return nil
-	}
-
-	// Confirm and execute updates
-	return confirmAndExecuteUpdates(ctx, ios, svc, toUpdate, stage, opts)
-}
-
-// loadAndFilterDevices loads config and filters devices based on options.
-// Returns empty map (not nil) with no error if no devices match; caller should check len().
-func loadAndFilterDevices(ios *iostreams.IOStreams, opts runOptions) (map[string]model.Device, error) {
+	// Load config
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	if len(cfg.Devices) == 0 {
 		ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
-		return make(map[string]model.Device), nil
+		return nil
 	}
 
-	deviceConfigs := filterDevices(cfg.Devices, opts.devices, opts.platform)
+	// Filter devices and check for updates
+	deviceConfigs := shelly.FilterDevicesByNameAndPlatform(cfg.Devices, opts.Devices, opts.Platform)
 	if len(deviceConfigs) == 0 {
 		ios.Warning("No devices matched the specified filters")
+		return nil
 	}
 
-	return deviceConfigs, nil
-}
-
-// buildUpdateList builds a sorted list of devices that have updates available.
-func buildUpdateList(results []shelly.FirmwareCheckResult, deviceConfigs map[string]model.Device) []deviceUpdateInfo {
-	var devicesWithUpdates []deviceUpdateInfo
-	for _, r := range results {
-		device := deviceConfigs[r.Name]
-		info := deviceUpdateInfo{
-			Name:   r.Name,
-			Device: device,
-			FwInfo: r.Info,
-		}
-		if r.Err != nil {
-			info.UpdateError = r.Err
-		} else if r.Info != nil {
-			info.HasUpdate = r.Info.HasUpdate
-			info.HasBeta = r.Info.Beta != "" && r.Info.Beta != r.Info.Current
-		}
-		if info.HasUpdate || info.HasBeta {
-			devicesWithUpdates = append(devicesWithUpdates, info)
-		}
+	entries := shelly.BuildFirmwareUpdateList(svc.CheckFirmwareAllPlatforms(ctx, ios, deviceConfigs), deviceConfigs)
+	if len(entries) == 0 {
+		ios.Info("All devices are up to date")
+		return nil
 	}
 
-	// Sort by device name
-	sort.Slice(devicesWithUpdates, func(i, j int) bool {
-		return devicesWithUpdates[i].Name < devicesWithUpdates[j].Name
-	})
+	// Display and select devices
+	termEntries := term.ConvertToTermEntries(entries)
+	term.DisplayFirmwareUpdatesTable(ios, termEntries)
 
-	return devicesWithUpdates
-}
+	var selectedIndices []int
+	var stage string
+	if opts.All || opts.Devices != "" {
+		selectedIndices, stage = shelly.SelectEntriesByStage(entries, opts.Beta)
+	} else {
+		selectedIndices, stage = term.InteractiveFirmwareSelect(ios, termEntries, shelly.AnyHasBeta(entries))
+	}
 
-// confirmAndExecuteUpdates confirms with user and executes the updates.
-func confirmAndExecuteUpdates(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, toUpdate []deviceUpdateInfo, stage string, opts runOptions) error {
-	// Confirm if not --yes
-	if !opts.yes {
+	if len(selectedIndices) == 0 {
+		ios.Info("No devices selected for update")
+		return nil
+	}
+
+	toUpdate := shelly.GetEntriesByIndices(entries, selectedIndices)
+
+	// Confirm if needed
+	if !opts.Yes {
 		msg := fmt.Sprintf("Update %d device(s) to %s?", len(toUpdate), stage)
 		confirmed, confirmErr := ios.Confirm(msg, false)
 		if confirmErr != nil {
@@ -214,244 +151,19 @@ func confirmAndExecuteUpdates(ctx context.Context, ios *iostreams.IOStreams, svc
 		}
 	}
 
-	// Convert to DeviceUpdateStatus for the service
-	updateStatuses := make([]shelly.DeviceUpdateStatus, len(toUpdate))
-	for i, d := range toUpdate {
-		updateStatuses[i] = shelly.DeviceUpdateStatus{
-			Name:      d.Name,
-			Info:      d.FwInfo,
-			HasUpdate: d.HasUpdate,
-		}
-	}
-
-	// Perform updates
-	updateResults := svc.UpdateDevices(ctx, ios, updateStatuses, shelly.UpdateOpts{
-		Beta:        stage == stageBeta,
-		Parallelism: opts.parallel,
+	// Execute updates
+	updateResults := svc.UpdateDevices(ctx, ios, shelly.ToDeviceUpdateStatuses(toUpdate), shelly.UpdateOpts{
+		Beta:        stage == "beta",
+		Parallelism: opts.Parallel,
 	})
 
-	// Display results
-	termResults := make([]term.UpdateResult, len(updateResults))
-	for i, r := range updateResults {
-		termResults[i] = term.UpdateResult{
-			Name:    r.Name,
-			Success: r.Success,
-			Err:     r.Err,
-		}
-	}
-	term.DisplayUpdateResults(ios, termResults)
+	term.DisplayUpdateResults(ios, term.ConvertToTermResults(updateResults))
 
-	// Exit code based on results
+	// Check for failures
 	for _, r := range updateResults {
 		if !r.Success {
 			return fmt.Errorf("some updates failed")
 		}
 	}
 	return nil
-}
-
-// filterDevices filters devices based on --devices and --platform flags.
-func filterDevices(devices map[string]model.Device, devicesList, platform string) map[string]model.Device {
-	result := make(map[string]model.Device)
-
-	// If --devices is specified, filter by names
-	var selectedNames map[string]bool
-	if devicesList != "" {
-		selectedNames = make(map[string]bool)
-		for _, name := range strings.Split(devicesList, ",") {
-			selectedNames[strings.TrimSpace(name)] = true
-		}
-	}
-
-	for name, device := range devices {
-		// Filter by name if --devices specified
-		if selectedNames != nil && !selectedNames[name] {
-			continue
-		}
-
-		// Filter by platform if --platform specified
-		if platform != "" {
-			devicePlatform := device.Platform
-			if devicePlatform == "" {
-				devicePlatform = "shelly"
-			}
-			if devicePlatform != platform {
-				continue
-			}
-		}
-
-		result[name] = device
-	}
-
-	return result
-}
-
-// displayUpdatesTable shows a table of devices with available updates.
-func displayUpdatesTable(ios *iostreams.IOStreams, devices []deviceUpdateInfo) {
-	ios.Println("")
-	ios.Printf("%s\n\n", theme.Bold().Render("Devices with available updates:"))
-
-	table := output.NewTable("#", "Device", "Platform", "Current", "Stable", "Beta")
-	for i, d := range devices {
-		platform := d.FwInfo.Platform
-		if platform == "" {
-			platform = "shelly"
-		}
-
-		stable := d.FwInfo.Available
-		if stable == "" {
-			stable = output.LabelPlaceholder
-		}
-
-		beta := d.FwInfo.Beta
-		if beta == "" {
-			beta = output.LabelPlaceholder
-		}
-
-		table.AddRow(
-			fmt.Sprintf("%d", i+1),
-			d.Name,
-			platform,
-			d.FwInfo.Current,
-			stable,
-			beta,
-		)
-	}
-
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
-	}
-	ios.Println("")
-}
-
-// selectDevicesForUpdate determines which devices to update based on options.
-// Returns the devices to update and the release stage (stageStable or stageBeta).
-func selectDevicesForUpdate(ios *iostreams.IOStreams, devices []deviceUpdateInfo, opts runOptions) (selected []deviceUpdateInfo, stage string) {
-	// Determine release stage
-	stage = stageStable
-	if opts.beta {
-		stage = stageBeta
-	}
-
-	// Non-interactive mode: --all or --devices specified
-	if opts.all || opts.devices != "" {
-		return filterDevicesByStage(devices, stage), stage
-	}
-
-	// Interactive mode
-	return interactiveDeviceSelect(ios, devices, stage)
-}
-
-// filterDevicesByStage filters devices based on the requested stage.
-func filterDevicesByStage(devices []deviceUpdateInfo, stage string) []deviceUpdateInfo {
-	var result []deviceUpdateInfo
-	for _, d := range devices {
-		if stage == stageBeta && d.HasBeta {
-			result = append(result, d)
-		} else if d.HasUpdate {
-			result = append(result, d)
-		}
-	}
-	return result
-}
-
-// interactiveDeviceSelect prompts user to select devices interactively.
-func interactiveDeviceSelect(ios *iostreams.IOStreams, devices []deviceUpdateInfo, stage string) (selected []deviceUpdateInfo, selectedStage string) {
-	ios.Println("Options:")
-	ios.Println("  [a] Update all to stable")
-	if anyHasBeta(devices) {
-		ios.Println("  [b] Update all to beta")
-	}
-	ios.Println("  [s] Select specific devices")
-	ios.Println("  [q] Quit")
-	ios.Println("")
-
-	choice, err := ios.Input("Choose option", "a")
-	if err != nil {
-		return nil, stage
-	}
-
-	return handleInteractiveChoice(ios, devices, choice, stage)
-}
-
-// handleInteractiveChoice processes the user's interactive menu choice.
-func handleInteractiveChoice(ios *iostreams.IOStreams, devices []deviceUpdateInfo, choice, stage string) (selected []deviceUpdateInfo, selectedStage string) {
-	switch strings.ToLower(strings.TrimSpace(choice)) {
-	case "a":
-		return filterDevicesByStage(devices, stageStable), stageStable
-	case "b":
-		return filterDevicesByStage(devices, stageBeta), stageBeta
-	case "s":
-		return selectSpecificDevices(ios, devices)
-	case "q", "":
-		return nil, stage
-	default:
-		return nil, stage
-	}
-}
-
-// selectSpecificDevices prompts user to select individual devices.
-func selectSpecificDevices(ios *iostreams.IOStreams, devices []deviceUpdateInfo) (selected []deviceUpdateInfo, stage string) {
-	ios.Println("")
-	ios.Println("Enter device numbers separated by commas (e.g., 1,3,5)")
-	ios.Println("Or enter 'all' for all devices")
-	ios.Println("")
-
-	input, err := ios.Input("Devices", "all")
-	if err != nil {
-		return nil, stageStable
-	}
-
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return nil, stageStable
-	}
-
-	if strings.EqualFold(input, "all") {
-		for _, d := range devices {
-			if d.HasUpdate {
-				selected = append(selected, d)
-			}
-		}
-		return selected, stageStable
-	}
-
-	// Parse device numbers
-	for _, part := range strings.Split(input, ",") {
-		var num int
-		if _, scanErr := fmt.Sscanf(strings.TrimSpace(part), "%d", &num); scanErr == nil {
-			if num >= 1 && num <= len(devices) {
-				selected = append(selected, devices[num-1])
-			}
-		}
-	}
-
-	if len(selected) == 0 {
-		ios.Warning("No valid devices selected")
-		return nil, stageStable
-	}
-
-	// Ask for stage
-	ios.Println("")
-	stageChoice, stageErr := ios.Input("Release channel (stable/beta)", stageStable)
-	if stageErr != nil {
-		return selected, stageStable
-	}
-
-	stage = stageStable
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(stageChoice)), "b") {
-		stage = stageBeta
-	}
-
-	return selected, stage
-}
-
-// anyHasBeta returns true if any device has a beta update available.
-func anyHasBeta(devices []deviceUpdateInfo) bool {
-	for _, d := range devices {
-		if d.HasBeta {
-			return true
-		}
-	}
-	return false
 }

@@ -1,11 +1,17 @@
 package term
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
+
+// FirmwareStageStable is the stable release channel.
+const FirmwareStageStable = "stable"
 
 // DisplayFirmwareStatus prints the firmware status.
 func DisplayFirmwareStatus(ios *iostreams.IOStreams, status *shelly.FirmwareStatus) {
@@ -169,6 +175,19 @@ type UpdateResult struct {
 	Err     error
 }
 
+// ConvertToTermResults converts shelly update results to term results for display.
+func ConvertToTermResults(results []shelly.UpdateResult) []UpdateResult {
+	termResults := make([]UpdateResult, len(results))
+	for i, r := range results {
+		termResults[i] = UpdateResult{
+			Name:    r.Name,
+			Success: r.Success,
+			Err:     r.Err,
+		}
+	}
+	return termResults
+}
+
 // DisplayUpdateResults prints the results of batch firmware updates.
 func DisplayUpdateResults(ios *iostreams.IOStreams, results []UpdateResult) {
 	ios.Println("")
@@ -229,4 +248,161 @@ func DisplayFirmwareUpdateInfo(ios *iostreams.IOStreams, info *shelly.FirmwareIn
 		ios.Printf("  Status:          Up to date\n")
 	}
 	ios.Println("")
+}
+
+// FirmwareUpdateEntry holds information about a device with an available update.
+type FirmwareUpdateEntry struct {
+	Name      string
+	FwInfo    *shelly.FirmwareInfo
+	HasUpdate bool
+	HasBeta   bool
+}
+
+// ConvertToTermEntries converts shelly firmware entries to term entries for display.
+func ConvertToTermEntries(entries []shelly.FirmwareUpdateEntry) []FirmwareUpdateEntry {
+	result := make([]FirmwareUpdateEntry, len(entries))
+	for i, e := range entries {
+		result[i] = FirmwareUpdateEntry{
+			Name:      e.Name,
+			FwInfo:    e.FwInfo,
+			HasUpdate: e.HasUpdate,
+			HasBeta:   e.HasBeta,
+		}
+	}
+	return result
+}
+
+// DisplayFirmwareUpdatesTable shows a table of devices with available updates.
+func DisplayFirmwareUpdatesTable(ios *iostreams.IOStreams, devices []FirmwareUpdateEntry) {
+	ios.Println("")
+	ios.Printf("%s\n\n", theme.Bold().Render("Devices with available updates:"))
+
+	table := output.NewTable("#", "Device", "Platform", "Current", "Stable", "Beta")
+	for i, d := range devices {
+		platform := d.FwInfo.Platform
+		if platform == "" {
+			platform = "shelly"
+		}
+
+		stable := d.FwInfo.Available
+		if stable == "" {
+			stable = output.LabelPlaceholder
+		}
+
+		beta := d.FwInfo.Beta
+		if beta == "" {
+			beta = output.LabelPlaceholder
+		}
+
+		table.AddRow(
+			fmt.Sprintf("%d", i+1),
+			d.Name,
+			platform,
+			d.FwInfo.Current,
+			stable,
+			beta,
+		)
+	}
+
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
+	ios.Println("")
+}
+
+// InteractiveFirmwareSelect prompts user to select devices for firmware update.
+// Returns the selected device indices (0-based) and the release stage ("stable" or "beta").
+func InteractiveFirmwareSelect(ios *iostreams.IOStreams, devices []FirmwareUpdateEntry, hasBeta bool) (selectedIndices []int, stage string) {
+	ios.Println("Options:")
+	ios.Println("  [a] Update all to stable")
+	if hasBeta {
+		ios.Println("  [b] Update all to beta")
+	}
+	ios.Println("  [s] Select specific devices")
+	ios.Println("  [q] Quit")
+	ios.Println("")
+
+	choice, err := ios.Input("Choose option", "a")
+	if err != nil {
+		return nil, FirmwareStageStable
+	}
+
+	switch strings.ToLower(strings.TrimSpace(choice)) {
+	case "a":
+		// All devices with stable updates
+		for i, d := range devices {
+			if d.HasUpdate {
+				selectedIndices = append(selectedIndices, i)
+			}
+		}
+		return selectedIndices, FirmwareStageStable
+	case "b":
+		// All devices with beta updates
+		for i, d := range devices {
+			if d.HasBeta {
+				selectedIndices = append(selectedIndices, i)
+			}
+		}
+		return selectedIndices, "beta"
+	case "s":
+		return selectSpecificFirmwareDevices(ios, devices)
+	default:
+		return nil, FirmwareStageStable
+	}
+}
+
+// selectSpecificFirmwareDevices prompts user to select individual devices for update.
+func selectSpecificFirmwareDevices(ios *iostreams.IOStreams, devices []FirmwareUpdateEntry) (selectedIndices []int, stage string) {
+	ios.Println("")
+	ios.Println("Enter device numbers separated by commas (e.g., 1,3,5)")
+	ios.Println("Or enter 'all' for all devices")
+	ios.Println("")
+
+	input, err := ios.Input("Devices", "all")
+	if err != nil {
+		return nil, FirmwareStageStable
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return nil, FirmwareStageStable
+	}
+
+	if strings.EqualFold(input, "all") {
+		for i, d := range devices {
+			if d.HasUpdate {
+				selectedIndices = append(selectedIndices, i)
+			}
+		}
+		return selectedIndices, FirmwareStageStable
+	}
+
+	// Parse device numbers
+	for _, part := range strings.Split(input, ",") {
+		var num int
+		if _, scanErr := fmt.Sscanf(strings.TrimSpace(part), "%d", &num); scanErr == nil {
+			if num >= 1 && num <= len(devices) {
+				selectedIndices = append(selectedIndices, num-1)
+			}
+		}
+	}
+
+	if len(selectedIndices) == 0 {
+		ios.Warning("No valid devices selected")
+		return nil, FirmwareStageStable
+	}
+
+	// Ask for stage
+	ios.Println("")
+	stageChoice, stageErr := ios.Input("Release channel (stable/beta)", "stable")
+	if stageErr != nil {
+		return selectedIndices, FirmwareStageStable
+	}
+
+	stage = FirmwareStageStable
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(stageChoice)), "b") {
+		stage = "beta"
+	}
+
+	return selectedIndices, stage
 }
