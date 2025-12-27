@@ -31,13 +31,13 @@ func DisplayCloudEvent(ios *iostreams.IOStreams, event *model.CloudEvent) {
 	case "Shelly:StatusOnChange":
 		ios.Printf("[%s] %s %s\n", timestamp, event.Event, deviceID)
 		if len(event.Status) > 0 {
-			PrintIndentedJSON(ios, event.Status)
+			DisplayIndentedJSON(ios, event.Status)
 		}
 
 	case "Shelly:Settings":
 		ios.Printf("[%s] %s %s\n", timestamp, event.Event, deviceID)
 		if len(event.Settings) > 0 {
-			PrintIndentedJSON(ios, event.Settings)
+			DisplayIndentedJSON(ios, event.Settings)
 		}
 
 	default:
@@ -45,8 +45,8 @@ func DisplayCloudEvent(ios *iostreams.IOStreams, event *model.CloudEvent) {
 	}
 }
 
-// PrintIndentedJSON outputs JSON data with indentation.
-func PrintIndentedJSON(ios *iostreams.IOStreams, data json.RawMessage) {
+// DisplayIndentedJSON outputs JSON data with indentation.
+func DisplayIndentedJSON(ios *iostreams.IOStreams, data json.RawMessage) {
 	var parsed any
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		ios.Printf("  %s\n", string(data))

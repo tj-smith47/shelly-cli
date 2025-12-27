@@ -105,7 +105,7 @@ func run(ctx context.Context, opts *Options) error { //nolint:gocyclo // will fi
 		// Get WebSocket config
 		result, wsErr := conn.Call(ctx, "Ws.GetConfig", nil)
 		if wsErr == nil {
-			term.PrintJSONResult(ios, "WebSocket Config:", result)
+			term.DisplayJSONResult(ios, "WebSocket Config:", result)
 		} else {
 			ios.Debug("Ws.GetConfig failed: %v", wsErr)
 			ios.Warning("WebSocket configuration not available")
@@ -123,7 +123,7 @@ func run(ctx context.Context, opts *Options) error { //nolint:gocyclo // will fi
 		if statusErr != nil {
 			ios.Debug("Ws.GetStatus failed: %v", statusErr)
 		} else {
-			term.PrintJSONResult(ios, "WebSocket Status:", statusResult)
+			term.DisplayJSONResult(ios, "WebSocket Status:", statusResult)
 		}
 
 		return nil

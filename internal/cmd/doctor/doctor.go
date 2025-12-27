@@ -66,7 +66,7 @@ Use --full for all checks including device connectivity tests.`,
 func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
 
-	term.PrintDoctorHeader(ios)
+	term.DisplayDoctorHeader(ios)
 
 	issues := 0
 	warnings := 0
@@ -98,7 +98,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		issues += term.CheckDeviceConnectivity(ctx, ios, svc)
 	}
 
-	term.PrintDoctorSummary(ios, issues, warnings)
+	term.DisplayDoctorSummary(ios, issues, warnings)
 
 	return nil
 }

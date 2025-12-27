@@ -124,7 +124,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	if coiot, ok := coiotStatus["coiot"].(map[string]any); ok {
 		ios.Println("  " + theme.Highlight().Render("CoIoT:"))
-		term.PrintMapSection(ios, coiot, "    ")
+		term.DisplayMapSection(ios, coiot, "    ")
 	} else {
 		ios.Println("  " + theme.Dim().Render("CoIoT: not configured or not available"))
 	}
@@ -132,7 +132,7 @@ func run(ctx context.Context, opts *Options) error {
 	if device, ok := coiotStatus["device"].(map[string]any); ok {
 		ios.Println()
 		ios.Println("  " + theme.Highlight().Render("Device:"))
-		term.PrintMapSection(ios, device, "    ")
+		term.DisplayMapSection(ios, device, "    ")
 	}
 
 	ios.Println()

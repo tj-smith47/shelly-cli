@@ -17,16 +17,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
-// PrintDoctorHeader prints the doctor command header.
-func PrintDoctorHeader(ios *iostreams.IOStreams) {
+// DisplayDoctorHeader displays the doctor command header.
+func DisplayDoctorHeader(ios *iostreams.IOStreams) {
 	ios.Println()
 	ios.Println(theme.Title().Render("Shelly CLI Doctor"))
 	ios.Println(theme.Dim().Render(strings.Repeat("━", 50)))
 	ios.Println()
 }
 
-// PrintDoctorSummary prints the doctor command summary.
-func PrintDoctorSummary(ios *iostreams.IOStreams, issues, warnings int) {
+// DisplayDoctorSummary displays the doctor command summary.
+func DisplayDoctorSummary(ios *iostreams.IOStreams, issues, warnings int) {
 	ios.Println(theme.Dim().Render(strings.Repeat("━", 50)))
 
 	switch {

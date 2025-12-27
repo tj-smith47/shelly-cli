@@ -73,35 +73,6 @@ func DisplayAllDevicesQuickStatus(ios *iostreams.IOStreams, statuses []QuickDevi
 	}
 }
 
-// RenderSwitchState returns the state string for a switch component.
-func RenderSwitchState(status *model.SwitchStatus) string {
-	return output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseDim)
-}
-
-// RenderLightState returns the state string for a light component.
-func RenderLightState(status *model.LightStatus) string {
-	return output.RenderOnOffStateWithBrightness(status.Output, status.Brightness)
-}
-
-// RenderRGBState returns the state string for an RGB component.
-func RenderRGBState(status *model.RGBStatus) string {
-	return output.RenderOnOffStateWithBrightness(status.Output, status.Brightness)
-}
-
-// RenderCoverState returns the state string for a cover component.
-func RenderCoverState(status *model.CoverStatus) string {
-	state := status.State
-	if status.CurrentPosition != nil && *status.CurrentPosition >= 0 {
-		state = fmt.Sprintf("%s (%d%%)", status.State, *status.CurrentPosition)
-	}
-	return state
-}
-
-// RenderInputState returns the state string for an input component.
-func RenderInputState(status *model.InputStatus) string {
-	return output.RenderInputTriggeredState(status.State)
-}
-
 // GetComponentState returns the state for a controllable component.
 func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *client.Client, comp model.Component) *ComponentState {
 	name := fmt.Sprintf("%s:%d", comp.Type, comp.ID)
@@ -113,7 +84,7 @@ func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *clie
 			ios.DebugErr("get switch status", err)
 			return &ComponentState{Name: name, State: output.RenderErrorState()}
 		}
-		return &ComponentState{Name: name, State: RenderSwitchState(status)}
+		return &ComponentState{Name: name, State: output.RenderSwitchState(status)}
 
 	case model.ComponentLight:
 		status, err := conn.Light(comp.ID).GetStatus(ctx)
@@ -121,7 +92,7 @@ func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *clie
 			ios.DebugErr("get light status", err)
 			return &ComponentState{Name: name, State: output.RenderErrorState()}
 		}
-		return &ComponentState{Name: name, State: RenderLightState(status)}
+		return &ComponentState{Name: name, State: output.RenderLightState(status)}
 
 	case model.ComponentRGB:
 		status, err := conn.RGB(comp.ID).GetStatus(ctx)
@@ -129,7 +100,7 @@ func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *clie
 			ios.DebugErr("get RGB status", err)
 			return &ComponentState{Name: name, State: output.RenderErrorState()}
 		}
-		return &ComponentState{Name: name, State: RenderRGBState(status)}
+		return &ComponentState{Name: name, State: output.RenderRGBState(status)}
 
 	case model.ComponentCover:
 		status, err := conn.Cover(comp.ID).GetStatus(ctx)
@@ -137,7 +108,7 @@ func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *clie
 			ios.DebugErr("get cover status", err)
 			return &ComponentState{Name: name, State: output.RenderErrorState()}
 		}
-		return &ComponentState{Name: name, State: RenderCoverState(status)}
+		return &ComponentState{Name: name, State: output.RenderCoverStatusState(status)}
 
 	case model.ComponentInput:
 		status, err := conn.Input(comp.ID).GetStatus(ctx)
@@ -145,7 +116,7 @@ func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *clie
 			ios.DebugErr("get input status", err)
 			return &ComponentState{Name: name, State: output.RenderErrorState()}
 		}
-		return &ComponentState{Name: name, State: RenderInputState(status)}
+		return &ComponentState{Name: name, State: output.RenderInputState(status)}
 
 	default:
 		return nil

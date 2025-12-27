@@ -8,6 +8,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -390,4 +391,36 @@ func RenderGeneration(gen int) string {
 		return "unknown"
 	}
 	return fmt.Sprintf("Gen%d", gen)
+}
+
+// Component state formatters
+
+// RenderSwitchState returns the state string for a switch component.
+func RenderSwitchState(status *model.SwitchStatus) string {
+	return RenderOnOff(status.Output, CaseUpper, theme.FalseDim)
+}
+
+// RenderLightState returns the state string for a light component.
+func RenderLightState(status *model.LightStatus) string {
+	return RenderOnOffStateWithBrightness(status.Output, status.Brightness)
+}
+
+// RenderRGBState returns the state string for an RGB component.
+func RenderRGBState(status *model.RGBStatus) string {
+	return RenderOnOffStateWithBrightness(status.Output, status.Brightness)
+}
+
+// RenderCoverStatusState returns the state string for a cover component.
+// Note: This is different from RenderCoverState which takes a state string.
+func RenderCoverStatusState(status *model.CoverStatus) string {
+	state := status.State
+	if status.CurrentPosition != nil && *status.CurrentPosition >= 0 {
+		state = fmt.Sprintf("%s (%d%%)", status.State, *status.CurrentPosition)
+	}
+	return state
+}
+
+// RenderInputState returns the state string for an input component.
+func RenderInputState(status *model.InputStatus) string {
+	return RenderInputTriggeredState(status.State)
 }
