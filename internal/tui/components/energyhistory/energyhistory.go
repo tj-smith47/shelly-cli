@@ -42,17 +42,31 @@ type Model struct {
 
 // Styles for the energy history component.
 type Styles struct {
-	Container lipgloss.Style
-	Header    lipgloss.Style
-	Label     lipgloss.Style
-	Sparkline lipgloss.Style
-	Value     lipgloss.Style
-	Time      lipgloss.Style
+	Container     lipgloss.Style
+	Header        lipgloss.Style
+	Label         lipgloss.Style
+	Sparkline     lipgloss.Style   // Fallback style (unused with gradient)
+	SparkGradient [8]lipgloss.Style // Gradient colors for levels 0-7
+	Value         lipgloss.Style
+	Time          lipgloss.Style
 }
 
 // DefaultStyles returns default styles for energy history.
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
+
+	// Gradient from cool (low) to warm (high): blue -> cyan -> green -> yellow -> orange -> red
+	gradient := [8]lipgloss.Style{
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#5c7cfa")), // 0: Blue (lowest)
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#22b8cf")), // 1: Cyan
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#20c997")), // 2: Teal
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#51cf66")), // 3: Green
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#94d82d")), // 4: Lime
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#fcc419")), // 5: Yellow
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#ff922b")), // 6: Orange
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#ff6b6b")), // 7: Red (highest)
+	}
+
 	return Styles{
 		Container: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
@@ -66,6 +80,7 @@ func DefaultStyles() Styles {
 			Width(16),
 		Sparkline: lipgloss.NewStyle().
 			Foreground(colors.Secondary),
+		SparkGradient: gradient,
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Warning).
 			Bold(true),
@@ -224,10 +239,16 @@ func (m *Model) View() string {
 		return m.renderNoData()
 	}
 
+	// Build gradient legend showing color scale
+	legend := "Legend: " +
+		m.styles.SparkGradient[0].Render("▁") +
+		m.styles.SparkGradient[3].Render("▄") +
+		m.styles.SparkGradient[7].Render("█")
+
 	// Use rendering package for consistent embedded title styling
 	r := rendering.New(m.width, m.height).
 		SetTitle("Energy History").
-		SetBadge("Legend: ▁low ▇high").
+		SetBadge(legend).
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
 		SetFooter("5m·····now")
@@ -274,9 +295,8 @@ func (m *Model) renderDeviceSparkline(name string, history []DataPoint, width in
 	}
 	labelStr := m.styles.Label.Width(labelWidth).Render(label)
 
-	// Generate sparkline
-	sparkline := m.generateSparkline(history, width)
-	sparkStr := m.styles.Sparkline.Render(sparkline)
+	// Generate sparkline (already styled with gradient colors)
+	sparkStr := m.generateSparkline(history, width)
 
 	// Current value (right-aligned)
 	current := history[len(history)-1].Value
@@ -288,7 +308,13 @@ func (m *Model) renderDeviceSparkline(name string, history []DataPoint, width in
 func (m *Model) generateSparkline(history []DataPoint, width int) string {
 	if len(history) == 0 {
 		// Use lowest bar char for empty data (shows "no data" state)
-		return strings.Repeat(string(sparkChars[0]), width)
+		// Apply lowest gradient color for consistency
+		lowestChar := m.styles.SparkGradient[0].Render(string(sparkChars[0]))
+		var spark strings.Builder
+		for range width {
+			spark.WriteString(lowestChar)
+		}
+		return spark.String()
 	}
 
 	// Get the last 'width' points
@@ -316,13 +342,14 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 		minVal -= 0.5 // Center the flat line
 	}
 
-	// Generate sparkline string
+	// Generate sparkline with gradient colors
 	var spark strings.Builder
 
 	// Pad at the start with lowest bar char if we don't have enough data
 	if len(data) < width {
+		lowestChar := m.styles.SparkGradient[0].Render(string(sparkChars[0]))
 		for range width - len(data) {
-			spark.WriteRune(sparkChars[0])
+			spark.WriteString(lowestChar)
 		}
 	}
 
@@ -336,7 +363,8 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 		if idx < 0 {
 			idx = 0
 		}
-		spark.WriteRune(sparkChars[idx])
+		// Apply gradient color based on level
+		spark.WriteString(m.styles.SparkGradient[idx].Render(string(sparkChars[idx])))
 	}
 
 	return spark.String()

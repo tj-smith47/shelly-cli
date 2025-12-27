@@ -3,6 +3,8 @@ package energyhistory
 import (
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestNew(t *testing.T) {
@@ -148,13 +150,10 @@ func TestGenerateSparkline(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := m.generateSparkline(tt.history, tt.width)
-			// Note: We count runes, not bytes, since sparkline uses Unicode
-			runeCount := 0
-			for range result {
-				runeCount++
-			}
-			if runeCount != tt.wantLen {
-				t.Errorf("sparkline rune count = %d, want %d", runeCount, tt.wantLen)
+			// Use ansi.StringWidth to measure visible width (ignores ANSI escape codes)
+			visibleWidth := ansi.StringWidth(result)
+			if visibleWidth != tt.wantLen {
+				t.Errorf("sparkline visible width = %d, want %d", visibleWidth, tt.wantLen)
 			}
 		})
 	}
