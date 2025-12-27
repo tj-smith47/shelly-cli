@@ -141,6 +141,28 @@ type IntegratorConfig struct {
 	Token string `mapstructure:"token" yaml:"token,omitempty"`
 }
 
+// GetIntegratorCredentials returns integrator credentials from environment or config.
+// Environment variables take precedence: SHELLY_INTEGRATOR_TAG, SHELLY_INTEGRATOR_TOKEN.
+// Returns an error if credentials are not configured.
+func (c *Config) GetIntegratorCredentials() (tag, token string, err error) {
+	tag = os.Getenv("SHELLY_INTEGRATOR_TAG")
+	token = os.Getenv("SHELLY_INTEGRATOR_TOKEN")
+
+	if c != nil {
+		if tag == "" {
+			tag = c.Integrator.Tag
+		}
+		if token == "" {
+			token = c.Integrator.Token
+		}
+	}
+
+	if tag == "" || token == "" {
+		return "", "", fmt.Errorf("integrator credentials required")
+	}
+	return tag, token, nil
+}
+
 // Alias represents a command alias.
 type Alias struct {
 	Name    string `mapstructure:"name" yaml:"name,omitempty"`

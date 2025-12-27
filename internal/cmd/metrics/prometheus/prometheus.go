@@ -6,15 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -96,14 +92,10 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 
 	sort.Strings(devices)
 
-	collector := &metricsCollector{
-		svc:     svc,
-		devices: devices,
-		ios:     ios,
-	}
+	collector := shelly.NewPrometheusCollector(svc, devices)
 
 	// Initial collection
-	collector.collect(ctx)
+	collector.Collect(ctx)
 
 	// Start background collection
 	go func() {
@@ -114,7 +106,7 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				collector.collect(ctx)
+				collector.Collect(ctx)
 			}
 		}
 	}()
@@ -123,16 +115,18 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 	mux := http.NewServeMux()
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-		collector.writeMetrics(w)
+		if _, writeErr := w.Write([]byte(collector.FormatMetrics())); writeErr != nil {
+			ios.DebugErr("writing metrics response", writeErr)
+		}
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		if _, err := fmt.Fprintf(w, `<html><body>
+		if _, writeErr := fmt.Fprintf(w, `<html><body>
 <h1>Shelly Metrics Exporter</h1>
 <p>Devices: %d</p>
 <p><a href="/metrics">Metrics</a></p>
-</body></html>`, len(devices)); err != nil {
-			ios.DebugErr("writing index page", err)
+</body></html>`, len(devices)); writeErr != nil {
+			ios.DebugErr("writing index page", writeErr)
 		}
 	})
 
@@ -151,8 +145,8 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			ios.DebugErr("server shutdown", err)
+		if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
+			ios.DebugErr("server shutdown", shutdownErr)
 		}
 	}()
 
@@ -161,65 +155,4 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 	}
 
 	return nil
-}
-
-// metricsCollector collects and caches metrics from devices.
-type metricsCollector struct {
-	svc     *shelly.Service
-	devices []string
-	ios     *iostreams.IOStreams
-
-	mu      sync.RWMutex
-	metrics map[string]*shelly.PrometheusMetrics
-}
-
-func (c *metricsCollector) collect(ctx context.Context) {
-	newMetrics := make(map[string]*shelly.PrometheusMetrics)
-
-	g, ctx := errgroup.WithContext(ctx)
-	// Use global rate limit for concurrency (service layer also enforces this)
-	g.SetLimit(config.GetGlobalMaxConcurrent())
-
-	var mu sync.Mutex
-
-	for _, device := range c.devices {
-		dev := device
-		g.Go(func() error {
-			m, err := c.svc.CollectPrometheusMetrics(ctx, dev)
-			if err != nil {
-				c.ios.DebugErr(fmt.Sprintf("collecting metrics for %s", dev), err)
-			}
-			mu.Lock()
-			newMetrics[dev] = m
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		c.ios.DebugErr("collecting device metrics", err)
-	}
-
-	c.mu.Lock()
-	c.metrics = newMetrics
-	c.mu.Unlock()
-}
-
-func (c *metricsCollector) writeMetrics(w http.ResponseWriter) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	// Combine all metrics
-	combined := &shelly.PrometheusMetrics{}
-	for _, m := range c.metrics {
-		if m != nil {
-			combined.Metrics = append(combined.Metrics, m.Metrics...)
-		}
-	}
-
-	// Use service layer formatter
-	output := shelly.FormatPrometheusMetrics(combined)
-	if _, err := w.Write([]byte(output)); err != nil {
-		c.ios.DebugErr("writing metrics response", err)
-	}
 }

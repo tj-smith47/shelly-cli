@@ -669,3 +669,44 @@ func ReleaseFetcher(ios *iostreams.IOStreams) func(ctx context.Context) (string,
 		return rel.Version(), nil
 	}
 }
+
+// ExtensionDownloadResult holds the result of downloading an extension from GitHub.
+type ExtensionDownloadResult struct {
+	LocalPath string
+	TagName   string
+	AssetName string
+	Cleanup   func()
+}
+
+// DownloadExtensionRelease downloads the latest release of an extension from GitHub.
+// The binaryPrefix is prepended to the repo name if not already present (e.g., "shelly-").
+func (c *Client) DownloadExtensionRelease(ctx context.Context, owner, repo, binaryPrefix string) (*ExtensionDownloadResult, error) {
+	binaryName := repo
+	if !strings.HasPrefix(binaryName, binaryPrefix) {
+		binaryName = binaryPrefix + repo
+	}
+
+	release, err := c.GetLatestRelease(ctx, owner, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest release: %w", err)
+	}
+
+	c.ios.Info("Found release: %s", release.TagName)
+
+	asset, err := c.FindBinaryAsset(release, binaryName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find binary: %w", err)
+	}
+
+	binaryPath, cleanup, err := c.DownloadAndExtract(ctx, asset, binaryName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download: %w", err)
+	}
+
+	return &ExtensionDownloadResult{
+		LocalPath: binaryPath,
+		TagName:   release.TagName,
+		AssetName: asset.Name,
+		Cleanup:   cleanup,
+	}, nil
+}

@@ -4,14 +4,12 @@ package connect
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds the command options.
@@ -70,8 +68,9 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	if cfgErr != nil {
 		ios.DebugErr("load config", cfgErr)
 	}
-	tag, token, err := loadIntegratorCredentials(ios, cfg)
+	tag, token, err := cfg.GetIntegratorCredentials()
 	if err != nil {
+		term.DisplayIntegratorCredentialHelp(ios)
 		return err
 	}
 
@@ -83,14 +82,36 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	}
 
 	// Determine hosts to connect to
-	hosts, err := determineHosts(opts)
-	if err != nil {
-		return err
+	var hosts []string
+	switch {
+	case opts.Host != "":
+		hosts = []string{opts.Host}
+	case opts.Region != "":
+		regionHosts, ok := cloudHosts[opts.Region]
+		if !ok {
+			return fmt.Errorf("unknown region: %s (valid: eu, us)", opts.Region)
+		}
+		hosts = regionHosts
+	default:
+		for _, h := range cloudHosts {
+			hosts = append(hosts, h...)
+		}
 	}
 
 	// Connect to hosts
 	fm := integrator.NewFleetManager(client)
-	successCount, failCount := connectToHosts(ctx, ios, fm, hosts)
+	var successCount, failCount int
+	connectOpts := &integrator.ConnectOptions{}
+	for _, host := range hosts {
+		ios.Info("Connecting to %s...", host)
+		if _, connErr := fm.Connect(ctx, host, connectOpts); connErr != nil {
+			ios.Warning("  Failed: %v", connErr)
+			failCount++
+		} else {
+			ios.Success("  Connected")
+			successCount++
+		}
+	}
 
 	// Report results
 	ios.Println()
@@ -104,76 +125,4 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		return nil
 	}
 	return fmt.Errorf("failed to connect to any hosts")
-}
-
-// loadIntegratorCredentials loads integrator credentials from environment or config.
-func loadIntegratorCredentials(ios *iostreams.IOStreams, cfg *config.Config) (tag, token string, err error) {
-	tag = os.Getenv("SHELLY_INTEGRATOR_TAG")
-	token = os.Getenv("SHELLY_INTEGRATOR_TOKEN")
-
-	// Try config if not in environment
-	if cfg != nil {
-		if tag == "" {
-			tag = cfg.Integrator.Tag
-		}
-		if token == "" {
-			token = cfg.Integrator.Token
-		}
-	}
-
-	if tag == "" || token == "" {
-		printCredentialHelp(ios)
-		return "", "", fmt.Errorf("integrator credentials required")
-	}
-	return tag, token, nil
-}
-
-// printCredentialHelp prints help for configuring integrator credentials.
-func printCredentialHelp(ios *iostreams.IOStreams) {
-	ios.Warning("Integrator credentials not configured")
-	ios.Println()
-	ios.Info("Set the following environment variables:")
-	ios.Printf("  export SHELLY_INTEGRATOR_TAG=your-integrator-tag\n")
-	ios.Printf("  export SHELLY_INTEGRATOR_TOKEN=your-integrator-token\n")
-	ios.Println()
-	ios.Info("Or add to config file (~/.config/shelly/config.yaml):")
-	ios.Printf("  integrator:\n")
-	ios.Printf("    tag: your-integrator-tag\n")
-	ios.Printf("    token: your-integrator-token\n")
-}
-
-// determineHosts returns the list of hosts to connect to based on options.
-func determineHosts(opts *Options) ([]string, error) {
-	switch {
-	case opts.Host != "":
-		return []string{opts.Host}, nil
-	case opts.Region != "":
-		regionHosts, ok := cloudHosts[opts.Region]
-		if !ok {
-			return nil, fmt.Errorf("unknown region: %s (valid: eu, us)", opts.Region)
-		}
-		return regionHosts, nil
-	default:
-		var hosts []string
-		for _, h := range cloudHosts {
-			hosts = append(hosts, h...)
-		}
-		return hosts, nil
-	}
-}
-
-// connectToHosts connects to the specified hosts and returns success/fail counts.
-func connectToHosts(ctx context.Context, ios *iostreams.IOStreams, fm *integrator.FleetManager, hosts []string) (success, fail int) {
-	connectOpts := &integrator.ConnectOptions{}
-	for _, host := range hosts {
-		ios.Info("Connecting to %s...", host)
-		if _, err := fm.Connect(ctx, host, connectOpts); err != nil {
-			ios.Warning("  Failed: %v", err)
-			fail++
-		} else {
-			ios.Success("  Connected")
-			success++
-		}
-	}
-	return success, fail
 }

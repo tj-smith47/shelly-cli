@@ -59,3 +59,17 @@ func valueOrEmpty(s string) string {
 	}
 	return s
 }
+
+// DisplayIntegratorCredentialHelp prints help for configuring integrator credentials.
+func DisplayIntegratorCredentialHelp(ios *iostreams.IOStreams) {
+	ios.Warning("Integrator credentials not configured")
+	ios.Println()
+	ios.Info("Set the following environment variables:")
+	ios.Printf("  export SHELLY_INTEGRATOR_TAG=your-integrator-tag\n")
+	ios.Printf("  export SHELLY_INTEGRATOR_TOKEN=your-integrator-token\n")
+	ios.Println()
+	ios.Info("Or add to config file (~/.config/shelly/config.yaml):")
+	ios.Printf("  integrator:\n")
+	ios.Printf("    tag: your-integrator-tag\n")
+	ios.Printf("    token: your-integrator-token\n")
+}

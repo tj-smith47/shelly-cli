@@ -1467,6 +1467,66 @@ func (s *Service) CollectJSONMetrics(ctx context.Context, devices []string) JSON
 	return output
 }
 
+// PrometheusCollector collects and caches Prometheus metrics from multiple devices.
+type PrometheusCollector struct {
+	svc     *Service
+	devices []string
+
+	mu      sync.RWMutex
+	metrics map[string]*PrometheusMetrics
+}
+
+// NewPrometheusCollector creates a new Prometheus metrics collector.
+func NewPrometheusCollector(svc *Service, devices []string) *PrometheusCollector {
+	return &PrometheusCollector{
+		svc:     svc,
+		devices: devices,
+		metrics: make(map[string]*PrometheusMetrics),
+	}
+}
+
+// Collect fetches metrics from all configured devices concurrently.
+func (c *PrometheusCollector) Collect(ctx context.Context) {
+	newMetrics := make(map[string]*PrometheusMetrics)
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(config.GetGlobalMaxConcurrent())
+
+	var mu sync.Mutex
+
+	for _, device := range c.devices {
+		dev := device
+		g.Go(func() error {
+			m, _ := c.svc.CollectPrometheusMetrics(ctx, dev)
+			mu.Lock()
+			newMetrics[dev] = m
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	_ = g.Wait()
+
+	c.mu.Lock()
+	c.metrics = newMetrics
+	c.mu.Unlock()
+}
+
+// FormatMetrics returns the collected metrics in Prometheus exposition format.
+func (c *PrometheusCollector) FormatMetrics() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	combined := &PrometheusMetrics{}
+	for _, m := range c.metrics {
+		if m != nil {
+			combined.Metrics = append(combined.Metrics, m.Metrics...)
+		}
+	}
+
+	return FormatPrometheusMetrics(combined)
+}
+
 // CollectInfluxDBPointsMulti collects InfluxDB points from multiple devices concurrently.
 // It applies the specified measurement name and additional tags to all points.
 func (s *Service) CollectInfluxDBPointsMulti(ctx context.Context, devices []string, measurement string, tags map[string]string) []InfluxDBPoint {

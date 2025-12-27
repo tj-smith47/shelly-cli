@@ -4,17 +4,14 @@ package install
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/download"
 	"github.com/tj-smith47/shelly-cli/internal/github"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
@@ -56,14 +53,6 @@ The extension must be named with the shelly- prefix.`,
 	return cmd
 }
 
-// installResult holds the result of downloading/preparing a plugin for installation.
-type installResult struct {
-	localPath string
-	source    plugins.Source
-	version   string
-	cleanup   func()
-}
-
 func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) error {
 	ios := f.IOStreams()
 
@@ -72,42 +61,62 @@ func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) err
 		return err
 	}
 
-	var result *installResult
+	var (
+		localPath string
+		pluginSrc plugins.Source
+		version   string
+		cleanup   func()
+	)
 
 	// Determine source type and get local path
 	switch {
 	case strings.HasPrefix(source, "gh:") || strings.HasPrefix(source, "github:"):
-		// GitHub source
-		var gerr error
-		result, gerr = installFromGitHub(ctx, ios, source)
-		if gerr != nil {
-			return fmt.Errorf("failed to download from GitHub: %w", gerr)
+		owner, repo, parseErr := github.ParseRepoString(source)
+		if parseErr != nil {
+			return fmt.Errorf("failed to parse GitHub source: %w", parseErr)
 		}
-		if result.cleanup != nil {
-			defer result.cleanup()
+
+		client := github.NewClient(ios)
+		var result *github.ExtensionDownloadResult
+		downloadErr := cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Downloading from %s/%s...", owner, repo), func(ctx context.Context) error {
+			var derr error
+			result, derr = client.DownloadExtensionRelease(ctx, owner, repo, plugins.PluginPrefix)
+			return derr
+		})
+		if downloadErr != nil {
+			return fmt.Errorf("failed to download from GitHub: %w", downloadErr)
 		}
+
+		localPath = result.LocalPath
+		cleanup = result.Cleanup
+		pluginSrc = plugins.ParseGitHubSource(owner+"/"+repo, result.TagName, result.AssetName)
+		version = strings.TrimPrefix(result.TagName, "v")
 
 	case strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://"):
-		// URL source
-		var derr error
-		result, derr = downloadFromURL(ctx, ios, source)
-		if derr != nil {
-			return fmt.Errorf("failed to download extension: %w", derr)
+		var result *download.Result
+		downloadErr := cmdutil.RunWithSpinner(ctx, ios, "Downloading extension...", func(ctx context.Context) error {
+			var derr error
+			result, derr = download.FromURL(ctx, source)
+			return derr
+		})
+		if downloadErr != nil {
+			return fmt.Errorf("failed to download extension: %w", downloadErr)
 		}
-		if result.cleanup != nil {
-			defer result.cleanup()
-		}
+		localPath = result.LocalPath
+		cleanup = result.Cleanup
+		pluginSrc = plugins.ParseURLSource(source)
 
 	default:
-		// Local file
-		result = &installResult{
-			localPath: source,
-			source:    plugins.ParseLocalSource(source),
-		}
+		localPath = source
+		pluginSrc = plugins.ParseLocalSource(source)
+	}
+
+	if cleanup != nil {
+		defer cleanup()
 	}
 
 	// Get extension name from filename
-	filename := filepath.Base(result.localPath)
+	filename := filepath.Base(localPath)
 	if !strings.HasPrefix(filename, plugins.PluginPrefix) {
 		return fmt.Errorf("extension must be named with prefix %q (got %q)", plugins.PluginPrefix, filename)
 	}
@@ -120,136 +129,16 @@ func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) err
 	}
 
 	// Create manifest with source information
-	manifest := plugins.NewManifest(extName, result.source)
-	if result.version != "" {
-		manifest.Version = result.version
+	manifest := plugins.NewManifest(extName, pluginSrc)
+	if version != "" {
+		manifest.Version = version
 	}
 
 	// Install with manifest
-	if err := registry.InstallWithManifest(result.localPath, manifest); err != nil {
+	if err := registry.InstallWithManifest(localPath, manifest); err != nil {
 		return err
 	}
 
 	ios.Success("Installed extension '%s'", extName)
 	return nil
-}
-
-// installFromGitHub downloads an extension from a GitHub repository.
-func installFromGitHub(ctx context.Context, ios *iostreams.IOStreams, source string) (*installResult, error) {
-	owner, repo, err := github.ParseRepoString(source)
-	if err != nil {
-		return nil, err
-	}
-
-	// The binary name is the repo name (should be shelly-something)
-	binaryName := repo
-	if !strings.HasPrefix(binaryName, plugins.PluginPrefix) {
-		binaryName = plugins.PluginPrefix + repo
-	}
-
-	client := github.NewClient(ios)
-
-	var release *github.Release
-	err = cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Fetching latest release from %s/%s...", owner, repo), func(ctx context.Context) error {
-		var fetchErr error
-		release, fetchErr = client.GetLatestRelease(ctx, owner, repo)
-		return fetchErr
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	ios.Info("Found release: %s", release.TagName)
-
-	// Find the appropriate binary for this platform
-	asset, err := client.FindBinaryAsset(release, binaryName)
-	if err != nil {
-		return nil, err
-	}
-
-	var binaryPath string
-	var cleanup func()
-	err = cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Downloading %s...", asset.Name), func(ctx context.Context) error {
-		var downloadErr error
-		binaryPath, cleanup, downloadErr = client.DownloadAndExtract(ctx, asset, binaryName)
-		return downloadErr
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Build source info with repo string (e.g., "owner/repo")
-	repoStr := owner + "/" + repo
-	return &installResult{
-		localPath: binaryPath,
-		source:    plugins.ParseGitHubSource(repoStr, release.TagName, asset.Name),
-		version:   strings.TrimPrefix(release.TagName, "v"),
-		cleanup:   cleanup,
-	}, nil
-}
-
-// downloadFromURL downloads an extension from a URL.
-func downloadFromURL(ctx context.Context, ios *iostreams.IOStreams, downloadURL string) (*installResult, error) {
-	// Create temp file
-	tmpFile, err := os.CreateTemp("", "shelly-ext-*")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-
-	cleanup := func() {
-		if rerr := os.Remove(tmpPath); rerr != nil {
-			ios.DebugErr("removing temp file", rerr)
-		}
-	}
-
-	err = cmdutil.RunWithSpinner(ctx, ios, "Downloading extension...", func(ctx context.Context) error {
-		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, http.NoBody)
-		if reqErr != nil {
-			return fmt.Errorf("failed to create request: %w", reqErr)
-		}
-
-		req.Header.Set("User-Agent", "shelly-cli")
-
-		client := &http.Client{}
-		resp, doErr := client.Do(req)
-		if doErr != nil {
-			return fmt.Errorf("failed to download: %w", doErr)
-		}
-		defer func() {
-			if cerr := resp.Body.Close(); cerr != nil {
-				ios.DebugErr("closing response body", cerr)
-			}
-		}()
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
-		}
-
-		_, copyErr := io.Copy(tmpFile, resp.Body)
-		if cerr := tmpFile.Close(); cerr != nil && copyErr == nil {
-			copyErr = cerr
-		}
-
-		if copyErr != nil {
-			return fmt.Errorf("failed to write file: %w", copyErr)
-		}
-
-		// Make executable - extensions must be executable binaries
-		if chmodErr := os.Chmod(tmpPath, 0o755); chmodErr != nil { //nolint:gosec // G302: extensions require executable permissions
-			return fmt.Errorf("failed to make executable: %w", chmodErr)
-		}
-
-		return nil
-	})
-	if err != nil {
-		cleanup()
-		return nil, err
-	}
-
-	return &installResult{
-		localPath: tmpPath,
-		source:    plugins.ParseURLSource(downloadURL),
-		cleanup:   cleanup,
-	}, nil
 }

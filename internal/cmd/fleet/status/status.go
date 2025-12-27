@@ -4,14 +4,11 @@ package status
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -67,9 +64,9 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	if cfgErr != nil {
 		ios.DebugErr("load config", cfgErr)
 	}
-	tag, token, err := loadCredentials(cfg)
+	tag, token, err := cfg.GetIntegratorCredentials()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w. Run 'shelly fleet connect' first", err)
 	}
 
 	// Create client and authenticate
@@ -81,10 +78,25 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	// Create fleet manager and connect
 	fm := integrator.NewFleetManager(client)
 	ios.Info("Connecting to fleet...")
-	reportConnectionErrors(ios, fm.ConnectAll(ctx, nil))
+	for host, connErr := range fm.ConnectAll(ctx, nil) {
+		ios.Warning("Failed to connect to %s: %v", host, connErr)
+	}
 
 	// Get and filter device statuses
-	statuses := filterDevices(fm.ListDeviceStatuses(), opts)
+	statuses := fm.ListDeviceStatuses()
+	if opts.Online || opts.Offline {
+		filtered := make([]*integrator.DeviceStatus, 0, len(statuses))
+		for _, s := range statuses {
+			if opts.Online && !s.Online {
+				continue
+			}
+			if opts.Offline && s.Online {
+				continue
+			}
+			filtered = append(filtered, s)
+		}
+		statuses = filtered
+	}
 
 	if output.WantsStructured() {
 		return output.FormatOutput(ios.Out, statuses)
@@ -100,50 +112,4 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	term.DisplayFleetStatus(ios, statuses)
 
 	return nil
-}
-
-// loadCredentials loads integrator credentials from environment or config.
-func loadCredentials(cfg *config.Config) (tag, token string, err error) {
-	tag = os.Getenv("SHELLY_INTEGRATOR_TAG")
-	token = os.Getenv("SHELLY_INTEGRATOR_TOKEN")
-
-	if cfg != nil {
-		if tag == "" {
-			tag = cfg.Integrator.Tag
-		}
-		if token == "" {
-			token = cfg.Integrator.Token
-		}
-	}
-
-	if tag == "" || token == "" {
-		return "", "", fmt.Errorf("integrator credentials required. Run 'shelly fleet connect' first")
-	}
-	return tag, token, nil
-}
-
-// reportConnectionErrors logs warnings for any connection failures.
-func reportConnectionErrors(ios *iostreams.IOStreams, errors map[string]error) {
-	for host, err := range errors {
-		ios.Warning("Failed to connect to %s: %v", host, err)
-	}
-}
-
-// filterDevices filters device statuses based on online/offline options.
-func filterDevices(statuses []*integrator.DeviceStatus, opts *Options) []*integrator.DeviceStatus {
-	if !opts.Online && !opts.Offline {
-		return statuses
-	}
-
-	filtered := make([]*integrator.DeviceStatus, 0, len(statuses))
-	for _, s := range statuses {
-		if opts.Online && !s.Online {
-			continue
-		}
-		if opts.Offline && s.Online {
-			continue
-		}
-		filtered = append(filtered, s)
-	}
-	return filtered
 }
