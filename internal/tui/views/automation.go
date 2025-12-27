@@ -168,18 +168,19 @@ func NewAutomation(deps AutomationDeps) *Automation {
 	layoutCalc := layout.NewTwoColumnLayout(0.5, 1)
 
 	// Configure left column panels with expansion on focus
+	// MinHeight includes borders (2) + top padding (1) + content (1) + bottom padding (1) = 5 minimum
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(PanelScripts), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelSchedules), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelWebhooks), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelWebhooks), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	// Configure right column panels with expansion on focus
 	layoutCalc.RightColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(PanelScriptEditor), MinHeight: 6, ExpandOnFocus: true},
 		{ID: layout.PanelID(PanelScheduleEditor), MinHeight: 5, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelVirtuals), MinHeight: 4, ExpandOnFocus: true},
-		{ID: layout.PanelID(PanelKVS), MinHeight: 4, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelVirtuals), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(PanelKVS), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	a := &Automation{

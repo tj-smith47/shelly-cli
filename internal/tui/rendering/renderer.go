@@ -195,7 +195,7 @@ func (r *Renderer) buildContentLines(contentWidth int, borderStyle lipgloss.Styl
 
 // renderContentWithBorders wraps content lines with borders and padding.
 // Returns exactly contentHeight lines to ensure panels fit their allocated space.
-// Uses 1-line top padding when space allows, with content starting from top.
+// Adds 1-line top and bottom padding when space allows (contentHeight >= 3).
 func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth, contentHeight int, borderStyle lipgloss.Style) []string {
 	if contentHeight <= 0 {
 		return []string{}
@@ -209,20 +209,38 @@ func (r *Renderer) renderContentWithBorders(contentLines []string, contentWidth,
 
 	lines := make([]string, 0, contentHeight)
 
-	// Add top padding if we have room (at least 2 lines total)
+	// Determine padding based on available height
+	// >= 3 lines: top padding + content + bottom padding
+	// == 2 lines: top padding + content
+	// == 1 line:  content only
+	topPadding := 0
+	bottomPadding := 0
 	if contentHeight >= 2 {
+		topPadding = 1
+	}
+	if contentHeight >= 3 {
+		bottomPadding = 1
+	}
+
+	// Add top padding
+	for range topPadding {
 		lines = append(lines, emptyLine)
 	}
 
-	// Add content lines (fill remaining space)
-	remainingHeight := contentHeight - len(lines)
-	for i := range remainingHeight {
+	// Add content lines (between padding)
+	contentSpace := contentHeight - topPadding - bottomPadding
+	for i := range contentSpace {
 		line := ""
 		if i < len(contentLines) {
 			line = contentLines[i]
 		}
 		line = r.padOrTruncate(line, paddedWidth)
 		lines = append(lines, leftBorder+line+rightBorder)
+	}
+
+	// Add bottom padding
+	for range bottomPadding {
+		lines = append(lines, emptyLine)
 	}
 
 	return lines
