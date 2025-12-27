@@ -3,22 +3,19 @@ package list
 
 import (
 	"context"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the rgb list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list <device>",
-		Aliases: []string{"ls", "l"},
-		Short:   "List RGB components",
+	return factories.NewListCommand(f, factories.ListOpts[shelly.RGBInfo]{
+		Component: "RGB",
 		Long: `List all RGB light components on the specified device with their current status.
 
 RGB components control color-capable lights (RGBW, RGBW2, etc.). Each
@@ -49,28 +46,9 @@ Columns: ID, Name, State (ON/OFF), Color (R:G:B), Brightness (%), Power`,
 
   # Short forms
   shelly rgb ls living-room`,
-		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completion.DeviceNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
-		},
-	}
-
-	return cmd
-}
-
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	return cmdutil.RunList(ctx, ios, svc, device,
-		"Fetching RGB components...",
-		"RGB components",
-		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.RGBInfo, error) {
+		Fetcher: func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.RGBInfo, error) {
 			return svc.RGBList(ctx, device)
 		},
-		term.DisplayRGBList)
+		Display: term.DisplayRGBList,
+	})
 }

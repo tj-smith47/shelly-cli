@@ -3,22 +3,19 @@ package list
 
 import (
 	"context"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the light list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list <device>",
-		Aliases: []string{"ls", "l"},
-		Short:   "List light components",
+	return factories.NewListCommand(f, factories.ListOpts[shelly.LightInfo]{
+		Component: "Light",
 		Long: `List all light components on the specified device with their current status.
 
 Light components control dimmable lights. Each light has an ID, optional
@@ -56,28 +53,9 @@ Columns: ID, Name, State (ON/OFF), Brightness (%), Power (watts)`,
   # Short forms
   shelly light ls kitchen
   shelly lt ls kitchen`,
-		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completion.DeviceNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
-		},
-	}
-
-	return cmd
-}
-
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	return cmdutil.RunList(ctx, ios, svc, device,
-		"Fetching light components...",
-		"light components",
-		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.LightInfo, error) {
+		Fetcher: func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.LightInfo, error) {
 			return svc.LightList(ctx, device)
 		},
-		term.DisplayLightList)
+		Display: term.DisplayLightList,
+	})
 }

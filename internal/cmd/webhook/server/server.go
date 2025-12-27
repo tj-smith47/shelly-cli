@@ -111,6 +111,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		ios.Println("")
 		ios.Info("Shutting down server...")
 
+		// Use fresh context for shutdown since parent context is already cancelled
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 

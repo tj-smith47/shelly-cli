@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // Options holds the command options.
@@ -60,13 +61,8 @@ Actions can be:
 	cmd.Flags().StringVarP(&opts.Action, "action", "a", "notify", "Action when alert triggers")
 	cmd.Flags().StringVar(&opts.Description, "description", "", "Alert description")
 
-	if err := cmd.MarkFlagRequired("device"); err != nil {
-		// Flag marking failed - this is a programming error
-		panic(fmt.Sprintf("failed to mark device flag required: %v", err))
-	}
-	if err := cmd.MarkFlagRequired("condition"); err != nil {
-		panic(fmt.Sprintf("failed to mark condition flag required: %v", err))
-	}
+	utils.Must(cmd.MarkFlagRequired("device"))
+	utils.Must(cmd.MarkFlagRequired("condition"))
 
 	return cmd
 }

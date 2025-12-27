@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // Options holds create command options.
@@ -85,9 +86,7 @@ Examples:
 	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable the thermostat")
 	cmd.Flags().BoolVar(&opts.Enabled, "enabled", true, "Whether the schedule itself is enabled")
 
-	if err := cmd.MarkFlagRequired("time"); err != nil {
-		panic(fmt.Sprintf("failed to mark flag required: %v", err))
-	}
+	utils.Must(cmd.MarkFlagRequired("time"))
 	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
 
 	return cmd

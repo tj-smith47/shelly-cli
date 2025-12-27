@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -148,4 +149,57 @@ func runComponent(ctx context.Context, f *cmdutil.Factory, opts ComponentOpts, d
 	default:
 		return fmt.Errorf("unknown action: %s", opts.Action)
 	}
+}
+
+// ListOpts configures a component list command.
+type ListOpts[T any] struct {
+	// Component is the display name (e.g., "Light", "RGB", "Switch", "Cover").
+	Component string
+
+	// Long is the long description for the command.
+	Long string
+
+	// Example is the example usage text.
+	Example string
+
+	// Fetcher retrieves the list of components from the device.
+	Fetcher cmdutil.ListFetcher[T]
+
+	// Display renders the list in human-readable format.
+	Display cmdutil.ListDisplay[T]
+}
+
+// NewListCommand creates a generic component list command.
+// This factory consolidates the common pattern across Light, RGB, Switch, Cover list commands.
+func NewListCommand[T any](f *cmdutil.Factory, opts ListOpts[T]) *cobra.Command {
+	componentLower := strings.ToLower(opts.Component)
+
+	cmd := &cobra.Command{
+		Use:               "list <device>",
+		Aliases:           []string{"ls", "l"},
+		Short:             fmt.Sprintf("List %s components", componentLower),
+		Long:              opts.Long,
+		Example:           opts.Example,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: completion.DeviceNames(),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runList(cmd.Context(), f, opts, args[0])
+		},
+	}
+
+	return cmd
+}
+
+func runList[T any](ctx context.Context, f *cmdutil.Factory, opts ListOpts[T], device string) error {
+	ctx, cancel := f.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	ios := f.IOStreams()
+	svc := f.ShellyService()
+
+	componentLower := strings.ToLower(opts.Component)
+	spinnerMsg := fmt.Sprintf("Fetching %s components...", componentLower)
+	emptyMsg := fmt.Sprintf("%s components", componentLower)
+
+	return cmdutil.RunList(ctx, ios, svc, device, spinnerMsg, emptyMsg, opts.Fetcher, opts.Display)
 }

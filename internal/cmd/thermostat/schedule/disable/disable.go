@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // Options holds disable command options.
@@ -39,9 +40,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd.Flags().IntVar(&opts.ScheduleID, "id", 0, "Schedule ID to disable (required)")
-	if err := cmd.MarkFlagRequired("id"); err != nil {
-		panic(fmt.Sprintf("failed to mark flag required: %v", err))
-	}
+	utils.Must(cmd.MarkFlagRequired("id"))
 
 	return cmd
 }

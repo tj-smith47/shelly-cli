@@ -3,22 +3,19 @@ package list
 
 import (
 	"context"
-	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // NewCommand creates the switch list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list <device>",
-		Aliases: []string{"ls", "l"},
-		Short:   "List switch components",
+	return factories.NewListCommand(f, factories.ListOpts[shelly.SwitchInfo]{
+		Component: "Switch",
 		Long: `List all switch components on the specified device with their current status.
 
 Switch components control relay outputs (on/off). Each switch has an ID,
@@ -52,28 +49,9 @@ Columns: ID, Name, State (ON/OFF), Power (watts)`,
   # Short forms
   shelly switch ls kitchen
   shelly sw ls kitchen`,
-		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: completion.DeviceNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
-		},
-	}
-
-	return cmd
-}
-
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-
-	return cmdutil.RunList(ctx, ios, svc, device,
-		"Fetching switch components...",
-		"switch components",
-		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.SwitchInfo, error) {
+		Fetcher: func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.SwitchInfo, error) {
 			return svc.SwitchList(ctx, device)
 		},
-		term.DisplaySwitchList)
+		Display: term.DisplaySwitchList,
+	})
 }

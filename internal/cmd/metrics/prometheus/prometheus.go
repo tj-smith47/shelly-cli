@@ -143,6 +143,7 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 	// Handle shutdown
 	go func() {
 		<-ctx.Done()
+		// Use fresh context for shutdown since parent context is already cancelled
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if shutdownErr := server.Shutdown(shutdownCtx); shutdownErr != nil {
