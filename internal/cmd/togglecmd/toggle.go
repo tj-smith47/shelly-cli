@@ -7,15 +7,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds command options.
 type Options struct {
-	Device      string
-	ComponentID int // -1 means all components
-	Factory     *cmdutil.Factory
+	flags.QuickComponentFlags
+	Device  string
+	Factory *cmdutil.Factory
 }
 
 // NewCommand creates the toggle command.
@@ -49,7 +50,7 @@ Use --id to target a specific component (e.g., for multi-switch devices).`,
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.ComponentID, "id", -1, "Component ID to control (omit to control all)")
+	flags.AddQuickComponentFlags(cmd, &opts.QuickComponentFlags)
 
 	return cmd
 }
@@ -62,16 +63,10 @@ func run(ctx context.Context, opts *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	// Convert -1 (default) to nil (all components), otherwise pass the ID
-	var componentID *int
-	if opts.ComponentID >= 0 {
-		componentID = &opts.ComponentID
-	}
-
 	var result *shelly.QuickResult
 	err := cmdutil.RunWithSpinner(ctx, ios, "Toggling...", func(ctx context.Context) error {
 		var opErr error
-		result, opErr = svc.QuickToggle(ctx, opts.Device, componentID)
+		result, opErr = svc.QuickToggle(ctx, opts.Device, opts.ComponentIDPointer())
 		return opErr
 	})
 	if err != nil {
