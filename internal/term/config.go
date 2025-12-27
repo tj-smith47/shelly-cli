@@ -2,9 +2,11 @@ package term
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
@@ -87,4 +89,44 @@ func DisplayResetableComponents(ios *iostreams.IOStreams, device string, configK
 	for _, key := range configKeys {
 		ios.Printf("  shelly config reset %s %s\n", device, key)
 	}
+}
+
+// DisplayTemplateDiffs prints a table of template comparison diffs.
+func DisplayTemplateDiffs(ios *iostreams.IOStreams, templateName, deviceName string, diffs []model.ConfigDiff) {
+	if len(diffs) == 0 {
+		ios.Info("No differences - device matches template")
+		return
+	}
+
+	ios.Title("Configuration Differences")
+	ios.Printf("Template: %s  Device: %s\n\n", templateName, deviceName)
+
+	table := output.NewTable("Path", "Type", "Device Value", "Template Value")
+	for _, d := range diffs {
+		table.AddRow(d.Path, d.DiffType, output.FormatDisplayValue(d.OldValue), output.FormatDisplayValue(d.NewValue))
+	}
+	printTable(ios, table)
+	ios.Printf("\n%d difference(s) found\n", len(diffs))
+}
+
+// DisplayTemplateList prints a table of configuration templates.
+func DisplayTemplateList(ios *iostreams.IOStreams, templates []config.Template) {
+	ios.Title("Configuration Templates")
+	ios.Println()
+
+	table := output.NewTable("Name", "Model", "Gen", "Source", "Created")
+	for _, t := range templates {
+		source := t.SourceDevice
+		if source == "" {
+			source = "-"
+		}
+		created := t.CreatedAt
+		if len(created) > 10 {
+			created = created[:10] // Just the date part
+		}
+		table.AddRow(t.Name, t.Model, fmt.Sprintf("Gen%d", t.Generation), source, created)
+	}
+
+	printTable(ios, table)
+	ios.Printf("\n%d template(s)\n", len(templates))
 }

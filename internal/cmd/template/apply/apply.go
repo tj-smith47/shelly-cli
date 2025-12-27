@@ -84,8 +84,30 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Warning("Template was created for Gen%d but device is Gen%d", tpl.Generation, info.Generation)
 	}
 
+	// Handle dry run mode
 	if opts.DryRun {
-		return runDryRun(ctx, opts, tpl)
+		var changes []string
+		err := cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
+			var dryRunErr error
+			changes, dryRunErr = svc.ApplyTemplate(ctx, opts.Device, tpl.Config, true)
+			return dryRunErr
+		})
+		if err != nil {
+			return err
+		}
+
+		if len(changes) == 0 {
+			ios.Info("No changes would be made")
+			return nil
+		}
+
+		ios.Title("Changes that would be applied")
+		ios.Println()
+		for _, change := range changes {
+			ios.Printf("  %s\n", change)
+		}
+		ios.Printf("\n%d change(s) would be applied\n", len(changes))
+		return nil
 	}
 
 	// Confirm unless --yes
@@ -113,35 +135,6 @@ func run(ctx context.Context, opts *Options) error {
 	for _, change := range changes {
 		ios.Printf("  %s\n", change)
 	}
-
-	return nil
-}
-
-func runDryRun(ctx context.Context, opts *Options, tpl config.Template) error {
-	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
-
-	var changes []string
-	err := cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
-		var dryRunErr error
-		changes, dryRunErr = svc.ApplyTemplate(ctx, opts.Device, tpl.Config, true)
-		return dryRunErr
-	})
-	if err != nil {
-		return err
-	}
-
-	if len(changes) == 0 {
-		ios.Info("No changes would be made")
-		return nil
-	}
-
-	ios.Title("Changes that would be applied")
-	ios.Println()
-	for _, change := range changes {
-		ios.Printf("  %s\n", change)
-	}
-	ios.Printf("\n%d change(s) would be applied\n", len(changes))
 
 	return nil
 }

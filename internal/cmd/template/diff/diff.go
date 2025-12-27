@@ -12,7 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
@@ -80,29 +80,6 @@ func run(ctx context.Context, opts *Options) error {
 		return cmdutil.PrintListResult(ios, diffs, nil)
 	}
 
-	displayDiffs(opts, diffs)
+	term.DisplayTemplateDiffs(ios, opts.Template, opts.Device, diffs)
 	return nil
-}
-
-func displayDiffs(opts *Options, diffs []model.ConfigDiff) {
-	ios := opts.Factory.IOStreams()
-	highlight := theme.Highlight()
-
-	if len(diffs) == 0 {
-		ios.Info("No differences - device matches template")
-		return
-	}
-
-	ios.Title("Configuration Differences")
-	ios.Printf("Template: %s  Device: %s\n\n", highlight.Render(opts.Template), highlight.Render(opts.Device))
-
-	table := output.NewTable("Path", "Type", "Device Value", "Template Value")
-	for _, d := range diffs {
-		table.AddRow(d.Path, d.DiffType, output.FormatDisplayValue(d.OldValue), output.FormatDisplayValue(d.NewValue))
-	}
-	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print diff table", err)
-	}
-
-	ios.Printf("\n%d difference(s) found\n", len(diffs))
 }

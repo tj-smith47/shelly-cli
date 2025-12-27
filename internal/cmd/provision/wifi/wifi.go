@@ -4,7 +4,6 @@ package wifi
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -76,13 +75,45 @@ func run(ctx context.Context, opts *Options) error {
 		opts.SSID = ssid
 	}
 
-	if opts.SSID == "" {
+	if opts.SSID == "" { //nolint:nestif // Scan+select flow has inherent complexity
 		// Scan and select
-		ssid, err := scanAndSelect(ctx, ios, svc, opts.Device)
+		ios.Info("Scanning for networks...")
+
+		results, err := svc.ScanWiFi(ctx, opts.Device)
 		if err != nil {
-			return err
+			return fmt.Errorf("network scan failed: %w", err)
 		}
-		opts.SSID = ssid
+
+		if len(results) == 0 {
+			return fmt.Errorf("no networks found")
+		}
+
+		// Dedupe and sort networks
+		networks := shelly.DedupeWiFiNetworks(results)
+
+		// Build selection options
+		options := make([]string, len(networks))
+		for i, n := range networks {
+			signal := output.FormatWiFiSignalStrength(n.RSSI)
+			options[i] = fmt.Sprintf("%s (%s, ch %d)", n.SSID, signal, n.Channel)
+		}
+
+		selected, err := ios.Select("Select WiFi network:", options, 0)
+		if err != nil {
+			return fmt.Errorf("network selection failed: %w", err)
+		}
+
+		// Find the selected network by matching the option string
+		for i, opt := range options {
+			if opt == selected {
+				opts.SSID = networks[i].SSID
+				break
+			}
+		}
+
+		if opts.SSID == "" {
+			return fmt.Errorf("selected network not found")
+		}
 	}
 
 	// Get password if not provided
@@ -106,60 +137,4 @@ func run(ctx context.Context, opts *Options) error {
 	ios.Info("The device will attempt to connect to the network.")
 
 	return nil
-}
-
-func scanAndSelect(ctx context.Context, ios *iostreams.IOStreams, svc *shelly.Service, device string) (string, error) {
-	ios.Info("Scanning for networks...")
-
-	results, err := svc.ScanWiFi(ctx, device)
-	if err != nil {
-		return "", fmt.Errorf("network scan failed: %w", err)
-	}
-
-	if len(results) == 0 {
-		return "", fmt.Errorf("no networks found")
-	}
-
-	// Dedupe by SSID, keeping strongest signal
-	seen := make(map[string]shelly.WiFiScanResult)
-	for _, r := range results {
-		if r.SSID == "" {
-			continue
-		}
-		existing, exists := seen[r.SSID]
-		if !exists || r.RSSI > existing.RSSI {
-			seen[r.SSID] = r
-		}
-	}
-
-	// Convert to slice and sort by signal strength
-	networks := make([]shelly.WiFiScanResult, 0, len(seen))
-	for _, n := range seen {
-		networks = append(networks, n)
-	}
-
-	sort.Slice(networks, func(i, j int) bool {
-		return networks[i].RSSI > networks[j].RSSI
-	})
-
-	// Build selection options
-	options := make([]string, len(networks))
-	for i, n := range networks {
-		signal := output.FormatWiFiSignalStrength(n.RSSI)
-		options[i] = fmt.Sprintf("%s (%s, ch %d)", n.SSID, signal, n.Channel)
-	}
-
-	selected, err := ios.Select("Select WiFi network:", options, 0)
-	if err != nil {
-		return "", fmt.Errorf("network selection failed: %w", err)
-	}
-
-	// Find the selected network by matching the option string
-	for i, opt := range options {
-		if opt == selected {
-			return networks[i].SSID, nil
-		}
-	}
-
-	return "", fmt.Errorf("selected network not found")
 }

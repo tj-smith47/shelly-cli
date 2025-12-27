@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
@@ -200,6 +201,35 @@ type WiFiScanResult struct {
 	RSSI    int    `json:"rssi"`
 	Channel int    `json:"channel"`
 	Auth    string `json:"auth"`
+}
+
+// DedupeWiFiNetworks deduplicates WiFi scan results by SSID, keeping the
+// strongest signal for each network, and returns them sorted by signal strength.
+func DedupeWiFiNetworks(results []WiFiScanResult) []WiFiScanResult {
+	// Dedupe by SSID, keeping strongest signal
+	seen := make(map[string]WiFiScanResult)
+	for _, r := range results {
+		if r.SSID == "" {
+			continue
+		}
+		existing, exists := seen[r.SSID]
+		if !exists || r.RSSI > existing.RSSI {
+			seen[r.SSID] = r
+		}
+	}
+
+	// Convert to slice
+	networks := make([]WiFiScanResult, 0, len(seen))
+	for _, n := range seen {
+		networks = append(networks, n)
+	}
+
+	// Sort by signal strength (strongest first)
+	sort.Slice(networks, func(i, j int) bool {
+		return networks[i].RSSI > networks[j].RSSI
+	})
+
+	return networks
 }
 
 // ScanWiFi scans for available WiFi networks.
