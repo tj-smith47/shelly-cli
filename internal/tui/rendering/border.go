@@ -406,12 +406,17 @@ func BuildBottomBorderWithFooterBadgeAndHint(width int, footer, badge, hint stri
 		return BuildBottomBorderWithFooterAndHint(width, footer+" "+badge, hint, border)
 	}
 
-	// Minimal left fill (1), rest between sections
-	leftFillCount := 1
-	midFillCount := (availableForFill / bottomW) - leftFillCount
+	// Center the footer+badge section by distributing fill evenly on both sides
+	totalFill := availableForFill / bottomW
+	leftFillCount := totalFill / 2
+	rightFillCount := totalFill - leftFillCount
 
-	if midFillCount < 0 {
-		midFillCount = 0
+	if leftFillCount < 1 {
+		leftFillCount = 1
+		rightFillCount = totalFill - 1
+	}
+	if rightFillCount < 0 {
+		rightFillCount = 0
 	}
 
 	var result string
@@ -425,7 +430,7 @@ func BuildBottomBorderWithFooterBadgeAndHint(width int, footer, badge, hint stri
 		result += midLeft + bottom + badgeText + bottom + midRight
 	}
 
-	result += strings.Repeat(bottom, midFillCount)
+	result += strings.Repeat(bottom, rightFillCount)
 
 	if hint != "" {
 		result += midLeft + bottom + hintText + bottom + midRight
@@ -436,8 +441,8 @@ func BuildBottomBorderWithFooterBadgeAndHint(width int, footer, badge, hint stri
 	return result
 }
 
-// BuildBottomBorderWithFooterAndHint creates a bottom border with footer on left and hint on right.
-// Example output: "╰─├─ footer ─┤─────────├─ ⇧1 ─┤╯".
+// BuildBottomBorderWithFooterAndHint creates a bottom border with centered footer and right-aligned hint.
+// Example output: "╰────├─ footer ─┤────├─ ⇧1 ─┤╯".
 func BuildBottomBorderWithFooterAndHint(width int, footer, hint string, border lipgloss.Border) string {
 	if width < 5 {
 		return ""
@@ -474,7 +479,7 @@ func BuildBottomBorderWithFooterAndHint(width int, footer, hint string, border l
 	hintText := " " + hint + " "
 	hintWidth := charWidth(hintText)
 
-	// Structure: BottomLeft + fill + midLeft + ─ + footer + ─ + midRight + fill + midLeft + ─ + hint + ─ + midRight + BottomRight
+	// Structure: BottomLeft + leftFill + midLeft + ─ + footer + ─ + midRight + rightFill + midLeft + ─ + hint + ─ + midRight + BottomRight
 	minFooterWidth := midLeftW + bottomW + footerWidth + bottomW + midRightW
 	minHintWidth := midLeftW + bottomW + hintWidth + bottomW + midRightW
 	availableForFill := width - bottomLeftW - bottomRightW - minFooterWidth - minHintWidth
@@ -484,18 +489,23 @@ func BuildBottomBorderWithFooterAndHint(width int, footer, hint string, border l
 		return BuildBottomBorderWithHint(width, hint, border)
 	}
 
-	// Minimal left fill (1), rest between footer and hint
-	leftFillCount := 1
-	midFillCount := (availableForFill / bottomW) - leftFillCount
+	// Center the footer by distributing fill evenly on both sides
+	totalFill := availableForFill / bottomW
+	leftFillCount := totalFill / 2
+	rightFillCount := totalFill - leftFillCount
 
-	if midFillCount < 0 {
-		midFillCount = 0
+	if leftFillCount < 1 {
+		leftFillCount = 1
+		rightFillCount = totalFill - 1
+	}
+	if rightFillCount < 0 {
+		rightFillCount = 0
 	}
 
 	return bottomLeft +
 		strings.Repeat(bottom, leftFillCount) +
 		midLeft + bottom + footerText + bottom + midRight +
-		strings.Repeat(bottom, midFillCount) +
+		strings.Repeat(bottom, rightFillCount) +
 		midLeft + bottom + hintText + bottom + midRight +
 		bottomRight
 }

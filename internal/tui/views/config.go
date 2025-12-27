@@ -303,6 +303,10 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 
 	// Handle view focus changes from app.go
 	if focusMsg, ok := msg.(ViewFocusChangedMsg); ok {
+		// When regaining focus, reset to first panel so Tab cycling starts fresh
+		if focusMsg.Focused && !c.viewFocused {
+			c.focusedPanel = PanelWiFi
+		}
 		c.viewFocused = focusMsg.Focused
 		c.updateFocusStates()
 		return c, nil

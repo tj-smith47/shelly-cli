@@ -308,6 +308,10 @@ func (a *Automation) advanceLoadPhase() tea.Cmd {
 func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 	// Handle view focus changes from app.go
 	if focusMsg, ok := msg.(ViewFocusChangedMsg); ok {
+		// When regaining focus, reset to first panel so Tab cycling starts fresh
+		if focusMsg.Focused && !a.viewFocused {
+			a.focusedPanel = PanelScripts
+		}
 		a.viewFocused = focusMsg.Focused
 		a.updateFocusStates()
 		return a, nil

@@ -1731,10 +1731,11 @@ func (m Model) padContent(content string, contentHeight int) string {
 			if lineWidth > cw {
 				// Truncate lines that are too wide
 				line = ansi.Truncate(line, cw, "")
-				lineWidth = cw
+				// Re-measure after truncation as ansi.Truncate may return shorter string
+				lineWidth = ansi.StringWidth(line)
 			}
 			if lineWidth < cw {
-				// Pad lines that are too narrow
+				// Pad lines that are too narrow to fill content width
 				line += strings.Repeat(" ", cw-lineWidth)
 			}
 			paddedLines[i] = pad + line + pad
@@ -1836,7 +1837,7 @@ func (m Model) renderMultiPanelLayout(height int) string {
 
 	// Split height: top 70% for panels, bottom 30% for energy bars
 	topHeight := height * 70 / 100
-	energyHeight := height - topHeight - 1 // -1 for gap
+	energyHeight := height - topHeight // JoinVertical stacks directly, no gap needed
 
 	if topHeight < 10 {
 		topHeight = 10

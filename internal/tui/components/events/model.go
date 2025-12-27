@@ -911,22 +911,67 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 	sepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", colWidth))
 	lines = append(lines, sepLine+" "+separator+" "+sepLine)
 
-	for i := range m.perPage {
-		leftCell := ""
-		rightCell := ""
-
-		if i < len(userPage) {
-			leftCell = m.renderUserEvent(userPage[i], timeW, userDeviceW, userCompW, levelW, userDescW)
+	// Calculate max lines per user event based on available space and event count
+	// User events can wrap, system events stay single-line
+	availableEventLines := m.perPage
+	userEventCount := len(userPage)
+	maxLinesPerUserEvent := 1
+	if userEventCount > 0 && availableEventLines > userEventCount {
+		// Allow user events to expand - use up to 3 lines each, distributed fairly
+		maxLinesPerUserEvent = availableEventLines / userEventCount
+		if maxLinesPerUserEvent > 3 {
+			maxLinesPerUserEvent = 3 // Cap at 3 lines per event
 		}
-		if i < len(sysPage) {
-			rightCell = m.renderSystemEvent(sysPage[i], timeW, sysDeviceW, levelW, sysDescW)
+	}
+
+	linesUsed := 0
+	userIdx := 0
+	sysIdx := 0
+	emptyLeft := output.PadRight("", colWidth)
+	emptyRight := output.PadRight("", colWidth)
+
+	for linesUsed < availableEventLines {
+		switch {
+		case userIdx < len(userPage):
+			// Render user event with wrapping
+			userLines := m.renderUserEventWrapped(userPage[userIdx], timeW, userDeviceW, userCompW, levelW, userDescW, maxLinesPerUserEvent)
+
+			// Get corresponding system event (if any)
+			sysLine := ""
+			if sysIdx < len(sysPage) {
+				sysLine = m.renderSystemEvent(sysPage[sysIdx], timeW, sysDeviceW, levelW, sysDescW)
+				sysIdx++
+			}
+
+			// Add all lines for this user event
+			for i, uline := range userLines {
+				if linesUsed >= availableEventLines {
+					break
+				}
+				leftCell := output.PadRight(uline, colWidth)
+				rightCell := emptyRight
+				if i == 0 {
+					// First line pairs with system event
+					rightCell = output.PadRight(sysLine, colWidth)
+				}
+				lines = append(lines, leftCell+" "+separator+" "+rightCell)
+				linesUsed++
+			}
+			userIdx++
+
+		case sysIdx < len(sysPage):
+			// No more user events, show remaining system events
+			leftCell := emptyLeft
+			rightCell := output.PadRight(m.renderSystemEvent(sysPage[sysIdx], timeW, sysDeviceW, levelW, sysDescW), colWidth)
+			lines = append(lines, leftCell+" "+separator+" "+rightCell)
+			sysIdx++
+			linesUsed++
+
+		default:
+			// No more events, add empty row to fill space
+			lines = append(lines, emptyLeft+" "+separator+" "+emptyRight)
+			linesUsed++
 		}
-
-		// Pad cells to column width
-		leftCell = output.PadRight(leftCell, colWidth)
-		rightCell = output.PadRight(rightCell, colWidth)
-
-		lines = append(lines, leftCell+" "+separator+" "+rightCell)
 	}
 
 	// Always add pagination dots row at bottom (shows current page position)
@@ -947,8 +992,9 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 	return strings.Join(lines, "\n")
 }
 
-// renderUserEvent renders a user event row (with COMP column).
-func (m Model) renderUserEvent(e Event, timeW, deviceW, compW, levelW, descW int) string {
+// renderUserEventWrapped renders a user event with word-wrapped description.
+// Returns multiple lines if the description needs wrapping, up to maxLines.
+func (m Model) renderUserEventWrapped(e Event, timeW, deviceW, compW, levelW, descW, maxLines int) []string {
 	// Time column
 	timeStr := m.styles.Time.Width(timeW).Render(e.Timestamp.Format("15:04:05"))
 
@@ -966,18 +1012,47 @@ func (m Model) renderUserEvent(e Event, timeW, deviceW, compW, levelW, descW int
 	}
 	compStr := m.styles.Component.Width(compW).Render(comp)
 
-	// Level column - no truncation needed now that levelW is 12
+	// Level column
 	levelStyle := m.getTypeStyle(e.Type)
 	levelStr := levelStyle.Width(levelW).Render(e.Type)
 
-	// Description column
-	desc := e.Description
-	if len(desc) > descW {
-		desc = desc[:descW-1] + "…"
-	}
-	descStr := m.styles.Description.Render(desc)
+	// Build prefix for first line and continuation indent
+	prefix := timeStr + " " + deviceStr + " " + compStr + " " + levelStr + " "
+	prefixWidth := timeW + 1 + deviceW + 1 + compW + 1 + levelW + 1
+	contIndent := strings.Repeat(" ", prefixWidth)
 
-	return timeStr + " " + deviceStr + " " + compStr + " " + levelStr + " " + descStr
+	// Wrap description using lipgloss word-wrap
+	wrappedDesc := lipgloss.NewStyle().Width(descW).Render(e.Description)
+	descLines := strings.Split(wrappedDesc, "\n")
+
+	// Cap at maxLines and add truncation indicator if needed
+	truncated := false
+	if len(descLines) > maxLines {
+		descLines = descLines[:maxLines]
+		truncated = true
+	}
+
+	// Build result lines
+	result := make([]string, len(descLines))
+	for i, descLine := range descLines {
+		// Add truncation indicator on last line if we truncated
+		if truncated && i == len(descLines)-1 {
+			if len(descLine) > descW-1 {
+				descLine = descLine[:descW-2] + "…"
+			} else {
+				descLine += "…"
+			}
+		}
+		descStr := m.styles.Description.Render(descLine)
+
+		if i == 0 {
+			result[i] = prefix + descStr
+		} else {
+			result[i] = contIndent + descStr
+		}
+	}
+
+	return result
 }
 
 // renderSystemEvent renders a system event row (no COMP column).

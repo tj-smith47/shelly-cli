@@ -60,15 +60,25 @@ func (c *Column) distributeWithExpansion(expandingID PanelID) map[PanelID]int {
 
 	// Calculate minimum space needed by non-expanding panels
 	minSpaceNeeded := 0
-	var expandingMaxHeight int
+	var expandingMinHeight, expandingMaxHeight int
+	nonExpandingPanels := 0
 	for _, p := range c.Panels {
 		if p.ID != expandingID {
 			minSpaceNeeded += p.MinHeight
+			nonExpandingPanels++
 		} else {
+			expandingMinHeight = p.MinHeight
 			expandingMaxHeight = p.MaxHeight
 		}
 	}
 
+	// Handle the case where TotalHeight is too small for all MinHeights
+	// In this case, we need to shrink non-expanding panels proportionally
+	if minSpaceNeeded >= c.TotalHeight {
+		return c.distributeConstrained(expandingID, expandingMinHeight, nonExpandingPanels)
+	}
+
+	// Normal case: enough space for all MinHeights
 	// Calculate expanding panel height
 	expandingHeight := max(0, c.TotalHeight-minSpaceNeeded)
 	if expandingMaxHeight > 0 && expandingHeight > expandingMaxHeight {
@@ -86,6 +96,49 @@ func (c *Column) distributeWithExpansion(expandingID PanelID) map[PanelID]int {
 
 	// Handle remaining space after max constraint
 	c.distributeRemaining(heights, expandingID)
+
+	return heights
+}
+
+// distributeConstrained handles the case where TotalHeight is too small for all MinHeights.
+// It shrinks non-expanding panels proportionally to fit within TotalHeight.
+func (c *Column) distributeConstrained(expandingID PanelID, expandingMinHeight, nonExpandingPanels int) map[PanelID]int {
+	heights := make(map[PanelID]int)
+
+	// Give expanding panel at least 1 line (or its MinHeight if possible)
+	expandingHeight := 1
+	if c.TotalHeight > expandingMinHeight+nonExpandingPanels {
+		expandingHeight = expandingMinHeight
+	}
+	remainingForOthers := c.TotalHeight - expandingHeight
+
+	// Distribute remaining space proportionally among non-expanding panels
+	usedHeight := 0
+	panelIdx := 0
+	for _, p := range c.Panels {
+		if p.ID == expandingID {
+			heights[p.ID] = expandingHeight
+			continue
+		}
+		panelIdx++
+
+		// Each non-expanding panel gets a proportional share, minimum 1
+		share := remainingForOthers / nonExpandingPanels
+		if share < 1 {
+			share = 1
+		}
+
+		// Last panel gets whatever's left to avoid rounding issues
+		if panelIdx == nonExpandingPanels {
+			share = c.TotalHeight - usedHeight - expandingHeight
+			if share < 1 {
+				share = 1
+			}
+		}
+
+		heights[p.ID] = share
+		usedHeight += share
+	}
 
 	return heights
 }
