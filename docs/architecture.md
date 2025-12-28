@@ -12,6 +12,10 @@ This document defines **where code belongs** in the shelly-cli codebase. For **h
 | Print formatted output to terminal | `term/` |
 | Format data to string (no I/O) | `output/` |
 | Implement device operations | `shelly/` |
+| Implement auth operations | `shelly/auth/` |
+| Implement Modbus operations | `shelly/modbus/` |
+| Implement provisioning operations | `shelly/provision/` |
+| Implement network operations | `shelly/network/` (mqtt.go, ethernet.go, wifi.go) |
 | Export data to external format | `shelly/export/` |
 | Define domain types | `model/` |
 | Add CLI infrastructure (flags, runners) | `cmdutil/` |
@@ -189,6 +193,7 @@ internal/
 │   ├── shelly.go       # Service struct
 │   │                   #   Connect(), WithConnection(), RawRPC()
 │   │                   #   ResolveWithGeneration() - Gen1/Gen2 detection
+│   │                   #   Service accessors for subpackages
 │   │
 │   ├── connection.go   # Connection management helpers
 │   │                   #   DeviceClient, WithDevice(), WithDevices()
@@ -205,7 +210,7 @@ internal/
 │   ├── power.go        # Power operations
 │   ├── energy.go       # Energy meter operations
 │   ├── quick.go        # QuickOn(), QuickOff(), QuickToggle()
-│   ├── config.go       # Config get/set operations
+│   ├── config.go       # Config get/set, WiFi, BLE, cloud, webhooks
 │   ├── wifi.go         # WiFi operations (WiFiStatusFull, WiFiConfigFull, etc.)
 │   ├── backup.go       # Service methods using backup/ types
 │   ├── schedule.go     # Schedule operations
@@ -221,19 +226,54 @@ internal/
 │   ├── matter.go       # Matter operations
 │   ├── migrate.go      # Migration operations
 │   │
+│   ├── auth/           # Authentication configuration
+│   │   └── auth.go       # Service: GetStatus(), Set(), Disable()
+│   │                     # Status type, CalculateHA1()
+│   │
+│   ├── automation/     # Scripts, schedules, webhooks
+│   │   └── ...           # Automation-related operations
+│   │
 │   ├── backup/         # Backup domain types
 │   │   └── types.go      # DeviceBackup, Options, RestoreOptions, DeviceInfo
 │   │                     # Validate(), LoadAndValidate(), IsFile()
+│   │
+│   ├── component/      # Component operations
+│   │   └── ...           # Switch, Light, Cover, RGB, Input
+│   │
+│   ├── device/         # Device operations
+│   │   └── ...           # Reboot, Info, Status, List
+│   │
+│   ├── export/         # Export format builders
+│   │   ├── ansible.go    # BuildAnsibleInventory(), AnsibleInventory
+│   │   ├── terraform.go  # BuildTerraformConfig(), TerraformDevice
+│   │   ├── backup.go     # BackupExporter, ScanBackupFiles(), WriteBackupFile()
+│   │   └── energy.go     # FormatEMDataCSV(), FormatEM1DataCSV()
+│   │
+│   ├── firmware/       # Firmware checking and updates
+│   │   └── ...           # Check, Update, Rollback, Cache
 │   │
 │   ├── kvs/            # KVS domain types
 │   │   └── types.go      # Item, ListResult, GetResult, Export
 │   │                     # ParseValue(), ParseImportFile()
 │   │
-│   └── export/         # Export format builders
-│       ├── ansible.go    # BuildAnsibleInventory(), AnsibleInventory
-│       ├── terraform.go  # BuildTerraformConfig(), TerraformDevice
-│       ├── backup.go     # BackupExporter, ScanBackupFiles(), WriteBackupFile()
-│       └── energy.go     # FormatEMDataCSV(), FormatEM1DataCSV()
+│   ├── modbus/         # Modbus configuration
+│   │   └── modbus.go     # Service: GetStatus(), GetConfig(), SetConfig()
+│   │                     # Status, Config types
+│   │
+│   ├── network/        # Network-related services
+│   │   ├── wifi.go       # WiFiService: GetStatusFull(), GetConfigFull(), etc.
+│   │   ├── mqtt.go       # MQTTService: GetStatus(), GetConfig(), SetConfig()
+│   │   ├── ethernet.go   # EthernetService: GetStatus(), GetConfig(), SetConfig()
+│   │   ├── cloud.go      # CloudClient: Login(), GetAllDevices(), etc.
+│   │   └── cloudcontrol.go # Cloud device control operations
+│   │
+│   ├── provision/      # Device provisioning
+│   │   └── provision.go  # Service: GetDeviceInfoByAddress(), ConfigureWiFi()
+│   │                     # GetBTHomeStatus(), StartBTHomeDiscovery()
+│   │                     # DeviceInfo, BTHomeDiscovery types
+│   │
+│   └── wireless/       # Wireless protocol services
+│       └── ...           # BLE, BTHome, Matter, Zigbee, LoRa
 │
 ├── term/               # Terminal presentation (composed displays)
 │   ├── term.go         # Package doc, shared helpers (printTable, formatTemp)

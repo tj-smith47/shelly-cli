@@ -15,10 +15,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/auth"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/component"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/device"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/firmware"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/modbus"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/provision"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/wireless"
 )
 
@@ -27,14 +30,19 @@ const DefaultTimeout = 10 * time.Second
 
 // Service provides high-level operations on Shelly devices.
 type Service struct {
-	resolver         DeviceResolver
-	rateLimiter      *ratelimit.DeviceRateLimiter
-	pluginRegistry   *plugins.Registry
-	firmwareService  *firmware.Service
-	wirelessService  *wireless.Service
-	networkService   *network.WiFiService
-	deviceService    *device.Service
-	componentService *component.Service
+	resolver          DeviceResolver
+	rateLimiter       *ratelimit.DeviceRateLimiter
+	pluginRegistry    *plugins.Registry
+	firmwareService   *firmware.Service
+	wirelessService   *wireless.Service
+	networkService    *network.WiFiService
+	mqttService       *network.MQTTService
+	ethernetService   *network.EthernetService
+	deviceService     *device.Service
+	componentService  *component.Service
+	authService       *auth.Service
+	modbusService     *modbus.Service
+	provisionService  *provision.Service
 }
 
 // DeviceResolver resolves device identifiers to device configurations.
@@ -124,12 +132,20 @@ func New(resolver DeviceResolver, opts ...ServiceOption) *Service {
 	}
 	// Initialize wireless service
 	svc.wirelessService = wireless.New(svc)
-	// Initialize network service
+	// Initialize network services
 	svc.networkService = network.NewWiFiService(svc)
+	svc.mqttService = network.NewMQTTService(svc)
+	svc.ethernetService = network.NewEthernetService(svc)
 	// Initialize device service
 	svc.deviceService = device.New(svc)
 	// Initialize component service using adapter
 	svc.componentService = component.New(&componentAdapter{svc})
+	// Initialize auth service with adapter for device info
+	svc.authService = auth.New(svc, &authAdapter{svc})
+	// Initialize modbus service
+	svc.modbusService = modbus.New(svc)
+	// Initialize provision service
+	svc.provisionService = provision.New(svc)
 	return svc
 }
 
@@ -145,6 +161,20 @@ func (a *componentAdapter) WithDevice(ctx context.Context, identifier string, fn
 	return a.Service.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
 		return fn(dev) // *DeviceClient implements component.DeviceClient
 	})
+}
+
+// authAdapter adapts shelly.Service to implement auth.DeviceInfoProvider.
+type authAdapter struct {
+	*Service
+}
+
+// GetAuthEnabled implements auth.DeviceInfoProvider.
+func (a *authAdapter) GetAuthEnabled(ctx context.Context, identifier string) (bool, error) {
+	info, err := a.Service.DeviceInfo(ctx, identifier)
+	if err != nil {
+		return false, err
+	}
+	return info.AuthEn, nil
 }
 
 // Connect establishes a connection to a device by identifier (name or address).
@@ -734,4 +764,187 @@ func (s *Service) DeviceService() *device.Service {
 // ComponentService returns the component service for direct access.
 func (s *Service) ComponentService() *component.Service {
 	return s.componentService
+}
+
+// ----- MQTT Service accessor and delegations -----
+
+// MQTTService returns the MQTT service for direct access.
+func (s *Service) MQTTService() *network.MQTTService {
+	return s.mqttService
+}
+
+// GetMQTTStatus delegates to the MQTT service for backward compatibility.
+func (s *Service) GetMQTTStatus(ctx context.Context, identifier string) (*network.MQTTStatus, error) {
+	return s.mqttService.GetStatus(ctx, identifier)
+}
+
+// GetMQTTConfig delegates to the MQTT service for backward compatibility.
+func (s *Service) GetMQTTConfig(ctx context.Context, identifier string) (map[string]any, error) {
+	cfg, err := s.mqttService.GetConfig(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"enable":       cfg.Enable,
+		"server":       cfg.Server,
+		"user":         cfg.User,
+		"client_id":    cfg.ClientID,
+		"topic_prefix": cfg.TopicPrefix,
+		"rpc_ntf":      cfg.RPCNTF,
+		"status_ntf":   cfg.StatusNTF,
+	}, nil
+}
+
+// SetMQTTConfig delegates to the MQTT service for backward compatibility.
+func (s *Service) SetMQTTConfig(ctx context.Context, identifier string, enable *bool, server, user, password, topicPrefix string) error {
+	return s.mqttService.SetConfig(ctx, identifier, network.SetConfigParams{
+		Enable:      enable,
+		Server:      server,
+		User:        user,
+		Password:    password,
+		TopicPrefix: topicPrefix,
+	})
+}
+
+// ----- Ethernet Service accessor and delegations -----
+
+// EthernetService returns the Ethernet service for direct access.
+func (s *Service) EthernetService() *network.EthernetService {
+	return s.ethernetService
+}
+
+// GetEthernetStatus delegates to the Ethernet service for backward compatibility.
+func (s *Service) GetEthernetStatus(ctx context.Context, identifier string) (*network.EthernetStatus, error) {
+	return s.ethernetService.GetStatus(ctx, identifier)
+}
+
+// GetEthernetConfig delegates to the Ethernet service for backward compatibility.
+func (s *Service) GetEthernetConfig(ctx context.Context, identifier string) (map[string]any, error) {
+	cfg, err := s.ethernetService.GetConfig(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"enable":     cfg.Enable,
+		"ipv4mode":   cfg.IPv4Mode,
+		"ip":         cfg.IP,
+		"netmask":    cfg.Netmask,
+		"gw":         cfg.GW,
+		"nameserver": cfg.Nameserver,
+	}, nil
+}
+
+// SetEthernetConfig delegates to the Ethernet service for backward compatibility.
+func (s *Service) SetEthernetConfig(ctx context.Context, identifier string, enable *bool, ipv4Mode, ip, netmask, gw, nameserver string) error {
+	return s.ethernetService.SetConfig(ctx, identifier, network.EthernetSetConfigParams{
+		Enable:     enable,
+		IPv4Mode:   ipv4Mode,
+		IP:         ip,
+		Netmask:    netmask,
+		GW:         gw,
+		Nameserver: nameserver,
+	})
+}
+
+// ----- Auth Service accessor and delegations -----
+
+// AuthService returns the Auth service for direct access.
+func (s *Service) AuthService() *auth.Service {
+	return s.authService
+}
+
+// GetAuthStatus delegates to the Auth service for backward compatibility.
+func (s *Service) GetAuthStatus(ctx context.Context, identifier string) (*auth.Status, error) {
+	return s.authService.GetStatus(ctx, identifier)
+}
+
+// SetAuth delegates to the Auth service for backward compatibility.
+func (s *Service) SetAuth(ctx context.Context, identifier, user, realm, password string) error {
+	return s.authService.Set(ctx, identifier, user, realm, password)
+}
+
+// DisableAuth delegates to the Auth service for backward compatibility.
+func (s *Service) DisableAuth(ctx context.Context, identifier string) error {
+	return s.authService.Disable(ctx, identifier)
+}
+
+// ----- Modbus Service accessor and delegations -----
+
+// ModbusService returns the Modbus service for direct access.
+func (s *Service) ModbusService() *modbus.Service {
+	return s.modbusService
+}
+
+// GetModbusStatus delegates to the Modbus service for backward compatibility.
+func (s *Service) GetModbusStatus(ctx context.Context, identifier string) (*modbus.Status, error) {
+	return s.modbusService.GetStatus(ctx, identifier)
+}
+
+// GetModbusConfig delegates to the Modbus service for backward compatibility.
+func (s *Service) GetModbusConfig(ctx context.Context, identifier string) (map[string]any, error) {
+	cfg, err := s.modbusService.GetConfig(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"enable": cfg.Enable,
+	}, nil
+}
+
+// SetModbusConfig delegates to the Modbus service for backward compatibility.
+func (s *Service) SetModbusConfig(ctx context.Context, identifier string, enable bool) error {
+	return s.modbusService.SetConfig(ctx, identifier, enable)
+}
+
+// ----- Provision Service accessor and delegations -----
+
+// ProvisionService returns the Provision service for direct access.
+func (s *Service) ProvisionService() *provision.Service {
+	return s.provisionService
+}
+
+// GetDeviceInfoByAddress delegates to the Provision service for backward compatibility.
+func (s *Service) GetDeviceInfoByAddress(ctx context.Context, address string) (*provision.DeviceInfo, error) {
+	return s.provisionService.GetDeviceInfoByAddress(ctx, address)
+}
+
+// ConfigureWiFi delegates to the Provision service for backward compatibility.
+func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string) error {
+	return s.provisionService.ConfigureWiFi(ctx, address, ssid, password)
+}
+
+// GetBTHomeStatus delegates to the Provision service for backward compatibility.
+func (s *Service) GetBTHomeStatus(ctx context.Context, identifier string) (*provision.BTHomeDiscovery, error) {
+	return s.provisionService.GetBTHomeStatus(ctx, identifier)
+}
+
+// StartBTHomeDiscovery delegates to the Provision service for backward compatibility.
+func (s *Service) StartBTHomeDiscovery(ctx context.Context, identifier string, duration int) error {
+	return s.provisionService.StartBTHomeDiscovery(ctx, identifier, duration)
+}
+
+// ----- Type aliases for backward compatibility -----
+
+// MQTTStatus is an alias for network.MQTTStatus.
+type MQTTStatus = network.MQTTStatus
+
+// EthernetStatus is an alias for network.EthernetStatus.
+type EthernetStatus = network.EthernetStatus
+
+// AuthStatus is an alias for auth.Status.
+type AuthStatus = auth.Status
+
+// ModbusStatus is an alias for modbus.Status.
+type ModbusStatus = modbus.Status
+
+// BTHomeDiscovery is an alias for provision.BTHomeDiscovery.
+type BTHomeDiscovery = provision.BTHomeDiscovery
+
+// ProvisioningDeviceInfo is an alias for provision.DeviceInfo.
+type ProvisioningDeviceInfo = provision.DeviceInfo
+
+// ExtractWiFiSSID extracts the station SSID from a raw WiFi.GetConfig result.
+// Re-exported from provision package for backward compatibility.
+func ExtractWiFiSSID(rawResult any) string {
+	return provision.ExtractWiFiSSID(rawResult)
 }

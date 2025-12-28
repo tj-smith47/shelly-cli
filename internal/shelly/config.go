@@ -3,8 +3,6 @@ package shelly
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec // Required for Shelly digest auth (HA1 hash)
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -265,77 +263,6 @@ func (s *Service) ScanWiFi(ctx context.Context, identifier string) ([]WiFiScanRe
 	return results, err
 }
 
-// MQTTStatus holds MQTT status information.
-type MQTTStatus struct {
-	Connected bool `json:"connected"`
-}
-
-// GetMQTTStatus returns the MQTT status.
-func (s *Service) GetMQTTStatus(ctx context.Context, identifier string) (*MQTTStatus, error) {
-	var result *MQTTStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		mqtt := components.NewMQTT(conn.RPCClient())
-		status, err := mqtt.GetStatus(ctx)
-		if err != nil {
-			return err
-		}
-		result = &MQTTStatus{
-			Connected: status.Connected,
-		}
-		return nil
-	})
-	return result, err
-}
-
-// GetMQTTConfig returns the MQTT configuration.
-func (s *Service) GetMQTTConfig(ctx context.Context, identifier string) (map[string]any, error) {
-	var result map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		mqtt := components.NewMQTT(conn.RPCClient())
-		config, err := mqtt.GetConfig(ctx)
-		if err != nil {
-			return err
-		}
-		result = map[string]any{
-			"enable":       config.Enable,
-			"server":       config.Server,
-			"user":         config.User,
-			"client_id":    config.ClientID,
-			"topic_prefix": config.TopicPrefix,
-			"rpc_ntf":      config.RPCNTF,
-			"status_ntf":   config.StatusNTF,
-		}
-		return nil
-	})
-	return result, err
-}
-
-// SetMQTTConfig updates the MQTT configuration.
-func (s *Service) SetMQTTConfig(ctx context.Context, identifier string, enable *bool, server, user, password, topicPrefix string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		mqtt := components.NewMQTT(conn.RPCClient())
-
-		mqttCfg := &components.MQTTConfig{}
-		if enable != nil {
-			mqttCfg.Enable = enable
-		}
-		if server != "" {
-			mqttCfg.Server = &server
-		}
-		if user != "" {
-			mqttCfg.User = &user
-		}
-		if password != "" {
-			mqttCfg.Pass = &password
-		}
-		if topicPrefix != "" {
-			mqttCfg.TopicPrefix = &topicPrefix
-		}
-
-		return mqtt.SetConfig(ctx, mqttCfg)
-	})
-}
-
 // CloudStatus holds cloud connection status.
 type CloudStatus struct {
 	Connected bool `json:"connected"`
@@ -383,80 +310,6 @@ func (s *Service) SetCloudEnabled(ctx context.Context, identifier string, enable
 		return cloud.SetConfig(ctx, &components.CloudConfig{
 			Enable: &enable,
 		})
-	})
-}
-
-// EthernetStatus holds ethernet status information.
-type EthernetStatus struct {
-	IP string `json:"ip"`
-}
-
-// GetEthernetStatus returns the ethernet status.
-func (s *Service) GetEthernetStatus(ctx context.Context, identifier string) (*EthernetStatus, error) {
-	var result *EthernetStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		eth := components.NewEthernet(conn.RPCClient())
-		status, err := eth.GetStatus(ctx)
-		if err != nil {
-			return err
-		}
-		result = &EthernetStatus{}
-		if status.IP != nil {
-			result.IP = *status.IP
-		}
-		return nil
-	})
-	return result, err
-}
-
-// GetEthernetConfig returns the ethernet configuration.
-func (s *Service) GetEthernetConfig(ctx context.Context, identifier string) (map[string]any, error) {
-	var result map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		eth := components.NewEthernet(conn.RPCClient())
-		config, err := eth.GetConfig(ctx)
-		if err != nil {
-			return err
-		}
-		result = map[string]any{
-			"enable":     config.Enable,
-			"ipv4mode":   config.IPv4Mode,
-			"ip":         config.IP,
-			"netmask":    config.Netmask,
-			"gw":         config.GW,
-			"nameserver": config.Nameserver,
-		}
-		return nil
-	})
-	return result, err
-}
-
-// SetEthernetConfig updates the ethernet configuration.
-func (s *Service) SetEthernetConfig(ctx context.Context, identifier string, enable *bool, ipv4Mode, ip, netmask, gw, nameserver string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		eth := components.NewEthernet(conn.RPCClient())
-
-		ethCfg := &components.EthernetConfig{}
-		if enable != nil {
-			ethCfg.Enable = enable
-		}
-		if ipv4Mode != "" {
-			ethCfg.IPv4Mode = &ipv4Mode
-		}
-		if ip != "" {
-			ethCfg.IP = &ip
-		}
-		if netmask != "" {
-			ethCfg.Netmask = &netmask
-		}
-		if gw != "" {
-			ethCfg.GW = &gw
-		}
-		if nameserver != "" {
-			ethCfg.Nameserver = &nameserver
-		}
-
-		return eth.SetConfig(ctx, ethCfg)
 	})
 }
 
@@ -513,56 +366,6 @@ func (s *Service) ListWiFiAPClients(ctx context.Context, identifier string) ([]W
 		return nil
 	})
 	return results, err
-}
-
-// AuthStatus holds authentication status information.
-type AuthStatus struct {
-	Enabled bool   `json:"enabled"`
-	User    string `json:"user,omitempty"`
-	Realm   string `json:"realm,omitempty"`
-}
-
-// GetAuthStatus returns the authentication status for a device.
-func (s *Service) GetAuthStatus(ctx context.Context, identifier string) (*AuthStatus, error) {
-	info, err := s.DeviceInfo(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-	return &AuthStatus{
-		Enabled: info.AuthEn,
-	}, nil
-}
-
-// SetAuth configures device authentication.
-// If password is empty, authentication is disabled.
-func (s *Service) SetAuth(ctx context.Context, identifier, user, realm, password string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		params := map[string]any{
-			"user":  user,
-			"realm": realm,
-		}
-		if password != "" {
-			// Calculate HA1 = MD5(user:realm:password)
-			ha1 := calculateHA1(user, realm, password)
-			params["ha1"] = ha1
-		}
-		_, err := conn.Call(ctx, "Shelly.SetAuth", params)
-		return err
-	})
-}
-
-// DisableAuth disables device authentication.
-func (s *Service) DisableAuth(ctx context.Context, identifier string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		// Setting ha1 to null disables authentication
-		params := map[string]any{
-			"user":  "admin",
-			"realm": "",
-			"ha1":   nil,
-		}
-		_, err := conn.Call(ctx, "Shelly.SetAuth", params)
-		return err
-	})
 }
 
 // WebhookInfo holds webhook information.
@@ -692,64 +495,6 @@ func (s *Service) ListSupportedWebhookEvents(ctx context.Context, identifier str
 	return events, err
 }
 
-// calculateHA1 calculates the HA1 hash for digest authentication.
-// MD5 is required by the Shelly device protocol - not a security concern since
-// this is a password hash transmitted over a local network to the device.
-func calculateHA1(user, realm, password string) string {
-	data := user + ":" + realm + ":" + password
-	hash := md5.Sum([]byte(data)) //nolint:gosec // Required by Shelly digest auth protocol
-	return hex.EncodeToString(hash[:])
-}
-
-// ModbusStatus holds Modbus status information.
-type ModbusStatus struct {
-	Enabled bool `json:"enabled"`
-}
-
-// GetModbusStatus returns the Modbus status.
-func (s *Service) GetModbusStatus(ctx context.Context, identifier string) (*ModbusStatus, error) {
-	var result *ModbusStatus
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		modbus := components.NewModbus(conn.RPCClient())
-		status, err := modbus.GetStatus(ctx)
-		if err != nil {
-			return err
-		}
-		result = &ModbusStatus{
-			Enabled: status.Enabled,
-		}
-		return nil
-	})
-	return result, err
-}
-
-// GetModbusConfig returns the Modbus configuration.
-func (s *Service) GetModbusConfig(ctx context.Context, identifier string) (map[string]any, error) {
-	var result map[string]any
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		modbus := components.NewModbus(conn.RPCClient())
-		config, err := modbus.GetConfig(ctx)
-		if err != nil {
-			return err
-		}
-		result = map[string]any{
-			"enable": config.Enable,
-		}
-		return nil
-	})
-	return result, err
-}
-
-// SetModbusConfig updates the Modbus configuration.
-func (s *Service) SetModbusConfig(ctx context.Context, identifier string, enable bool) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		modbus := components.NewModbus(conn.RPCClient())
-		return modbus.SetConfig(ctx, &components.ModbusConfig{
-			Enable: enable,
-		})
-	})
-}
-
 // BLEConfig holds BLE configuration.
 type BLEConfig struct {
 	Enable       bool `json:"enable"`
@@ -798,51 +543,6 @@ func (s *Service) SetBLEConfig(ctx context.Context, identifier string, enable, r
 		}
 
 		return ble.SetConfig(ctx, config)
-	})
-}
-
-// BTHomeDevice holds BTHome device information.
-type BTHomeDevice struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Addr     string `json:"addr"`
-	RSSI     int    `json:"rssi,omitempty"`
-	Battery  int    `json:"battery,omitempty"`
-	LastSeen int64  `json:"last_seen,omitempty"`
-}
-
-// BTHomeDiscovery holds BTHome discovery status.
-type BTHomeDiscovery struct {
-	Active    bool  `json:"active"`
-	StartedAt int64 `json:"started_at,omitempty"`
-	Duration  int   `json:"duration,omitempty"`
-}
-
-// GetBTHomeStatus returns the BTHome status including discovery.
-func (s *Service) GetBTHomeStatus(ctx context.Context, identifier string) (*BTHomeDiscovery, error) {
-	var result *BTHomeDiscovery
-	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		bthome := components.NewBTHome(conn.RPCClient())
-		status, err := bthome.GetStatus(ctx)
-		if err != nil {
-			return err
-		}
-		result = &BTHomeDiscovery{}
-		if status.Discovery != nil {
-			result.Active = true
-			result.StartedAt = int64(status.Discovery.StartedAt)
-			result.Duration = status.Discovery.Duration
-		}
-		return nil
-	})
-	return result, err
-}
-
-// StartBTHomeDiscovery starts BTHome device discovery.
-func (s *Service) StartBTHomeDiscovery(ctx context.Context, identifier string, duration int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		bthome := components.NewBTHome(conn.RPCClient())
-		return bthome.StartDeviceDiscovery(ctx, &duration)
 	})
 }
 
@@ -1095,60 +795,3 @@ func (s *Service) GetTUISecurityStatus(ctx context.Context, identifier string) (
 	return result, err
 }
 
-// ProvisioningDeviceInfo holds basic device information for provisioning.
-type ProvisioningDeviceInfo struct {
-	Model string
-	MAC   string
-	ID    string
-}
-
-// GetDeviceInfoByAddress attempts to connect to a device at the given address
-// and retrieve its basic info. Used for provisioning.
-func (s *Service) GetDeviceInfoByAddress(ctx context.Context, address string) (*ProvisioningDeviceInfo, error) {
-	var result *ProvisioningDeviceInfo
-	err := s.WithConnection(ctx, address, func(conn *client.Client) error {
-		info := conn.Info()
-		result = &ProvisioningDeviceInfo{
-			Model: info.Model,
-			MAC:   info.MAC,
-			ID:    info.ID,
-		}
-		return nil
-	})
-	return result, err
-}
-
-// ConfigureWiFi configures a device's WiFi station settings.
-// Used during provisioning to set up the device's network connection.
-func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string) error {
-	return s.WithConnection(ctx, address, func(conn *client.Client) error {
-		params := map[string]any{
-			"config": map[string]any{
-				"sta": map[string]any{
-					"ssid":   ssid,
-					"pass":   password,
-					"enable": true,
-				},
-			},
-		}
-		_, err := conn.Call(ctx, "WiFi.SetConfig", params)
-		return err
-	})
-}
-
-// ExtractWiFiSSID extracts the station SSID from a raw WiFi.GetConfig result.
-func ExtractWiFiSSID(rawResult any) string {
-	wifiBytes, err := json.Marshal(rawResult)
-	if err != nil {
-		return ""
-	}
-	var wifiConfig struct {
-		Sta struct {
-			SSID string `json:"ssid"`
-		} `json:"sta"`
-	}
-	if err := json.Unmarshal(wifiBytes, &wifiConfig); err != nil {
-		return ""
-	}
-	return wifiConfig.Sta.SSID
-}
