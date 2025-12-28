@@ -14,6 +14,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// File extension constants for config file parsing.
+const (
+	ExtJSON = ".json"
+	ExtYAML = ".yaml"
+	ExtYML  = ".yml"
+)
+
 // ThemeConfig supports both string and block theme configuration formats.
 // It allows users to specify just a theme name, or customize with color overrides.
 type ThemeConfig struct {
@@ -210,23 +217,23 @@ type DeviceTemplate struct {
 
 // ScriptTemplate represents a reusable JavaScript script template.
 type ScriptTemplate struct {
-	Name        string            `mapstructure:"name" json:"name" yaml:"name"`
-	Description string            `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
-	Code        string            `mapstructure:"code" json:"code" yaml:"code"`
-	Category    string            `mapstructure:"category,omitempty" json:"category,omitempty" yaml:"category,omitempty"`       // e.g., "automation", "monitoring", "utility"
-	Variables   []ScriptVariable  `mapstructure:"variables,omitempty" json:"variables,omitempty" yaml:"variables,omitempty"`   // Configurable variables
-	Models      []string          `mapstructure:"models,omitempty" json:"models,omitempty" yaml:"models,omitempty"`            // Compatible device models (empty = all)
-	MinGen      int               `mapstructure:"min_gen,omitempty" json:"min_gen,omitempty" yaml:"min_gen,omitempty"`         // Minimum generation (2 for Gen2+)
-	BuiltIn     bool              `mapstructure:"-" json:"-" yaml:"-"`                                                          // True for bundled templates
-	Author      string            `mapstructure:"author,omitempty" json:"author,omitempty" yaml:"author,omitempty"`
-	Version     string            `mapstructure:"version,omitempty" json:"version,omitempty" yaml:"version,omitempty"`
+	Name        string           `mapstructure:"name" json:"name" yaml:"name"`
+	Description string           `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
+	Code        string           `mapstructure:"code" json:"code" yaml:"code"`
+	Category    string           `mapstructure:"category,omitempty" json:"category,omitempty" yaml:"category,omitempty"`    // e.g., "automation", "monitoring", "utility"
+	Variables   []ScriptVariable `mapstructure:"variables,omitempty" json:"variables,omitempty" yaml:"variables,omitempty"` // Configurable variables
+	Models      []string         `mapstructure:"models,omitempty" json:"models,omitempty" yaml:"models,omitempty"`          // Compatible device models (empty = all)
+	MinGen      int              `mapstructure:"min_gen,omitempty" json:"min_gen,omitempty" yaml:"min_gen,omitempty"`       // Minimum generation (2 for Gen2+)
+	BuiltIn     bool             `mapstructure:"-" json:"-" yaml:"-"`                                                       // True for bundled templates
+	Author      string           `mapstructure:"author,omitempty" json:"author,omitempty" yaml:"author,omitempty"`
+	Version     string           `mapstructure:"version,omitempty" json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 // ScriptVariable represents a configurable variable in a script template.
 type ScriptVariable struct {
-	Name        string `mapstructure:"name" json:"name" yaml:"name"`                                                           // Variable name in code (e.g., "THRESHOLD")
+	Name        string `mapstructure:"name" json:"name" yaml:"name"` // Variable name in code (e.g., "THRESHOLD")
 	Description string `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
-	Type        string `mapstructure:"type,omitempty" json:"type,omitempty" yaml:"type,omitempty"`                             // "string", "number", "boolean"
+	Type        string `mapstructure:"type,omitempty" json:"type,omitempty" yaml:"type,omitempty"` // "string", "number", "boolean"
 	Default     any    `mapstructure:"default,omitempty" json:"default,omitempty" yaml:"default,omitempty"`
 	Required    bool   `mapstructure:"required,omitempty" json:"required,omitempty" yaml:"required,omitempty"`
 }

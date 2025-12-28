@@ -35,7 +35,7 @@ func AddOutputFlags(cmd *cobra.Command, flags *OutputFlags) {
 }
 
 // AddOutputFlagsCustom adds output format flags with custom default and allowed values.
-// Example: AddOutputFlagsCustom(cmd, &opts.OutputFlags, "json", "json", "yaml", "text")
+// Example: AddOutputFlagsCustom(cmd, &opts.OutputFlags, "json", "json", "yaml", "text").
 func AddOutputFlagsCustom(cmd *cobra.Command, flags *OutputFlags, defaultVal string, allowed ...string) {
 	usage := fmt.Sprintf("Output format: %s", strings.Join(allowed, ", "))
 	cmd.Flags().StringVarP(&flags.Format, "format", "f", defaultVal, usage)
@@ -43,7 +43,7 @@ func AddOutputFlagsCustom(cmd *cobra.Command, flags *OutputFlags, defaultVal str
 
 // AddOutputFlagsNamed adds output format flags with a custom flag name.
 // Use this when the flag should be named something other than "format" (e.g., "output").
-// Example: AddOutputFlagsNamed(cmd, &opts.OutputFlags, "output", "o", "json", "json", "yaml")
+// Example: AddOutputFlagsNamed(cmd, &opts.OutputFlags, "output", "o", "json", "json", "yaml").
 func AddOutputFlagsNamed(cmd *cobra.Command, flags *OutputFlags, name, shorthand, defaultVal string, allowed ...string) {
 	usage := fmt.Sprintf("Output format: %s", strings.Join(allowed, ", "))
 	cmd.Flags().StringVarP(&flags.Format, name, shorthand, defaultVal, usage)

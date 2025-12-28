@@ -72,11 +72,11 @@ func ParseSceneFile(file string) (*Scene, error) {
 	// Determine format from file extension
 	ext := strings.ToLower(filepath.Ext(file))
 	switch ext {
-	case ".json":
+	case ExtJSON:
 		if err := json.Unmarshal(data, &scene); err != nil {
 			return nil, fmt.Errorf("failed to parse JSON: %w", err)
 		}
-	case ".yaml", ".yml":
+	case ExtYAML, ExtYML:
 		if err := yaml.Unmarshal(data, &scene); err != nil {
 			return nil, fmt.Errorf("failed to parse YAML: %w", err)
 		}

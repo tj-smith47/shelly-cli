@@ -21,11 +21,11 @@ func ParseDeviceTemplateFile(filename string, data []byte) (DeviceTemplate, erro
 
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
-	case ".json":
+	case ExtJSON:
 		if err := json.Unmarshal(data, &tpl); err != nil {
 			return tpl, fmt.Errorf("failed to parse JSON: %w", err)
 		}
-	case ".yaml", ".yml":
+	case ExtYAML, ExtYML:
 		if err := yaml.Unmarshal(data, &tpl); err != nil {
 			return tpl, fmt.Errorf("failed to parse YAML: %w", err)
 		}
@@ -107,11 +107,11 @@ func ParseScriptTemplateFile(filename string, data []byte) (ScriptTemplate, erro
 
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
-	case ".json":
+	case ExtJSON:
 		if err := json.Unmarshal(data, &tpl); err != nil {
 			return tpl, fmt.Errorf("failed to parse JSON: %w", err)
 		}
-	case ".yaml", ".yml":
+	case ExtYAML, ExtYML:
 		if err := yaml.Unmarshal(data, &tpl); err != nil {
 			return tpl, fmt.Errorf("failed to parse YAML: %w", err)
 		}

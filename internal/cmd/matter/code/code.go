@@ -79,7 +79,7 @@ func run(ctx context.Context, opts *Options) error {
 	if !commissionable {
 		ios.Warning("Device is not commissionable.")
 		ios.Info("Enable Matter first: shelly matter enable %s", opts.Device)
-		if opts.Format == "json" {
+		if opts.Format == string(output.FormatJSON) {
 			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
 		}
 		return nil
@@ -90,14 +90,14 @@ func run(ctx context.Context, opts *Options) error {
 	if err != nil {
 		ios.Debug("failed to get commissioning code: %v", err)
 		// Code not available via API, show instructions
-		if opts.Format == "json" {
+		if opts.Format == string(output.FormatJSON) {
 			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
 		}
 		term.DisplayNotAvailable(ios, deviceIP)
 		return nil
 	}
 
-	if opts.Format == "json" {
+	if opts.Format == string(output.FormatJSON) {
 		return output.JSON(ios.Out, info)
 	}
 
