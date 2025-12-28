@@ -71,8 +71,8 @@ docs:
 	@go run ./cmd/mangen ./docs/man
 	@echo "Man pages generated in docs/man/"
 	@echo "Migrating docs to Hugo site..."
-	@cd docs/site && ./scripts/migrate-docs.sh
-	@cd docs/site && ./scripts/migrate-commands.sh
+	@./scripts/migrate-docs.sh
+	@./scripts/migrate-commands.sh
 	@echo "Hugo site updated in docs/site/"
 
 ## fmt: Format code

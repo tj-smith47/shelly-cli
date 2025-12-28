@@ -1,14 +1,14 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # MIGRATE EXISTING DOCUMENTATION TO HUGO FORMAT
 # =============================================================================
-# Run this script from the docs/site directory
+# Run this script from the repository root
 # Usage: ./scripts/migrate-docs.sh
 
 set -euo pipefail
 
-SOURCE_DOCS="../../docs"  # Relative to docs/site
-TARGET_DOCS="content/docs"
+SOURCE_DOCS="docs"
+TARGET_DOCS="docs/site/content/docs"
 
 echo "Migrating documentation from ${SOURCE_DOCS} to ${TARGET_DOCS}..."
 

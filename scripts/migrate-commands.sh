@@ -1,13 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # MIGRATE COMMAND DOCUMENTATION
 # =============================================================================
 # Processes 350+ command docs into grouped subdirectories for collapsible sidebar
+# Run this script from the repository root
+# Usage: ./scripts/migrate-commands.sh
 
 set -euo pipefail
 
-SOURCE_DIR="../../docs/commands"
-TARGET_DIR="content/docs/commands"
+SOURCE_DIR="docs/commands"
+TARGET_DIR="docs/site/content/docs/commands"
 
 # Create parent command _index.md with collapsed sidebar
 create_parent_index() {
