@@ -247,20 +247,20 @@ jobs:
             # Latest: deploy to root, preserving versioned directories
             echo "Deploying latest docs to root"
 
-            # Preserve versions.json and versioned directories
-            [ -f versions.json ] && cp versions.json ../versions.json.bak
+            # Preserve versions.json and versioned directories (if they exist)
+            [ -f versions.json ] && cp versions.json ../versions.json.bak || true
             for dir in v*/; do
-              [ -d "$dir" ] && mv "$dir" "../$dir"
+              [ -d "$dir" ] && mv "$dir" "../$dir" || true
             done
 
             # Clear root and copy new build
-            rm -rf *
+            rm -rf * || true
             cp -r ../site-build/* .
 
-            # Restore versions.json and versioned directories
-            [ -f ../versions.json.bak ] && mv ../versions.json.bak versions.json
+            # Restore versions.json and versioned directories (if they exist)
+            [ -f ../versions.json.bak ] && mv ../versions.json.bak versions.json || true
             for dir in ../v*/; do
-              [ -d "$dir" ] && mv "$dir" .
+              [ -d "$dir" ] && mv "$dir" . || true
             done
           fi
 
