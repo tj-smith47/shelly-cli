@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/modal"
 )
 
 // ConfirmedMsg signals that the user confirmed the operation.
@@ -32,6 +33,8 @@ type Model struct {
 	width         int
 	height        int
 	visible       bool
+	useModal      bool        // Whether to use modal overlay
+	modal         modal.Model // Modal component for overlay support
 	styles        Styles
 }
 
@@ -80,11 +83,38 @@ func DefaultStyles() Styles {
 	}
 }
 
-// New creates a new Confirm model.
-func New() Model {
-	return Model{
-		styles: DefaultStyles(),
+// Option configures the confirm model.
+type Option func(*Model)
+
+// WithModalOverlay enables modal overlay mode.
+func WithModalOverlay() Option {
+	return func(m *Model) {
+		m.useModal = true
 	}
+}
+
+// WithStyles sets custom styles.
+func WithStyles(styles Styles) Option {
+	return func(m *Model) {
+		m.styles = styles
+	}
+}
+
+// New creates a new Confirm model.
+func New(opts ...Option) Model {
+	m := Model{
+		styles: DefaultStyles(),
+		modal: modal.New(
+			modal.WithCloseOnEsc(false),     // We handle Esc ourselves
+			modal.WithConfirmOnEnter(false), // We handle Enter ourselves
+		),
+	}
+
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	return m
 }
 
 // Init returns the initial command.
@@ -100,6 +130,9 @@ func (m Model) Show(operation, title, message, confirmPhrase string) Model {
 	m.confirmPhrase = confirmPhrase
 	m.input = ""
 	m.visible = true
+	if m.useModal {
+		m.modal = m.modal.SetTitle("⚠ " + title).Show()
+	}
 	return m
 }
 
@@ -107,6 +140,9 @@ func (m Model) Show(operation, title, message, confirmPhrase string) Model {
 func (m Model) Hide() Model {
 	m.visible = false
 	m.input = ""
+	if m.useModal {
+		m.modal = m.modal.Hide()
+	}
 	return m
 }
 
@@ -114,6 +150,9 @@ func (m Model) Hide() Model {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	if m.useModal {
+		m.modal = m.modal.SetSize(width, height)
+	}
 	return m
 }
 
@@ -170,11 +209,31 @@ func (m Model) View() string {
 		return ""
 	}
 
-	var content strings.Builder
+	content := m.buildContent()
 
-	// Title
-	content.WriteString(m.styles.Title.Render("⚠ " + m.title))
-	content.WriteString("\n\n")
+	if m.useModal {
+		// When using modal, update modal content and return its view
+		m.modal = m.modal.SetContent(content)
+		return m.modal.View()
+	}
+
+	// Traditional bordered view
+	dialog := m.styles.Border.Render(content)
+
+	// Center the dialog
+	if m.width > 0 {
+		dialogWidth := lipgloss.Width(dialog)
+		if dialogWidth < m.width {
+			padding := (m.width - dialogWidth) / 2
+			dialog = strings.Repeat(" ", padding) + dialog
+		}
+	}
+
+	return dialog
+}
+
+func (m Model) buildContent() string {
+	var content strings.Builder
 
 	// Message
 	content.WriteString(m.styles.Message.Render(m.message))
@@ -208,19 +267,22 @@ func (m Model) View() string {
 	content.WriteString("\n")
 	content.WriteString(m.styles.Muted.Render("Esc: cancel"))
 
-	// Apply border and center
-	dialog := m.styles.Border.Render(content.String())
+	return content.String()
+}
 
-	// Center the dialog
-	if m.width > 0 {
-		dialogWidth := lipgloss.Width(dialog)
-		if dialogWidth < m.width {
-			padding := (m.width - dialogWidth) / 2
-			dialog = strings.Repeat(" ", padding) + dialog
-		}
+// Overlay renders the confirmation dialog as an overlay on base content.
+func (m Model) Overlay(base string) string {
+	if !m.visible {
+		return base
 	}
 
-	return dialog
+	if m.useModal {
+		m.modal = m.modal.SetContent(m.buildContent())
+		return m.modal.Overlay(base)
+	}
+
+	// Fallback: just return the view for non-modal mode
+	return m.View()
 }
 
 // Visible returns whether the dialog is visible.

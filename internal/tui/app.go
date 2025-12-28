@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -320,7 +321,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		energyBars:      energyBarsModel,
 		energyHistory:   energyHistoryModel,
 		jsonViewer:      jsonViewerModel,
-		confirm:         confirm.New(),
+		confirm:         confirm.New(confirm.WithModalOverlay()),
 		deviceInfo:      deviceInfoModel,
 		deviceList:      deviceListModel,
 		deviceDetail:    deviceDetailModel,
@@ -1763,7 +1764,7 @@ func (m Model) applyOverlays(result string) string {
 		result = m.toast.Overlay(result)
 	}
 	if m.confirm.Visible() {
-		result = m.centerOverlay(m.confirm.View())
+		result = m.confirm.Overlay(result)
 	}
 	if m.deviceDetail.Visible() {
 		result = m.centerOverlay(m.deviceDetail.View())
@@ -2259,11 +2260,20 @@ func Run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
 }
 
 // openDeviceBrowser opens the device's web UI in the default browser.
+// If the browser cannot be opened, the URL is copied to clipboard.
 func (m Model) openDeviceBrowser(address string) tea.Cmd {
 	return func() tea.Msg {
 		url := "http://" + address
 		b := browser.New()
 		if err := b.Browse(m.ctx, url); err != nil {
+			// Check if URL was copied to clipboard as fallback
+			var clipErr *browser.ClipboardFallbackError
+			if errors.As(err, &clipErr) {
+				return toast.ShowMsg{
+					Level:   toast.LevelInfo,
+					Message: "Could not open browser. URL copied to clipboard.",
+				}
+			}
 			return DeviceActionMsg{
 				Device: address,
 				Action: "open browser",

@@ -356,3 +356,120 @@ func TestDefaultStyles(t *testing.T) {
 	_ = styles.Danger.Render("test")
 	_ = styles.Highlight.Render("test")
 }
+
+func TestWithModalOverlay(t *testing.T) {
+	t.Parallel()
+	m := New(WithModalOverlay())
+
+	if !m.useModal {
+		t.Error("WithModalOverlay should set useModal to true")
+	}
+}
+
+func TestWithStyles(t *testing.T) {
+	t.Parallel()
+	customStyles := DefaultStyles()
+	m := New(WithStyles(customStyles))
+
+	// Styles should be applied
+	_ = m.styles.Border.Render("test")
+}
+
+func TestModel_Show_WithModal(t *testing.T) {
+	t.Parallel()
+	m := New(WithModalOverlay())
+
+	updated := m.Show(testOp, testTitle, testMessage, testPhrase)
+
+	if !updated.visible {
+		t.Error("should be visible after Show")
+	}
+	// Modal should also be visible when useModal is true
+	if !updated.modal.IsVisible() {
+		t.Error("modal should be visible when useModal is true")
+	}
+}
+
+func TestModel_Hide_WithModal(t *testing.T) {
+	t.Parallel()
+	m := New(WithModalOverlay())
+	m = m.Show(testOp, testTitle, testMessage, testPhrase)
+
+	updated := m.Hide()
+
+	if updated.visible {
+		t.Error("should not be visible after Hide")
+	}
+	if updated.modal.IsVisible() {
+		t.Error("modal should be hidden when Hide is called")
+	}
+}
+
+func TestModel_SetSize_WithModal(t *testing.T) {
+	t.Parallel()
+	m := New(WithModalOverlay())
+
+	updated := m.SetSize(100, 50)
+
+	if updated.width != 100 {
+		t.Errorf("width = %d, want 100", updated.width)
+	}
+	if updated.height != 50 {
+		t.Errorf("height = %d, want 50", updated.height)
+	}
+}
+
+func TestModel_View_WithModal(t *testing.T) {
+	t.Parallel()
+	m := New(WithModalOverlay())
+	m = m.Show(testOp, testTitle, testMessage, testPhrase)
+	m = m.SetSize(80, 40)
+
+	view := m.View()
+
+	if view == "" {
+		t.Error("View() should not be empty when visible with modal")
+	}
+}
+
+func TestModel_Overlay_NotVisible(t *testing.T) {
+	t.Parallel()
+	m := New()
+	base := "base content"
+
+	result := m.Overlay(base)
+
+	if result != base {
+		t.Error("Overlay should return base when not visible")
+	}
+}
+
+func TestModel_Overlay_WithModal(t *testing.T) {
+	t.Parallel()
+	m := New(WithModalOverlay())
+	m = m.Show(testOp, testTitle, testMessage, testPhrase)
+	m = m.SetSize(80, 40)
+	base := "base content\nline 2\nline 3"
+
+	result := m.Overlay(base)
+
+	// Result should contain the modal overlay
+	if result == base {
+		t.Error("Overlay should modify base when modal is visible")
+	}
+}
+
+func TestModel_Overlay_NoModal(t *testing.T) {
+	t.Parallel()
+	m := New() // No modal
+	m = m.Show(testOp, testTitle, testMessage, testPhrase)
+	m = m.SetSize(80, 40)
+	base := "base content"
+
+	result := m.Overlay(base)
+
+	// Without modal, Overlay returns the View
+	if result == "" {
+		t.Error("Overlay should return View when not using modal")
+	}
+}

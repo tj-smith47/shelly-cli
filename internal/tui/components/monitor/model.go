@@ -20,6 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -94,6 +95,7 @@ type Model struct {
 	styles          Styles
 	refreshInterval time.Duration
 	scroller        *panel.Scroller
+	loader          loading.Model // Loading spinner
 }
 
 // Styles for the monitor component.
@@ -228,6 +230,11 @@ func New(deps Deps) Model {
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
 		scroller:        panel.NewScroller(0, 10),
+		loader: loading.New(
+			loading.WithMessage("Fetching device statuses..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -235,6 +242,7 @@ func New(deps Deps) Model {
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.fetchStatuses(), // Initial HTTP fetch for immediate data
+		m.loader.Init(),   // Start spinner animation
 	}
 
 	if m.useWebSocket {
@@ -413,22 +421,22 @@ func (m Model) Refresh() tea.Cmd {
 
 // Update handles messages for the monitor.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Update loader for spinner animation during initial load
+	if m.initialLoad {
+		var loaderCmd tea.Cmd
+		m.loader, loaderCmd = m.loader.Update(msg)
+		if loaderCmd != nil {
+			// Continue to process StatusUpdateMsg even during loading
+			if statusMsg, ok := msg.(StatusUpdateMsg); ok {
+				return m.handleStatusUpdate(statusMsg, loaderCmd)
+			}
+			return m, loaderCmd
+		}
+	}
+
 	switch msg := msg.(type) {
 	case StatusUpdateMsg:
-		m.initialLoad = false
-		m.refreshing = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.statuses = msg.Statuses
-		m.scroller.SetItemCount(len(m.statuses))
-		// Build status map for O(1) updates
-		m.statusMap = make(map[string]*DeviceStatus, len(m.statuses))
-		for i := range m.statuses {
-			m.statusMap[m.statuses[i].Name] = &m.statuses[i]
-		}
-		return m, nil
+		return m.handleStatusUpdate(msg, nil)
 
 	case DeviceEventMsg:
 		// Handle WebSocket event - update status in place
@@ -459,6 +467,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 // handleDeviceEvent processes a WebSocket event and updates device status.
+// handleStatusUpdate processes status update messages.
+func (m Model) handleStatusUpdate(msg StatusUpdateMsg, additionalCmd tea.Cmd) (Model, tea.Cmd) {
+	m.initialLoad = false
+	m.refreshing = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, additionalCmd
+	}
+	m.statuses = msg.Statuses
+	m.scroller.SetItemCount(len(m.statuses))
+	// Build status map for O(1) updates
+	m.statusMap = make(map[string]*DeviceStatus, len(m.statuses))
+	for i := range m.statuses {
+		m.statusMap[m.statuses[i].Name] = &m.statuses[i]
+	}
+	return m, additionalCmd
+}
+
 func (m Model) handleDeviceEvent(evt events.Event) {
 	deviceID := evt.DeviceID()
 
@@ -570,12 +596,10 @@ func (m Model) SetSize(width, height int) Model {
 // View renders the monitor.
 func (m Model) View() string {
 	if m.initialLoad {
-		loadingText := m.styles.UpdatingIcon.Render("◐ ") + "Fetching device statuses..."
 		return m.styles.Container.
 			Width(m.width).
 			Height(m.height).
-			Align(lipgloss.Center, lipgloss.Center).
-			Render(loadingText)
+			Render(m.loader.SetSize(m.width, m.height).View())
 	}
 
 	if m.err != nil {

@@ -20,6 +20,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -42,12 +43,13 @@ type Model struct {
 	endpointIdx   int
 	data          map[string]any
 	viewport      viewport.Model
-	loading       bool
+	isLoading     bool
 	error         error
 	visible       bool
 	width         int
 	height        int
 	styles        Styles
+	loader        loading.Model // Loading spinner
 }
 
 // Styles for the JSON viewer.
@@ -111,6 +113,11 @@ func New(ctx context.Context, svc *shelly.Service) Model {
 		svc:      svc,
 		viewport: vp,
 		styles:   DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -125,59 +132,88 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	switch msg := msg.(type) {
-	case FetchedMsg:
-		m.loading = false
-		if msg.Error != nil {
-			m.error = msg.Error
-		} else {
-			m.data = msg.Data
-			m.error = nil
-			m.viewport.SetContent(m.formatJSON())
-		}
-		return m, nil
+	// Handle FetchedMsg first (regardless of loading state)
+	if fetchedMsg, ok := msg.(FetchedMsg); ok {
+		return m.handleFetchedMsg(fetchedMsg)
+	}
 
-	case tea.KeyPressMsg:
-		switch {
-		case key.Matches(msg, key.NewBinding(key.WithKeys("escape", "q"))):
-			m.visible = false
-			return m, func() tea.Msg { return CloseMsg{} }
-
-		case key.Matches(msg, key.NewBinding(key.WithKeys("h", "left"))):
-			// Previous endpoint
-			if len(m.endpoints) > 1 && m.endpointIdx > 0 {
-				m.endpointIdx--
-				m.endpoint = m.endpoints[m.endpointIdx]
-				return m, m.fetchEndpoint()
-			}
-
-		case key.Matches(msg, key.NewBinding(key.WithKeys("l", "right"))):
-			// Next endpoint
-			if len(m.endpoints) > 1 && m.endpointIdx < len(m.endpoints)-1 {
-				m.endpointIdx++
-				m.endpoint = m.endpoints[m.endpointIdx]
-				return m, m.fetchEndpoint()
-			}
-
-		case key.Matches(msg, key.NewBinding(key.WithKeys("g"))):
-			// Go to top
-			m.viewport.GotoTop()
-
-		case key.Matches(msg, key.NewBinding(key.WithKeys("G"))):
-			// Go to bottom
-			m.viewport.GotoBottom()
-
-		case key.Matches(msg, key.NewBinding(key.WithKeys("r"))):
-			// Refresh
-			return m, m.fetchEndpoint()
-		}
-
-		// Forward to viewport for scrolling (handles j/k/up/down/pgup/pgdn)
+	// Update loader for spinner animation when loading
+	if m.isLoading {
 		var cmd tea.Cmd
-		m.viewport, cmd = m.viewport.Update(msg)
+		m.loader, cmd = m.loader.Update(msg)
 		return m, cmd
 	}
 
+	// Handle key presses
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		return m.handleKeyPress(keyMsg)
+	}
+
+	return m, nil
+}
+
+// handleFetchedMsg processes the FetchedMsg when data arrives.
+func (m Model) handleFetchedMsg(msg FetchedMsg) (Model, tea.Cmd) {
+	m.isLoading = false
+	if msg.Error != nil {
+		m.error = msg.Error
+	} else {
+		m.data = msg.Data
+		m.error = nil
+		m.viewport.SetContent(m.formatJSON())
+	}
+	return m, nil
+}
+
+// handleKeyPress processes key press messages.
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("escape", "q"))):
+		m.visible = false
+		return m, func() tea.Msg { return CloseMsg{} }
+
+	case key.Matches(msg, key.NewBinding(key.WithKeys("h", "left"))):
+		return m.prevEndpoint()
+
+	case key.Matches(msg, key.NewBinding(key.WithKeys("l", "right"))):
+		return m.nextEndpoint()
+
+	case key.Matches(msg, key.NewBinding(key.WithKeys("g"))):
+		m.viewport.GotoTop()
+
+	case key.Matches(msg, key.NewBinding(key.WithKeys("G"))):
+		m.viewport.GotoBottom()
+
+	case key.Matches(msg, key.NewBinding(key.WithKeys("r"))):
+		m.isLoading = true
+		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
+	}
+
+	// Forward to viewport for scrolling (handles j/k/up/down/pgup/pgdn)
+	var cmd tea.Cmd
+	m.viewport, cmd = m.viewport.Update(msg)
+	return m, cmd
+}
+
+// prevEndpoint navigates to the previous endpoint.
+func (m Model) prevEndpoint() (Model, tea.Cmd) {
+	if len(m.endpoints) > 1 && m.endpointIdx > 0 {
+		m.endpointIdx--
+		m.endpoint = m.endpoints[m.endpointIdx]
+		m.isLoading = true
+		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
+	}
+	return m, nil
+}
+
+// nextEndpoint navigates to the next endpoint.
+func (m Model) nextEndpoint() (Model, tea.Cmd) {
+	if len(m.endpoints) > 1 && m.endpointIdx < len(m.endpoints)-1 {
+		m.endpointIdx++
+		m.endpoint = m.endpoints[m.endpointIdx]
+		m.isLoading = true
+		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
+	}
 	return m, nil
 }
 
@@ -203,8 +239,8 @@ func (m Model) View() string {
 
 	// Content
 	switch {
-	case m.loading:
-		content.WriteString(m.styles.Loading.Render("Loading..."))
+	case m.isLoading:
+		content.WriteString(m.loader.View())
 	case m.error != nil:
 		content.WriteString(m.styles.Error.Render("Error: " + m.error.Error()))
 	default:
@@ -321,7 +357,7 @@ func (m Model) getChromaStyle() *chroma.Style {
 // fetchEndpoint fetches JSON from device.
 func (m Model) fetchEndpoint() tea.Cmd {
 	return func() tea.Msg {
-		m.loading = true
+		// Note: isLoading is set by caller, this just performs the fetch
 
 		// Parse endpoint to method call
 		// Format: "Switch.GetStatus?id=0" or "Shelly.GetStatus"
@@ -362,7 +398,7 @@ func (m Model) fetchEndpoint() tea.Cmd {
 // Open opens the JSON viewer for a device endpoint.
 func (m Model) Open(deviceAddress, endpoint string, endpoints []string) (Model, tea.Cmd) {
 	m.visible = true
-	m.loading = true
+	m.isLoading = true
 	m.error = nil
 	m.data = nil
 	m.deviceAddress = deviceAddress
@@ -390,7 +426,7 @@ func (m Model) Open(deviceAddress, endpoint string, endpoints []string) (Model, 
 		m.viewport.SetHeight(contentHeight)
 	}
 
-	return m, m.fetchEndpoint()
+	return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
 }
 
 // Close closes the JSON viewer.
@@ -427,7 +463,7 @@ func (m Model) SetSize(width, height int) Model {
 
 // Loading returns whether the viewer is loading.
 func (m Model) Loading() bool {
-	return m.loading
+	return m.isLoading
 }
 
 // Error returns any error that occurred.

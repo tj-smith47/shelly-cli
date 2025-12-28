@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -38,6 +39,7 @@ type Model struct {
 	width      int
 	height     int
 	styles     Styles
+	loader     loading.Model // Loading spinner for initial load
 }
 
 // Styles for the device list component.
@@ -131,17 +133,32 @@ func New(c *cache.Cache) Model {
 		cache:    c,
 		scroller: panel.NewScroller(0, 10),
 		styles:   DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading devices..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
 // Init initializes the device list component.
-// The cache handles device loading and refresh, so no commands needed here.
+// The cache handles device loading and refresh, but we start the spinner if loading.
 func (m Model) Init() tea.Cmd {
+	if m.cache != nil && m.cache.IsLoading() {
+		return m.loader.Init()
+	}
 	return nil
 }
 
 // Update handles messages for the device list.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Update loader for spinner animation when loading
+	if m.cache != nil && m.cache.IsLoading() && len(m.getFilteredDevices()) == 0 {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		return m, cmd
+	}
+
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		// Sync item count from cache before handling key
 		devices := m.getFilteredDevices()
@@ -330,10 +347,9 @@ func (m Model) View() string {
 
 	if m.cache.IsLoading() && len(devices) == 0 {
 		return m.styles.Table.
-			Width(m.width-4).
+			Width(m.width - 4).
 			Height(m.height).
-			Align(lipgloss.Center, lipgloss.Center).
-			Render("Loading devices...")
+			Render(m.loader.SetSize(m.width-4, m.height).View())
 	}
 
 	if m.cache.DeviceCount() == 0 {
