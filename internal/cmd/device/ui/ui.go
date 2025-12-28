@@ -3,16 +3,25 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds the command options.
+type Options struct {
+	CopyURL bool
+}
+
 // NewCommand creates the device ui command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{}
+
 	cmd := &cobra.Command{
 		Use:     "ui <device>",
 		Aliases: []string{"web", "open"},
@@ -27,26 +36,48 @@ The device can be specified by name (from config) or by IP address/hostname.`,
   shelly device ui 192.168.1.100
 
   # Using the 'web' alias
-  shelly device web kitchen`,
+  shelly device web kitchen
+
+  # Copy URL to clipboard instead of opening
+  shelly device ui living-room --copy-url`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			return run(cmd.Context(), f, opts, args[0])
 		},
 	}
+
+	cmd.Flags().BoolVar(&opts.CopyURL, "copy-url", false, "Copy URL to clipboard instead of opening browser")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options, device string) error {
 	ios := f.IOStreams()
+	br := f.Browser()
 
 	// Resolve device to get its address
 	addr := f.ResolveAddress(device)
+	url := fmt.Sprintf("http://%s", addr)
 
-	ios.Info("Opening http://%s in browser...", addr)
+	// If --copy-url flag is set, copy to clipboard directly
+	if opts.CopyURL {
+		if err := br.CopyToClipboard(url); err != nil {
+			return fmt.Errorf("failed to copy URL to clipboard: %w", err)
+		}
+		ios.Success("URL copied to clipboard: %s", url)
+		return nil
+	}
 
-	if err := f.Browser().OpenDeviceUI(ctx, addr); err != nil {
+	ios.Info("Opening %s in browser...", url)
+
+	if err := br.OpenDeviceUI(ctx, addr); err != nil {
+		// Check if URL was copied to clipboard as fallback
+		var clipErr *browser.ClipboardFallbackError
+		if errors.As(err, &clipErr) {
+			ios.Warning("Could not open browser. URL copied to clipboard: %s", clipErr.URL)
+			return nil
+		}
 		return fmt.Errorf("failed to open browser: %w", err)
 	}
 

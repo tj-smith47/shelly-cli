@@ -134,9 +134,10 @@ func (tf *TestFactory) ErrString() string {
 
 // MockBrowser implements browser.Browser for testing.
 type MockBrowser struct {
-	BrowseCalled bool
-	LastURL      string
-	Err          error
+	BrowseCalled          bool
+	CopyToClipboardCalled bool
+	LastURL               string
+	Err                   error
 }
 
 // Browse records the call and returns the mock error.
@@ -149,6 +150,13 @@ func (m *MockBrowser) Browse(_ context.Context, url string) error {
 // OpenDeviceUI opens a Shelly device's web interface by IP address.
 func (m *MockBrowser) OpenDeviceUI(ctx context.Context, deviceIP string) error {
 	return m.Browse(ctx, "http://"+deviceIP)
+}
+
+// CopyToClipboard records the call and returns the mock error.
+func (m *MockBrowser) CopyToClipboard(url string) error {
+	m.CopyToClipboardCalled = true
+	m.LastURL = url
+	return m.Err
 }
 
 // NewTestFactoryWithMockBrowser creates a test factory with a mock browser.

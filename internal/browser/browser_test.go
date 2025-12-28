@@ -165,10 +165,12 @@ func TestOpenDeviceUI_IPVariants(t *testing.T) {
 
 // MockBrowser is a test double for Browser interface.
 type MockBrowser struct {
-	BrowseCalls     []string
-	OpenDeviceCalls []string
-	BrowseError     error
-	OpenDeviceError error
+	BrowseCalls        []string
+	OpenDeviceCalls    []string
+	CopyClipboardCalls []string
+	BrowseError        error
+	OpenDeviceError    error
+	CopyClipboardError error
 }
 
 // Browse records the URL and returns configured error.
@@ -181,6 +183,12 @@ func (m *MockBrowser) Browse(_ context.Context, url string) error {
 func (m *MockBrowser) OpenDeviceUI(_ context.Context, deviceIP string) error {
 	m.OpenDeviceCalls = append(m.OpenDeviceCalls, deviceIP)
 	return m.OpenDeviceError
+}
+
+// CopyToClipboard records the URL and returns configured error.
+func (m *MockBrowser) CopyToClipboard(url string) error {
+	m.CopyClipboardCalls = append(m.CopyClipboardCalls, url)
+	return m.CopyClipboardError
 }
 
 // TestMockBrowser verifies the mock implementation works correctly.
@@ -251,4 +259,74 @@ func TestMockBrowserInterface(t *testing.T) {
 	t.Parallel()
 
 	var _ Browser = (*MockBrowser)(nil)
+}
+
+// TestClipboardFallbackError_Error verifies error message format.
+func TestClipboardFallbackError_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{"http_url", "http://example.com", "URL copied to clipboard: http://example.com"},
+		{"https_url", "https://example.com", "URL copied to clipboard: https://example.com"},
+		{"device_url", "http://192.168.1.1", "URL copied to clipboard: http://192.168.1.1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := &ClipboardFallbackError{URL: tt.url}
+			got := err.Error()
+			if got != tt.want {
+				t.Errorf("Error() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestClipboardFallbackError_ImplementsError verifies it implements error interface.
+func TestClipboardFallbackError_ImplementsError(t *testing.T) {
+	t.Parallel()
+
+	// Verify ClipboardFallbackError implements error interface at compile time
+	err := &ClipboardFallbackError{URL: "http://example.com"}
+	msg := err.Error()
+	if msg == "" {
+		t.Error("Error() should return non-empty message")
+	}
+}
+
+// TestMockBrowser_CopyToClipboard verifies the mock records clipboard calls.
+func TestMockBrowser_CopyToClipboard(t *testing.T) {
+	t.Parallel()
+
+	t.Run("records_calls", func(t *testing.T) {
+		t.Parallel()
+		m := &MockBrowser{}
+
+		err := m.CopyToClipboard("http://example.com")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if len(m.CopyClipboardCalls) != 1 {
+			t.Errorf("expected 1 CopyToClipboard call, got %d", len(m.CopyClipboardCalls))
+		}
+		if m.CopyClipboardCalls[0] != "http://example.com" {
+			t.Errorf("CopyClipboardCalls[0] = %q, want http://example.com", m.CopyClipboardCalls[0])
+		}
+	})
+
+	t.Run("returns_error", func(t *testing.T) {
+		t.Parallel()
+		m := &MockBrowser{CopyClipboardError: fmt.Errorf("clipboard error")}
+
+		err := m.CopyToClipboard("http://example.com")
+		if err == nil {
+			t.Error("expected error, got nil")
+		}
+	})
 }

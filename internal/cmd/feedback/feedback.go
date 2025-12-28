@@ -3,10 +3,12 @@ package feedback
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/github"
@@ -79,7 +81,15 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	// If --issues flag, just open issues page
 	if opts.OpenIssues {
 		ios.Info("Opening GitHub issues...")
-		return br.Browse(ctx, github.IssuesURL())
+		if err := br.Browse(ctx, github.IssuesURL()); err != nil {
+			var clipErr *browser.ClipboardFallbackError
+			if errors.As(err, &clipErr) {
+				ios.Warning("Could not open browser. URL copied to clipboard: %s", clipErr.URL)
+				return nil
+			}
+			return fmt.Errorf("failed to open browser: %w", err)
+		}
+		return nil
 	}
 
 	// Determine issue type
@@ -125,6 +135,12 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 
 	ios.Info("Opening GitHub issue form...")
 	if err := br.Browse(ctx, issueURL); err != nil {
+		var clipErr *browser.ClipboardFallbackError
+		if errors.As(err, &clipErr) {
+			ios.Warning("Could not open browser. URL copied to clipboard: %s", clipErr.URL)
+			ios.Info("Please open the URL manually to submit your issue")
+			return nil
+		}
 		return fmt.Errorf("failed to open browser: %w", err)
 	}
 
