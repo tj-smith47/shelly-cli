@@ -8,22 +8,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds the command options.
 type Options struct {
+	flags.OutputFlags
 	Type   string
 	Output string
-	Format string
 }
 
 // NewCommand creates the report command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
-		Type:   "devices",
-		Format: "json",
+		Type: "devices",
 	}
 
 	cmd := &cobra.Command{
@@ -58,8 +58,8 @@ Output formats:
 	}
 
 	cmd.Flags().StringVarP(&opts.Type, "type", "t", "devices", "Report type: devices, energy, audit")
-	cmd.Flags().StringVarP(&opts.Output, "output", "o", "", "Output file path")
-	cmd.Flags().StringVar(&opts.Format, "format", "json", "Output format: json, text")
+	cmd.Flags().StringVar(&opts.Output, "output-file", "", "Output file path")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "json", "json", "text")
 
 	return cmd
 }

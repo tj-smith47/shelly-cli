@@ -2,6 +2,39 @@ package flags
 
 import "github.com/spf13/cobra"
 
+// DeviceTargetFlags holds flags for targeting devices.
+// This is simpler than BatchFlags, providing just group and all selection.
+//
+// Usage:
+//
+//	type Options struct {
+//	    flags.DeviceTargetFlags
+//	    Factory *cmdutil.Factory
+//	}
+//
+//	func NewCommand(f *cmdutil.Factory) *cobra.Command {
+//	    opts := &Options{Factory: f}
+//	    cmd := &cobra.Command{...}
+//	    flags.AddDeviceTargetFlags(cmd, &opts.DeviceTargetFlags)
+//	    return cmd
+//	}
+type DeviceTargetFlags struct {
+	GroupName string
+	All       bool
+}
+
+// AddDeviceTargetFlags adds device targeting flags to a command.
+func AddDeviceTargetFlags(cmd *cobra.Command, flags *DeviceTargetFlags) {
+	AddGroupFlag(cmd, &flags.GroupName)
+	AddAllFlag(cmd, &flags.All)
+}
+
+// AddAllOnlyFlag adds only the --all flag without --group.
+// Use for commands that just need "all devices" selection.
+func AddAllOnlyFlag(cmd *cobra.Command, flags *DeviceTargetFlags) {
+	AddAllFlag(cmd, &flags.All)
+}
+
 // DeviceFilterFlags holds flags for filtering device lists.
 // Embed this in your Options struct for commands that list or select devices.
 //

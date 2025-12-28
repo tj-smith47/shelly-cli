@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -15,9 +16,9 @@ import (
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	Factory *cmdutil.Factory
 	Device  string
-	JSON    bool
 }
 
 // NewCommand creates the matter code command.
@@ -51,7 +52,7 @@ label or web UI at http://<device-ip>/matter for the QR code.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
 
 	return cmd
 }
@@ -78,7 +79,7 @@ func run(ctx context.Context, opts *Options) error {
 	if !commissionable {
 		ios.Warning("Device is not commissionable.")
 		ios.Info("Enable Matter first: shelly matter enable %s", opts.Device)
-		if opts.JSON {
+		if opts.Format == "json" {
 			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
 		}
 		return nil
@@ -89,14 +90,14 @@ func run(ctx context.Context, opts *Options) error {
 	if err != nil {
 		ios.Debug("failed to get commissioning code: %v", err)
 		// Code not available via API, show instructions
-		if opts.JSON {
+		if opts.Format == "json" {
 			return output.JSON(ios.Out, model.CommissioningInfo{Available: false})
 		}
 		term.DisplayNotAvailable(ios, deviceIP)
 		return nil
 	}
 
-	if opts.JSON {
+	if opts.Format == "json" {
 		return output.JSON(ios.Out, info)
 	}
 

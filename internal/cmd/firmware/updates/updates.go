@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -17,15 +18,10 @@ import (
 
 // NewCommand creates the firmware updates command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		allFlag      bool
-		stableFlag   bool
-		betaFlag     bool
-		devicesFlag  string
-		platformFlag string
-		yesFlag      bool
-		parallelFlag int
-	)
+	opts := &Options{
+		Factory:  f,
+		Parallel: 3,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "updates",
@@ -55,43 +51,36 @@ Supports both native Shelly devices and plugin-managed devices (Tasmota, etc.).`
   # Update specific devices interactively
   shelly firmware updates --devices=kitchen,bedroom`,
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts := Options{
-				All:      allFlag,
-				Stable:   stableFlag,
-				Beta:     betaFlag,
-				Devices:  devicesFlag,
-				Platform: platformFlag,
-				Yes:      yesFlag,
-				Parallel: parallelFlag,
-			}
-			return run(cmd.Context(), f, opts)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&allFlag, "all", false, "Update all devices with available updates")
-	cmd.Flags().BoolVar(&stableFlag, "stable", false, "Use stable release channel (default)")
-	cmd.Flags().BoolVar(&betaFlag, "beta", false, "Use beta/development release channel")
-	cmd.Flags().StringVar(&devicesFlag, "devices", "", "Comma-separated list of specific devices to update")
-	cmd.Flags().StringVar(&platformFlag, "platform", "", "Only update devices of this platform (e.g., tasmota)")
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompts")
-	cmd.Flags().IntVar(&parallelFlag, "parallel", 3, "Number of devices to update in parallel")
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Update all devices with available updates")
+	cmd.Flags().BoolVar(&opts.Stable, "stable", false, "Use stable release channel (default)")
+	cmd.Flags().BoolVar(&opts.Beta, "beta", false, "Use beta/development release channel")
+	cmd.Flags().StringVar(&opts.Devices, "devices", "", "Comma-separated list of specific devices to update")
+	cmd.Flags().StringVar(&opts.Platform, "platform", "", "Only update devices of this platform (e.g., tasmota)")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
+	cmd.Flags().IntVar(&opts.Parallel, "parallel", 3, "Number of devices to update in parallel")
 
 	return cmd
 }
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
+	Factory  *cmdutil.Factory
 	All      bool
 	Stable   bool
 	Beta     bool
 	Devices  string
 	Platform string
-	Yes      bool
 	Parallel int
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts Options) error {
+func run(ctx context.Context, opts *Options) error {
+	f := opts.Factory
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 

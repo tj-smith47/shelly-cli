@@ -9,22 +9,27 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/github"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory    *cmdutil.Factory
+	Check      bool
+	Version    string
+	Channel    string
+	Rollback   bool
+	IncludePre bool
+}
+
 // NewCommand creates the update command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		check      bool
-		ver        string
-		channel    string
-		rollback   bool
-		yes        bool
-		includePre bool
-	)
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "update",
@@ -50,37 +55,37 @@ Use --version to install a specific version.`,
   # Update without confirmation
   shelly update --yes`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, check, ver, channel, rollback, yes, includePre)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&check, "check", "c", false, "Check for updates without installing")
-	cmd.Flags().StringVar(&ver, "version", "", "Install a specific version")
-	cmd.Flags().StringVar(&channel, "channel", "stable", "Release channel (stable, beta)")
-	cmd.Flags().BoolVar(&rollback, "rollback", false, "Rollback to previous version")
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
-	cmd.Flags().BoolVar(&includePre, "include-pre", false, "Include pre-release versions")
+	cmd.Flags().BoolVarP(&opts.Check, "check", "c", false, "Check for updates without installing")
+	cmd.Flags().StringVar(&opts.Version, "version", "", "Install a specific version")
+	cmd.Flags().StringVar(&opts.Channel, "channel", "stable", "Release channel (stable, beta)")
+	cmd.Flags().BoolVar(&opts.Rollback, "rollback", false, "Rollback to previous version")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
+	cmd.Flags().BoolVar(&opts.IncludePre, "include-pre", false, "Include pre-release versions")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, check bool, ver, channel string, rollback, yes, includePre bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 	ghClient := github.NewClient(ios)
 	currentVersion := version.Version
 
 	if version.IsDevelopment() {
 		ios.Warning("Development version detected, cannot determine update status")
-		if !check {
+		if !opts.Check {
 			return fmt.Errorf("cannot update development version")
 		}
 	}
 
-	if rollback {
-		return ghClient.PerformRollback(ctx, ios, currentVersion, includePre, f.ConfirmAction, yes)
+	if opts.Rollback {
+		return ghClient.PerformRollback(ctx, ios, currentVersion, opts.IncludePre, opts.Factory.ConfirmAction, opts.Yes)
 	}
 
-	release, err := ghClient.GetTargetRelease(ctx, ver, includePre || channel == "beta")
+	release, err := ghClient.GetTargetRelease(ctx, opts.Version, opts.IncludePre || opts.Channel == "beta")
 	if err != nil {
 		if errors.Is(err, github.ErrNoReleases) {
 			ios.Info("No releases found")
@@ -92,15 +97,15 @@ func run(ctx context.Context, f *cmdutil.Factory, check bool, ver, channel strin
 	availableVersion := release.Version()
 	hasUpdate := github.IsNewerVersion(currentVersion, availableVersion)
 
-	if check {
+	if opts.Check {
 		term.DisplayUpdateStatus(ios, currentVersion, availableVersion, hasUpdate, release.HTMLURL)
 		return nil
 	}
 
-	if !hasUpdate && ver == "" {
+	if !hasUpdate && opts.Version == "" {
 		ios.Printf("Already at latest version (%s)\n", currentVersion)
 		return nil
 	}
 
-	return ghClient.PerformUpdate(ctx, ios, release, currentVersion, output.FormatReleaseNotes(release.Body), f.ConfirmAction, yes)
+	return ghClient.PerformUpdate(ctx, ios, release, currentVersion, output.FormatReleaseNotes(release.Body), opts.Factory.ConfirmAction, opts.Yes)
 }

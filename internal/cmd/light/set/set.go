@@ -12,13 +12,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.ComponentFlags
+	Factory    *cmdutil.Factory
+	Device     string
+	Brightness int
+	On         bool
+}
+
 // NewCommand creates the light set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		lightID    int
-		brightness int
-		on         bool
-	)
+	opts := &Options{
+		Factory:    f,
+		Brightness: -1,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "set <device>",
@@ -36,18 +44,20 @@ Values not specified will be left unchanged.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], lightID, brightness, on)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	flags.AddComponentIDFlag(cmd, &lightID, "Light")
-	cmd.Flags().IntVarP(&brightness, "brightness", "b", -1, "Brightness (0-100)")
-	cmd.Flags().BoolVar(&on, "on", false, "Turn on")
+	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "Light")
+	cmd.Flags().IntVarP(&opts.Brightness, "brightness", "b", -1, "Brightness (0-100)")
+	cmd.Flags().BoolVar(&opts.On, "on", false, "Turn on")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, lightID, brightness int, on bool) error {
+func run(ctx context.Context, opts *Options) error {
+	f := opts.Factory
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
@@ -55,22 +65,22 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, lightID, bright
 	ios := f.IOStreams()
 
 	var brightnessPtr *int
-	if brightness >= 0 && brightness <= 100 {
-		brightnessPtr = &brightness
+	if opts.Brightness >= 0 && opts.Brightness <= 100 {
+		brightnessPtr = &opts.Brightness
 	}
 
 	var onPtr *bool
-	if on {
-		onPtr = &on
+	if opts.On {
+		onPtr = &opts.On
 	}
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Setting light parameters...", func(ctx context.Context) error {
-		return svc.LightSet(ctx, device, lightID, brightnessPtr, onPtr)
+		return svc.LightSet(ctx, opts.Device, opts.ID, brightnessPtr, onPtr)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set light parameters: %w", err)
 	}
 
-	ios.Success("Light %d parameters set", lightID)
+	ios.Success("Light %d parameters set", opts.ID)
 	return nil
 }

@@ -7,14 +7,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ComponentFlags
 	Factory   *cmdutil.Factory
 	Device    string
-	ID        int
 	Freq      int64
 	Bandwidth int
 	DataRate  int
@@ -57,7 +58,8 @@ Common frequencies:
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.ID, "id", 100, "LoRa component ID")
+	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "LoRa")
+	opts.ID = 100 // LoRa components start at ID 100
 	cmd.Flags().Int64Var(&opts.Freq, "freq", 0, "RF frequency in Hz")
 	cmd.Flags().IntVar(&opts.Bandwidth, "bw", 0, "Bandwidth setting")
 	cmd.Flags().IntVar(&opts.DataRate, "dr", 0, "Data rate / spreading factor")

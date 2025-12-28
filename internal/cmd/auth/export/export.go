@@ -12,13 +12,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 )
 
 // Options holds the command options.
 type Options struct {
+	flags.DeviceTargetFlags
 	Output   string
 	Password string
-	All      bool
 }
 
 // NewCommand creates the auth export command.
@@ -44,7 +45,7 @@ Use with auth import to restore credentials on another system.`,
 	}
 
 	cmd.Flags().StringVarP(&opts.Output, "output", "o", "credentials.json", "Output file path")
-	cmd.Flags().BoolVar(&opts.All, "all", false, "Export all configured credentials")
+	flags.AddAllOnlyFlag(cmd, &opts.DeviceTargetFlags)
 
 	return cmd
 }

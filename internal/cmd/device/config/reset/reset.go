@@ -9,13 +9,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var yesFlag bool
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory   *cmdutil.Factory
+	Device    string
+	Component string
+}
 
 // NewCommand creates the config reset command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "reset <device> [component]",
 		Aliases: []string{"factory", "clear"},
@@ -34,33 +43,32 @@ Note: This does not perform a full factory reset. For that, use:
   shelly config reset living-room switch:0 --yes`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
-			component := ""
+			opts.Device = args[0]
 			if len(args) > 1 {
-				component = args[1]
+				opts.Component = args[1]
 			}
-			return run(cmd.Context(), f, device, component)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, component string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
-	ios := f.IOStreams()
+	svc := opts.Factory.ShellyService()
+	ios := opts.Factory.IOStreams()
 
-	if component == "" {
+	if opts.Component == "" {
 		// Show available components
 		var config map[string]any
 		err := cmdutil.RunWithSpinner(ctx, ios, "Getting device components...", func(ctx context.Context) error {
 			var getErr error
-			config, getErr = svc.GetConfig(ctx, device)
+			config, getErr = svc.GetConfig(ctx, opts.Device)
 			return getErr
 		})
 		if err != nil {
@@ -73,14 +81,14 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 		}
 		sort.Strings(keys)
 
-		term.DisplayResetableComponents(ios, device, keys)
+		term.DisplayResetableComponents(ios, opts.Device, keys)
 		return nil
 	}
 
 	// Confirm reset
-	confirmed, err := f.ConfirmAction(
-		fmt.Sprintf("Reset %s configuration on %s to defaults?", component, device),
-		yesFlag,
+	confirmed, err := opts.Factory.ConfirmAction(
+		fmt.Sprintf("Reset %s configuration on %s to defaults?", opts.Component, opts.Device),
+		opts.Yes,
 	)
 	if err != nil {
 		return err
@@ -92,12 +100,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 
 	// Reset by setting config to empty/defaults
 	err = cmdutil.RunWithSpinner(ctx, ios, "Resetting configuration...", func(ctx context.Context) error {
-		return svc.SetComponentConfig(ctx, device, component, map[string]any{})
+		return svc.SetComponentConfig(ctx, opts.Device, opts.Component, map[string]any{})
 	})
 	if err != nil {
 		return fmt.Errorf("failed to reset configuration: %w", err)
 	}
 
-	ios.Success("Configuration reset for %s on %s", component, device)
+	ios.Success("Configuration reset for %s on %s", opts.Component, opts.Device)
 	return nil
 }

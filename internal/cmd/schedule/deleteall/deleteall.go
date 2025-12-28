@@ -8,13 +8,21 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
-var yesFlag bool
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory *cmdutil.Factory
+	Device  string
+}
 
 // NewCommand creates the schedule delete-all command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "delete-all <device>",
 		Aliases: []string{"clear"},
@@ -28,25 +36,26 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	// Confirm unless --yes
 	ios.Warning("This will delete ALL schedules from the device.")
-	confirmed, err := f.ConfirmAction("Delete all schedules?", yesFlag)
+	confirmed, err := opts.Factory.ConfirmAction("Delete all schedules?", opts.Yes)
 	if err != nil {
 		return err
 	}
@@ -56,7 +65,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
-		if err := svc.DeleteAllSchedules(ctx, device); err != nil {
+		if err := svc.DeleteAllSchedules(ctx, opts.Device); err != nil {
 			return fmt.Errorf("failed to delete schedules: %w", err)
 		}
 		ios.Success("All schedules deleted")

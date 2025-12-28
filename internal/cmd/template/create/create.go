@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -15,11 +16,11 @@ import (
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	Name        string
 	Device      string
 	Description string
 	IncludeWiFi bool
-	Force       bool
 	Factory     *cmdutil.Factory
 }
 
@@ -63,7 +64,7 @@ Use --include-wifi to include them.`,
 
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Template description")
 	cmd.Flags().BoolVar(&opts.IncludeWiFi, "include-wifi", false, "Include WiFi credentials (security risk)")
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing template")
+	cmd.Flags().BoolVarP(&opts.Yes, "force", "f", false, "Overwrite existing template")
 
 	return cmd
 }
@@ -81,7 +82,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Check if template exists
-	if _, exists := config.GetTemplate(opts.Name); exists && !opts.Force {
+	if _, exists := config.GetTemplate(opts.Name); exists && !opts.Yes {
 		return fmt.Errorf("template %q already exists (use --force to overwrite)", opts.Name)
 	}
 
@@ -97,7 +98,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Save template - if force flag and exists, delete first
-	if opts.Force {
+	if opts.Yes {
 		if _, exists := config.GetTemplate(opts.Name); exists {
 			if delErr := config.DeleteTemplate(opts.Name); delErr != nil {
 				return fmt.Errorf("failed to delete existing template: %w", delErr)

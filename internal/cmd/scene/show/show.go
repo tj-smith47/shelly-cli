@@ -7,15 +7,23 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.OutputFlags
+	Factory *cmdutil.Factory
+	Name    string
+}
+
 // NewCommand creates the scene show command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var outputFormat string
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "show <name>",
@@ -36,28 +44,29 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.SceneNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0], outputFormat)
+			opts.Name = args[0]
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format: table, json, yaml")
+	flags.AddOutputFlags(cmd, &opts.OutputFlags)
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, name, outputFormat string) error {
-	scene, exists := config.GetScene(name)
+func run(opts *Options) error {
+	scene, exists := config.GetScene(opts.Name)
 	if !exists {
-		return fmt.Errorf("scene %q not found", name)
+		return fmt.Errorf("scene %q not found", opts.Name)
 	}
 
-	switch outputFormat {
+	switch opts.Format {
 	case "json":
 		return output.PrintJSON(scene)
 	case "yaml":
 		return output.PrintYAML(scene)
 	default:
-		term.DisplaySceneDetails(f.IOStreams(), scene)
+		term.DisplaySceneDetails(opts.Factory.IOStreams(), scene)
 		return nil
 	}
 }

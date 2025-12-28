@@ -8,13 +8,21 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory *cmdutil.Factory
+	Device  string
+	Delay   int
+}
+
 // NewCommand creates the device reboot command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var delay int
-	var yes bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "reboot <device>",
@@ -32,20 +40,21 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], delay, yes)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().IntVarP(&delay, "delay", "d", 0, "Delay in milliseconds before reboot")
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().IntVarP(&opts.Delay, "delay", "d", 0, "Delay in milliseconds before reboot")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, delay int, yes bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	confirmed, err := f.ConfirmAction(fmt.Sprintf("Reboot device %q?", device), yes)
+	confirmed, err := opts.Factory.ConfirmAction(fmt.Sprintf("Reboot device %q?", opts.Device), opts.Yes)
 	if err != nil {
 		return err
 	}
@@ -54,18 +63,18 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, delay int, yes 
 		return nil
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
+	svc := opts.Factory.ShellyService()
 
 	err = cmdutil.RunWithSpinner(ctx, ios, "Rebooting device...", func(ctx context.Context) error {
-		return svc.DeviceReboot(ctx, device, delay)
+		return svc.DeviceReboot(ctx, opts.Device, opts.Delay)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to reboot device: %w", err)
 	}
 
-	ios.Success("Device %q rebooting", device)
+	ios.Success("Device %q rebooting", opts.Device)
 	return nil
 }

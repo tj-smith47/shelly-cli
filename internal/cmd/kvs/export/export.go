@@ -11,15 +11,16 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	Device  string
 	File    string
-	Format  string // json or yaml
 	Factory *cmdutil.Factory
 }
 
@@ -57,7 +58,7 @@ The export format can be JSON (default) or YAML.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Format, "format", "f", "json", "Output format (json, yaml)")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "json", "json", "yaml")
 
 	return cmd
 }

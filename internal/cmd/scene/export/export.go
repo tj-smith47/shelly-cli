@@ -11,14 +11,20 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.OutputFlags
+}
+
 // NewCommand creates the scene export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var outputFormat string
+	opts := &Options{}
 
 	cmd := &cobra.Command{
 		Use:     "export <name> [file]",
@@ -47,16 +53,16 @@ Format is auto-detected from file extension (.json, .yaml, .yml).`,
 			if len(args) > 1 {
 				file = args[1]
 			}
-			return run(f, name, file, outputFormat)
+			return run(f, name, file, opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFormat, "format", "f", "yaml", "File format: json, yaml")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "yaml", "json", "yaml")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, name, file, format string) error {
+func run(f *cmdutil.Factory, name, file string, opts *Options) error {
 	ios := f.IOStreams()
 
 	scene, exists := config.GetScene(name)
@@ -68,6 +74,7 @@ func run(f *cmdutil.Factory, name, file, format string) error {
 	export := scene
 
 	// Determine format from file extension if file specified
+	format := opts.Format
 	if file != "" {
 		ext := strings.ToLower(filepath.Ext(file))
 		switch ext {

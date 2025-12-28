@@ -8,14 +8,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-var yesFlag bool
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory *cmdutil.Factory
+	Device  string
+}
 
 // NewCommand creates the firmware rollback command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "rollback <device>",
 		Aliases: []string{"rb"},
@@ -32,24 +40,25 @@ a recent firmware update or when in safe mode).`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Check rollback availability
 	var status *shelly.FirmwareStatus
 	err := cmdutil.RunWithSpinner(ctx, ios, "Checking rollback availability...", func(ctx context.Context) error {
 		var statusErr error
-		status, statusErr = svc.GetFirmwareStatus(ctx, device)
+		status, statusErr = svc.GetFirmwareStatus(ctx, opts.Device)
 		return statusErr
 	})
 	if err != nil {
@@ -64,7 +73,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 
 	// Confirm unless --yes
 	ios.Warning("This will rollback the firmware to the previous version.")
-	confirmed, confirmErr := f.ConfirmAction("Proceed with rollback?", yesFlag)
+	confirmed, confirmErr := opts.Factory.ConfirmAction("Proceed with rollback?", opts.Yes)
 	if confirmErr != nil {
 		return confirmErr
 	}
@@ -73,14 +82,14 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		return nil
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Rolling back firmware...", func(ctx context.Context) error {
-		if rollbackErr := svc.RollbackFirmware(ctx, device); rollbackErr != nil {
+		if rollbackErr := svc.RollbackFirmware(ctx, opts.Device); rollbackErr != nil {
 			return fmt.Errorf("failed to rollback: %w", rollbackErr)
 		}
-		ios.Success("Firmware rollback started on %s", device)
+		ios.Success("Firmware rollback started on %s", opts.Device)
 		ios.Info("The device will reboot automatically.")
 		return nil
 	})

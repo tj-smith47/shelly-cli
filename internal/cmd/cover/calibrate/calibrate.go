@@ -12,9 +12,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.ComponentFlags
+	Factory *cmdutil.Factory
+	Device  string
+}
+
 // NewCommand creates the cover calibrate command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var coverID int
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "calibrate <device>",
@@ -32,16 +39,18 @@ The cover will move to both extremes during calibration.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], coverID)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	flags.AddComponentIDFlag(cmd, &coverID, "Cover")
+	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "Cover")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, coverID int) error {
+func run(ctx context.Context, opts *Options) error {
+	f := opts.Factory
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
@@ -49,12 +58,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, coverID int) er
 	ios := f.IOStreams()
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Starting calibration...", func(ctx context.Context) error {
-		return svc.CoverCalibrate(ctx, device, coverID)
+		return svc.CoverCalibrate(ctx, opts.Device, opts.ID)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to start calibration: %w", err)
 	}
 
-	ios.Success("Cover %d calibration started", coverID)
+	ios.Success("Cover %d calibration started", opts.ID)
 	return nil
 }

@@ -12,15 +12,16 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	Template string
 	File     string
-	Format   string
 	Factory  *cmdutil.Factory
 }
 
@@ -58,7 +59,7 @@ Format is auto-detected from file extension, or can be specified with --format.`
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Format, "format", "f", "yaml", "File format (json, yaml)")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "yaml", "json", "yaml")
 
 	return cmd
 }

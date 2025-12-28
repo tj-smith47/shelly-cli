@@ -11,16 +11,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	Factory *cmdutil.Factory
 	Device  string
 	Filter  string
-	JSON    bool
 }
 
 // NewCommand creates the debug methods command.
@@ -52,7 +53,7 @@ Use --filter to search for specific methods by name.`,
 	}
 
 	cmd.Flags().StringVar(&opts.Filter, "filter", "", "Filter methods by name (case-insensitive)")
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON array")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
 
 	return cmd
 }
@@ -99,12 +100,12 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Output
-	if opts.JSON {
-		output, err := json.MarshalIndent(methods, "", "  ")
+	if opts.Format == "json" {
+		jsonOutput, err := json.MarshalIndent(methods, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonOutput))
 		return nil
 	}
 

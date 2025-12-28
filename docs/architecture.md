@@ -96,9 +96,10 @@ internal/
 │   │   ├── flags.go      # Core flag adders (AddTimeoutFlag, etc.)
 │   │   ├── batch.go      # BatchFlags, AddBatchFlags()
 │   │   ├── scene.go      # SceneFlags, AddSceneFlags()
-│   │   ├── component.go  # ComponentFlags, AddComponentFlags()
+│   │   ├── component.go  # ComponentFlags, QuickComponentFlags
 │   │   ├── output.go     # OutputFlags, AddOutputFlags()
-│   │   └── confirm.go    # ConfirmFlags, AddConfirmFlags()
+│   │   ├── confirm.go    # ConfirmFlags, AddConfirmFlags()
+│   │   └── device.go     # DeviceListFlags, AddDeviceListFlags()
 │   │
 │   └── factories/      # Generic command factories
 │       ├── component.go  # NewComponentCommand (switch/light/rgb on/off/toggle)
@@ -467,11 +468,17 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 Available embeddable structs:
 - `BatchFlags` - GroupName, All, Timeout, SwitchID, Concurrent
 - `SceneFlags` - Timeout, Concurrent, DryRun
-- `ComponentFlags` - ID
-- `OutputFlags` - Format
-- `ConfirmFlags` - Yes, Confirm
+- `ComponentFlags` - ID (for component selection via --id/-i flag)
+- `QuickComponentFlags` - ID with -1 default for "all components" (on/off/toggle)
+- `OutputFlags` - Format (table/json/yaml display output)
+- `ConfirmFlags` - Yes, Confirm (for destructive operations)
+- `DeviceListFlags` - All, Group, Quiet, JSON (for device list filtering)
 
 **Note:** For backward compatibility, these are also re-exported from `cmdutil` directly (e.g., `cmdutil.BatchFlags`). New code should import from `cmdutil/flags` directly.
+
+**Dynamic helpers for custom defaults:**
+- `AddOutputFlagsCustom(cmd, flags, default, allowed...)` - custom default and allowed values
+- `AddOutputFlagsNamed(cmd, flags, name, short, default, allowed...)` - custom flag name
 
 ### shelly/export/ Placement
 

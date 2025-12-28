@@ -8,13 +8,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Options holds the command options.
 type Options struct {
-	All   bool
-	Group string
+	flags.BatchFlags
 }
 
 // NewCommand creates the fleet on command.
@@ -46,8 +46,7 @@ Requires integrator credentials configured via environment variables or config:
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.All, "all", false, "Turn on all relay devices")
-	cmd.Flags().StringVarP(&opts.Group, "group", "g", "", "Turn on devices in group")
+	flags.AddBatchFlags(cmd, &opts.BatchFlags)
 
 	return cmd
 }
@@ -56,7 +55,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 	ios := f.IOStreams()
 
 	// Validate arguments
-	if !opts.All && opts.Group == "" && len(devices) == 0 {
+	if !opts.All && opts.GroupName == "" && len(devices) == 0 {
 		ios.Warning("Specify devices, --group, or --all")
 		return fmt.Errorf("no devices specified")
 	}
@@ -79,6 +78,6 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 	defer conn.Close()
 
 	// Execute relay control
-	results := shelly.FleetRelayControl(ctx, conn.Manager, shelly.RelayOn, devices, opts.All, opts.Group)
+	results := shelly.FleetRelayControl(ctx, conn.Manager, shelly.RelayOn, devices, opts.All, opts.GroupName)
 	return shelly.ReportBatchResults(ios, results, "turned on")
 }

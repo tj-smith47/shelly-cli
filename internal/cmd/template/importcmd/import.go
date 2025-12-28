@@ -8,15 +8,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ConfirmFlags
 	File    string
 	Name    string
-	Force   bool
 	Factory *cmdutil.Factory
 }
 
@@ -51,7 +52,7 @@ Use --force to overwrite an existing template with the same name.`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing template")
+	cmd.Flags().BoolVarP(&opts.Yes, "force", "f", false, "Overwrite existing template")
 
 	return cmd
 }
@@ -82,7 +83,7 @@ func run(opts *Options) error {
 	}
 
 	// Check if exists
-	if _, exists := config.GetTemplate(tpl.Name); exists && !opts.Force {
+	if _, exists := config.GetTemplate(tpl.Name); exists && !opts.Yes {
 		return fmt.Errorf("template %q already exists (use --force to overwrite)", tpl.Name)
 	}
 

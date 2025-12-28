@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -23,9 +24,9 @@ import (
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	DeviceFilter string
 	EventFilter  string
-	Format       string
 	Raw          bool
 }
 
@@ -67,7 +68,7 @@ Event types:
 
 	cmd.Flags().StringVar(&opts.DeviceFilter, "device", "", "Filter by device ID")
 	cmd.Flags().StringVar(&opts.EventFilter, "event", "", "Filter by event type")
-	cmd.Flags().StringVar(&opts.Format, "format", "text", "Output format (text, json)")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
 	cmd.Flags().BoolVar(&opts.Raw, "raw", false, "Output raw JSON messages")
 
 	return cmd

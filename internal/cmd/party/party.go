@@ -9,14 +9,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
 type Options struct {
+	flags.DeviceTargetFlags
 	Duration time.Duration
 	Interval time.Duration
-	All      bool
 }
 
 // NewCommand creates the party command.
@@ -65,7 +66,7 @@ Use Ctrl+C to stop early.`,
 
 	cmd.Flags().DurationVarP(&opts.Duration, "duration", "d", 30*time.Second, "Party duration")
 	cmd.Flags().DurationVarP(&opts.Interval, "interval", "i", 500*time.Millisecond, "Toggle interval")
-	cmd.Flags().BoolVar(&opts.All, "all", false, "Party with all registered devices")
+	flags.AddAllOnlyFlag(cmd, &opts.DeviceTargetFlags)
 
 	return cmd
 }

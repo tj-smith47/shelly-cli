@@ -11,21 +11,28 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.OutputFlags
+	GroupName  string
+	All        bool
+	Timeout    time.Duration
+	Concurrent int
+}
+
 // NewCommand creates the batch command command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		groupName    string
-		all          bool
-		timeout      time.Duration
-		concurrent   int
-		outputFormat string
-	)
+	opts := &Options{
+		Timeout:    10 * time.Second,
+		Concurrent: 5,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "command <method> [params-json] [device...]",
@@ -87,29 +94,29 @@ the device name and either the response or error message.`,
 				deviceArgs = args[2:]
 			}
 
-			targets, err := utils.ResolveBatchTargets(groupName, all, deviceArgs)
+			targets, err := utils.ResolveBatchTargets(opts.GroupName, opts.All, deviceArgs)
 			if err != nil {
 				return err
 			}
-			return run(cmd.Context(), f, targets, method, params, timeout, concurrent, outputFormat)
+			return run(cmd.Context(), f, targets, method, params, opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&groupName, "group", "g", "", "Target device group")
-	cmd.Flags().BoolVarP(&all, "all", "a", false, "Target all registered devices")
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 10*time.Second, "Timeout per device")
-	cmd.Flags().IntVarP(&concurrent, "concurrent", "c", 5, "Max concurrent operations")
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "json", "Output format: json, yaml")
+	cmd.Flags().StringVarP(&opts.GroupName, "group", "g", "", "Target device group")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Target all registered devices")
+	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", 10*time.Second, "Timeout per device")
+	cmd.Flags().IntVarP(&opts.Concurrent, "concurrent", "c", 5, "Max concurrent operations")
+	flags.AddOutputFlagsNamed(cmd, &opts.OutputFlags, "output", "o", "json", "json", "yaml")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, targets []string, method string, params map[string]any, timeout time.Duration, concurrent int, outputFormat string) error {
+func run(ctx context.Context, f *cmdutil.Factory, targets []string, method string, params map[string]any, opts *Options) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
 	// Cap concurrency to global rate limit
-	concurrent = cmdutil.CapConcurrency(ios, concurrent)
+	concurrent := cmdutil.CapConcurrency(ios, opts.Concurrent)
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
@@ -123,7 +130,7 @@ func run(ctx context.Context, f *cmdutil.Factory, targets []string, method strin
 	results := make([]model.BatchRPCResult, len(targets))
 
 	// Create parent context with overall timeout
-	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(targets)))
+	ctx, cancel := context.WithTimeout(ctx, opts.Timeout*time.Duration(len(targets)))
 	defer cancel()
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -136,7 +143,7 @@ func run(ctx context.Context, f *cmdutil.Factory, targets []string, method strin
 			mw.UpdateLine(device, iostreams.StatusRunning, method)
 
 			// Per-device timeout
-			deviceCtx, deviceCancel := context.WithTimeout(ctx, timeout)
+			deviceCtx, deviceCancel := context.WithTimeout(ctx, opts.Timeout)
 			defer deviceCancel()
 
 			resp, err := svc.RawRPC(deviceCtx, device, method, params)
@@ -167,7 +174,7 @@ func run(ctx context.Context, f *cmdutil.Factory, targets []string, method strin
 	}
 
 	// Output results
-	switch outputFormat {
+	switch opts.Format {
 	case "yaml":
 		if err := output.PrintYAML(results); err != nil {
 			return err

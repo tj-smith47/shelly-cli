@@ -9,24 +9,34 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	betaFlag    bool
-	urlFlag     string
-	yesFlag     bool
-	allFlag     bool
-	listFlag    bool
-	parallelism int
-	stagedFlag  int
-)
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory     *cmdutil.Factory
+	Device      string
+	Beta        bool
+	URL         string
+	All         bool
+	List        bool
+	Parallelism int
+	Staged      int
+}
 
 // NewCommand creates the firmware update command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Factory:     f,
+		Parallelism: 3,
+		Staged:      100,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "update [device]",
 		Aliases: []string{"up"},
@@ -66,30 +76,30 @@ rollouts (e.g., --staged 25 updates 25% of devices).`,
   shelly firmware update --all --staged 25`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var deviceName string
 			if len(args) > 0 {
-				deviceName = args[0]
+				opts.Device = args[0]
 			}
-			if !allFlag && deviceName == "" {
+			if !opts.All && opts.Device == "" {
 				return fmt.Errorf("device name required (or use --all)")
 			}
-			return run(cmd.Context(), f, deviceName, allFlag)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&betaFlag, "beta", false, "Update to beta firmware")
-	cmd.Flags().StringVar(&urlFlag, "url", "", "Custom firmware URL")
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
-	cmd.Flags().BoolVar(&allFlag, "all", false, "Update all registered devices")
-	cmd.Flags().BoolVarP(&listFlag, "list", "l", false, "Show available updates before prompting")
-	cmd.Flags().IntVar(&parallelism, "parallel", 3, "Number of devices to update in parallel")
-	cmd.Flags().IntVar(&stagedFlag, "staged", 100, "Percentage of devices to update (for staged rollouts)")
+	cmd.Flags().BoolVar(&opts.Beta, "beta", false, "Update to beta firmware")
+	cmd.Flags().StringVar(&opts.URL, "url", "", "Custom firmware URL")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Update all registered devices")
+	cmd.Flags().BoolVarP(&opts.List, "list", "l", false, "Show available updates before prompting")
+	cmd.Flags().IntVar(&opts.Parallelism, "parallel", 3, "Number of devices to update in parallel")
+	cmd.Flags().IntVar(&opts.Staged, "staged", 100, "Percentage of devices to update (for staged rollouts)")
 
 	return cmd
 }
 
 //nolint:gocyclo,nestif // Complexity from handling both --all batch mode and single device mode in one function
-func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll bool) error {
+func run(ctx context.Context, opts *Options) error {
+	f := opts.Factory
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
@@ -99,7 +109,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 	}
 
 	// Handle --all mode
-	if updateAll {
+	if opts.All {
 		if len(cfg.Devices) == 0 {
 			ios.Warning("No devices registered. Use 'shelly device add' to add devices.")
 			return nil
@@ -112,7 +122,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 		}
 
 		// Check all devices for updates
-		toUpdate := svc.CheckDevicesForUpdates(ctx, ios, deviceNames, stagedFlag)
+		toUpdate := svc.CheckDevicesForUpdates(ctx, ios, deviceNames, opts.Staged)
 
 		if len(toUpdate) == 0 {
 			ios.Info("All devices are up to date")
@@ -123,7 +133,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 		term.DisplayDevicesToUpdate(ios, toUpdate)
 
 		// Confirm
-		confirmed, confirmErr := f.ConfirmAction(fmt.Sprintf("Update %d device(s)?", len(toUpdate)), yesFlag)
+		confirmed, confirmErr := f.ConfirmAction(fmt.Sprintf("Update %d device(s)?", len(toUpdate)), opts.Yes)
 		if confirmErr != nil {
 			return confirmErr
 		}
@@ -134,9 +144,9 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 
 		// Perform updates
 		results := svc.UpdateDevices(ctx, ios, toUpdate, shelly.UpdateOpts{
-			Beta:        betaFlag,
-			CustomURL:   urlFlag,
-			Parallelism: parallelism,
+			Beta:        opts.Beta,
+			CustomURL:   opts.URL,
+			Parallelism: opts.Parallelism,
 		})
 
 		// Convert to term.UpdateResult for display
@@ -154,16 +164,16 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 	}
 
 	// Single device mode
-	device, ok := cfg.Devices[deviceName]
+	device, ok := cfg.Devices[opts.Device]
 	if !ok {
 		// Ad-hoc device (IP address) - treat as Shelly
 		device = model.Device{
-			Name:     deviceName,
-			Address:  deviceName,
+			Name:     opts.Device,
+			Address:  opts.Device,
 			Platform: model.PlatformShelly,
 		}
 	} else {
-		device.Name = deviceName
+		device.Name = opts.Device
 	}
 
 	// Check for updates first (platform-aware)
@@ -178,12 +188,12 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 	}
 
 	// If --list flag, show detailed update info
-	if listFlag {
+	if opts.List {
 		term.DisplayFirmwareUpdateInfo(ios, info, device.DisplayName(), device.GetPlatform())
 	}
 
-	if !info.HasUpdate && urlFlag == "" && !betaFlag {
-		ios.Info("Device %s is already up to date (version %s)", deviceName, info.Current)
+	if !info.HasUpdate && opts.URL == "" && !opts.Beta {
+		ios.Info("Device %s is already up to date (version %s)", opts.Device, info.Current)
 		return nil
 	}
 
@@ -194,12 +204,12 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 		Current:     info.Current,
 		Available:   info.Available,
 		Beta:        info.Beta,
-		CustomURL:   urlFlag,
-		UseBeta:     betaFlag,
+		CustomURL:   opts.URL,
+		UseBeta:     opts.Beta,
 	})
 
 	// Confirm unless --yes
-	confirmed, confirmErr := f.ConfirmAction("Proceed with firmware update?", yesFlag)
+	confirmed, confirmErr := f.ConfirmAction("Proceed with firmware update?", opts.Yes)
 	if confirmErr != nil {
 		return confirmErr
 	}
@@ -213,11 +223,11 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string, updateAll b
 	defer cancel()
 
 	return cmdutil.RunWithSpinner(updateCtx, ios, "Updating firmware...", func(ctx context.Context) error {
-		if err := svc.UpdateDeviceFirmware(ctx, device, betaFlag, urlFlag); err != nil {
+		if err := svc.UpdateDeviceFirmware(ctx, device, opts.Beta, opts.URL); err != nil {
 			return fmt.Errorf("failed to start update: %w", err)
 		}
-		ios.Success("Firmware update started on %s", deviceName)
-		ios.Info("The device will reboot automatically. Use 'shelly firmware status %s' to check progress.", deviceName)
+		ios.Success("Firmware update started on %s", opts.Device)
+		ios.Info("The device will reboot automatically. Use 'shelly firmware status %s' to check progress.", opts.Device)
 		return nil
 	})
 }

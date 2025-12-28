@@ -10,14 +10,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.ComponentFlags
 	Factory *cmdutil.Factory
 	Device  string
-	ID      int
 	Data    string
 	Hex     bool
 }
@@ -55,7 +56,8 @@ the LoRa.SendBytes API.`,
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.ID, "id", 100, "LoRa component ID")
+	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "LoRa")
+	opts.ID = 100 // LoRa components start at ID 100
 	cmd.Flags().BoolVar(&opts.Hex, "hex", false, "Data is hexadecimal")
 
 	return cmd

@@ -5,13 +5,20 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
-var yesFlag bool
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory *cmdutil.Factory
+}
 
 // NewCommand creates the config reset command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "reset",
 		Aliases: []string{"clear"},
@@ -27,19 +34,19 @@ aliases, and other data are preserved.`,
   shelly config reset --yes`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f)
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	confirmed, err := f.ConfirmAction("Reset CLI configuration to defaults?", yesFlag)
+	confirmed, err := opts.Factory.ConfirmAction("Reset CLI configuration to defaults?", opts.Yes)
 	if err != nil {
 		return err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -17,9 +18,9 @@ import (
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	Factory *cmdutil.Factory
 	Device  string
-	JSON    bool
 }
 
 // NewCommand creates the sensor status command.
@@ -54,7 +55,7 @@ Only sensors present on the device will be shown.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
 
 	return cmd
 }
@@ -94,7 +95,7 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.JSON {
+	if opts.Format == "json" {
 		jsonOut, jsonErr := json.MarshalIndent(data, "", "  ")
 		if jsonErr != nil {
 			return fmt.Errorf("failed to format JSON: %w", jsonErr)

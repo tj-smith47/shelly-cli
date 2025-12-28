@@ -7,15 +7,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	Factory *cmdutil.Factory
 	Device  string
-	JSON    bool
 }
 
 // NewCommand creates the matter status command.
@@ -46,7 +47,7 @@ Displays:
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
 
 	return cmd
 }
@@ -63,7 +64,7 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.JSON {
+	if opts.Format == "json" {
 		return term.OutputMatterStatusJSON(ios, status)
 	}
 

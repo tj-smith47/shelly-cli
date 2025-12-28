@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -17,9 +18,9 @@ import (
 
 // Options holds command options.
 type Options struct {
+	flags.OutputFlags
 	Factory *cmdutil.Factory
 	Device  string
-	JSON    bool
 }
 
 // NewCommand creates the debug coiot command.
@@ -53,7 +54,7 @@ This command shows:
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output as JSON")
+	flags.AddOutputFlagsCustom(cmd, &opts.OutputFlags, "text", "text", "json")
 
 	return cmd
 }
@@ -115,12 +116,12 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	if opts.JSON {
-		output, err := json.MarshalIndent(coiotStatus, "", "  ")
+	if opts.Format == "json" {
+		jsonOutput, err := json.MarshalIndent(coiotStatus, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to format JSON: %w", err)
 		}
-		ios.Println(string(output))
+		ios.Println(string(jsonOutput))
 		return nil
 	}
 

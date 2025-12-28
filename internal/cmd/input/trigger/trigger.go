@@ -19,10 +19,20 @@ const (
 	EventLongPush   = "long_push"
 )
 
+// Options holds command options.
+type Options struct {
+	flags.ComponentFlags
+	Factory *cmdutil.Factory
+	Device  string
+	Event   string
+}
+
 // NewCommand creates the input trigger command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var inputID int
-	var event string
+	opts := &Options{
+		Factory: f,
+		Event:   EventSinglePush,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "trigger <device>",
@@ -45,17 +55,19 @@ Event types:
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], inputID, event)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	flags.AddComponentIDFlag(cmd, &inputID, "Input")
-	cmd.Flags().StringVarP(&event, "event", "e", EventSinglePush, "Event type (single_push, double_push, long_push)")
+	flags.AddComponentFlags(cmd, &opts.ComponentFlags, "Input")
+	cmd.Flags().StringVarP(&opts.Event, "event", "e", EventSinglePush, "Event type (single_push, double_push, long_push)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, inputID int, event string) error {
+func run(ctx context.Context, opts *Options) error {
+	f := opts.Factory
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
@@ -63,12 +75,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, inputID int, ev
 	ios := f.IOStreams()
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Triggering input event...", func(ctx context.Context) error {
-		return svc.InputTrigger(ctx, device, inputID, event)
+		return svc.InputTrigger(ctx, opts.Device, opts.ID, opts.Event)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to trigger input event: %w", err)
 	}
 
-	ios.Success("Input %d triggered with event %q", inputID, event)
+	ios.Success("Input %d triggered with event %q", opts.ID, opts.Event)
 	return nil
 }

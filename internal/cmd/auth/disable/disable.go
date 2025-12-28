@@ -8,13 +8,21 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
-var yesFlag bool
+// Options holds command options.
+type Options struct {
+	flags.ConfirmFlags
+	Factory *cmdutil.Factory
+	Device  string
+}
 
 // NewCommand creates the auth disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "disable <device>",
 		Aliases: []string{"off", "remove"},
@@ -31,22 +39,23 @@ Use with caution in production environments.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompt")
+	flags.AddYesOnlyFlag(cmd, &opts.ConfirmFlags)
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Confirm before disabling
-	confirmed, err := f.ConfirmAction(
-		fmt.Sprintf("Disable authentication on %s? This will allow unauthenticated access.", device),
-		yesFlag,
+	confirmed, err := opts.Factory.ConfirmAction(
+		fmt.Sprintf("Disable authentication on %s? This will allow unauthenticated access.", opts.Device),
+		opts.Yes,
 	)
 	if err != nil {
 		return err
@@ -56,16 +65,16 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		return nil
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
+	svc := opts.Factory.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Disabling authentication...", func(ctx context.Context) error {
-		if err := svc.DisableAuth(ctx, device); err != nil {
+		if err := svc.DisableAuth(ctx, opts.Device); err != nil {
 			return fmt.Errorf("failed to disable authentication: %w", err)
 		}
-		ios.Success("Authentication disabled on %s", device)
+		ios.Success("Authentication disabled on %s", opts.Device)
 		return nil
 	})
 }
