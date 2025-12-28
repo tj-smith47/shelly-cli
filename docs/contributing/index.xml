@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Contributing on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/contributing/</link><description>Recent content in Contributing on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/contributing/index.xml" rel="self" type="application/rss+xml"/><item><title>Development Guide</title><link>https://tj-smith47.github.io/shelly-cli/docs/contributing/development/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/contributing/development/</guid><description>&lt;p>This document provides development standards and architectural patterns for the shelly-cli codebase. The first half covers practical coding standards; the second half provides reference patterns derived from audits of gh, kubectl, docker, jira-cli, gh-dash, and k9s.&lt;/p>
+&lt;h2 id="table-of-contents">Table of Contents&lt;/h2>
+&lt;h3 id="development-standards">Development Standards&lt;/h3>
+&lt;ol>
+&lt;li>&lt;a href="#command-development-standards">Command Development Standards&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#factory-usage">Factory Usage&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#iostreams-usage">IOStreams Usage&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#error-handling">Error Handling&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#context-propagation">Context Propagation&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#import-organization">Import Organization&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#anti-patterns-to-avoid">Anti-Patterns to Avoid&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#migration-checklist">Migration Checklist&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#reference-implementations">Reference Implementations&lt;/a>&lt;/li>
+&lt;/ol>
+&lt;h3 id="reference-patterns">Reference Patterns&lt;/h3>
+&lt;ol start="10">
+&lt;li>&lt;a href="#factory-pattern">Factory Pattern (gh/kubectl)&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#iostreams-pattern">IOStreams Pattern (gh)&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#command-utilities">Command Utilities (gh/kubectl/jira-cli)&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#directory-structure">Directory Structure&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#tui-architecture">TUI Architecture (gh-dash/BubbleTea)&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#multi-writer-output-pattern">Multi-Writer Output Pattern&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#concurrency-patterns">Concurrency Patterns&lt;/a>&lt;/li>
+&lt;li>&lt;a href="#testing-patterns">Testing Patterns&lt;/a>&lt;/li>
+&lt;/ol>
+&lt;hr>
+&lt;h1 id="development-standards-1">Development Standards&lt;/h1>
+&lt;p>These standards apply to all code in the shelly-cli repository.&lt;/p></description></item><item><title>Testing Strategy</title><link>https://tj-smith47.github.io/shelly-cli/docs/contributing/testing/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/contributing/testing/</guid><description>&lt;blockquote>
+&lt;p>&lt;strong>Target Coverage:&lt;/strong> 90%+ overall, with specific targets per package.
+&lt;strong>Reference:&lt;/strong> gh CLI achieves ~80%+ coverage; kubectl ~70%+; we target 90%+ as a premium CLI.&lt;/p>&lt;/blockquote>
+&lt;h2 id="coverage-targets-by-package">Coverage Targets by Package&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th>Package&lt;/th>
+ &lt;th>Current&lt;/th>
+ &lt;th>Target&lt;/th>
+ &lt;th>Priority&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td>&lt;code>internal/model/&lt;/code>&lt;/td>
+ &lt;td>~100%&lt;/td>
+ &lt;td>100%&lt;/td>
+ &lt;td>Done&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/iostreams/&lt;/code>&lt;/td>
+ &lt;td>0%&lt;/td>
+ &lt;td>95%+&lt;/td>
+ &lt;td>Critical&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/cmdutil/&lt;/code>&lt;/td>
+ &lt;td>0%&lt;/td>
+ &lt;td>95%+&lt;/td>
+ &lt;td>Critical&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/config/&lt;/code>&lt;/td>
+ &lt;td>~60%&lt;/td>
+ &lt;td>90%+&lt;/td>
+ &lt;td>High&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/output/&lt;/code>&lt;/td>
+ &lt;td>~50%&lt;/td>
+ &lt;td>90%+&lt;/td>
+ &lt;td>High&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/client/&lt;/code>&lt;/td>
+ &lt;td>~5%&lt;/td>
+ &lt;td>85%+&lt;/td>
+ &lt;td>High&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/shelly/&lt;/code>&lt;/td>
+ &lt;td>~40%&lt;/td>
+ &lt;td>85%+&lt;/td>
+ &lt;td>High&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/plugins/&lt;/code>&lt;/td>
+ &lt;td>~30%&lt;/td>
+ &lt;td>80%+&lt;/td>
+ &lt;td>Medium&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/theme/&lt;/code>&lt;/td>
+ &lt;td>~50%&lt;/td>
+ &lt;td>80%+&lt;/td>
+ &lt;td>Medium&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/cmd/*/&lt;/code>&lt;/td>
+ &lt;td>~20%&lt;/td>
+ &lt;td>80%+&lt;/td>
+ &lt;td>High&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>internal/tui/&lt;/code>&lt;/td>
+ &lt;td>0%&lt;/td>
+ &lt;td>75%+&lt;/td>
+ &lt;td>Medium&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>&lt;code>pkg/api/&lt;/code>&lt;/td>
+ &lt;td>0%&lt;/td>
+ &lt;td>90%+&lt;/td>
+ &lt;td>High (public)&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;h2 id="unit-tests">Unit Tests&lt;/h2>
+&lt;h3 id="iostreams-package-target-95">iostreams package (target: 95%+)&lt;/h3>
+&lt;ul>
+&lt;li>Test IOStreams creation with various terminal states&lt;/li>
+&lt;li>Test color detection (TTY, NO_COLOR, FORCE_COLOR)&lt;/li>
+&lt;li>Test progress indicator start/stop&lt;/li>
+&lt;li>Test writer variants (Out, ErrOut)&lt;/li>
+&lt;li>Test MultiWriter concurrent updates&lt;/li>
+&lt;/ul>
+&lt;h3 id="cmdutil-package-target-95">cmdutil package (target: 95%+)&lt;/h3>
+&lt;ul>
+&lt;li>Test Factory initialization and lazy loading&lt;/li>
+&lt;li>Test RunWithSpinner with success/error/cancel&lt;/li>
+&lt;li>Test RunBatch with concurrent execution&lt;/li>
+&lt;li>Test PrintResult with all output formats&lt;/li>
+&lt;li>Test flag helpers&lt;/li>
+&lt;/ul>
+&lt;h3 id="config-package-target-90">config package (target: 90%+)&lt;/h3>
+&lt;ul>
+&lt;li>Test config loading from various sources&lt;/li>
+&lt;li>Test alias CRUD operations&lt;/li>
+&lt;li>Test device registry operations&lt;/li>
+&lt;li>Test scene management&lt;/li>
+&lt;li>Test group management&lt;/li>
+&lt;/ul>
+&lt;h3 id="output-package-target-90">output package (target: 90%+)&lt;/h3>
+&lt;ul>
+&lt;li>Test JSON/YAML/Table/Text formatters&lt;/li>
+&lt;li>Test template rendering&lt;/li>
+&lt;li>Test table column alignment&lt;/li>
+&lt;/ul>
+&lt;h3 id="client-package-target-85">client package (target: 85%+)&lt;/h3>
+&lt;ul>
+&lt;li>Mock HTTP responses&lt;/li>
+&lt;li>Test connection management&lt;/li>
+&lt;li>Test error handling&lt;/li>
+&lt;/ul>
+&lt;h3 id="command-packages-target-80">command packages (target: 80%+)&lt;/h3>
+&lt;ul>
+&lt;li>Table-driven tests for all commands&lt;/li>
+&lt;li>Test flag parsing&lt;/li>
+&lt;li>Test output formatting&lt;/li>
+&lt;li>Test error conditions&lt;/li>
+&lt;/ul>
+&lt;h2 id="integration-tests">Integration Tests&lt;/h2>
+&lt;h3 id="mock-device-server">Mock Device Server&lt;/h3>
+&lt;ul>
+&lt;li>Create mock Shelly device using shelly-go testutil&lt;/li>
+&lt;li>Support Gen1 and Gen2 API responses&lt;/li>
+&lt;li>Simulate various device states&lt;/li>
+&lt;li>Support WebSocket connections for events&lt;/li>
+&lt;/ul>
+&lt;h3 id="workflow-tests">Workflow Tests&lt;/h3>
+&lt;ul>
+&lt;li>Discovery → Add → Control → Status flow&lt;/li>
+&lt;li>Backup → Modify → Restore flow&lt;/li>
+&lt;li>Scene create → Activate → Delete flow&lt;/li>
+&lt;li>Group create → Add devices → Batch control flow&lt;/li>
+&lt;/ul>
+&lt;h3 id="tui-tests">TUI Tests&lt;/h3>
+&lt;p>Use &lt;code>charmbracelet/x/exp/teatest&lt;/code> for TUI testing:&lt;/p></description></item></channel></rss>

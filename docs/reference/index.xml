@@ -1,0 +1,882 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Reference on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/reference/</link><description>Recent content in Reference on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/reference/index.xml" rel="self" type="application/rss+xml"/><item><title>Project Architecture</title><link>https://tj-smith47.github.io/shelly-cli/docs/reference/architecture/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/reference/architecture/</guid><description>&lt;p>This document defines &lt;strong>where code belongs&lt;/strong> in the shelly-cli codebase. For &lt;strong>how to write code&lt;/strong> (patterns, standards, conventions), see &lt;a href="development.md">development.md&lt;/a>.&lt;/p>
+&lt;hr>
+&lt;h2 id="quick-reference">Quick Reference&lt;/h2>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th>I need to&amp;hellip;&lt;/th>
+ &lt;th>Put it in&amp;hellip;&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td>Define a cobra command&lt;/td>
+ &lt;td>&lt;code>cmd/&amp;lt;domain&amp;gt;/&amp;lt;action&amp;gt;/&amp;lt;action&amp;gt;.go&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Print formatted output to terminal&lt;/td>
+ &lt;td>&lt;code>term/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Format data to string (no I/O)&lt;/td>
+ &lt;td>&lt;code>output/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Implement device operations&lt;/td>
+ &lt;td>&lt;code>shelly/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Implement auth operations&lt;/td>
+ &lt;td>&lt;code>shelly/auth/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Implement Modbus operations&lt;/td>
+ &lt;td>&lt;code>shelly/modbus/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Implement provisioning operations&lt;/td>
+ &lt;td>&lt;code>shelly/provision/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Implement network operations&lt;/td>
+ &lt;td>&lt;code>shelly/network/&lt;/code> (mqtt.go, ethernet.go, wifi.go)&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Export data to external format&lt;/td>
+ &lt;td>&lt;code>shelly/export/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Define domain types&lt;/td>
+ &lt;td>&lt;code>model/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Add CLI infrastructure (flags, runners)&lt;/td>
+ &lt;td>&lt;code>cmdutil/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Add shared utilities&lt;/td>
+ &lt;td>&lt;code>utils/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td>Manage configuration&lt;/td>
+ &lt;td>&lt;code>config/&lt;/code>&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;hr>
+&lt;h2 id="directory-structure">Directory Structure&lt;/h2>
+
+
+
+&lt;div class="expressive-code">
+ &lt;figure class="frame not-content">
+ &lt;figcaption class="header">
+ &lt;span class="title">&lt;/span>
+ &lt;/figcaption>
+ &lt;div class="highlight">&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 10
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 11
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 12
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 13
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 14
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 15
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 16
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 17
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 18
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 19
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 20
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 21
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 22
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 23
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 24
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 25
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 26
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 27
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 28
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 29
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 30
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 31
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 32
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 33
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 34
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 35
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 36
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 37
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 38
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 39
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 40
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 41
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 42
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 43
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 44
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 45
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 46
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 47
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 48
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 49
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 50
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 51
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 52
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 53
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 54
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 55
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 56
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 57
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 58
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 59
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 60
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 61
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 62
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 63
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 64
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 65
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 66
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 67
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 68
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 69
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 70
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 71
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 72
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 73
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 74
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 75
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 76
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 77
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 78
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 79
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 80
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 81
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 82
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 83
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 84
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 85
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 86
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 87
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 88
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 89
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 90
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 91
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 92
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 93
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 94
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 95
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 96
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 97
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 98
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 99
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">100
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">101
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">102
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">103
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">104
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">105
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">106
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">107
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">108
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">109
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">110
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">111
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">112
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">113
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">114
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">115
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">116
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">117
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">118
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">119
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">120
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">121
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">122
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">123
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">124
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">125
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">126
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">127
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">128
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">129
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">130
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">131
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">132
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">133
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">134
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">135
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">136
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">137
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">138
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">139
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">140
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">141
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">142
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">143
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">144
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">145
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">146
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">147
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">148
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">149
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">150
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">151
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">152
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">153
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">154
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">155
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">156
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">157
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">158
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">159
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">160
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">161
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">162
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">163
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">164
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">165
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">166
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">167
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">168
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">169
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">170
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">171
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">172
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">173
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">174
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">175
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">176
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">177
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">178
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">179
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">180
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">181
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">182
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">183
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">184
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">185
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">186
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">187
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">188
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">189
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">190
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">191
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">192
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">193
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">194
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">195
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">196
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">197
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">198
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">199
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">200
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">201
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">202
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">203
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">204
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">205
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">206
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">207
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">208
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">209
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">210
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">211
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">212
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">213
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">214
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">215
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">216
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">217
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">218
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">219
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">220
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">221
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">222
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">223
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">224
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">225
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">226
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">227
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">228
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">229
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">230
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">231
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">232
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">233
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">234
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">235
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">236
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">237
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">238
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">239
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">240
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">241
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">242
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">243
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">244
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">245
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">246
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">247
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">248
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">249
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">250
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">251
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">252
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">253
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">254
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">255
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">256
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">257
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">258
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">259
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">260
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">261
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">262
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">263
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">264
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">265
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">266
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">267
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">268
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">269
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">270
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">271
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">272
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">273
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">274
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">275
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">276
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">277
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">278
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">279
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">280
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">281
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">282
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">283
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">284
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">285
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">286
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">287
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">288
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">289
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">290
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">291
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">292
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">293
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">294
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">295
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">296
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">297
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">298
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">299
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">300
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">301
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">302
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">303
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">304
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">305
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">306
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">307
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">308
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">309
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">310
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">311
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">312
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">313
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">314
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">315
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span style="display:flex;">&lt;span>internal&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── branding&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># ASCII banner utilities&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── branding&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Banner, StyledBanner(), BannerLines()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── browser&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Cross-platform URL opening&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── browser&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Browser interface, New()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── client&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Low-level shelly-go SDK wrapper&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── client&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Client struct, Gen2 connection&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── detect&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Device detection&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── gen1&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Gen1Client for legacy devices&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── &lt;span style="color:#ff79c6">switch&lt;/span>&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># SwitchComponent accessor&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── light&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># LightComponent accessor&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── rgb&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># RGBComponent accessor&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── cover&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># CoverComponent accessor&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── input&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># InputComponent accessor&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── kvs&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># KVS accessor&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── thermostat&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># ThermostatComponent accessor&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── cmd&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Cobra commands ONLY&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Each command: NewCommand(f *Factory) + run()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># NO helper functions - move them elsewhere!&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── root&lt;span style="color:#ff79c6">.&lt;/span>go
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── device&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── device&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Parent command&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── info&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly device info&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── status&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly device status&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── reboot&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly device reboot&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── switchcmd&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly switch (on/off/toggle/status)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── light&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly light (on/off/set/status)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── rgb&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly rgb (on/off/set/status)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── cover&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly cover (open/close/stop/status)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── sensor&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly sensor (temp/humidity/flood/smoke)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── energy&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly energy (status/history/export)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── config&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly config (get/set/edit)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── backup&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly backup (create/restore/list)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── &lt;span style="color:#ff79c6">export&lt;/span>&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly export (ansible/terraform)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── scene&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly scene (activate/list/import)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── schedule&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly schedule (list/create/delete)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── script&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly script (list/run/stop)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── batch&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly batch (on/off/command)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── discover&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly discover (scan/mdns/ble)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── monitor&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly monitor (power/status/events)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── versioncmd&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># shelly version&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── &lt;span style="color:#ff79c6">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── cmdutil&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Command infrastructure&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── factory&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Factory (DI container)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># IOStreams(), Config(), ShellyService()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># ResolveAddress(), ExpandTargets()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># GetDevice(), GetGroup(), GetAlias()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── runner&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Execution helpers&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># RunWithSpinner(), RunBatch()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># RunStatus[T](), RunList[T]()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># PrintResult[T](), PrintListResult[T]()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── flags&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Flag re-exports from flags/ subpackage&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># BatchFlags, SceneFlags, ComponentFlags, etc.&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── helpers&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Cobra helpers&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># AddCommandsToGroup()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── &lt;span style="color:#8be9fd;font-style:italic">log&lt;/span>&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Logging utilities&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── flags&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Embeddable flag structs (subpackage)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── flags&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Core flag adders (AddTimeoutFlag, etc.)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── batch&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># BatchFlags, AddBatchFlags()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── scene&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># SceneFlags, AddSceneFlags()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── component&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># ComponentFlags, QuickComponentFlags&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── output&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># OutputFlags, AddOutputFlags()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── confirm&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># ConfirmFlags, AddConfirmFlags()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── device&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DeviceListFlags, AddDeviceListFlags()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── factories&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Generic command factories&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── component&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># NewComponentCommand (switch/light/rgb on/off/toggle)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── batch&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># NewBatchComponentCommand&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── status&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># NewStatusCommand[T]&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── sensor&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># NewSensorCommand[T]&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── cover&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># NewCoverCommand&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── config&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># NewConfigDeleteCommand, NewConfigListCommand&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── delete&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># NewDeviceDeleteCommand&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── completion&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Shell completion&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── completion&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Completers for bash/zsh/fish&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── config&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Configuration management&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── config&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Config struct, Load(), Save()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── manager&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Manager - config mutations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── devices&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Device registry&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── aliases&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Alias management&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># ExpandAliasArgs(), ExecuteShellAlias()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── scenes&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Scene management, ParseSceneFile()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── template&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Template management&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── alerts&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Alert configuration&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── validation&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># ValidateName() - shared validation&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── github&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># GitHub integration&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── releases&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Release checking, downloads&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── utils&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Shared utilities (batch, device conversion)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── batch&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># ResolveBatchTargets() - args/stdin/group/all&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── device&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DiscoveredDeviceToConfig(), RegisterDiscoveredDevices()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># UnmarshalJSON() - RPC response helper&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── must&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Must() - panic on error for init-time failures&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── iostreams&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># I/O abstraction&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── iostreams&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># IOStreams struct&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># In, Out, ErrOut (io.Reader/Writer)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># IsStdinTTY(), IsStdoutTTY(), ColorEnabled()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Printf(), Println(), Success(), Error()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># StartProgress(), StopProgress()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── color&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Color detection, theme handling&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── progress&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Progress indicator management&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── prompt&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Confirm(), Prompt() - user input&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── debug&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DebugErr() - non-fatal error logging&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── &lt;span style="color:#8be9fd;font-style:italic">log&lt;/span>&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Structured logging&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── multiwriter&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Multi-line concurrent output&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── model&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Domain types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── device&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Device struct&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Name, Address, Generation, Type, Model, Auth&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── component&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Component struct, *Status types, *Config types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># SwitchStatus, CoverStatus, LightStatus, RGBStatus&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── sensor&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Sensor types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># AlarmSensor interface (generic)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># AlarmSensorReading, TemperatureReading&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># HumidityReading, IlluminanceReading&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># VoltmeterReading, DevicePowerReading&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── errors&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Error types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── output&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Pure formatters (data → string, NO IOStreams)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── format&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Output format routing&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Format type (JSON, YAML, Table, Text, Template)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># FormatOutput(), PrintJSON(), PrintYAML()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># FormatConfigValue(), FormatSize()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── state&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Boolean/state renderers&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Case enum (CaseLower, CaseTitle, CaseUpper)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># RenderOnOff(), RenderYesNo(), RenderOnline()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># RenderActive(), RenderAlarmState(), RenderMuteState()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># RenderUpdateStatus(), RenderGeneration()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── devices&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Device formatters&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># FormatDiscoveredDevices(), FormatAlarmSensors()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># FormatPower(), FormatPowerColored(), FormatEnergy()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># FormatEMLines(), FormatEM1Line(), FormatPMLine()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── table&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Table builder utilities&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── backup&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># FormatBackupsTable()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── plugins&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Plugin system&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── registry&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Registry - plugin management&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── loader&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Plugin loading&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── executor&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Plugin execution&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── manifest&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Plugin metadata&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── migrate&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Plugin migration&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── shelly&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Business logic service layer&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── shelly&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Service struct&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Connect(), WithConnection(), RawRPC()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># ResolveWithGeneration() - Gen1/Gen2 detection&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Service accessors for subpackages&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── connection&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Connection management helpers&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># DeviceClient, WithDevice(), WithDevices()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── resolver&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DeviceResolver interface&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── device&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Device operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── devicedata&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DeviceData collection&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── &lt;span style="color:#ff79c6">switch&lt;/span>&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Switch operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── light&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Light operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── rgb&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># RGB operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── cover&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Cover operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── input&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Input operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── sensor&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Sensor operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── power&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Power operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── energy&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Energy meter operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── quick&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># QuickOn(), QuickOff(), QuickToggle()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── config&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Config get/set, WiFi, BLE, cloud, webhooks&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── wifi&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># WiFi operations (WiFiStatusFull, WiFiConfigFull, etc.)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── backup&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Service methods using backup/ types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── schedule&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Schedule operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── script&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Script operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── firmware&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Firmware operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── cloud&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Cloud operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── monitoring&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># MonitoringSnapshot, FetchAllSnapshots()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── kvs&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Service methods using kvs/ types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── template&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Template operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── zigbee&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Zigbee operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── bthome&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># BTHome operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── lora&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># LoRa operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── matter&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Matter operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── migrate&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Migration operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── auth&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Authentication configuration&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── auth&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Service: GetStatus(), Set(), Disable()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Status type, CalculateHA1()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── automation&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Scripts, schedules, webhooks&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── &lt;span style="color:#ff79c6">...&lt;/span> &lt;span style="color:#6272a4"># Automation-related operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── backup&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Backup domain types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── types&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DeviceBackup, Options, RestoreOptions, DeviceInfo&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Validate(), LoadAndValidate(), IsFile()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── component&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Component operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── &lt;span style="color:#ff79c6">...&lt;/span> &lt;span style="color:#6272a4"># Switch, Light, Cover, RGB, Input&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── device&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Device operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── &lt;span style="color:#ff79c6">...&lt;/span> &lt;span style="color:#6272a4"># Reboot, Info, Status, List&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── &lt;span style="color:#ff79c6">export&lt;/span>&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Export format builders&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── ansible&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># BuildAnsibleInventory(), AnsibleInventory&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── terraform&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># BuildTerraformConfig(), TerraformDevice&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── backup&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># BackupExporter, ScanBackupFiles(), WriteBackupFile()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── energy&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># FormatEMDataCSV(), FormatEM1DataCSV()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── firmware&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Firmware checking and updates&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── &lt;span style="color:#ff79c6">...&lt;/span> &lt;span style="color:#6272a4"># Check, Update, Rollback, Cache&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── kvs&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># KVS domain types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── types&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Item, ListResult, GetResult, Export&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># ParseValue(), ParseImportFile()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── modbus&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Modbus configuration&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── modbus&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Service: GetStatus(), GetConfig(), SetConfig()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># Status, Config types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── network&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Network-related services&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── wifi&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># WiFiService: GetStatusFull(), GetConfigFull(), etc.&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── mqtt&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># MQTTService: GetStatus(), GetConfig(), SetConfig()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── ethernet&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># EthernetService: GetStatus(), GetConfig(), SetConfig()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ ├── cloud&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># CloudClient: Login(), GetAllDevices(), etc.&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── cloudcontrol&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Cloud device control operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── provision&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Device provisioning&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ └── provision&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Service: GetDeviceInfoByAddress(), ConfigureWiFi()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># GetBTHomeStatus(), StartBTHomeDiscovery()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># DeviceInfo, BTHomeDiscovery types&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── wireless&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Wireless protocol services&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── &lt;span style="color:#ff79c6">...&lt;/span> &lt;span style="color:#6272a4"># BLE, BTHome, Matter, Zigbee, LoRa&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── term&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Terminal presentation (composed displays)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── term&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Package doc, shared helpers (printTable, formatTemp)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── action&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayActions - Gen1 action URL display&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── alert&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayAlerts*, DisplayAlertStatus&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── audit&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayAuditResults&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── automation&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayScript*, DisplaySchedule*, DisplayWebhook*&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── backup&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayBackupSummary, DisplayRestorePreview, etc.&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── benchmark&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayBenchmarkResults&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── ble&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayBLEProvisionResult&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── bthome&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayBTHomeDevices*, DisplayBTHomeSensor*&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── component&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplaySwitch*, DisplayLight*, DisplayCover*, DisplayInput*&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── config&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayConfigTable, DisplaySceneList, DisplayAliasList&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── debug&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># PrintJSONResult, DisplayWebSocketEvent&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── device&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayDeviceStatus, DisplayAllSnapshots&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── diff&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayConfigDiffs, DisplayScriptDiffs, etc.&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── discovery&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayDiscoveredDevices, DisplayBLEDevices&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── doctor&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayDoctorResults, DisplayCheckResult*&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── energy&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayEnergyStatus, DisplayEnergyHistory&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── event&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayEvent, OutputEventJSON&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── firmware&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayFirmwareStatus, DisplayFirmwareInfo&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── fleet&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayFleetStatus, DisplayFleetHealth, DisplayFleetStats&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── kvs&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayKVS*&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── network&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayWiFi*, DisplayEthernet*, DisplayMQTT*, DisplayCloud*&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── power&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayPowerMetrics, DisplayDashboard, DisplayComparison&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── repl&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># REPL session display and command handling&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── scene&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplaySceneDetails&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── script&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayScriptStatus, DisplayScriptCode&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── sensor&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Generic sensor displays (partial application pattern)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ │ &lt;span style="color:#6272a4"># DisplayTemperature*, DisplayHumidity*, etc.&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── shell&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Shell session display and command handling&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── version&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># DisplayVersionInfo, DisplayUpdateAvailable, RunUpdateCheck&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── testutil&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Testing utilities&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── testutil&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Test helpers&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── mock_client&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># MockClient for testing&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── mock_resolver&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># MockResolver for testing&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── theme&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Theming (bubbletint)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── theme&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Style builders&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ &lt;span style="color:#6272a4"># Bold(), Dim(), Highlight()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ &lt;span style="color:#6272a4"># StatusOK(), StatusWarn(), StatusError()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ &lt;span style="color:#6272a4"># StyledPower(), StyledEnergy()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ &lt;span style="color:#6272a4"># FalseStyle (FalseError, FalseDim)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── tui&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Terminal UI (BubbleTea)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── app&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Main TUI application&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── keys&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Key bindings&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── styles&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># TUI styles&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── components&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># TUI components&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── devicelist&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Device list component&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── devicedetail&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Device detail component&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── energy&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Energy dashboard&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── monitor&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Monitoring component&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── events&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Events component&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── search&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Search component&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── tabs&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Tab navigation&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── statusbar&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Status bar&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── help&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Help overlay&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ ├── toast&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Toast notifications&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ └── cmdmode&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Command mode&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>└── version&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#6272a4"># Build-time version info&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── version&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># Version, Commit, Date variables&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │ &lt;span style="color:#6272a4"># Get(), Short(), Long(), String()&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── cache&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># ReadCachedVersion() - version cache management&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> └── notification&lt;span style="color:#ff79c6">.&lt;/span>go &lt;span style="color:#6272a4"># ShowUpdateNotification() - update availability&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>
+ &lt;/figure>
+&lt;/div>
+&lt;hr>
+&lt;h2 id="decision-tree-where-does-this-go">Decision Tree: &amp;ldquo;Where Does This Go?&amp;rdquo;&lt;/h2>
+
+
+
+&lt;div class="expressive-code">
+ &lt;figure class="frame not-content">
+ &lt;figcaption class="header">
+ &lt;span class="title">&lt;/span>
+ &lt;/figcaption>
+ &lt;div class="highlight">&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">15
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">16
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">17
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">18
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">19
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">20
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">21
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">22
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">23
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">24
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">25
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">26
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">27
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">28
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">29
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">30
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">31
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">32
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">33
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">34
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span style="display:flex;">&lt;span>Is it a cobra command definition?
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>├── Yes → cmd&lt;span style="color:#ff79c6">/&amp;lt;&lt;/span>domain&lt;span style="color:#ff79c6">&amp;gt;/&amp;lt;&lt;/span>action&lt;span style="color:#ff79c6">&amp;gt;/&amp;lt;&lt;/span>action&lt;span style="color:#ff79c6">&amp;gt;.&lt;/span>go
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│ (ONLY NewCommand &lt;span style="color:#ff79c6">+&lt;/span> run, NO helpers&lt;span style="color:#ff79c6">!&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>│
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>└── No → Does it write to IOStreams?
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── Yes → term&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │ (composed display functions wrapping output&lt;span style="color:#ff79c6">/&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> └── No → Is it a pure formatter (data → string)?
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── Yes → output&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │ (format&lt;span style="color:#ff79c6">.&lt;/span>go, state&lt;span style="color:#ff79c6">.&lt;/span>go, devices&lt;span style="color:#ff79c6">.&lt;/span>go, etc&lt;span style="color:#ff79c6">.&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> └── No → Is it business logic (device operations)?
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── Yes → shelly&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │ (&lt;span style="color:#ff79c6">or&lt;/span> shelly&lt;span style="color:#ff79c6">/&lt;/span>&lt;span style="color:#ff79c6">export&lt;/span>&lt;span style="color:#ff79c6">/&lt;/span> &lt;span style="color:#ff79c6">for&lt;/span> external formats)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> └── No → Is it a domain type?
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── Yes → model&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> └── No → Is it CLI infrastructure?
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── Yes → cmdutil&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │ (factory, flags, runner, factories&lt;span style="color:#ff79c6">/&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> └── No → Is it config&lt;span style="color:#ff79c6">-&lt;/span>related?
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> ├── Yes → config&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> │
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> └── No → utils&lt;span style="color:#ff79c6">/&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> (shared utilities)&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>
+ &lt;/figure>
+&lt;/div>
+&lt;hr>
+&lt;h2 id="patterns">Patterns&lt;/h2>
+&lt;h3 id="display-vs-format">Display vs Format&lt;/h3>
+&lt;p>The separation between &lt;code>output/&lt;/code> and &lt;code>term/&lt;/code>:&lt;/p></description></item><item><title>Dependencies</title><link>https://tj-smith47.github.io/shelly-cli/docs/reference/dependencies/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/reference/dependencies/</guid><description>&lt;h2 id="core-dependencies">Core Dependencies&lt;/h2>
+
+
+
+&lt;div class="expressive-code">
+ &lt;figure class="frame not-content">
+ &lt;figcaption class="header">
+ &lt;span class="title">&lt;/span>
+ &lt;/figcaption>
+ &lt;div class="highlight">&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">15
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">16
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">17
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#50fa7b">require&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>tj&lt;span style="color:#ff79c6">-&lt;/span>smith47&lt;span style="color:#ff79c6">/&lt;/span>shelly&lt;span style="color:#ff79c6">-&lt;/span>&lt;span style="color:#ff79c6">go&lt;/span> v0&lt;span style="color:#bd93f9">.1.6&lt;/span> &lt;span style="color:#6272a4">// Shelly device library&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>spf13&lt;span style="color:#ff79c6">/&lt;/span>cobra v1&lt;span style="color:#bd93f9">.8&lt;/span>.x &lt;span style="color:#6272a4">// CLI framework&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>spf13&lt;span style="color:#ff79c6">/&lt;/span>viper v1&lt;span style="color:#bd93f9">.18&lt;/span>.x &lt;span style="color:#6272a4">// Configuration&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>charmbracelet&lt;span style="color:#ff79c6">/&lt;/span>bubbletea &lt;span style="color:#6272a4">// TUI framework&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>charmbracelet&lt;span style="color:#ff79c6">/&lt;/span>bubbles &lt;span style="color:#6272a4">// TUI components&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>charmbracelet&lt;span style="color:#ff79c6">/&lt;/span>lipgloss &lt;span style="color:#6272a4">// Styling (CLI + TUI)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>charmbracelet&lt;span style="color:#ff79c6">/&lt;/span>glamour &lt;span style="color:#6272a4">// Markdown rendering (help screens)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>charmbracelet&lt;span style="color:#ff79c6">/&lt;/span>x&lt;span style="color:#ff79c6">/&lt;/span>exp&lt;span style="color:#ff79c6">/&lt;/span>teatest &lt;span style="color:#6272a4">// TUI testing&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>lrstanley&lt;span style="color:#ff79c6">/&lt;/span>bubbletint &lt;span style="color:#6272a4">// Themes for ALL output (CLI + TUI)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>AlecAivazis&lt;span style="color:#ff79c6">/&lt;/span>survey&lt;span style="color:#ff79c6">/&lt;/span>v2 &lt;span style="color:#6272a4">// Interactive prompts&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>briandowns&lt;span style="color:#ff79c6">/&lt;/span>spinner &lt;span style="color:#6272a4">// Progress spinners&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>olekukonko&lt;span style="color:#ff79c6">/&lt;/span>tablewriter &lt;span style="color:#6272a4">// Table output (non-TUI)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>skip2&lt;span style="color:#ff79c6">/&lt;/span>&lt;span style="color:#ff79c6">go&lt;/span>&lt;span style="color:#ff79c6">-&lt;/span>qrcode &lt;span style="color:#6272a4">// QR code generation (ASCII terminal output)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> golang.org&lt;span style="color:#ff79c6">/&lt;/span>x&lt;span style="color:#ff79c6">/&lt;/span>sync&lt;span style="color:#ff79c6">/&lt;/span>errgroup &lt;span style="color:#6272a4">// Concurrent operations&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> gopkg.in&lt;span style="color:#ff79c6">/&lt;/span>yaml.v3 &lt;span style="color:#6272a4">// YAML support&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>)&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>
+ &lt;/figure>
+&lt;/div>
+&lt;h2 id="development-dependencies">Development Dependencies&lt;/h2>
+
+
+
+&lt;div class="expressive-code">
+ &lt;figure class="frame not-content">
+ &lt;figcaption class="header">
+ &lt;span class="title">&lt;/span>
+ &lt;/figcaption>
+ &lt;div class="highlight">&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">4
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#50fa7b">require&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>stretchr&lt;span style="color:#ff79c6">/&lt;/span>testify &lt;span style="color:#6272a4">// Testing assertions&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> github.com&lt;span style="color:#ff79c6">/&lt;/span>golang&lt;span style="color:#ff79c6">/&lt;/span>mock &lt;span style="color:#6272a4">// Mocking (or use Go 1.25 testing features)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>)&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>
+ &lt;/figure>
+&lt;/div>
+&lt;hr>
+&lt;h2 id="usage-guidelines">Usage Guidelines&lt;/h2>
+&lt;h3 id="theming-bubbletint">Theming (bubbletint)&lt;/h3>
+&lt;p>&lt;code>github.com/lrstanley/bubbletint&lt;/code> provides theming for ALL CLI output, not just TUI:&lt;/p></description></item></channel></rss>

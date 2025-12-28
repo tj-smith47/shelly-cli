@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Command Reference on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/</link><description>Recent content in Command Reference on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly shelly</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/shelly/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/shelly/</guid><description>&lt;h2 id="shelly">shelly&lt;/h2>
+&lt;p>CLI for controlling Shelly smart home devices&lt;/p>
+&lt;h3 id="synopsis">Synopsis&lt;/h3>
+&lt;p>Shelly CLI - Control your Shelly smart home devices from the command line.&lt;/p>
+&lt;p>This tool provides a comprehensive interface for discovering, monitoring,
+and controlling Shelly devices on your local network.&lt;/p>
+&lt;h3 id="examples">Examples&lt;/h3>
+
+
+
+&lt;div class="expressive-code">
+ &lt;figure class="frame not-content">
+ &lt;figcaption class="header">
+ &lt;span class="title">&lt;/span>
+ &lt;/figcaption>
+ &lt;div class="highlight">&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">15
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-fallback" data-lang="fallback">&lt;span style="display:flex;">&lt;span> # Initialize configuration
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> shelly init
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> # Discover and control devices
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> shelly discover scan
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> shelly switch on kitchen
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> # Pipe output to jq for processing
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> shelly device list -o json | jq &amp;#39;.[].name&amp;#39;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> # Pipe device names to batch commands
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> echo -e &amp;#34;kitchen\nbedroom&amp;#34; | shelly batch on
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> # Launch interactive dashboard
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> shelly dash&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>
+ &lt;/figure>
+&lt;/div>
+&lt;h3 id="options">Options&lt;/h3>
+
+
+
+&lt;div class="expressive-code">
+ &lt;figure class="frame not-content">
+ &lt;figcaption class="header">
+ &lt;span class="title">&lt;/span>
+ &lt;/figcaption>
+ &lt;div class="highlight">&lt;div style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-fallback" data-lang="fallback">&lt;span style="display:flex;">&lt;span> --config string Config file (default $HOME/.config/shelly/config.yaml)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> -h, --help help for shelly
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> --log-categories string Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> --log-json Output logs in JSON format
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> --no-color Disable colored output
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> --no-headers Hide table headers in output
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> -o, --output string Output format (table, json, yaml, template) (default &amp;#34;table&amp;#34;)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> --plain Disable borders and colors (machine-readable output)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> -q, --quiet Suppress non-essential output
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> --template string Go template string for output (use with -o template)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> -v, --verbose count Increase verbosity (-v=info, -vv=debug, -vvv=trace)&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>
+ &lt;/figure>
+&lt;/div>
+&lt;h3 id="see-also">SEE ALSO&lt;/h3>
+&lt;ul>
+&lt;li>&lt;a href="shelly_action.md">shelly action&lt;/a>	 - Manage Gen1 device action URLs&lt;/li>
+&lt;li>&lt;a href="shelly_alert.md">shelly alert&lt;/a>	 - Manage monitoring alerts&lt;/li>
+&lt;li>&lt;a href="shelly_alias.md">shelly alias&lt;/a>	 - Manage command aliases&lt;/li>
+&lt;li>&lt;a href="shelly_audit.md">shelly audit&lt;/a>	 - Security audit for devices&lt;/li>
+&lt;li>&lt;a href="shelly_auth.md">shelly auth&lt;/a>	 - Manage device authentication&lt;/li>
+&lt;li>&lt;a href="shelly_backup.md">shelly backup&lt;/a>	 - Backup and restore device configurations&lt;/li>
+&lt;li>&lt;a href="shelly_batch.md">shelly batch&lt;/a>	 - Execute commands on multiple devices&lt;/li>
+&lt;li>&lt;a href="shelly_benchmark.md">shelly benchmark&lt;/a>	 - Test device performance&lt;/li>
+&lt;li>&lt;a href="shelly_bthome.md">shelly bthome&lt;/a>	 - Manage BTHome Bluetooth devices&lt;/li>
+&lt;li>&lt;a href="shelly_cache.md">shelly cache&lt;/a>	 - Manage CLI cache&lt;/li>
+&lt;li>&lt;a href="shelly_cert.md">shelly cert&lt;/a>	 - Manage device TLS certificates&lt;/li>
+&lt;li>&lt;a href="shelly_cloud.md">shelly cloud&lt;/a>	 - Manage cloud connection and Shelly Cloud API&lt;/li>
+&lt;li>&lt;a href="shelly_completion.md">shelly completion&lt;/a>	 - Generate shell completion scripts&lt;/li>
+&lt;li>&lt;a href="shelly_config.md">shelly config&lt;/a>	 - Manage CLI configuration&lt;/li>
+&lt;li>&lt;a href="shelly_cover.md">shelly cover&lt;/a>	 - Control cover/roller components&lt;/li>
+&lt;li>&lt;a href="shelly_dash.md">shelly dash&lt;/a>	 - Launch interactive TUI dashboard&lt;/li>
+&lt;li>&lt;a href="shelly_debug.md">shelly debug&lt;/a>	 - Debug and diagnostic commands&lt;/li>
+&lt;li>&lt;a href="shelly_device.md">shelly device&lt;/a>	 - Manage Shelly devices&lt;/li>
+&lt;li>&lt;a href="shelly_discover.md">shelly discover&lt;/a>	 - Discover Shelly devices on the network&lt;/li>
+&lt;li>&lt;a href="shelly_doctor.md">shelly doctor&lt;/a>	 - Check system health and diagnose issues&lt;/li>
+&lt;li>&lt;a href="shelly_energy.md">shelly energy&lt;/a>	 - Energy monitoring operations (EM/EM1 components)&lt;/li>
+&lt;li>&lt;a href="shelly_ethernet.md">shelly ethernet&lt;/a>	 - Manage device Ethernet configuration&lt;/li>
+&lt;li>&lt;a href="shelly_export.md">shelly export&lt;/a>	 - Export fleet data for infrastructure tools&lt;/li>
+&lt;li>&lt;a href="shelly_feedback.md">shelly feedback&lt;/a>	 - Report issues or request features&lt;/li>
+&lt;li>&lt;a href="shelly_firmware.md">shelly firmware&lt;/a>	 - Manage device firmware&lt;/li>
+&lt;li>&lt;a href="shelly_fleet.md">shelly fleet&lt;/a>	 - Cloud-based fleet management&lt;/li>
+&lt;li>&lt;a href="shelly_group.md">shelly group&lt;/a>	 - Manage device groups&lt;/li>
+&lt;li>&lt;a href="shelly_init.md">shelly init&lt;/a>	 - Initialize shelly CLI for first-time use&lt;/li>
+&lt;li>&lt;a href="shelly_input.md">shelly input&lt;/a>	 - Manage input components&lt;/li>
+&lt;li>&lt;a href="shelly_kvs.md">shelly kvs&lt;/a>	 - Manage device key-value storage&lt;/li>
+&lt;li>&lt;a href="shelly_light.md">shelly light&lt;/a>	 - Control light components&lt;/li>
+&lt;li>&lt;a href="shelly_log.md">shelly log&lt;/a>	 - Manage CLI logs&lt;/li>
+&lt;li>&lt;a href="shelly_lora.md">shelly lora&lt;/a>	 - Manage LoRa add-on&lt;/li>
+&lt;li>&lt;a href="shelly_matter.md">shelly matter&lt;/a>	 - Manage Matter connectivity&lt;/li>
+&lt;li>&lt;a href="shelly_metrics.md">shelly metrics&lt;/a>	 - Export device metrics&lt;/li>
+&lt;li>&lt;a href="shelly_migrate.md">shelly migrate&lt;/a>	 - Migrate configuration between devices&lt;/li>
+&lt;li>&lt;a href="shelly_mock.md">shelly mock&lt;/a>	 - Mock device mode for testing&lt;/li>
+&lt;li>&lt;a href="shelly_modbus.md">shelly modbus&lt;/a>	 - Manage Modbus-TCP configuration&lt;/li>
+&lt;li>&lt;a href="shelly_monitor.md">shelly monitor&lt;/a>	 - Real-time device monitoring&lt;/li>
+&lt;li>&lt;a href="shelly_mqtt.md">shelly mqtt&lt;/a>	 - Manage device MQTT configuration&lt;/li>
+&lt;li>&lt;a href="shelly_off.md">shelly off&lt;/a>	 - Turn off a device (auto-detects type)&lt;/li>
+&lt;li>&lt;a href="shelly_on.md">shelly on&lt;/a>	 - Turn on a device (auto-detects type)&lt;/li>
+&lt;li>&lt;a href="shelly_party.md">shelly party&lt;/a>	 - Party mode - flash lights!&lt;/li>
+&lt;li>&lt;a href="shelly_plugin.md">shelly plugin&lt;/a>	 - Manage CLI plugins&lt;/li>
+&lt;li>&lt;a href="shelly_power.md">shelly power&lt;/a>	 - Power meter operations (PM/PM1 components)&lt;/li>
+&lt;li>&lt;a href="shelly_profile.md">shelly profile&lt;/a>	 - Device profile information&lt;/li>
+&lt;li>&lt;a href="shelly_provision.md">shelly provision&lt;/a>	 - Provision device settings&lt;/li>
+&lt;li>&lt;a href="shelly_qr.md">shelly qr&lt;/a>	 - Generate device QR code&lt;/li>
+&lt;li>&lt;a href="shelly_repl.md">shelly repl&lt;/a>	 - Launch interactive REPL&lt;/li>
+&lt;li>&lt;a href="shelly_report.md">shelly report&lt;/a>	 - Generate reports&lt;/li>
+&lt;li>&lt;a href="shelly_rgb.md">shelly rgb&lt;/a>	 - Control RGB light components&lt;/li>
+&lt;li>&lt;a href="shelly_rgbw.md">shelly rgbw&lt;/a>	 - Control RGBW LED outputs&lt;/li>
+&lt;li>&lt;a href="shelly_scene.md">shelly scene&lt;/a>	 - Manage device scenes&lt;/li>
+&lt;li>&lt;a href="shelly_schedule.md">shelly schedule&lt;/a>	 - Manage device schedules&lt;/li>
+&lt;li>&lt;a href="shelly_script.md">shelly script&lt;/a>	 - Manage device scripts&lt;/li>
+&lt;li>&lt;a href="shelly_sensor.md">shelly sensor&lt;/a>	 - Manage device sensors&lt;/li>
+&lt;li>&lt;a href="shelly_sensoraddon.md">shelly sensoraddon&lt;/a>	 - Manage Sensor Add-on peripherals&lt;/li>
+&lt;li>&lt;a href="shelly_shell.md">shelly shell&lt;/a>	 - Interactive shell for a specific device&lt;/li>
+&lt;li>&lt;a href="shelly_sleep.md">shelly sleep&lt;/a>	 - Turn device off after a delay&lt;/li>
+&lt;li>&lt;a href="shelly_status.md">shelly status&lt;/a>	 - Show device status (quick overview)&lt;/li>
+&lt;li>&lt;a href="shelly_switch.md">shelly switch&lt;/a>	 - Control switch components&lt;/li>
+&lt;li>&lt;a href="shelly_sync.md">shelly sync&lt;/a>	 - Synchronize device configurations&lt;/li>
+&lt;li>&lt;a href="shelly_template.md">shelly template&lt;/a>	 - Manage device configuration templates&lt;/li>
+&lt;li>&lt;a href="shelly_theme.md">shelly theme&lt;/a>	 - Manage CLI color themes&lt;/li>
+&lt;li>&lt;a href="shelly_thermostat.md">shelly thermostat&lt;/a>	 - Manage thermostats&lt;/li>
+&lt;li>&lt;a href="shelly_toggle.md">shelly toggle&lt;/a>	 - Toggle a device (auto-detects type)&lt;/li>
+&lt;li>&lt;a href="shelly_update.md">shelly update&lt;/a>	 - Update shelly to the latest version&lt;/li>
+&lt;li>&lt;a href="shelly_version.md">shelly version&lt;/a>	 - Print version information&lt;/li>
+&lt;li>&lt;a href="shelly_virtual.md">shelly virtual&lt;/a>	 - Manage virtual components&lt;/li>
+&lt;li>&lt;a href="shelly_wait.md">shelly wait&lt;/a>	 - Wait for a duration&lt;/li>
+&lt;li>&lt;a href="shelly_wake.md">shelly wake&lt;/a>	 - Turn device on after a delay&lt;/li>
+&lt;li>&lt;a href="shelly_webhook.md">shelly webhook&lt;/a>	 - Manage device webhooks&lt;/li>
+&lt;li>&lt;a href="shelly_wifi.md">shelly wifi&lt;/a>	 - Manage device WiFi configuration&lt;/li>
+&lt;li>&lt;a href="shelly_zigbee.md">shelly zigbee&lt;/a>	 - Manage Zigbee connectivity&lt;/li>
+&lt;li>&lt;a href="shelly_zwave.md">shelly zwave&lt;/a>	 - Z-Wave device utilities&lt;/li>
+&lt;/ul></description></item></channel></rss>
