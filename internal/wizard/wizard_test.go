@@ -17,6 +17,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
+const testAPIModeHTTP = "http"
+
 //nolint:gocritic,unparam // helper function returns multiple values for API consistency
 func testIOStreams() (*iostreams.IOStreams, *bytes.Buffer, *bytes.Buffer) {
 	in := strings.NewReader("")
@@ -212,13 +214,13 @@ func TestOptionsFields(t *testing.T) {
 	if opts.Completions != "zsh" {
 		t.Errorf("Completions = %q", opts.Completions)
 	}
-	if opts.Theme != "dracula" { //nolint:goconst // test value
+	if opts.Theme != "dracula" {
 		t.Errorf("Theme = %q", opts.Theme)
 	}
 	if opts.OutputFormat != "yaml" {
 		t.Errorf("OutputFormat = %q", opts.OutputFormat)
 	}
-	if opts.APIMode != "http" { //nolint:goconst // test value
+	if opts.APIMode != testAPIModeHTTP {
 		t.Errorf("APIMode = %q", opts.APIMode)
 	}
 	if opts.CloudEmail != "user@example.com" {
@@ -1931,13 +1933,13 @@ func TestSelectDiscoveryMethods_InteractiveFallback(t *testing.T) {
 	// The first (or only) method should be http due to fallback
 	found := false
 	for _, m := range methods {
-		if m == "http" {
+		if m == testAPIModeHTTP {
 			found = true
 			break
 		}
 	}
 	if !found && len(methods) > 0 {
-		t.Logf("methods returned: %v (expected http in fallback)", methods)
+		t.Logf("methods returned: %v (expected %s in fallback)", methods, testAPIModeHTTP)
 	}
 }
 
@@ -2417,9 +2419,9 @@ func TestValidateConfig_GroupsWithIPAddresses(t *testing.T) {
 }
 
 // TestRunCheck tests the RunCheck function with a test factory.
+//
+//nolint:paralleltest // RunCheck uses global config.Get() which cannot be parallelized
 func TestRunCheck(t *testing.T) {
-	t.Parallel()
-
 	tf := factory.NewTestFactory(t)
 
 	// Run the check
@@ -2441,9 +2443,9 @@ func TestRunCheck(t *testing.T) {
 }
 
 // TestRunCheck_WithDevices tests RunCheck when devices are registered.
+//
+//nolint:paralleltest // RunCheck uses global config.Get() which cannot be parallelized
 func TestRunCheck_WithDevices(t *testing.T) {
-	t.Parallel()
-
 	devices := map[string]model.Device{
 		"kitchen": {Address: "192.168.1.100", Model: "SNSW-001P16EU"},
 		"bedroom": {Address: "192.168.1.101", Model: "SNSW-002P16EU"},
@@ -2464,9 +2466,9 @@ func TestRunCheck_WithDevices(t *testing.T) {
 }
 
 // TestRunCheck_NoConfig tests RunCheck when no config exists.
+//
+//nolint:paralleltest // RunCheck uses global config.Get() which cannot be parallelized
 func TestRunCheck_NoConfig(t *testing.T) {
-	t.Parallel()
-
 	// Create a test factory - by default has empty config
 	tf := factory.NewTestFactory(t)
 
@@ -2577,15 +2579,15 @@ func TestSelectDiscoveryMethods_InteractiveWithParsing(t *testing.T) {
 	}
 
 	// First/only method should be http (fallback)
-	if len(methods) > 0 && methods[0] != "http" {
-		t.Logf("got methods: %v (expected http as fallback)", methods)
+	if len(methods) > 0 && methods[0] != testAPIModeHTTP {
+		t.Logf("got methods: %v (expected %s as fallback)", methods, testAPIModeHTTP)
 	}
 }
 
 // TestRunFlagDevicesStep tests the runFlagDevicesStep helper.
+//
+//nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestRunFlagDevicesStep(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name string
 		opts *Options
@@ -2606,7 +2608,6 @@ func TestRunFlagDevicesStep(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			ios, _, _ := testIOStreams()
 			// Should not panic
 			runFlagDevicesStep(ios, tt.opts)
@@ -2694,9 +2695,9 @@ func TestRunDiscoveryStep(t *testing.T) {
 }
 
 // TestStepFlagDevices tests stepFlagDevices.
+//
+//nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestStepFlagDevices(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name    string
 		opts    *Options
@@ -2726,7 +2727,6 @@ func TestStepFlagDevices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			ios, _, _ := testIOStreams()
 			err := stepFlagDevices(ios, tt.opts)
 			if (err != nil) != tt.wantErr {
@@ -2737,9 +2737,9 @@ func TestStepFlagDevices(t *testing.T) {
 }
 
 // TestRunCheck_Output tests that RunCheck produces expected output sections.
+//
+//nolint:paralleltest // RunCheck uses global config.Get() which cannot be parallelized
 func TestRunCheck_Output(t *testing.T) {
-	t.Parallel()
-
 	tf := factory.NewTestFactory(t)
 
 	err := RunCheck(tf.Factory)
@@ -2806,8 +2806,6 @@ func TestStepCloudNonInteractive_IncompleteCredentials(t *testing.T) {
 func TestStepCompletionsNonInteractive(t *testing.T) {
 	t.Parallel()
 
-	ios, _, _ := testIOStreams()
-
 	// Test only cases that don't require a valid rootCmd (which would need completion generation)
 	// Invalid shells get skipped early before trying to use rootCmd
 	tests := []struct {
@@ -2835,6 +2833,7 @@ func TestStepCompletionsNonInteractive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			ios, _, _ := testIOStreams() // Create new buffer per subtest to avoid race
 			// Pass nil for rootCmd - invalid shells are skipped before trying to use it
 			err := stepCompletionsNonInteractive(ios, nil, tt.opts)
 			if (err != nil) != tt.wantErr {
@@ -2861,9 +2860,9 @@ func TestRunSetupSteps_Components(t *testing.T) {
 }
 
 // TestRunCheck_AllPaths tests RunCheck covers all output paths.
+//
+//nolint:paralleltest // RunCheck uses global config.Get() which cannot be parallelized
 func TestRunCheck_AllPaths(t *testing.T) {
-	t.Parallel()
-
 	// Test with devices
 	devices := map[string]model.Device{
 		"dev1": {Address: "192.168.1.100", Model: "SNSW-001P16EU"},
@@ -2948,9 +2947,6 @@ func TestRunCloudStep_NonInteractive(t *testing.T) {
 func TestStepDiscovery_Paths(t *testing.T) {
 	t.Parallel()
 
-	ios, _, _ := testIOStreams()
-	ctx := context.Background()
-
 	tests := []struct {
 		name string
 		opts *Options
@@ -2976,6 +2972,8 @@ func TestStepDiscovery_Paths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			ios, _, _ := testIOStreams() // Create new buffer per subtest to avoid race
+			ctx := context.Background()
 			// Just verify it doesn't panic - actual discovery will fail but that's expected
 			devices, err := stepDiscovery(ctx, ios, tt.opts)
 			if err != nil {
@@ -3013,9 +3011,9 @@ func TestRunDiscoveryStep_WithMethods(t *testing.T) {
 }
 
 // TestStepFlagDevices_MoreCases tests additional stepFlagDevices scenarios.
+//
+//nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestStepFlagDevices_MoreCases(t *testing.T) {
-	t.Parallel()
-
 	ios, out, _ := testIOStreams()
 
 	// Test with valid JSON device
@@ -3105,9 +3103,9 @@ func TestStepCloudNonInteractive_Empty(t *testing.T) {
 }
 
 // TestRunCheck_CloudAuth tests RunCheck cloud auth detection.
+//
+//nolint:paralleltest // RunCheck uses global config.Get() which cannot be parallelized
 func TestRunCheck_CloudAuth(t *testing.T) {
-	t.Parallel()
-
 	tf := factory.NewTestFactory(t)
 
 	// Set cloud token to test that code path

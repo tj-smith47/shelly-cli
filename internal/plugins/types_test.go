@@ -78,8 +78,8 @@ func TestDeviceDetectionResult(t *testing.T) {
 	if !result.Detected {
 		t.Error("Detected = false, want true")
 	}
-	if result.Platform != "tasmota" {
-		t.Errorf("Platform = %q, want %q", result.Platform, "tasmota")
+	if result.Platform != testPlatformTasmota {
+		t.Errorf("Platform = %q, want %q", result.Platform, testPlatformTasmota)
 	}
 	if result.DeviceID != "tasmota-123456" {
 		t.Errorf("DeviceID = %q, want %q", result.DeviceID, "tasmota-123456")
@@ -361,7 +361,7 @@ func TestPlugin(t *testing.T) {
 	if plugin.Name != "tasmota" {
 		t.Errorf("Name = %q, want %q", plugin.Name, "tasmota")
 	}
-	if plugin.Version != "1.0.0" { //nolint:goconst // test value
+	if plugin.Version != "1.0.0" {
 		t.Errorf("Version = %q, want %q", plugin.Version, "1.0.0")
 	}
 	if plugin.Manifest == nil {

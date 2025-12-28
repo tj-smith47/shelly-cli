@@ -20,6 +20,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
+const defaultTheme = "dracula"
+
 func runSetupSteps(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Command, opts *Options) error {
 	ios := f.IOStreams()
 
@@ -529,7 +531,7 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 		return opts.Theme, nil
 	}
 	if opts.IsNonInteractive() {
-		return "dracula", nil
+		return defaultTheme, nil
 	}
 
 	themeOptions := []string{
@@ -547,7 +549,7 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 		return "", err
 	}
 	if strings.HasPrefix(selected, "[") {
-		return "dracula", nil
+		return defaultTheme, nil
 	}
 	return strings.Split(selected, " ")[0], nil
 }

@@ -269,8 +269,8 @@ func TestRegistry_FindByPlatform(t *testing.T) {
 	if plugin == nil {
 		t.Fatal("FindByPlatform() returned nil for existing platform")
 	}
-	if plugin.Name != "tasmota" { //nolint:goconst // same constant in different test file
-		t.Errorf("expected plugin name 'tasmota', got %q", plugin.Name)
+	if plugin.Name != testPlatformTasmota {
+		t.Errorf("expected plugin name %q, got %q", testPlatformTasmota, plugin.Name)
 	}
 
 	// Test finding non-existent platform

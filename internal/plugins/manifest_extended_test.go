@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const testVersion100 = "1.0.0"
+
 // TestNewManifest tests NewManifest function.
 func TestNewManifest(t *testing.T) {
 	t.Parallel()
@@ -61,7 +63,7 @@ func TestManifest_Save(t *testing.T) {
 	})
 
 	manifest := NewManifest("test", ParseLocalSource("/path/to/plugin"))
-	manifest.Version = "1.0.0"
+	manifest.Version = testVersion100
 	manifest.Description = "Test plugin"
 
 	if err := manifest.Save(tmpDir); err != nil {
@@ -82,8 +84,8 @@ func TestManifest_Save(t *testing.T) {
 	if loaded.Name != "test" {
 		t.Errorf("loaded.Name = %q, want %q", loaded.Name, "test")
 	}
-	if loaded.Version != "1.0.0" {
-		t.Errorf("loaded.Version = %q, want %q", loaded.Version, "1.0.0")
+	if loaded.Version != testVersion100 {
+		t.Errorf("loaded.Version = %q, want %q", loaded.Version, testVersion100)
 	}
 }
 
@@ -597,7 +599,7 @@ func TestCapabilities(t *testing.T) {
 
 	caps := Capabilities{
 		DeviceDetection: true,
-		Platform:        "tasmota",
+		Platform:        testPlatformTasmota,
 		Components:      []string{"switch", "light", "energy"},
 		FirmwareUpdates: true,
 		Hints: map[string]string{
@@ -609,8 +611,8 @@ func TestCapabilities(t *testing.T) {
 	if !caps.DeviceDetection {
 		t.Error("DeviceDetection = false, want true")
 	}
-	if caps.Platform != "tasmota" {
-		t.Errorf("Platform = %q, want %q", caps.Platform, "tasmota")
+	if caps.Platform != testPlatformTasmota {
+		t.Errorf("Platform = %q, want %q", caps.Platform, testPlatformTasmota)
 	}
 	if len(caps.Components) != 3 {
 		t.Errorf("Components len = %d, want 3", len(caps.Components))
