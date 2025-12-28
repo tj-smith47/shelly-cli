@@ -389,7 +389,7 @@ func TestInputConfig_Fields(t *testing.T) {
 	if cfg.Name == nil || *cfg.Name != "Wall Switch" {
 		t.Errorf("Name = %v, want Wall Switch", cfg.Name)
 	}
-	if cfg.Type != "switch" {
+	if cfg.Type != "switch" { //nolint:goconst // test uses ComponentSwitch constant elsewhere
 		t.Errorf("Type = %q, want switch", cfg.Type)
 	}
 	if !cfg.Invert {

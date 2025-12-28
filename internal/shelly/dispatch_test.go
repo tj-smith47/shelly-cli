@@ -13,6 +13,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
+const (
+	testDevice = "test-device"
+)
+
 func TestSupportsPluginCommand_WithHints(t *testing.T) {
 	t.Parallel()
 
@@ -274,4 +278,68 @@ func TestPlatformErrorWithHint(t *testing.T) {
 			t.Errorf("Error() = %q, want %q", err.Error(), wantMsg)
 		}
 	})
+}
+
+func TestPluginQuickResult_Fields(t *testing.T) {
+	t.Parallel()
+
+	result := PluginQuickResult{
+		Device:    testDevice,
+		Component: "switch",
+		State:     "on",
+		Success:   true,
+	}
+
+	if result.Device != testDevice {
+		t.Errorf("Device = %q, want %q", result.Device, testDevice)
+	}
+	if result.Component != "switch" {
+		t.Errorf("Component = %q, want %q", result.Component, "switch")
+	}
+	if result.State != "on" {
+		t.Errorf("State = %q, want %q", result.State, "on")
+	}
+	if !result.Success {
+		t.Error("Success = false, want true")
+	}
+}
+
+func TestPluginQuickResult_ZeroValues(t *testing.T) {
+	t.Parallel()
+
+	var result PluginQuickResult
+
+	if result.Device != "" {
+		t.Errorf("Device = %q, want empty", result.Device)
+	}
+	if result.Component != "" {
+		t.Errorf("Component = %q, want empty", result.Component)
+	}
+	if result.State != "" {
+		t.Errorf("State = %q, want empty", result.State)
+	}
+	if result.Success {
+		t.Error("Success = true, want false")
+	}
+}
+
+func TestSupportsPluginCommand_NoRegistry(t *testing.T) {
+	t.Parallel()
+
+	service := NewService()
+	// No plugin registry set
+
+	device := model.Device{
+		Name:     "test-tasmota",
+		Address:  "192.168.1.100",
+		Platform: "tasmota",
+	}
+
+	err := service.SupportsPluginCommand(device, "on")
+	if err == nil {
+		t.Fatal("expected error when no registry is set")
+	}
+	if !errors.Is(err, ErrPluginNotFound) {
+		t.Errorf("expected ErrPluginNotFound, got %v", err)
+	}
 }

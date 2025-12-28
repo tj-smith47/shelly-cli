@@ -67,3 +67,56 @@ func TestString(t *testing.T) {
 		t.Errorf("String() = %q, expected Short() = %q", s, Short())
 	}
 }
+
+func TestIsDevelopment(t *testing.T) {
+	t.Parallel()
+
+	isDev := IsDevelopment()
+	// During tests, Version is usually "dev" or empty
+	if Version == "" || Version == DevVersion {
+		if !isDev {
+			t.Error("IsDevelopment() should return true for dev builds")
+		}
+	} else {
+		if isDev {
+			t.Error("IsDevelopment() should return false for release builds")
+		}
+	}
+}
+
+func TestDevVersionConstant(t *testing.T) {
+	t.Parallel()
+
+	if DevVersion != "dev" {
+		t.Errorf("DevVersion = %q, want 'dev'", DevVersion)
+	}
+}
+
+func TestInfoFields(t *testing.T) {
+	t.Parallel()
+
+	info := Get()
+
+	// Verify all fields are populated
+	if info.Version == "" {
+		t.Error("Version should not be empty")
+	}
+	if info.Commit == "" {
+		t.Error("Commit should not be empty")
+	}
+	if info.Date == "" {
+		t.Error("Date should not be empty")
+	}
+	if info.BuiltBy == "" {
+		t.Error("BuiltBy should not be empty")
+	}
+	if info.GoVersion == "" {
+		t.Error("GoVersion should not be empty")
+	}
+	if info.OS == "" {
+		t.Error("OS should not be empty")
+	}
+	if info.Arch == "" {
+		t.Error("Arch should not be empty")
+	}
+}

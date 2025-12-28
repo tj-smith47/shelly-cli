@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // NewCommand creates the group add command.
@@ -48,9 +47,15 @@ func run(f *cmdutil.Factory, groupName string, devices []string) error {
 		return fmt.Errorf("group %q not found", groupName)
 	}
 
+	// Get config manager for mutations
+	mgr, err := f.ConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	added := 0
 	for _, device := range devices {
-		err := config.AddDeviceToGroup(groupName, device)
+		err := mgr.AddDeviceToGroup(groupName, device)
 		if err != nil {
 			ios.Warning("Failed to add %q: %v", device, err)
 			continue

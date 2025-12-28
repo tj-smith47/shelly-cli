@@ -323,3 +323,53 @@ func TestTemplateFormatter_ComplexData(t *testing.T) {
 		t.Error("expected output to contain 'Bedroom: OFF'")
 	}
 }
+
+func TestFormatConstants(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		format Format
+		want   string
+	}{
+		{"JSON", FormatJSON, "json"},
+		{"YAML", FormatYAML, "yaml"},
+		{"Table", FormatTable, "table"},
+		{"Text", FormatText, "text"},
+		{"Template", FormatTemplate, "template"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if string(tt.format) != tt.want {
+				t.Errorf("Format constant %s = %q, want %q", tt.name, tt.format, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		format Format
+	}{
+		{"JSON", FormatJSON},
+		{"YAML", FormatYAML},
+		{"Table", FormatTable},
+		{"Text", FormatText},
+		{"Unknown", Format("unknown")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			formatter := NewFormatter(tt.format)
+			if formatter == nil {
+				t.Errorf("NewFormatter(%q) returned nil", tt.format)
+			}
+		})
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 const testMAC = "AA:BB:CC:DD:EE:FF"
@@ -662,5 +663,228 @@ func TestManager_DeviceAliases(t *testing.T) {
 	// Try to remove non-existent alias
 	if err := m.RemoveDeviceAlias("kitchen-light", "nonexistent"); err == nil {
 		t.Error("expected error removing non-existent alias")
+	}
+}
+
+func TestDefaultRateLimitConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultRateLimitConfig()
+
+	// Check Gen1 defaults
+	if cfg.Gen1.MinInterval != 2*time.Second {
+		t.Errorf("Gen1.MinInterval = %v, want 2s", cfg.Gen1.MinInterval)
+	}
+	if cfg.Gen1.MaxConcurrent != 1 {
+		t.Errorf("Gen1.MaxConcurrent = %d, want 1", cfg.Gen1.MaxConcurrent)
+	}
+	if cfg.Gen1.CircuitThreshold != 3 {
+		t.Errorf("Gen1.CircuitThreshold = %d, want 3", cfg.Gen1.CircuitThreshold)
+	}
+
+	// Check Gen2 defaults
+	if cfg.Gen2.MinInterval != 500*time.Millisecond {
+		t.Errorf("Gen2.MinInterval = %v, want 500ms", cfg.Gen2.MinInterval)
+	}
+	if cfg.Gen2.MaxConcurrent != 3 {
+		t.Errorf("Gen2.MaxConcurrent = %d, want 3", cfg.Gen2.MaxConcurrent)
+	}
+	if cfg.Gen2.CircuitThreshold != 5 {
+		t.Errorf("Gen2.CircuitThreshold = %d, want 5", cfg.Gen2.CircuitThreshold)
+	}
+
+	// Check Global defaults
+	if cfg.Global.MaxConcurrent != 5 {
+		t.Errorf("Global.MaxConcurrent = %d, want 5", cfg.Global.MaxConcurrent)
+	}
+	if cfg.Global.CircuitOpenDuration != 60*time.Second {
+		t.Errorf("Global.CircuitOpenDuration = %v, want 60s", cfg.Global.CircuitOpenDuration)
+	}
+	if cfg.Global.CircuitSuccessThreshold != 2 {
+		t.Errorf("Global.CircuitSuccessThreshold = %d, want 2", cfg.Global.CircuitSuccessThreshold)
+	}
+}
+
+func TestDefaultTUIRefreshConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultTUIRefreshConfig()
+
+	if cfg.Gen1Online != 15*time.Second {
+		t.Errorf("Gen1Online = %v, want 15s", cfg.Gen1Online)
+	}
+	if cfg.Gen1Offline != 60*time.Second {
+		t.Errorf("Gen1Offline = %v, want 60s", cfg.Gen1Offline)
+	}
+	if cfg.Gen2Online != 5*time.Second {
+		t.Errorf("Gen2Online = %v, want 5s", cfg.Gen2Online)
+	}
+	if cfg.Gen2Offline != 30*time.Second {
+		t.Errorf("Gen2Offline = %v, want 30s", cfg.Gen2Offline)
+	}
+	if cfg.FocusedBoost != 3*time.Second {
+		t.Errorf("FocusedBoost = %v, want 3s", cfg.FocusedBoost)
+	}
+}
+
+func TestConfig_GetRateLimitConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  Config
+	}{
+		{
+			name: "empty config uses defaults",
+			cfg:  Config{},
+		},
+		{
+			name: "partial config uses defaults for missing",
+			cfg: Config{
+				RateLimit: RateLimitConfig{
+					Gen1: GenerationRateLimitConfig{
+						MinInterval: 5 * time.Second,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.cfg.GetRateLimitConfig()
+
+			// Should always have non-zero values
+			if result.Gen1.MinInterval == 0 {
+				t.Error("Gen1.MinInterval should not be zero")
+			}
+			if result.Gen1.MaxConcurrent == 0 {
+				t.Error("Gen1.MaxConcurrent should not be zero")
+			}
+			if result.Gen2.MinInterval == 0 {
+				t.Error("Gen2.MinInterval should not be zero")
+			}
+			if result.Global.MaxConcurrent == 0 {
+				t.Error("Global.MaxConcurrent should not be zero")
+			}
+		})
+	}
+}
+
+func TestConfig_GetTUIRefreshConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  Config
+	}{
+		{
+			name: "empty config uses defaults",
+			cfg:  Config{},
+		},
+		{
+			name: "partial config uses defaults for missing",
+			cfg: Config{
+				TUI: TUIConfig{
+					Refresh: TUIRefreshConfig{
+						Gen1Online: 20 * time.Second,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.cfg.GetTUIRefreshConfig()
+
+			// Should always have non-zero values
+			if result.Gen1Online == 0 {
+				t.Error("Gen1Online should not be zero")
+			}
+			if result.Gen1Offline == 0 {
+				t.Error("Gen1Offline should not be zero")
+			}
+			if result.Gen2Online == 0 {
+				t.Error("Gen2Online should not be zero")
+			}
+			if result.Gen2Offline == 0 {
+				t.Error("Gen2Offline should not be zero")
+			}
+			if result.FocusedBoost == 0 {
+				t.Error("FocusedBoost should not be zero")
+			}
+		})
+	}
+}
+
+func TestConfig_GlobalMaxConcurrentViaGetRateLimitConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  Config
+		want int
+	}{
+		{
+			name: "empty config uses default",
+			cfg:  Config{},
+			want: 5, // Default from DefaultRateLimitConfig().Global.MaxConcurrent
+		},
+		{
+			name: "configured value",
+			cfg: Config{
+				RateLimit: RateLimitConfig{
+					Global: GlobalRateLimitConfig{
+						MaxConcurrent: 10,
+					},
+				},
+			},
+			want: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rlCfg := tt.cfg.GetRateLimitConfig()
+			got := rlCfg.Global.MaxConcurrent
+			if got != tt.want {
+				t.Errorf("Global.MaxConcurrent = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewTestManager(t *testing.T) {
+	t.Parallel()
+
+	cfg := &Config{}
+	m := NewTestManager(cfg)
+
+	// Should initialize all maps
+	c := m.Get()
+	if c.Devices == nil {
+		t.Error("Devices should be initialized")
+	}
+	if c.Aliases == nil {
+		t.Error("Aliases should be initialized")
+	}
+	if c.Groups == nil {
+		t.Error("Groups should be initialized")
+	}
+	if c.Scenes == nil {
+		t.Error("Scenes should be initialized")
+	}
+	if c.Templates.Device == nil {
+		t.Error("Templates.Device should be initialized")
+	}
+	if c.Templates.Script == nil {
+		t.Error("Templates.Script should be initialized")
+	}
+	if c.Alerts == nil {
+		t.Error("Alerts should be initialized")
 	}
 }

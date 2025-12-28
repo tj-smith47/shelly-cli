@@ -7,6 +7,8 @@ import (
 	"io"
 )
 
+const availabilityYes = "yes"
+
 // Output extends Info with optional update availability information for JSON output.
 type Output struct {
 	Version       string  `json:"version"`
@@ -37,7 +39,7 @@ func NewOutput(info Info) *Output {
 func (o *Output) SetUpdateInfo(latestVersion string, updateAvailable bool) {
 	o.LatestVersion = &latestVersion
 	if updateAvailable {
-		avail := "yes"
+		avail := availabilityYes
 		o.UpdateAvail = &avail
 	} else {
 		avail := "no"

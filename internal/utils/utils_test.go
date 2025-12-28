@@ -2,8 +2,10 @@
 package utils
 
 import (
+	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/tj-smith47/shelly-go/discovery"
 	"github.com/tj-smith47/shelly-go/types"
@@ -11,11 +13,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+const testAddress = "192.168.1.100"
+
 func TestDiscoveredDeviceToConfig_Basic(t *testing.T) {
 	t.Parallel()
 	d := discovery.DiscoveredDevice{
 		ID:         "shelly-device-1",
-		Address:    net.ParseIP("192.168.1.100"),
+		Address:    net.ParseIP(testAddress),
 		Generation: 2,
 		Model:      "SHSW-1",
 	}
@@ -25,8 +29,8 @@ func TestDiscoveredDeviceToConfig_Basic(t *testing.T) {
 	if cfg.Name != d.ID {
 		t.Errorf("Name = %q, want %q", cfg.Name, d.ID)
 	}
-	if cfg.Address != "192.168.1.100" {
-		t.Errorf("Address = %q, want %q", cfg.Address, "192.168.1.100")
+	if cfg.Address != testAddress {
+		t.Errorf("Address = %q, want %q", cfg.Address, testAddress)
 	}
 	if cfg.Generation != int(d.Generation) {
 		t.Errorf("Generation = %d, want %d", cfg.Generation, d.Generation)
@@ -175,6 +179,155 @@ func TestUnmarshalJSON_SliceData(t *testing.T) {
 	}
 }
 
+func TestCalculateLatencyStats(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		latencies []time.Duration
+		errors    int
+		wantMin   time.Duration
+		wantMax   time.Duration
+	}{
+		{
+			name:      "empty latencies",
+			latencies: []time.Duration{},
+			errors:    5,
+		},
+		{
+			name:      "single latency",
+			latencies: []time.Duration{100 * time.Millisecond},
+			errors:    0,
+			wantMin:   100 * time.Millisecond,
+			wantMax:   100 * time.Millisecond,
+		},
+		{
+			name:      "multiple latencies",
+			latencies: []time.Duration{100 * time.Millisecond, 200 * time.Millisecond, 50 * time.Millisecond},
+			errors:    1,
+			wantMin:   50 * time.Millisecond,
+			wantMax:   200 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			stats := CalculateLatencyStats(tt.latencies, tt.errors)
+
+			if stats.Errors != tt.errors {
+				t.Errorf("Errors = %d, want %d", stats.Errors, tt.errors)
+			}
+			if len(tt.latencies) > 0 {
+				if stats.Min != tt.wantMin {
+					t.Errorf("Min = %v, want %v", stats.Min, tt.wantMin)
+				}
+				if stats.Max != tt.wantMax {
+					t.Errorf("Max = %v, want %v", stats.Max, tt.wantMax)
+				}
+			}
+		})
+	}
+}
+
+func TestPercentile(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		sorted []time.Duration
+		p      int
+		want   time.Duration
+	}{
+		{"empty slice", []time.Duration{}, 50, 0},
+		{"single element", []time.Duration{100 * time.Millisecond}, 50, 100 * time.Millisecond},
+		{"p50 of 10 elements", []time.Duration{
+			10 * time.Millisecond, 20 * time.Millisecond, 30 * time.Millisecond, 40 * time.Millisecond, 50 * time.Millisecond,
+			60 * time.Millisecond, 70 * time.Millisecond, 80 * time.Millisecond, 90 * time.Millisecond, 100 * time.Millisecond,
+		}, 50, 60 * time.Millisecond},
+		{"p95 of 10 elements", []time.Duration{
+			10 * time.Millisecond, 20 * time.Millisecond, 30 * time.Millisecond, 40 * time.Millisecond, 50 * time.Millisecond,
+			60 * time.Millisecond, 70 * time.Millisecond, 80 * time.Millisecond, 90 * time.Millisecond, 100 * time.Millisecond,
+		}, 95, 100 * time.Millisecond},
+		{"p99 of 10 elements", []time.Duration{
+			10 * time.Millisecond, 20 * time.Millisecond, 30 * time.Millisecond, 40 * time.Millisecond, 50 * time.Millisecond,
+			60 * time.Millisecond, 70 * time.Millisecond, 80 * time.Millisecond, 90 * time.Millisecond, 100 * time.Millisecond,
+		}, 99, 100 * time.Millisecond},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := Percentile(tt.sorted, tt.p)
+			if got != tt.want {
+				t.Errorf("Percentile(%v, %d) = %v, want %v", tt.sorted, tt.p, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeepEqualJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		a    any
+		b    any
+		want bool
+	}{
+		{"equal maps", map[string]int{"a": 1}, map[string]int{"a": 1}, true},
+		{"different maps", map[string]int{"a": 1}, map[string]int{"a": 2}, false},
+		{"equal slices", []int{1, 2, 3}, []int{1, 2, 3}, true},
+		{"different slices", []int{1, 2, 3}, []int{1, 2, 4}, false},
+		{"equal strings", "hello", "hello", true},
+		{"different strings", "hello", "world", false},
+		{"nil values", nil, nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := DeepEqualJSON(tt.a, tt.b)
+			if got != tt.want {
+				t.Errorf("DeepEqualJSON(%v, %v) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMust_Success(t *testing.T) {
+	t.Parallel()
+	// Should not panic with nil error
+	Must(nil)
+}
+
+func TestMust_Panic(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Must(error) should panic")
+		}
+	}()
+	Must(fmt.Errorf("test error"))
+}
+
+func TestDetectSubnet(t *testing.T) {
+	t.Parallel()
+
+	// This test just verifies the function runs without error
+	// The actual result depends on the network configuration
+	subnet, err := DetectSubnet()
+	if err != nil {
+		// On some CI environments there may be no suitable interface
+		t.Skipf("DetectSubnet() returned error (may be expected in CI): %v", err)
+	}
+
+	// Verify it looks like a valid CIDR
+	if subnet == "" {
+		t.Error("DetectSubnet() returned empty string")
+	}
+}
+
 func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -253,5 +406,84 @@ func TestDiscoveredDeviceToConfig_AllFields(t *testing.T) {
 				t.Errorf("Model = %q, want %q", got.Model, tt.want.Model)
 			}
 		})
+	}
+}
+
+func TestIsJSONObject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		s    string
+		want bool
+	}{
+		{"empty string", "", false},
+		{"JSON object", `{"key": "value"}`, true},
+		{"JSON object minimal", `{}`, true},
+		{"not JSON", "hello", false},
+		{"array", `[1, 2, 3]`, false},
+		{"number", "42", false},
+		{"starts with brace", "{", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := IsJSONObject(tt.s)
+			if got != tt.want {
+				t.Errorf("IsJSONObject(%q) = %v, want %v", tt.s, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetEditor(t *testing.T) {
+	// Cannot use t.Parallel() with t.Setenv
+
+	// Test with EDITOR set
+	t.Run("with EDITOR env", func(t *testing.T) {
+		t.Setenv("EDITOR", "nano")
+		t.Setenv("VISUAL", "")
+		editor := GetEditor()
+		if editor != "nano" {
+			t.Errorf("GetEditor() = %q, want nano", editor)
+		}
+	})
+
+	// Test with VISUAL set but not EDITOR
+	t.Run("with VISUAL env", func(t *testing.T) {
+		t.Setenv("EDITOR", "")
+		t.Setenv("VISUAL", "vim")
+		editor := GetEditor()
+		if editor != "vim" {
+			t.Errorf("GetEditor() = %q, want vim", editor)
+		}
+	})
+}
+
+func TestResolveBatchTargets_Args(t *testing.T) {
+	t.Parallel()
+
+	// When args are provided, they should be returned
+	targets, err := ResolveBatchTargets("", false, []string{"device1", "device2"})
+	if err != nil {
+		t.Fatalf("ResolveBatchTargets() error = %v", err)
+	}
+	if len(targets) != 2 {
+		t.Errorf("len(targets) = %d, want 2", len(targets))
+	}
+	if targets[0] != "device1" {
+		t.Errorf("targets[0] = %q, want device1", targets[0])
+	}
+}
+
+func TestResolveBatchTargets_NoInput(t *testing.T) {
+	t.Parallel()
+
+	// When no input provided and not piped, should error
+	// Note: this test may behave differently in TTY vs CI
+	_, err := ResolveBatchTargets("", false, nil)
+	if err == nil {
+		t.Error("ResolveBatchTargets() should error when no input")
 	}
 }

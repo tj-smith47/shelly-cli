@@ -4,13 +4,17 @@ import (
 	"testing"
 )
 
+const (
+	testModel = "SNSW-001P16EU"
+)
+
 func TestDeviceInfo_Fields(t *testing.T) {
 	t.Parallel()
 
 	info := DeviceInfo{
 		ID:         "shellypro1pm-123456",
-		MAC:        "AA:BB:CC:DD:EE:FF",
-		Model:      "SNSW-001P16EU",
+		MAC:        testMAC,
+		Model:      testModel,
 		Generation: 2,
 		Firmware:   "1.0.0",
 		App:        "Pro1PM",
@@ -20,11 +24,11 @@ func TestDeviceInfo_Fields(t *testing.T) {
 	if info.ID != "shellypro1pm-123456" {
 		t.Errorf("ID = %q, want shellypro1pm-123456", info.ID)
 	}
-	if info.MAC != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("MAC = %q, want AA:BB:CC:DD:EE:FF", info.MAC)
+	if info.MAC != testMAC {
+		t.Errorf("MAC = %q, want %s", info.MAC, testMAC)
 	}
-	if info.Model != "SNSW-001P16EU" {
-		t.Errorf("Model = %q, want SNSW-001P16EU", info.Model)
+	if info.Model != testModel {
+		t.Errorf("Model = %q, want %s", info.Model, testModel)
 	}
 	if info.Generation != 2 {
 		t.Errorf("Generation = %d, want 2", info.Generation)

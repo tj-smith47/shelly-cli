@@ -13,6 +13,9 @@ import (
 // FirmwareStageStable is the stable release channel.
 const FirmwareStageStable = "stable"
 
+// platformShelly is the default platform identifier.
+const platformShelly = "shelly"
+
 // DisplayFirmwareStatus prints the firmware status.
 func DisplayFirmwareStatus(ios *iostreams.IOStreams, status *shelly.FirmwareStatus) {
 	ios.Println(theme.Bold().Render("Firmware Status"))
@@ -93,7 +96,7 @@ func buildFirmwareCheckRow(r shelly.FirmwareCheckResult) firmwareCheckRow {
 	// Get platform, defaulting to "shelly" if empty
 	row.platform = r.Info.Platform
 	if row.platform == "" {
-		row.platform = "shelly"
+		row.platform = platformShelly
 	}
 
 	row.current = r.Info.Current
@@ -281,7 +284,7 @@ func DisplayFirmwareUpdatesTable(ios *iostreams.IOStreams, devices []FirmwareUpd
 	for i, d := range devices {
 		platform := d.FwInfo.Platform
 		if platform == "" {
-			platform = "shelly"
+			platform = platformShelly
 		}
 
 		stable := d.FwInfo.Available

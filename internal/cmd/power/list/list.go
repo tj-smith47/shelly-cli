@@ -14,8 +14,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
+// Options holds command options.
+type Options struct {
+	Device  string
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the power list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:   "list <device>",
 		Short: "List power meter components",
@@ -55,25 +63,26 @@ Columns: ID, Type (PM or PM1)`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// List PM components
-	pmIDs, err := svc.ListPMComponents(ctx, device)
+	pmIDs, err := svc.ListPMComponents(ctx, opts.Device)
 	if err != nil {
 		return fmt.Errorf("failed to list PM components: %w", err)
 	}
 
 	// List PM1 components
-	pm1IDs, err := svc.ListPM1Components(ctx, device)
+	pm1IDs, err := svc.ListPM1Components(ctx, opts.Device)
 	if err != nil {
 		return fmt.Errorf("failed to list PM1 components: %w", err)
 	}

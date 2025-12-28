@@ -601,12 +601,13 @@ func Dir() (string, error) {
 }
 
 // CacheDir returns the cache directory path.
+// This uses the OS-standard cache directory (~/.cache/shelly on Linux).
 func CacheDir() (string, error) {
-	configDir, err := Dir()
+	cacheDir, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(configDir, "cache"), nil
+	return filepath.Join(cacheDir, "shelly"), nil
 }
 
 // PluginsDir returns the plugins directory path.

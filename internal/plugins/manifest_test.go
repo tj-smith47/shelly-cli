@@ -5,13 +5,15 @@ import (
 	"testing"
 )
 
+const testPluginName = "test-plugin"
+
 func TestManifest_BackwardCompatibility(t *testing.T) {
 	t.Parallel()
 
 	// Old manifest without capabilities/hooks fields.
 	oldManifest := `{
 		"schema_version": "1",
-		"name": "test-plugin",
+		"name": "` + testPluginName + `",
 		"version": "1.0.0",
 		"description": "Test plugin",
 		"installed_at": "2024-01-01T00:00:00Z",
@@ -24,8 +26,8 @@ func TestManifest_BackwardCompatibility(t *testing.T) {
 		t.Fatalf("failed to unmarshal old manifest: %v", err)
 	}
 
-	if m.Name != "test-plugin" {
-		t.Errorf("expected name 'test-plugin', got %q", m.Name)
+	if m.Name != testPluginName {
+		t.Errorf("expected name %q, got %q", testPluginName, m.Name)
 	}
 	if m.Capabilities != nil {
 		t.Error("expected Capabilities to be nil for old manifest")

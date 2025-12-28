@@ -11,6 +11,7 @@ import (
 
 const (
 	defValueFalse = "false"
+	defValueTable = "table"
 )
 
 func newTestCommand() *cobra.Command {
@@ -117,8 +118,8 @@ func TestAddOutputFormatFlag(t *testing.T) {
 	if flag.Shorthand != "o" {
 		t.Errorf("output shorthand = %q, want %q", flag.Shorthand, "o")
 	}
-	if flag.DefValue != "table" {
-		t.Errorf("output default = %q, want %q", flag.DefValue, "table")
+	if flag.DefValue != defValueTable {
+		t.Errorf("output default = %q, want %q", flag.DefValue, defValueTable)
 	}
 }
 
@@ -355,5 +356,312 @@ func TestDefaultConstants(t *testing.T) {
 	}
 	if flags.DefaultComponentID != 0 {
 		t.Errorf("DefaultComponentID = %d, want 0", flags.DefaultComponentID)
+	}
+}
+
+func TestAddComponentFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.ComponentFlags{}
+
+	flags.AddComponentFlags(cmd, f, "Switch")
+
+	flag := cmd.Flags().Lookup("id")
+	if flag == nil {
+		t.Fatal("id flag not found")
+	}
+	if flag.Shorthand != "i" {
+		t.Errorf("id shorthand = %q, want %q", flag.Shorthand, "i")
+	}
+}
+
+func TestQuickComponentFlags_ComponentIDPointer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		id      int
+		wantNil bool
+	}{
+		{"negative (all)", -1, true},
+		{"zero", 0, false},
+		{"positive", 5, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := &flags.QuickComponentFlags{ID: tt.id}
+			ptr := f.ComponentIDPointer()
+
+			if tt.wantNil && ptr != nil {
+				t.Errorf("ComponentIDPointer() = %v, want nil", *ptr)
+			}
+			if !tt.wantNil && ptr == nil {
+				t.Error("ComponentIDPointer() = nil, want non-nil")
+			}
+			if !tt.wantNil && ptr != nil && *ptr != tt.id {
+				t.Errorf("*ComponentIDPointer() = %d, want %d", *ptr, tt.id)
+			}
+		})
+	}
+}
+
+func TestAddQuickComponentFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.QuickComponentFlags{}
+
+	flags.AddQuickComponentFlags(cmd, f)
+
+	flag := cmd.Flags().Lookup("id")
+	if flag == nil {
+		t.Fatal("id flag not found")
+	}
+	if flag.DefValue != "-1" {
+		t.Errorf("id default = %q, want %q", flag.DefValue, "-1")
+	}
+}
+
+func TestAddConfirmFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.ConfirmFlags{}
+
+	flags.AddConfirmFlags(cmd, f)
+
+	// Check yes flag
+	yesFlag := cmd.Flags().Lookup("yes")
+	if yesFlag == nil {
+		t.Error("yes flag not found")
+	}
+
+	// Check confirm flag
+	confirmFlag := cmd.Flags().Lookup("confirm")
+	if confirmFlag == nil {
+		t.Error("confirm flag not found")
+	}
+}
+
+func TestAddYesOnlyFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.ConfirmFlags{}
+
+	flags.AddYesOnlyFlag(cmd, f)
+
+	// Yes flag should exist
+	yesFlag := cmd.Flags().Lookup("yes")
+	if yesFlag == nil {
+		t.Error("yes flag not found")
+	}
+
+	// Confirm flag should NOT exist
+	confirmFlag := cmd.Flags().Lookup("confirm")
+	if confirmFlag != nil {
+		t.Error("confirm flag should not exist with AddYesOnlyFlag")
+	}
+}
+
+func TestAddOutputFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.OutputFlags{}
+
+	flags.AddOutputFlags(cmd, f)
+
+	// Check output flag exists (via AddOutputFormatFlag)
+	flag := cmd.Flags().Lookup("output")
+	if flag == nil {
+		t.Fatal("output flag not found")
+	}
+	if flag.DefValue != defValueTable {
+		t.Errorf("output default = %q, want %q", flag.DefValue, defValueTable)
+	}
+}
+
+func TestAddOutputFlagsCustom(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.OutputFlags{}
+
+	flags.AddOutputFlagsCustom(cmd, f, "json", "json", "yaml", "text")
+
+	flag := cmd.Flags().Lookup("format")
+	if flag == nil {
+		t.Fatal("format flag not found")
+	}
+	if flag.DefValue != "json" {
+		t.Errorf("format default = %q, want %q", flag.DefValue, "json")
+	}
+	if flag.Shorthand != "f" {
+		t.Errorf("format shorthand = %q, want %q", flag.Shorthand, "f")
+	}
+}
+
+func TestAddOutputFlagsNamed(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.OutputFlags{}
+
+	flags.AddOutputFlagsNamed(cmd, f, "out", "O", "yaml", "json", "yaml")
+
+	flag := cmd.Flags().Lookup("out")
+	if flag == nil {
+		t.Fatal("out flag not found")
+	}
+	if flag.DefValue != "yaml" {
+		t.Errorf("out default = %q, want %q", flag.DefValue, "yaml")
+	}
+	if flag.Shorthand != "O" {
+		t.Errorf("out shorthand = %q, want %q", flag.Shorthand, "O")
+	}
+}
+
+func TestSetOutputDefaults(t *testing.T) {
+	t.Parallel()
+
+	f := &flags.OutputFlags{Format: "json"}
+
+	flags.SetOutputDefaults(f)
+
+	if f.Format != defValueTable {
+		t.Errorf("Format = %q, want %q", f.Format, defValueTable)
+	}
+}
+
+func TestAddDeviceTargetFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.DeviceTargetFlags{}
+
+	flags.AddDeviceTargetFlags(cmd, f)
+
+	// Check group flag
+	groupFlag := cmd.Flags().Lookup("group")
+	if groupFlag == nil {
+		t.Error("group flag not found")
+	}
+
+	// Check all flag
+	allFlag := cmd.Flags().Lookup("all")
+	if allFlag == nil {
+		t.Error("all flag not found")
+	}
+}
+
+func TestAddAllOnlyFlag(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.DeviceTargetFlags{}
+
+	flags.AddAllOnlyFlag(cmd, f)
+
+	// All flag should exist
+	allFlag := cmd.Flags().Lookup("all")
+	if allFlag == nil {
+		t.Error("all flag not found")
+	}
+
+	// Group flag should NOT exist
+	groupFlag := cmd.Flags().Lookup("group")
+	if groupFlag != nil {
+		t.Error("group flag should not exist with AddAllOnlyFlag")
+	}
+}
+
+func TestAddDeviceFilterFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.DeviceFilterFlags{}
+
+	flags.AddDeviceFilterFlags(cmd, f)
+
+	expectedFlags := []struct {
+		name      string
+		shorthand string
+	}{
+		{"generation", "g"},
+		{"type", "t"},
+		{"platform", "p"},
+	}
+
+	for _, ef := range expectedFlags {
+		flag := cmd.Flags().Lookup(ef.name)
+		if flag == nil {
+			t.Errorf("%s flag not found", ef.name)
+			continue
+		}
+		if flag.Shorthand != ef.shorthand {
+			t.Errorf("%s shorthand = %q, want %q", ef.name, flag.Shorthand, ef.shorthand)
+		}
+	}
+}
+
+func TestDeviceFilterFlags_HasFilters(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		flags  flags.DeviceFilterFlags
+		expect bool
+	}{
+		{"empty", flags.DeviceFilterFlags{}, false},
+		{"generation set", flags.DeviceFilterFlags{Generation: 2}, true},
+		{"type set", flags.DeviceFilterFlags{DeviceType: "switch"}, true},
+		{"platform set", flags.DeviceFilterFlags{Platform: "shelly"}, true},
+		{"all set", flags.DeviceFilterFlags{Generation: 1, DeviceType: "relay", Platform: "tasmota"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := tt.flags.HasFilters()
+			if got != tt.expect {
+				t.Errorf("HasFilters() = %v, want %v", got, tt.expect)
+			}
+		})
+	}
+}
+
+func TestAddDeviceListFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newTestCommand()
+	f := &flags.DeviceListFlags{}
+
+	flags.AddDeviceListFlags(cmd, f)
+
+	// Check filter flags are added
+	genFlag := cmd.Flags().Lookup("generation")
+	if genFlag == nil {
+		t.Error("generation flag not found")
+	}
+
+	// Check list-specific flags
+	updatesFlag := cmd.Flags().Lookup("updates-first")
+	if updatesFlag == nil {
+		t.Fatal("updates-first flag not found")
+	}
+	if updatesFlag.Shorthand != "u" {
+		t.Errorf("updates-first shorthand = %q, want %q", updatesFlag.Shorthand, "u")
+	}
+
+	versionFlag := cmd.Flags().Lookup("version")
+	if versionFlag == nil {
+		t.Fatal("version flag not found")
+	}
+	if versionFlag.Shorthand != "V" {
+		t.Errorf("version shorthand = %q, want %q", versionFlag.Shorthand, "V")
 	}
 }

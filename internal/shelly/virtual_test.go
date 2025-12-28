@@ -274,3 +274,139 @@ func TestAddVirtualComponentParams(t *testing.T) {
 		t.Errorf("Name = %q, want %q", params.Name, "Test")
 	}
 }
+
+func TestValidVirtualTypes(t *testing.T) {
+	t.Parallel()
+
+	expected := []string{"boolean", "number", "text", "enum", "button", "group"}
+	if len(ValidVirtualTypes) != len(expected) {
+		t.Errorf("len(ValidVirtualTypes) = %d, want %d", len(ValidVirtualTypes), len(expected))
+	}
+
+	for _, exp := range expected {
+		found := false
+		for _, vt := range ValidVirtualTypes {
+			if vt == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("ValidVirtualTypes missing %q", exp)
+		}
+	}
+}
+
+func TestIsValidVirtualType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		t    string
+		want bool
+	}{
+		{"boolean", "boolean", true},
+		{"number", "number", true},
+		{"text", "text", true},
+		{"enum", "enum", true},
+		{"button", "button", true},
+		{"group", "group", true},
+		{"switch", "switch", false},
+		{"unknown", "unknown", false},
+		{"empty", "", false},
+		{"Bool capitalized", "Boolean", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := IsValidVirtualType(tt.t); got != tt.want {
+				t.Errorf("IsValidVirtualType(%q) = %v, want %v", tt.t, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseVirtualKey(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		key      string
+		wantType string
+		wantID   int
+		wantErr  bool
+	}{
+		{"valid boolean:200", "boolean:200", "boolean", 200, false},
+		{"valid number:250", "number:250", "number", 250, false},
+		{"valid text:299", "text:299", "text", 299, false},
+		{"empty key", "", "", 0, true},
+		{"no colon", "boolean200", "", 0, true},
+		{"too many parts", "boolean:200:extra", "", 0, true},
+		{"non-numeric id", "boolean:abc", "", 0, true},
+		{"ID below 200", "boolean:199", "", 0, true},
+		{"ID above 299", "boolean:300", "", 0, true},
+		{"ID at 200 boundary", "enum:200", "enum", 200, false},
+		{"ID at 299 boundary", "group:299", "group", 299, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			compType, id, err := ParseVirtualKey(tt.key)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseVirtualKey(%q) error = %v, wantErr %v", tt.key, err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				if compType != tt.wantType {
+					t.Errorf("ParseVirtualKey(%q) type = %q, want %q", tt.key, compType, tt.wantType)
+				}
+				if id != tt.wantID {
+					t.Errorf("ParseVirtualKey(%q) id = %d, want %d", tt.key, id, tt.wantID)
+				}
+			}
+		})
+	}
+}
+
+func TestParseVirtualComponent_EmptyConfig(t *testing.T) {
+	t.Parallel()
+
+	comp := componentInfo{
+		Key:    "boolean:200",
+		Config: json.RawMessage(`{}`),
+		Status: json.RawMessage(`{"value":false}`),
+	}
+
+	vc, ok := parseVirtualComponent(comp)
+	if !ok {
+		t.Fatal("parseVirtualComponent() returned false, want true")
+	}
+	if vc.Name != "" {
+		t.Errorf("Name = %q, want empty", vc.Name)
+	}
+	if vc.BoolValue == nil || *vc.BoolValue {
+		t.Error("BoolValue should be false")
+	}
+}
+
+func TestParseVirtualComponent_NoStatus(t *testing.T) {
+	t.Parallel()
+
+	comp := componentInfo{
+		Key:    "text:205",
+		Config: json.RawMessage(`{"name":"No Value"}`),
+	}
+
+	vc, ok := parseVirtualComponent(comp)
+	if !ok {
+		t.Fatal("parseVirtualComponent() returned false, want true")
+	}
+	if vc.Value != nil {
+		t.Errorf("Value = %v, want nil", vc.Value)
+	}
+	if vc.StrValue != nil {
+		t.Errorf("StrValue = %v, want nil", vc.StrValue)
+	}
+}

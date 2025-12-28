@@ -251,3 +251,108 @@ func containsString(s, substr string) bool {
 	}
 	return false
 }
+
+// mockEnergyBlock is a test helper that implements energyDataBlock.
+type mockEnergyBlock struct {
+	period int
+	powers []float64
+}
+
+func (m mockEnergyBlock) GetPeriod() int            { return m.period }
+func (m mockEnergyBlock) GetPowerValues() []float64 { return m.powers }
+
+//nolint:gocyclo // Test function with multiple subtests is inherently complex.
+func TestCalculateMetrics(t *testing.T) {
+	t.Parallel()
+
+	t.Run("calculates metrics from data", func(t *testing.T) {
+		t.Parallel()
+
+		blocks := []energyDataBlock{
+			mockEnergyBlock{period: 60, powers: []float64{100.0, 200.0, 150.0}},
+		}
+
+		energy, avgPower, peakPower, dataPoints := calculateMetrics(blocks)
+
+		if dataPoints != 3 {
+			t.Errorf("dataPoints = %d, want 3", dataPoints)
+		}
+		if peakPower != 200.0 {
+			t.Errorf("peakPower = %f, want 200.0", peakPower)
+		}
+		// avgPower = (100 + 200 + 150) / 3 = 150
+		if avgPower != 150.0 {
+			t.Errorf("avgPower = %f, want 150.0", avgPower)
+		}
+		// energy = sum(power * period/3600) / 1000 = (100*60/3600 + 200*60/3600 + 150*60/3600) / 1000
+		// = (1.667 + 3.333 + 2.5) / 1000 = 0.0075 kWh
+		if energy < 0.007 || energy > 0.008 {
+			t.Errorf("energy = %f, expected ~0.0075 kWh", energy)
+		}
+	})
+
+	t.Run("handles empty data", func(t *testing.T) {
+		t.Parallel()
+
+		blocks := []energyDataBlock{}
+
+		energy, avgPower, peakPower, dataPoints := calculateMetrics(blocks)
+
+		if dataPoints != 0 {
+			t.Errorf("dataPoints = %d, want 0", dataPoints)
+		}
+		if energy != 0 || avgPower != 0 || peakPower != 0 {
+			t.Error("expected all zeros for empty data")
+		}
+	})
+
+	t.Run("handles multiple blocks with different periods", func(t *testing.T) {
+		t.Parallel()
+
+		blocks := []energyDataBlock{
+			mockEnergyBlock{period: 60, powers: []float64{100.0}},
+			mockEnergyBlock{period: 120, powers: []float64{200.0}},
+		}
+
+		_, _, peakPower, dataPoints := calculateMetrics(blocks)
+
+		if dataPoints != 2 {
+			t.Errorf("dataPoints = %d, want 2", dataPoints)
+		}
+		if peakPower != 200.0 {
+			t.Errorf("peakPower = %f, want 200.0", peakPower)
+		}
+	})
+
+	t.Run("handles empty powers in blocks", func(t *testing.T) {
+		t.Parallel()
+
+		blocks := []energyDataBlock{
+			mockEnergyBlock{period: 60, powers: []float64{}},
+		}
+
+		energy, avgPower, peakPower, dataPoints := calculateMetrics(blocks)
+
+		if dataPoints != 0 {
+			t.Errorf("dataPoints = %d, want 0", dataPoints)
+		}
+		if energy != 0 || avgPower != 0 || peakPower != 0 {
+			t.Error("expected all zeros for empty powers")
+		}
+	})
+
+	t.Run("finds peak power correctly", func(t *testing.T) {
+		t.Parallel()
+
+		blocks := []energyDataBlock{
+			mockEnergyBlock{period: 60, powers: []float64{10.0, 50.0, 30.0}},
+			mockEnergyBlock{period: 60, powers: []float64{25.0, 75.0, 40.0}},
+		}
+
+		_, _, peakPower, _ := calculateMetrics(blocks)
+
+		if peakPower != 75.0 {
+			t.Errorf("peakPower = %f, want 75.0", peakPower)
+		}
+	})
+}

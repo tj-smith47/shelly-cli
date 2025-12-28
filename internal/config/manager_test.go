@@ -1,0 +1,520 @@
+package config
+
+import (
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+const testModelSHSW1 = "SHSW-1"
+
+func TestManager_Path(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "config.yaml")
+	m := NewManager(path)
+
+	if m.Path() != path {
+		t.Errorf("Path() = %q, want %q", m.Path(), path)
+	}
+}
+
+func TestManager_Reload(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Register a device
+	if err := m.RegisterDevice("test", "192.168.1.1", 2, "", "", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+
+	// Reload should reset and reload from file
+	if err := m.Reload(); err != nil {
+		t.Fatalf("Reload() error: %v", err)
+	}
+
+	// Device should still exist (saved to file)
+	if _, ok := m.GetDevice("test"); !ok {
+		t.Error("device should exist after reload")
+	}
+}
+
+func TestManager_SaveWithoutLoad(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+
+	// Try to save without loading first
+	err := m.Save()
+	if err == nil {
+		t.Error("Save() should fail when config is not loaded")
+	}
+}
+
+//nolint:gocyclo // test function with many assertions
+func TestManager_SceneOperations(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create a scene
+	if err := m.CreateScene("movie-night", "Dim lights for movies"); err != nil {
+		t.Fatalf("CreateScene() error: %v", err)
+	}
+
+	// Get scene
+	scene, ok := m.GetScene("movie-night")
+	if !ok {
+		t.Fatal("GetScene() returned false")
+	}
+	if scene.Description != "Dim lights for movies" {
+		t.Errorf("Description = %q, want %q", scene.Description, "Dim lights for movies")
+	}
+
+	// List scenes
+	scenes := m.ListScenes()
+	if len(scenes) != 1 {
+		t.Errorf("ListScenes() returned %d scenes, want 1", len(scenes))
+	}
+
+	// Add action to scene
+	action := SceneAction{
+		Device: "light1",
+		Method: "Switch.Set",
+		Params: map[string]any{"on": true},
+	}
+	if err := m.AddActionToScene("movie-night", action); err != nil {
+		t.Fatalf("AddActionToScene() error: %v", err)
+	}
+
+	// Verify action was added
+	scene, _ = m.GetScene("movie-night")
+	if len(scene.Actions) != 1 {
+		t.Errorf("scene has %d actions, want 1", len(scene.Actions))
+	}
+
+	// Set scene actions (replace all)
+	newActions := []SceneAction{
+		{Device: "light2", Method: "Switch.Set", Params: map[string]any{"on": false}},
+	}
+	if err := m.SetSceneActions("movie-night", newActions); err != nil {
+		t.Fatalf("SetSceneActions() error: %v", err)
+	}
+	scene, _ = m.GetScene("movie-night")
+	if len(scene.Actions) != 1 || scene.Actions[0].Device != "light2" {
+		t.Error("SetSceneActions did not replace actions correctly")
+	}
+
+	// Update scene
+	if err := m.UpdateScene("movie-night", "movie-time", "Updated description"); err != nil {
+		t.Fatalf("UpdateScene() error: %v", err)
+	}
+	_, ok = m.GetScene("movie-night")
+	if ok {
+		t.Error("old scene name should not exist")
+	}
+	scene, ok = m.GetScene("movie-time")
+	if !ok {
+		t.Fatal("renamed scene should exist")
+	}
+	if scene.Description != "Updated description" {
+		t.Errorf("Description = %q, want %q", scene.Description, "Updated description")
+	}
+
+	// Delete scene
+	if err := m.DeleteScene("movie-time"); err != nil {
+		t.Fatalf("DeleteScene() error: %v", err)
+	}
+	_, ok = m.GetScene("movie-time")
+	if ok {
+		t.Error("scene should not exist after delete")
+	}
+}
+
+func TestManager_SceneOperations_Errors(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create scene to test duplicate error
+	if err := m.CreateScene("test-scene", ""); err != nil {
+		t.Fatalf("CreateScene() error: %v", err)
+	}
+
+	// Try to create duplicate
+	if err := m.CreateScene("test-scene", ""); err == nil {
+		t.Error("expected error creating duplicate scene")
+	}
+
+	// Add action to nonexistent scene
+	if err := m.AddActionToScene("nonexistent", SceneAction{}); err == nil {
+		t.Error("expected error adding action to nonexistent scene")
+	}
+
+	// Set actions on nonexistent scene
+	if err := m.SetSceneActions("nonexistent", nil); err == nil {
+		t.Error("expected error setting actions on nonexistent scene")
+	}
+
+	// Update nonexistent scene
+	if err := m.UpdateScene("nonexistent", "", ""); err == nil {
+		t.Error("expected error updating nonexistent scene")
+	}
+
+	// Delete nonexistent scene
+	if err := m.DeleteScene("nonexistent"); err == nil {
+		t.Error("expected error deleting nonexistent scene")
+	}
+}
+
+func TestManager_DeviceTemplateOperations(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create template
+	cfg := map[string]any{"setting1": "value1"}
+	if err := m.CreateDeviceTemplate("my-template", "Test template", testModelSHSW1, "switch", 2, cfg, "source-device"); err != nil {
+		t.Fatalf("CreateDeviceTemplate() error: %v", err)
+	}
+
+	// Get template
+	tpl, ok := m.GetDeviceTemplate("my-template")
+	if !ok {
+		t.Fatal("GetDeviceTemplate() returned false")
+	}
+	if tpl.Description != "Test template" {
+		t.Errorf("Description = %q, want %q", tpl.Description, "Test template")
+	}
+	if tpl.Model != testModelSHSW1 {
+		t.Errorf("Model = %q, want %q", tpl.Model, testModelSHSW1)
+	}
+	if tpl.App != "switch" {
+		t.Errorf("App = %q, want %q", tpl.App, "switch")
+	}
+
+	// List templates
+	templates := m.ListDeviceTemplates()
+	if len(templates) != 1 {
+		t.Errorf("ListDeviceTemplates() returned %d, want 1", len(templates))
+	}
+
+	// Update template
+	if err := m.UpdateDeviceTemplate("my-template", "New description"); err != nil {
+		t.Fatalf("UpdateDeviceTemplate() error: %v", err)
+	}
+	tpl, _ = m.GetDeviceTemplate("my-template")
+	if tpl.Description != "New description" {
+		t.Errorf("Description = %q, want %q", tpl.Description, "New description")
+	}
+
+	// Save template (overwrite)
+	newTpl := DeviceTemplate{
+		Name:        "my-template",
+		Description: "Replaced",
+		Model:       "SHSW-2",
+		Generation:  3,
+		Config:      map[string]any{},
+	}
+	if err := m.SaveDeviceTemplate(newTpl); err != nil {
+		t.Fatalf("SaveDeviceTemplate() error: %v", err)
+	}
+	tpl, _ = m.GetDeviceTemplate("my-template")
+	if tpl.Model != "SHSW-2" {
+		t.Errorf("Model = %q, want %q", tpl.Model, "SHSW-2")
+	}
+
+	// Delete template
+	if err := m.DeleteDeviceTemplate("my-template"); err != nil {
+		t.Fatalf("DeleteDeviceTemplate() error: %v", err)
+	}
+	_, ok = m.GetDeviceTemplate("my-template")
+	if ok {
+		t.Error("template should not exist after delete")
+	}
+}
+
+func TestManager_DeviceTemplateOperations_Errors(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create template
+	if err := m.CreateDeviceTemplate("test", "", "Model", "", 2, map[string]any{}, ""); err != nil {
+		t.Fatalf("CreateDeviceTemplate() error: %v", err)
+	}
+
+	// Try to create duplicate
+	if err := m.CreateDeviceTemplate("test", "", "Model", "", 2, map[string]any{}, ""); err == nil {
+		t.Error("expected error creating duplicate template")
+	}
+
+	// Update nonexistent
+	if err := m.UpdateDeviceTemplate("nonexistent", ""); err == nil {
+		t.Error("expected error updating nonexistent template")
+	}
+
+	// Delete nonexistent
+	if err := m.DeleteDeviceTemplate("nonexistent"); err == nil {
+		t.Error("expected error deleting nonexistent template")
+	}
+}
+
+func TestManager_ScriptTemplateOperations(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Save script template
+	tpl := ScriptTemplate{
+		Name:        "my-script",
+		Description: "Test script",
+		Code:        "console.log('hello');",
+		Category:    "utility",
+	}
+	if err := m.SaveScriptTemplate(tpl); err != nil {
+		t.Fatalf("SaveScriptTemplate() error: %v", err)
+	}
+
+	// Get script template
+	got, ok := m.GetScriptTemplate("my-script")
+	if !ok {
+		t.Fatal("GetScriptTemplate() returned false")
+	}
+	if got.Code != "console.log('hello');" {
+		t.Errorf("Code = %q, want %q", got.Code, "console.log('hello');")
+	}
+
+	// List script templates
+	templates := m.ListScriptTemplates()
+	if len(templates) != 1 {
+		t.Errorf("ListScriptTemplates() returned %d, want 1", len(templates))
+	}
+
+	// Delete script template
+	if err := m.DeleteScriptTemplate("my-script"); err != nil {
+		t.Fatalf("DeleteScriptTemplate() error: %v", err)
+	}
+	_, ok = m.GetScriptTemplate("my-script")
+	if ok {
+		t.Error("template should not exist after delete")
+	}
+}
+
+func TestManager_ScriptTemplateOperations_Errors(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Delete nonexistent
+	if err := m.DeleteScriptTemplate("nonexistent"); err == nil {
+		t.Error("expected error deleting nonexistent script template")
+	}
+}
+
+func TestManager_AlertOperations(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create alert
+	if err := m.CreateAlert("power-alert", "High power warning", "device1", "power>100", "notify", true); err != nil {
+		t.Fatalf("CreateAlert() error: %v", err)
+	}
+
+	// Get alert
+	alert, ok := m.GetAlert("power-alert")
+	if !ok {
+		t.Fatal("GetAlert() returned false")
+	}
+	if alert.Description != "High power warning" {
+		t.Errorf("Description = %q, want %q", alert.Description, "High power warning")
+	}
+	if alert.Device != "device1" {
+		t.Errorf("Device = %q, want %q", alert.Device, "device1")
+	}
+	if alert.Condition != "power>100" {
+		t.Errorf("Condition = %q, want %q", alert.Condition, "power>100")
+	}
+	if !alert.Enabled {
+		t.Error("Enabled should be true")
+	}
+
+	// List alerts
+	alerts := m.ListAlerts()
+	if len(alerts) != 1 {
+		t.Errorf("ListAlerts() returned %d, want 1", len(alerts))
+	}
+
+	// Update alert
+	enabled := false
+	snoozed := time.Now().Add(time.Hour).Format(time.RFC3339)
+	if err := m.UpdateAlert("power-alert", &enabled, snoozed); err != nil {
+		t.Fatalf("UpdateAlert() error: %v", err)
+	}
+	alert, _ = m.GetAlert("power-alert")
+	if alert.Enabled {
+		t.Error("Enabled should be false after update")
+	}
+	if alert.SnoozedUntil != snoozed {
+		t.Errorf("SnoozedUntil = %q, want %q", alert.SnoozedUntil, snoozed)
+	}
+
+	// Delete alert
+	if err := m.DeleteAlert("power-alert"); err != nil {
+		t.Fatalf("DeleteAlert() error: %v", err)
+	}
+	_, ok = m.GetAlert("power-alert")
+	if ok {
+		t.Error("alert should not exist after delete")
+	}
+}
+
+func TestManager_AlertOperations_Errors(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create alert
+	if err := m.CreateAlert("test", "", "", "", "", true); err != nil {
+		t.Fatalf("CreateAlert() error: %v", err)
+	}
+
+	// Try to create duplicate
+	if err := m.CreateAlert("test", "", "", "", "", true); err == nil {
+		t.Error("expected error creating duplicate alert")
+	}
+
+	// Update nonexistent
+	if err := m.UpdateAlert("nonexistent", nil, ""); err == nil {
+		t.Error("expected error updating nonexistent alert")
+	}
+
+	// Delete nonexistent
+	if err := m.DeleteAlert("nonexistent"); err == nil {
+		t.Error("expected error deleting nonexistent alert")
+	}
+}
+
+func TestManager_ListAliasesMap(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if err := m.AddAlias("test1", "cmd1", false); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+	if err := m.AddAlias("test2", "cmd2", true); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+
+	aliases := m.ListAliasesMap()
+	if len(aliases) != 2 {
+		t.Errorf("ListAliasesMap() returned %d aliases, want 2", len(aliases))
+	}
+
+	if aliases["test1"].Command != "cmd1" {
+		t.Errorf("test1 command = %q, want %q", aliases["test1"].Command, "cmd1")
+	}
+	if aliases["test2"].Shell != true {
+		t.Error("test2 should have Shell=true")
+	}
+}
+
+func TestManager_SetDeviceAuth(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Register device
+	if err := m.RegisterDevice("test", "192.168.1.1", 2, "", "", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+
+	// Set auth
+	if err := m.SetDeviceAuth("test", "admin", "password123"); err != nil {
+		t.Fatalf("SetDeviceAuth() error: %v", err)
+	}
+
+	// Verify auth was set
+	dev, _ := m.GetDevice("test")
+	if dev.Auth == nil {
+		t.Fatal("Auth should not be nil")
+	}
+	if dev.Auth.Username != "admin" {
+		t.Errorf("Username = %q, want %q", dev.Auth.Username, "admin")
+	}
+	if dev.Auth.Password != "password123" {
+		t.Errorf("Password = %q, want %q", dev.Auth.Password, "password123")
+	}
+
+	// Get all credentials
+	creds := m.GetAllDeviceCredentials()
+	if len(creds) != 1 {
+		t.Errorf("GetAllDeviceCredentials() returned %d, want 1", len(creds))
+	}
+	if creds["test"].Username != "admin" {
+		t.Errorf("creds[test].Username = %q, want %q", creds["test"].Username, "admin")
+	}
+}
+
+func TestManager_SetDeviceAuth_NotFound(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if err := m.SetDeviceAuth("nonexistent", "user", "pass"); err == nil {
+		t.Error("expected error setting auth on nonexistent device")
+	}
+}
