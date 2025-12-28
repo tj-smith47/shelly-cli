@@ -15,6 +15,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/component"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/device"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/wireless"
@@ -25,12 +27,14 @@ const DefaultTimeout = 10 * time.Second
 
 // Service provides high-level operations on Shelly devices.
 type Service struct {
-	resolver        DeviceResolver
-	rateLimiter     *ratelimit.DeviceRateLimiter
-	pluginRegistry  *plugins.Registry
-	firmwareService *firmware.Service
-	wirelessService *wireless.Service
-	networkService  *network.WiFiService
+	resolver         DeviceResolver
+	rateLimiter      *ratelimit.DeviceRateLimiter
+	pluginRegistry   *plugins.Registry
+	firmwareService  *firmware.Service
+	wirelessService  *wireless.Service
+	networkService   *network.WiFiService
+	deviceService    *device.Service
+	componentService *component.Service
 }
 
 // DeviceResolver resolves device identifiers to device configurations.
@@ -122,48 +126,66 @@ func New(resolver DeviceResolver, opts ...ServiceOption) *Service {
 	svc.wirelessService = wireless.New(svc)
 	// Initialize network service
 	svc.networkService = network.NewWiFiService(svc)
+	// Initialize device service
+	svc.deviceService = device.New(svc)
+	// Initialize component service using adapter
+	svc.componentService = component.New(&componentAdapter{svc})
 	return svc
+}
+
+// componentAdapter adapts shelly.Service to implement component.ConnectionProvider.
+// This is necessary because shelly.WithDevice uses func(*DeviceClient) but
+// component.ConnectionProvider expects func(component.DeviceClient).
+type componentAdapter struct {
+	*Service
+}
+
+// WithDevice adapts the function signature for component.ConnectionProvider.
+func (a *componentAdapter) WithDevice(ctx context.Context, identifier string, fn func(component.DeviceClient) error) error {
+	return a.Service.WithDevice(ctx, identifier, func(dev *DeviceClient) error {
+		return fn(dev) // *DeviceClient implements component.DeviceClient
+	})
 }
 
 // Connect establishes a connection to a device by identifier (name or address).
 func (s *Service) Connect(ctx context.Context, identifier string) (*client.Client, error) {
-	device, err := s.resolver.Resolve(identifier)
+	dev, err := s.resolver.Resolve(identifier)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.Connect(ctx, device)
+	return client.Connect(ctx, dev)
 }
 
 // WithConnection executes a function with a device connection, handling cleanup.
 // Rate limiting is automatically applied if configured.
 func (s *Service) WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error {
 	// Resolve device to get address and generation for rate limiting
-	device, err := s.ResolveWithGeneration(ctx, identifier)
+	dev, err := s.ResolveWithGeneration(ctx, identifier)
 	if err != nil {
 		return err
 	}
 
 	// If no rate limiter, execute directly (backward compatible)
 	if s.rateLimiter == nil {
-		return s.executeWithConnection(ctx, device, fn)
+		return s.executeWithConnection(ctx, dev, fn)
 	}
 
 	// Acquire rate limiter slot
-	release, err := s.rateLimiter.Acquire(ctx, device.Address, device.Generation)
+	release, err := s.rateLimiter.Acquire(ctx, dev.Address, dev.Generation)
 	if err != nil {
 		return err
 	}
 	defer release()
 
 	// Execute the operation
-	err = s.executeWithConnection(ctx, device, fn)
+	err = s.executeWithConnection(ctx, dev, fn)
 
 	// Record success/failure for circuit breaker
 	if err != nil {
-		s.rateLimiter.RecordFailure(device.Address)
+		s.rateLimiter.RecordFailure(dev.Address)
 	} else {
-		s.rateLimiter.RecordSuccess(device.Address)
+		s.rateLimiter.RecordSuccess(dev.Address)
 	}
 
 	return err
@@ -172,11 +194,11 @@ func (s *Service) WithConnection(ctx context.Context, identifier string, fn func
 // executeWithConnection performs the actual connection and function execution.
 // Includes automatic IP remapping: if connection fails and device has a MAC,
 // attempts mDNS discovery to find the device's new IP address.
-func (s *Service) executeWithConnection(ctx context.Context, device model.Device, fn func(*client.Client) error) error {
-	conn, err := client.Connect(ctx, device)
+func (s *Service) executeWithConnection(ctx context.Context, dev model.Device, fn func(*client.Client) error) error {
+	conn, err := client.Connect(ctx, dev)
 	if err != nil {
 		// Try IP remapping if connection failed and we have a MAC address
-		conn, err = s.tryIPRemap(ctx, device, err)
+		conn, err = s.tryIPRemap(ctx, dev, err)
 		if err != nil {
 			return err
 		}
@@ -188,31 +210,31 @@ func (s *Service) executeWithConnection(ctx context.Context, device model.Device
 
 // tryIPRemap attempts to remap a device's IP address via mDNS discovery.
 // Returns a new connection if remapping succeeds, or the original error if not.
-func (s *Service) tryIPRemap(ctx context.Context, device model.Device, originalErr error) (*client.Client, error) {
+func (s *Service) tryIPRemap(ctx context.Context, dev model.Device, originalErr error) (*client.Client, error) {
 	// Only attempt remap for connection errors with a known MAC
-	if !isConnectionError(originalErr) || device.MAC == "" {
+	if !isConnectionError(originalErr) || dev.MAC == "" {
 		return nil, originalErr
 	}
 
-	iostreams.DebugCat(iostreams.CategoryDevice, "connection failed for %s, attempting MAC discovery...", device.Name)
+	iostreams.DebugCat(iostreams.CategoryDevice, "connection failed for %s, attempting MAC discovery...", dev.Name)
 
 	// Quick mDNS discovery (~2 seconds)
-	newIP, discoverErr := s.DiscoverByMAC(ctx, device.MAC)
+	newIP, discoverErr := s.DiscoverByMAC(ctx, dev.MAC)
 	if discoverErr != nil {
 		iostreams.DebugErr("MAC discovery failed", discoverErr)
 		return nil, originalErr
 	}
-	if newIP == "" || newIP == device.Address {
+	if newIP == "" || newIP == dev.Address {
 		// Not found or same IP - return original error
 		return nil, originalErr
 	}
 
-	iostreams.DebugCat(iostreams.CategoryDevice, "found new IP %s for MAC %s, verifying...", newIP, device.MAC)
+	iostreams.DebugCat(iostreams.CategoryDevice, "found new IP %s for MAC %s, verifying...", newIP, dev.MAC)
 
 	// Try connecting to new IP
-	deviceCopy := device
-	deviceCopy.Address = newIP
-	conn, retryErr := client.Connect(ctx, deviceCopy)
+	devCopy := dev
+	devCopy.Address = newIP
+	conn, retryErr := client.Connect(ctx, devCopy)
 	if retryErr != nil {
 		iostreams.DebugErr("connection to new IP failed", retryErr)
 		return nil, originalErr
@@ -220,18 +242,18 @@ func (s *Service) tryIPRemap(ctx context.Context, device model.Device, originalE
 
 	// Verify MAC matches (security check)
 	info := conn.Info()
-	if info == nil || model.NormalizeMAC(info.MAC) != device.NormalizedMAC() {
-		iostreams.DebugCat(iostreams.CategoryDevice, "MAC mismatch: expected %s, got %s", device.NormalizedMAC(), model.NormalizeMAC(info.MAC))
+	if info == nil || model.NormalizeMAC(info.MAC) != dev.NormalizedMAC() {
+		iostreams.DebugCat(iostreams.CategoryDevice, "MAC mismatch: expected %s, got %s", dev.NormalizedMAC(), model.NormalizeMAC(info.MAC))
 		iostreams.CloseWithDebug("closing mismatched connection", conn)
 		return nil, originalErr
 	}
 
 	// Success! Update config silently
-	if err := config.UpdateDeviceAddress(device.Name, newIP); err != nil {
+	if err := config.UpdateDeviceAddress(dev.Name, newIP); err != nil {
 		iostreams.DebugErr("failed to persist new IP", err)
 		// Continue anyway - connection works, just won't persist
 	} else {
-		iostreams.DebugCat(iostreams.CategoryDevice, "remapped %s: %s -> %s", device.Name, device.Address, newIP)
+		iostreams.DebugCat(iostreams.CategoryDevice, "remapped %s: %s -> %s", dev.Name, dev.Address, newIP)
 	}
 
 	return conn, nil
@@ -294,43 +316,43 @@ func (s *Service) ResolveWithGeneration(ctx context.Context, identifier string) 
 
 // ConnectGen1 establishes a connection to a Gen1 device by identifier.
 func (s *Service) ConnectGen1(ctx context.Context, identifier string) (*client.Gen1Client, error) {
-	device, err := s.ResolveWithGeneration(ctx, identifier)
+	dev, err := s.ResolveWithGeneration(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}
 
-	return client.ConnectGen1(ctx, device)
+	return client.ConnectGen1(ctx, dev)
 }
 
 // WithGen1Connection executes a function with a Gen1 device connection, handling cleanup.
 // Rate limiting is automatically applied if configured.
 func (s *Service) WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error {
 	// Resolve device to get address for rate limiting
-	device, err := s.ResolveWithGeneration(ctx, identifier)
+	dev, err := s.ResolveWithGeneration(ctx, identifier)
 	if err != nil {
 		return err
 	}
 
 	// If no rate limiter, execute directly (backward compatible)
 	if s.rateLimiter == nil {
-		return s.executeWithGen1Connection(ctx, device, fn)
+		return s.executeWithGen1Connection(ctx, dev, fn)
 	}
 
 	// Gen1 devices always use generation=1 for rate limiting
-	release, err := s.rateLimiter.Acquire(ctx, device.Address, 1)
+	release, err := s.rateLimiter.Acquire(ctx, dev.Address, 1)
 	if err != nil {
 		return err
 	}
 	defer release()
 
 	// Execute the operation
-	err = s.executeWithGen1Connection(ctx, device, fn)
+	err = s.executeWithGen1Connection(ctx, dev, fn)
 
 	// Record success/failure for circuit breaker
 	if err != nil {
-		s.rateLimiter.RecordFailure(device.Address)
+		s.rateLimiter.RecordFailure(dev.Address)
 	} else {
-		s.rateLimiter.RecordSuccess(device.Address)
+		s.rateLimiter.RecordSuccess(dev.Address)
 	}
 
 	return err
@@ -339,11 +361,11 @@ func (s *Service) WithGen1Connection(ctx context.Context, identifier string, fn 
 // executeWithGen1Connection performs the actual Gen1 connection and function execution.
 // Includes automatic IP remapping: if connection fails and device has a MAC,
 // attempts mDNS discovery to find the device's new IP address.
-func (s *Service) executeWithGen1Connection(ctx context.Context, device model.Device, fn func(*client.Gen1Client) error) error {
-	conn, err := client.ConnectGen1(ctx, device)
+func (s *Service) executeWithGen1Connection(ctx context.Context, dev model.Device, fn func(*client.Gen1Client) error) error {
+	conn, err := client.ConnectGen1(ctx, dev)
 	if err != nil {
 		// Try IP remapping if connection failed and we have a MAC address
-		conn, err = s.tryGen1IPRemap(ctx, device, err)
+		conn, err = s.tryGen1IPRemap(ctx, dev, err)
 		if err != nil {
 			return err
 		}
@@ -355,31 +377,31 @@ func (s *Service) executeWithGen1Connection(ctx context.Context, device model.De
 
 // tryGen1IPRemap attempts to remap a Gen1 device's IP address via mDNS discovery.
 // Returns a new connection if remapping succeeds, or the original error if not.
-func (s *Service) tryGen1IPRemap(ctx context.Context, device model.Device, originalErr error) (*client.Gen1Client, error) {
+func (s *Service) tryGen1IPRemap(ctx context.Context, dev model.Device, originalErr error) (*client.Gen1Client, error) {
 	// Only attempt remap for connection errors with a known MAC
-	if !isConnectionError(originalErr) || device.MAC == "" {
+	if !isConnectionError(originalErr) || dev.MAC == "" {
 		return nil, originalErr
 	}
 
-	iostreams.DebugCat(iostreams.CategoryDevice, "Gen1 connection failed for %s, attempting MAC discovery...", device.Name)
+	iostreams.DebugCat(iostreams.CategoryDevice, "Gen1 connection failed for %s, attempting MAC discovery...", dev.Name)
 
 	// Quick mDNS discovery (~2 seconds)
-	newIP, discoverErr := s.DiscoverByMAC(ctx, device.MAC)
+	newIP, discoverErr := s.DiscoverByMAC(ctx, dev.MAC)
 	if discoverErr != nil {
 		iostreams.DebugErr("MAC discovery failed", discoverErr)
 		return nil, originalErr
 	}
-	if newIP == "" || newIP == device.Address {
+	if newIP == "" || newIP == dev.Address {
 		// Not found or same IP - return original error
 		return nil, originalErr
 	}
 
-	iostreams.DebugCat(iostreams.CategoryDevice, "found new IP %s for MAC %s, verifying...", newIP, device.MAC)
+	iostreams.DebugCat(iostreams.CategoryDevice, "found new IP %s for MAC %s, verifying...", newIP, dev.MAC)
 
 	// Try connecting to new IP
-	deviceCopy := device
-	deviceCopy.Address = newIP
-	conn, retryErr := client.ConnectGen1(ctx, deviceCopy)
+	devCopy := dev
+	devCopy.Address = newIP
+	conn, retryErr := client.ConnectGen1(ctx, devCopy)
 	if retryErr != nil {
 		iostreams.DebugErr("Gen1 connection to new IP failed", retryErr)
 		return nil, originalErr
@@ -389,11 +411,11 @@ func (s *Service) tryGen1IPRemap(ctx context.Context, device model.Device, origi
 	// but the discovery already matched by MAC, so we trust it
 
 	// Success! Update config silently
-	if err := config.UpdateDeviceAddress(device.Name, newIP); err != nil {
+	if err := config.UpdateDeviceAddress(dev.Name, newIP); err != nil {
 		iostreams.DebugErr("failed to persist new IP", err)
 		// Continue anyway - connection works, just won't persist
 	} else {
-		iostreams.DebugCat(iostreams.CategoryDevice, "remapped Gen1 %s: %s -> %s", device.Name, device.Address, newIP)
+		iostreams.DebugCat(iostreams.CategoryDevice, "remapped Gen1 %s: %s -> %s", dev.Name, dev.Address, newIP)
 	}
 
 	return conn, nil
@@ -401,11 +423,11 @@ func (s *Service) tryGen1IPRemap(ctx context.Context, device model.Device, origi
 
 // IsGen1Device checks if a device is Gen1.
 func (s *Service) IsGen1Device(ctx context.Context, identifier string) (bool, model.Device, error) {
-	device, err := s.ResolveWithGeneration(ctx, identifier)
+	dev, err := s.ResolveWithGeneration(ctx, identifier)
 	if err != nil {
 		return false, model.Device{}, err
 	}
-	return device.Generation == 1, device, nil
+	return dev.Generation == 1, dev, nil
 }
 
 // withGenAwareAction executes gen1Fn for Gen1 devices, gen2Fn for Gen2+ devices.
@@ -626,23 +648,23 @@ func (s *Service) CheckFirmwareAllPlatforms(ctx context.Context, ios *iostreams.
 }
 
 // CheckPluginFirmware delegates to the firmware service.
-func (s *Service) CheckPluginFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
-	return s.firmwareService.CheckPlugin(ctx, device)
+func (s *Service) CheckPluginFirmware(ctx context.Context, dev model.Device) (*FirmwareInfo, error) {
+	return s.firmwareService.CheckPlugin(ctx, dev)
 }
 
 // UpdatePluginFirmware delegates to the firmware service.
-func (s *Service) UpdatePluginFirmware(ctx context.Context, device model.Device, stage, url string) error {
-	return s.firmwareService.UpdatePlugin(ctx, device, stage, url)
+func (s *Service) UpdatePluginFirmware(ctx context.Context, dev model.Device, stage, url string) error {
+	return s.firmwareService.UpdatePlugin(ctx, dev, stage, url)
 }
 
 // UpdateDeviceFirmware delegates to the firmware service.
-func (s *Service) UpdateDeviceFirmware(ctx context.Context, device model.Device, useBeta bool, customURL string) error {
-	return s.firmwareService.UpdateDevice(ctx, device, useBeta, customURL)
+func (s *Service) UpdateDeviceFirmware(ctx context.Context, dev model.Device, useBeta bool, customURL string) error {
+	return s.firmwareService.UpdateDevice(ctx, dev, useBeta, customURL)
 }
 
 // CheckDeviceFirmware delegates to the firmware service.
-func (s *Service) CheckDeviceFirmware(ctx context.Context, device model.Device) (*FirmwareInfo, error) {
-	return s.firmwareService.CheckDevice(ctx, device)
+func (s *Service) CheckDeviceFirmware(ctx context.Context, dev model.Device) (*FirmwareInfo, error) {
+	return s.firmwareService.CheckDevice(ctx, dev)
 }
 
 // CheckDevicesForUpdates delegates to the firmware service.
@@ -698,4 +720,18 @@ func (s *Service) SetWiFiStation(ctx context.Context, identifier, ssid, password
 // Delegates to the network service.
 func (s *Service) SetWiFiAP(ctx context.Context, identifier, ssid, password string, enable bool) error {
 	return s.networkService.SetAP(ctx, identifier, ssid, password, enable)
+}
+
+// ----- Device Service accessor and delegations -----
+
+// DeviceService returns the device service for direct access.
+func (s *Service) DeviceService() *device.Service {
+	return s.deviceService
+}
+
+// ----- Component Service accessor and delegations -----
+
+// ComponentService returns the component service for direct access.
+func (s *Service) ComponentService() *component.Service {
+	return s.componentService
 }
