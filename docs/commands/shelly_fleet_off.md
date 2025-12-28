@@ -33,9 +33,12 @@ shelly fleet off [device...] [flags]
 ### Options
 
 ```
-      --all            Turn off all relay devices
-  -g, --group string   Turn off devices in group
-  -h, --help           help for off
+  -a, --all                Target all registered devices
+  -c, --concurrent int     Max concurrent operations (default 5)
+  -g, --group string       Target device group
+  -h, --help               help for off
+  -s, --switch int         Switch component ID
+  -t, --timeout duration   Timeout per device (default 10s)
 ```
 
 ### Options inherited from parent commands

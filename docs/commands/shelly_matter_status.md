@@ -29,8 +29,8 @@ shelly matter status <device> [flags]
 ### Options
 
 ```
-  -h, --help   help for status
-      --json   Output as JSON
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for status
 ```
 
 ### Options inherited from parent commands

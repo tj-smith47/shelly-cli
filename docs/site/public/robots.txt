@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /admin/
+Sitemap: https://tj-smith47.github.io/sitemap.xml

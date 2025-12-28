@@ -51,8 +51,8 @@ shelly bthome list <device> [flags]
 ### Options
 
 ```
-  -h, --help   help for list
-      --json   Output as JSON
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for list
 ```
 
 ### Options inherited from parent commands

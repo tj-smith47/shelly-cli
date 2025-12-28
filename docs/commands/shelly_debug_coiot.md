@@ -32,8 +32,8 @@ shelly debug coiot <device> [flags]
 ### Options
 
 ```
-  -h, --help   help for coiot
-      --json   Output as JSON
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for coiot
 ```
 
 ### Options inherited from parent commands

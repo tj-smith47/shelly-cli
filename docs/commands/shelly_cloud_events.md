@@ -42,7 +42,7 @@ shelly cloud events [flags]
 ```
       --device string   Filter by device ID
       --event string    Filter by event type
-      --format string   Output format (text, json) (default "text")
+  -f, --format string   Output format: text, json (default "text")
   -h, --help            help for events
       --raw             Output raw JSON messages
 ```

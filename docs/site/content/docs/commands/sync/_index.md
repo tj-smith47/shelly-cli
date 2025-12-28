@@ -1,0 +1,68 @@
+---
+title: "shelly sync"
+description: "shelly sync"
+weight: 580
+sidebar:
+  collapsed: true
+---
+
+## shelly sync
+
+Synchronize device configurations
+
+### Synopsis
+
+Synchronize device configurations between local storage and devices.
+
+Operations:
+  --pull  Download device configs to local storage
+  --push  Upload local configs to devices
+
+Configurations are stored in the CLI config directory.
+
+```
+shelly sync [flags]
+```
+
+### Examples
+
+```
+  # Pull all device configs to local storage
+  shelly sync --pull
+
+  # Push local config to specific device
+  shelly sync --push --device kitchen-light
+
+  # Preview sync without making changes
+  shelly sync --pull --dry-run
+```
+
+### Options
+
+```
+      --device strings   Specific devices to sync (default: all)
+      --dry-run          Preview actions without executing
+  -h, --help             help for sync
+      --pull             Pull device configs to local storage
+      --push             Push local configs to devices
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+

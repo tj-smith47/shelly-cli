@@ -1,0 +1,81 @@
+---
+title: "shelly bthome list"
+description: "shelly bthome list"
+---
+
+## shelly bthome list
+
+List BTHome devices
+
+### Synopsis
+
+List all BTHome devices connected to a Shelly gateway.
+
+BTHome is a Bluetooth Low Energy (BLE) protocol for sensors and devices.
+Shelly BLU sensors (motion, door/window, button) connect to a gateway
+device that collects their readings.
+
+Shows configured BTHomeDevice components with their current status,
+signal strength (RSSI), battery level, and last update time.
+
+Use 'shelly bthome add' to discover and pair new devices.
+Use 'shelly bthome sensors' to view sensor readings.
+
+Output is formatted as styled text by default. Use --json for
+structured output suitable for scripting.
+
+```
+shelly bthome list <device> [flags]
+```
+
+### Examples
+
+```
+  # List all BTHome devices
+  shelly bthome list living-room
+
+  # Output as JSON
+  shelly bthome list living-room --json
+
+  # Get devices with low battery
+  shelly bthome list living-room --json | jq '.[] | select(.battery != null and .battery < 20)'
+
+  # Find devices with weak signal
+  shelly bthome list living-room --json | jq '.[] | select(.rssi != null and .rssi < -80)'
+
+  # Get device addresses (MAC)
+  shelly bthome list living-room --json | jq -r '.[].addr'
+
+  # List device names and IDs
+  shelly bthome list living-room --json | jq '.[] | {name, id}'
+
+  # Short form
+  shelly bthome ls living-room
+```
+
+### Options
+
+```
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for list
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly bthome](shelly_bthome.md)	 - Manage BTHome Bluetooth devices
+

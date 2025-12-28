@@ -29,7 +29,7 @@ shelly bthome remove <device> <id> [flags]
 
 ```
   -h, --help   help for remove
-  -y, --yes    Skip confirmation
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

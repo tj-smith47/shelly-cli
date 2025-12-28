@@ -46,6 +46,7 @@ Registered devices can be referenced by name in other commands.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly device alias](shelly_device_alias.md)	 - Manage device aliases
 * [shelly device config](shelly_device_config.md)	 - Manage device configuration
 * [shelly device factory-reset](shelly_device_factory-reset.md)	 - Factory reset a device
 * [shelly device info](shelly_device_info.md)	 - Show device information

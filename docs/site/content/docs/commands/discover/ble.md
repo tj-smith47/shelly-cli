@@ -1,0 +1,69 @@
+---
+title: "shelly discover ble"
+description: "shelly discover ble"
+---
+
+## shelly discover ble
+
+Discover devices using Bluetooth Low Energy
+
+### Synopsis
+
+Discover Shelly devices using Bluetooth Low Energy (BLE).
+
+This method finds Shelly devices that are in provisioning mode or
+BLU devices broadcasting BTHome sensor data.
+
+Requirements:
+  - Bluetooth adapter on the host machine
+  - Bluetooth must be enabled
+  - May require elevated privileges on some systems
+
+```
+shelly discover ble [flags]
+```
+
+### Examples
+
+```
+  # Basic BLE discovery
+  shelly discover ble
+
+  # With longer timeout
+  shelly discover ble --timeout 30s
+
+  # Include BTHome sensor data
+  shelly discover ble --bthome
+
+  # Filter by device name prefix
+  shelly discover ble --filter "Shelly"
+```
+
+### Options
+
+```
+      --bthome             Include BTHome sensor broadcasts
+  -f, --filter string      Filter by device name prefix
+  -h, --help               help for ble
+  -t, --timeout duration   Discovery timeout (default 15s)
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly discover](shelly_discover.md)	 - Discover Shelly devices on the network
+

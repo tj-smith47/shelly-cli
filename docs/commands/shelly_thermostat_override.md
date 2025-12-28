@@ -39,7 +39,7 @@ shelly thermostat override <device> [flags]
       --cancel              Cancel active override
   -d, --duration duration   Override duration (e.g., 30m, 2h)
   -h, --help                help for override
-      --id int              Thermostat component ID
+  -i, --id int              Thermostat component ID (default 0)
   -t, --target float        Target temperature in Celsius
 ```
 

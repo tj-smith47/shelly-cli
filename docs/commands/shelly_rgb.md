@@ -43,7 +43,7 @@ Control RGB and RGBW light components on Shelly devices.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly rgb list](shelly_rgb_list.md)	 - List RGB components
+* [shelly rgb list](shelly_rgb_list.md)	 - List rgb components
 * [shelly rgb off](shelly_rgb_off.md)	 - Turn rgb off
 * [shelly rgb on](shelly_rgb_on.md)	 - Turn rgb on
 * [shelly rgb set](shelly_rgb_set.md)	 - Set RGB parameters

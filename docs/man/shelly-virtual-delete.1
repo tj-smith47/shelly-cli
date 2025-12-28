@@ -1,0 +1,87 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-virtual-delete - Delete a virtual component
+
+
+.SH SYNOPSIS
+\fBshelly virtual delete   [flags]\fP
+
+
+.SH DESCRIPTION
+Delete a virtual component from a Shelly Gen2+ device.
+
+.PP
+The key format is "type:id", for example "boolean:200" or "number:201".
+
+.PP
+This action cannot be undone.
+
+
+.SH OPTIONS
+\fB--confirm\fP[=false]
+	Double-confirm destructive operation
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for delete
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Delete a virtual component
+  shelly virtual delete kitchen boolean:200
+
+  # Skip confirmation
+  shelly virtual delete kitchen boolean:200 --yes
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-virtual(1)\fP

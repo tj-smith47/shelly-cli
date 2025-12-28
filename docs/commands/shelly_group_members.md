@@ -24,7 +24,7 @@ shelly group members <group> [flags]
 
 ```
   -h, --help            help for members
-  -o, --output string   Output format (table, json, yaml) (default "table")
+  -o, --output string   Output format: table, json, yaml (default "table")
 ```
 
 ### Options inherited from parent commands

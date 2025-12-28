@@ -40,7 +40,7 @@ shelly bthome add <device> [flags]
       --addr string    MAC address of device to add directly
       --duration int   Discovery scan duration in seconds (default 30)
   -h, --help           help for add
-      --name string    Name for the device (with --addr)
+  -n, --name string    Name for the device (with --addr)
 ```
 
 ### Options inherited from parent commands

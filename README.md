@@ -106,6 +106,30 @@ shelly dash
 shelly firmware update living-room
 ```
 
+## Documentation
+
+📖 **[Full Documentation Site](https://tj-smith47.github.io/shelly-cli/)** - Browse the complete documentation online.
+
+### Guides
+- [Configuration Reference](docs/configuration.md) - Complete configuration options
+- [Plugin Development](docs/plugins.md) - Create custom plugins
+- [Theme Customization](docs/themes.md) - Theme system details
+
+### Reference
+- [Command Reference](docs/commands/) - Auto-generated docs for all 347 commands
+- [Man Pages](docs/man/) - Unix manual pages
+- [Architecture](docs/architecture.md) - Directory structure and placement guide
+- [Development Guide](docs/development.md) - Development patterns and standards
+- [Dependencies](docs/dependencies.md) - Library dependencies
+- [Testing Strategy](docs/testing.md) - Test coverage approach
+
+### Examples
+- [Example Configurations](examples/config/) - Ready-to-use config files
+- [Example Aliases](examples/aliases/) - Pre-built command shortcuts
+- [Example Scripts](examples/scripts/) - Automation shell scripts
+- [Example Plugins](examples/plugins/) - Plugin implementation examples
+- [Deployment Examples](examples/deployments/) - Docker, Kubernetes, Prometheus
+
 ## Command Overview
 
 <details>
@@ -537,28 +561,6 @@ The `examples/` directory contains ready-to-use configurations and scripts:
 - **[examples/deployments/](examples/deployments/)** - Kubernetes, Docker, and Docker Compose deployment examples
 
 **We welcome script / manifest contributions!** If you've written useful automation scripts or integrations, please submit a PR to add them to the examples directory.
-
-## Documentation
-
-### Guides
-- [Configuration Reference](docs/configuration.md) - Complete configuration options
-- [Plugin Development](docs/plugins.md) - Create custom plugins
-- [Theme Customization](docs/themes.md) - Theme system details
-
-### Reference
-- [Command Reference](docs/commands/) - Auto-generated docs for all 347 commands
-- [Man Pages](docs/man/) - Unix manual pages
-- [Architecture](docs/architecture.md) - Directory structure and placement guide
-- [Development Guide](docs/development.md) - Development patterns and standards
-- [Dependencies](docs/dependencies.md) - Library dependencies
-- [Testing Strategy](docs/testing.md) - Test coverage approach
-
-### Examples
-- [Example Configurations](examples/config/) - Ready-to-use config files
-- [Example Aliases](examples/aliases/) - Pre-built command shortcuts
-- [Example Scripts](examples/scripts/) - Automation shell scripts
-- [Example Plugins](examples/plugins/) - Plugin implementation examples
-- [Deployment Examples](examples/deployments/) - Docker, Kubernetes, Prometheus
 
 ## Contributing
 

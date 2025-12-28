@@ -33,7 +33,7 @@ shelly thermostat calibrate <device> [flags]
 
 ```
   -h, --help     help for calibrate
-      --id int   Thermostat component ID
+  -i, --id int   Thermostat component ID (default 0)
 ```
 
 ### Options inherited from parent commands

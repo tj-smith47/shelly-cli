@@ -1,0 +1,55 @@
+---
+title: "shelly cloud device"
+description: "shelly cloud device"
+---
+
+## shelly cloud device
+
+Show cloud device details
+
+### Synopsis
+
+Show details for a specific device from Shelly Cloud.
+
+Displays device information including status, settings, and online state.
+
+```
+shelly cloud device <id> [flags]
+```
+
+### Examples
+
+```
+  # Get device details
+  shelly cloud device abc123
+
+  # Get device with full status
+  shelly cloud device abc123 --status
+```
+
+### Options
+
+```
+  -h, --help     help for device
+      --status   Show full device status
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly cloud](shelly_cloud.md)	 - Manage cloud connection and Shelly Cloud API
+

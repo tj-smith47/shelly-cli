@@ -1,0 +1,59 @@
+---
+title: "shelly alert snooze"
+description: "shelly alert snooze"
+---
+
+## shelly alert snooze
+
+Snooze an alert temporarily
+
+### Synopsis
+
+Snooze an alert for a specified duration.
+
+While snoozed, the alert will not trigger even if the condition is met.
+
+```
+shelly alert snooze <name> [flags]
+```
+
+### Examples
+
+```
+  # Snooze for 1 hour
+  shelly alert snooze kitchen-offline --duration 1h
+
+  # Snooze for 30 minutes
+  shelly alert snooze kitchen-offline --duration 30m
+
+  # Clear snooze
+  shelly alert snooze kitchen-offline --clear
+```
+
+### Options
+
+```
+      --clear             Clear existing snooze
+  -d, --duration string   Snooze duration (e.g., 30m, 1h, 2h) (default "1h")
+  -h, --help              help for snooze
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly alert](shelly_alert.md)	 - Manage monitoring alerts
+

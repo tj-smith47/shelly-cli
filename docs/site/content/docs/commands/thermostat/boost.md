@@ -1,0 +1,67 @@
+---
+title: "shelly thermostat boost"
+description: "shelly thermostat boost"
+---
+
+## shelly thermostat boost
+
+Activate boost mode
+
+### Synopsis
+
+Activate boost mode on a thermostat.
+
+Boost mode sets the valve to 100% for rapid heating. This is useful
+when you need to quickly warm up a room.
+
+Use --duration to specify how long boost mode should last.
+Use --cancel to cancel an active boost.
+
+```
+shelly thermostat boost <device> [flags]
+```
+
+### Examples
+
+```
+  # Activate boost with device default duration
+  shelly thermostat boost gateway
+
+  # Boost for 5 minutes
+  shelly thermostat boost gateway --duration 5m
+
+  # Boost for 30 minutes
+  shelly thermostat boost gateway --duration 30m
+
+  # Cancel active boost
+  shelly thermostat boost gateway --cancel
+```
+
+### Options
+
+```
+      --cancel              Cancel active boost
+  -d, --duration duration   Boost duration (e.g., 5m, 30m, 1h)
+  -h, --help                help for boost
+  -i, --id int              Thermostat component ID (default 0)
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly thermostat](shelly_thermostat.md)	 - Manage thermostats
+

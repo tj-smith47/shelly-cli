@@ -1,0 +1,58 @@
+---
+title: "shelly cache"
+description: "shelly cache"
+weight: 100
+sidebar:
+  collapsed: true
+---
+
+## shelly cache
+
+Manage CLI cache
+
+### Synopsis
+
+Manage the Shelly CLI cache directory.
+
+The cache stores:
+  - Device discovery results
+  - Firmware update information
+  - Version check data
+
+### Examples
+
+```
+  # Show cache statistics
+  shelly cache show
+
+  # Clear the cache
+  shelly cache clear
+```
+
+### Options
+
+```
+  -h, --help   help for cache
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly cache clear](shelly_cache_clear.md)	 - Clear the discovery cache
+* [shelly cache show](shelly_cache_show.md)	 - Show cache statistics
+

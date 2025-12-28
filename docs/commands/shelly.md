@@ -111,6 +111,7 @@ and controlling Shelly devices on your local network.
 * [shelly toggle](shelly_toggle.md)	 - Toggle a device (auto-detects type)
 * [shelly update](shelly_update.md)	 - Update shelly to the latest version
 * [shelly version](shelly_version.md)	 - Print version information
+* [shelly virtual](shelly_virtual.md)	 - Manage virtual components
 * [shelly wait](shelly_wait.md)	 - Wait for a duration
 * [shelly wake](shelly_wake.md)	 - Turn device on after a delay
 * [shelly webhook](shelly_webhook.md)	 - Manage device webhooks

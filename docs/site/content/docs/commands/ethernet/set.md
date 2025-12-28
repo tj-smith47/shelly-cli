@@ -1,0 +1,68 @@
+---
+title: "shelly ethernet set"
+description: "shelly ethernet set"
+---
+
+## shelly ethernet set
+
+Configure Ethernet connection
+
+### Synopsis
+
+Configure the Ethernet connection for a device.
+
+By default, Ethernet uses DHCP for automatic IP configuration. Use static IP
+options to configure a fixed IP address.
+
+Only available on Shelly Pro devices with an Ethernet port.
+
+```
+shelly ethernet set <device> [flags]
+```
+
+### Examples
+
+```
+  # Enable Ethernet with DHCP
+  shelly ethernet set living-room-pro --enable
+
+  # Configure static IP
+  shelly ethernet set living-room-pro --enable \
+    --static-ip "192.168.1.50" --gateway "192.168.1.1" \
+    --netmask "255.255.255.0" --dns "8.8.8.8"
+
+  # Disable Ethernet
+  shelly ethernet set living-room-pro --disable
+```
+
+### Options
+
+```
+      --disable            Disable Ethernet
+      --dns string         DNS server address (for static IP)
+      --enable             Enable Ethernet
+      --gateway string     Gateway address (for static IP)
+  -h, --help               help for set
+      --netmask string     Network mask (for static IP)
+      --static-ip string   Static IP address (uses DHCP if not set)
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly ethernet](shelly_ethernet.md)	 - Manage device Ethernet configuration
+

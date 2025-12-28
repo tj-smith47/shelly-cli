@@ -1,0 +1,60 @@
+---
+title: "shelly bthome status"
+description: "shelly bthome status"
+---
+
+## shelly bthome status
+
+Show BTHome device status
+
+### Synopsis
+
+Show detailed status of BTHome devices.
+
+Without an ID, shows the BTHome component status including any active
+discovery scan. With an ID, shows detailed status of a specific
+BTHomeDevice including signal strength, battery, and known objects.
+
+```
+shelly bthome status <device> [id] [flags]
+```
+
+### Examples
+
+```
+  # Show BTHome component status
+  shelly bthome status living-room
+
+  # Show specific device status
+  shelly bthome status living-room 200
+
+  # Output as JSON
+  shelly bthome status living-room 200 --json
+```
+
+### Options
+
+```
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for status
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly bthome](shelly_bthome.md)	 - Manage BTHome Bluetooth devices
+

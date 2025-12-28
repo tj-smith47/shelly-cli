@@ -1,0 +1,98 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-device-alias - Manage device aliases
+
+
+.SH SYNOPSIS
+\fBshelly device alias  [alias] [flags]\fP
+
+
+.SH DESCRIPTION
+Manage short aliases for devices.
+
+.PP
+Aliases allow you to reference devices by short, memorable names
+in addition to their full registered names. For example, you can
+create an alias "mb" for a device named "master-bathroom".
+
+.PP
+Aliases must be 1-32 characters, start with a letter or number,
+and contain only letters, numbers, hyphens, and underscores.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for alias
+
+.PP
+\fB-l\fP, \fB--list\fP[=false]
+	List all aliases for the device
+
+.PP
+\fB-r\fP, \fB--remove\fP=""
+	Remove the specified alias
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Add an alias to a device
+  shelly device alias master-bathroom mb
+  shelly device alias kitchen-light k
+
+  # List aliases for a device
+  shelly device alias master-bathroom --list
+
+  # Remove an alias from a device
+  shelly device alias master-bathroom --remove mb
+
+  # Use an alias in commands
+  shelly toggle mb
+  shelly status k
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-device(1)\fP

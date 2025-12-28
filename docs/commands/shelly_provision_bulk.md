@@ -42,7 +42,7 @@ shelly provision bulk <config-file> [flags]
 ### Options
 
 ```
-      --dry-run        Validate config without provisioning
+      --dry-run        Preview actions without executing
   -h, --help           help for bulk
       --parallel int   Maximum parallel provisioning operations (default 5)
 ```

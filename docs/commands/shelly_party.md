@@ -31,7 +31,7 @@ shelly party [device...] [flags]
 ### Options
 
 ```
-      --all                 Party with all registered devices
+  -a, --all                 Target all registered devices
   -d, --duration duration   Party duration (default 30s)
   -h, --help                help for party
   -i, --interval duration   Toggle interval (default 500ms)

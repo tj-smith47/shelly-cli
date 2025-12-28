@@ -38,7 +38,7 @@ shelly thermostat boost <device> [flags]
       --cancel              Cancel active boost
   -d, --duration duration   Boost duration (e.g., 5m, 30m, 1h)
   -h, --help                help for boost
-      --id int              Thermostat component ID
+  -i, --id int              Thermostat component ID (default 0)
 ```
 
 ### Options inherited from parent commands

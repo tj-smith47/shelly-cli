@@ -45,7 +45,7 @@ shelly feedback [flags]
 ```
       --attach-log      Include CLI log info in report
       --device string   Device name/IP for device compatibility issues
-      --dry-run         Preview issue without opening browser
+      --dry-run         Preview actions without executing
   -h, --help            help for feedback
       --issues          Open GitHub issues page instead
       --title string    Issue title

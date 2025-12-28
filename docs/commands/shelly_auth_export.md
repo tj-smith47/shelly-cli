@@ -26,7 +26,7 @@ shelly auth export [device...] [flags]
 ### Options
 
 ```
-      --all             Export all configured credentials
+  -a, --all             Target all registered devices
   -h, --help            help for export
   -o, --output string   Output file path (default "credentials.json")
 ```

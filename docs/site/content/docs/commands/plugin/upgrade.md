@@ -1,0 +1,60 @@
+---
+title: "shelly plugin upgrade"
+description: "shelly plugin upgrade"
+---
+
+## shelly plugin upgrade
+
+Upgrade extension(s)
+
+### Synopsis
+
+Upgrade installed extension(s) to the latest version.
+
+If a name is provided, upgrades only that extension.
+Use --all to upgrade all installed extensions.
+
+Note: This command checks GitHub for newer releases. Extensions must have been
+originally installed from GitHub (the repo info is stored in plugin metadata).
+For extensions installed from local files or URLs, you need to reinstall manually.
+
+```
+shelly plugin upgrade [name] [flags]
+```
+
+### Examples
+
+```
+  # Upgrade a specific extension (requires GitHub source)
+  shelly extension upgrade myext
+
+  # Check and upgrade all extensions
+  shelly extension upgrade --all
+```
+
+### Options
+
+```
+  -a, --all    Upgrade all installed extensions
+  -h, --help   help for upgrade
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly plugin](shelly_plugin.md)	 - Manage CLI plugins
+

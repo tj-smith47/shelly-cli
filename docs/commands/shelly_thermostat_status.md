@@ -35,7 +35,7 @@ shelly thermostat status <device> [flags]
 
 ```
   -h, --help     help for status
-      --id int   Thermostat component ID
+  -i, --id int   Thermostat component ID (default 0)
       --json     Output as JSON
 ```
 

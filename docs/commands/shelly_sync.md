@@ -33,7 +33,7 @@ shelly sync [flags]
 
 ```
       --device strings   Specific devices to sync (default: all)
-      --dry-run          Preview changes without applying
+      --dry-run          Preview actions without executing
   -h, --help             help for sync
       --pull             Pull device configs to local storage
       --push             Push local configs to devices

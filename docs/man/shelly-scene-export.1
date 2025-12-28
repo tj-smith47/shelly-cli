@@ -18,12 +18,12 @@ Format is auto-detected from file extension (.json, .yaml, .yml).
 
 
 .SH OPTIONS
-\fB-h\fP, \fB--help\fP[=false]
-	help for export
+\fB-f\fP, \fB--format\fP="yaml"
+	Output format: json, yaml
 
 .PP
-\fB-o\fP, \fB--output\fP="yaml"
-	Output format: json, yaml
+\fB-h\fP, \fB--help\fP[=false]
+	help for export
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -45,6 +45,10 @@ Format is auto-detected from file extension (.json, .yaml, .yml).
 .PP
 \fB--no-headers\fP[=false]
 	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
 
 .PP
 \fB--plain\fP[=false]
@@ -75,7 +79,7 @@ Format is auto-detected from file extension (.json, .yaml, .yml).
   shelly scene export movie-night
 
   # Export to stdout as JSON
-  shelly scene export movie-night --output json
+  shelly scene export movie-night --format json
 .EE
 
 

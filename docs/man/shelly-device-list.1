@@ -14,15 +14,15 @@ List all devices registered in the local registry.
 
 .PP
 The registry stores device information including name, address, model,
-generation, and authentication credentials. Use filters to narrow results
-by device generation (1, 2, or 3) or device type (e.g., SHSW-1, SHRGBW2).
+generation, platform, and authentication credentials. Use filters to
+narrow results by device generation, device type, or platform.
 
 .PP
 Output is formatted as a table by default. Use -o json or -o yaml for
 structured output suitable for scripting and piping to tools like jq.
 
 .PP
-Columns: Name, Address, Model, Generation, Auth (yes/no)
+Columns: Name, Address, Platform, Type, Model, Generation, Auth
 
 
 .SH OPTIONS
@@ -34,8 +34,20 @@ Columns: Name, Address, Model, Generation, Auth (yes/no)
 	help for list
 
 .PP
+\fB-p\fP, \fB--platform\fP=""
+	Filter by platform (e.g., shelly, tasmota)
+
+.PP
 \fB-t\fP, \fB--type\fP=""
 	Filter by device type
+
+.PP
+\fB-u\fP, \fB--updates-first\fP[=false]
+	Sort devices with available updates first
+
+.PP
+\fB-V\fP, \fB--version\fP[=false]
+	Show firmware version information
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -89,6 +101,15 @@ Columns: Name, Address, Model, Generation, Auth (yes/no)
 
   # List devices by type
   shelly device list --type SHSW-1
+
+  # List only Shelly devices (exclude plugin-managed)
+  shelly device list --platform shelly
+
+  # List only Tasmota devices (from shelly-tasmota plugin)
+  shelly device list --platform tasmota
+
+  # Show firmware versions and sort updates first
+  shelly device list --version --updates-first
 
   # Output as JSON for scripting
   shelly device list -o json

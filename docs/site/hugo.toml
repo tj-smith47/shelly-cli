@@ -1,0 +1,271 @@
+# =============================================================================
+# SHELLY CLI DOCUMENTATION SITE - HUGO CONFIGURATION
+# =============================================================================
+# DO NOT MODIFY without updating DOCSITE-PLAN.md
+# This configuration is designed for GitHub Pages deployment with Doks theme
+
+# -----------------------------------------------------------------------------
+# BASIC CONFIGURATION
+# -----------------------------------------------------------------------------
+baseURL = "https://tj-smith47.github.io/shelly-cli/"
+title = "Shelly CLI"
+languageCode = "en-US"
+defaultContentLanguage = "en"
+
+# Enable features
+enableEmoji = true
+enableGitInfo = true        # Shows last modified from git
+enableRobotsTXT = true      # Generate robots.txt
+canonifyURLs = false        # Keep relative URLs for portability
+
+# Summary length for list pages
+summaryLength = 70
+
+# -----------------------------------------------------------------------------
+# HUGO MODULE CONFIGURATION
+# -----------------------------------------------------------------------------
+# Module mounts are defined in config/_default/module.toml
+# Theme components loaded from node_modules via mounts
+[module]
+  [module.hugoVersion]
+    extended = true
+    min = "0.147.0"
+
+# -----------------------------------------------------------------------------
+# BUILD CONFIGURATION
+# -----------------------------------------------------------------------------
+[build]
+  writeStats = true         # Generate stats for PurgeCSS
+
+[minify]
+  minifyOutput = true
+  [minify.tdewolff]
+    [minify.tdewolff.css]
+      version = 2
+    [minify.tdewolff.html]
+      keepWhitespace = false
+
+# -----------------------------------------------------------------------------
+# SITE PARAMETERS
+# -----------------------------------------------------------------------------
+[params]
+  # Meta
+  description = "A powerful, intuitive command-line interface for managing Shelly smart home devices"
+  images = ["images/og-image.png"]
+
+  # Branding - SHELLY BLUE
+  themeColor = "#4594D1"
+
+  # Logo configuration
+  [params.logo]
+    path = "images/shelly-gopher.png"
+    text = "Shelly CLI"
+    height = 40
+    width = 40
+
+  # Footer
+  footer = "Shelly CLI Contributors"
+
+  # Social links
+  [params.social]
+    github = "https://github.com/tj-smith47/shelly-cli"
+
+  # Documentation settings
+  [params.docs]
+    # Table of contents
+    toc = true
+    tocDepth = 3
+    # Edit on GitHub
+    editPage = true
+    editPageUrl = "https://github.com/tj-smith47/shelly-cli/edit/main/docs/site/content/"
+    # Last modified
+    lastMod = true
+
+  # Search configuration (FlexSearch built into Doks)
+  [params.search]
+    enable = true
+    indexContent = true
+    indexAllPages = true
+    highlight = true
+    placeholder = "Search commands, guides..."
+
+  # Version selector
+  [params.versions]
+    current = "latest"
+    [[params.versions.list]]
+      version = "latest"
+      url = "/docs/"
+    # Add versioned docs here as releases happen:
+    # [[params.versions.list]]
+    #   version = "v1.0"
+    #   url = "/docs/v1.0/"
+
+  # Doks theme settings
+  [params.doks]
+    # Color mode
+    colorMode = "auto"
+    colorModeToggler = true
+
+    # Navbar
+    navbarSticky = true
+    containerBreakpoint = "lg"
+
+    # FlexSearch
+    flexSearch = true
+    searchExclKinds = []
+    searchExclTypes = []
+    showSearch = []
+    indexSummary = false
+    showDate = false
+    showSummary = true
+    searchLimit = 99
+
+    # Global alert
+    alert = false
+    alertDismissable = true
+
+    # Bootstrap
+    bootstrapJavascript = false
+
+    # Nav
+    sectionNav = ["docs"]
+    toTopButton = false
+    breadcrumbTrail = false
+    headlineHash = true
+    scrollSpy = true
+
+    # Multilingual
+    multilingualMode = false
+    showMissingLanguages = true
+
+    # Versioning - dynamically populated from versions.json
+    docsVersioning = true
+    docsVersion = "latest"
+
+    # UX
+    headerBar = false
+    backgroundDots = true
+
+    # Homepage
+    sectionFooter = false
+
+    # Repository
+    editPage = true
+    lastMod = true
+    repoHost = "GitHub"
+    docsRepo = "https://github.com/tj-smith47/shelly-cli"
+    docsRepoBranch = "main"
+    docsRepoSubPath = "docs/site"
+
+# -----------------------------------------------------------------------------
+# NAVIGATION MENUS
+# -----------------------------------------------------------------------------
+
+# Main navigation (header)
+[menu]
+  [[menu.main]]
+    identifier = "docs"
+    name = "Docs"
+    url = "/docs/"
+    weight = 10
+
+  [[menu.main]]
+    identifier = "commands"
+    name = "Commands"
+    url = "/docs/commands/"
+    weight = 20
+
+  [[menu.main]]
+    identifier = "examples"
+    name = "Examples"
+    url = "/examples/"
+    weight = 30
+
+  [[menu.main]]
+    identifier = "github"
+    name = "GitHub"
+    url = "https://github.com/tj-smith47/shelly-cli"
+    weight = 40
+    [menu.main.params]
+      external = true
+
+# Footer navigation
+  [[menu.footer]]
+    name = "Docs"
+    url = "/docs/"
+    weight = 10
+
+  [[menu.footer]]
+    name = "Commands"
+    url = "/docs/commands/"
+    weight = 20
+
+  [[menu.footer]]
+    name = "GitHub"
+    url = "https://github.com/tj-smith47/shelly-cli"
+    weight = 30
+
+# -----------------------------------------------------------------------------
+# OUTPUT FORMATS
+# -----------------------------------------------------------------------------
+[outputs]
+  home = ["HTML", "RSS", "SearchIndex"]
+  section = ["HTML", "RSS"]
+
+[outputFormats]
+  [outputFormats.SearchIndex]
+    mediaType = "application/json"
+    baseName = "search-index"
+    isPlainText = true
+    notAlternative = true
+
+# -----------------------------------------------------------------------------
+# MARKUP CONFIGURATION
+# -----------------------------------------------------------------------------
+[markup]
+  # Syntax highlighting
+  [markup.highlight]
+    style = "dracula"           # Match CLI default theme
+    lineNos = true              # Show line numbers
+    lineNumbersInTable = true   # Line numbers in table (for copy)
+    guessSyntax = true          # Auto-detect language
+    tabWidth = 4
+
+  # Goldmark (Markdown parser)
+  [markup.goldmark]
+    [markup.goldmark.extensions]
+      definitionList = true
+      footnote = true
+      linkify = true
+      strikethrough = true
+      table = true
+      taskList = true
+      typographer = true
+    [markup.goldmark.renderer]
+      unsafe = true             # Allow raw HTML in markdown
+
+  # Table of contents
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 4
+    ordered = false
+
+# -----------------------------------------------------------------------------
+# TAXONOMIES
+# -----------------------------------------------------------------------------
+[taxonomies]
+  category = "categories"
+  tag = "tags"
+
+# -----------------------------------------------------------------------------
+# PRIVACY (GDPR compliance)
+# -----------------------------------------------------------------------------
+[privacy]
+  [privacy.googleAnalytics]
+    disable = true
+  [privacy.x]
+    disable = true
+  [privacy.youtube]
+    disable = true
+  [privacy.vimeo]
+    disable = true

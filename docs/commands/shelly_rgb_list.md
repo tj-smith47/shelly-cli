@@ -1,6 +1,6 @@
 ## shelly rgb list
 
-List RGB components
+List rgb components
 
 ### Synopsis
 

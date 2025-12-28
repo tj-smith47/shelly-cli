@@ -34,7 +34,7 @@ shelly matter reset <device> [flags]
 
 ```
   -h, --help   help for reset
-  -y, --yes    Skip confirmation
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

@@ -30,8 +30,8 @@ shelly debug methods <device> [flags]
 
 ```
       --filter string   Filter methods by name (case-insensitive)
+  -f, --format string   Output format: text, json (default "text")
   -h, --help            help for methods
-      --json            Output as JSON array
 ```
 
 ### Options inherited from parent commands

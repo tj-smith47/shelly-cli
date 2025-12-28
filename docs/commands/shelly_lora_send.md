@@ -35,7 +35,7 @@ shelly lora send <device> <data> [flags]
 ```
   -h, --help     help for send
       --hex      Data is hexadecimal
-      --id int   LoRa component ID (default 100)
+  -i, --id int   LoRa component ID (default 0)
 ```
 
 ### Options inherited from parent commands

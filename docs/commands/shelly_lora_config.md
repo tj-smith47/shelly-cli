@@ -41,7 +41,7 @@ shelly lora config <device> [flags]
       --dr int      Data rate / spreading factor
       --freq int    RF frequency in Hz
   -h, --help        help for config
-      --id int      LoRa component ID (default 100)
+  -i, --id int      LoRa component ID (default 0)
       --power int   Transmit power in dBm
 ```
 

@@ -1,3 +1,17 @@
+# =============================================================================
+# DOCUMENTATION WORKFLOW
+# =============================================================================
+# Audits, builds, and deploys documentation to GitHub Pages.
+#
+# Triggers:
+#   - Push to master/develop: Audit docs, deploy latest to root (/)
+#   - Push tag (v*): Deploy versioned docs to /v1.0.0/, update versions.json
+#   - Pull request: Audit docs only (no deploy)
+#   - Manual: workflow_dispatch
+#
+# Deployment uses gh-pages branch directly (not deploy-pages action) to
+# preserve versioned directories across deployments.
+
 name: Docs
 
 on:
@@ -5,19 +19,41 @@ on:
     branches:
       - master
       - develop
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/docs.yml'
+    tags:
+      - 'v*'
   pull_request:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  HUGO_VERSION: "0.147.0"
 
 jobs:
+  # ===========================================================================
+  # AUDIT DOCUMENTATION
+  # ===========================================================================
+  # Verifies command docs and man pages are up to date
   audit:
     name: Audit Documentation
     runs-on: ubuntu-latest
+    # Skip audit for tag pushes (docs already audited on master)
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,7 +101,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git stash --include-untracked || true
-          # Fetch existing badges branch to preserve other badge files
           git fetch origin badges:badges 2>/dev/null || true
           if git show-ref --verify --quiet refs/heads/badges; then
             git checkout badges
@@ -77,3 +112,172 @@ jobs:
           git add docs.json
           git diff --cached --quiet || git commit -m "Update docs badge"
           git push origin badges --force
+
+  # ===========================================================================
+  # BUILD HUGO SITE
+  # ===========================================================================
+  build:
+    name: Build Hugo Site
+    runs-on: ubuntu-latest
+    needs: [audit]
+    # Run on master push or tag push, not PRs. Allow if audit skipped (tag push)
+    if: |
+      always() &&
+      (needs.audit.result == 'success' || needs.audit.result == 'skipped') &&
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_release: ${{ steps.version.outputs.is_release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "Building versioned docs for: $VERSION"
+          else
+            echo "version=latest" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "Building latest docs"
+          fi
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: ${{ env.HUGO_VERSION }}
+          extended: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: docs/site/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd docs/site
+          npm ci
+
+      - name: Build site
+        env:
+          HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache
+          HUGO_ENVIRONMENT: production
+        run: |
+          cd docs/site
+          VERSION="${{ steps.version.outputs.version }}"
+          if [ "$VERSION" = "latest" ]; then
+            hugo --minify --baseURL "https://tj-smith47.github.io/shelly-cli/"
+          else
+            hugo --minify --baseURL "https://tj-smith47.github.io/shelly-cli/$VERSION/"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hugo-site
+          path: docs/site/public
+          retention-days: 1
+
+  # ===========================================================================
+  # DEPLOY TO GITHUB PAGES
+  # ===========================================================================
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hugo-site
+          path: site-build
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+        continue-on-error: true
+
+      - name: Initialize gh-pages if needed
+        run: |
+          if [ ! -d "gh-pages/.git" ]; then
+            mkdir -p gh-pages
+            cd gh-pages
+            git init
+            git checkout -b gh-pages
+            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          fi
+
+      - name: Deploy docs
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          IS_RELEASE="${{ needs.build.outputs.is_release }}"
+
+          cd gh-pages
+
+          if [ "$IS_RELEASE" = "true" ]; then
+            # Versioned release: deploy to /vX.X.X/
+            echo "Deploying versioned docs to /$VERSION/"
+            rm -rf "$VERSION"
+            cp -r ../site-build "$VERSION"
+
+            # Update versions.json
+            if [ -f "versions.json" ]; then
+              if ! jq -e ".versions | index(\"$VERSION\")" versions.json > /dev/null 2>&1; then
+                jq ".versions = [\"$VERSION\"] + .versions | .latest = \"$VERSION\"" versions.json > versions.tmp
+                mv versions.tmp versions.json
+              fi
+            else
+              echo "{\"latest\": \"$VERSION\", \"versions\": [\"$VERSION\"]}" | jq '.' > versions.json
+            fi
+            echo "Updated versions.json:"
+            cat versions.json
+          else
+            # Latest: deploy to root, preserving versioned directories
+            echo "Deploying latest docs to root"
+
+            # Preserve versions.json and versioned directories
+            [ -f versions.json ] && cp versions.json ../versions.json.bak
+            for dir in v*/; do
+              [ -d "$dir" ] && mv "$dir" "../$dir"
+            done
+
+            # Clear root and copy new build
+            rm -rf *
+            cp -r ../site-build/* .
+
+            # Restore versions.json and versioned directories
+            [ -f ../versions.json.bak ] && mv ../versions.json.bak versions.json
+            for dir in ../v*/; do
+              [ -d "$dir" ] && mv "$dir" .
+            done
+          fi
+
+      - name: Commit and push
+        run: |
+          cd gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to deploy"
+          else
+            VERSION="${{ needs.build.outputs.version }}"
+            if [ "$VERSION" = "latest" ]; then
+              git commit -m "docs: deploy latest"
+            else
+              git commit -m "docs: deploy $VERSION"
+            fi
+            git push origin gh-pages
+          fi

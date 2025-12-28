@@ -7,9 +7,10 @@ Open CLI config in editor
 Open the Shelly CLI configuration file in your default editor.
 
 The editor is determined by:
-  1. $EDITOR environment variable
-  2. $VISUAL environment variable
-  3. Falls back to 'vi' on Unix, 'notepad' on Windows
+  1. 'editor' setting in config file
+  2. $EDITOR environment variable
+  3. $VISUAL environment variable
+  4. Falls back to common editors (nano, vim, vi)
 
 This allows you to directly edit the configuration file, including
 devices, aliases, groups, scenes, and other settings.

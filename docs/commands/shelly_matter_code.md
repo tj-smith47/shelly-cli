@@ -32,8 +32,8 @@ shelly matter code <device> [flags]
 ### Options
 
 ```
-  -h, --help   help for code
-      --json   Output as JSON
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for code
 ```
 
 ### Options inherited from parent commands

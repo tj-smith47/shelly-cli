@@ -1,0 +1,60 @@
+---
+title: "shelly debug methods"
+description: "shelly debug methods"
+---
+
+## shelly debug methods
+
+List available RPC methods
+
+### Synopsis
+
+List all RPC methods available on a Shelly device.
+
+This shows the methods you can call using 'shelly debug rpc'.
+Use --filter to search for specific methods by name.
+
+```
+shelly debug methods <device> [flags]
+```
+
+### Examples
+
+```
+  # List all methods
+  shelly debug methods living-room
+
+  # Filter methods containing "Switch"
+  shelly debug methods living-room --filter Switch
+
+  # Output as JSON
+  shelly debug methods living-room --json
+```
+
+### Options
+
+```
+      --filter string   Filter methods by name (case-insensitive)
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for methods
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly debug](shelly_debug.md)	 - Debug and diagnostic commands
+

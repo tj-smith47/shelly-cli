@@ -15,6 +15,10 @@ Available discovery methods (--method):
   ble    - Bluetooth Low Energy discovery (provisioning mode)
   coiot  - CoIoT/CoAP discovery (Gen1 devices)
 
+Plugin-managed devices (e.g., Tasmota, ESPHome) can also be discovered
+if the corresponding plugin is installed. Use --skip-plugins to disable
+plugin detection, or --platform to filter by specific platform.
+
 ```
 shelly discover [flags]
 ```
@@ -36,6 +40,12 @@ shelly discover [flags]
 
   # Auto-register discovered devices
   shelly discover --register
+
+  # Skip plugin detection (Shelly-only)
+  shelly discover --skip-plugins
+
+  # Discover only Tasmota devices
+  shelly discover --platform tasmota
 ```
 
 ### Options
@@ -43,8 +53,10 @@ shelly discover [flags]
 ```
   -h, --help               help for discover
   -m, --method string      Discovery method: http, mdns, ble, coiot (default "http")
+  -p, --platform string    Only discover devices of this platform (e.g., tasmota)
       --register           Auto-register discovered devices
       --skip-existing      Skip devices already registered (default true)
+      --skip-plugins       Skip plugin detection (Shelly-only discovery)
       --subnet string      Subnet to scan (auto-detected if not specified)
   -t, --timeout duration   Discovery timeout (default 2m0s)
 ```

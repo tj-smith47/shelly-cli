@@ -25,7 +25,7 @@ shelly auth import <file> [flags]
 ### Options
 
 ```
-      --dry-run   Preview import without applying changes
+      --dry-run   Preview actions without executing
   -h, --help      help for import
 ```
 

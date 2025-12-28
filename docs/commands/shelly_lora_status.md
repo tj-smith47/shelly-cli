@@ -30,7 +30,7 @@ shelly lora status <device> [flags]
 
 ```
   -h, --help     help for status
-      --id int   LoRa component ID (default 100)
+  -i, --id int   LoRa component ID (default 0)
       --json     Output as JSON
 ```
 

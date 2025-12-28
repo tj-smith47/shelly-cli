@@ -32,7 +32,7 @@ shelly template export <template> [file] [flags]
 ### Options
 
 ```
-      --format string   Output format (json, yaml) (default "yaml")
+  -f, --format string   Output format: json, yaml (default "yaml")
   -h, --help            help for export
 ```
 

@@ -33,9 +33,12 @@ shelly fleet on [device...] [flags]
 ### Options
 
 ```
-      --all            Turn on all relay devices
-  -g, --group string   Turn on devices in group
-  -h, --help           help for on
+  -a, --all                Target all registered devices
+  -c, --concurrent int     Max concurrent operations (default 5)
+  -g, --group string       Target device group
+  -h, --help               help for on
+  -s, --switch int         Switch component ID
+  -t, --timeout duration   Timeout per device (default 10s)
 ```
 
 ### Options inherited from parent commands

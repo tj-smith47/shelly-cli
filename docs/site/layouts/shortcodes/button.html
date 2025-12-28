@@ -1,0 +1,26 @@
+{{/*
+Button shortcode - renders a styled button link
+Parameters:
+  - href: The URL to link to (required)
+  - outline: If "true", render as outline button (optional)
+  - external: If "true", open in new tab (optional)
+*/}}
+{{ $href := .Get "href" }}
+{{ $outline := .Get "outline" }}
+{{ $external := .Get "external" }}
+
+{{ $class := "btn btn-primary" }}
+{{ if eq $outline "true" }}
+  {{ $class = "btn btn-outline" }}
+{{ end }}
+
+{{ $target := "" }}
+{{ $rel := "" }}
+{{ if eq $external "true" }}
+  {{ $target = "_blank" }}
+  {{ $rel = "noopener noreferrer" }}
+{{ end }}
+
+<a href="{{ $href }}" class="{{ $class }}"{{ with $target }} target="{{ . }}"{{ end }}{{ with $rel }} rel="{{ . }}"{{ end }}>
+  {{ .Inner | markdownify }}
+</a>

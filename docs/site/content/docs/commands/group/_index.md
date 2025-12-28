@@ -1,0 +1,72 @@
+---
+title: "shelly group"
+description: "shelly group"
+weight: 270
+sidebar:
+  collapsed: true
+---
+
+## shelly group
+
+Manage device groups
+
+### Synopsis
+
+Manage device groups for batch operations.
+
+Groups allow you to organize devices and perform bulk operations on them.
+Devices can belong to multiple groups.
+
+### Examples
+
+```
+  # List all groups
+  shelly group list
+
+  # Create a new group
+  shelly group create living-room
+
+  # Add devices to a group
+  shelly group add living-room light-1 switch-2
+
+  # Show group members
+  shelly group members living-room
+
+  # Remove a device from a group
+  shelly group remove living-room switch-2
+
+  # Delete a group
+  shelly group delete living-room
+```
+
+### Options
+
+```
+  -h, --help   help for group
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly group add](shelly_group_add.md)	 - Add devices to a group
+* [shelly group create](shelly_group_create.md)	 - Create a new device group
+* [shelly group delete](shelly_group_delete.md)	 - Delete a group
+* [shelly group list](shelly_group_list.md)	 - List groups
+* [shelly group members](shelly_group_members.md)	 - List group members
+* [shelly group remove](shelly_group_remove.md)	 - Remove devices from a group
+

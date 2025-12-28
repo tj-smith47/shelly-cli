@@ -1,0 +1,58 @@
+---
+title: "shelly bthome remove"
+description: "shelly bthome remove"
+---
+
+## shelly bthome remove
+
+Remove a BTHome device
+
+### Synopsis
+
+Remove a BTHome device from a Shelly gateway.
+
+This removes the BTHomeDevice component and any associated BTHomeSensor
+components. The physical device will no longer be tracked by the gateway.
+
+Use 'shelly bthome list' to see device IDs.
+
+```
+shelly bthome remove <device> <id> [flags]
+```
+
+### Examples
+
+```
+  # Remove BTHome device with ID 200
+  shelly bthome remove living-room 200
+
+  # Remove without confirmation
+  shelly bthome remove living-room 200 --yes
+```
+
+### Options
+
+```
+  -h, --help   help for remove
+  -y, --yes    Skip confirmation prompt
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly bthome](shelly_bthome.md)	 - Manage BTHome Bluetooth devices
+

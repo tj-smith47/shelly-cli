@@ -1,0 +1,64 @@
+---
+title: "shelly completion bash"
+description: "shelly completion bash"
+---
+
+## shelly completion bash
+
+Generate bash completion script
+
+### Synopsis
+
+Generate the autocompletion script for bash.
+
+This script depends on the 'bash-completion' package.
+If it is not installed already, you can install it via your OS's package manager.
+
+To load completions in your current shell session:
+
+  source <(shelly completion bash)
+
+To load completions for every new session, execute once:
+
+  # Linux:
+  shelly completion bash > /etc/bash_completion.d/shelly
+
+  # macOS:
+  shelly completion bash > $(brew --prefix)/etc/bash_completion.d/shelly
+
+```
+shelly completion bash
+```
+
+### Examples
+
+```
+  shelly completion bash > /tmp/shelly.bash
+  source /tmp/shelly.bash
+```
+
+### Options
+
+```
+  -h, --help   help for bash
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly completion](shelly_completion.md)	 - Generate shell completion scripts
+

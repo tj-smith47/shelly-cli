@@ -23,16 +23,28 @@ Requires integrator credentials configured via environment variables or config:
 
 
 .SH OPTIONS
-\fB--all\fP[=false]
-	Turn off all relay devices
+\fB-a\fP, \fB--all\fP[=false]
+	Target all registered devices
+
+.PP
+\fB-c\fP, \fB--concurrent\fP=5
+	Max concurrent operations
 
 .PP
 \fB-g\fP, \fB--group\fP=""
-	Turn off devices in group
+	Target device group
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for off
+
+.PP
+\fB-s\fP, \fB--switch\fP=0
+	Switch component ID
+
+.PP
+\fB-t\fP, \fB--timeout\fP=10s
+	Timeout per device
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS

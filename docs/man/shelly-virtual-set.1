@@ -1,0 +1,96 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-virtual-set - Set a virtual component value
+
+
+.SH SYNOPSIS
+\fBshelly virtual set    [flags]\fP
+
+
+.SH DESCRIPTION
+Set the value of a virtual component.
+
+.PP
+The key format is "type:id", for example "boolean:200" or "number:201".
+
+.PP
+For boolean components, use --toggle to flip the current value.
+For button components, use "trigger" as the value to press the button.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for set
+
+.PP
+\fB-t\fP, \fB--toggle\fP[=false]
+	Toggle boolean value instead of setting
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Set a boolean to true
+  shelly virtual set kitchen boolean:200 true
+
+  # Toggle a boolean
+  shelly virtual set kitchen boolean:200 --toggle
+
+  # Set a number
+  shelly virtual set kitchen number:201 25.5
+
+  # Set text
+  shelly virtual set kitchen text:202 "Hello World"
+
+  # Set enum value
+  shelly virtual set kitchen enum:203 "option1"
+
+  # Trigger a button
+  shelly virtual set kitchen button:204 trigger
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-virtual(1)\fP

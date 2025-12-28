@@ -38,10 +38,10 @@ shelly report [flags]
 ### Options
 
 ```
-      --format string   Output format: json, text (default "json")
-  -h, --help            help for report
-  -o, --output string   Output file path
-  -t, --type string     Report type: devices, energy, audit (default "devices")
+  -f, --format string        Output format: json, text (default "json")
+  -h, --help                 help for report
+      --output-file string   Output file path
+  -t, --type string          Report type: devices, energy, audit (default "devices")
 ```
 
 ### Options inherited from parent commands
@@ -52,6 +52,7 @@ shelly report [flags]
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --template string         Go template string for output (use with -o template)

@@ -1,0 +1,54 @@
+{{/*
+  Version selector - dynamically populates the Doks version dropdown from versions.json
+  This script runs on page load and updates the dropdown content
+*/}}
+<script>
+(function() {
+  // Determine current version from URL path
+  const path = window.location.pathname;
+  const versionMatch = path.match(/\/shelly-cli\/(v[\d.]+(?:-[a-zA-Z0-9.]+)?)\//);
+  const currentVersion = versionMatch ? versionMatch[1] : 'latest';
+
+  // Wait for DOM to be ready
+  document.addEventListener('DOMContentLoaded', function() {
+    // Find the Doks version dropdown
+    const versionDropdown = document.getElementById('doks-versions');
+    const versionMenu = versionDropdown ? versionDropdown.nextElementSibling : null;
+
+    if (!versionDropdown || !versionMenu) return;
+
+    // Fetch versions.json and populate dropdown
+    fetch('/shelly-cli/versions.json')
+      .then(response => response.ok ? response.json() : null)
+      .catch(() => null)
+      .then(data => {
+        if (!data || !data.versions || data.versions.length === 0) return;
+
+        // Update button text
+        const buttonText = currentVersion === 'latest'
+          ? `latest (${data.latest || 'dev'})`
+          : currentVersion;
+        versionDropdown.innerHTML = `${buttonText} <span class="dropdown-caret"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M6 9l6 6l6 -6"></path></svg></span>`;
+
+        // Build dropdown menu
+        let menuHTML = '';
+
+        // Latest option
+        const isLatest = currentVersion === 'latest';
+        menuHTML += `<li><a class="dropdown-item${isLatest ? ' current' : ''}" href="/shelly-cli/"${isLatest ? ' aria-current="true"' : ''}>Latest (${data.latest || 'dev'})</a></li>`;
+
+        if (data.versions.length > 0) {
+          menuHTML += '<li><hr class="dropdown-divider"></li>';
+        }
+
+        // Versioned options
+        data.versions.forEach(version => {
+          const isCurrent = currentVersion === version;
+          menuHTML += `<li><a class="dropdown-item${isCurrent ? ' current' : ''}" href="/shelly-cli/${version}/"${isCurrent ? ' aria-current="true"' : ''}>${version}</a></li>`;
+        });
+
+        versionMenu.innerHTML = menuHTML;
+      });
+  });
+})();
+</script>

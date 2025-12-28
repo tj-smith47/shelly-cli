@@ -26,6 +26,12 @@ Check for updates, update to the latest version, or rollback to a previous versi
   # Update to beta firmware
   shelly firmware update living-room --beta
 
+  # Interactive update workflow
+  shelly firmware updates
+
+  # Update all devices (non-interactive)
+  shelly firmware updates --all --yes
+
   # Rollback to previous firmware
   shelly firmware rollback living-room
 
@@ -62,4 +68,5 @@ Check for updates, update to the latest version, or rollback to a previous versi
 * [shelly firmware rollback](shelly_firmware_rollback.md)	 - Rollback to previous firmware
 * [shelly firmware status](shelly_firmware_status.md)	 - Show firmware status
 * [shelly firmware update](shelly_firmware_update.md)	 - Update device firmware
+* [shelly firmware updates](shelly_firmware_updates.md)	 - Interactive firmware update workflow
 

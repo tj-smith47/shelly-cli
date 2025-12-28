@@ -1,0 +1,96 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-virtual-create - Create a virtual component
+
+
+.SH SYNOPSIS
+\fBshelly virtual create   [flags]\fP
+
+
+.SH DESCRIPTION
+Create a new virtual component on a Shelly Gen2+ device.
+
+.PP
+Available types:
+  boolean  - True/false value
+  number   - Numeric value with optional min/max
+  text     - Text string value
+  enum     - Selection from predefined options
+  button   - Triggerable button
+  group    - Component group
+
+.PP
+Virtual components are automatically assigned IDs in the range 200-299.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for create
+
+.PP
+\fB--id\fP=0
+	Specific component ID (200-299, auto-assigned if not specified)
+
+.PP
+\fB--name\fP=""
+	Component display name
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Create a boolean component
+  shelly virtual create kitchen boolean --name "Away Mode"
+
+  # Create a number component
+  shelly virtual create kitchen number --name "Temperature Offset"
+
+  # Create with specific ID
+  shelly virtual create kitchen boolean --name "Override" --id 205
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-virtual(1)\fP

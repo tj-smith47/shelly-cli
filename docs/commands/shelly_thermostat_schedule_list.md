@@ -33,8 +33,8 @@ shelly thermostat schedule list <device> [flags]
 
 ```
       --all                 Show all device schedules
+  -f, --format string       Output format: text, json (default "text")
   -h, --help                help for list
-      --json                Output as JSON
       --thermostat-id int   Filter by thermostat component ID
 ```
 

@@ -7,13 +7,13 @@ List registered devices
 List all devices registered in the local registry.
 
 The registry stores device information including name, address, model,
-generation, and authentication credentials. Use filters to narrow results
-by device generation (1, 2, or 3) or device type (e.g., SHSW-1, SHRGBW2).
+generation, platform, and authentication credentials. Use filters to
+narrow results by device generation, device type, or platform.
 
 Output is formatted as a table by default. Use -o json or -o yaml for
 structured output suitable for scripting and piping to tools like jq.
 
-Columns: Name, Address, Model, Generation, Auth (yes/no)
+Columns: Name, Address, Platform, Type, Model, Generation, Auth
 
 ```
 shelly device list [flags]
@@ -30,6 +30,15 @@ shelly device list [flags]
 
   # List devices by type
   shelly device list --type SHSW-1
+
+  # List only Shelly devices (exclude plugin-managed)
+  shelly device list --platform shelly
+
+  # List only Tasmota devices (from shelly-tasmota plugin)
+  shelly device list --platform tasmota
+
+  # Show firmware versions and sort updates first
+  shelly device list --version --updates-first
 
   # Output as JSON for scripting
   shelly device list -o json
@@ -52,9 +61,12 @@ shelly device list [flags]
 ### Options
 
 ```
-  -g, --generation int   Filter by generation (1, 2, or 3)
-  -h, --help             help for list
-  -t, --type string      Filter by device type
+  -g, --generation int    Filter by generation (1, 2, or 3)
+  -h, --help              help for list
+  -p, --platform string   Filter by platform (e.g., shelly, tasmota)
+  -t, --type string       Filter by device type
+  -u, --updates-first     Sort devices with available updates first
+  -V, --version           Show firmware version information
 ```
 
 ### Options inherited from parent commands

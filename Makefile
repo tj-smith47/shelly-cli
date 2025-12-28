@@ -62,14 +62,18 @@ deps:
 	@go mod download
 	@go mod tidy
 
-## docs: Generate command documentation and man pages
+## docs: Generate command documentation, man pages, and update Hugo site
 docs:
-	@echo "Generating documentation..."
+	@echo "Generating command documentation..."
 	@go run ./cmd/docgen ./docs/commands
 	@echo "Documentation generated in docs/commands/"
 	@echo "Generating man pages..."
 	@go run ./cmd/mangen ./docs/man
 	@echo "Man pages generated in docs/man/"
+	@echo "Migrating docs to Hugo site..."
+	@cd docs/site && ./scripts/migrate-docs.sh
+	@cd docs/site && ./scripts/migrate-commands.sh
+	@echo "Hugo site updated in docs/site/"
 
 ## fmt: Format code
 fmt:

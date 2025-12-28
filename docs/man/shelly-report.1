@@ -25,7 +25,7 @@ Output formats:
 
 
 .SH OPTIONS
-\fB--format\fP="json"
+\fB-f\fP, \fB--format\fP="json"
 	Output format: json, text
 
 .PP
@@ -33,7 +33,7 @@ Output formats:
 	help for report
 
 .PP
-\fB-o\fP, \fB--output\fP=""
+\fB--output-file\fP=""
 	Output file path
 
 .PP
@@ -60,6 +60,10 @@ Output formats:
 .PP
 \fB--no-headers\fP[=false]
 	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
 
 .PP
 \fB--plain\fP[=false]

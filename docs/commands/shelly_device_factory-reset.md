@@ -40,9 +40,9 @@ shelly device factory-reset <device> [flags]
 ### Options
 
 ```
-      --confirm   Double-confirm factory reset
+      --confirm   Double-confirm destructive operation
   -h, --help      help for factory-reset
-  -y, --yes       Confirm you want to proceed
+  -y, --yes       Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands

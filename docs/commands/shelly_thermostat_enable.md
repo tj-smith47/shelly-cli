@@ -32,7 +32,7 @@ shelly thermostat enable <device> [flags]
 
 ```
   -h, --help          help for enable
-      --id int        Thermostat component ID
+  -i, --id int        Thermostat component ID (default 0)
       --mode string   Operating mode (heat, cool, auto)
 ```
 

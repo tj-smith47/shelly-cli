@@ -26,14 +26,14 @@ shelly scene export <name> [file] [flags]
   shelly scene export movie-night
 
   # Export to stdout as JSON
-  shelly scene export movie-night --output json
+  shelly scene export movie-night --format json
 ```
 
 ### Options
 
 ```
+  -f, --format string   Output format: json, yaml (default "yaml")
   -h, --help            help for export
-  -o, --output string   Output format: json, yaml (default "yaml")
 ```
 
 ### Options inherited from parent commands
@@ -44,6 +44,7 @@ shelly scene export <name> [file] [flags]
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --template string         Go template string for output (use with -o template)

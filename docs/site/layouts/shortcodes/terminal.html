@@ -1,0 +1,15 @@
+{{/* Terminal window shortcode - displays code in macOS-style terminal window */}}
+
+{{ $title := .Get "title" | default "Terminal" }}
+
+<div class="terminal-window">
+  <div class="terminal-header">
+    <span class="terminal-button red"></span>
+    <span class="terminal-button yellow"></span>
+    <span class="terminal-button green"></span>
+    <span class="terminal-title">{{ $title }}</span>
+  </div>
+  <div class="terminal-body">
+    <pre>{{ .Inner }}</pre>
+  </div>
+</div>

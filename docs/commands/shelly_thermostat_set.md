@@ -37,7 +37,7 @@ shelly thermostat set <device> [flags]
       --disable        Disable thermostat
       --enable         Enable thermostat
   -h, --help           help for set
-      --id int         Thermostat component ID
+  -i, --id int         Thermostat component ID (default 0)
       --mode string    Operating mode (heat, cool, auto)
       --target float   Target temperature in Celsius
 ```

@@ -32,7 +32,7 @@ shelly kvs export <device> [file] [flags]
 ### Options
 
 ```
-  -f, --format string   Output format (json, yaml) (default "json")
+  -f, --format string   Output format: json, yaml (default "json")
   -h, --help            help for export
 ```
 

@@ -1,0 +1,21 @@
+// =============================================================================
+// SHELLY CLI - CUSTOM SCSS VARIABLES
+// =============================================================================
+// Override Doks theme variables with Shelly branding
+
+// Override theme's internal color variable (used for $primary)
+$db-purple-300: #4594D1;     // Shelly Blue (replaces theme purple)
+
+// Primary brand colors
+$primary: #4594D1;           // Shelly Blue
+$primary-hover: #3a7cb3;     // Shelly Blue Dark
+
+// Secondary colors
+$secondary: #0f8a71;         // Shelly Teal
+$secondary-hover: #0c6f5c;   // Shelly Teal Dark
+
+// Link colors
+$link-color-dark: #6bb0e3;   // Shelly Blue Light (for dark mode)
+
+// Heading colors - make h1 Shelly Blue
+$headings-color: #4594D1;    // Shelly Blue for all headings

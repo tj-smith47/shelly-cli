@@ -1,0 +1,120 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-firmware-updates - Interactive firmware update workflow
+
+
+.SH SYNOPSIS
+\fBshelly firmware updates [flags]\fP
+
+
+.SH DESCRIPTION
+Check for and apply firmware updates with an interactive workflow.
+
+.PP
+By default, runs in interactive mode - displays devices with available updates
+and prompts for selection. Use --all with --yes for non-interactive batch updates.
+
+.PP
+Supports both native Shelly devices and plugin-managed devices (Tasmota, etc.).
+
+
+.SH OPTIONS
+\fB--all\fP[=false]
+	Update all devices with available updates
+
+.PP
+\fB--beta\fP[=false]
+	Use beta/development release channel
+
+.PP
+\fB--devices\fP=""
+	Comma-separated list of specific devices to update
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for updates
+
+.PP
+\fB--parallel\fP=3
+	Number of devices to update in parallel
+
+.PP
+\fB--platform\fP=""
+	Only update devices of this platform (e.g., tasmota)
+
+.PP
+\fB--stable\fP[=false]
+	Use stable release channel (default)
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Interactive mode - check and select devices
+  shelly firmware updates
+
+  # Update all devices to stable (non-interactive)
+  shelly firmware updates --all --yes
+
+  # Update all devices to beta (non-interactive)
+  shelly firmware updates --all --beta --yes
+
+  # Update specific devices to stable
+  shelly firmware updates --devices=kitchen,bedroom --stable
+
+  # Update only Tasmota devices
+  shelly firmware updates --all --platform=tasmota --yes
+
+  # Update specific devices interactively
+  shelly firmware updates --devices=kitchen,bedroom
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-firmware(1)\fP
