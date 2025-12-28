@@ -66,6 +66,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/repl"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/report"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/rgb"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/rgbw"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/scene"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
@@ -241,6 +242,7 @@ func init() {
 		cover.NewCommand(f),
 		light.NewCommand(f),
 		rgb.NewCommand(f),
+		rgbw.NewCommand(f),
 		party.NewCommand(f),
 		input.NewCommand(f),
 		thermostat.NewCommand(f),

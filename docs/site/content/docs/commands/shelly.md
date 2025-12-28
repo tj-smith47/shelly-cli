@@ -90,6 +90,7 @@ and controlling Shelly devices on your local network.
 * [shelly metrics](shelly_metrics.md)	 - Export device metrics
 * [shelly migrate](shelly_migrate.md)	 - Migrate configuration between devices
 * [shelly mock](shelly_mock.md)	 - Mock device mode for testing
+* [shelly modbus](shelly_modbus.md)	 - Manage Modbus-TCP configuration
 * [shelly monitor](shelly_monitor.md)	 - Real-time device monitoring
 * [shelly mqtt](shelly_mqtt.md)	 - Manage device MQTT configuration
 * [shelly off](shelly_off.md)	 - Turn off a device (auto-detects type)
@@ -97,15 +98,18 @@ and controlling Shelly devices on your local network.
 * [shelly party](shelly_party.md)	 - Party mode - flash lights!
 * [shelly plugin](shelly_plugin.md)	 - Manage CLI plugins
 * [shelly power](shelly_power.md)	 - Power meter operations (PM/PM1 components)
+* [shelly profile](shelly_profile.md)	 - Device profile information
 * [shelly provision](shelly_provision.md)	 - Provision device settings
 * [shelly qr](shelly_qr.md)	 - Generate device QR code
 * [shelly repl](shelly_repl.md)	 - Launch interactive REPL
 * [shelly report](shelly_report.md)	 - Generate reports
 * [shelly rgb](shelly_rgb.md)	 - Control RGB light components
+* [shelly rgbw](shelly_rgbw.md)	 - Control RGBW LED outputs
 * [shelly scene](shelly_scene.md)	 - Manage device scenes
 * [shelly schedule](shelly_schedule.md)	 - Manage device schedules
 * [shelly script](shelly_script.md)	 - Manage device scripts
 * [shelly sensor](shelly_sensor.md)	 - Manage device sensors
+* [shelly sensoraddon](shelly_sensoraddon.md)	 - Manage Sensor Add-on peripherals
 * [shelly shell](shelly_shell.md)	 - Interactive shell for a specific device
 * [shelly sleep](shelly_sleep.md)	 - Turn device off after a delay
 * [shelly status](shelly_status.md)	 - Show device status (quick overview)
@@ -123,4 +127,5 @@ and controlling Shelly devices on your local network.
 * [shelly webhook](shelly_webhook.md)	 - Manage device webhooks
 * [shelly wifi](shelly_wifi.md)	 - Manage device WiFi configuration
 * [shelly zigbee](shelly_zigbee.md)	 - Manage Zigbee connectivity
+* [shelly zwave](shelly_zwave.md)	 - Z-Wave device utilities
 

@@ -4,7 +4,7 @@ Control RGB light components
 
 ### Synopsis
 
-Control RGB and RGBW light components on Shelly devices.
+Control RGB light components on Shelly devices.
 
 ### Examples
 

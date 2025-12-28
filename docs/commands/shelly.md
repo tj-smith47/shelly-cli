@@ -98,6 +98,7 @@ and controlling Shelly devices on your local network.
 * [shelly repl](shelly_repl.md)	 - Launch interactive REPL
 * [shelly report](shelly_report.md)	 - Generate reports
 * [shelly rgb](shelly_rgb.md)	 - Control RGB light components
+* [shelly rgbw](shelly_rgbw.md)	 - Control RGBW LED outputs
 * [shelly scene](shelly_scene.md)	 - Manage device scenes
 * [shelly schedule](shelly_schedule.md)	 - Manage device schedules
 * [shelly script](shelly_script.md)	 - Manage device scripts

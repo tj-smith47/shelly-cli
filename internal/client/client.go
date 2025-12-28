@@ -135,6 +135,15 @@ func (c *Client) RGB(id int) *RGBComponent {
 	}
 }
 
+// RGBW returns an RGBW component accessor.
+func (c *Client) RGBW(id int) *RGBWComponent {
+	return &RGBWComponent{
+		rgbw: components.NewRGBW(c.rpcClient, id),
+		rpc:  c.rpcClient,
+		id:   id,
+	}
+}
+
 // Input returns an input component accessor.
 func (c *Client) Input(id int) *InputComponent {
 	return &InputComponent{
@@ -204,6 +213,7 @@ var componentPrefixes = map[string]model.ComponentType{
 	"cover:":  model.ComponentCover,
 	"light:":  model.ComponentLight,
 	"rgb:":    model.ComponentRGB,
+	"rgbw:":   model.ComponentRGBW,
 	"input:":  model.ComponentInput,
 }
 

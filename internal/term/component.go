@@ -66,6 +66,33 @@ func DisplayRGBStatus(ios *iostreams.IOStreams, status *model.RGBStatus) {
 	}
 }
 
+// DisplayRGBWStatus prints RGBW component status.
+func DisplayRGBWStatus(ios *iostreams.IOStreams, status *model.RGBWStatus) {
+	ios.Title("RGBW %d Status", status.ID)
+	ios.Println()
+
+	ios.Printf("  State:      %s\n", output.RenderOnOff(status.Output, output.CaseUpper, theme.FalseError))
+	if status.RGB != nil {
+		ios.Printf("  Color:      R:%d G:%d B:%d\n",
+			status.RGB.Red, status.RGB.Green, status.RGB.Blue)
+	}
+	if status.White != nil {
+		ios.Printf("  White:      %d\n", *status.White)
+	}
+	if status.Brightness != nil {
+		ios.Printf("  Brightness: %d%%\n", *status.Brightness)
+	}
+	if status.Power != nil {
+		ios.Printf("  Power:      %.1f W\n", *status.Power)
+	}
+	if status.Voltage != nil {
+		ios.Printf("  Voltage:    %.1f V\n", *status.Voltage)
+	}
+	if status.Current != nil {
+		ios.Printf("  Current:    %.3f A\n", *status.Current)
+	}
+}
+
 // DisplayCoverStatus prints cover component status.
 func DisplayCoverStatus(ios *iostreams.IOStreams, status *model.CoverStatus) {
 	ios.Title("Cover %d Status", status.ID)
@@ -134,6 +161,30 @@ func DisplayRGBList(ios *iostreams.IOStreams, rgbs []shelly.RGBInfo) {
 
 		power := output.FormatPowerTableValue(rgb.Power)
 		t.AddRow(fmt.Sprintf("%d", rgb.ID), name, state, color, brightness, power)
+	}
+	printTable(ios, t)
+}
+
+// DisplayRGBWList prints a table of RGBW components.
+func DisplayRGBWList(ios *iostreams.IOStreams, rgbws []shelly.RGBWInfo) {
+	t := output.NewTable("ID", "Name", "State", "Color", "White", "Brightness", "Power")
+	for _, rgbw := range rgbws {
+		name := output.FormatComponentName(rgbw.Name, "rgbw", rgbw.ID)
+		state := output.RenderOnOff(rgbw.Output, output.CaseUpper, theme.FalseError)
+		color := fmt.Sprintf("R:%d G:%d B:%d", rgbw.Red, rgbw.Green, rgbw.Blue)
+
+		white := "-"
+		if rgbw.White >= 0 {
+			white = fmt.Sprintf("%d", rgbw.White)
+		}
+
+		brightness := "-"
+		if rgbw.Brightness >= 0 {
+			brightness = fmt.Sprintf("%d%%", rgbw.Brightness)
+		}
+
+		power := output.FormatPowerTableValue(rgbw.Power)
+		t.AddRow(fmt.Sprintf("%d", rgbw.ID), name, state, color, white, brightness, power)
 	}
 	printTable(ios, t)
 }

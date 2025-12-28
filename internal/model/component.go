@@ -10,6 +10,7 @@ const (
 	ComponentCover  ComponentType = "cover"
 	ComponentLight  ComponentType = "light"
 	ComponentRGB    ComponentType = "rgb"
+	ComponentRGBW   ComponentType = "rgbw"
 	ComponentInput  ComponentType = "input"
 )
 
@@ -143,6 +144,37 @@ type RGBConfig struct {
 	DefaultBright   int
 	NightModeEnable bool
 	NightModeBright int
+}
+
+// RGBWStatus represents the status of an RGBW component.
+type RGBWStatus struct {
+	ID         int
+	Output     bool
+	Brightness *int
+	RGB        *RGBColor
+	White      *int
+	Source     string
+	Power      *float64
+	Voltage    *float64
+	Current    *float64
+	Overtemp   bool
+	Overpower  bool
+}
+
+// RGBWConfig represents the configuration of an RGBW component.
+type RGBWConfig struct {
+	ID              int
+	Name            *string
+	InitialState    string
+	AutoOn          bool
+	AutoOnDelay     float64
+	AutoOff         bool
+	AutoOffDelay    float64
+	DefaultBright   int
+	DefaultWhite    int
+	NightModeEnable bool
+	NightModeBright int
+	NightModeWhite  int
 }
 
 // EnergyCounter represents energy consumption data.

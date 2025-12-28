@@ -1,0 +1,111 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-rgbw-set - Set RGBW parameters
+
+
+.SH SYNOPSIS
+\fBshelly rgbw set  [flags]\fP
+
+
+.SH DESCRIPTION
+Set parameters of an RGBW light component on the specified device.
+
+.PP
+You can set color values (red, green, blue), white channel, brightness, and on/off state.
+Values not specified will be left unchanged.
+
+
+.SH OPTIONS
+\fB-b\fP, \fB--blue\fP=-1
+	Blue value (0-255)
+
+.PP
+\fB--brightness\fP=-1
+	Brightness (0-100)
+
+.PP
+\fB-g\fP, \fB--green\fP=-1
+	Green value (0-255)
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for set
+
+.PP
+\fB-i\fP, \fB--id\fP=0
+	RGBW component ID (default 0)
+
+.PP
+\fB--on\fP[=false]
+	Turn on
+
+.PP
+\fB-r\fP, \fB--red\fP=-1
+	Red value (0-255)
+
+.PP
+\fB-w\fP, \fB--white\fP=-1
+	White channel value (0-100)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Set RGBW color to red
+  shelly rgbw set living-room --red 255 --green 0 --blue 0
+
+  # Set RGBW with white channel
+  shelly rgbw set living-room -r 255 -g 200 -b 150 --white 128
+
+  # Set RGBW with brightness
+  shelly rgbw color living-room -r 0 -g 255 -b 128 --brightness 75
+
+  # Set only white channel
+  shelly rgbw set living-room --white 200
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-rgbw(1)\fP

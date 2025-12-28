@@ -1,0 +1,84 @@
+---
+title: "shelly thermostat"
+description: "shelly thermostat"
+weight: 650
+sidebar:
+  collapsed: true
+---
+
+## shelly thermostat
+
+Manage thermostats
+
+### Synopsis
+
+Manage Shelly thermostat devices and components.
+
+Thermostat support is available on specific devices like:
+- Shelly BLU TRV (Thermostatic Radiator Valve) via BLU Gateway
+- Devices with virtual thermostat components
+
+Commands allow you to:
+- View thermostat status (current/target temperature, valve position)
+- Set target temperature and operating mode (heat/cool/auto)
+- Enable/disable thermostat control
+- Activate boost mode for rapid heating
+- Override target temperature temporarily
+- Calibrate valve position
+
+### Examples
+
+```
+  # List thermostats on a device
+  shelly thermostat list gateway
+
+  # Show thermostat status
+  shelly thermostat status gateway
+
+  # Set target temperature to 22°C
+  shelly thermostat set gateway --target 22
+
+  # Enable thermostat in heat mode
+  shelly thermostat enable gateway --mode heat
+
+  # Activate boost for 5 minutes
+  shelly thermostat boost gateway --duration 5m
+
+  # Override temperature for 30 minutes
+  shelly thermostat override gateway --target 25 --duration 30m
+```
+
+### Options
+
+```
+  -h, --help   help for thermostat
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly thermostat boost](shelly_thermostat_boost.md)	 - Activate boost mode
+* [shelly thermostat calibrate](shelly_thermostat_calibrate.md)	 - Calibrate thermostat valve
+* [shelly thermostat disable](shelly_thermostat_disable.md)	 - Disable thermostat
+* [shelly thermostat enable](shelly_thermostat_enable.md)	 - Enable thermostat
+* [shelly thermostat list](shelly_thermostat_list.md)	 - List thermostats
+* [shelly thermostat override](shelly_thermostat_override.md)	 - Override target temperature
+* [shelly thermostat schedule](shelly_thermostat_schedule.md)	 - Manage thermostat schedules
+* [shelly thermostat set](shelly_thermostat_set.md)	 - Set thermostat configuration
+* [shelly thermostat status](shelly_thermostat_status.md)	 - Show thermostat status
+

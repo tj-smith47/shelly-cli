@@ -1,0 +1,74 @@
+---
+title: "shelly energy dashboard"
+description: "shelly energy dashboard"
+---
+
+## shelly energy dashboard
+
+Show energy dashboard for all devices
+
+### Synopsis
+
+Display an aggregated energy dashboard showing power consumption across all devices.
+
+Shows total power consumption, per-device breakdown, and optional cost estimation.
+By default, queries all registered devices. Use --devices to specify a subset.
+
+Examples:
+  # Show dashboard for all registered devices
+  shelly energy dashboard
+
+  # Show dashboard for specific devices
+  shelly energy dashboard --devices kitchen,living-room,garage
+
+  # Include cost estimation at $0.12 per kWh
+  shelly energy dashboard --cost 0.12 --currency USD
+
+```
+shelly energy dashboard [flags]
+```
+
+### Examples
+
+```
+  # Show dashboard for all registered devices
+  shelly energy dashboard
+
+  # Show dashboard for specific devices
+  shelly energy dashboard --devices kitchen,living-room
+
+  # Include cost estimation
+  shelly energy dashboard --cost 0.15 --currency EUR
+
+  # Output as JSON
+  shelly energy dashboard -o json
+```
+
+### Options
+
+```
+      --cost float        Cost per kWh for estimation
+      --currency string   Currency for cost display (default "USD")
+      --devices strings   Devices to include (default: all registered)
+  -h, --help              help for dashboard
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly energy](shelly_energy.md)	 - Energy monitoring operations (EM/EM1 components)
+
