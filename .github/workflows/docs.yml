@@ -284,11 +284,6 @@ jobs:
             else
               git commit -m "docs: deploy $VERSION"
             fi
-            # Force push if new branch, otherwise normal push
-            if [ "${{ steps.init.outputs.is_new }}" = "true" ]; then
-              echo "Creating new gh-pages branch on remote"
-              git push -u origin gh-pages --force
-            else
-              git push origin gh-pages
-            fi
+            # Always force push to gh-pages (safe for deployment branches)
+            git push -u origin gh-pages --force
           fi

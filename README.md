@@ -10,8 +10,6 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/tj-smith47/shelly-cli.svg)](https://pkg.go.dev/github.com/tj-smith47/shelly-cli)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-<a href="https://www.buymeacoffee.com/tjsmith47" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
-
 A powerful, intuitive command-line interface for managing Shelly smart home devices.
 
 [Installation](#installation) •
@@ -158,7 +156,7 @@ shelly firmware update living-room
 | `thermostat` | Control thermostats | `shelly thermostat set living-room --temp 22` |
 | `input` | Manage input components | `shelly input status kitchen` |
 | `scene` | Manage scenes | `shelly scene activate movie-night` |
-| `batch` | Batch device operations | `shelly batch on all-lights` |
+| `batch` | Batch device operations | `shelly batch on --group all-lights` |
 
 </details>
 
@@ -343,10 +341,10 @@ shelly device list -o json | jq '.[] | select(.online)'
 shelly status kitchen --plain  # Returns "on" or "off"
 
 # Quiet mode for cron jobs
-shelly batch on all-lights -q
+shelly batch on --group all-lights -q
 
-# Export to file
-shelly config export kitchen -o yaml > kitchen-backup.yaml
+# Export device config to file
+shelly backup create kitchen -o yaml > kitchen-backup.yaml
 ```
 
 ## TUI Dashboard
@@ -497,8 +495,8 @@ Group devices for batch operations:
 shelly group create lights --devices living-room,kitchen,bedroom
 
 # Control group
-shelly batch on lights
-shelly batch off lights
+shelly batch on --group lights
+shelly batch off --group lights
 
 # List groups
 shelly group list
@@ -614,3 +612,9 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 ## Disclaimer
 
 Generated entirely by Claude Opus 4.5 over many iterations 🤖
+
+---
+
+<div align="center">
+<a href="https://www.buymeacoffee.com/tjsmith47" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+</div>

@@ -206,6 +206,7 @@ func TestComponentPrefixes_AllTypes(t *testing.T) {
 		"cover:":  model.ComponentCover,
 		"light:":  model.ComponentLight,
 		"rgb:":    model.ComponentRGB,
+		"rgbw:":   model.ComponentRGBW,
 		"input:":  model.ComponentInput,
 	}
 
