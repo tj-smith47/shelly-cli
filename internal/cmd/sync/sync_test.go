@@ -10,6 +10,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
+const testFalseValue = "false"
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -108,24 +110,24 @@ func TestNewCommand_Flags(t *testing.T) {
 	pushFlag := cmd.Flags().Lookup("push")
 	if pushFlag == nil {
 		t.Error("push flag not found")
-	} else if pushFlag.DefValue != "false" {
-		t.Errorf("push default = %q, want %q", pushFlag.DefValue, "false")
+	} else if pushFlag.DefValue != testFalseValue {
+		t.Errorf("push default = %q, want %q", pushFlag.DefValue, testFalseValue)
 	}
 
 	// Test pull flag
 	pullFlag := cmd.Flags().Lookup("pull")
 	if pullFlag == nil {
 		t.Error("pull flag not found")
-	} else if pullFlag.DefValue != "false" {
-		t.Errorf("pull default = %q, want %q", pullFlag.DefValue, "false")
+	} else if pullFlag.DefValue != testFalseValue {
+		t.Errorf("pull default = %q, want %q", pullFlag.DefValue, testFalseValue)
 	}
 
 	// Test dry-run flag
 	dryRunFlag := cmd.Flags().Lookup("dry-run")
 	if dryRunFlag == nil {
 		t.Error("dry-run flag not found")
-	} else if dryRunFlag.DefValue != "false" {
-		t.Errorf("dry-run default = %q, want %q", dryRunFlag.DefValue, "false")
+	} else if dryRunFlag.DefValue != testFalseValue {
+		t.Errorf("dry-run default = %q, want %q", dryRunFlag.DefValue, testFalseValue)
 	}
 
 	// Test device flag

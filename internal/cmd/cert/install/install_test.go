@@ -1,6 +1,7 @@
 package install
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
+
+const testStringType = "string"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -110,8 +113,8 @@ func TestNewCommand_CAFlagType(t *testing.T) {
 	}
 
 	// Flag type should be string
-	if caFlag.Value.Type() != "string" {
-		t.Errorf("ca flag type = %q, want 'string'", caFlag.Value.Type())
+	if caFlag.Value.Type() != testStringType {
+		t.Errorf("ca flag type = %q, want %q", caFlag.Value.Type(), testStringType)
 	}
 }
 
@@ -125,8 +128,8 @@ func TestNewCommand_ClientCertFlagType(t *testing.T) {
 	}
 
 	// Flag type should be string
-	if clientCertFlag.Value.Type() != "string" {
-		t.Errorf("client-cert flag type = %q, want 'string'", clientCertFlag.Value.Type())
+	if clientCertFlag.Value.Type() != testStringType {
+		t.Errorf("client-cert flag type = %q, want %q", clientCertFlag.Value.Type(), testStringType)
 	}
 }
 
@@ -140,8 +143,8 @@ func TestNewCommand_ClientKeyFlagType(t *testing.T) {
 	}
 
 	// Flag type should be string
-	if clientKeyFlag.Value.Type() != "string" {
-		t.Errorf("client-key flag type = %q, want 'string'", clientKeyFlag.Value.Type())
+	if clientKeyFlag.Value.Type() != testStringType {
+		t.Errorf("client-key flag type = %q, want %q", clientKeyFlag.Value.Type(), testStringType)
 	}
 }
 
@@ -173,6 +176,7 @@ func TestNewCommand_CommandStructure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if !tt.fn() {
 				t.Errorf("command structure check failed: %s", tt.name)
 			}
@@ -312,7 +316,7 @@ func TestNewCommand_FlagUsages(t *testing.T) {
 	}
 }
 
-// Test Options.validate function
+// Test Options.validate function.
 func TestOptions_Validate_NoFlags(t *testing.T) {
 	t.Parallel()
 
@@ -387,7 +391,7 @@ func TestOptions_Validate_AllFlags(t *testing.T) {
 	}
 }
 
-// Test Options.loadCertData function
+// Test Options.loadCertData function.
 func TestOptions_LoadCertData_NonexistentCAFile(t *testing.T) {
 	t.Parallel()
 
@@ -430,7 +434,7 @@ func TestOptions_LoadCertData_ValidCAFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	caFile := filepath.Join(tmpDir, "ca.pem")
 	caContent := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----")
-	if err := os.WriteFile(caFile, caContent, 0600); err != nil {
+	if err := os.WriteFile(caFile, caContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp CA file: %v", err)
 	}
 
@@ -443,7 +447,7 @@ func TestOptions_LoadCertData_ValidCAFile(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if string(data.CAData) != string(caContent) {
+	if !bytes.Equal(data.CAData, caContent) {
 		t.Errorf("CA data mismatch: got %q, want %q", data.CAData, caContent)
 	}
 }
@@ -458,10 +462,10 @@ func TestOptions_LoadCertData_ValidClientCertAndKey(t *testing.T) {
 	certContent := []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----")
 	keyContent := []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----")
 
-	if err := os.WriteFile(certFile, certContent, 0600); err != nil {
+	if err := os.WriteFile(certFile, certContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp cert file: %v", err)
 	}
-	if err := os.WriteFile(keyFile, keyContent, 0600); err != nil {
+	if err := os.WriteFile(keyFile, keyContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp key file: %v", err)
 	}
 
@@ -475,10 +479,10 @@ func TestOptions_LoadCertData_ValidClientCertAndKey(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if string(data.CertData) != string(certContent) {
+	if !bytes.Equal(data.CertData, certContent) {
 		t.Errorf("Cert data mismatch: got %q, want %q", data.CertData, certContent)
 	}
-	if string(data.KeyData) != string(keyContent) {
+	if !bytes.Equal(data.KeyData, keyContent) {
 		t.Errorf("Key data mismatch: got %q, want %q", data.KeyData, keyContent)
 	}
 }
@@ -491,7 +495,7 @@ func TestOptions_LoadCertData_NonexistentClientKey(t *testing.T) {
 	certFile := filepath.Join(tmpDir, "cert.pem")
 	certContent := []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----")
 
-	if err := os.WriteFile(certFile, certContent, 0600); err != nil {
+	if err := os.WriteFile(certFile, certContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp cert file: %v", err)
 	}
 

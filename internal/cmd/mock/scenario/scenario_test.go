@@ -116,6 +116,7 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_UnknownScenario(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -148,6 +149,7 @@ func TestRun_UnknownScenario(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_MinimalScenario(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -193,6 +195,7 @@ func TestRun_MinimalScenario(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_HomeScenario(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -242,6 +245,7 @@ func TestRun_HomeScenario(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_OfficeScenario(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -295,6 +299,7 @@ func TestRun_OfficeScenario(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -328,7 +333,7 @@ func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
 	}
 
 	deviceFile := filepath.Join(mockDir, "test-switch.json")
-	data, err := os.ReadFile(deviceFile)
+	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -361,6 +366,7 @@ func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_DeviceHasInitialState(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -394,7 +400,7 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 	}
 
 	deviceFile := filepath.Join(mockDir, "test-switch.json")
-	data, err := os.ReadFile(deviceFile)
+	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}

@@ -7,6 +7,7 @@ import (
 )
 
 func TestNewCommand(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd.Use != "device" {
@@ -24,6 +25,7 @@ func TestNewCommand(t *testing.T) {
 }
 
 func TestNewCommand_Subcommands(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	expected := []string{"alias", "config", "factory-reset", "info", "list", "ping", "reboot", "status", "ui"}

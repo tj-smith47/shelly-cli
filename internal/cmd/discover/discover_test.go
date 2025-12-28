@@ -15,6 +15,11 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+const (
+	testMethodHTTP      = "http"
+	testPlatformTasmota = "tasmota"
+)
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -164,8 +169,8 @@ func TestNewCommand_MethodFlag(t *testing.T) {
 		t.Errorf("method shorthand = %q, want %q", methodFlag.Shorthand, "m")
 	}
 
-	if methodFlag.DefValue != "http" {
-		t.Errorf("method default = %q, want %q", methodFlag.DefValue, "http")
+	if methodFlag.DefValue != testMethodHTTP {
+		t.Errorf("method default = %q, want %q", methodFlag.DefValue, testMethodHTTP)
 	}
 }
 
@@ -275,16 +280,16 @@ func TestOptions_AllFields(t *testing.T) {
 		t.Errorf("subnet = %q, want %q", opts.subnet, "192.168.1.0/24")
 	}
 
-	if opts.method != "http" {
-		t.Errorf("method = %q, want %q", opts.method, "http")
+	if opts.method != testMethodHTTP {
+		t.Errorf("method = %q, want %q", opts.method, testMethodHTTP)
 	}
 
 	if !opts.skipPlugins {
 		t.Error("skipPlugins = false, want true")
 	}
 
-	if opts.platform != "tasmota" {
-		t.Errorf("platform = %q, want %q", opts.platform, "tasmota")
+	if opts.platform != testPlatformTasmota {
+		t.Errorf("platform = %q, want %q", opts.platform, testPlatformTasmota)
 	}
 }
 

@@ -9,14 +9,16 @@ import (
 	"testing"
 	"time"
 
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-
-	shellybackup "github.com/tj-smith47/shelly-go/backup"
 )
 
+const testFalseValue = "false"
+
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd == nil {
@@ -46,8 +48,8 @@ func TestNewCommand(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Aliases(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	aliases := cmd.Aliases
@@ -74,8 +76,8 @@ func TestNewCommand_Aliases(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_RequiresTwoArgs(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Should require exactly 2 arguments
@@ -100,8 +102,8 @@ func TestNewCommand_RequiresTwoArgs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Flags(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Check dry-run flag
@@ -109,8 +111,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if dryRunFlag == nil {
 		t.Fatal("dry-run flag not found")
 	}
-	if dryRunFlag.DefValue != "false" {
-		t.Errorf("dry-run flag default = %q, want 'false'", dryRunFlag.DefValue)
+	if dryRunFlag.DefValue != testFalseValue {
+		t.Errorf("dry-run flag default = %q, want %q", dryRunFlag.DefValue, testFalseValue)
 	}
 
 	// Check skip-network flag (defaults to true)
@@ -127,8 +129,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if skipScriptsFlag == nil {
 		t.Fatal("skip-scripts flag not found")
 	}
-	if skipScriptsFlag.DefValue != "false" {
-		t.Errorf("skip-scripts flag default = %q, want 'false'", skipScriptsFlag.DefValue)
+	if skipScriptsFlag.DefValue != testFalseValue {
+		t.Errorf("skip-scripts flag default = %q, want %q", skipScriptsFlag.DefValue, testFalseValue)
 	}
 
 	// Check skip-schedules flag
@@ -136,8 +138,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if skipSchedulesFlag == nil {
 		t.Fatal("skip-schedules flag not found")
 	}
-	if skipSchedulesFlag.DefValue != "false" {
-		t.Errorf("skip-schedules flag default = %q, want 'false'", skipSchedulesFlag.DefValue)
+	if skipSchedulesFlag.DefValue != testFalseValue {
+		t.Errorf("skip-schedules flag default = %q, want %q", skipSchedulesFlag.DefValue, testFalseValue)
 	}
 
 	// Check skip-webhooks flag
@@ -145,8 +147,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if skipWebhooksFlag == nil {
 		t.Fatal("skip-webhooks flag not found")
 	}
-	if skipWebhooksFlag.DefValue != "false" {
-		t.Errorf("skip-webhooks flag default = %q, want 'false'", skipWebhooksFlag.DefValue)
+	if skipWebhooksFlag.DefValue != testFalseValue {
+		t.Errorf("skip-webhooks flag default = %q, want %q", skipWebhooksFlag.DefValue, testFalseValue)
 	}
 
 	// Check decrypt flag
@@ -159,7 +161,7 @@ func TestNewCommand_Flags(t *testing.T) {
 	}
 }
 
-// createTestBackupFile creates a valid backup JSON file for testing
+// createTestBackupFile creates a valid backup JSON file for testing.
 func createTestBackupFile(t *testing.T, dir, filename string) string {
 	t.Helper()
 
@@ -183,16 +185,15 @@ func createTestBackupFile(t *testing.T, dir, filename string) string {
 	}
 
 	filePath := filepath.Join(dir, filename)
-	if err := os.WriteFile(filePath, data, 0o644); err != nil {
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
 	return filePath
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestRun_FileNotFound(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -214,9 +215,8 @@ func TestRun_FileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestRun_InvalidBackupFile(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -225,7 +225,7 @@ func TestRun_InvalidBackupFile(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	invalidFile := filepath.Join(tmpDir, "invalid.json")
-	if err := os.WriteFile(invalidFile, []byte("not valid json"), 0o644); err != nil {
+	if err := os.WriteFile(invalidFile, []byte("not valid json"), 0o600); err != nil {
 		t.Fatalf("failed to create invalid file: %v", err)
 	}
 
@@ -244,9 +244,8 @@ func TestRun_InvalidBackupFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestRun_BackupMissingVersion(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -261,9 +260,12 @@ func TestRun_BackupMissingVersion(t *testing.T) {
 		},
 		"config": map[string]any{},
 	}
-	data, _ := json.Marshal(invalidBackup)
+	data, err := json.Marshal(invalidBackup)
+	if err != nil {
+		t.Fatalf("failed to marshal backup: %v", err)
+	}
 	invalidFile := filepath.Join(tmpDir, "no-version.json")
-	if err := os.WriteFile(invalidFile, data, 0o644); err != nil {
+	if err := os.WriteFile(invalidFile, data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -272,7 +274,7 @@ func TestRun_BackupMissingVersion(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for backup missing version")
 	}
@@ -282,9 +284,8 @@ func TestRun_BackupMissingVersion(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestRun_BackupMissingDeviceInfo(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -296,9 +297,12 @@ func TestRun_BackupMissingDeviceInfo(t *testing.T) {
 		"version": 1,
 		"config":  map[string]any{},
 	}
-	data, _ := json.Marshal(invalidBackup)
+	data, err := json.Marshal(invalidBackup)
+	if err != nil {
+		t.Fatalf("failed to marshal backup: %v", err)
+	}
 	invalidFile := filepath.Join(tmpDir, "no-device-info.json")
-	if err := os.WriteFile(invalidFile, data, 0o644); err != nil {
+	if err := os.WriteFile(invalidFile, data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -307,7 +311,7 @@ func TestRun_BackupMissingDeviceInfo(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for backup missing device info")
 	}
@@ -317,9 +321,8 @@ func TestRun_BackupMissingDeviceInfo(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestRun_BackupMissingConfig(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -334,9 +337,12 @@ func TestRun_BackupMissingConfig(t *testing.T) {
 			"name": "Test",
 		},
 	}
-	data, _ := json.Marshal(invalidBackup)
+	data, err := json.Marshal(invalidBackup)
+	if err != nil {
+		t.Fatalf("failed to marshal backup: %v", err)
+	}
 	invalidFile := filepath.Join(tmpDir, "no-config.json")
-	if err := os.WriteFile(invalidFile, data, 0o644); err != nil {
+	if err := os.WriteFile(invalidFile, data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -345,7 +351,7 @@ func TestRun_BackupMissingConfig(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error for backup missing config")
 	}
@@ -355,9 +361,8 @@ func TestRun_BackupMissingConfig(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Modifies package-level flag variables
 func TestRun_DryRun_ValidBackup(t *testing.T) {
-	// Not parallel - modifies package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -385,9 +390,8 @@ func TestRun_DryRun_ValidBackup(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_FlagParsing(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -432,8 +436,8 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Example_Content(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	example := cmd.Example
@@ -448,23 +452,14 @@ func TestNewCommand_Example_Content(t *testing.T) {
 	}
 
 	for _, e := range examples {
-		found := false
-		if len(example) >= len(e) {
-			for i := 0; i <= len(example)-len(e); i++ {
-				if example[i:i+len(e)] == e {
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
+		if !strings.Contains(example, e) {
 			t.Errorf("expected example to contain %q", e)
 		}
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Long_Description(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	long := cmd.Long
@@ -478,24 +473,14 @@ func TestNewCommand_Long_Description(t *testing.T) {
 	}
 
 	for _, kw := range keywords {
-		found := false
-		if len(long) >= len(kw) {
-			for i := 0; i <= len(long)-len(kw); i++ {
-				if long[i:i+len(kw)] == kw {
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
+		if !strings.Contains(long, kw) {
 			t.Errorf("expected long description to contain %q", kw)
 		}
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestRun_DirectoryAsFile(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -504,7 +489,7 @@ func TestRun_DirectoryAsFile(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	subDir := filepath.Join(tmpDir, "subdir")
-	if err := os.MkdirAll(subDir, 0o755); err != nil {
+	if err := os.MkdirAll(subDir, 0o750); err != nil {
 		t.Fatalf("failed to create subdir: %v", err)
 	}
 

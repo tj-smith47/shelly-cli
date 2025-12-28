@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	shellybackup "github.com/tj-smith47/shelly-go/backup"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-
-	shellybackup "github.com/tj-smith47/shelly-go/backup"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -107,7 +107,7 @@ func TestRun_NotADirectory(t *testing.T) {
 	// Create a file instead of directory
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "not-a-directory")
-	if err := os.WriteFile(filePath, []byte("test"), 0o644); err != nil {
+	if err := os.WriteFile(filePath, []byte("test"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -164,10 +164,10 @@ func TestRun_DirectoryWithNonBackupFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create non-backup files
-	if err := os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte("readme"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte("readme"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "config.toml"), []byte("toml"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "config.toml"), []byte("toml"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -187,8 +187,8 @@ func TestRun_DirectoryWithNonBackupFiles(t *testing.T) {
 	}
 }
 
-// createTestBackupFile creates a valid backup JSON file for testing
-func createTestBackupFile(t *testing.T, dir, filename string) string {
+// createTestBackupFile creates a valid backup JSON file for testing.
+func createTestBackupFile(t *testing.T, dir, filename string) {
 	t.Helper()
 
 	backup := shellybackup.Backup{
@@ -211,11 +211,9 @@ func createTestBackupFile(t *testing.T, dir, filename string) string {
 	}
 
 	filePath := filepath.Join(dir, filename)
-	if err := os.WriteFile(filePath, data, 0o644); err != nil {
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
-
-	return filePath
 }
 
 func TestRun_WithBackupFiles(t *testing.T) {
@@ -245,7 +243,7 @@ func TestRun_WithBackupFiles(t *testing.T) {
 	// Should display the backup files in table format
 	if !strings.Contains(output, "device1.json") && !strings.Contains(output, "device2.json") {
 		// Table might show truncated names, just verify some output exists
-		if len(output) == 0 {
+		if output == "" {
 			t.Error("expected some output for backup files")
 		}
 	}
@@ -264,7 +262,7 @@ func TestRun_WithInvalidBackupFiles(t *testing.T) {
 
 	// Create an invalid JSON file
 	invalidPath := filepath.Join(tmpDir, "invalid.json")
-	if err := os.WriteFile(invalidPath, []byte("not valid json"), 0o644); err != nil {
+	if err := os.WriteFile(invalidPath, []byte("not valid json"), 0o600); err != nil {
 		t.Fatalf("failed to create invalid file: %v", err)
 	}
 
@@ -284,7 +282,7 @@ func TestRun_WithInvalidBackupFiles(t *testing.T) {
 	// Should skip invalid files and show valid ones
 	output := out.String()
 	// The valid file should be shown
-	if len(output) == 0 {
+	if output == "" {
 		t.Error("expected some output")
 	}
 }
@@ -302,13 +300,13 @@ func TestRun_WithYamlBackupFile(t *testing.T) {
 
 	// Create a YAML file with .yaml extension (won't be valid backup but tests extension detection)
 	yamlPath := filepath.Join(tmpDir, "backup.yaml")
-	if err := os.WriteFile(yamlPath, []byte("invalid: yaml"), 0o644); err != nil {
+	if err := os.WriteFile(yamlPath, []byte("invalid: yaml"), 0o600); err != nil {
 		t.Fatalf("failed to create yaml file: %v", err)
 	}
 
 	// Also create a .yml file
 	ymlPath := filepath.Join(tmpDir, "backup.yml")
-	if err := os.WriteFile(ymlPath, []byte("invalid: yml"), 0o644); err != nil {
+	if err := os.WriteFile(ymlPath, []byte("invalid: yml"), 0o600); err != nil {
 		t.Fatalf("failed to create yml file: %v", err)
 	}
 
@@ -327,7 +325,7 @@ func TestRun_WithYamlBackupFile(t *testing.T) {
 
 	// Should at least find the valid JSON backup
 	output := out.String()
-	if len(output) == 0 {
+	if output == "" {
 		t.Error("expected some output")
 	}
 }
@@ -345,7 +343,7 @@ func TestRun_DirectoryWithSubdirectories(t *testing.T) {
 
 	// Create a subdirectory (should be ignored)
 	subDir := filepath.Join(tmpDir, "subdir")
-	if err := os.MkdirAll(subDir, 0o755); err != nil {
+	if err := os.MkdirAll(subDir, 0o750); err != nil {
 		t.Fatalf("failed to create subdir: %v", err)
 	}
 
@@ -389,8 +387,11 @@ func TestRun_BackupWithMissingVersion(t *testing.T) {
 		},
 		"config": map[string]any{},
 	}
-	data, _ := json.Marshal(invalidBackup)
-	if err := os.WriteFile(filepath.Join(tmpDir, "no-version.json"), data, 0o644); err != nil {
+	data, err := json.Marshal(invalidBackup)
+	if err != nil {
+		t.Fatalf("failed to marshal backup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "no-version.json"), data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -399,7 +400,7 @@ func TestRun_BackupWithMissingVersion(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -427,8 +428,11 @@ func TestRun_BackupWithMissingDeviceInfo(t *testing.T) {
 		"version": 1,
 		"config":  map[string]any{},
 	}
-	data, _ := json.Marshal(invalidBackup)
-	if err := os.WriteFile(filepath.Join(tmpDir, "no-device.json"), data, 0o644); err != nil {
+	data, err := json.Marshal(invalidBackup)
+	if err != nil {
+		t.Fatalf("failed to marshal backup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "no-device.json"), data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -437,7 +441,7 @@ func TestRun_BackupWithMissingDeviceInfo(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -468,8 +472,11 @@ func TestRun_BackupWithMissingConfig(t *testing.T) {
 			"name": "Test",
 		},
 	}
-	data, _ := json.Marshal(invalidBackup)
-	if err := os.WriteFile(filepath.Join(tmpDir, "no-config.json"), data, 0o644); err != nil {
+	data, err := json.Marshal(invalidBackup)
+	if err != nil {
+		t.Fatalf("failed to marshal backup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "no-config.json"), data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -478,7 +485,7 @@ func TestRun_BackupWithMissingConfig(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	err := cmd.Execute()
+	err = cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -518,7 +525,7 @@ func TestRun_MultipleValidBackups(t *testing.T) {
 
 	// Should have output for all three backups
 	output := out.String()
-	if len(output) == 0 {
+	if output == "" {
 		t.Error("expected output for multiple backups")
 	}
 }

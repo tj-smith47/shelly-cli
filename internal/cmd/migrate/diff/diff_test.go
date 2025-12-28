@@ -92,6 +92,7 @@ func TestNewCommand_Args(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			err := cmd.Args(cmd, tc.args)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("Args(%v) error = %v, wantErr %v", tc.args, err, tc.wantErr)
@@ -124,7 +125,7 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 }
 
 // createValidBackupFile creates a test backup file with valid structure.
-func createValidBackupFile(t *testing.T, dir string, name string) string {
+func createValidBackupFile(t *testing.T, dir, name string) string {
 	t.Helper()
 
 	backup := shellybackup.Backup{
@@ -155,7 +156,7 @@ func createValidBackupFile(t *testing.T, dir string, name string) string {
 }
 
 // createInvalidBackupFile creates an invalid backup file for error testing.
-func createInvalidBackupFile(t *testing.T, dir string, name string, content string) string {
+func createInvalidBackupFile(t *testing.T, dir, name, content string) string {
 	t.Helper()
 
 	filePath := filepath.Join(dir, name)

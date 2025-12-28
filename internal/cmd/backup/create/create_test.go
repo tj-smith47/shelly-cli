@@ -2,14 +2,17 @@ package create
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
+const testFalseValue = "false"
+
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd == nil {
@@ -39,8 +42,8 @@ func TestNewCommand(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Aliases(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	aliases := cmd.Aliases
@@ -67,8 +70,8 @@ func TestNewCommand_Aliases(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_RequiresDevice(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Should require at least 1 argument (device)
@@ -96,8 +99,8 @@ func TestNewCommand_RequiresDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Flags(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Check format flag
@@ -126,8 +129,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if skipScriptsFlag == nil {
 		t.Fatal("skip-scripts flag not found")
 	}
-	if skipScriptsFlag.DefValue != "false" {
-		t.Errorf("skip-scripts flag default = %q, want 'false'", skipScriptsFlag.DefValue)
+	if skipScriptsFlag.DefValue != testFalseValue {
+		t.Errorf("skip-scripts flag default = %q, want %q", skipScriptsFlag.DefValue, testFalseValue)
 	}
 
 	// Check skip-schedules flag
@@ -135,8 +138,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if skipSchedulesFlag == nil {
 		t.Fatal("skip-schedules flag not found")
 	}
-	if skipSchedulesFlag.DefValue != "false" {
-		t.Errorf("skip-schedules flag default = %q, want 'false'", skipSchedulesFlag.DefValue)
+	if skipSchedulesFlag.DefValue != testFalseValue {
+		t.Errorf("skip-schedules flag default = %q, want %q", skipSchedulesFlag.DefValue, testFalseValue)
 	}
 
 	// Check skip-webhooks flag
@@ -144,14 +147,13 @@ func TestNewCommand_Flags(t *testing.T) {
 	if skipWebhooksFlag == nil {
 		t.Fatal("skip-webhooks flag not found")
 	}
-	if skipWebhooksFlag.DefValue != "false" {
-		t.Errorf("skip-webhooks flag default = %q, want 'false'", skipWebhooksFlag.DefValue)
+	if skipWebhooksFlag.DefValue != testFalseValue {
+		t.Errorf("skip-webhooks flag default = %q, want %q", skipWebhooksFlag.DefValue, testFalseValue)
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_FlagParsing(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
-
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -203,8 +205,8 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Example_Content(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	example := cmd.Example
@@ -226,20 +228,11 @@ func TestNewCommand_Example_Content(t *testing.T) {
 }
 
 func containsString(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && len(s) >= len(substr) && findString(s, substr)
+	return strings.Contains(s, substr)
 }
 
-func findString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
+//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Long_Description(t *testing.T) {
-	// Not parallel - NewCommand uses package-level flag variables
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	long := cmd.Long

@@ -12,10 +12,7 @@ func TestBanner(t *testing.T) {
 		t.Error("Banner should not be empty")
 	}
 
-	// Should contain CLI name
-	if !strings.Contains(Banner, "Shelly") && !strings.Contains(Banner, "CLI") {
-		// ASCII art may not spell out full names, just verify non-empty
-	}
+	// ASCII art may not spell out full names - just verify non-empty
 }
 
 func TestBannerLines(t *testing.T) {

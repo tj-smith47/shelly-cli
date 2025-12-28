@@ -253,6 +253,8 @@ func getCacheDir(tempDir string) string {
 
 // TestRun tests the run function with various cache directory states.
 // This test is NOT parallel because it modifies environment variables.
+//
+//nolint:gocyclo,paralleltest // Table-driven test with complex cases; modifies environment variables
 func TestRun(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -440,6 +442,8 @@ func TestRun(t *testing.T) {
 
 // TestRun_ViaCommand tests run by executing through the cobra command.
 // This test is NOT parallel because it modifies environment variables.
+//
+//nolint:paralleltest // Modifies environment variables
 func TestRun_ViaCommand(t *testing.T) {
 	tempDir := t.TempDir()
 	setCacheHome(t, tempDir)

@@ -111,9 +111,8 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_NoDevices(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
 	// Create temp directory for mock config
 	tmpDir := t.TempDir()
 	mockDir := filepath.Join(tmpDir, "mock")
@@ -158,6 +157,7 @@ func TestRun_NoDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_WithDevices(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -219,6 +219,7 @@ func TestRun_WithDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_SkipsNonJSONFiles(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -286,6 +287,7 @@ func TestRun_SkipsNonJSONFiles(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_SkipsDirectories(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -331,6 +333,7 @@ func TestRun_SkipsDirectories(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_SkipsInvalidJSON(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 

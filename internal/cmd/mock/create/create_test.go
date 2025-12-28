@@ -110,20 +110,16 @@ func TestNewCommand_Flags(t *testing.T) {
 	modelFlag := cmd.Flags().Lookup("model")
 	if modelFlag == nil {
 		t.Error("model flag is missing")
-	} else {
-		if modelFlag.DefValue != "Plus 1PM" {
-			t.Errorf("model default = %q, want %q", modelFlag.DefValue, "Plus 1PM")
-		}
+	} else if modelFlag.DefValue != "Plus 1PM" {
+		t.Errorf("model default = %q, want %q", modelFlag.DefValue, "Plus 1PM")
 	}
 
 	// Check firmware flag exists
 	firmwareFlag := cmd.Flags().Lookup("firmware")
 	if firmwareFlag == nil {
 		t.Error("firmware flag is missing")
-	} else {
-		if firmwareFlag.DefValue != "1.0.0" {
-			t.Errorf("firmware default = %q, want %q", firmwareFlag.DefValue, "1.0.0")
-		}
+	} else if firmwareFlag.DefValue != "1.0.0" {
+		t.Errorf("firmware default = %q, want %q", firmwareFlag.DefValue, "1.0.0")
 	}
 }
 
@@ -141,9 +137,8 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_CreateDevice(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
 	// Create temp directory for mock config
 	tmpDir := t.TempDir()
 
@@ -185,6 +180,7 @@ func TestRun_CreateDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_CustomModel(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -218,7 +214,7 @@ func TestRun_CustomModel(t *testing.T) {
 	}
 
 	deviceFile := filepath.Join(mockDir, "custom-device.json")
-	data, err := os.ReadFile(deviceFile)
+	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -233,6 +229,7 @@ func TestRun_CustomModel(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_CustomFirmware(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -266,7 +263,7 @@ func TestRun_CustomFirmware(t *testing.T) {
 	}
 
 	deviceFile := filepath.Join(mockDir, "fw-device.json")
-	data, err := os.ReadFile(deviceFile)
+	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -281,6 +278,7 @@ func TestRun_CustomFirmware(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_DeviceHasMAC(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -314,7 +312,7 @@ func TestRun_DeviceHasMAC(t *testing.T) {
 	}
 
 	deviceFile := filepath.Join(mockDir, "mac-device.json")
-	data, err := os.ReadFile(deviceFile)
+	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -335,6 +333,7 @@ func TestRun_DeviceHasMAC(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_DeviceHasInitialState(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -368,7 +367,7 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 	}
 
 	deviceFile := filepath.Join(mockDir, "state-device.json")
-	data, err := os.ReadFile(deviceFile)
+	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -405,6 +404,7 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_OutputContainsModelAndFirmware(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -444,6 +444,7 @@ func TestRun_OutputContainsModelAndFirmware(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_FilePermissions(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -489,6 +490,7 @@ func TestRun_FilePermissions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_DeterministicMAC(t *testing.T) {
 	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
 
@@ -523,7 +525,7 @@ func TestRun_DeterministicMAC(t *testing.T) {
 	}
 
 	deviceFile := filepath.Join(mockDir, "deterministic.json")
-	data1, err := os.ReadFile(deviceFile)
+	data1, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -542,7 +544,7 @@ func TestRun_DeterministicMAC(t *testing.T) {
 	}
 
 	// Read second MAC
-	data2, err := os.ReadFile(deviceFile)
+	data2, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
 	if err != nil {
 		t.Fatalf("failed to read device file second time: %v", err)
 	}

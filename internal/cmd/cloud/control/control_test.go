@@ -137,6 +137,7 @@ func TestNewCommand_CommandStructure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if !tt.fn() {
 				t.Errorf("command structure check failed: %s", tt.name)
 			}
@@ -179,6 +180,7 @@ func TestNewCommand_LongDescriptionDocumentsActions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.Get() which may have side effects
 func TestRun_NotLoggedIn(t *testing.T) {
 	// This test uses the global config.Get() which should return empty access token
 	// when no config file is present
