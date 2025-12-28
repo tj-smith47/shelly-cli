@@ -210,13 +210,18 @@ jobs:
         continue-on-error: true
 
       - name: Initialize gh-pages if needed
+        id: init
         run: |
           if [ ! -d "gh-pages/.git" ]; then
+            echo "Initializing new gh-pages branch"
+            echo "is_new=true" >> $GITHUB_OUTPUT
             mkdir -p gh-pages
             cd gh-pages
             git init
             git checkout -b gh-pages
             git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          else
+            echo "is_new=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Deploy docs
@@ -279,5 +284,11 @@ jobs:
             else
               git commit -m "docs: deploy $VERSION"
             fi
-            git push origin gh-pages
+            # Force push if new branch, otherwise normal push
+            if [ "${{ steps.init.outputs.is_new }}" = "true" ]; then
+              echo "Creating new gh-pages branch on remote"
+              git push -u origin gh-pages --force
+            else
+              git push origin gh-pages
+            fi
           fi

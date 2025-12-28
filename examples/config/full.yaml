@@ -88,6 +88,10 @@ verbosity: 0
 # Suppress non-essential output
 quiet: false
 
+# Preferred editor for 'shelly config edit'
+# Falls back to $EDITOR, $VISUAL, then nano
+# editor: vim
+
 # =============================================================================
 # Logging Settings (for debugging)
 # =============================================================================
@@ -139,6 +143,17 @@ cloud:
 
   # Cloud server URL (default is Shelly's production server)
   server_url: https://shelly-api.shelly.cloud
+
+# =============================================================================
+# Integrator Settings (for OEM/partners)
+# =============================================================================
+
+# Shelly Integrator API credentials for partner integrations.
+# Environment variables take precedence: SHELLY_INTEGRATOR_TAG, SHELLY_INTEGRATOR_TOKEN
+#
+# integrator:
+#   tag: my-partner-tag
+#   token: my-integrator-token
 
 # =============================================================================
 # Registered Devices
@@ -264,6 +279,99 @@ scenes:
   #       params:
   #         id: 0
   #         on: false
+
+# =============================================================================
+# Templates
+# =============================================================================
+
+# Reusable configuration templates for devices and scripts.
+# Create templates with 'shelly template create' or 'shelly script template'.
+
+templates:
+  # Device configuration templates
+  # device:
+  #   my-switch-config:
+  #     name: my-switch-config
+  #     description: Standard switch configuration
+  #     model: SNSW-001X16EU
+  #     generation: 2
+  #     config:
+  #       switch:0:
+  #         name: Main Switch
+  #         initial_state: restore_last
+  #     source_device: living-room
+
+  # Script templates
+  # script:
+  #   motion-light:
+  #     name: motion-light
+  #     description: Turn on light when motion detected
+  #     code: |
+  #       // Motion-activated light script
+  #       let TIMEOUT = 300; // seconds
+  #       Shelly.addEventHandler(function(event) {
+  #         if (event.component === "input:0" && event.info.state) {
+  #           Shelly.call("Switch.Set", {id: 0, on: true});
+  #           Timer.set(TIMEOUT * 1000, false, function() {
+  #             Shelly.call("Switch.Set", {id: 0, on: false});
+  #           });
+  #         }
+  #       });
+  #     category: automation
+  #     variables:
+  #       - name: TIMEOUT
+  #         description: Auto-off timeout in seconds
+  #         type: number
+  #         default: 300
+  #     min_gen: 2
+
+# =============================================================================
+# Alerts
+# =============================================================================
+
+# Device monitoring alerts. Create with 'shelly alert create'.
+#
+# alerts:
+#   kitchen-offline:
+#     name: kitchen-offline
+#     description: Alert when kitchen device goes offline
+#     device: kitchen
+#     condition: offline
+#     action: notify
+#     enabled: true
+#
+#   high-power:
+#     name: high-power
+#     description: Alert when power exceeds threshold
+#     device: living-room
+#     condition: "power>1000"
+#     action: "webhook:https://example.com/alert"
+#     enabled: true
+
+# =============================================================================
+# Rate Limiting Settings
+# =============================================================================
+
+# Rate limiting prevents overloading Shelly devices.
+# Gen1 (ESP8266) supports max 2 concurrent connections.
+# Gen2 (ESP32) supports max 5 concurrent transactions.
+# These defaults are tuned for stability - customize only if needed.
+
+ratelimit:
+  gen1:
+    min_interval: 2s        # Min time between requests to same device
+    max_concurrent: 1       # Max in-flight requests per device
+    circuit_threshold: 5    # Failures before circuit breaker opens
+
+  gen2:
+    min_interval: 500ms
+    max_concurrent: 3
+    circuit_threshold: 5
+
+  global:
+    max_concurrent: 5               # Total concurrent requests across all devices
+    circuit_open_duration: 60s      # How long circuit stays open
+    circuit_success_threshold: 2    # Successes needed to close circuit
 
 # =============================================================================
 # Plugin Settings

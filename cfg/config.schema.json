@@ -66,6 +66,26 @@
       "description": "Suppress non-essential output",
       "default": false
     },
+    "editor": {
+      "type": "string",
+      "description": "Preferred editor command for 'shelly config edit'. Falls back to $EDITOR, $VISUAL, then nano.",
+      "examples": ["vim", "code", "nano", "emacs"]
+    },
+    "integrator": {
+      "type": "object",
+      "description": "Shelly Integrator API credentials for OEM/partner integrations. Environment variables SHELLY_INTEGRATOR_TAG and SHELLY_INTEGRATOR_TOKEN take precedence.",
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "Integrator tag (partner identifier)"
+        },
+        "token": {
+          "type": "string",
+          "description": "Integrator API token"
+        }
+      },
+      "additionalProperties": false
+    },
     "discovery": {
       "type": "object",
       "description": "Device discovery settings",
@@ -157,6 +177,34 @@
       "description": "Saved scenes",
       "additionalProperties": {
         "$ref": "#/$defs/scene"
+      }
+    },
+    "templates": {
+      "type": "object",
+      "description": "Reusable configuration templates for devices and scripts",
+      "properties": {
+        "device": {
+          "type": "object",
+          "description": "Device configuration templates",
+          "additionalProperties": {
+            "$ref": "#/$defs/deviceTemplate"
+          }
+        },
+        "script": {
+          "type": "object",
+          "description": "Script templates for device automation",
+          "additionalProperties": {
+            "$ref": "#/$defs/scriptTemplate"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "alerts": {
+      "type": "object",
+      "description": "Device monitoring alerts",
+      "additionalProperties": {
+        "$ref": "#/$defs/alert"
       }
     },
     "plugins": {
@@ -366,6 +414,174 @@
           "type": "object",
           "description": "Parameters for the RPC method",
           "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "deviceTemplate": {
+      "type": "object",
+      "description": "A reusable device configuration template",
+      "required": ["name", "model", "generation", "config"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Template name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Template description"
+        },
+        "model": {
+          "type": "string",
+          "description": "Device model this template applies to",
+          "examples": ["SHSW-PM", "SHPLG-S", "SHDM-2"]
+        },
+        "app": {
+          "type": "string",
+          "description": "Device app type (for Gen2+)",
+          "examples": ["switch", "light", "cover"]
+        },
+        "generation": {
+          "type": "integer",
+          "description": "Device generation",
+          "enum": [1, 2, 3]
+        },
+        "config": {
+          "type": "object",
+          "description": "Device configuration to apply",
+          "additionalProperties": true
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Template creation timestamp"
+        },
+        "source_device": {
+          "type": "string",
+          "description": "Device this template was created from"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scriptTemplate": {
+      "type": "object",
+      "description": "A reusable JavaScript script template",
+      "required": ["name", "code"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Script template name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Script description"
+        },
+        "code": {
+          "type": "string",
+          "description": "JavaScript code for the script"
+        },
+        "category": {
+          "type": "string",
+          "description": "Script category",
+          "examples": ["automation", "monitoring", "utility"]
+        },
+        "variables": {
+          "type": "array",
+          "description": "Configurable variables in the script",
+          "items": {
+            "$ref": "#/$defs/scriptVariable"
+          }
+        },
+        "models": {
+          "type": "array",
+          "description": "Compatible device models (empty = all)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "min_gen": {
+          "type": "integer",
+          "description": "Minimum device generation required",
+          "minimum": 2
+        },
+        "author": {
+          "type": "string",
+          "description": "Script author"
+        },
+        "version": {
+          "type": "string",
+          "description": "Script version"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scriptVariable": {
+      "type": "object",
+      "description": "A configurable variable in a script template",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Variable name in code (e.g., THRESHOLD)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Variable description"
+        },
+        "type": {
+          "type": "string",
+          "description": "Variable type",
+          "enum": ["string", "number", "boolean"]
+        },
+        "default": {
+          "description": "Default value for the variable"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this variable must be set",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "alert": {
+      "type": "object",
+      "description": "A device monitoring alert",
+      "required": ["name", "device", "condition", "action"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Alert name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Alert description"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device to monitor"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Alert condition",
+          "examples": ["offline", "power>100", "temperature>30"]
+        },
+        "action": {
+          "type": "string",
+          "description": "Action to take when alert triggers",
+          "examples": ["notify", "webhook:http://...", "command:..."]
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the alert is enabled",
+          "default": true
+        },
+        "snoozed_until": {
+          "type": "string",
+          "description": "ISO timestamp until which the alert is snoozed"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Alert creation timestamp"
         }
       },
       "additionalProperties": false
