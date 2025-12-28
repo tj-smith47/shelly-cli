@@ -1,0 +1,89 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-modbus - Manage Modbus-TCP configuration
+
+
+.SH SYNOPSIS
+\fBshelly modbus [flags]\fP
+
+
+.SH DESCRIPTION
+Manage Modbus-TCP server on Shelly Gen2+ devices.
+
+.PP
+The Modbus-TCP server runs on port 502 when enabled, allowing integration
+with industrial automation systems and SCADA software.
+
+.PP
+Device info registers (when enabled):
+  30000: Device MAC (6 registers / 12 bytes)
+  30006: Device model (10 registers / 20 bytes)
+  30016: Device name (32 registers / 64 bytes)
+
+.PP
+Additional component-specific registers are documented per-component.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for modbus
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Check Modbus status
+  shelly modbus status kitchen
+
+  # Enable Modbus
+  shelly modbus enable kitchen
+
+  # Disable Modbus
+  shelly modbus disable kitchen
+.EE
+
+
+.SH SEE ALSO
+\fBshelly(1)\fP, \fBshelly-modbus-disable(1)\fP, \fBshelly-modbus-enable(1)\fP, \fBshelly-modbus-status(1)\fP

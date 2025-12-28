@@ -109,8 +109,8 @@ func DisplayTemplateDiffs(ios *iostreams.IOStreams, templateName, deviceName str
 	ios.Printf("\n%d difference(s) found\n", len(diffs))
 }
 
-// DisplayTemplateList prints a table of configuration templates.
-func DisplayTemplateList(ios *iostreams.IOStreams, templates []config.Template) {
+// DisplayDeviceTemplateList prints a table of device configuration templates.
+func DisplayDeviceTemplateList(ios *iostreams.IOStreams, templates []config.DeviceTemplate) {
 	ios.Title("Configuration Templates")
 	ios.Println()
 

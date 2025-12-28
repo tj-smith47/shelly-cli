@@ -1,0 +1,95 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-zwave - Z-Wave device utilities
+
+
+.SH SYNOPSIS
+\fBshelly zwave [flags]\fP
+
+
+.SH DESCRIPTION
+Utilities for working with Shelly Wave Z-Wave devices.
+
+.PP
+Shelly Wave devices are Z-Wave end devices that require a third-party
+gateway/hub for full operation. They support both standard Z-Wave mesh
+networks and Z-Wave Long Range (ZWLR) star topology.
+
+.PP
+Supported gateways: Home Assistant (Z-Wave JS), Hubitat, HomeSeer,
+SmartThings, Vera/ezlo, OpenHAB, and other Z-Wave certified controllers.
+
+.PP
+Note: Many Wave devices also include WiFi or Ethernet connectivity,
+allowing direct control via the standard Gen2 RPC API.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for zwave
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Show Z-Wave device info
+  shelly zwave info SNSW-001P16ZW
+
+  # Show inclusion instructions
+  shelly zwave inclusion SNSW-001P16ZW --mode button
+
+  # Show exclusion instructions
+  shelly zwave exclusion SNSW-001P16ZW
+
+  # Show factory reset instructions
+  shelly zwave reset SNSW-001P16ZW
+
+  # Show common configuration parameters
+  shelly zwave config
+.EE
+
+
+.SH SEE ALSO
+\fBshelly(1)\fP, \fBshelly-zwave-config(1)\fP, \fBshelly-zwave-exclusion(1)\fP, \fBshelly-zwave-inclusion(1)\fP, \fBshelly-zwave-info(1)\fP, \fBshelly-zwave-reset(1)\fP

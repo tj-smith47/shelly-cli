@@ -18,11 +18,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Resource:      "template",
 		ValidArgsFunc: completion.TemplateNames(),
 		ExistsFunc: func(name string) (any, bool) {
-			return config.GetTemplate(name)
+			return config.GetDeviceTemplate(name)
 		},
-		DeleteFunc: config.DeleteTemplate,
+		DeleteFunc: config.DeleteDeviceTemplate,
 		InfoFunc: func(resource any, name string) string {
-			tpl, ok := resource.(config.Template)
+			tpl, ok := resource.(config.DeviceTemplate)
 			if !ok || tpl.Model == "" {
 				return fmt.Sprintf("Delete template %q?", name)
 			}

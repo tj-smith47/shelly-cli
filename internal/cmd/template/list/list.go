@@ -14,11 +14,11 @@ import (
 
 // NewCommand creates the template list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return factories.NewConfigListCommand(f, factories.ConfigListOpts[config.Template]{
+	return factories.NewConfigListCommand(f, factories.ConfigListOpts[config.DeviceTemplate]{
 		Resource: "template",
-		FetchFunc: func() []config.Template {
-			templates := config.ListTemplates()
-			result := make([]config.Template, 0, len(templates))
+		FetchFunc: func() []config.DeviceTemplate {
+			templates := config.ListDeviceTemplates()
+			result := make([]config.DeviceTemplate, 0, len(templates))
 			for _, t := range templates {
 				result = append(result, t)
 			}
@@ -27,7 +27,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 			})
 			return result
 		},
-		DisplayFunc: term.DisplayTemplateList,
+		DisplayFunc: term.DisplayDeviceTemplateList,
 		EmptyMsg:    "No templates configured",
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -59,7 +60,7 @@ can be monitored with 'shelly monitor events'.`,
 
 	cmd.Flags().IntVar(&opts.Duration, "duration", 30, "Discovery scan duration in seconds")
 	cmd.Flags().StringVar(&opts.Addr, "addr", "", "MAC address of device to add directly")
-	cmd.Flags().StringVar(&opts.Name, "name", "", "Name for the device (with --addr)")
+	flags.AddNameFlag(cmd, &opts.Name, "Name for the device (with --addr)")
 
 	return cmd
 }

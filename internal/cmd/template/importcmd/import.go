@@ -67,7 +67,7 @@ func run(opts *Options) error {
 	}
 
 	// Parse template
-	tpl, err := config.ParseTemplateFile(opts.File, data)
+	tpl, err := config.ParseDeviceTemplateFile(opts.File, data)
 	if err != nil {
 		return err
 	}
@@ -83,12 +83,12 @@ func run(opts *Options) error {
 	}
 
 	// Check if exists
-	if _, exists := config.GetTemplate(tpl.Name); exists && !opts.Yes {
+	if _, exists := config.GetDeviceTemplate(tpl.Name); exists && !opts.Yes {
 		return fmt.Errorf("template %q already exists (use --force to overwrite)", tpl.Name)
 	}
 
 	// Save template
-	if err := config.SaveTemplate(tpl); err != nil {
+	if err := config.SaveDeviceTemplate(tpl); err != nil {
 		return fmt.Errorf("failed to save template: %w", err)
 	}
 

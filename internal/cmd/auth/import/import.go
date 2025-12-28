@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 )
 
 // Options holds the command options.
@@ -41,7 +42,7 @@ Imports credentials that were previously exported with auth export.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview import without applying changes")
+	flags.AddDryRunFlag(cmd, &opts.DryRun)
 
 	return cmd
 }

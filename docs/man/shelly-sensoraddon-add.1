@@ -1,0 +1,94 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-sensoraddon-add - Add a peripheral
+
+
+.SH SYNOPSIS
+\fBshelly sensoraddon add   [flags]\fP
+
+
+.SH DESCRIPTION
+Add a Sensor Add-on peripheral to a device.
+
+.PP
+Peripheral types:
+  ds18b20    - Dallas 1-Wire temperature sensor (requires --addr)
+  dht22      - Temperature and humidity sensor
+  digital_in - Digital input
+  analog_in  - Analog input
+
+.PP
+Note: Changes require a device reboot to take effect.
+
+
+.SH OPTIONS
+\fB--addr\fP=""
+	Sensor address (required for DS18B20)
+
+.PP
+\fB--cid\fP=0
+	Component ID (auto-assigned if not specified)
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for add
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Add a DS18B20 sensor
+  shelly sensoraddon add kitchen ds18b20 --addr "40:255:100:6:199:204:149:177"
+
+  # Add a DHT22 sensor
+  shelly sensoraddon add kitchen dht22
+
+  # Add with specific component ID
+  shelly sensoraddon add kitchen digital_in --cid 101
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-sensoraddon(1)\fP

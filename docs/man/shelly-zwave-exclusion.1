@@ -1,0 +1,82 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-zwave-exclusion - Show exclusion instructions
+
+
+.SH SYNOPSIS
+\fBshelly zwave exclusion  [flags]\fP
+
+
+.SH DESCRIPTION
+Show Z-Wave exclusion (unpairing) instructions for a device.
+
+.PP
+Exclusion modes:
+  button - Manual exclusion using the S button (default)
+  switch - Manual exclusion using the connected switch
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for exclusion
+
+.PP
+\fB--mode\fP="button"
+	Exclusion mode (button, switch)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Show button-based exclusion (default)
+  shelly zwave exclusion SNSW-001P16ZW
+
+  # Show switch-based exclusion
+  shelly zwave exclusion SNSW-001P16ZW --mode switch
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-zwave(1)\fP

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
@@ -314,4 +315,36 @@ func (s *Service) DeleteVirtualComponent(ctx context.Context, identifier, key st
 		virtual := components.NewVirtual(conn.RPCClient())
 		return virtual.Delete(ctx, key)
 	})
+}
+
+// ValidVirtualTypes is the list of valid virtual component types.
+var ValidVirtualTypes = []string{"boolean", "number", "text", "enum", "button", "group"}
+
+// IsValidVirtualType checks if a type string is a valid virtual component type.
+func IsValidVirtualType(t string) bool {
+	for _, valid := range ValidVirtualTypes {
+		if t == valid {
+			return true
+		}
+	}
+	return false
+}
+
+// ParseVirtualKey parses a virtual component key (e.g., "boolean:200") into type and ID.
+func ParseVirtualKey(key string) (compType string, id int, err error) {
+	parts := strings.Split(key, ":")
+	if len(parts) != 2 {
+		return "", 0, fmt.Errorf("invalid key format %q, expected type:id (e.g., boolean:200)", key)
+	}
+
+	id, err = strconv.Atoi(parts[1])
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid component ID %q: %w", parts[1], err)
+	}
+
+	if id < 200 || id > 299 {
+		return "", 0, fmt.Errorf("virtual component ID must be in range 200-299, got %d", id)
+	}
+
+	return parts[0], id, nil
 }

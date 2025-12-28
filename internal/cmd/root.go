@@ -52,6 +52,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mock"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/modbus"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/monitor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mqtt"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/off"
@@ -59,6 +60,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/party"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/plugin"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/power"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/profile"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/provision"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/qr"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/repl"
@@ -68,6 +70,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/sensoraddon"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/shellcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sleep"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/statuscmd"
@@ -79,11 +82,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/togglecmd"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
 	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wait"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wake"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/zigbee"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/zwave"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -258,22 +263,26 @@ func init() {
 
 	// Configuration commands - device and service configuration
 	cmdutil.AddCommandsToGroup(rootCmd, groupConfig,
-		configcmd.NewCommand(f),
-		wifi.NewCommand(f),
-		ethernet.NewCommand(f),
-		cloud.NewCommand(f),
-		auth.NewCommand(f),
-		cert.NewCommand(f),
-		mqtt.NewCommand(f),
-		webhook.NewCommand(f),
-		kvs.NewCommand(f),
-		template.NewCommand(f),
-		provision.NewCommand(f),
 		action.NewCommand(f),
+		auth.NewCommand(f),
 		bthome.NewCommand(f),
-		zigbee.NewCommand(f),
+		cert.NewCommand(f),
+		cloud.NewCommand(f),
+		configcmd.NewCommand(f),
+		ethernet.NewCommand(f),
+		kvs.NewCommand(f),
 		lora.NewCommand(f),
 		matter.NewCommand(f),
+		modbus.NewCommand(f),
+		mqtt.NewCommand(f),
+		provision.NewCommand(f),
+		sensoraddon.NewCommand(f),
+		template.NewCommand(f),
+		virtual.NewCommand(f),
+		webhook.NewCommand(f),
+		wifi.NewCommand(f),
+		zigbee.NewCommand(f),
+		zwave.NewCommand(f),
 	)
 
 	// Monitoring commands - status and metrics
@@ -301,18 +310,19 @@ func init() {
 
 	// Utility commands - CLI utilities
 	cmdutil.AddCommandsToGroup(rootCmd, groupUtility,
-		initcmd.NewCommand(f),
-		firmware.NewCommand(f),
-		exportcmd.NewCommand(f),
 		alias.NewCommand(f),
+		cache.NewCommand(f),
+		completioncmd.NewCommand(f),
+		exportcmd.NewCommand(f),
+		feedback.NewCommand(f),
+		firmware.NewCommand(f),
+		initcmd.NewCommand(f),
+		logcmd.NewCommand(f),
 		plugin.NewCommand(f),
+		profile.NewCommand(f),
 		themecmd.NewCommand(f),
 		updatecmd.NewCommand(f),
-		completioncmd.NewCommand(f),
 		versioncmd.NewCommand(f),
-		cache.NewCommand(f),
-		logcmd.NewCommand(f),
-		feedback.NewCommand(f),
 	)
 }
 

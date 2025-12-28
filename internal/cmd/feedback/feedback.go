@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/github"
 )
 
@@ -65,7 +66,7 @@ pre-populated system information.`,
 	cmd.Flags().StringVar(&opts.Title, "title", "", "Issue title")
 	cmd.Flags().StringVar(&opts.Device, "device", "", "Device name/IP for device compatibility issues")
 	cmd.Flags().BoolVar(&opts.AttachLog, "attach-log", false, "Include CLI log info in report")
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview issue without opening browser")
+	flags.AddDryRunFlag(cmd, &opts.DryRun)
 	cmd.Flags().BoolVar(&opts.OpenIssues, "issues", false, "Open GitHub issues page instead")
 
 	return cmd

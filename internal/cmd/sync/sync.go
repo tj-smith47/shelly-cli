@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -53,7 +54,7 @@ Configurations are stored in the CLI config directory.`,
 
 	cmd.Flags().BoolVar(&opts.Push, "push", false, "Push local configs to devices")
 	cmd.Flags().BoolVar(&opts.Pull, "pull", false, "Pull device configs to local storage")
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview changes without applying")
+	flags.AddDryRunFlag(cmd, &opts.DryRun)
 	cmd.Flags().StringSliceVar(&opts.Devices, "device", nil, "Specific devices to sync (default: all)")
 
 	return cmd

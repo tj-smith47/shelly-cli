@@ -68,7 +68,7 @@ func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Get template
-	tpl, exists := config.GetTemplate(opts.Template)
+	tpl, exists := config.GetDeviceTemplate(opts.Template)
 	if !exists {
 		return fmt.Errorf("template %q not found", opts.Template)
 	}

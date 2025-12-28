@@ -82,7 +82,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Check if template exists
-	if _, exists := config.GetTemplate(opts.Name); exists && !opts.Yes {
+	if _, exists := config.GetDeviceTemplate(opts.Name); exists && !opts.Yes {
 		return fmt.Errorf("template %q already exists (use --force to overwrite)", opts.Name)
 	}
 
@@ -99,14 +99,14 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Save template - if force flag and exists, delete first
 	if opts.Yes {
-		if _, exists := config.GetTemplate(opts.Name); exists {
-			if delErr := config.DeleteTemplate(opts.Name); delErr != nil {
+		if _, exists := config.GetDeviceTemplate(opts.Name); exists {
+			if delErr := config.DeleteDeviceTemplate(opts.Name); delErr != nil {
 				return fmt.Errorf("failed to delete existing template: %w", delErr)
 			}
 		}
 	}
 
-	err = config.CreateTemplate(
+	err = config.CreateDeviceTemplate(
 		opts.Name,
 		opts.Description,
 		deviceTpl.Model,

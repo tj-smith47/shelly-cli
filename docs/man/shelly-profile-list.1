@@ -1,0 +1,90 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-profile-list - List device profiles
+
+
+.SH SYNOPSIS
+\fBshelly profile list [flags]\fP
+
+
+.SH DESCRIPTION
+List all known Shelly device profiles.
+
+.PP
+Optionally filter by generation or series.
+
+
+.SH OPTIONS
+\fB--gen\fP=""
+	Filter by generation (gen1, gen2, gen3, gen4)
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for list
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format: table, json, yaml
+
+.PP
+\fB--series\fP=""
+	Filter by series (classic, plus, pro, mini, blu, wave)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # List all profiles
+  shelly profile list
+
+  # List Gen2 devices
+  shelly profile list --gen gen2
+
+  # List Pro series devices
+  shelly profile list --series pro
+
+  # JSON output
+  shelly profile list -o json
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-profile(1)\fP

@@ -18,6 +18,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/modbus"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/sensoraddon"
 )
 
 // Factory provides dependencies to commands through lazy initialization.
@@ -44,12 +46,14 @@ type Factory struct {
 	Browser func() browser.Browser
 
 	// Cached instances - set after first call to avoid re-initialization.
-	ioStreams         *iostreams.IOStreams
-	cfgMgr            *config.Manager
-	shellyService     *shelly.Service
-	automationService *automation.Service
-	kvsService        *kvs.Service
-	browserInst       browser.Browser
+	ioStreams          *iostreams.IOStreams
+	cfgMgr             *config.Manager
+	shellyService      *shelly.Service
+	automationService  *automation.Service
+	kvsService         *kvs.Service
+	modbusService      *modbus.Service
+	sensorAddonService *sensoraddon.Service
+	browserInst        browser.Browser
 }
 
 // NewFactory creates a Factory with production dependencies.
@@ -215,6 +219,24 @@ func (f *Factory) AutomationService() *automation.Service {
 		f.automationService = automation.New(f.ShellyService())
 	}
 	return f.automationService
+}
+
+// ModbusService returns the Modbus service, lazily initialized.
+// Provides Modbus-TCP configuration management.
+func (f *Factory) ModbusService() *modbus.Service {
+	if f.modbusService == nil {
+		f.modbusService = modbus.New(f.ShellyService())
+	}
+	return f.modbusService
+}
+
+// SensorAddonService returns the Sensor Add-on service, lazily initialized.
+// Provides sensor add-on peripheral management.
+func (f *Factory) SensorAddonService() *sensoraddon.Service {
+	if f.sensorAddonService == nil {
+		f.sensorAddonService = sensoraddon.New(f.ShellyService())
+	}
+	return f.sensorAddonService
 }
 
 // =============================================================================

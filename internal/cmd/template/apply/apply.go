@@ -67,7 +67,7 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 
 	// Get template
-	tpl, exists := config.GetTemplate(opts.Template)
+	tpl, exists := config.GetDeviceTemplate(opts.Template)
 	if !exists {
 		return fmt.Errorf("template %q not found", opts.Template)
 	}

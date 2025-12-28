@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -62,7 +63,7 @@ Config file format:
 	}
 
 	cmd.Flags().IntVar(&opts.Parallel, "parallel", 5, "Maximum parallel provisioning operations")
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Validate config without provisioning")
+	flags.AddDryRunFlag(cmd, &opts.DryRun)
 
 	return cmd
 }
