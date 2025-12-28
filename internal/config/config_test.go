@@ -49,8 +49,11 @@ func TestManager_InitializesMaps(t *testing.T) {
 	if c.Scenes == nil {
 		t.Error("expected Scenes map to be initialized")
 	}
-	if c.Templates == nil {
-		t.Error("expected Templates map to be initialized")
+	if c.Templates.Device == nil {
+		t.Error("expected Templates.Device map to be initialized")
+	}
+	if c.Templates.Script == nil {
+		t.Error("expected Templates.Script map to be initialized")
 	}
 	if c.Alerts == nil {
 		t.Error("expected Alerts map to be initialized")
