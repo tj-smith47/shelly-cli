@@ -284,6 +284,6 @@ jobs:
             else
               git commit -m "docs: deploy $VERSION"
             fi
-            # Always force push to gh-pages (safe for deployment branches)
-            git push -u origin gh-pages --force
+            # Push HEAD to gh-pages branch (works for new and existing branches)
+            git push --force origin HEAD:gh-pages
           fi
