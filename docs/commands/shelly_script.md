@@ -63,6 +63,7 @@ Note: Scripts are only available on Gen2+ devices.
 * [shelly script list](shelly_script_list.md)	 - List scripts on a device
 * [shelly script start](shelly_script_start.md)	 - Start a script
 * [shelly script stop](shelly_script_stop.md)	 - Stop a running script
+* [shelly script template](shelly_script_template.md)	 - Manage script templates
 * [shelly script update](shelly_script_update.md)	 - Update a script
 * [shelly script upload](shelly_script_upload.md)	 - Upload script from file
 

@@ -1,0 +1,96 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-script-template-install - Install a script template on a device
+
+
+.SH SYNOPSIS
+\fBshelly script template install   [flags]\fP
+
+
+.SH DESCRIPTION
+Install a script template on a Shelly device.
+
+.PP
+Creates a new script on the device with the template code. Template
+variables are substituted with their default values, or you can use
+--configure for interactive configuration.
+
+
+.SH OPTIONS
+\fB--configure\fP[=false]
+	Interactive variable configuration
+
+.PP
+\fB--enable\fP[=false]
+	Enable script after installation
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for install
+
+.PP
+\fB--name\fP=""
+	Custom script name (defaults to template name)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Install with default values
+  shelly script template install living-room motion-light
+
+  # Install with interactive configuration
+  shelly script template install living-room motion-light --configure
+
+  # Install and enable immediately
+  shelly script template install living-room motion-light --enable
+
+  # Install with custom script name
+  shelly script template install living-room motion-light --name "Motion Sensor"
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-script-template(1)\fP

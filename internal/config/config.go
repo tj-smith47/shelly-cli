@@ -55,8 +55,8 @@ type Config struct {
 	// Scenes
 	Scenes map[string]Scene `mapstructure:"scenes" yaml:"scenes,omitempty"`
 
-	// Templates
-	Templates map[string]Template `mapstructure:"templates" yaml:"templates,omitempty"`
+	// Templates (device and script)
+	Templates TemplatesConfig `mapstructure:"templates" yaml:"templates,omitempty"`
 
 	// Alerts
 	Alerts map[string]Alert `mapstructure:"alerts" yaml:"alerts,omitempty"`
@@ -190,8 +190,14 @@ type SceneAction struct {
 	Params map[string]any `mapstructure:"params,omitempty" json:"params,omitempty" yaml:"params,omitempty"`
 }
 
-// Template represents a device configuration template.
-type Template struct {
+// TemplatesConfig holds all template types.
+type TemplatesConfig struct {
+	Device map[string]DeviceTemplate `mapstructure:"device" yaml:"device,omitempty"`
+	Script map[string]ScriptTemplate `mapstructure:"script" yaml:"script,omitempty"`
+}
+
+// DeviceTemplate represents a device configuration template.
+type DeviceTemplate struct {
 	Name         string         `mapstructure:"name" json:"name" yaml:"name"`
 	Description  string         `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
 	Model        string         `mapstructure:"model" json:"model" yaml:"model"`
@@ -200,6 +206,29 @@ type Template struct {
 	Config       map[string]any `mapstructure:"config" json:"config" yaml:"config"`
 	CreatedAt    string         `mapstructure:"created_at" json:"created_at" yaml:"created_at"`
 	SourceDevice string         `mapstructure:"source_device,omitempty" json:"source_device,omitempty" yaml:"source_device,omitempty"`
+}
+
+// ScriptTemplate represents a reusable JavaScript script template.
+type ScriptTemplate struct {
+	Name        string            `mapstructure:"name" json:"name" yaml:"name"`
+	Description string            `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
+	Code        string            `mapstructure:"code" json:"code" yaml:"code"`
+	Category    string            `mapstructure:"category,omitempty" json:"category,omitempty" yaml:"category,omitempty"`       // e.g., "automation", "monitoring", "utility"
+	Variables   []ScriptVariable  `mapstructure:"variables,omitempty" json:"variables,omitempty" yaml:"variables,omitempty"`   // Configurable variables
+	Models      []string          `mapstructure:"models,omitempty" json:"models,omitempty" yaml:"models,omitempty"`            // Compatible device models (empty = all)
+	MinGen      int               `mapstructure:"min_gen,omitempty" json:"min_gen,omitempty" yaml:"min_gen,omitempty"`         // Minimum generation (2 for Gen2+)
+	BuiltIn     bool              `mapstructure:"-" json:"-" yaml:"-"`                                                          // True for bundled templates
+	Author      string            `mapstructure:"author,omitempty" json:"author,omitempty" yaml:"author,omitempty"`
+	Version     string            `mapstructure:"version,omitempty" json:"version,omitempty" yaml:"version,omitempty"`
+}
+
+// ScriptVariable represents a configurable variable in a script template.
+type ScriptVariable struct {
+	Name        string `mapstructure:"name" json:"name" yaml:"name"`                                                           // Variable name in code (e.g., "THRESHOLD")
+	Description string `mapstructure:"description,omitempty" json:"description,omitempty" yaml:"description,omitempty"`
+	Type        string `mapstructure:"type,omitempty" json:"type,omitempty" yaml:"type,omitempty"`                             // "string", "number", "boolean"
+	Default     any    `mapstructure:"default,omitempty" json:"default,omitempty" yaml:"default,omitempty"`
+	Required    bool   `mapstructure:"required,omitempty" json:"required,omitempty" yaml:"required,omitempty"`
 }
 
 // PluginsConfig holds plugin system settings.
@@ -393,12 +422,15 @@ func getDefaultManager() *Manager {
 			// Load failure is not fatal - Get() will return nil and we handle that
 			// This can happen if config file is missing or unreadable
 			defaultManager.config = &Config{
-				Devices:   make(map[string]model.Device),
-				Aliases:   make(map[string]Alias),
-				Groups:    make(map[string]Group),
-				Scenes:    make(map[string]Scene),
-				Templates: make(map[string]Template),
-				Alerts:    make(map[string]Alert),
+				Devices: make(map[string]model.Device),
+				Aliases: make(map[string]Alias),
+				Groups:  make(map[string]Group),
+				Scenes:  make(map[string]Scene),
+				Templates: TemplatesConfig{
+					Device: make(map[string]DeviceTemplate),
+					Script: make(map[string]ScriptTemplate),
+				},
+				Alerts: make(map[string]Alert),
 			}
 			defaultManager.loaded = true
 		}
@@ -413,16 +445,19 @@ func Get() *Config {
 	cfg := mgr.Get()
 	if cfg == nil {
 		return &Config{
-			Output:    "table",
-			Color:     true,
-			Theme:     "dracula",
-			APIMode:   "local",
-			Devices:   make(map[string]model.Device),
-			Aliases:   make(map[string]Alias),
-			Groups:    make(map[string]Group),
-			Scenes:    make(map[string]Scene),
-			Templates: make(map[string]Template),
-			Alerts:    make(map[string]Alert),
+			Output:  "table",
+			Color:   true,
+			Theme:   "dracula",
+			APIMode: "local",
+			Devices: make(map[string]model.Device),
+			Aliases: make(map[string]Alias),
+			Groups:  make(map[string]Group),
+			Scenes:  make(map[string]Scene),
+			Templates: TemplatesConfig{
+				Device: make(map[string]DeviceTemplate),
+				Script: make(map[string]ScriptTemplate),
+			},
+			Alerts: make(map[string]Alert),
 		}
 	}
 	return cfg

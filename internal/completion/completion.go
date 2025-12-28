@@ -523,7 +523,7 @@ func ExpandDeviceArgs(devices []string) []string {
 // TemplateNames returns a completion function for template names.
 func TemplateNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		templates := config.ListTemplates()
+		templates := config.ListDeviceTemplates()
 		var completions []string
 		for name := range templates {
 			if strings.HasPrefix(name, toComplete) {
@@ -540,7 +540,7 @@ func TemplateThenDevice() func(*cobra.Command, []string, string) ([]string, cobr
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			// First argument: template names
-			templates := config.ListTemplates()
+			templates := config.ListDeviceTemplates()
 			var completions []string
 			for name := range templates {
 				if strings.HasPrefix(name, toComplete) {
@@ -563,7 +563,7 @@ func TemplateThenFile() func(*cobra.Command, []string, string) ([]string, cobra.
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			// First argument: template names
-			templates := config.ListTemplates()
+			templates := config.ListDeviceTemplates()
 			var completions []string
 			for name := range templates {
 				if strings.HasPrefix(name, toComplete) {
@@ -678,4 +678,37 @@ func SaveDiscoveryCache(addresses []string) error {
 	cache.Unlock()
 
 	return os.WriteFile(cacheFile, []byte(data), 0o600)
+}
+
+// ScriptTemplateNames returns a completion function for script template names.
+func ScriptTemplateNames() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return scriptTemplateNamesFiltered(toComplete), cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// DeviceThenScriptTemplate returns a completion function that completes
+// device names for the first arg and script template names for the second arg.
+func DeviceThenScriptTemplate() func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return deviceNamesFiltered(toComplete)
+		}
+		if len(args) == 1 {
+			return scriptTemplateNamesFiltered(toComplete), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// scriptTemplateNamesFiltered returns script template names matching the prefix.
+func scriptTemplateNamesFiltered(toComplete string) []string {
+	templates := automation.ListAllScriptTemplates()
+	var names []string
+	for name := range templates {
+		if strings.HasPrefix(name, toComplete) {
+			names = append(names, name)
+		}
+	}
+	return names
 }

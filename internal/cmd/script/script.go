@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/start"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/stop"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/script/template"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/update"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/upload"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -56,6 +57,7 @@ Note: Scripts are only available on Gen2+ devices.`,
 	cmd.AddCommand(eval.NewCommand(f))
 	cmd.AddCommand(upload.NewCommand(f))
 	cmd.AddCommand(download.NewCommand(f))
+	cmd.AddCommand(template.NewCommand(f))
 
 	return cmd
 }

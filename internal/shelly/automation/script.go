@@ -207,3 +207,49 @@ func (s *Service) EvalScript(ctx context.Context, identifier string, id int, cod
 	})
 	return result, err
 }
+
+// InstallScriptResult contains the result of installing a script.
+type InstallScriptResult struct {
+	ID      int
+	Name    string
+	Enabled bool
+}
+
+// InstallScript creates a new script, uploads code, and optionally enables it.
+func (s *Service) InstallScript(ctx context.Context, identifier, name, code string, enable bool) (*InstallScriptResult, error) {
+	var result InstallScriptResult
+	result.Name = name
+	result.Enabled = enable
+
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		script := components.NewScript(conn.RPCClient())
+
+		// Create script
+		var namePtr *string
+		if name != "" {
+			namePtr = &name
+		}
+		createResp, err := script.Create(ctx, namePtr)
+		if err != nil {
+			return err
+		}
+		result.ID = createResp.ID
+
+		// Upload code
+		if err := script.PutCode(ctx, result.ID, code, false); err != nil {
+			return err
+		}
+
+		// Enable if requested
+		if enable {
+			cfg := &components.ScriptConfig{Enable: &enable}
+			if err := script.SetConfig(ctx, result.ID, cfg); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return &result, err
+}

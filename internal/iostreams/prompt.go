@@ -3,8 +3,12 @@ package iostreams
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Prompt functions for interactive user input.
@@ -177,6 +181,34 @@ func Credential(usernameMsg, passwordMsg string) (username, password string, err
 	return username, password, nil
 }
 
+// PromptTypedInput prompts for a value with type parsing (number, boolean, string).
+// Used for script template variable configuration.
+func PromptTypedInput(message, defaultStr, valueType string) (any, error) {
+	input, err := Input(message, defaultStr)
+	if err != nil {
+		return nil, err
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" || input == defaultStr {
+		// Return default as-is (caller handles nil case)
+		return defaultStr, nil
+	}
+
+	// Parse based on type
+	switch valueType {
+	case "number":
+		if strings.Contains(input, ".") {
+			return strconv.ParseFloat(input, 64)
+		}
+		return strconv.Atoi(input)
+	case "boolean":
+		return strconv.ParseBool(input)
+	default:
+		return input, nil
+	}
+}
+
 // IOStreams prompt methods
 
 // Confirm prompts the user for a yes/no confirmation using this IOStreams.
@@ -229,4 +261,48 @@ func (s *IOStreams) MultiSelect(message string, options, defaults []string) ([]s
 		return defaults, nil
 	}
 	return MultiSelect(message, options, defaults)
+}
+
+// PromptTypedInput prompts for a typed value.
+// Returns the default value if the terminal doesn't support prompts.
+func (s *IOStreams) PromptTypedInput(message, defaultStr, valueType string) (any, error) {
+	if !s.CanPrompt() {
+		return defaultStr, nil
+	}
+	return PromptTypedInput(message, defaultStr, valueType)
+}
+
+// PromptScriptVariables prompts for script template variable values.
+// Returns a map of variable names to their values, starting with defaults
+// and updating with user input when configure is true.
+func (s *IOStreams) PromptScriptVariables(variables []config.ScriptVariable, configure bool) map[string]any {
+	values := make(map[string]any, len(variables))
+	for _, v := range variables {
+		values[v.Name] = v.Default
+	}
+
+	if !configure || len(variables) == 0 || !s.CanPrompt() {
+		return values
+	}
+
+	s.Title("Configure Template Variables")
+	s.Println()
+
+	for _, v := range variables {
+		defaultStr := fmt.Sprintf("%v", v.Default)
+		prompt := v.Name
+		if v.Description != "" {
+			prompt += fmt.Sprintf(" (%s)", v.Description)
+		}
+		result, err := PromptTypedInput(prompt, defaultStr, v.Type)
+		if err != nil {
+			continue // Keep default on error
+		}
+		if resultStr, ok := result.(string); !ok || resultStr != defaultStr {
+			values[v.Name] = result
+		}
+	}
+	s.Println()
+
+	return values
 }

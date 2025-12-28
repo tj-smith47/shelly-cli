@@ -15,9 +15,9 @@ func ValidateTemplateName(name string) error {
 	return ValidateName(name, "template")
 }
 
-// ParseTemplateFile parses a template from file data, detecting format by extension.
-func ParseTemplateFile(filename string, data []byte) (Template, error) {
-	var tpl Template
+// ParseDeviceTemplateFile parses a device template from file data, detecting format by extension.
+func ParseDeviceTemplateFile(filename string, data []byte) (DeviceTemplate, error) {
+	var tpl DeviceTemplate
 
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
@@ -55,44 +55,105 @@ func ParseTemplateFile(filename string, data []byte) (Template, error) {
 	return tpl, nil
 }
 
-// IsCompatibleModel checks if a template is compatible with a device model.
-func IsCompatibleModel(template Template, model string) bool {
+// IsCompatibleModel checks if a device template is compatible with a device model.
+func IsCompatibleModel(template DeviceTemplate, model string) bool {
 	return template.Model == model
 }
 
-// IsCompatibleGeneration checks if a template is compatible with a device generation.
-func IsCompatibleGeneration(template Template, generation int) bool {
+// IsCompatibleGeneration checks if a device template is compatible with a device generation.
+func IsCompatibleGeneration(template DeviceTemplate, generation int) bool {
 	return template.Generation == generation
 }
 
 // Package-level functions delegate to the default manager.
 
-// CreateTemplate creates a new template.
-func CreateTemplate(name, description, deviceModel, app string, generation int, cfg map[string]any, sourceDevice string) error {
-	return getDefaultManager().CreateTemplate(name, description, deviceModel, app, generation, cfg, sourceDevice)
+// CreateDeviceTemplate creates a new device template.
+func CreateDeviceTemplate(name, description, deviceModel, app string, generation int, cfg map[string]any, sourceDevice string) error {
+	return getDefaultManager().CreateDeviceTemplate(name, description, deviceModel, app, generation, cfg, sourceDevice)
 }
 
-// DeleteTemplate removes a template.
-func DeleteTemplate(name string) error {
-	return getDefaultManager().DeleteTemplate(name)
+// DeleteDeviceTemplate removes a device template.
+func DeleteDeviceTemplate(name string) error {
+	return getDefaultManager().DeleteDeviceTemplate(name)
 }
 
-// GetTemplate returns a template by name.
-func GetTemplate(name string) (Template, bool) {
-	return getDefaultManager().GetTemplate(name)
+// GetDeviceTemplate returns a device template by name.
+func GetDeviceTemplate(name string) (DeviceTemplate, bool) {
+	return getDefaultManager().GetDeviceTemplate(name)
 }
 
-// ListTemplates returns all templates.
-func ListTemplates() map[string]Template {
-	return getDefaultManager().ListTemplates()
+// ListDeviceTemplates returns all device templates.
+func ListDeviceTemplates() map[string]DeviceTemplate {
+	return getDefaultManager().ListDeviceTemplates()
 }
 
-// UpdateTemplate updates a template's metadata.
-func UpdateTemplate(name, description string) error {
-	return getDefaultManager().UpdateTemplate(name, description)
+// UpdateDeviceTemplate updates a device template's metadata.
+func UpdateDeviceTemplate(name, description string) error {
+	return getDefaultManager().UpdateDeviceTemplate(name, description)
 }
 
-// SaveTemplate saves or updates a template.
-func SaveTemplate(template Template) error {
-	return getDefaultManager().SaveTemplate(template)
+// SaveDeviceTemplate saves or updates a device template.
+func SaveDeviceTemplate(template DeviceTemplate) error {
+	return getDefaultManager().SaveDeviceTemplate(template)
+}
+
+// =============================================================================
+// Script Template Functions
+// =============================================================================
+
+// ParseScriptTemplateFile parses a script template from file data, detecting format by extension.
+func ParseScriptTemplateFile(filename string, data []byte) (ScriptTemplate, error) {
+	var tpl ScriptTemplate
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".json":
+		if err := json.Unmarshal(data, &tpl); err != nil {
+			return tpl, fmt.Errorf("failed to parse JSON: %w", err)
+		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(data, &tpl); err != nil {
+			return tpl, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+	default:
+		// Try YAML first, then JSON
+		yamlErr := yaml.Unmarshal(data, &tpl)
+		if yamlErr == nil {
+			break
+		}
+		jsonErr := json.Unmarshal(data, &tpl)
+		if jsonErr != nil {
+			return tpl, fmt.Errorf("failed to parse file: %w", errors.Join(yamlErr, jsonErr))
+		}
+	}
+
+	// Validate required fields
+	if tpl.Name == "" {
+		return tpl, fmt.Errorf("script template missing required field: name")
+	}
+	if tpl.Code == "" {
+		return tpl, fmt.Errorf("script template missing required field: code")
+	}
+
+	return tpl, nil
+}
+
+// SaveScriptTemplate saves or updates a script template.
+func SaveScriptTemplate(template ScriptTemplate) error {
+	return getDefaultManager().SaveScriptTemplate(template)
+}
+
+// DeleteScriptTemplate removes a script template.
+func DeleteScriptTemplate(name string) error {
+	return getDefaultManager().DeleteScriptTemplate(name)
+}
+
+// GetScriptTemplate returns a script template by name.
+func GetScriptTemplate(name string) (ScriptTemplate, bool) {
+	return getDefaultManager().GetScriptTemplate(name)
+}
+
+// ListScriptTemplates returns all user-defined script templates.
+func ListScriptTemplates() map[string]ScriptTemplate {
+	return getDefaultManager().ListScriptTemplates()
 }

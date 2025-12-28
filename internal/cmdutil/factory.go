@@ -289,14 +289,14 @@ func (f *Factory) GetScene(name string) *config.Scene {
 	return nil
 }
 
-// GetTemplate retrieves a template from config by name.
+// GetDeviceTemplate retrieves a device template from config by name.
 // Returns nil if not found or config fails to load.
-func (f *Factory) GetTemplate(name string) *config.Template {
+func (f *Factory) GetDeviceTemplate(name string) *config.DeviceTemplate {
 	cfg, err := f.Config()
 	if err != nil {
 		return nil
 	}
-	if tmpl, ok := cfg.Templates[name]; ok {
+	if tmpl, ok := cfg.Templates.Device[name]; ok {
 		return &tmpl
 	}
 	return nil

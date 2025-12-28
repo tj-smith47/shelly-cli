@@ -30,19 +30,19 @@ const DefaultTimeout = 10 * time.Second
 
 // Service provides high-level operations on Shelly devices.
 type Service struct {
-	resolver          DeviceResolver
-	rateLimiter       *ratelimit.DeviceRateLimiter
-	pluginRegistry    *plugins.Registry
-	firmwareService   *firmware.Service
-	wirelessService   *wireless.Service
-	networkService    *network.WiFiService
-	mqttService       *network.MQTTService
-	ethernetService   *network.EthernetService
-	deviceService     *device.Service
-	componentService  *component.Service
-	authService       *auth.Service
-	modbusService     *modbus.Service
-	provisionService  *provision.Service
+	resolver         DeviceResolver
+	rateLimiter      *ratelimit.DeviceRateLimiter
+	pluginRegistry   *plugins.Registry
+	firmwareService  *firmware.Service
+	wirelessService  *wireless.Service
+	networkService   *network.WiFiService
+	mqttService      *network.MQTTService
+	ethernetService  *network.EthernetService
+	deviceService    *device.Service
+	componentService *component.Service
+	authService      *auth.Service
+	modbusService    *modbus.Service
+	provisionService *provision.Service
 }
 
 // DeviceResolver resolves device identifiers to device configurations.
@@ -170,7 +170,7 @@ type authAdapter struct {
 
 // GetAuthEnabled implements auth.DeviceInfoProvider.
 func (a *authAdapter) GetAuthEnabled(ctx context.Context, identifier string) (bool, error) {
-	info, err := a.Service.DeviceInfo(ctx, identifier)
+	info, err := a.DeviceInfo(ctx, identifier)
 	if err != nil {
 		return false, err
 	}

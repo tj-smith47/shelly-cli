@@ -96,3 +96,22 @@ func DisplayWebSocketConnectionState(ios *iostreams.IOStreams, state string) {
 		ios.Info("WebSocket state: %s", state)
 	}
 }
+
+// DisplayWebSocketInfo displays WebSocket configuration and status.
+func DisplayWebSocketInfo(ios *iostreams.IOStreams, config, status map[string]any) {
+	if config != nil {
+		DisplayJSONResult(ios, "WebSocket Config:", config)
+	}
+	if status != nil {
+		DisplayJSONResult(ios, "WebSocket Status:", status)
+	}
+}
+
+// DisplayWebSocketDeviceInfo displays device info for WebSocket debugging.
+func DisplayWebSocketDeviceInfo(ios *iostreams.IOStreams, model, id string, generation int) {
+	ios.Println(theme.Bold().Render("WebSocket Configuration:"))
+	ios.Println()
+	ios.Printf("  Device: %s (%s)\n", model, id)
+	ios.Printf("  Generation: %d\n", generation)
+	ios.Println()
+}

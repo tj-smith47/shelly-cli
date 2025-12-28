@@ -313,6 +313,61 @@ func (s *Service) SetCloudEnabled(ctx context.Context, identifier string, enable
 	})
 }
 
+// WebSocketInfo contains WebSocket configuration and status.
+type WebSocketInfo struct {
+	Config map[string]any `json:"config,omitempty"`
+	Status map[string]any `json:"status,omitempty"`
+}
+
+// GetWebSocketInfo returns WebSocket configuration and status.
+func (s *Service) GetWebSocketInfo(ctx context.Context, identifier string) (*WebSocketInfo, error) {
+	var info WebSocketInfo
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		info.Config = getWebSocketConfig(ctx, conn)
+		info.Status = getWebSocketStatus(ctx, conn)
+		return nil
+	})
+	return &info, err
+}
+
+// getWebSocketConfig retrieves WebSocket config, falling back to Sys.GetConfig if needed.
+func getWebSocketConfig(ctx context.Context, conn *client.Client) map[string]any {
+	// Try direct Ws.GetConfig first
+	if result, err := conn.Call(ctx, "Ws.GetConfig", nil); err == nil {
+		if m, ok := result.(map[string]any); ok {
+			return m
+		}
+	}
+
+	// Fallback: extract ws from Sys.GetConfig
+	sysResult, err := conn.Call(ctx, "Sys.GetConfig", nil)
+	if err != nil {
+		return nil
+	}
+	sysMap, ok := sysResult.(map[string]any)
+	if !ok {
+		return nil
+	}
+	wsConfig, ok := sysMap["ws"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return wsConfig
+}
+
+// getWebSocketStatus retrieves WebSocket status.
+func getWebSocketStatus(ctx context.Context, conn *client.Client) map[string]any {
+	result, err := conn.Call(ctx, "Ws.GetStatus", nil)
+	if err != nil {
+		return nil
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return m
+}
+
 // SetWiFiAPConfig updates the WiFi access point configuration.
 func (s *Service) SetWiFiAPConfig(ctx context.Context, identifier, ssid, password string, enable *bool) error {
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
@@ -794,4 +849,3 @@ func (s *Service) GetTUISecurityStatus(ctx context.Context, identifier string) (
 	})
 	return result, err
 }
-

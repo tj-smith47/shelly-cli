@@ -1,0 +1,92 @@
+.nh
+.TH "SHELLY" "1" "Dec 2025" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-script-template - Manage script templates
+
+
+.SH SYNOPSIS
+\fBshelly script template [flags]\fP
+
+
+.SH DESCRIPTION
+Manage JavaScript script templates for Shelly devices.
+
+.PP
+Script templates provide reusable JavaScript code that can be installed
+on Gen2+ devices. Templates include configurable variables that are
+substituted during installation.
+
+.PP
+The CLI includes built-in templates for common use cases:
+  - motion-light: Motion-activated lighting
+  - power-monitor: Power consumption alerts
+  - schedule-helper: Simple on/off scheduling
+  - toggle-sync: Synchronize multiple switches
+  - energy-logger: Log energy usage to KVS
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for template
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # List available script templates
+  shelly script template list
+
+  # Show template details and code
+  shelly script template show motion-light
+
+  # Install a template on a device
+  shelly script template install living-room motion-light
+
+  # Install with interactive configuration
+  shelly script template install living-room motion-light --configure
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-script(1)\fP, \fBshelly-script-template-install(1)\fP, \fBshelly-script-template-list(1)\fP, \fBshelly-script-template-show(1)\fP
