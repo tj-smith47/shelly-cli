@@ -41,6 +41,7 @@ type GroupsModel struct {
 	groups     []*integrator.DeviceGroup
 	scroller   *panel.Scroller
 	loading    bool
+	editing    bool
 	err        error
 	width      int
 	height     int
@@ -48,6 +49,7 @@ type GroupsModel struct {
 	panelIndex int
 	styles     GroupsStyles
 	loader     loading.Model
+	editModal  GroupEditModel
 }
 
 // GroupsStyles holds styles for the Groups component.
@@ -101,6 +103,7 @@ func NewGroups(deps GroupsDeps) GroupsModel {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModal: NewGroupEditModel(),
 	}
 }
 
@@ -158,6 +161,11 @@ func (m GroupsModel) SetPanelIndex(index int) GroupsModel {
 
 // Update handles messages.
 func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		var cmd tea.Cmd
@@ -192,6 +200,34 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 	return m, nil
 }
 
+func (m GroupsModel) handleEditModalUpdate(msg tea.Msg) (GroupsModel, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.Visible() {
+		m.editing = false
+		// Refresh data after edit
+		m.loading = true
+		return m, tea.Batch(cmd, m.loader.Tick(), m.loadGroups())
+	}
+
+	// Handle save result message
+	if saveMsg, ok := msg.(GroupEditSaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			// Refresh data after successful save
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.loadGroups(), func() tea.Msg {
+				return GroupEditClosedMsg{Saved: true}
+			})
+		}
+	}
+
+	return m, cmd
+}
+
 func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
@@ -211,6 +247,36 @@ func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 			m.loading = true
 			return m, tea.Batch(m.loader.Tick(), m.loadGroups())
 		}
+	case "n":
+		// Create new group
+		if m.fleet != nil && !m.loading {
+			m.editing = true
+			m.editModal = m.editModal.SetSize(m.width, m.height)
+			m.editModal = m.editModal.ShowCreate(m.fleet)
+			return m, func() tea.Msg { return GroupEditOpenedMsg{} }
+		}
+	case "e", "enter":
+		// Edit selected group
+		if m.fleet != nil && !m.loading && len(m.groups) > 0 {
+			group := m.SelectedGroup()
+			if group != nil {
+				m.editing = true
+				m.editModal = m.editModal.SetSize(m.width, m.height)
+				m.editModal = m.editModal.ShowEdit(m.fleet, group)
+				return m, func() tea.Msg { return GroupEditOpenedMsg{} }
+			}
+		}
+	case "d":
+		// Delete selected group
+		if m.fleet != nil && !m.loading && len(m.groups) > 0 {
+			group := m.SelectedGroup()
+			if group != nil {
+				m.editing = true
+				m.editModal = m.editModal.SetSize(m.width, m.height)
+				m.editModal = m.editModal.ShowDelete(m.fleet, group)
+				return m, func() tea.Msg { return GroupEditOpenedMsg{} }
+			}
+		}
 	}
 
 	return m, nil
@@ -218,6 +284,11 @@ func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 
 // View renders the Groups component.
 func (m GroupsModel) View() string {
+	// Render edit modal if editing
+	if m.editing {
+		return m.editModal.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Device Groups").
 		SetFocused(m.focused).
@@ -225,7 +296,7 @@ func (m GroupsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("j/k:nav r:refresh")
+		r.SetFooter("n:new e:edit d:del r:refresh")
 	}
 
 	// Calculate content area for centering (accounting for panel borders)
@@ -352,5 +423,5 @@ func (m GroupsModel) Refresh() (GroupsModel, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m GroupsModel) FooterText() string {
-	return "j/k:scroll g/G:top/bottom enter:details"
+	return "n:new e:edit d:delete r:refresh"
 }

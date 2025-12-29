@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/fleet"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
@@ -249,6 +250,11 @@ func (f *Fleet) Update(msg tea.Msg) (View, tea.Cmd) {
 		return f, tea.Batch(cmds...)
 	}
 
+	// Handle group edit completion with toast
+	if cmd := f.handleGroupEditMsg(msg); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
 	// Handle keyboard input
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		f.handleKeyPress(keyMsg)
@@ -259,6 +265,28 @@ func (f *Fleet) Update(msg tea.Msg) (View, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	return f, tea.Batch(cmds...)
+}
+
+// handleGroupEditMsg processes group edit completion messages and returns toast commands.
+func (f *Fleet) handleGroupEditMsg(msg tea.Msg) tea.Cmd {
+	switch editMsg := msg.(type) {
+	case fleet.GroupEditClosedMsg:
+		if editMsg.Saved {
+			return toast.Success("Group saved")
+		}
+	case fleet.GroupEditSaveResultMsg:
+		if editMsg.Err == nil {
+			switch editMsg.Mode {
+			case fleet.GroupEditModeCreate:
+				return toast.Success("Group created")
+			case fleet.GroupEditModeEdit:
+				return toast.Success("Group updated")
+			case fleet.GroupEditModeDelete:
+				return toast.Success("Group deleted")
+			}
+		}
+	}
+	return nil
 }
 
 func (f *Fleet) handleKeyPress(msg tea.KeyPressMsg) {
@@ -424,11 +452,14 @@ func (f *Fleet) renderConnectionPrompt() string {
 	default:
 		content.WriteString(f.styles.Muted.Render("Not connected to Shelly Cloud"))
 		content.WriteString("\n\n")
-		content.WriteString("To connect, you need:\n")
-		content.WriteString(f.styles.Muted.Render("  1. A Shelly Cloud Integrator account\n"))
-		content.WriteString(f.styles.Muted.Render("  2. SHELLY_INTEGRATOR_TAG environment variable\n"))
-		content.WriteString(f.styles.Muted.Render("  3. SHELLY_INTEGRATOR_TOKEN environment variable\n"))
+		content.WriteString(f.styles.Muted.Render("To connect, you need:"))
 		content.WriteString("\n")
+		content.WriteString(f.styles.Muted.Render("1. A Shelly Cloud Integrator account"))
+		content.WriteString("\n")
+		content.WriteString(f.styles.Muted.Render("2. SHELLY_INTEGRATOR_TAG environment variable"))
+		content.WriteString("\n")
+		content.WriteString(f.styles.Muted.Render("3. SHELLY_INTEGRATOR_TOKEN environment variable"))
+		content.WriteString("\n\n")
 		content.WriteString(f.styles.Muted.Render("Press 'c' to connect"))
 	}
 
