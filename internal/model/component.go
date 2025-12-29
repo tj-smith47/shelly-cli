@@ -193,10 +193,12 @@ type InputStatus struct {
 
 // InputConfig represents the configuration of an input component.
 type InputConfig struct {
-	ID     int
-	Name   *string
-	Type   string
-	Invert bool
+	ID           int
+	Name         *string
+	Type         string
+	Enable       bool
+	Invert       bool
+	FactoryReset bool
 }
 
 // ComponentListItem represents a component in list output (for power/energy list commands).

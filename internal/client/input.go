@@ -43,16 +43,37 @@ func (i *InputComponent) GetConfig(ctx context.Context) (*model.InputConfig, err
 	}
 
 	result := &model.InputConfig{
-		ID:   config.ID,
-		Name: config.Name,
-		Type: config.Type,
+		ID:     config.ID,
+		Name:   config.Name,
+		Type:   config.Type,
+		Enable: true, // Default to enabled
 	}
 
+	if config.Enable != nil {
+		result.Enable = *config.Enable
+	}
 	if config.Invert != nil {
 		result.Invert = *config.Invert
 	}
+	if config.FactoryReset != nil {
+		result.FactoryReset = *config.FactoryReset
+	}
 
 	return result, nil
+}
+
+// SetConfig updates the configuration of the input.
+func (i *InputComponent) SetConfig(ctx context.Context, cfg *model.InputConfig) error {
+	genConfig := &components.InputConfig{
+		ID:           cfg.ID,
+		Type:         cfg.Type,
+		Name:         cfg.Name,
+		Enable:       &cfg.Enable,
+		Invert:       &cfg.Invert,
+		FactoryReset: &cfg.FactoryReset,
+	}
+
+	return i.input.SetConfig(ctx, genConfig)
 }
 
 // Trigger triggers an input event.

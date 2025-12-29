@@ -16,6 +16,7 @@ type InputInfo struct {
 	State bool
 }
 
+
 // InputStatus gets the status of an input component.
 func (s *Service) InputStatus(ctx context.Context, identifier string, inputID int) (*model.InputStatus, error) {
 	var result *model.InputStatus
@@ -41,6 +42,27 @@ func (s *Service) InputStatus(ctx context.Context, identifier string, inputID in
 func (s *Service) InputTrigger(ctx context.Context, identifier string, inputID int, eventType string) error {
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		return conn.Input(inputID).Trigger(ctx, eventType)
+	})
+}
+
+// InputGetConfig gets the configuration for an input component.
+func (s *Service) InputGetConfig(ctx context.Context, identifier string, inputID int) (*model.InputConfig, error) {
+	var result *model.InputConfig
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		config, err := conn.Input(inputID).GetConfig(ctx)
+		if err != nil {
+			return err
+		}
+		result = config
+		return nil
+	})
+	return result, err
+}
+
+// InputSetConfig updates the configuration for an input component.
+func (s *Service) InputSetConfig(ctx context.Context, identifier string, inputID int, cfg *model.InputConfig) error {
+	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		return conn.Input(inputID).SetConfig(ctx, cfg)
 	})
 }
 

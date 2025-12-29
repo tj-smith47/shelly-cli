@@ -40,6 +40,19 @@ type LoadedMsg struct {
 	Err    error
 }
 
+// ActionMsg signals an input action completed.
+type ActionMsg struct {
+	Action  string
+	InputID int
+	Err     error
+}
+
+// EditRequestMsg signals that the edit modal should be opened.
+type EditRequestMsg struct {
+	Device  string
+	InputID int
+}
+
 // Model displays input settings for a device.
 type Model struct {
 	ctx        context.Context
@@ -48,6 +61,7 @@ type Model struct {
 	inputs     []shelly.InputInfo
 	scroller   *panel.Scroller
 	loading    bool
+	editing    bool
 	err        error
 	width      int
 	height     int
@@ -55,6 +69,7 @@ type Model struct {
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     Styles
 	loader     loading.Model
+	editModal  EditModel
 }
 
 // Styles holds styles for the Inputs component.
@@ -114,6 +129,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModal: NewEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -174,6 +190,11 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		var cmd tea.Cmd
@@ -207,6 +228,34 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.Visible() {
+		m.editing = false
+		// Refresh data after edit
+		m.loading = true
+		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchInputs())
+	}
+
+	// Handle save result message
+	if saveMsg, ok := msg.(EditSaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			// Refresh data after successful save
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.fetchInputs(), func() tea.Msg {
+				return EditClosedMsg{Saved: true}
+			})
+		}
+	}
+
+	return m, cmd
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
@@ -226,6 +275,18 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.loading = true
 			return m, tea.Batch(m.loader.Tick(), m.fetchInputs())
 		}
+	case "e", "enter":
+		// Open edit modal for selected input
+		if len(m.inputs) > 0 && !m.loading {
+			input := m.inputs[m.scroller.Cursor()]
+			m.editing = true
+			m.editModal = m.editModal.SetSize(m.width, m.height)
+			var cmd tea.Cmd
+			m.editModal, cmd = m.editModal.Show(m.device, input.ID)
+			return m, tea.Batch(cmd, func() tea.Msg {
+				return EditOpenedMsg{}
+			})
+		}
 	}
 
 	return m, nil
@@ -233,6 +294,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // View renders the Inputs component.
 func (m Model) View() string {
+	// Render edit modal if editing
+	if m.editing {
+		return m.editModal.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Inputs").
 		SetFocused(m.focused).
@@ -357,5 +423,17 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom enter:details"
+	return "j/k:scroll e:edit r:refresh"
+}
+
+// SelectedInput returns the currently selected input, if any.
+func (m Model) SelectedInput() *shelly.InputInfo {
+	if len(m.inputs) == 0 {
+		return nil
+	}
+	cursor := m.scroller.Cursor()
+	if cursor < 0 || cursor >= len(m.inputs) {
+		return nil
+	}
+	return &m.inputs[cursor]
 }
