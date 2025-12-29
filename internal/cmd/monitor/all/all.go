@@ -14,10 +14,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var intervalFlag time.Duration
+// Options holds command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Interval time.Duration
+}
 
 // NewCommand creates the monitor all command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "all",
 		Aliases: []string{"overview", "summary"},
@@ -32,19 +38,19 @@ Press Ctrl+C to stop monitoring.`,
   # Monitor with custom interval
   shelly monitor all --interval 5s`,
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(f, cmd.Context())
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().DurationVarP(&intervalFlag, "interval", "i", 5*time.Second, "Refresh interval")
+	cmd.Flags().DurationVarP(&opts.Interval, "interval", "i", 5*time.Second, "Refresh interval")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, ctx context.Context) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Load registered devices
 	devices := config.ListDevices()
@@ -73,7 +79,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	mu.Unlock()
 
 	// Monitoring loop
-	ticker := time.NewTicker(intervalFlag)
+	ticker := time.NewTicker(opts.Interval)
 	defer ticker.Stop()
 
 	for {

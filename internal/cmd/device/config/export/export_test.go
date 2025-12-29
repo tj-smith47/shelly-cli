@@ -250,7 +250,14 @@ func TestRun_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "test-device", "output.json")
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		FilePath: "output.json",
+		Format:   "json",
+	}
+
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error with cancelled context")
 	}
@@ -266,7 +273,14 @@ func TestRun_Timeout(t *testing.T) {
 
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "test-device", "output.json")
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		FilePath: "output.json",
+		Format:   "json",
+	}
+
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error with timed out context")
 	}

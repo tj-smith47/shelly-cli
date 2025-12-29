@@ -303,9 +303,8 @@ func TestNewCommand_LongMentionsEnvVars(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies package-level flags
 func TestRun_MissingEmail_NonInteractive(t *testing.T) {
-	// Test that run returns error when email is missing and not interactive
+	t.Parallel()
 
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -314,12 +313,14 @@ func TestRun_MissingEmail_NonInteractive(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Reset flags for fresh test
-	emailFlag = ""
-	passwordFlag = ""
+	opts := &Options{
+		Factory:  f,
+		Email:    "",
+		Password: "",
+	}
 
 	ctx := context.Background()
-	err := run(f, ctx)
+	err := run(ctx, opts)
 
 	if err == nil {
 		t.Error("expected error when email is missing")
@@ -330,9 +331,8 @@ func TestRun_MissingEmail_NonInteractive(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies package-level flags
 func TestRun_MissingPassword_NonInteractive(t *testing.T) {
-	// Test that run returns error when password is missing and not interactive
+	t.Parallel()
 
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -341,12 +341,14 @@ func TestRun_MissingPassword_NonInteractive(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Set email but not password
-	emailFlag = "test@example.com"
-	passwordFlag = ""
+	opts := &Options{
+		Factory:  f,
+		Email:    "test@example.com",
+		Password: "",
+	}
 
 	ctx := context.Background()
-	err := run(f, ctx)
+	err := run(ctx, opts)
 
 	if err == nil {
 		t.Error("expected error when password is missing")
@@ -355,9 +357,6 @@ func TestRun_MissingPassword_NonInteractive(t *testing.T) {
 	if !strings.Contains(err.Error(), "password") {
 		t.Errorf("error should mention password, got: %v", err)
 	}
-
-	// Reset flags
-	emailFlag = ""
 }
 
 func TestNewCommand_ExampleContainsCloud(t *testing.T) {
@@ -412,9 +411,8 @@ func TestNewCommand_LongHasMultipleLines(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies package-level flags
 func TestRun_CancelledContext(t *testing.T) {
-	// Test that run respects context cancellation
+	t.Parallel()
 
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -423,24 +421,22 @@ func TestRun_CancelledContext(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Set credentials via flags
-	emailFlag = "test@example.com"
-	passwordFlag = "testpassword"
+	opts := &Options{
+		Factory:  f,
+		Email:    "test@example.com",
+		Password: "testpassword",
+	}
 
 	// Create cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(f, ctx)
+	err := run(ctx, opts)
 
 	// Should fail due to cancelled context
 	if err == nil {
 		t.Error("expected error with cancelled context")
 	}
-
-	// Reset flags
-	emailFlag = ""
-	passwordFlag = ""
 }
 
 func TestNewCommand_ExampleMentionsInteractive(t *testing.T) {
@@ -537,8 +533,9 @@ func TestNewCommand_VerifyReturnType(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies package-level flags
 func TestRun_BothCredentialsEmpty(t *testing.T) {
+	t.Parallel()
+
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -546,20 +543,23 @@ func TestRun_BothCredentialsEmpty(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Both flags empty
-	emailFlag = ""
-	passwordFlag = ""
+	opts := &Options{
+		Factory:  f,
+		Email:    "",
+		Password: "",
+	}
 
 	ctx := context.Background()
-	err := run(f, ctx)
+	err := run(ctx, opts)
 
 	if err == nil {
 		t.Error("expected error when both credentials are empty")
 	}
 }
 
-//nolint:paralleltest // modifies package-level flags
 func TestRun_EmailValidPasswordEmpty(t *testing.T) {
+	t.Parallel()
+
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -567,19 +567,18 @@ func TestRun_EmailValidPasswordEmpty(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Only email set
-	emailFlag = "valid@email.com"
-	passwordFlag = ""
+	opts := &Options{
+		Factory:  f,
+		Email:    "valid@email.com",
+		Password: "",
+	}
 
 	ctx := context.Background()
-	err := run(f, ctx)
+	err := run(ctx, opts)
 
 	if err == nil {
 		t.Error("expected error when password is empty")
 	}
-
-	// Clean up
-	emailFlag = ""
 }
 
 func TestNewCommand_LocalFlags(t *testing.T) {

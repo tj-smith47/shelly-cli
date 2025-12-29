@@ -1,0 +1,667 @@
+// Package security provides TUI components for displaying device security settings.
+package security
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+	"unicode"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+)
+
+// EditField represents a field in the edit form.
+type EditField int
+
+// Edit field constants.
+const (
+	EditFieldPassword EditField = iota
+	EditFieldConfirm
+	EditFieldCount
+)
+
+// PasswordStrength represents password strength levels.
+type PasswordStrength int
+
+// Password strength constants.
+const (
+	StrengthNone PasswordStrength = iota
+	StrengthWeak
+	StrengthFair
+	StrengthGood
+	StrengthStrong
+)
+
+// EditSaveResultMsg signals a save operation completed.
+type EditSaveResultMsg struct {
+	Err error
+}
+
+// EditOpenedMsg signals the edit modal was opened.
+type EditOpenedMsg struct{}
+
+// EditClosedMsg signals the edit modal was closed.
+type EditClosedMsg struct {
+	Saved bool
+}
+
+// EditModel represents the auth configuration edit modal.
+type EditModel struct {
+	ctx     context.Context
+	svc     *shelly.Service
+	device  string
+	visible bool
+	cursor  EditField
+	saving  bool
+	err     error
+	width   int
+	height  int
+	styles  EditStyles
+
+	// Auth state
+	authEnabled bool // Current auth state from device
+
+	// Form inputs
+	passwordInput form.Password
+	confirmInput  form.Password
+
+	// UI state
+	disableMode bool // True when disabling auth (no password required)
+}
+
+// EditStyles holds styles for the edit modal.
+type EditStyles struct {
+	Overlay        lipgloss.Style
+	Modal          lipgloss.Style
+	Title          lipgloss.Style
+	Label          lipgloss.Style
+	LabelFocus     lipgloss.Style
+	Input          lipgloss.Style
+	InputFocus     lipgloss.Style
+	Button         lipgloss.Style
+	ButtonFocus    lipgloss.Style
+	ButtonDanger   lipgloss.Style
+	Error          lipgloss.Style
+	Help           lipgloss.Style
+	Selector       lipgloss.Style
+	StrengthWeak   lipgloss.Style
+	StrengthFair   lipgloss.Style
+	StrengthGood   lipgloss.Style
+	StrengthStrong lipgloss.Style
+	StatusEnabled  lipgloss.Style
+	StatusDisabled lipgloss.Style
+}
+
+// DefaultEditStyles returns the default edit modal styles.
+func DefaultEditStyles() EditStyles {
+	colors := theme.GetSemanticColors()
+	return EditStyles{
+		Overlay: lipgloss.NewStyle().
+			Background(lipgloss.Color("#000000")),
+		Modal: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colors.TableBorder).
+			Background(colors.Background).
+			Padding(1, 2),
+		Title: lipgloss.NewStyle().
+			Foreground(colors.Highlight).
+			Bold(true).
+			MarginBottom(1),
+		Label: lipgloss.NewStyle().
+			Foreground(colors.Muted).
+			Width(14),
+		LabelFocus: lipgloss.NewStyle().
+			Foreground(colors.Highlight).
+			Bold(true).
+			Width(14),
+		Input: lipgloss.NewStyle().
+			Foreground(colors.Text),
+		InputFocus: lipgloss.NewStyle().
+			Foreground(colors.Highlight),
+		Button: lipgloss.NewStyle().
+			Foreground(colors.Muted).
+			Padding(0, 2),
+		ButtonFocus: lipgloss.NewStyle().
+			Foreground(colors.Highlight).
+			Bold(true).
+			Padding(0, 2),
+		ButtonDanger: lipgloss.NewStyle().
+			Foreground(colors.Error).
+			Bold(true).
+			Padding(0, 2),
+		Error: lipgloss.NewStyle().
+			Foreground(colors.Error),
+		Help: lipgloss.NewStyle().
+			Foreground(colors.Muted),
+		Selector: lipgloss.NewStyle().
+			Foreground(colors.Highlight),
+		StrengthWeak: lipgloss.NewStyle().
+			Foreground(colors.Error),
+		StrengthFair: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		StrengthGood: lipgloss.NewStyle().
+			Foreground(colors.Success),
+		StrengthStrong: lipgloss.NewStyle().
+			Foreground(colors.Online),
+		StatusEnabled: lipgloss.NewStyle().
+			Foreground(colors.Online).
+			Bold(true),
+		StatusDisabled: lipgloss.NewStyle().
+			Foreground(colors.Error).
+			Bold(true),
+	}
+}
+
+// NewEditModel creates a new auth configuration edit modal.
+func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
+	passwordInput := form.NewPassword(
+		form.WithPasswordPlaceholder("Enter new password"),
+		form.WithPasswordCharLimit(64),
+		form.WithPasswordWidth(30),
+		form.WithPasswordHelp("Min 8 characters, Ctrl+T to show/hide"),
+	)
+
+	confirmInput := form.NewPassword(
+		form.WithPasswordPlaceholder("Confirm password"),
+		form.WithPasswordCharLimit(64),
+		form.WithPasswordWidth(30),
+	)
+
+	return EditModel{
+		ctx:           ctx,
+		svc:           svc,
+		styles:        DefaultEditStyles(),
+		passwordInput: passwordInput,
+		confirmInput:  confirmInput,
+	}
+}
+
+// Show displays the edit modal with the given device and auth status.
+func (m EditModel) Show(device string, authEnabled bool) EditModel {
+	m.device = device
+	m.visible = true
+	m.cursor = EditFieldPassword
+	m.saving = false
+	m.err = nil
+	m.authEnabled = authEnabled
+	m.disableMode = false
+
+	// Reset inputs
+	m.passwordInput = m.passwordInput.Reset()
+	m.confirmInput = m.confirmInput.Reset()
+
+	// Focus password input
+	m.passwordInput, _ = m.passwordInput.Focus()
+	m.confirmInput = m.confirmInput.Blur()
+
+	return m
+}
+
+// Hide hides the edit modal.
+func (m EditModel) Hide() EditModel {
+	m.visible = false
+	m.passwordInput = m.passwordInput.Blur()
+	m.confirmInput = m.confirmInput.Blur()
+	return m
+}
+
+// Visible returns whether the modal is visible.
+func (m EditModel) Visible() bool {
+	return m.visible
+}
+
+// SetSize sets the modal dimensions.
+func (m EditModel) SetSize(width, height int) EditModel {
+	m.width = width
+	m.height = height
+	return m
+}
+
+// Init returns the initial command.
+func (m EditModel) Init() tea.Cmd {
+	return nil
+}
+
+// Update handles messages.
+func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
+	if !m.visible {
+		return m, nil
+	}
+
+	switch msg := msg.(type) {
+	case EditSaveResultMsg:
+		m.saving = false
+		if msg.Err != nil {
+			m.err = msg.Err
+			return m, nil
+		}
+		// Success - close modal
+		m = m.Hide()
+		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
+
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
+	}
+
+	// Forward to focused input
+	return m.updateFocusedInput(msg)
+}
+
+func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
+	key := msg.String()
+
+	switch key {
+	case "esc":
+		m = m.Hide()
+		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
+
+	case "enter":
+		return m.handleEnter()
+
+	case "tab":
+		return m.nextField(), nil
+
+	case "shift+tab":
+		return m.prevField(), nil
+
+	case "d":
+		// Toggle disable mode when auth is currently enabled
+		if m.authEnabled && !m.saving {
+			m.disableMode = !m.disableMode
+			if m.disableMode {
+				// Clear password fields in disable mode
+				m.passwordInput = m.passwordInput.Reset()
+				m.confirmInput = m.confirmInput.Reset()
+			}
+			return m, nil
+		}
+	}
+
+	// Forward to focused input
+	return m.updateFocusedInput(msg)
+}
+
+func (m EditModel) handleEnter() (EditModel, tea.Cmd) {
+	if m.saving {
+		return m, nil
+	}
+
+	if m.disableMode {
+		return m.disableAuth()
+	}
+
+	return m.save()
+}
+
+func (m EditModel) updateFocusedInput(msg tea.Msg) (EditModel, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch m.cursor {
+	case EditFieldPassword:
+		m.passwordInput, cmd = m.passwordInput.Update(msg)
+	case EditFieldConfirm:
+		m.confirmInput, cmd = m.confirmInput.Update(msg)
+	case EditFieldCount:
+		// No input to update
+	}
+
+	return m, cmd
+}
+
+func (m EditModel) nextField() EditModel {
+	// Blur current field
+	m = m.blurCurrentField()
+
+	// Move to next
+	if m.cursor < EditFieldCount-1 {
+		m.cursor++
+	}
+
+	// Focus new field
+	m = m.focusCurrentField()
+
+	return m
+}
+
+func (m EditModel) prevField() EditModel {
+	// Blur current field
+	m = m.blurCurrentField()
+
+	// Move to previous
+	if m.cursor > 0 {
+		m.cursor--
+	}
+
+	// Focus new field
+	m = m.focusCurrentField()
+
+	return m
+}
+
+func (m EditModel) blurCurrentField() EditModel {
+	switch m.cursor {
+	case EditFieldPassword:
+		m.passwordInput = m.passwordInput.Blur()
+	case EditFieldConfirm:
+		m.confirmInput = m.confirmInput.Blur()
+	case EditFieldCount:
+		// No input
+	}
+	return m
+}
+
+func (m EditModel) focusCurrentField() EditModel {
+	switch m.cursor {
+	case EditFieldPassword:
+		m.passwordInput, _ = m.passwordInput.Focus()
+	case EditFieldConfirm:
+		m.confirmInput, _ = m.confirmInput.Focus()
+	case EditFieldCount:
+		// No input
+	}
+	return m
+}
+
+func (m EditModel) save() (EditModel, tea.Cmd) {
+	password := m.passwordInput.Value()
+	confirm := m.confirmInput.Value()
+
+	// Validate password
+	if password == "" {
+		m.err = fmt.Errorf("password is required")
+		return m, nil
+	}
+
+	if len(password) < 8 {
+		m.err = fmt.Errorf("password must be at least 8 characters")
+		return m, nil
+	}
+
+	if password != confirm {
+		m.err = fmt.Errorf("passwords do not match")
+		return m, nil
+	}
+
+	m.saving = true
+	m.err = nil
+
+	return m, m.createSaveCmd(password)
+}
+
+func (m EditModel) disableAuth() (EditModel, tea.Cmd) {
+	m.saving = true
+	m.err = nil
+
+	return m, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.DisableAuth(ctx, m.device)
+		return EditSaveResultMsg{Err: err}
+	}
+}
+
+func (m EditModel) createSaveCmd(password string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		// Use standard admin user and device realm
+		err := m.svc.SetAuth(ctx, m.device, "admin", m.device, password)
+		return EditSaveResultMsg{Err: err}
+	}
+}
+
+// passwordCharTypes holds character type flags for password analysis.
+type passwordCharTypes struct {
+	hasLower   bool
+	hasUpper   bool
+	hasDigit   bool
+	hasSpecial bool
+}
+
+// analyzePasswordChars checks what character types are present in a password.
+func analyzePasswordChars(password string) passwordCharTypes {
+	var types passwordCharTypes
+	for _, r := range password {
+		switch {
+		case unicode.IsLower(r):
+			types.hasLower = true
+		case unicode.IsUpper(r):
+			types.hasUpper = true
+		case unicode.IsDigit(r):
+			types.hasDigit = true
+		case unicode.IsPunct(r) || unicode.IsSymbol(r):
+			types.hasSpecial = true
+		}
+	}
+	return types
+}
+
+// scoreFromLength returns a score based on password length.
+func scoreFromLength(length int) int {
+	score := 0
+	if length >= 8 {
+		score++
+	}
+	if length >= 12 {
+		score++
+	}
+	if length >= 16 {
+		score++
+	}
+	return score
+}
+
+// scoreFromTypes returns a score based on character type variety.
+func scoreFromTypes(types passwordCharTypes) int {
+	score := 0
+	if types.hasLower {
+		score++
+	}
+	if types.hasUpper {
+		score++
+	}
+	if types.hasDigit {
+		score++
+	}
+	if types.hasSpecial {
+		score++
+	}
+	return score
+}
+
+// strengthFromScore converts a numeric score to PasswordStrength.
+func strengthFromScore(score int) PasswordStrength {
+	switch {
+	case score >= 6:
+		return StrengthStrong
+	case score >= 4:
+		return StrengthGood
+	case score >= 2:
+		return StrengthFair
+	default:
+		return StrengthWeak
+	}
+}
+
+// calculateStrength calculates password strength.
+func calculateStrength(password string) PasswordStrength {
+	if password == "" {
+		return StrengthNone
+	}
+
+	types := analyzePasswordChars(password)
+	score := scoreFromLength(len(password)) + scoreFromTypes(types)
+	return strengthFromScore(score)
+}
+
+// View renders the edit modal.
+func (m EditModel) View() string {
+	if !m.visible {
+		return ""
+	}
+
+	var content strings.Builder
+
+	// Title
+	content.WriteString(m.styles.Title.Render("Authentication Settings"))
+	content.WriteString("\n\n")
+
+	// Current status
+	content.WriteString(m.renderStatus())
+	content.WriteString("\n\n")
+
+	if m.disableMode {
+		content.WriteString(m.renderDisableConfirmation())
+	} else {
+		content.WriteString(m.renderPasswordForm())
+	}
+
+	// Render modal box
+	modalContent := content.String()
+	modalWidth := min(55, m.width-4)
+	modal := m.styles.Modal.Width(modalWidth).Render(modalContent)
+
+	// Center the modal
+	return m.centerModal(modal)
+}
+
+func (m EditModel) renderDisableConfirmation() string {
+	var content strings.Builder
+	content.WriteString(m.styles.ButtonDanger.Render("⚠ Disable authentication?"))
+	content.WriteString("\n")
+	content.WriteString(m.styles.Help.Render("This will allow anyone to control your device"))
+	content.WriteString("\n\n")
+	content.WriteString(m.styles.Help.Render("Press Enter to confirm, Esc to cancel"))
+	return content.String()
+}
+
+func (m EditModel) renderPasswordForm() string {
+	var content strings.Builder
+
+	// Password field
+	content.WriteString(m.renderField(EditFieldPassword, "Password:", m.passwordInput.View()))
+	content.WriteString("\n")
+
+	// Password strength indicator
+	strength := calculateStrength(m.passwordInput.Value())
+	content.WriteString(m.renderStrength(strength))
+	content.WriteString("\n\n")
+
+	// Confirm field
+	content.WriteString(m.renderField(EditFieldConfirm, "Confirm:", m.confirmInput.View()))
+	content.WriteString("\n\n")
+
+	// Error display
+	if m.err != nil {
+		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
+		content.WriteString("\n\n")
+	}
+
+	// Status/help
+	content.WriteString(m.renderHelpText())
+
+	return content.String()
+}
+
+func (m EditModel) renderHelpText() string {
+	if m.saving {
+		return m.styles.Help.Render("Saving...")
+	}
+	helpText := "Enter: Save | Tab: Next | Esc: Cancel"
+	if m.authEnabled {
+		helpText += " | d: Disable auth"
+	}
+	return m.styles.Help.Render(helpText)
+}
+
+func (m EditModel) renderStatus() string {
+	var content strings.Builder
+
+	content.WriteString(m.styles.Label.Render("Current status: "))
+	if m.authEnabled {
+		content.WriteString(m.styles.StatusEnabled.Render("● Protected"))
+	} else {
+		content.WriteString(m.styles.StatusDisabled.Render("○ UNPROTECTED"))
+	}
+
+	return content.String()
+}
+
+func (m EditModel) renderField(field EditField, label, input string) string {
+	var selector, labelStr string
+
+	if m.cursor == field {
+		selector = m.styles.Selector.Render("▶ ")
+		labelStr = m.styles.LabelFocus.Render(label)
+	} else {
+		selector = "  "
+		labelStr = m.styles.Label.Render(label)
+	}
+
+	return selector + labelStr + " " + input
+}
+
+func (m EditModel) renderStrength(strength PasswordStrength) string {
+	// Indent to align with input
+	indent := "                  " // 2 (selector) + 14 (label) + 2 (space)
+
+	switch strength {
+	case StrengthNone:
+		return indent + m.styles.Help.Render("Enter a password")
+	case StrengthWeak:
+		return indent + m.styles.StrengthWeak.Render("█░░░ Weak")
+	case StrengthFair:
+		return indent + m.styles.StrengthFair.Render("██░░ Fair")
+	case StrengthGood:
+		return indent + m.styles.StrengthGood.Render("███░ Good")
+	case StrengthStrong:
+		return indent + m.styles.StrengthStrong.Render("████ Strong")
+	default:
+		return ""
+	}
+}
+
+func (m EditModel) centerModal(modal string) string {
+	lines := strings.Split(modal, "\n")
+	modalHeight := len(lines)
+	modalWidth := 0
+	for _, line := range lines {
+		if lipgloss.Width(line) > modalWidth {
+			modalWidth = lipgloss.Width(line)
+		}
+	}
+
+	// Calculate centering
+	topPad := (m.height - modalHeight) / 2
+	leftPad := (m.width - modalWidth) / 2
+
+	if topPad < 0 {
+		topPad = 0
+	}
+	if leftPad < 0 {
+		leftPad = 0
+	}
+
+	// Build centered output
+	var result strings.Builder
+	for range topPad {
+		result.WriteString("\n")
+	}
+
+	padding := strings.Repeat(" ", leftPad)
+	for _, line := range lines {
+		result.WriteString(padding)
+		result.WriteString(line)
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}

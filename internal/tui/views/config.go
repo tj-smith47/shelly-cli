@@ -314,11 +314,9 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 		return c, nil
 	}
 
-	// Handle WiFi edit completion with toast feedback
-	if editMsg, ok := msg.(wifi.EditClosedMsg); ok {
-		if editMsg.Saved {
-			cmds = append(cmds, toast.Success("WiFi settings saved"))
-		}
+	// Handle edit completion messages with toast feedback
+	if cmd := c.handleEditClosedMsg(msg); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 
 	// Handle sequential loading messages
@@ -349,6 +347,29 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 	}
 
 	return c, tea.Batch(cmds...)
+}
+
+// handleEditClosedMsg processes edit completion messages and returns toast commands.
+func (c *Config) handleEditClosedMsg(msg tea.Msg) tea.Cmd {
+	switch editMsg := msg.(type) {
+	case wifi.EditClosedMsg:
+		if editMsg.Saved {
+			return toast.Success("WiFi settings saved")
+		}
+	case system.EditClosedMsg:
+		if editMsg.Saved {
+			return toast.Success("System settings saved")
+		}
+	case security.EditClosedMsg:
+		if editMsg.Saved {
+			return toast.Success("Authentication settings saved")
+		}
+	case cloud.EditClosedMsg:
+		if editMsg.Saved {
+			return toast.Success("Cloud settings saved")
+		}
+	}
+	return nil
 }
 
 // handleComponentLoaded checks for component completion messages and advances loading.

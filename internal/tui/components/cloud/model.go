@@ -65,6 +65,9 @@ type Model struct {
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     Styles
 	loader     loading.Model
+
+	// Edit modal
+	editModel EditModel
 }
 
 // Styles holds styles for the Cloud component.
@@ -122,6 +125,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModel: NewEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -188,6 +192,7 @@ func (m Model) fetchStatus() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.editModel = m.editModel.SetSize(width, height)
 	return m
 }
 
@@ -205,16 +210,14 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward messages to edit modal when visible
+	if m.editModel.Visible() {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing other messages even during loading
-		if _, ok := msg.(StatusLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
-		}
+		return m.handleLoadingUpdate(msg)
 	}
 
 	switch msg := msg.(type) {
@@ -252,8 +255,51 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+	m.editModel, cmd = m.editModel.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	// Check for EditClosedMsg to refresh data
+	if closedMsg, ok := msg.(EditClosedMsg); ok && closedMsg.Saved && m.device != "" {
+		m.loading = true
+		cmds = append(cmds, m.loader.Tick(), m.fetchStatus())
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleLoadingUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+
+	// Process StatusLoadedMsg even during loading
+	if loadedMsg, ok := msg.(StatusLoadedMsg); ok {
+		m.loading = false
+		if loadedMsg.Err != nil {
+			m.err = loadedMsg.Err
+			return m, nil
+		}
+		if loadedMsg.Status != nil {
+			m.connected = loadedMsg.Status.Connected
+		}
+		m.enabled = loadedMsg.Enabled
+		m.server = loadedMsg.Server
+		return m, nil
+	}
+
+	return m, cmd
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
+	case "c":
+		// Open cloud configuration modal
+		if m.device != "" && !m.loading && !m.toggling {
+			m.editModel = m.editModel.Show(m.device, m.connected, m.enabled, m.server)
+			return m, func() tea.Msg { return EditOpenedMsg{} }
+		}
 	case "t", "enter":
 		if !m.toggling && !m.loading && m.device != "" {
 			m.toggling = true
@@ -287,6 +333,11 @@ func (m Model) toggleCloud() tea.Cmd {
 
 // View renders the Cloud component.
 func (m Model) View() string {
+	// If edit modal is visible, render it as overlay
+	if m.editModel.Visible() {
+		return m.editModel.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Cloud").
 		SetFocused(m.focused).
@@ -342,7 +393,7 @@ func (m Model) View() string {
 
 	// Help text
 	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("t: toggle | r: refresh"))
+	content.WriteString(m.styles.Muted.Render("c: config | t: toggle | r: refresh"))
 
 	r.SetContent(content.String())
 	return r.Render()
@@ -390,4 +441,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+}
+
+// EditModelVisible returns whether the edit modal is currently visible.
+func (m Model) EditModelVisible() bool {
+	return m.editModel.Visible()
 }

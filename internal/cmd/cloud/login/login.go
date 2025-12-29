@@ -15,13 +15,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
-var (
-	emailFlag    string
-	passwordFlag string
-)
+// Options holds command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Email    string
+	Password string
+}
 
 // NewCommand creates the cloud login command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "login",
 		Aliases: []string{"auth", "signin"},
@@ -44,24 +48,24 @@ You can provide credentials via:
   # Login with environment variables
   SHELLY_CLOUD_EMAIL=user@example.com SHELLY_CLOUD_PASSWORD=mypassword shelly cloud login`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(f, cmd.Context())
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&emailFlag, "email", "", "Shelly Cloud email")
-	cmd.Flags().StringVar(&passwordFlag, "password", "", "Shelly Cloud password")
+	cmd.Flags().StringVar(&opts.Email, "email", "", "Shelly Cloud email")
+	cmd.Flags().StringVar(&opts.Password, "password", "", "Shelly Cloud password")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, ctx context.Context) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
 	// Get email: flag > env var > interactive prompt
-	email := emailFlag
+	email := opts.Email
 	if email == "" {
 		email = os.Getenv("SHELLY_CLOUD_EMAIL")
 	}
@@ -77,7 +81,7 @@ func run(f *cmdutil.Factory, ctx context.Context) error {
 	}
 
 	// Get password: flag > env var > interactive prompt
-	password := passwordFlag
+	password := opts.Password
 	if password == "" {
 		password = os.Getenv("SHELLY_CLOUD_PASSWORD")
 	}

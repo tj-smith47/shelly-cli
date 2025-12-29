@@ -116,6 +116,12 @@ verbosity: 0
 # Suppress non-essential output
 quiet: false
 
+# Opt-in anonymous usage telemetry (disabled by default)
+# When enabled, sends command usage statistics to help improve the CLI.
+# Only collects: command name, success/failure, version, OS, duration.
+# Does NOT collect: device info, IPs, personal data, credentials.
+# telemetry: true
+
 # Preferred editor for 'shelly config edit'
 # Falls back to $EDITOR, $VISUAL, then nano
 # editor: vim

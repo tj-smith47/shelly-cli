@@ -535,8 +535,6 @@ func TestRun_KeyWithInvalidID(t *testing.T) {
 func TestRun_KeyWithOutOfRangeID(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
 	tests := []struct {
 		name string
 		key  string
@@ -554,6 +552,8 @@ func TestRun_KeyWithOutOfRangeID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			tf := factory.NewTestFactory(t) // Create factory per subtest to avoid race
 
 			opts := &Options{
 				Factory: tf.Factory,

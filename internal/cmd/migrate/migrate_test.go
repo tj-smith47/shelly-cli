@@ -349,7 +349,8 @@ func TestRun_SourceFileNotFound(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	err := run(ctx, tf.Factory, "/nonexistent/backup.json", "target-device")
+	opts := &Options{Factory: tf.Factory, Source: "/nonexistent/backup.json", Target: "target-device"}
+	err := run(ctx, opts)
 
 	// We expect an error because the file doesn't exist
 	// The service's LoadMigrationSource will fail
@@ -370,7 +371,8 @@ func TestRun_InvalidBackupFile(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	err := run(ctx, tf.Factory, invalidFile, "192.0.2.1")
+	opts := &Options{Factory: tf.Factory, Source: invalidFile, Target: "192.0.2.1"}
+	err := run(ctx, opts)
 
 	// We expect an error because the backup file is invalid
 	if err == nil {
@@ -391,7 +393,8 @@ func TestRun_ValidBackupFileUnreachableTarget(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	err := run(ctx, tf.Factory, validFile, "192.0.2.1") // TEST-NET-1, unreachable
+	opts := &Options{Factory: tf.Factory, Source: validFile, Target: "192.0.2.1"}
+	err := run(ctx, opts) // TEST-NET-1, unreachable
 
 	// We expect an error due to unreachable target
 	if err == nil {
@@ -408,7 +411,8 @@ func TestRun_DeviceToDeviceMigrationFails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	err := run(ctx, tf.Factory, "192.0.2.1", "192.0.2.2") // TEST-NET-1 addresses
+	opts := &Options{Factory: tf.Factory, Source: "192.0.2.1", Target: "192.0.2.2"}
+	err := run(ctx, opts) // TEST-NET-1 addresses
 
 	// Should fail to connect to source device
 	if err == nil {
@@ -425,7 +429,8 @@ func TestRun_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "source", "target")
+	opts := &Options{Factory: tf.Factory, Source: "source", Target: "target"}
+	err := run(ctx, opts)
 
 	// Expect error due to cancelled context
 	if err == nil {
@@ -445,7 +450,8 @@ func TestRun_ContextTimeout(t *testing.T) {
 	// Allow timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "source", "target")
+	opts := &Options{Factory: tf.Factory, Source: "source", Target: "target"}
+	err := run(ctx, opts)
 
 	// Expect error due to timeout
 	if err == nil {
@@ -612,7 +618,8 @@ func TestRun_ValidFileSourceFormat(t *testing.T) {
 	defer cancel()
 
 	// Run should attempt to load the file and then fail when trying to reach target
-	err := run(ctx, f, validFile, "192.0.2.1")
+	opts := &Options{Factory: f, Source: validFile, Target: "192.0.2.1"}
+	err := run(ctx, opts)
 
 	// We expect some kind of error (either file processing or network error)
 	// The key is that it doesn't panic and handles the backup file
@@ -630,7 +637,8 @@ func TestRun_InvalidSourceDeviceAddress(t *testing.T) {
 	defer cancel()
 
 	// Use an invalid address format
-	err := run(ctx, tf.Factory, "not-a-valid-source", "target-device")
+	opts := &Options{Factory: tf.Factory, Source: "not-a-valid-source", Target: "target-device"}
+	err := run(ctx, opts)
 
 	// Expect error because neither file nor valid device
 	if err == nil {

@@ -15,14 +15,20 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	dryRunFlag    bool
-	mergeFlag     bool
-	overwriteFlag bool
-)
+// Options holds command options.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Device    string
+	FilePath  string
+	DryRun    bool
+	Merge     bool
+	Overwrite bool
+}
 
 // NewCommand creates the config import command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "import <device> <file>",
 		Aliases: []string{"restore", "load"},
@@ -41,23 +47,25 @@ to replace the entire configuration.`,
   shelly config import living-room config.json --overwrite`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1])
+			opts.Device = args[0]
+			opts.FilePath = args[1]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would be changed without applying")
-	cmd.Flags().BoolVar(&mergeFlag, "merge", true, "Merge with existing configuration (default)")
-	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "Overwrite entire configuration")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be changed without applying")
+	cmd.Flags().BoolVar(&opts.Merge, "merge", true, "Merge with existing configuration (default)")
+	cmd.Flags().BoolVar(&opts.Overwrite, "overwrite", false, "Overwrite entire configuration")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	// Read and parse file
-	fileData, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is user-provided CLI argument, intentional
+	fileData, err := os.ReadFile(opts.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
@@ -71,15 +79,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 		}
 	}
 
-	svc := f.ShellyService()
-	ios := f.IOStreams()
+	svc := opts.Factory.ShellyService()
+	ios := opts.Factory.IOStreams()
 
-	if dryRunFlag {
+	if opts.DryRun {
 		// Get current config and show diff
 		var currentConfig map[string]any
 		err = cmdutil.RunWithSpinner(ctx, ios, "Getting current configuration...", func(ctx context.Context) error {
 			var getErr error
-			currentConfig, getErr = svc.GetConfig(ctx, device)
+			currentConfig, getErr = svc.GetConfig(ctx, opts.Device)
 			return getErr
 		})
 		if err != nil {
@@ -92,12 +100,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	err = cmdutil.RunWithSpinner(ctx, ios, "Importing configuration...", func(ctx context.Context) error {
-		return svc.SetConfig(ctx, device, config)
+		return svc.SetConfig(ctx, opts.Device, config)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to import configuration: %w", err)
 	}
 
-	ios.Success("Configuration imported to %s", device)
+	ios.Success("Configuration imported to %s", opts.Device)
 	return nil
 }

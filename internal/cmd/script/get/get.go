@@ -13,10 +13,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var statusFlag bool
+// Options holds command options.
+type Options struct {
+	Factory    *cmdutil.Factory
+	Device     string
+	ID         int
+	ShowStatus bool
+}
 
 // NewCommand creates the script get command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "get <device> <id>",
 		Aliases: []string{"code"},
@@ -37,25 +45,27 @@ detailed status including memory usage and errors.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id)
+			opts.Device = args[0]
+			opts.ID = id
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&statusFlag, "status", false, "Show script status instead of code")
+	cmd.Flags().BoolVar(&opts.ShowStatus, "status", false, "Show script status instead of code")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
-	if statusFlag {
+	if opts.ShowStatus {
 		return cmdutil.RunWithSpinner(ctx, ios, "Getting script status...", func(ctx context.Context) error {
-			status, err := svc.GetScriptStatus(ctx, device, id)
+			status, err := svc.GetScriptStatus(ctx, opts.Device, opts.ID)
 			if err != nil {
 				return fmt.Errorf("failed to get script status: %w", err)
 			}
@@ -65,7 +75,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Getting script code...", func(ctx context.Context) error {
-		code, err := svc.GetScriptCode(ctx, device, id)
+		code, err := svc.GetScriptCode(ctx, opts.Device, opts.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get script code: %w", err)
 		}

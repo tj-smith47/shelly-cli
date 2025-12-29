@@ -16,13 +16,19 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	dryRunFlag bool
-	forceFlag  bool
-)
+// Options holds command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Source  string
+	Target  string
+	DryRun  bool
+	Force   bool
+}
 
 // NewCommand creates the migrate command and its subcommands.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "migrate <source> <target>",
 		Aliases: []string{"mig"},
@@ -41,12 +47,14 @@ The --dry-run flag shows what would be changed without applying.`,
   shelly migrate backup.json bedroom --force`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1])
+			opts.Source = args[0]
+			opts.Target = args[1]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would be changed without applying")
-	cmd.Flags().BoolVar(&forceFlag, "force", false, "Force migration between different device types")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be changed without applying")
+	cmd.Flags().BoolVar(&opts.Force, "force", false, "Force migration between different device types")
 
 	cmd.AddCommand(validate.NewCommand(f))
 	cmd.AddCommand(diff.NewCommand(f))
@@ -54,26 +62,26 @@ The --dry-run flag shows what would be changed without applying.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*3)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Load source backup (from file or device)
 	var bkp *backup.DeviceBackup
 	var sourceType backup.MigrationSource
 	var err error
 
-	if backup.IsFile(source) {
+	if backup.IsFile(opts.Source) {
 		err = cmdutil.RunWithSpinner(ctx, ios, "Reading backup file...", func(_ context.Context) error {
-			bkp, sourceType, err = svc.LoadMigrationSource(ctx, source)
+			bkp, sourceType, err = svc.LoadMigrationSource(ctx, opts.Source)
 			return err
 		})
 	} else {
 		err = cmdutil.RunWithSpinner(ctx, ios, "Reading source device...", func(ctx context.Context) error {
-			bkp, sourceType, err = svc.LoadMigrationSource(ctx, source)
+			bkp, sourceType, err = svc.LoadMigrationSource(ctx, opts.Source)
 			return err
 		})
 	}
@@ -82,7 +90,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 	}
 
 	// Check target device compatibility
-	if err := svc.CheckMigrationCompatibility(ctx, bkp, target, forceFlag); err != nil {
+	if err := svc.CheckMigrationCompatibility(ctx, bkp, opts.Target, opts.Force); err != nil {
 		var compErr *backup.CompatibilityError
 		if errors.As(err, &compErr) {
 			ios.Warning("Source and target are different device types:")
@@ -94,23 +102,23 @@ func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
 		return err
 	}
 
-	if dryRunFlag {
-		d, err := svc.CompareBackup(ctx, target, bkp)
+	if opts.DryRun {
+		d, err := svc.CompareBackup(ctx, opts.Target, bkp)
 		if err != nil {
 			return fmt.Errorf("failed to compare: %w", err)
 		}
-		term.DisplayMigrationPreview(ios, source, string(sourceType), target, d)
+		term.DisplayMigrationPreview(ios, opts.Source, string(sourceType), opts.Target, d)
 		return nil
 	}
 
 	// Perform migration
-	opts := backup.RestoreOptions{
+	restoreOpts := backup.RestoreOptions{
 		SkipNetwork: true, // Always skip network to prevent disconnection
 	}
 	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Migrating configuration...", func(ctx context.Context) error {
 		var restoreErr error
-		result, restoreErr = svc.RestoreBackup(ctx, target, bkp, opts)
+		result, restoreErr = svc.RestoreBackup(ctx, opts.Target, bkp, restoreOpts)
 		return restoreErr
 	})
 	if err != nil {

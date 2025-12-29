@@ -690,9 +690,8 @@ func TestRunCoIoTDiscovery(t *testing.T) {
 }
 
 // TestRunBLEDiscovery tests BLE discovery.
-func TestRunBLEDiscovery(t *testing.T) {
-	t.Parallel()
-
+// NOTE: No t.Parallel() - BLE library has race when multiple tests init concurrently.
+func TestRunBLEDiscovery(t *testing.T) { //nolint:paralleltest // Intentional - BLE library race
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 
@@ -798,9 +797,8 @@ func TestRun_CoIoTMethod(t *testing.T) {
 }
 
 // TestRun_BLEMethod tests the run function with BLE method.
-func TestRun_BLEMethod(t *testing.T) {
-	t.Parallel()
-
+// NOTE: No t.Parallel() - BLE library has race when multiple tests init concurrently.
+func TestRun_BLEMethod(t *testing.T) { //nolint:paralleltest // Intentional - BLE library race
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)

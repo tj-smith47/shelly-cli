@@ -54,6 +54,9 @@ type Model struct {
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     Styles
 	loader     loading.Model
+
+	// Edit modal
+	editModel EditModel
 }
 
 // Styles holds styles for the Security component.
@@ -115,6 +118,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModel: NewEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -156,6 +160,8 @@ func (m Model) SetSize(width, height int) Model {
 	m.height = height
 	// Update loader size for proper centering
 	m.loader = m.loader.SetSize(width-4, height-4)
+	// Update edit modal size
+	m.editModel = m.editModel.SetSize(width, height)
 	return m
 }
 
@@ -173,16 +179,14 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward messages to edit modal when visible
+	if m.editModel.Visible() {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing StatusLoadedMsg even during loading
-		if _, ok := msg.(StatusLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
-		}
+		return m.handleLoadingUpdate(msg)
 	}
 
 	switch msg := msg.(type) {
@@ -205,10 +209,52 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	if msg.String() == "r" && !m.loading && m.device != "" {
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+	m.editModel, cmd = m.editModel.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	// Check for EditClosedMsg to refresh data
+	if closedMsg, ok := msg.(EditClosedMsg); ok && closedMsg.Saved && m.device != "" {
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+		cmds = append(cmds, m.loader.Tick(), m.fetchStatus())
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleLoadingUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+
+	// Process StatusLoadedMsg even during loading (exit loading state first to avoid recursion)
+	if loadedMsg, ok := msg.(StatusLoadedMsg); ok {
+		m.loading = false
+		if loadedMsg.Err != nil {
+			m.err = loadedMsg.Err
+			return m, nil
+		}
+		m.status = loadedMsg.Status
+		return m, nil
+	}
+
+	return m, cmd
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "r":
+		if !m.loading && m.device != "" {
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+		}
+	case "a":
+		// Open auth configuration modal
+		if m.device != "" && m.status != nil && !m.loading {
+			m.editModel = m.editModel.Show(m.device, m.status.AuthEnabled)
+			return m, func() tea.Msg { return EditOpenedMsg{} }
+		}
 	}
 
 	return m, nil
@@ -216,6 +262,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // View renders the Security component.
 func (m Model) View() string {
+	// If edit modal is visible, render it as overlay
+	if m.editModel.Visible() {
+		return m.editModel.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Security").
 		SetFocused(m.focused).
@@ -256,7 +307,7 @@ func (m Model) View() string {
 
 	// Help text
 	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("r: refresh"))
+	content.WriteString(m.styles.Muted.Render("a: auth | r: refresh"))
 
 	r.SetContent(content.String())
 	return r.Render()
@@ -376,4 +427,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+}
+
+// EditModelVisible returns whether the edit modal is currently visible.
+func (m Model) EditModelVisible() bool {
+	return m.editModel.Visible()
 }

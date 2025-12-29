@@ -14,10 +14,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
-var formatFlag string
+// Options holds command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Device   string
+	FilePath string
+	Format   string
+}
 
 // NewCommand creates the config export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "export <device> <file>",
 		Aliases: []string{"backup", "save"},
@@ -37,26 +45,28 @@ for YAML output.`,
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: completion.DeviceThenFile(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1])
+			opts.Device = args[0]
+			opts.FilePath = args[1]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&formatFlag, "format", "f", "json", "Output format (json, yaml)")
+	cmd.Flags().StringVarP(&opts.Format, "format", "f", "json", "Output format (json, yaml)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
-	ios := f.IOStreams()
+	svc := opts.Factory.ShellyService()
+	ios := opts.Factory.IOStreams()
 
 	var config map[string]any
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting configuration...", func(ctx context.Context) error {
 		var err error
-		config, err = svc.GetConfig(ctx, device)
+		config, err = svc.GetConfig(ctx, opts.Device)
 		return err
 	})
 	if err != nil {
@@ -65,7 +75,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 
 	// Marshal based on format
 	var data []byte
-	switch formatFlag {
+	switch opts.Format {
 	case "yaml", "yml":
 		data, err = yaml.Marshal(config)
 	default:
@@ -76,13 +86,13 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Write to file or stdout
-	if filePath == "-" {
+	if opts.FilePath == "-" {
 		ios.Printf("%s\n", data)
 	} else {
-		if err := os.WriteFile(filePath, data, 0o644); err != nil { //nolint:gosec // G306: 0o644 is acceptable for config exports
+		if err := os.WriteFile(opts.FilePath, data, 0o644); err != nil { //nolint:gosec // G306: 0o644 is acceptable for config exports
 			return fmt.Errorf("failed to write file: %w", err)
 		}
-		ios.Success("Configuration exported to %s", filePath)
+		ios.Success("Configuration exported to %s", opts.FilePath)
 	}
 
 	return nil

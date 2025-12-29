@@ -35,30 +35,33 @@ shelly init [flags]
   # Check current setup without changes
   shelly init --check
 
-  # Headless: register devices directly
+  # Non-interactive: register devices directly
   shelly init --device kitchen=192.168.1.100 --device bedroom=192.168.1.101
 
-  # Headless: device with authentication
+  # Non-interactive: device with authentication
   shelly init --device secure=192.168.1.102:admin:secret
 
-  # Headless: import from JSON file
+  # Non-interactive: import from JSON file
   shelly init --devices-json devices.json
 
-  # Headless: inline JSON
+  # Non-interactive: inline JSON
   shelly init --devices-json '{"name":"kitchen","address":"192.168.1.100"}'
 
-  # Headless: with discovery and completions
+  # Non-interactive: with discovery and completions
   shelly init --discover --discover-modes http,mdns --completions bash,zsh
 
-  # Headless: full CI/CD setup
+  # Non-interactive: full CI/CD setup
   shelly init \
     --device kitchen=192.168.1.100 \
     --theme dracula \
     --api-mode local \
     --no-color
 
-  # Headless: with cloud credentials
+  # Non-interactive: with cloud credentials
   shelly init --cloud-email user@example.com --cloud-password secret
+
+  # Non-interactive: enable anonymous telemetry
+  shelly init --telemetry
 ```
 
 ### Options
@@ -80,6 +83,7 @@ shelly init [flags]
       --network string              Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)
       --no-color                    Disable colors in output
       --output-format string        Set output format: table,json,yaml (default: table)
+      --telemetry                   Enable anonymous usage telemetry (opt-in)
       --theme string                Set theme (default: dracula)
 ```
 
