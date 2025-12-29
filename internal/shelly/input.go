@@ -16,7 +16,6 @@ type InputInfo struct {
 	State bool
 }
 
-
 // InputStatus gets the status of an input component.
 func (s *Service) InputStatus(ctx context.Context, identifier string, inputID int) (*model.InputStatus, error) {
 	var result *model.InputStatus

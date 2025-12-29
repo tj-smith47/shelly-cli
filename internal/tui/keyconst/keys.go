@@ -24,3 +24,11 @@ const (
 	KeyTab   = "tab"
 	KeyEsc   = "esc"
 )
+
+// Navigation key constants.
+const (
+	KeyDown   = "down"
+	KeyUp     = "up"
+	KeyPgDown = "pgdown"
+	KeyPgUp   = "pgup"
+)

@@ -337,11 +337,12 @@ func (m Model) View() string {
 	// LoRa Section
 	content.WriteString(m.renderLoRa())
 
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("1-3: select | j/k: navigate | r: refresh"))
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		r.SetFooter("1-3:sel j/k:nav r:refresh")
+	}
 	return r.Render()
 }
 

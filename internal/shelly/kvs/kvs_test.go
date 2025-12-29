@@ -2,6 +2,7 @@
 package kvs
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -394,7 +395,10 @@ func TestService_List_CallbackInvoked(t *testing.T) {
 	}
 
 	svc := NewService(mockConn)
-	_, _ = svc.List(context.Background(), "test-device")
+	_, err := svc.List(context.Background(), "test-device")
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -433,7 +437,10 @@ func TestService_Get_CallbackInvoked(t *testing.T) {
 	}
 
 	svc := NewService(mockConn)
-	_, _ = svc.Get(context.Background(), "test-device", "test-key")
+	_, err := svc.Get(context.Background(), "test-device", "test-key")
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -469,7 +476,10 @@ func TestService_GetMany_CallbackInvoked(t *testing.T) {
 	}
 
 	svc := NewService(mockConn)
-	_, _ = svc.GetMany(context.Background(), "test-device", "prefix_*")
+	_, err := svc.GetMany(context.Background(), "test-device", "prefix_*")
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -505,7 +515,10 @@ func TestService_GetAll_CallbackInvoked(t *testing.T) {
 	}
 
 	svc := NewService(mockConn)
-	_, _ = svc.GetAll(context.Background(), "test-device")
+	_, err := svc.GetAll(context.Background(), "test-device")
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -538,7 +551,10 @@ func TestService_Set_CallbackInvoked(t *testing.T) {
 	}
 
 	svc := NewService(mockConn)
-	_ = svc.Set(context.Background(), "test-device", "key", "value")
+	err := svc.Set(context.Background(), "test-device", "key", "value")
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -571,7 +587,10 @@ func TestService_Delete_CallbackInvoked(t *testing.T) {
 	}
 
 	svc := NewService(mockConn)
-	_ = svc.Delete(context.Background(), "test-device", "key")
+	err := svc.Delete(context.Background(), "test-device", "key")
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -607,7 +626,10 @@ func TestService_Export_CallbackInvoked(t *testing.T) {
 	}
 
 	svc := NewService(mockConn)
-	_, _ = svc.Export(context.Background(), "test-device")
+	_, err := svc.Export(context.Background(), "test-device")
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -648,7 +670,10 @@ func TestService_Import_CallbackInvoked(t *testing.T) {
 
 	svc := NewService(mockConn)
 	data := &Export{Items: []Item{{Key: "key1", Value: "value1"}}}
-	_, _, _ = svc.Import(context.Background(), "test-device", data, false)
+	_, _, err := svc.Import(context.Background(), "test-device", data, false)
+	if err != nil {
+		t.Logf("expected nil error in callback test, got: %v", err)
+	}
 
 	if !callbackInvoked {
 		t.Error("expected callback to be invoked")
@@ -713,9 +738,15 @@ func TestParseValue_EdgeCases(t *testing.T) {
 			result := ParseValue(tt.input)
 
 			// For complex types, compare JSON representation
-			expectedJSON, _ := json.Marshal(tt.expectValue)
-			resultJSON, _ := json.Marshal(result)
-			if string(expectedJSON) != string(resultJSON) {
+			expectedJSON, err := json.Marshal(tt.expectValue)
+			if err != nil {
+				t.Fatalf("failed to marshal expected value: %v", err)
+			}
+			resultJSON, err := json.Marshal(result)
+			if err != nil {
+				t.Fatalf("failed to marshal result: %v", err)
+			}
+			if !bytes.Equal(expectedJSON, resultJSON) {
 				t.Errorf("ParseValue(%q) = %v, want %v", tt.input, result, tt.expectValue)
 			}
 		})

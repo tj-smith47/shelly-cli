@@ -589,6 +589,12 @@ func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
 	m.events, eventsCmd = m.events.Update(msg)
 	cmds = append(cmds, statusCmd, toastCmd, eventsCmd)
 
+	// Update energy panels for spinner animation (they need tick messages)
+	var energyBarsCmd, energyHistoryCmd tea.Cmd
+	m.energyBars, energyBarsCmd = m.energyBars.Update(msg)
+	*m.energyHistory, energyHistoryCmd = m.energyHistory.Update(msg)
+	cmds = append(cmds, energyBarsCmd, energyHistoryCmd)
+
 	// Forward non-key messages to ALL views so async results can be processed
 	// (e.g., Config's wifi.StatusLoadedMsg needs to reach Config even if Dashboard is active)
 	if _, isKey := msg.(tea.KeyPressMsg); !isKey {

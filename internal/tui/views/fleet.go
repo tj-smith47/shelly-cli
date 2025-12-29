@@ -285,6 +285,14 @@ func (f *Fleet) handleGroupEditMsg(msg tea.Msg) tea.Cmd {
 				return toast.Success("Group deleted")
 			}
 		}
+	case fleet.GroupCommandResultMsg:
+		if editMsg.Err != nil {
+			return toast.Error("Group command failed: " + editMsg.Err.Error())
+		}
+		if editMsg.On {
+			return toast.Success("Group relays turned on")
+		}
+		return toast.Success("Group relays turned off")
 	}
 	return nil
 }

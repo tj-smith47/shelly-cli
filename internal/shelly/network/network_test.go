@@ -13,6 +13,7 @@ import (
 const (
 	testStaIP       = "192.168.1.101"
 	testCloudAPIURL = "https://api.shelly.cloud"
+	testIPv4Static  = "static"
 )
 
 // mockConnectionProvider is a test double for ConnectionProvider.
@@ -269,7 +270,7 @@ func TestEthernetConfig_Fields(t *testing.T) {
 
 	config := EthernetConfig{
 		Enable:     true,
-		IPv4Mode:   "static",
+		IPv4Mode:   testIPv4Static,
 		IP:         testStaIP,
 		Netmask:    "255.255.255.0",
 		GW:         "192.168.1.1",
@@ -279,8 +280,8 @@ func TestEthernetConfig_Fields(t *testing.T) {
 	if !config.Enable {
 		t.Error("expected Enable to be true")
 	}
-	if config.IPv4Mode != "static" {
-		t.Errorf("got IPv4Mode=%q, want %q", config.IPv4Mode, "static")
+	if config.IPv4Mode != testIPv4Static {
+		t.Errorf("got IPv4Mode=%q, want %q", config.IPv4Mode, testIPv4Static)
 	}
 	if config.IP != testStaIP {
 		t.Errorf("got IP=%q, want %q", config.IP, testStaIP)
@@ -302,7 +303,7 @@ func TestEthernetSetConfigParams_Fields(t *testing.T) {
 	enable := true
 	params := EthernetSetConfigParams{
 		Enable:     &enable,
-		IPv4Mode:   "static",
+		IPv4Mode:   testIPv4Static,
 		IP:         testStaIP,
 		Netmask:    "255.255.255.0",
 		GW:         "192.168.1.1",
@@ -312,8 +313,8 @@ func TestEthernetSetConfigParams_Fields(t *testing.T) {
 	if params.Enable == nil || !*params.Enable {
 		t.Error("expected Enable to be true")
 	}
-	if params.IPv4Mode != "static" {
-		t.Errorf("got IPv4Mode=%q, want %q", params.IPv4Mode, "static")
+	if params.IPv4Mode != testIPv4Static {
+		t.Errorf("got IPv4Mode=%q, want %q", params.IPv4Mode, testIPv4Static)
 	}
 	if params.IP != testStaIP {
 		t.Errorf("got IP=%q, want %q", params.IP, testStaIP)
@@ -1009,10 +1010,10 @@ func TestParseToken_InvalidToken(t *testing.T) {
 func TestNewCloudClient_SetClient(t *testing.T) {
 	t.Parallel()
 
-	client := NewCloudClient("test-token")
+	cloudClient := NewCloudClient("test-token")
 
 	// The internal client should be set
-	if client.client == nil {
+	if cloudClient.client == nil {
 		t.Error("expected internal client to be set")
 	}
 }
@@ -1365,14 +1366,14 @@ func TestWiFiStationFull_StaticIP(t *testing.T) {
 		SSID:     "StaticNetwork",
 		Enabled:  true,
 		IsOpen:   false,
-		IPv4Mode: "static",
+		IPv4Mode: testIPv4Static,
 		IP:       "10.0.0.50",
 		Netmask:  "255.0.0.0",
 		Gateway:  "10.0.0.1",
 	}
 
-	if station.IPv4Mode != "static" {
-		t.Errorf("got IPv4Mode=%q, want static", station.IPv4Mode)
+	if station.IPv4Mode != testIPv4Static {
+		t.Errorf("got IPv4Mode=%q, want %q", station.IPv4Mode, testIPv4Static)
 	}
 	if station.IP != "10.0.0.50" {
 		t.Errorf("got IP=%q", station.IP)
@@ -1555,10 +1556,10 @@ func TestMockConnectionProvider_CallbackInvoked(t *testing.T) {
 func TestWiFiService_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	var capturedCtx context.Context
+	contextWasCaptured := false
 	provider := &mockConnectionProvider{
 		withConnectionFn: func(ctx context.Context, _ string, _ func(*client.Client) error) error {
-			capturedCtx = ctx
+			contextWasCaptured = true
 			return ctx.Err()
 		},
 	}
@@ -1569,7 +1570,7 @@ func TestWiFiService_ContextCancellation(t *testing.T) {
 
 	_, err := svc.GetStatusFull(ctx, "test-device")
 
-	if capturedCtx == nil {
+	if !contextWasCaptured {
 		t.Fatal("expected context to be captured")
 	}
 	if err == nil {

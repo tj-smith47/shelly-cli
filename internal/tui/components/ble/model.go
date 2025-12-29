@@ -343,15 +343,16 @@ func (m Model) View() string {
 	// BTHome Section
 	content.WriteString(m.renderBTHome())
 
-	// Help text
-	content.WriteString("\n\n")
-	helpText := "e: edit | r: refresh"
-	if m.ble != nil && m.ble.Enable {
-		helpText += " | d: discover"
-	}
-	content.WriteString(m.styles.Muted.Render(helpText))
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		if m.ble != nil && m.ble.Enable {
+			r.SetFooter("e:edit r:refresh d:discover")
+		} else {
+			r.SetFooter("e:edit r:refresh")
+		}
+	}
 	return r.Render()
 }
 

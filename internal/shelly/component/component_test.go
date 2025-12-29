@@ -1026,25 +1026,6 @@ func TestWithGenAwareAction_IsGen1Error(t *testing.T) {
 	}
 }
 
-// mockDeviceClient implements DeviceClient for testing.
-type mockDeviceClient struct {
-	isGen1Val bool
-	gen1Cli   *client.Gen1Client
-	gen2Cli   *client.Client
-}
-
-func (m *mockDeviceClient) IsGen1() bool {
-	return m.isGen1Val
-}
-
-func (m *mockDeviceClient) Gen1() *client.Gen1Client {
-	return m.gen1Cli
-}
-
-func (m *mockDeviceClient) Gen2() *client.Client {
-	return m.gen2Cli
-}
-
 // ============== Switch Operation Tests ==============
 
 func TestSwitchOn_Gen2(t *testing.T) {

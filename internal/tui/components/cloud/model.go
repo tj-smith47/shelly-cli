@@ -391,11 +391,12 @@ func (m Model) View() string {
 		content.WriteString(m.styles.Muted.Render("Updating..."))
 	}
 
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("c: config | t: toggle | r: refresh"))
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		r.SetFooter("c:config t:toggle r:refresh")
+	}
 	return r.Render()
 }
 

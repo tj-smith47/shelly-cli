@@ -413,11 +413,12 @@ func (m Model) View() string {
 	content.WriteString("\n")
 	content.WriteString(m.renderSettings())
 
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("e: edit | z: timezone | t: toggle | r: refresh"))
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		r.SetFooter("e:edit z:timezone t:toggle r:refresh")
+	}
 
 	// Render edit modal overlay if editing
 	if m.editing {

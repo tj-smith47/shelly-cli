@@ -2,8 +2,10 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -228,58 +231,152 @@ func (m GroupsModel) handleEditModalUpdate(msg tea.Msg) (GroupsModel, tea.Cmd) {
 	return m, cmd
 }
 
+// canModify returns true if we can perform group operations.
+func (m GroupsModel) canModify() bool {
+	return m.fleet != nil && !m.loading
+}
+
+// canActOnSelected returns true if we can act on the selected group.
+func (m GroupsModel) canActOnSelected() bool {
+	return m.canModify() && len(m.groups) > 0
+}
+
 func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
-	switch msg.String() {
-	case "j", "down":
+	key := msg.String()
+
+	// Navigation keys
+	switch key {
+	case "j", keyconst.KeyDown:
 		m.scroller.CursorDown()
-	case "k", "up":
+		return m, nil
+	case "k", keyconst.KeyUp:
 		m.scroller.CursorUp()
+		return m, nil
 	case "g":
 		m.scroller.CursorToStart()
+		return m, nil
 	case "G":
 		m.scroller.CursorToEnd()
-	case "ctrl+d", "pgdown":
+		return m, nil
+	case "ctrl+d", keyconst.KeyPgDown:
 		m.scroller.PageDown()
-	case "ctrl+u", "pgup":
+		return m, nil
+	case "ctrl+u", keyconst.KeyPgUp:
 		m.scroller.PageUp()
+		return m, nil
 	case "r":
-		if !m.loading {
-			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.loadGroups())
-		}
+		return m.handleRefresh()
 	case "n":
-		// Create new group
-		if m.fleet != nil && !m.loading {
-			m.editing = true
-			m.editModal = m.editModal.SetSize(m.width, m.height)
-			m.editModal = m.editModal.ShowCreate(m.fleet)
-			return m, func() tea.Msg { return GroupEditOpenedMsg{} }
-		}
+		return m.handleCreate()
 	case "e", "enter":
-		// Edit selected group
-		if m.fleet != nil && !m.loading && len(m.groups) > 0 {
-			group := m.SelectedGroup()
-			if group != nil {
-				m.editing = true
-				m.editModal = m.editModal.SetSize(m.width, m.height)
-				m.editModal = m.editModal.ShowEdit(m.fleet, group)
-				return m, func() tea.Msg { return GroupEditOpenedMsg{} }
-			}
-		}
+		return m.handleEdit()
 	case "d":
-		// Delete selected group
-		if m.fleet != nil && !m.loading && len(m.groups) > 0 {
-			group := m.SelectedGroup()
-			if group != nil {
-				m.editing = true
-				m.editModal = m.editModal.SetSize(m.width, m.height)
-				m.editModal = m.editModal.ShowDelete(m.fleet, group)
-				return m, func() tea.Msg { return GroupEditOpenedMsg{} }
-			}
-		}
+		return m.handleDelete()
+	case "o":
+		return m.handleGroupOn()
+	case "f":
+		return m.handleGroupOff()
 	}
 
 	return m, nil
+}
+
+func (m GroupsModel) handleRefresh() (GroupsModel, tea.Cmd) {
+	if m.loading {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.loadGroups())
+}
+
+func (m GroupsModel) handleCreate() (GroupsModel, tea.Cmd) {
+	if !m.canModify() {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowCreate(m.fleet)
+	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
+}
+
+func (m GroupsModel) handleEdit() (GroupsModel, tea.Cmd) {
+	if !m.canActOnSelected() {
+		return m, nil
+	}
+	group := m.SelectedGroup()
+	if group == nil {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowEdit(m.fleet, group)
+	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
+}
+
+func (m GroupsModel) handleDelete() (GroupsModel, tea.Cmd) {
+	if !m.canActOnSelected() {
+		return m, nil
+	}
+	group := m.SelectedGroup()
+	if group == nil {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowDelete(m.fleet, group)
+	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
+}
+
+func (m GroupsModel) handleGroupOn() (GroupsModel, tea.Cmd) {
+	if !m.canActOnSelected() {
+		return m, nil
+	}
+	group := m.SelectedGroup()
+	if group == nil {
+		return m, nil
+	}
+	return m, m.sendGroupCommand(group.ID, true)
+}
+
+func (m GroupsModel) handleGroupOff() (GroupsModel, tea.Cmd) {
+	if !m.canActOnSelected() {
+		return m, nil
+	}
+	group := m.SelectedGroup()
+	if group == nil {
+		return m, nil
+	}
+	return m, m.sendGroupCommand(group.ID, false)
+}
+
+// GroupCommandResultMsg signals a group command completed.
+type GroupCommandResultMsg struct {
+	GroupID string
+	On      bool
+	Err     error
+}
+
+func (m GroupsModel) sendGroupCommand(groupID string, on bool) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		var results []integrator.BatchResult
+		if on {
+			results = m.fleet.GroupRelaysOn(ctx, groupID)
+		} else {
+			results = m.fleet.GroupRelaysOff(ctx, groupID)
+		}
+
+		// Check for errors
+		for _, r := range results {
+			if !r.Success {
+				return GroupCommandResultMsg{GroupID: groupID, On: on, Err: errors.New(r.Error)}
+			}
+		}
+
+		return GroupCommandResultMsg{GroupID: groupID, On: on}
+	}
 }
 
 // View renders the Groups component.
@@ -296,7 +393,7 @@ func (m GroupsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("n:new e:edit d:del r:refresh")
+		r.SetFooter("n:new e:edit d:del o:on f:off r:refresh")
 	}
 
 	// Calculate content area for centering (accounting for panel borders)
@@ -423,5 +520,5 @@ func (m GroupsModel) Refresh() (GroupsModel, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m GroupsModel) FooterText() string {
-	return "n:new e:edit d:delete r:refresh"
+	return "n:new e:edit d:del o:on f:off r:refresh"
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -209,17 +210,17 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 
 func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
 	switch msg.String() {
-	case "j", "down":
+	case "j", keyconst.KeyDown:
 		m.scroller.CursorDown()
-	case "k", "up":
+	case "k", keyconst.KeyUp:
 		m.scroller.CursorUp()
 	case "g":
 		m.scroller.CursorToStart()
 	case "G":
 		m.scroller.CursorToEnd()
-	case "ctrl+d", "pgdown":
+	case "ctrl+d", keyconst.KeyPgDown:
 		m.scroller.PageDown()
-	case "ctrl+u", "pgup":
+	case "ctrl+u", keyconst.KeyPgUp:
 		m.scroller.PageUp()
 	case "r":
 		if !m.loading {

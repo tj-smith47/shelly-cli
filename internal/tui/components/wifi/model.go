@@ -411,11 +411,12 @@ func (m Model) View() string {
 		content.WriteString(m.renderNetworks())
 	}
 
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("e: edit | s: scan | r: refresh"))
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		r.SetFooter("e:edit s:scan r:refresh")
+	}
 	return r.Render()
 }
 

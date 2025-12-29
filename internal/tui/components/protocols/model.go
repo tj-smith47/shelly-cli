@@ -483,15 +483,16 @@ func (m Model) View() string {
 	// Ethernet Section
 	content.WriteString(m.renderEthernet())
 
-	// Help text (include 'm' for MQTT edit when MQTT is selected)
-	content.WriteString("\n\n")
-	if m.activeProtocol == ProtocolMQTT && m.mqtt != nil {
-		content.WriteString(m.styles.Muted.Render("1-3: select | j/k: navigate | m: edit MQTT | r: refresh"))
-	} else {
-		content.WriteString(m.styles.Muted.Render("1-3: select | j/k: navigate | r: refresh"))
-	}
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		if m.activeProtocol == ProtocolMQTT && m.mqtt != nil {
+			r.SetFooter("1-3:sel j/k:nav m:mqtt r:refresh")
+		} else {
+			r.SetFooter("1-3:sel j/k:nav r:refresh")
+		}
+	}
 	return r.Render()
 }
 
