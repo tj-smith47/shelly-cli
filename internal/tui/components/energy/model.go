@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -77,6 +78,7 @@ type Model struct {
 	height          int
 	styles          Styles
 	refreshInterval time.Duration
+	loader          loading.Model
 }
 
 // Styles for the energy component.
@@ -186,12 +188,18 @@ func New(deps Deps) Model {
 		loading:         true,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
+		loader: loading.New(
+			loading.WithMessage("Fetching energy data..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
 // Init returns the initial command for energy.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
+		m.loader.Tick(),
 		m.fetchEnergy(),
 		m.scheduleRefresh(),
 	)
@@ -336,6 +344,18 @@ func (m Model) Refresh() tea.Cmd {
 
 // Update handles messages for energy.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing UpdateMsg even during loading
+		if _, ok := msg.(UpdateMsg); !ok {
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case UpdateMsg:
 		m.loading = false
@@ -398,12 +418,10 @@ func (m Model) SetSize(width, height int) Model {
 // View renders the energy dashboard.
 func (m Model) View() string {
 	if m.loading {
-		loadingText := m.styles.UpdatingIcon.Render("◐ ") + "Fetching energy data..."
 		return m.styles.Container.
-			Width(m.width-4).
+			Width(m.width - 4).
 			Height(m.height).
-			Align(lipgloss.Center, lipgloss.Center).
-			Render(loadingText)
+			Render(m.loader.SetSize(m.width-4, m.height).View())
 	}
 
 	if m.err != nil {

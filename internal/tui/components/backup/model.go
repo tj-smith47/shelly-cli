@@ -20,6 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	shellybackup "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -106,21 +107,23 @@ type ImportCompleteMsg struct {
 
 // Model displays backup and restore operations.
 type Model struct {
-	ctx         context.Context
-	svc         *shelly.Service
-	mode        Mode
-	devices     []DeviceBackup
-	backupFiles []File
-	scroller    *panel.Scroller
-	exporting   bool
-	importing   bool
-	backupDir   string
-	err         error
-	width       int
-	height      int
-	focused     bool
-	panelIndex  int
-	styles      Styles
+	ctx          context.Context
+	svc          *shelly.Service
+	mode         Mode
+	devices      []DeviceBackup
+	backupFiles  []File
+	scroller     *panel.Scroller
+	exporting    bool
+	importing    bool
+	backupDir    string
+	err          error
+	width        int
+	height       int
+	focused      bool
+	panelIndex   int
+	styles       Styles
+	exportLoader loading.Model
+	importLoader loading.Model
 }
 
 // Styles holds styles for the Backup component.
@@ -192,6 +195,16 @@ func New(deps Deps) Model {
 		scroller:  panel.NewScroller(0, 10),
 		backupDir: backupDir,
 		styles:    DefaultStyles(),
+		exportLoader: loading.New(
+			loading.WithMessage("Exporting backups..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(false, false),
+		),
+		importLoader: loading.New(
+			loading.WithMessage("Importing backup..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(false, false),
+		),
 	}
 }
 
@@ -289,6 +302,9 @@ func (m Model) SetSize(width, height int) Model {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader sizes
+	m.exportLoader = m.exportLoader.SetSize(width-4, height-4)
+	m.importLoader = m.importLoader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -332,7 +348,7 @@ func (m Model) ExportSelected() (Model, tea.Cmd) {
 		}
 	}
 
-	return m, m.exportDevices(selected)
+	return m, tea.Batch(m.exportLoader.Tick(), m.exportDevices(selected))
 }
 
 func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
@@ -429,7 +445,7 @@ func (m Model) ImportSelected() (Model, tea.Cmd) {
 	m.importing = true
 	m.err = nil
 
-	return m, m.importBackup(backupFile)
+	return m, tea.Batch(m.importLoader.Tick(), m.importBackup(backupFile))
 }
 
 func (m Model) importBackup(backupFile File) tea.Cmd {
@@ -490,6 +506,32 @@ func (m Model) importBackup(backupFile File) tea.Cmd {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loaders when active
+	if m.exporting {
+		var cmd tea.Cmd
+		m.exportLoader, cmd = m.exportLoader.Update(msg)
+		switch msg.(type) {
+		case ExportCompleteMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+	if m.importing {
+		var cmd tea.Cmd
+		m.importLoader, cmd = m.importLoader.Update(msg)
+		switch msg.(type) {
+		case ImportCompleteMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case ExportCompleteMsg:
 		m.exporting = false
@@ -663,13 +705,13 @@ func (m Model) View() string {
 		}
 	}
 
-	// Status indicator
+	// Status indicator with animated loader
 	if m.exporting {
 		content.WriteString("\n")
-		content.WriteString(m.styles.InProgress.Render("Exporting backups..."))
+		content.WriteString(m.exportLoader.View())
 	} else if m.importing {
 		content.WriteString("\n")
-		content.WriteString(m.styles.InProgress.Render("Importing backup..."))
+		content.WriteString(m.importLoader.View())
 	}
 
 	r.SetContent(content.String())

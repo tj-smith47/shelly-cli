@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -80,6 +81,7 @@ type Model struct {
 	focused    bool
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     Styles
+	loader     loading.Model
 }
 
 // Styles holds styles for the webhook list component.
@@ -132,6 +134,11 @@ func New(deps Deps) Model {
 		scroller: panel.NewScroller(0, 1),
 		loading:  false,
 		styles:   DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading webhooks..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -152,7 +159,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	}
 
 	m.loading = true
-	return m, m.fetchWebhooks()
+	return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
 }
 
 // fetchWebhooks creates a command to fetch webhooks from the device.
@@ -192,6 +199,8 @@ func (m Model) SetSize(width, height int) Model {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -209,6 +218,21 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing LoadedMsg/ActionMsg even during loading
+		switch msg.(type) {
+		case LoadedMsg, ActionMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case LoadedMsg:
 		m.loading = false
@@ -227,7 +251,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.loading = true
-		return m, m.fetchWebhooks()
+		return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
 
 	case tea.KeyPressMsg:
 		if !m.focused {
@@ -263,7 +287,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.createWebhook()
 	case "r":
 		m.loading = true
-		return m, m.fetchWebhooks()
+		return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
 	}
 
 	return m, nil
@@ -370,7 +394,7 @@ func (m Model) getStateContent() (string, bool) {
 		return m.styles.Muted.Render("No device selected"), true
 	}
 	if m.loading {
-		return m.styles.Muted.Render("Loading webhooks..."), true
+		return m.loader.View(), true
 	}
 	if m.err != nil {
 		return m.getErrorContent(), true
@@ -494,7 +518,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.fetchWebhooks()
+	return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
 }
 
 // FooterText returns keybinding hints for the footer.

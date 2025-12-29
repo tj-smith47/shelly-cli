@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -65,18 +66,20 @@ type UpdateCompleteMsg struct {
 
 // Model displays firmware management.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	devices    []DeviceFirmware
-	scroller   *panel.Scroller
-	checking   bool
-	updating   bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int
-	styles     Styles
+	ctx          context.Context
+	svc          *shelly.Service
+	devices      []DeviceFirmware
+	scroller     *panel.Scroller
+	checking     bool
+	updating     bool
+	err          error
+	width        int
+	height       int
+	focused      bool
+	panelIndex   int
+	styles       Styles
+	checkLoader  loading.Model
+	updateLoader loading.Model
 }
 
 // Styles holds styles for the Firmware component.
@@ -138,6 +141,16 @@ func New(deps Deps) Model {
 		svc:      deps.Svc,
 		scroller: panel.NewScroller(0, 10),
 		styles:   DefaultStyles(),
+		checkLoader: loading.New(
+			loading.WithMessage("Checking firmware..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(false, false),
+		),
+		updateLoader: loading.New(
+			loading.WithMessage("Updating devices..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(false, false),
+		),
 	}
 }
 
@@ -174,6 +187,9 @@ func (m Model) SetSize(width, height int) Model {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader sizes
+	m.checkLoader = m.checkLoader.SetSize(width-4, height-4)
+	m.updateLoader = m.updateLoader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -197,7 +213,7 @@ func (m Model) CheckAll() (Model, tea.Cmd) {
 
 	m.checking = true
 	m.err = nil
-	return m, m.checkAllDevices()
+	return m, tea.Batch(m.checkLoader.Tick(), m.checkAllDevices())
 }
 
 func (m Model) checkAllDevices() tea.Cmd {
@@ -266,7 +282,7 @@ func (m Model) UpdateSelected() (Model, tea.Cmd) {
 		}
 	}
 
-	return m, m.updateDevices(selected)
+	return m, tea.Batch(m.updateLoader.Tick(), m.updateDevices(selected))
 }
 
 func (m Model) updateDevices(devices []DeviceFirmware) tea.Cmd {
@@ -296,43 +312,20 @@ type updateBatchComplete struct{}
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to the appropriate loader
+	var cmd tea.Cmd
+	m, cmd = m.updateLoaders(msg)
+	if cmd != nil {
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case CheckCompleteMsg:
-		m.checking = false
-		// Merge results with existing devices
-		for _, result := range msg.Results {
-			for i := range m.devices {
-				if m.devices[i].Name == result.Name {
-					m.devices[i] = result
-					break
-				}
-			}
-		}
-		return m, nil
-
+		return m.handleCheckComplete(msg), nil
 	case UpdateCompleteMsg:
-		for i := range m.devices {
-			if m.devices[i].Name == msg.Name {
-				m.devices[i].Updating = false
-				if msg.Success {
-					m.devices[i].HasUpdate = false
-				} else {
-					m.devices[i].Err = msg.Err
-				}
-				break
-			}
-		}
-		return m, nil
-
+		return m.handleUpdateComplete(msg), nil
 	case updateBatchComplete:
-		m.updating = false
-		// Clear updating status
-		for i := range m.devices {
-			m.devices[i].Updating = false
-			m.devices[i].Selected = false
-		}
-		return m, nil
-
+		return m.handleBatchComplete(), nil
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -341,6 +334,68 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// updateLoaders forwards tick messages to the appropriate loader.
+// Returns updated model and command if the message was consumed.
+func (m Model) updateLoaders(msg tea.Msg) (Model, tea.Cmd) {
+	if m.checking {
+		var cmd tea.Cmd
+		m.checkLoader, cmd = m.checkLoader.Update(msg)
+		if _, ok := msg.(CheckCompleteMsg); !ok && cmd != nil {
+			return m, cmd
+		}
+	}
+	if m.updating {
+		var cmd tea.Cmd
+		m.updateLoader, cmd = m.updateLoader.Update(msg)
+		switch msg.(type) {
+		case updateBatchComplete, UpdateCompleteMsg:
+			// Pass through
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleCheckComplete(msg CheckCompleteMsg) Model {
+	m.checking = false
+	for _, result := range msg.Results {
+		for i := range m.devices {
+			if m.devices[i].Name == result.Name {
+				m.devices[i] = result
+				break
+			}
+		}
+	}
+	return m
+}
+
+func (m Model) handleUpdateComplete(msg UpdateCompleteMsg) Model {
+	for i := range m.devices {
+		if m.devices[i].Name == msg.Name {
+			m.devices[i].Updating = false
+			if msg.Success {
+				m.devices[i].HasUpdate = false
+			} else {
+				m.devices[i].Err = msg.Err
+			}
+			break
+		}
+	}
+	return m
+}
+
+func (m Model) handleBatchComplete() Model {
+	m.updating = false
+	for i := range m.devices {
+		m.devices[i].Updating = false
+		m.devices[i].Selected = false
+	}
+	return m
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -445,10 +500,10 @@ func (m Model) View() string {
 	// Status indicator
 	if m.checking {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render("Checking firmware..."))
+		content.WriteString(m.checkLoader.View())
 	} else if m.updating {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Updating.Render("Updating devices..."))
+		content.WriteString(m.updateLoader.View())
 	}
 
 	r.SetContent(content.String())

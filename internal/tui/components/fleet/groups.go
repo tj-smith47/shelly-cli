@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -46,6 +47,7 @@ type GroupsModel struct {
 	focused    bool
 	panelIndex int
 	styles     GroupsStyles
+	loader     loading.Model
 }
 
 // GroupsStyles holds styles for the Groups component.
@@ -94,6 +96,11 @@ func NewGroups(deps GroupsDeps) GroupsModel {
 		ctx:      deps.Ctx,
 		scroller: panel.NewScroller(0, 10),
 		styles:   DefaultGroupsStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading groups..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -110,7 +117,7 @@ func (m GroupsModel) SetFleetManager(fm *integrator.FleetManager) (GroupsModel, 
 		return m, nil
 	}
 	m.loading = true
-	return m, m.loadGroups()
+	return m, tea.Batch(m.loader.Tick(), m.loadGroups())
 }
 
 func (m GroupsModel) loadGroups() tea.Cmd {
@@ -132,6 +139,8 @@ func (m GroupsModel) SetSize(width, height int) GroupsModel {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -149,6 +158,18 @@ func (m GroupsModel) SetPanelIndex(index int) GroupsModel {
 
 // Update handles messages.
 func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing GroupsLoadedMsg even during loading
+		if _, ok := msg.(GroupsLoadedMsg); !ok {
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case GroupsLoadedMsg:
 		m.loading = false
@@ -188,7 +209,7 @@ func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 	case "r":
 		if !m.loading {
 			m.loading = true
-			return m, m.loadGroups()
+			return m, tea.Batch(m.loader.Tick(), m.loadGroups())
 		}
 	}
 
@@ -207,23 +228,36 @@ func (m GroupsModel) View() string {
 		r.SetFooter("j/k:nav r:refresh")
 	}
 
+	// Calculate content area for centering (accounting for panel borders)
+	contentWidth := m.width - 4
+	contentHeight := m.height - 4
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
 	if m.fleet == nil {
-		r.SetContent(m.styles.Muted.Render("Not connected to Shelly Cloud"))
+		msg := m.styles.Muted.Render("Not connected to Shelly Cloud")
+		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}
 
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading groups..."))
+		r.SetContent(m.loader.View())
 		return r.Render()
 	}
 
 	if m.err != nil {
-		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg := m.styles.Error.Render("Error: " + m.err.Error())
+		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}
 
 	if len(m.groups) == 0 {
-		r.SetContent(m.styles.Muted.Render("No device groups defined"))
+		msg := m.styles.Muted.Render("No device groups defined")
+		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}
 
@@ -313,7 +347,7 @@ func (m GroupsModel) Refresh() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.loadGroups()
+	return m, tea.Batch(m.loader.Tick(), m.loadGroups())
 }
 
 // FooterText returns keybinding hints for the footer.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -77,20 +78,22 @@ type PollMsg struct{}
 
 // Model is the provisioning wizard model.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	step       Step
-	deviceInfo *shelly.ProvisioningDeviceInfo
-	ssid       string
-	password   string
-	inputField int // 0 = SSID, 1 = password
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int
-	polling    bool
-	styles     Styles
+	ctx          context.Context
+	svc          *shelly.Service
+	step         Step
+	deviceInfo   *shelly.ProvisioningDeviceInfo
+	ssid         string
+	password     string
+	inputField   int // 0 = SSID, 1 = password
+	err          error
+	width        int
+	height       int
+	focused      bool
+	panelIndex   int
+	polling      bool
+	styles       Styles
+	scanLoader   loading.Model
+	configLoader loading.Model
 }
 
 // Styles holds styles for the Provisioning component.
@@ -149,6 +152,16 @@ func New(deps Deps) Model {
 		svc:    deps.Svc,
 		step:   StepInstructions,
 		styles: DefaultStyles(),
+		scanLoader: loading.New(
+			loading.WithMessage("Scanning..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(false, false),
+		),
+		configLoader: loading.New(
+			loading.WithMessage("Please wait..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(false, false),
+		),
 	}
 }
 
@@ -173,6 +186,9 @@ func (m Model) Reset() Model {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	// Update loader sizes
+	m.scanLoader = m.scanLoader.SetSize(width-4, height-4)
+	m.configLoader = m.configLoader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -190,12 +206,38 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loaders when active
+	if m.step == StepWaiting {
+		var cmd tea.Cmd
+		m.scanLoader, cmd = m.scanLoader.Update(msg)
+		switch msg.(type) {
+		case DeviceFoundMsg, PollMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+	if m.step == StepConfiguring {
+		var cmd tea.Cmd
+		m.configLoader, cmd = m.configLoader.Update(msg)
+		switch msg.(type) {
+		case ConfiguredMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case DeviceFoundMsg:
 		m.polling = false
 		if msg.Err != nil {
 			// Keep polling on error
-			return m, m.pollAfterDelay()
+			return m, tea.Batch(m.scanLoader.Tick(), m.pollAfterDelay())
 		}
 		m.deviceInfo = msg.DeviceInfo
 		m.step = StepCredentials
@@ -212,7 +254,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case PollMsg:
 		if m.step == StepWaiting {
-			return m, m.checkDevice()
+			return m, tea.Batch(m.scanLoader.Tick(), m.checkDevice())
 		}
 		return m, nil
 
@@ -249,7 +291,7 @@ func (m Model) handleInstructionsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case keyEnter:
 		m.step = StepWaiting
 		m.polling = true
-		return m, m.checkDevice()
+		return m, tea.Batch(m.scanLoader.Tick(), m.checkDevice())
 	case keyEsc, keyQ:
 		m = m.Reset()
 	}
@@ -263,7 +305,7 @@ func (m Model) handleCredentialsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case keyEnter:
 		if m.ssid != "" {
 			m.step = StepConfiguring
-			return m, m.configureDevice()
+			return m, tea.Batch(m.configLoader.Tick(), m.configureDevice())
 		}
 	case keyEsc:
 		m = m.Reset()
@@ -422,7 +464,7 @@ func (m Model) renderWaiting() string {
 	content.WriteString(m.styles.Highlight.Render(DefaultAPAddress))
 	content.WriteString("\n\n")
 
-	content.WriteString(m.styles.Warning.Render("◐ Scanning..."))
+	content.WriteString(m.scanLoader.View())
 	content.WriteString("\n\n")
 
 	content.WriteString(m.styles.Muted.Render("Make sure you're connected to the device's WiFi network."))
@@ -491,7 +533,7 @@ func (m Model) renderConfiguring() string {
 	content.WriteString(m.styles.Highlight.Render(m.ssid))
 	content.WriteString("\n\n")
 
-	content.WriteString(m.styles.Warning.Render("◐ Please wait..."))
+	content.WriteString(m.configLoader.View())
 	content.WriteString("\n\n")
 
 	content.WriteString(m.styles.Muted.Render("The device will restart and connect to your network."))

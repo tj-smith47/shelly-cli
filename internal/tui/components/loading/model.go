@@ -85,7 +85,7 @@ func DefaultStyles() Styles {
 		Spinner: lipgloss.NewStyle().
 			Foreground(colors.Highlight),
 		Message: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			MarginLeft(1),
 	}
 }

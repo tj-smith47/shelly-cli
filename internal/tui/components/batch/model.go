@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -102,6 +103,7 @@ type Model struct {
 	focused    bool
 	panelIndex int
 	styles     Styles
+	loader     loading.Model
 }
 
 // Styles holds styles for the Batch component.
@@ -157,6 +159,11 @@ func New(deps Deps) Model {
 		scroller:  panel.NewScroller(0, 10),
 		operation: OpToggle,
 		styles:    DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Executing..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(false, false),
+		),
 	}
 }
 
@@ -195,6 +202,8 @@ func (m Model) SetSize(width, height int) Model {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader size
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -212,6 +221,20 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loader when executing
+	if m.executing {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		switch msg.(type) {
+		case CompleteMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case CompleteMsg:
 		m.executing = false
@@ -330,7 +353,7 @@ func (m Model) execute() (Model, tea.Cmd) {
 	m.results = nil
 	m.err = nil
 
-	return m, m.executeOperation(selected)
+	return m, tea.Batch(m.loader.Tick(), m.executeOperation(selected))
 }
 
 func (m Model) executeOperation(devices []DeviceSelection) tea.Cmd {
@@ -429,7 +452,7 @@ func (m Model) View() string {
 	// Executing indicator
 	if m.executing {
 		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render("Executing..."))
+		content.WriteString(m.loader.View())
 	}
 
 	r.SetContent(content.String())

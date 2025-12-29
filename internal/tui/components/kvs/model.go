@@ -13,6 +13,7 @@ import (
 
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -73,6 +74,7 @@ type Model struct {
 	focused    bool
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     Styles
+	loader     loading.Model
 }
 
 // Styles holds styles for the KVS browser component.
@@ -131,6 +133,11 @@ func New(deps Deps) Model {
 		scroller: panel.NewScroller(0, 10),
 		loading:  false,
 		styles:   DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading KVS..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -152,7 +159,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	}
 
 	m.loading = true
-	return m, m.fetchItems()
+	return m, tea.Batch(m.loader.Tick(), m.fetchItems())
 }
 
 // fetchItems creates a command to fetch KVS items from the device.
@@ -205,6 +212,18 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing LoadedMsg even during loading
+		if _, ok := msg.(LoadedMsg); !ok {
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case LoadedMsg:
 		m.loading = false
@@ -223,7 +242,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.loading = true
-		return m, m.fetchItems()
+		return m, tea.Batch(m.loader.Tick(), m.fetchItems())
 
 	case tea.KeyPressMsg:
 		if !m.focused {
@@ -255,7 +274,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.deleteItem()
 	case "r":
 		m.loading = true
-		return m, m.fetchItems()
+		return m, tea.Batch(m.loader.Tick(), m.fetchItems())
 	}
 
 	return m, nil
@@ -301,7 +320,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading KVS..."))
+		r.SetContent(m.loader.View())
 		return r.Render()
 	}
 
@@ -443,7 +462,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.fetchItems()
+	return m, tea.Batch(m.loader.Tick(), m.fetchItems())
 }
 
 // FooterText returns keybinding hints for the footer.

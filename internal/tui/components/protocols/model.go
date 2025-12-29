@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -94,6 +95,7 @@ type Model struct {
 	focused        bool
 	panelIndex     int // 1-based panel index for Shift+N hotkey hint
 	styles         Styles
+	loader         loading.Model
 }
 
 // Styles holds styles for the Protocols component.
@@ -149,6 +151,11 @@ func New(deps Deps) Model {
 		svc:     deps.Svc,
 		loading: false,
 		styles:  DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading protocols..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -171,7 +178,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	}
 
 	m.loading = true
-	return m, m.fetchStatus()
+	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -278,6 +285,8 @@ func (m Model) fetchEthernet(ctx context.Context) *EthernetData {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -295,6 +304,18 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing StatusLoadedMsg even during loading
+		if _, ok := msg.(StatusLoadedMsg); !ok {
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case StatusLoadedMsg:
 		m.loading = false
@@ -326,7 +347,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "r":
 		if !m.loading && m.device != "" {
 			m.loading = true
-			return m, m.fetchStatus()
+			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
 		}
 	case "1":
 		m.activeProtocol = ProtocolMQTT
@@ -376,7 +397,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading protocol settings..."))
+		r.SetContent(m.loader.View())
 		return r.Render()
 	}
 
@@ -578,5 +599,5 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.fetchStatus()
+	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
 }

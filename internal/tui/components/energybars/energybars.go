@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -36,6 +37,8 @@ type Model struct {
 	showTotal  bool
 	focused    bool
 	panelIndex int // For Shift+N hint
+	loading    bool
+	loader     loading.Model
 }
 
 // Styles for the energy bars.
@@ -85,6 +88,12 @@ func New(c *cache.Cache) Model {
 		barHeight: 1,
 		styles:    DefaultStyles(),
 		showTotal: true,
+		loading:   true, // Start in loading state until cache is populated
+		loader: loading.New(
+			loading.WithMessage("Loading power data..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -95,12 +104,43 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles messages for the energy bars.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	// Energy bars are read-only, no key handling needed
-	return m, nil
+	if !m.loading {
+		return m, nil
+	}
+
+	// Forward tick messages to loader when loading
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+
+	// Auto-detect when cache has PM devices (data is ready)
+	if m.hasPMDevicesInCache() {
+		m.loading = false
+	}
+
+	return m, cmd
+}
+
+// hasPMDevicesInCache checks if the cache has any PM-capable devices.
+func (m Model) hasPMDevicesInCache() bool {
+	if m.cache == nil {
+		return false
+	}
+	devices := m.cache.GetOnlineDevices()
+	for _, d := range devices {
+		if hasPMCapability(d) {
+			return true
+		}
+	}
+	return false
 }
 
 // View renders the energy bars.
 func (m Model) View() string {
+	// Show loading indicator during initial load
+	if m.loading {
+		return m.renderLoading()
+	}
+
 	if m.cache == nil {
 		return m.renderEmpty()
 	}
@@ -307,6 +347,22 @@ func (m Model) renderNoData() string {
 	return r.SetContent(centered).Render()
 }
 
+func (m Model) renderLoading() string {
+	r := rendering.New(m.width, m.height).
+		SetTitle("Power Consumption").
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
+
+	// Use yellow borders for energy panels
+	if m.focused {
+		r.SetFocusColor(theme.Yellow())
+	} else {
+		r.SetBlurColor(theme.Yellow())
+	}
+
+	return r.SetContent(m.loader.View()).Render()
+}
+
 // formatValue formats a power/energy value with appropriate units.
 func formatValue(value float64, unit string) string {
 	absVal := value
@@ -327,6 +383,7 @@ func formatValue(value float64, unit string) string {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -357,4 +414,21 @@ func (m Model) SetFocused(focused bool) Model {
 func (m Model) SetPanelIndex(index int) Model {
 	m.panelIndex = index
 	return m
+}
+
+// SetLoading sets the loading state.
+func (m Model) SetLoading(isLoading bool) Model {
+	m.loading = isLoading
+	return m
+}
+
+// StartLoading sets loading to true and returns a tick command.
+func (m Model) StartLoading() (Model, tea.Cmd) {
+	m.loading = true
+	return m, m.loader.Tick()
+}
+
+// IsLoading returns whether the component is in loading state.
+func (m Model) IsLoading() bool {
+	return m.loading
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -75,6 +76,7 @@ type Model struct {
 	focused    bool
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     Styles
+	loader     loading.Model
 }
 
 // Styles holds styles for the virtual components list.
@@ -136,6 +138,11 @@ func New(deps Deps) Model {
 		scroller: panel.NewScroller(0, 10),
 		loading:  false,
 		styles:   DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading virtual components..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -157,7 +164,7 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	}
 
 	m.loading = true
-	return m, m.fetchVirtuals()
+	return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
 }
 
 // fetchVirtuals creates a command to fetch virtual components from the device.
@@ -201,6 +208,8 @@ func (m Model) SetSize(width, height int) Model {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -218,6 +227,21 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing LoadedMsg/ActionMsg even during loading
+		switch msg.(type) {
+		case LoadedMsg, ActionMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case LoadedMsg:
 		m.loading = false
@@ -236,7 +260,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.loading = true
-		return m, m.fetchVirtuals()
+		return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
 
 	case tea.KeyPressMsg:
 		if !m.focused {
@@ -272,7 +296,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.deleteVirtual()
 	case "r":
 		m.loading = true
-		return m, m.fetchVirtuals()
+		return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
 	}
 
 	return m, nil
@@ -384,7 +408,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading virtual components..."))
+		r.SetContent(m.loader.View())
 		return r.Render()
 	}
 
@@ -551,7 +575,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.fetchVirtuals()
+	return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
 }
 
 // FooterText returns keybinding hints for the footer.

@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -82,6 +83,7 @@ type EditorModel struct {
 	panelIndex       int // 1-based panel index for Shift+N hotkey hint
 	showNumbers      bool
 	styles           EditorStyles
+	loader           loading.Model
 }
 
 // EditorStyles holds styles for the editor component.
@@ -147,6 +149,11 @@ func NewEditor(deps EditorDeps) EditorModel {
 		svc:         deps.Svc,
 		showNumbers: true,
 		styles:      DefaultEditorStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading script code..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -172,6 +179,7 @@ func (m EditorModel) SetScript(device string, script Script) (EditorModel, tea.C
 
 	m.loading = true
 	return m, tea.Batch(
+		m.loader.Tick(),
 		m.fetchCode(),
 		m.fetchStatus(),
 	)
@@ -217,6 +225,8 @@ func (m EditorModel) fetchStatus() tea.Cmd {
 func (m EditorModel) SetSize(width, height int) EditorModel {
 	m.width = width
 	m.height = height
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -234,6 +244,21 @@ func (m EditorModel) SetPanelIndex(index int) EditorModel {
 
 // Update handles messages.
 func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing CodeLoadedMsg/StatusLoadedMsg even during loading
+		switch msg.(type) {
+		case CodeLoadedMsg, StatusLoadedMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case CodeLoadedMsg:
 		if msg.Err != nil {
@@ -283,7 +308,7 @@ func (m EditorModel) handleKey(msg tea.KeyPressMsg) (EditorModel, tea.Cmd) {
 		m.showNumbers = !m.showNumbers
 	case "r":
 		m.loading = true
-		return m, tea.Batch(m.fetchCode(), m.fetchStatus())
+		return m, tea.Batch(m.loader.Tick(), m.fetchCode(), m.fetchStatus())
 	}
 
 	return m, nil
@@ -357,7 +382,7 @@ func (m EditorModel) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading script code..."))
+		r.SetContent(m.loader.View())
 		return r.Render()
 	}
 
@@ -491,7 +516,7 @@ func (m EditorModel) Refresh() (EditorModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.fetchCode(), m.fetchStatus())
+	return m, tea.Batch(m.loader.Tick(), m.fetchCode(), m.fetchStatus())
 }
 
 // Edit opens the script in an external editor.

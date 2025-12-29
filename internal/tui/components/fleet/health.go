@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -46,6 +47,7 @@ type HealthModel struct {
 	panelIndex int
 	styles     HealthStyles
 	lastFetch  time.Time
+	loader     loading.Model
 }
 
 // HealthStyles holds styles for the Health component.
@@ -100,6 +102,11 @@ func NewHealth(deps HealthDeps) HealthModel {
 	return HealthModel{
 		ctx:    deps.Ctx,
 		styles: DefaultHealthStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading health data..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -116,7 +123,7 @@ func (m HealthModel) SetFleetManager(fm *integrator.FleetManager) (HealthModel, 
 		return m, nil
 	}
 	m.loading = true
-	return m, m.loadHealth()
+	return m, tea.Batch(m.loader.Tick(), m.loadHealth())
 }
 
 func (m HealthModel) loadHealth() tea.Cmd {
@@ -133,6 +140,8 @@ func (m HealthModel) loadHealth() tea.Cmd {
 func (m HealthModel) SetSize(width, height int) HealthModel {
 	m.width = width
 	m.height = height
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -150,6 +159,18 @@ func (m HealthModel) SetPanelIndex(index int) HealthModel {
 
 // Update handles messages.
 func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing HealthLoadedMsg even during loading
+		if _, ok := msg.(HealthLoadedMsg); !ok {
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case HealthLoadedMsg:
 		m.loading = false
@@ -175,7 +196,7 @@ func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
 func (m HealthModel) handleKey(msg tea.KeyPressMsg) (HealthModel, tea.Cmd) {
 	if msg.String() == "r" && !m.loading && m.fleet != nil {
 		m.loading = true
-		return m, m.loadHealth()
+		return m, tea.Batch(m.loader.Tick(), m.loadHealth())
 	}
 
 	return m, nil
@@ -193,23 +214,36 @@ func (m HealthModel) View() string {
 		r.SetFooter("r:refresh")
 	}
 
+	// Calculate content area for centering (accounting for panel borders)
+	contentWidth := m.width - 4
+	contentHeight := m.height - 4
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
 	if m.fleet == nil {
-		r.SetContent(m.styles.Muted.Render("Not connected to Shelly Cloud"))
+		msg := m.styles.Muted.Render("Not connected to Shelly Cloud")
+		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}
 
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading health data..."))
+		r.SetContent(m.loader.View())
 		return r.Render()
 	}
 
 	if m.err != nil {
-		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg := m.styles.Error.Render("Error: " + m.err.Error())
+		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}
 
 	if m.stats == nil {
-		r.SetContent(m.styles.Muted.Render("No health data available"))
+		msg := m.styles.Muted.Render("No health data available")
+		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}
 
@@ -297,5 +331,5 @@ func (m HealthModel) Refresh() (HealthModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.loadHealth()
+	return m, tea.Batch(m.loader.Tick(), m.loadHealth())
 }

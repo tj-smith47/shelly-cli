@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 )
 
 // Deps holds the dependencies for the device detail component.
@@ -47,6 +48,7 @@ type Model struct {
 	width    int
 	height   int
 	styles   Styles
+	loader   loading.Model
 }
 
 // Styles for the device detail component.
@@ -104,6 +106,11 @@ func New(deps Deps) Model {
 		svc:      deps.Svc,
 		viewport: vp,
 		styles:   DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading device details..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -116,6 +123,18 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if !m.visible {
 		return m, nil
+	}
+
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing Msg even during loading
+		if _, ok := msg.(Msg); !ok {
+			if cmd != nil {
+				return m, cmd
+			}
+		}
 	}
 
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
@@ -157,7 +176,7 @@ func (m Model) View() string {
 
 	switch {
 	case m.loading:
-		content = "Loading device details..."
+		content = m.loader.View()
 	case m.err != nil:
 		content = m.styles.Error.Render("Error: " + m.err.Error())
 	default:
@@ -285,7 +304,7 @@ func (m Model) Show(device model.Device) (Model, tea.Cmd) {
 	m.err = nil
 	m.device = &device
 
-	return m, m.fetchDeviceDetails(device)
+	return m, tea.Batch(m.loader.Tick(), m.fetchDeviceDetails(device))
 }
 
 // Hide hides the device detail overlay.

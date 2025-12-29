@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -60,6 +61,7 @@ type Model struct {
 	focused    bool
 	panelIndex int
 	styles     Styles
+	loader     loading.Model
 }
 
 // Styles holds styles for the Discovery component.
@@ -119,6 +121,11 @@ func New(deps Deps) Model {
 		scanning: false,
 		method:   shelly.DiscoveryMDNS,
 		styles:   DefaultStyles(),
+		loader: loading.New(
+			loading.WithMessage("Scanning for devices..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -137,6 +144,8 @@ func (m Model) SetSize(width, height int) Model {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -162,7 +171,7 @@ func (m Model) StartScan() (Model, tea.Cmd) {
 	m.devices = nil
 	m.scroller.SetItemCount(0)
 	m.scroller.CursorToStart()
-	return m, m.scanDevices()
+	return m, tea.Batch(m.loader.Tick(), m.scanDevices())
 }
 
 func (m Model) scanDevices() tea.Cmd {
@@ -183,6 +192,21 @@ func (m Model) scanDevices() tea.Cmd {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Forward tick messages to loader when scanning
+	if m.scanning {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing ScanCompleteMsg even during scanning
+		switch msg.(type) {
+		case ScanCompleteMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case ScanCompleteMsg:
 		m.scanning = false
@@ -284,7 +308,8 @@ func (m Model) View() string {
 
 	// Scan button / status
 	if m.scanning {
-		content.WriteString(m.styles.Muted.Render("Scanning..."))
+		content.WriteString(m.loader.View())
+		content.WriteString("\n")
 	} else {
 		content.WriteString(m.styles.ScanButton.Render("[s] Scan"))
 	}

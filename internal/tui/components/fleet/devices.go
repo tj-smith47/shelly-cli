@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -50,6 +51,7 @@ type DevicesModel struct {
 	panelIndex int
 	styles     DevicesStyles
 	lastFetch  time.Time
+	loader     loading.Model
 }
 
 // DevicesStyles holds styles for the Devices component.
@@ -108,6 +110,11 @@ func NewDevices(deps DevicesDeps) DevicesModel {
 		ctx:      deps.Ctx,
 		scroller: panel.NewScroller(0, 10),
 		styles:   DefaultDevicesStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading devices..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -124,7 +131,7 @@ func (m DevicesModel) SetFleetManager(fm *integrator.FleetManager) (DevicesModel
 		return m, nil
 	}
 	m.loading = true
-	return m, m.loadDevices()
+	return m, tea.Batch(m.loader.Tick(), m.loadDevices())
 }
 
 func (m DevicesModel) loadDevices() tea.Cmd {
@@ -146,6 +153,8 @@ func (m DevicesModel) SetSize(width, height int) DevicesModel {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -163,6 +172,18 @@ func (m DevicesModel) SetPanelIndex(index int) DevicesModel {
 
 // Update handles messages.
 func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing DevicesLoadedMsg even during loading
+		if _, ok := msg.(DevicesLoadedMsg); !ok {
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case DevicesLoadedMsg:
 		m.loading = false
@@ -203,7 +224,7 @@ func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
 	case "r":
 		if !m.loading {
 			m.loading = true
-			return m, m.loadDevices()
+			return m, tea.Batch(m.loader.Tick(), m.loadDevices())
 		}
 	}
 
@@ -233,18 +254,31 @@ func (m DevicesModel) View() string {
 }
 
 func (m DevicesModel) getStatusMessage() string {
+	// Calculate content area for centering (accounting for panel borders)
+	contentWidth := m.width - 4
+	contentHeight := m.height - 4
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
 	switch {
 	case m.fleet == nil:
-		return m.styles.Muted.Render("Not connected to Shelly Cloud")
+		msg := m.styles.Muted.Render("Not connected to Shelly Cloud")
+		return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg)
 	case m.loading:
-		return m.styles.Muted.Render("Loading devices...")
+		return m.loader.View()
 	case m.err != nil:
 		msg, hint := tuierrors.FormatError(m.err)
-		return m.styles.Error.Render(msg) + "\n" +
+		errMsg := m.styles.Error.Render(msg) + "\n" +
 			m.styles.Muted.Render("  "+hint) + "\n" +
 			m.styles.Muted.Render("  Press 'r' to retry")
+		return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, errMsg)
 	case len(m.devices) == 0:
-		return m.styles.Muted.Render("No devices in fleet")
+		msg := m.styles.Muted.Render("No devices in fleet")
+		return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg)
 	default:
 		return ""
 	}
@@ -368,7 +402,7 @@ func (m DevicesModel) Refresh() (DevicesModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.loadDevices()
+	return m, tea.Batch(m.loader.Tick(), m.loadDevices())
 }
 
 // FooterText returns keybinding hints for the footer.

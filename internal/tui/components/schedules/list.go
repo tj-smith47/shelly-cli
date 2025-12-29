@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -78,6 +79,7 @@ type ListModel struct {
 	focused    bool
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     ListStyles
+	loader     loading.Model
 }
 
 // ListStyles holds styles for the list component.
@@ -126,6 +128,11 @@ func NewList(deps ListDeps) ListModel {
 		scroller: panel.NewScroller(0, 10),
 		loading:  false,
 		styles:   DefaultListStyles(),
+		loader: loading.New(
+			loading.WithMessage("Loading schedules..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -147,7 +154,7 @@ func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 	}
 
 	m.loading = true
-	return m, m.fetchSchedules()
+	return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
 }
 
 // fetchSchedules creates a command to fetch schedules from the device.
@@ -184,6 +191,8 @@ func (m ListModel) SetSize(width, height int) ListModel {
 		visibleRows = 1
 	}
 	m.scroller.SetVisibleRows(visibleRows)
+	// Update loader size for proper centering
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -201,6 +210,21 @@ func (m ListModel) SetPanelIndex(index int) ListModel {
 
 // Update handles messages.
 func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+		// Continue processing LoadedMsg/ActionMsg even during loading
+		switch msg.(type) {
+		case LoadedMsg, ActionMsg:
+			// Pass through to main switch below
+		default:
+			if cmd != nil {
+				return m, cmd
+			}
+		}
+	}
+
 	switch msg := msg.(type) {
 	case LoadedMsg:
 		m.loading = false
@@ -219,7 +243,7 @@ func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
 			return m, nil
 		}
 		m.loading = true
-		return m, m.fetchSchedules()
+		return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
 
 	case tea.KeyPressMsg:
 		if !m.focused {
@@ -260,7 +284,7 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	case "R":
 		// Refresh list
 		m.loading = true
-		return m, m.fetchSchedules()
+		return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
 	}
 
 	return m, nil
@@ -346,7 +370,7 @@ func (m ListModel) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.styles.Muted.Render("Loading schedules..."))
+		r.SetContent(m.loader.View())
 		return r.Render()
 	}
 
@@ -469,7 +493,7 @@ func (m ListModel) Refresh() (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, m.fetchSchedules()
+	return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
 }
 
 // FooterText returns keybinding hints for the footer.

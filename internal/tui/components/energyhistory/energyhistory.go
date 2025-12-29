@@ -14,6 +14,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -38,6 +39,8 @@ type Model struct {
 	styles         Styles
 	focused        bool
 	panelIndex     int // For Shift+N hint
+	loading        bool
+	loader         loading.Model
 }
 
 // Styles for the energy history component.
@@ -98,6 +101,12 @@ func New(c *cache.Cache) Model {
 		history:  make(map[string][]DataPoint),
 		maxItems: 60, // 5 minutes at 5-second intervals
 		styles:   DefaultStyles(),
+		loading:  true, // Start in loading state until first data point
+		loader: loading.New(
+			loading.WithMessage("Collecting energy history..."),
+			loading.WithStyle(loading.StyleDot),
+			loading.WithCentered(true, true),
+		),
 	}
 }
 
@@ -111,8 +120,24 @@ func (m *Model) Init() tea.Cmd {
 // to maintain the 5-minute window (60 points * 5 seconds = 5 minutes).
 // We don't record on every DeviceUpdateMsg because cache updates can be more frequent.
 func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	// We intentionally don't record on DeviceUpdateMsg - see collectCurrentPower()
-	_ = msg
+	// Forward tick messages to loader when loading
+	if m.loading {
+		var cmd tea.Cmd
+		m.loader, cmd = m.loader.Update(msg)
+
+		// Auto-detect when we have history data
+		m.mu.RLock()
+		hasData := len(m.history) > 0
+		m.mu.RUnlock()
+		if hasData {
+			m.loading = false
+		}
+
+		if cmd != nil {
+			return *m, cmd
+		}
+	}
+
 	return *m, nil
 }
 
@@ -184,6 +209,11 @@ func (m *Model) addDataPoint(deviceName string, power float64) {
 
 // View renders the energy history.
 func (m *Model) View() string {
+	// Show loading indicator during initial data collection
+	if m.loading {
+		return m.renderLoading()
+	}
+
 	if m.cache == nil {
 		return m.renderEmpty()
 	}
@@ -405,6 +435,23 @@ func (m *Model) renderNoData() string {
 	return r.SetContent(centered).Render()
 }
 
+func (m *Model) renderLoading() string {
+	r := rendering.New(m.width, m.height).
+		SetTitle("Energy History").
+		SetBadge("5 min").
+		SetFocused(m.focused).
+		SetPanelIndex(m.panelIndex)
+
+	// Use yellow borders for energy panels
+	if m.focused {
+		r.SetFocusColor(theme.Yellow())
+	} else {
+		r.SetBlurColor(theme.Yellow())
+	}
+
+	return r.SetContent(m.loader.View()).Render()
+}
+
 // formatValue formats a power value with appropriate units.
 func formatValue(value float64, unit string) string {
 	absVal := value
@@ -422,6 +469,7 @@ func formatValue(value float64, unit string) string {
 func (m *Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return *m
 }
 
@@ -460,4 +508,21 @@ func (m *Model) SetFocused(focused bool) Model {
 func (m *Model) SetPanelIndex(index int) Model {
 	m.panelIndex = index
 	return *m
+}
+
+// SetLoading sets the loading state.
+func (m *Model) SetLoading(isLoading bool) Model {
+	m.loading = isLoading
+	return *m
+}
+
+// StartLoading sets loading to true and returns a tick command.
+func (m *Model) StartLoading() (Model, tea.Cmd) {
+	m.loading = true
+	return *m, m.loader.Tick()
+}
+
+// IsLoading returns whether the component is in loading state.
+func (m *Model) IsLoading() bool {
+	return m.loading
 }
