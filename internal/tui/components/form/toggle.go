@@ -5,6 +5,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 )
 
 // ToggleStyles holds the visual styles for a toggle.
@@ -134,7 +135,7 @@ func (t Toggle) Update(msg tea.Msg) (Toggle, tea.Cmd) {
 
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		switch keyMsg.String() {
-		case "enter", "space", "tab":
+		case keyconst.KeyEnter, keyconst.KeySpace, keyconst.KeyTab:
 			t.value = !t.value
 		case "y", "Y":
 			t.value = true

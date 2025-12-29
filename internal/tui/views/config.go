@@ -368,6 +368,10 @@ func (c *Config) handleEditClosedMsg(msg tea.Msg) tea.Cmd {
 		if editMsg.Saved {
 			return toast.Success("Cloud settings saved")
 		}
+	case protocols.MQTTEditClosedMsg:
+		if editMsg.Saved {
+			return toast.Success("MQTT settings saved")
+		}
 	}
 	return nil
 }

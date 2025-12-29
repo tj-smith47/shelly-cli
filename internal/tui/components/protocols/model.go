@@ -60,6 +60,7 @@ type MQTTData struct {
 	User        string
 	ClientID    string
 	TopicPrefix string
+	SSLCA       string
 }
 
 // ModbusData holds Modbus status and configuration.
@@ -89,6 +90,7 @@ type Model struct {
 	ethernet       *EthernetData
 	activeProtocol Protocol
 	loading        bool
+	editing        bool
 	err            error
 	width          int
 	height         int
@@ -96,6 +98,7 @@ type Model struct {
 	panelIndex     int // 1-based panel index for Shift+N hotkey hint
 	styles         Styles
 	loader         loading.Model
+	mqttEdit       MQTTEditModel
 }
 
 // Styles holds styles for the Protocols component.
@@ -156,6 +159,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		mqttEdit: NewMQTTEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -227,6 +231,9 @@ func (m Model) fetchMQTT(ctx context.Context) *MQTTData {
 	if v, ok := config["topic_prefix"].(string); ok {
 		data.TopicPrefix = v
 	}
+	if v, ok := config["ssl_ca"].(string); ok {
+		data.SSLCA = v
+	}
 	return data
 }
 
@@ -287,6 +294,8 @@ func (m Model) SetSize(width, height int) Model {
 	m.height = height
 	// Update loader size for proper centering
 	m.loader = m.loader.SetSize(width-4, height-4)
+	// Update edit modal size
+	m.mqttEdit = m.mqttEdit.SetSize(width, height)
 	return m
 }
 
@@ -304,6 +313,11 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		var cmd tea.Cmd
@@ -338,6 +352,34 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.mqttEdit, cmd = m.mqttEdit.Update(msg)
+
+	// Check if modal was closed
+	if !m.mqttEdit.IsVisible() {
+		m.editing = false
+		// Refresh data after edit
+		m.loading = true
+		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchStatus())
+	}
+
+	// Handle save result message
+	if saveMsg, ok := msg.(MQTTEditSaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.editing = false
+			m.mqttEdit = m.mqttEdit.Hide()
+			// Refresh data after successful save
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.fetchStatus(), func() tea.Msg {
+				return MQTTEditClosedMsg{Saved: true}
+			})
+		}
+	}
+
+	return m, cmd
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
@@ -355,9 +397,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.activeProtocol = ProtocolModbus
 	case "3":
 		m.activeProtocol = ProtocolEthernet
+	case "m":
+		// Open MQTT configuration modal when MQTT protocol is selected
+		return m.handleMQTTEditKey()
 	}
 
 	return m, nil
+}
+
+func (m Model) handleMQTTEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.mqtt == nil {
+		return m, nil
+	}
+	// Only allow editing when MQTT protocol is selected
+	if m.activeProtocol != ProtocolMQTT {
+		return m, nil
+	}
+	m.editing = true
+	m.mqttEdit = m.mqttEdit.SetSize(m.width, m.height)
+	m.mqttEdit = m.mqttEdit.Show(m.device, m.mqtt)
+	return m, func() tea.Msg { return MQTTEditOpenedMsg{} }
 }
 
 func (m Model) nextProtocol() Model {
@@ -386,6 +445,11 @@ func (m Model) prevProtocol() Model {
 
 // View renders the Protocols component.
 func (m Model) View() string {
+	// Render edit modal if editing
+	if m.editing {
+		return m.mqttEdit.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Protocols").
 		SetFocused(m.focused).
@@ -419,9 +483,13 @@ func (m Model) View() string {
 	// Ethernet Section
 	content.WriteString(m.renderEthernet())
 
-	// Help text
+	// Help text (include 'm' for MQTT edit when MQTT is selected)
 	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("1-3: select | j/k: navigate | r: refresh"))
+	if m.activeProtocol == ProtocolMQTT && m.mqtt != nil {
+		content.WriteString(m.styles.Muted.Render("1-3: select | j/k: navigate | m: edit MQTT | r: refresh"))
+	} else {
+		content.WriteString(m.styles.Muted.Render("1-3: select | j/k: navigate | r: refresh"))
+	}
 
 	r.SetContent(content.String())
 	return r.Render()
@@ -600,4 +668,9 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+}
+
+// IsEditing returns whether the edit modal is open.
+func (m Model) IsEditing() bool {
+	return m.editing
 }

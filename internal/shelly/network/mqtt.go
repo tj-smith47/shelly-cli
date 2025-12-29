@@ -21,6 +21,7 @@ type MQTTConfig struct {
 	User        string `json:"user,omitempty"`
 	ClientID    string `json:"client_id,omitempty"`
 	TopicPrefix string `json:"topic_prefix,omitempty"`
+	SSLCA       string `json:"ssl_ca,omitempty"`
 	RPCNTF      bool   `json:"rpc_ntf,omitempty"`
 	StatusNTF   bool   `json:"status_ntf,omitempty"`
 }
@@ -83,6 +84,9 @@ func (s *MQTTService) GetConfig(ctx context.Context, identifier string) (*MQTTCo
 		if config.StatusNTF != nil {
 			result.StatusNTF = *config.StatusNTF
 		}
+		if config.SSLCA != nil {
+			result.SSLCA = *config.SSLCA
+		}
 		return nil
 	})
 	return result, err
@@ -94,7 +98,9 @@ type SetConfigParams struct {
 	Server      string
 	User        string
 	Password    string
+	ClientID    string
 	TopicPrefix string
+	SSLCA       string // TLS settings: "", "*", "ca.pem", or "user_ca.pem"
 }
 
 // SetConfig updates the MQTT configuration.
@@ -117,6 +123,12 @@ func (s *MQTTService) SetConfig(ctx context.Context, identifier string, params S
 		}
 		if params.TopicPrefix != "" {
 			mqttCfg.TopicPrefix = &params.TopicPrefix
+		}
+		if params.ClientID != "" {
+			mqttCfg.ClientID = &params.ClientID
+		}
+		if params.SSLCA != "" {
+			mqttCfg.SSLCA = &params.SSLCA
 		}
 
 		return mqtt.SetConfig(ctx, mqttCfg)

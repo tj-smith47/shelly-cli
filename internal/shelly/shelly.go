@@ -790,6 +790,7 @@ func (s *Service) GetMQTTConfig(ctx context.Context, identifier string) (map[str
 		"user":         cfg.User,
 		"client_id":    cfg.ClientID,
 		"topic_prefix": cfg.TopicPrefix,
+		"ssl_ca":       cfg.SSLCA,
 		"rpc_ntf":      cfg.RPCNTF,
 		"status_ntf":   cfg.StatusNTF,
 	}, nil
@@ -804,6 +805,14 @@ func (s *Service) SetMQTTConfig(ctx context.Context, identifier string, enable *
 		Password:    password,
 		TopicPrefix: topicPrefix,
 	})
+}
+
+// MQTTSetConfigParams is an alias for network.SetConfigParams.
+type MQTTSetConfigParams = network.SetConfigParams
+
+// SetMQTTConfigFull delegates to the MQTT service with full configuration options.
+func (s *Service) SetMQTTConfigFull(ctx context.Context, identifier string, params MQTTSetConfigParams) error {
+	return s.mqttService.SetConfig(ctx, identifier, params)
 }
 
 // ----- Ethernet Service accessor and delegations -----

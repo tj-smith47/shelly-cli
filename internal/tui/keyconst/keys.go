@@ -16,3 +16,11 @@ const (
 	Shift8 = "*"
 	Shift9 = "("
 )
+
+// Common key constants.
+const (
+	KeyEnter = "enter"
+	KeySpace = "space"
+	KeyTab   = "tab"
+	KeyEsc   = "esc"
+)
