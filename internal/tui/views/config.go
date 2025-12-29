@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/security"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/smarthome"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/system"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
@@ -311,6 +312,13 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 		c.viewFocused = focusMsg.Focused
 		c.updateFocusStates()
 		return c, nil
+	}
+
+	// Handle WiFi edit completion with toast feedback
+	if editMsg, ok := msg.(wifi.EditClosedMsg); ok {
+		if editMsg.Saved {
+			cmds = append(cmds, toast.Success("WiFi settings saved"))
+		}
 	}
 
 	// Handle sequential loading messages

@@ -48,6 +48,14 @@ type ScanResultMsg struct {
 	Err      error
 }
 
+// EditOpenedMsg signals that the edit modal was opened.
+type EditOpenedMsg struct{}
+
+// EditClosedMsg signals that the edit modal was closed.
+type EditClosedMsg struct {
+	Saved bool
+}
+
 // Model displays WiFi settings for a device.
 type Model struct {
 	ctx           context.Context
@@ -59,6 +67,7 @@ type Model struct {
 	scroller      *panel.Scroller
 	loading       bool
 	scanning      bool
+	editing       bool
 	err           error
 	width         int
 	height        int
@@ -67,6 +76,7 @@ type Model struct {
 	styles        Styles
 	loader        loading.Model
 	scannerLoader loading.Model
+	editModal     EditModel
 }
 
 // Styles holds styles for the WiFi component.
@@ -135,6 +145,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModal: NewEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -202,6 +213,7 @@ func (m Model) SetSize(width, height int) Model {
 	// Update loader sizes for proper centering
 	m.loader = m.loader.SetSize(width-4, height-4)
 	m.scannerLoader = m.scannerLoader.SetSize(width-4, height-4)
+	m.editModal = m.editModal.SetSize(width, height)
 	return m
 }
 
@@ -219,6 +231,11 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loaders when loading or scanning
 	if m.loading {
 		var cmd tea.Cmd
@@ -273,6 +290,34 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.IsVisible() {
+		m.editing = false
+		// Refresh data after edit
+		m.loading = true
+		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchStatus())
+	}
+
+	// Handle save result message
+	if saveMsg, ok := msg.(SaveResultMsg); ok {
+		if saveMsg.Success {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			// Refresh data after successful save
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.fetchStatus(), func() tea.Msg {
+				return EditClosedMsg{Saved: true}
+			})
+		}
+	}
+
+	return m, cmd
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
@@ -288,23 +333,49 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "ctrl+u", "pgup":
 		m.scroller.PageUp()
 	case "s":
-		if !m.scanning && m.device != "" {
-			m.scanning = true
-			m.err = nil
-			return m, tea.Batch(m.scannerLoader.Tick(), m.scanNetworks())
-		}
+		return m.handleScanKey()
 	case "r":
-		if !m.loading && m.device != "" {
-			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
-		}
+		return m.handleRefreshKey()
+	case "e":
+		return m.handleEditKey()
 	}
 
 	return m, nil
 }
 
+func (m Model) handleScanKey() (Model, tea.Cmd) {
+	if m.scanning || m.device == "" {
+		return m, nil
+	}
+	m.scanning = true
+	m.err = nil
+	return m, tea.Batch(m.scannerLoader.Tick(), m.scanNetworks())
+}
+
+func (m Model) handleRefreshKey() (Model, tea.Cmd) {
+	if m.loading || m.device == "" {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+}
+
+func (m Model) handleEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.scanning {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.Show(m.device, m.config, m.networks)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
 // View renders the WiFi component.
 func (m Model) View() string {
+	// Render edit modal if editing
+	if m.editing {
+		return m.editModal.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("WiFi").
 		SetFocused(m.focused).
@@ -342,7 +413,7 @@ func (m Model) View() string {
 
 	// Help text
 	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("s: scan | r: refresh"))
+	content.WriteString(m.styles.Muted.Render("e: edit | s: scan | r: refresh"))
 
 	r.SetContent(content.String())
 	return r.Render()
@@ -567,5 +638,10 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom s:scan"
+	return "j/k:scroll g/G:top/bottom e:edit s:scan"
+}
+
+// IsEditing returns whether the edit modal is open.
+func (m Model) IsEditing() bool {
+	return m.editing
 }
