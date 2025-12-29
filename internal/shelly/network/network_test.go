@@ -961,3 +961,751 @@ func TestConnectionProvider_Interface(t *testing.T) {
 	// This test verifies that mockConnectionProvider satisfies the ConnectionProvider interface
 	var _ ConnectionProvider = (*mockConnectionProvider)(nil)
 }
+
+// ----- Token Validation Tests -----
+
+func TestValidateToken_InvalidToken(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateToken("invalid-token")
+	if err == nil {
+		t.Error("expected error for invalid token")
+	}
+}
+
+func TestIsTokenExpired_InvalidToken(t *testing.T) {
+	t.Parallel()
+
+	// An invalid token should not be treated as expired (returns false for parsing failure)
+	// This tests the edge case behavior
+	expired := IsTokenExpired("invalid-token")
+	// The behavior depends on the cloud package implementation
+	_ = expired // Just ensure it doesn't panic
+}
+
+func TestTimeUntilExpiry_InvalidToken(t *testing.T) {
+	t.Parallel()
+
+	// An invalid token should return a zero or negative duration
+	duration := TimeUntilExpiry("invalid-token")
+	// Just ensure it doesn't panic and returns some duration
+	_ = duration
+}
+
+func TestParseToken_InvalidToken(t *testing.T) {
+	t.Parallel()
+
+	token, err := ParseToken("invalid-token")
+	if err == nil {
+		t.Error("expected error for invalid token")
+	}
+	if token != nil {
+		t.Error("expected nil token for invalid input")
+	}
+}
+
+// ----- Cloud Client Tests -----
+
+func TestNewCloudClient_SetClient(t *testing.T) {
+	t.Parallel()
+
+	client := NewCloudClient("test-token")
+
+	// The internal client should be set
+	if client.client == nil {
+		t.Error("expected internal client to be set")
+	}
+}
+
+// ----- Cloud Event Stream Options Tests -----
+
+func TestCloudEventStreamOptions_Defaults(t *testing.T) {
+	t.Parallel()
+
+	var opts CloudEventStreamOptions
+
+	if opts.DeviceFilter != "" {
+		t.Errorf("expected empty DeviceFilter, got %q", opts.DeviceFilter)
+	}
+	if opts.EventFilter != "" {
+		t.Errorf("expected empty EventFilter, got %q", opts.EventFilter)
+	}
+	if opts.Raw {
+		t.Error("expected Raw to be false by default")
+	}
+}
+
+// ----- Cloud Control Result Tests -----
+
+func TestCloudControlResult_FailureCase(t *testing.T) {
+	t.Parallel()
+
+	result := CloudControlResult{
+		Success: false,
+		Message: "Device offline",
+	}
+
+	if result.Success {
+		t.Error("expected Success to be false")
+	}
+	if result.Message != "Device offline" {
+		t.Errorf("got Message=%q, want %q", result.Message, "Device offline")
+	}
+}
+
+// ----- Cloud Login Result Tests -----
+
+func TestCloudLoginResult_ZeroExpiry(t *testing.T) {
+	t.Parallel()
+
+	var result CloudLoginResult
+
+	if !result.Expiry.IsZero() {
+		t.Error("expected zero expiry by default")
+	}
+	if result.Token != "" {
+		t.Error("expected empty token by default")
+	}
+}
+
+// ----- Build Cloud Action Handlers Coverage Tests -----
+
+func TestBuildCloudActionHandlers_AllActions(t *testing.T) {
+	t.Parallel()
+
+	handlers := buildCloudActionHandlers()
+
+	// Verify all handlers are present and have correct field values
+	allActions := []string{
+		"on", "off", "toggle",
+		"open", "close", "stop",
+		"light-on", "light-off", "light-toggle",
+	}
+
+	for _, action := range allActions {
+		handler, ok := handlers[action]
+		if !ok {
+			t.Errorf("missing handler for action %q", action)
+			continue
+		}
+		// Verify handler has non-empty strings
+		if handler.success == "" {
+			t.Errorf("action %q has empty success message", action)
+		}
+		if handler.errMsg == "" {
+			t.Errorf("action %q has empty error message", action)
+		}
+		if handler.fn == nil {
+			t.Errorf("action %q has nil function", action)
+		}
+	}
+}
+
+// ----- Additional WiFi Tests -----
+
+func TestWiFiConfigFull_NilFields(t *testing.T) {
+	t.Parallel()
+
+	config := WiFiConfigFull{}
+
+	if config.STA != nil {
+		t.Error("expected STA to be nil by default")
+	}
+	if config.STA1 != nil {
+		t.Error("expected STA1 to be nil by default")
+	}
+	if config.AP != nil {
+		t.Error("expected AP to be nil by default")
+	}
+}
+
+// ----- Additional MQTT Tests -----
+
+func TestMQTTConfig_ZeroValue(t *testing.T) {
+	t.Parallel()
+
+	var config MQTTConfig
+
+	if config.Enable {
+		t.Error("expected Enable to be false by default")
+	}
+	if config.Server != "" {
+		t.Error("expected empty Server by default")
+	}
+	if config.User != "" {
+		t.Error("expected empty User by default")
+	}
+}
+
+// ----- Additional Ethernet Tests -----
+
+func TestEthernetConfig_ZeroValue(t *testing.T) {
+	t.Parallel()
+
+	var config EthernetConfig
+
+	if config.Enable {
+		t.Error("expected Enable to be false by default")
+	}
+	if config.IPv4Mode != "" {
+		t.Error("expected empty IPv4Mode by default")
+	}
+}
+
+// ----- Cloud Auth Status Tests -----
+
+func TestCloudAuthStatus_ZeroValue(t *testing.T) {
+	t.Parallel()
+
+	var status CloudAuthStatus
+
+	if status.Authenticated {
+		t.Error("expected Authenticated to be false by default")
+	}
+	if status.TokenValid {
+		t.Error("expected TokenValid to be false by default")
+	}
+	if !status.TokenExpiry.IsZero() {
+		t.Error("expected zero TokenExpiry by default")
+	}
+}
+
+// ----- Set Config Params Tests -----
+
+func TestSetConfigParams_NilEnable(t *testing.T) {
+	t.Parallel()
+
+	params := SetConfigParams{}
+
+	if params.Enable != nil {
+		t.Error("expected Enable to be nil by default")
+	}
+}
+
+func TestEthernetSetConfigParams_NilEnable(t *testing.T) {
+	t.Parallel()
+
+	params := EthernetSetConfigParams{}
+
+	if params.Enable != nil {
+		t.Error("expected Enable to be nil by default")
+	}
+}
+
+// ----- Additional BuildCloudWebSocketURL Tests -----
+
+func TestBuildCloudWebSocketURL_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		serverURL string
+		token     string
+		wantErr   bool
+		wantHost  string
+	}{
+		{
+			name:      "valid HTTPS URL",
+			serverURL: "https://api.shelly.cloud",
+			token:     "token123",
+			wantHost:  "api.shelly.cloud",
+		},
+		{
+			name:      "valid HTTP URL",
+			serverURL: "http://local.shelly.com",
+			token:     "token456",
+			wantHost:  "local.shelly.com",
+		},
+		{
+			name:      "URL with port",
+			serverURL: "https://api.shelly.cloud:8443",
+			token:     "token789",
+			wantHost:  "api.shelly.cloud",
+		},
+		{
+			name:      "URL with path",
+			serverURL: "https://api.shelly.cloud/v1/api",
+			token:     "tokenabc",
+			wantHost:  "api.shelly.cloud",
+		},
+		{
+			name:      "empty server and invalid token",
+			serverURL: "",
+			token:     "not-a-jwt",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			url, err := BuildCloudWebSocketURL(tt.serverURL, tt.token)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Check that URL contains expected host
+			if tt.wantHost != "" && !containsSubstring(url, tt.wantHost) {
+				t.Errorf("URL %q should contain host %q", url, tt.wantHost)
+			}
+
+			// Check URL structure
+			if !containsPrefix(url, "wss://") {
+				t.Errorf("URL %q should start with wss://", url)
+			}
+			if !containsSubstring(url, ":6113/shelly/wss/hk_sock?t=") {
+				t.Errorf("URL %q should contain port and path", url)
+			}
+		})
+	}
+}
+
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// ----- SetConfigParams Full Field Tests -----
+
+func TestSetConfigParams_AllFields(t *testing.T) {
+	t.Parallel()
+
+	enable := true
+	params := SetConfigParams{
+		Enable:      &enable,
+		Server:      "mqtt://broker:1883",
+		User:        "user",
+		Password:    "pass",
+		ClientID:    "client-123",
+		TopicPrefix: "prefix/",
+		SSLCA:       "ca.pem",
+	}
+
+	if params.Enable == nil || !*params.Enable {
+		t.Error("expected Enable to be true")
+	}
+	if params.Server != "mqtt://broker:1883" {
+		t.Errorf("got Server=%q", params.Server)
+	}
+	if params.User != "user" {
+		t.Errorf("got User=%q", params.User)
+	}
+	if params.Password != "pass" {
+		t.Errorf("got Password=%q", params.Password)
+	}
+	if params.ClientID != "client-123" {
+		t.Errorf("got ClientID=%q", params.ClientID)
+	}
+	if params.TopicPrefix != "prefix/" {
+		t.Errorf("got TopicPrefix=%q", params.TopicPrefix)
+	}
+	if params.SSLCA != "ca.pem" {
+		t.Errorf("got SSLCA=%q", params.SSLCA)
+	}
+}
+
+// ----- EthernetSetConfigParams Full Field Tests -----
+
+func TestEthernetSetConfigParams_AllFields(t *testing.T) {
+	t.Parallel()
+
+	enable := false
+	params := EthernetSetConfigParams{
+		Enable:     &enable,
+		IPv4Mode:   "dhcp",
+		IP:         "192.168.1.50",
+		Netmask:    "255.255.255.0",
+		GW:         "192.168.1.1",
+		Nameserver: "1.1.1.1",
+	}
+
+	if params.Enable == nil || *params.Enable {
+		t.Error("expected Enable to be false")
+	}
+	if params.IPv4Mode != "dhcp" {
+		t.Errorf("got IPv4Mode=%q", params.IPv4Mode)
+	}
+	if params.IP != "192.168.1.50" {
+		t.Errorf("got IP=%q", params.IP)
+	}
+	if params.Netmask != "255.255.255.0" {
+		t.Errorf("got Netmask=%q", params.Netmask)
+	}
+	if params.GW != "192.168.1.1" {
+		t.Errorf("got GW=%q", params.GW)
+	}
+	if params.Nameserver != "1.1.1.1" {
+		t.Errorf("got Nameserver=%q", params.Nameserver)
+	}
+}
+
+// ----- WiFi Station Full Edge Cases -----
+
+func TestWiFiStationFull_StaticIP(t *testing.T) {
+	t.Parallel()
+
+	station := WiFiStationFull{
+		SSID:     "StaticNetwork",
+		Enabled:  true,
+		IsOpen:   false,
+		IPv4Mode: "static",
+		IP:       "10.0.0.50",
+		Netmask:  "255.0.0.0",
+		Gateway:  "10.0.0.1",
+	}
+
+	if station.IPv4Mode != "static" {
+		t.Errorf("got IPv4Mode=%q, want static", station.IPv4Mode)
+	}
+	if station.IP != "10.0.0.50" {
+		t.Errorf("got IP=%q", station.IP)
+	}
+}
+
+// ----- WiFi Network Full Signal Strength Tests -----
+
+func TestWiFiNetworkFull_SignalStrength(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		rssi   float64
+		strong bool
+	}{
+		{"excellent signal", -30.0, true},
+		{"good signal", -50.0, true},
+		{"fair signal", -70.0, false},
+		{"weak signal", -85.0, false},
+		{"very weak signal", -95.0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			network := WiFiNetworkFull{
+				SSID: "TestNetwork",
+				RSSI: tt.rssi,
+			}
+
+			// Strong signal is typically > -60 dBm
+			isStrong := network.RSSI > -60.0
+			if isStrong != tt.strong {
+				t.Errorf("RSSI %f: got strong=%v, want %v", tt.rssi, isStrong, tt.strong)
+			}
+		})
+	}
+}
+
+// ----- MQTT Config SSL CA Tests -----
+
+func TestMQTTConfig_SSLCA(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		sslca string
+	}{
+		{"no TLS", ""},
+		{"trust all", "*"},
+		{"bundled CA", "ca.pem"},
+		{"user CA", "user_ca.pem"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := MQTTConfig{
+				Enable: true,
+				Server: "mqtts://broker:8883",
+				SSLCA:  tt.sslca,
+			}
+
+			if config.SSLCA != tt.sslca {
+				t.Errorf("got SSLCA=%q, want %q", config.SSLCA, tt.sslca)
+			}
+		})
+	}
+}
+
+// ----- Cloud Device Full Tests -----
+
+func TestCloudDevice_AllFields(t *testing.T) {
+	t.Parallel()
+
+	device := CloudDevice{
+		ID:              "shellyplus1pm-aabbccddee",
+		Name:            "Office Lamp",
+		Model:           "SNSW-001P16EU",
+		MAC:             "AA:BB:CC:DD:EE:FF",
+		FirmwareVersion: "1.2.3-beta1",
+		Generation:      2,
+		Online:          false,
+		CloudEnabled:    true,
+		Status:          []byte(`{"switch:0":{"output":true}}`),
+		Settings:        []byte(`{"name":"Office Lamp"}`),
+	}
+
+	if device.ID != "shellyplus1pm-aabbccddee" {
+		t.Errorf("got ID=%q", device.ID)
+	}
+	if device.Name != "Office Lamp" {
+		t.Errorf("got Name=%q", device.Name)
+	}
+	if device.Model != "SNSW-001P16EU" {
+		t.Errorf("got Model=%q", device.Model)
+	}
+	if device.MAC != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("got MAC=%q", device.MAC)
+	}
+	if device.FirmwareVersion != "1.2.3-beta1" {
+		t.Errorf("got FirmwareVersion=%q", device.FirmwareVersion)
+	}
+	if device.Generation != 2 {
+		t.Errorf("got Generation=%d", device.Generation)
+	}
+	if device.Online {
+		t.Error("expected Online to be false")
+	}
+	if !device.CloudEnabled {
+		t.Error("expected CloudEnabled to be true")
+	}
+	if len(device.Status) == 0 {
+		t.Error("expected non-empty Status")
+	}
+	if len(device.Settings) == 0 {
+		t.Error("expected non-empty Settings")
+	}
+}
+
+// ----- Cloud Token Full Tests -----
+
+func TestCloudToken_AllFields(t *testing.T) {
+	t.Parallel()
+
+	expiry := time.Now().Add(7 * 24 * time.Hour) // 7 days
+	token := CloudToken{
+		AccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test",
+		UserAPIURL:  "https://shelly-eu.cloudflare.com",
+		Email:       "test@example.com",
+		UserID:      999999,
+		Expiry:      expiry,
+	}
+
+	if token.AccessToken == "" {
+		t.Error("expected non-empty AccessToken")
+	}
+	if token.UserAPIURL != "https://shelly-eu.cloudflare.com" {
+		t.Errorf("got UserAPIURL=%q", token.UserAPIURL)
+	}
+	if token.Email != "test@example.com" {
+		t.Errorf("got Email=%q", token.Email)
+	}
+	if token.UserID != 999999 {
+		t.Errorf("got UserID=%d", token.UserID)
+	}
+	if token.Expiry.IsZero() {
+		t.Error("expected non-zero Expiry")
+	}
+}
+
+// ----- Mock Provider Callback Tests -----
+
+func TestMockConnectionProvider_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			callbackInvoked = true
+			// Don't actually call fn since we don't have a real client
+			return errors.New("mock error")
+		},
+	}
+
+	svc := NewWiFiService(provider)
+	//nolint:errcheck // testing callback invocation, not error
+	_, _ = svc.GetStatusFull(context.Background(), "test")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+// ----- Context Cancellation Tests -----
+
+func TestWiFiService_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	var capturedCtx context.Context
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(ctx context.Context, _ string, _ func(*client.Client) error) error {
+			capturedCtx = ctx
+			return ctx.Err()
+		},
+	}
+
+	svc := NewWiFiService(provider)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err := svc.GetStatusFull(ctx, "test-device")
+
+	if capturedCtx == nil {
+		t.Fatal("expected context to be captured")
+	}
+	if err == nil {
+		t.Error("expected error from cancelled context")
+	}
+}
+
+// ----- Hash Password Consistency Tests -----
+
+func TestHashPassword_Consistency(t *testing.T) {
+	t.Parallel()
+
+	passwords := []string{
+		"simple",
+		"P@ssw0rd!",
+		"with spaces here",
+		"日本語",
+		"",
+	}
+
+	for _, pass := range passwords {
+		t.Run(pass, func(t *testing.T) {
+			t.Parallel()
+
+			hash1 := HashPassword(pass)
+			hash2 := HashPassword(pass)
+
+			if hash1 != hash2 {
+				t.Errorf("inconsistent hash for %q: %q != %q", pass, hash1, hash2)
+			}
+		})
+	}
+}
+
+func TestHashPassword_Uniqueness(t *testing.T) {
+	t.Parallel()
+
+	hashes := make(map[string]string)
+	passwords := []string{
+		"password1",
+		"password2",
+		"password3",
+		"abc",
+		"ABC",
+	}
+
+	for _, pass := range passwords {
+		hash := HashPassword(pass)
+		if existing, ok := hashes[hash]; ok {
+			t.Errorf("hash collision: %q and %q both hash to %q", pass, existing, hash)
+		}
+		hashes[hash] = pass
+	}
+}
+
+// ----- Cloud Auth Status Validity Tests -----
+
+func TestCloudAuthStatus_Validity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("authenticated with valid token", func(t *testing.T) {
+		t.Parallel()
+
+		status := CloudAuthStatus{
+			Authenticated: true,
+			Email:         "user@example.com",
+			UserAPIURL:    "https://api.shelly.cloud",
+			TokenExpiry:   time.Now().Add(time.Hour),
+			TokenValid:    true,
+		}
+
+		if !status.Authenticated || !status.TokenValid {
+			t.Error("expected valid authenticated status")
+		}
+	})
+
+	t.Run("authenticated with expired token", func(t *testing.T) {
+		t.Parallel()
+
+		status := CloudAuthStatus{
+			Authenticated: true,
+			Email:         "user@example.com",
+			UserAPIURL:    "https://api.shelly.cloud",
+			TokenExpiry:   time.Now().Add(-time.Hour), // Expired
+			TokenValid:    false,
+		}
+
+		if !status.Authenticated {
+			t.Error("expected Authenticated to be true")
+		}
+		if status.TokenValid {
+			t.Error("expected TokenValid to be false for expired token")
+		}
+	})
+
+	t.Run("not authenticated", func(t *testing.T) {
+		t.Parallel()
+
+		status := CloudAuthStatus{
+			Authenticated: false,
+			TokenValid:    false,
+		}
+
+		if status.Authenticated {
+			t.Error("expected Authenticated to be false")
+		}
+	})
+}
+
+// ----- Cloud Login Result Expiry Tests -----
+
+func TestCloudLoginResult_ExpiryTimes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		expiry time.Time
+	}{
+		{"future expiry", time.Now().Add(24 * time.Hour)},
+		{"past expiry", time.Now().Add(-24 * time.Hour)},
+		{"immediate expiry", time.Now()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := CloudLoginResult{
+				Token:      "token",
+				UserAPIURL: "https://api.shelly.cloud",
+				Expiry:     tt.expiry,
+			}
+
+			if result.Expiry.IsZero() {
+				t.Error("expected non-zero expiry")
+			}
+		})
+	}
+}

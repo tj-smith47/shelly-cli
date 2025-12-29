@@ -1,7 +1,10 @@
 package output
 
 import (
+	"net"
 	"testing"
+
+	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -262,6 +265,550 @@ func TestCalculateSnapshotTotals(t *testing.T) {
 		}
 		if energy != 100 {
 			t.Errorf("energy = %v, want 100", energy)
+		}
+	})
+}
+
+func TestFormatPowerColored(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		watts float64
+	}{
+		{"low power", 50},
+		{"medium power", 150},
+		{"high power", 1500},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := FormatPowerColored(tt.watts)
+			if got == "" {
+				t.Error("expected non-empty result")
+			}
+		})
+	}
+}
+
+func TestFormatPowerWithChange(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no previous value", func(t *testing.T) {
+		t.Parallel()
+		got := FormatPowerWithChange(100, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("power increased", func(t *testing.T) {
+		t.Parallel()
+		prev := 50.0
+		got := FormatPowerWithChange(100, &prev)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("power decreased", func(t *testing.T) {
+		t.Parallel()
+		prev := 150.0
+		got := FormatPowerWithChange(100, &prev)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("power unchanged", func(t *testing.T) {
+		t.Parallel()
+		prev := 100.0
+		got := FormatPowerWithChange(100, &prev)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestFormatMeterLine(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without power factor", func(t *testing.T) {
+		t.Parallel()
+		got := FormatMeterLine("Switch", 0, 100, 230, 0.5, nil, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+		if !containsSubstring(got, "Switch 0:") {
+			t.Errorf("expected result to contain 'Switch 0:', got %q", got)
+		}
+	})
+
+	t.Run("with power factor", func(t *testing.T) {
+		t.Parallel()
+		pf := 0.95
+		got := FormatMeterLine("Switch", 1, 100, 230, 0.5, &pf, nil)
+		if !containsSubstring(got, "PF:") {
+			t.Errorf("expected result to contain 'PF:', got %q", got)
+		}
+	})
+
+	t.Run("with previous power", func(t *testing.T) {
+		t.Parallel()
+		prev := 50.0
+		got := FormatMeterLine("Switch", 0, 100, 230, 0.5, nil, &prev)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestFormatMeterLineWithEnergy(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without energy", func(t *testing.T) {
+		t.Parallel()
+		got := FormatMeterLineWithEnergy("PM", 0, 100, 230, 0.5, nil, nil, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("with energy", func(t *testing.T) {
+		t.Parallel()
+		energy := 500.0
+		got := FormatMeterLineWithEnergy("PM", 0, 100, 230, 0.5, nil, &energy, nil)
+		if !containsSubstring(got, "500.00 Wh") {
+			t.Errorf("expected result to contain '500.00 Wh', got %q", got)
+		}
+	})
+}
+
+func TestFormatEMPhase(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without power factor", func(t *testing.T) {
+		t.Parallel()
+		got := FormatEMPhase("Phase A", 100, 230, 0.5, nil, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+		if !containsSubstring(got, "Phase A:") {
+			t.Errorf("expected result to contain 'Phase A:', got %q", got)
+		}
+	})
+
+	t.Run("with power factor", func(t *testing.T) {
+		t.Parallel()
+		pf := 0.95
+		got := FormatEMPhase("Phase B", 100, 230, 0.5, &pf, nil)
+		if !containsSubstring(got, "PF:") {
+			t.Errorf("expected result to contain 'PF:', got %q", got)
+		}
+	})
+}
+
+func TestFormatEMLines(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without previous", func(t *testing.T) {
+		t.Parallel()
+		pf := 0.95
+		em := &shelly.EMStatus{
+			ID:               0,
+			AActivePower:     100,
+			AVoltage:         230,
+			ACurrent:         0.5,
+			APowerFactor:     &pf,
+			BActivePower:     200,
+			BVoltage:         231,
+			BCurrent:         0.9,
+			BPowerFactor:     &pf,
+			CActivePower:     150,
+			CVoltage:         229,
+			CCurrent:         0.7,
+			CPowerFactor:     &pf,
+			TotalActivePower: 450,
+		}
+		lines := FormatEMLines(em, nil)
+		if len(lines) != 5 {
+			t.Errorf("expected 5 lines, got %d", len(lines))
+		}
+	})
+
+	t.Run("with previous", func(t *testing.T) {
+		t.Parallel()
+		pf := 0.95
+		em := &shelly.EMStatus{
+			ID:               0,
+			AActivePower:     100,
+			AVoltage:         230,
+			ACurrent:         0.5,
+			APowerFactor:     &pf,
+			BActivePower:     200,
+			BVoltage:         231,
+			BCurrent:         0.9,
+			BPowerFactor:     &pf,
+			CActivePower:     150,
+			CVoltage:         229,
+			CCurrent:         0.7,
+			CPowerFactor:     &pf,
+			TotalActivePower: 450,
+		}
+		prev := &shelly.EMStatus{
+			ID:           0,
+			AActivePower: 90,
+			BActivePower: 180,
+			CActivePower: 140,
+		}
+		lines := FormatEMLines(em, prev)
+		if len(lines) != 5 {
+			t.Errorf("expected 5 lines, got %d", len(lines))
+		}
+	})
+}
+
+func TestFormatEM1Line(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without previous", func(t *testing.T) {
+		t.Parallel()
+		pf := 0.95
+		em1 := &shelly.EM1Status{
+			ID:       0,
+			ActPower: 100,
+			Voltage:  230,
+			Current:  0.5,
+			PF:       &pf,
+		}
+		got := FormatEM1Line(em1, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+		if !containsSubstring(got, "EM1 0:") {
+			t.Errorf("expected result to contain 'EM1 0:', got %q", got)
+		}
+	})
+
+	t.Run("with previous", func(t *testing.T) {
+		t.Parallel()
+		pf := 0.95
+		em1 := &shelly.EM1Status{
+			ID:       0,
+			ActPower: 100,
+			Voltage:  230,
+			Current:  0.5,
+			PF:       &pf,
+		}
+		prev := &shelly.EM1Status{
+			ID:       0,
+			ActPower: 80,
+		}
+		got := FormatEM1Line(em1, prev)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestFormatPMLine(t *testing.T) {
+	t.Parallel()
+
+	t.Run("without energy and previous", func(t *testing.T) {
+		t.Parallel()
+		pm := &shelly.PMStatus{
+			ID:      0,
+			APower:  100,
+			Voltage: 230,
+			Current: 0.5,
+		}
+		got := FormatPMLine(pm, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+		if !containsSubstring(got, "PM 0:") {
+			t.Errorf("expected result to contain 'PM 0:', got %q", got)
+		}
+	})
+
+	t.Run("with energy", func(t *testing.T) {
+		t.Parallel()
+		pm := &shelly.PMStatus{
+			ID:      0,
+			APower:  100,
+			Voltage: 230,
+			Current: 0.5,
+			AEnergy: &shelly.EnergyCounters{Total: 500},
+		}
+		got := FormatPMLine(pm, nil)
+		if !containsSubstring(got, "500.00 Wh") {
+			t.Errorf("expected result to contain '500.00 Wh', got %q", got)
+		}
+	})
+
+	t.Run("with previous", func(t *testing.T) {
+		t.Parallel()
+		pm := &shelly.PMStatus{
+			ID:      0,
+			APower:  100,
+			Voltage: 230,
+			Current: 0.5,
+		}
+		prev := &shelly.PMStatus{
+			ID:     0,
+			APower: 80,
+		}
+		got := FormatPMLine(pm, prev)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestFindPreviousEM1(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil snapshot returns nil", func(t *testing.T) {
+		t.Parallel()
+		result := FindPreviousEM1(0, nil)
+		if result != nil {
+			t.Error("expected nil for nil snapshot")
+		}
+	})
+
+	t.Run("finds existing EM1", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			EM1: []shelly.EM1Status{
+				{ID: 0, ActPower: 100},
+				{ID: 1, ActPower: 200},
+			},
+		}
+		result := FindPreviousEM1(1, snapshot)
+		if result == nil {
+			t.Fatal("expected to find EM1")
+		}
+		if result.ActPower != 200 {
+			t.Errorf("ActPower = %v, want 200", result.ActPower)
+		}
+	})
+
+	t.Run("returns nil for missing EM1", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			EM1: []shelly.EM1Status{
+				{ID: 0, ActPower: 100},
+			},
+		}
+		result := FindPreviousEM1(99, snapshot)
+		if result != nil {
+			t.Error("expected nil for missing EM1")
+		}
+	})
+}
+
+func TestFindPreviousPM(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil snapshot returns nil", func(t *testing.T) {
+		t.Parallel()
+		result := FindPreviousPM(0, nil)
+		if result != nil {
+			t.Error("expected nil for nil snapshot")
+		}
+	})
+
+	t.Run("finds existing PM", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			PM: []shelly.PMStatus{
+				{ID: 0, APower: 100},
+				{ID: 1, APower: 200},
+			},
+		}
+		result := FindPreviousPM(1, snapshot)
+		if result == nil {
+			t.Fatal("expected to find PM")
+		}
+		if result.APower != 200 {
+			t.Errorf("APower = %v, want 200", result.APower)
+		}
+	})
+
+	t.Run("returns nil for missing PM", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			PM: []shelly.PMStatus{
+				{ID: 0, APower: 100},
+			},
+		}
+		result := FindPreviousPM(99, snapshot)
+		if result != nil {
+			t.Error("expected nil for missing PM")
+		}
+	})
+}
+
+func TestGetPrevEMPhasePower(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil snapshot returns nil pointers", func(t *testing.T) {
+		t.Parallel()
+		prevA, prevB, prevC := GetPrevEMPhasePower(0, nil)
+		if prevA != nil || prevB != nil || prevC != nil {
+			t.Error("expected nil pointers for nil snapshot")
+		}
+	})
+
+	t.Run("returns phase powers for existing EM", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			EM: []shelly.EMStatus{
+				{ID: 0, AActivePower: 100, BActivePower: 200, CActivePower: 300},
+			},
+		}
+		prevA, prevB, prevC := GetPrevEMPhasePower(0, snapshot)
+		if prevA == nil || prevB == nil || prevC == nil {
+			t.Fatal("expected non-nil pointers")
+		}
+		if *prevA != 100 || *prevB != 200 || *prevC != 300 {
+			t.Errorf("got %v, %v, %v, want 100, 200, 300", *prevA, *prevB, *prevC)
+		}
+	})
+
+	t.Run("returns nil for missing EM", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			EM: []shelly.EMStatus{
+				{ID: 0, AActivePower: 100, BActivePower: 200, CActivePower: 300},
+			},
+		}
+		prevA, prevB, prevC := GetPrevEMPhasePower(99, snapshot)
+		if prevA != nil || prevB != nil || prevC != nil {
+			t.Error("expected nil pointers for missing EM")
+		}
+	})
+}
+
+func TestGetPrevEM1Power(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil snapshot returns nil", func(t *testing.T) {
+		t.Parallel()
+		result := GetPrevEM1Power(0, nil)
+		if result != nil {
+			t.Error("expected nil for nil snapshot")
+		}
+	})
+
+	t.Run("returns power for existing EM1", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			EM1: []shelly.EM1Status{
+				{ID: 0, ActPower: 100},
+			},
+		}
+		result := GetPrevEM1Power(0, snapshot)
+		if result == nil {
+			t.Fatal("expected non-nil pointer")
+		}
+		if *result != 100 {
+			t.Errorf("got %v, want 100", *result)
+		}
+	})
+
+	t.Run("returns nil for missing EM1", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			EM1: []shelly.EM1Status{
+				{ID: 0, ActPower: 100},
+			},
+		}
+		result := GetPrevEM1Power(99, snapshot)
+		if result != nil {
+			t.Error("expected nil for missing EM1")
+		}
+	})
+}
+
+func TestGetPrevPMPower(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil snapshot returns nil", func(t *testing.T) {
+		t.Parallel()
+		result := GetPrevPMPower(0, nil)
+		if result != nil {
+			t.Error("expected nil for nil snapshot")
+		}
+	})
+
+	t.Run("returns power for existing PM", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			PM: []shelly.PMStatus{
+				{ID: 0, APower: 100},
+			},
+		}
+		result := GetPrevPMPower(0, snapshot)
+		if result == nil {
+			t.Fatal("expected non-nil pointer")
+		}
+		if *result != 100 {
+			t.Errorf("got %v, want 100", *result)
+		}
+	})
+
+	t.Run("returns nil for missing PM", func(t *testing.T) {
+		t.Parallel()
+		snapshot := &shelly.MonitoringSnapshot{
+			PM: []shelly.PMStatus{
+				{ID: 0, APower: 100},
+			},
+		}
+		result := GetPrevPMPower(99, snapshot)
+		if result != nil {
+			t.Error("expected nil for missing PM")
+		}
+	})
+}
+
+func TestFormatDiscoveredDevices(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty slice returns nil", func(t *testing.T) {
+		t.Parallel()
+		result := FormatDiscoveredDevices(nil)
+		if result != nil {
+			t.Error("expected nil for empty slice")
+		}
+	})
+
+	t.Run("formats devices with auth required", func(t *testing.T) {
+		t.Parallel()
+		devices := []discovery.DiscoveredDevice{
+			{
+				ID:           "shelly1-abc123",
+				Name:         "Kitchen Light",
+				Model:        "SHSW-1",
+				Generation:   1,
+				AuthRequired: false,
+				Address:      net.ParseIP("192.168.1.100"),
+				Protocol:     discovery.ProtocolMDNS,
+			},
+			{
+				ID:           "shelly2-def456",
+				Name:         "",
+				Model:        "SHSW-PM",
+				Generation:   2,
+				AuthRequired: true,
+				Address:      net.ParseIP("192.168.1.101"),
+				Protocol:     discovery.ProtocolMDNS,
+			},
+		}
+		result := FormatDiscoveredDevices(devices)
+		if result == nil {
+			t.Fatal("expected non-nil table")
 		}
 	})
 }

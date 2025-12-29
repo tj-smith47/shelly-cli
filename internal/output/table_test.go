@@ -302,3 +302,209 @@ func TestGetTableStyle(t *testing.T) {
 		}
 	})
 }
+
+func TestShouldHideHeaders_Default(t *testing.T) {
+	t.Parallel()
+	// Default should be false (headers visible)
+	hide := ShouldHideHeaders()
+	if hide {
+		t.Error("ShouldHideHeaders() default should be false")
+	}
+}
+
+func TestNewStyledTable(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with plain mode", func(t *testing.T) {
+		t.Parallel()
+		checker := &mockModeChecker{plain: true, colorEnabled: false}
+		table := NewStyledTable(checker, "Name", "Value")
+		if table == nil {
+			t.Fatal("NewStyledTable returned nil")
+		}
+	})
+
+	t.Run("with color mode", func(t *testing.T) {
+		t.Parallel()
+		checker := &mockModeChecker{plain: false, colorEnabled: true}
+		table := NewStyledTable(checker, "Col1", "Col2", "Col3")
+		if table == nil {
+			t.Fatal("NewStyledTable returned nil")
+		}
+		table.AddRow("a", "b", "c")
+		rendered := table.Render()
+		if rendered == "" {
+			t.Error("expected non-empty rendered output")
+		}
+	})
+}
+
+func TestTable_HideHeaders(t *testing.T) {
+	t.Parallel()
+
+	table := NewTable("A", "B")
+	table.HideHeaders()
+	table.AddRow("1", "2")
+
+	rendered := table.Render()
+	// When headers are hidden, output should not contain the header row
+	// Headers are typically uppercase (A, B)
+	lines := strings.Split(strings.TrimSpace(rendered), "\n")
+	// Should have at least the data row
+	if len(lines) < 1 {
+		t.Error("expected at least one line of output")
+	}
+}
+
+func TestTable_RenderPlain(t *testing.T) {
+	t.Parallel()
+
+	table := NewTable("Name", "Value")
+	style := PlainTableStyle()
+	table.SetStyle(style)
+	table.AddRow("foo", "bar")
+	table.AddRow("baz", "qux")
+
+	var buf bytes.Buffer
+	if err := table.PrintTo(&buf); err != nil {
+		t.Fatalf("PrintTo() error: %v", err)
+	}
+
+	output := buf.String()
+	// Plain mode uses tab-separated values
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+}
+
+func TestTableFormatter_BuildTableFromData(t *testing.T) {
+	t.Parallel()
+
+	t.Run("slice of structs", func(t *testing.T) {
+		t.Parallel()
+		type Item struct {
+			ID   int
+			Name string
+		}
+		data := []Item{{1, "foo"}, {2, "bar"}}
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, data)
+		if err != nil {
+			t.Fatalf("Format() error: %v", err)
+		}
+		output := strings.ToLower(buf.String())
+		if !strings.Contains(output, "id") || !strings.Contains(output, "name") {
+			t.Error("expected table to have headers")
+		}
+	})
+
+	t.Run("single struct", func(t *testing.T) {
+		t.Parallel()
+		type Item struct {
+			ID   int
+			Name string
+		}
+		data := Item{1, "foo"}
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, data)
+		if err != nil {
+			t.Fatalf("Format() error: %v", err)
+		}
+		output := buf.String()
+		if output == "" {
+			t.Error("expected non-empty output")
+		}
+	})
+
+	t.Run("map data", func(t *testing.T) {
+		t.Parallel()
+		data := map[string]int{"a": 1, "b": 2}
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, data)
+		if err != nil {
+			t.Fatalf("Format() error: %v", err)
+		}
+		output := buf.String()
+		if output == "" {
+			t.Error("expected non-empty output")
+		}
+	})
+
+	t.Run("bool field", func(t *testing.T) {
+		t.Parallel()
+		type Item struct {
+			Active bool
+		}
+		data := []Item{{true}, {false}}
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, data)
+		if err != nil {
+			t.Fatalf("Format() error: %v", err)
+		}
+		output := buf.String()
+		if output == "" {
+			t.Error("expected non-empty output")
+		}
+	})
+
+	t.Run("slice field", func(t *testing.T) {
+		t.Parallel()
+		type Item struct {
+			Tags []string
+		}
+		data := []Item{{Tags: []string{"a", "b", "c"}}}
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, data)
+		if err != nil {
+			t.Fatalf("Format() error: %v", err)
+		}
+		output := buf.String()
+		if output == "" {
+			t.Error("expected non-empty output")
+		}
+	})
+
+	t.Run("nested struct field", func(t *testing.T) {
+		t.Parallel()
+		type Inner struct {
+			Value string
+		}
+		type Item struct {
+			ID    int
+			Inner Inner
+		}
+		data := []Item{{1, Inner{"nested"}}}
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, data)
+		if err != nil {
+			t.Fatalf("Format() error: %v", err)
+		}
+		output := buf.String()
+		if output == "" {
+			t.Error("expected non-empty output")
+		}
+	})
+}
+
+func TestTable_Print(t *testing.T) {
+	t.Parallel()
+	// Note: Print writes to os.Stdout which can't easily be captured in tests
+	// We test PrintTo instead which is the underlying implementation
+	table := NewTable("A")
+	table.AddRow("value")
+
+	var buf bytes.Buffer
+	err := table.PrintTo(&buf)
+	if err != nil {
+		t.Fatalf("PrintTo() error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected non-empty output")
+	}
+}

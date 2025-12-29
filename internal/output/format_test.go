@@ -373,3 +373,259 @@ func TestNewFormatter(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatReleaseNotes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("short notes", func(t *testing.T) {
+		t.Parallel()
+		body := "Line1\nLine2"
+		result := FormatReleaseNotes(body)
+		if !strings.Contains(result, "  Line1") {
+			t.Error("expected indented lines")
+		}
+	})
+
+	t.Run("long notes truncated", func(t *testing.T) {
+		t.Parallel()
+		body := strings.Repeat("a", 600)
+		result := FormatReleaseNotes(body)
+		if !strings.HasSuffix(result, "...") {
+			t.Error("expected truncated output")
+		}
+	})
+}
+
+func TestTableFormatter_Format(t *testing.T) {
+	t.Parallel()
+
+	t.Run("struct slice", func(t *testing.T) {
+		t.Parallel()
+		type item struct {
+			Name  string
+			Value int
+		}
+		data := []item{
+			{"a", 1},
+			{"b", 2},
+		}
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, data)
+		if err != nil {
+			t.Fatalf("Format error: %v", err)
+		}
+		output := buf.String()
+		// Table headers are uppercase by default
+		lowerOutput := strings.ToLower(output)
+		if !strings.Contains(lowerOutput, "name") || !strings.Contains(lowerOutput, "value") {
+			t.Errorf("expected table headers, got: %s", output)
+		}
+	})
+
+	t.Run("non-tabular data", func(t *testing.T) {
+		t.Parallel()
+		var buf bytes.Buffer
+		f := NewTableFormatter()
+		err := f.Format(&buf, "just a string")
+		if err != nil {
+			t.Fatalf("Format error: %v", err)
+		}
+		output := buf.String()
+		if !strings.Contains(output, "just a string") {
+			t.Error("expected text fallback")
+		}
+	})
+}
+
+// testStringer is a type that implements fmt.Stringer for testing.
+type testStringer struct{}
+
+func (ts testStringer) String() string {
+	return "custom stringer output"
+}
+
+func TestTextFormatter_Stringer(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	f := NewTextFormatter()
+	err := f.Format(&buf, testStringer{})
+	if err != nil {
+		t.Fatalf("Format error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "custom stringer output") {
+		t.Errorf("expected stringer output, got %q", buf.String())
+	}
+}
+
+func TestFormatPlaceholder(t *testing.T) {
+	t.Parallel()
+
+	result := FormatPlaceholder("placeholder text")
+	if result == "" {
+		t.Error("FormatPlaceholder returned empty string")
+	}
+	// Just verify it returns something with the text (theme may add styling)
+	if !strings.Contains(result, "placeholder") {
+		t.Error("expected result to contain placeholder text")
+	}
+}
+
+func TestGetFormat_Default(t *testing.T) {
+	t.Parallel()
+	// Test default format (when no config is set)
+	format := GetFormat()
+	// Default should be table
+	if format != FormatTable {
+		t.Errorf("GetFormat() default = %v, want %v", format, FormatTable)
+	}
+}
+
+func TestGetTemplate_Default(t *testing.T) {
+	t.Parallel()
+	// Test that GetTemplate returns empty string when not configured
+	tmpl := GetTemplate()
+	// Default template should be empty
+	if tmpl != "" {
+		t.Errorf("GetTemplate() default = %q, want empty", tmpl)
+	}
+}
+
+func TestPrintTo(t *testing.T) {
+	t.Parallel()
+
+	data := map[string]string{"key": "value"}
+	var buf bytes.Buffer
+	err := PrintTo(&buf, data)
+	if err != nil {
+		t.Fatalf("PrintTo() error: %v", err)
+	}
+	// Should produce some output (table format by default)
+	if buf.Len() == 0 {
+		t.Error("expected non-empty output")
+	}
+}
+
+func TestPrintTemplate(t *testing.T) {
+	t.Parallel()
+	// PrintTemplate writes to os.Stdout which we can't easily capture
+	// But we can verify it doesn't panic and returns no error for valid template
+	data := struct{ Name string }{"Test"}
+	err := Template(&bytes.Buffer{}, "Name: {{.Name}}", data)
+	if err != nil {
+		t.Errorf("Template() error: %v", err)
+	}
+}
+
+func TestIsQuiet_Default(t *testing.T) {
+	t.Parallel()
+	// Test that IsQuiet returns false when not configured
+	quiet := IsQuiet()
+	if quiet {
+		t.Error("IsQuiet() default should be false")
+	}
+}
+
+func TestIsVerbose_Default(t *testing.T) {
+	t.Parallel()
+	// Test that IsVerbose returns false when not configured
+	verbose := IsVerbose()
+	if verbose {
+		t.Error("IsVerbose() default should be false")
+	}
+}
+
+func TestWantsJSON_Default(t *testing.T) {
+	t.Parallel()
+	// Test that WantsJSON returns false when default format is table
+	want := WantsJSON()
+	if want {
+		t.Error("WantsJSON() default should be false")
+	}
+}
+
+func TestWantsYAML_Default(t *testing.T) {
+	t.Parallel()
+	// Test that WantsYAML returns false when default format is table
+	want := WantsYAML()
+	if want {
+		t.Error("WantsYAML() default should be false")
+	}
+}
+
+func TestWantsTable_Default(t *testing.T) {
+	t.Parallel()
+	// Test that WantsTable returns true when default format is table
+	want := WantsTable()
+	if !want {
+		t.Error("WantsTable() default should be true")
+	}
+}
+
+func TestWantsStructured_Default(t *testing.T) {
+	t.Parallel()
+	// Test that WantsStructured returns false when default format is table
+	want := WantsStructured()
+	if want {
+		t.Error("WantsStructured() default should be false")
+	}
+}
+
+func TestFormatOutput(t *testing.T) {
+	t.Parallel()
+
+	data := map[string]string{"key": "value"}
+	var buf bytes.Buffer
+	err := FormatOutput(&buf, data)
+	if err != nil {
+		t.Fatalf("FormatOutput() error: %v", err)
+	}
+	// Should produce some output (table format by default)
+	if buf.Len() == 0 {
+		t.Error("expected non-empty output")
+	}
+}
+
+func TestHighlightCode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("json syntax", func(t *testing.T) {
+		t.Parallel()
+		code := `{"key": "value"}`
+		result := highlightCode(code, "json")
+		// Should return non-empty result
+		if result == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("yaml syntax", func(t *testing.T) {
+		t.Parallel()
+		code := "key: value"
+		result := highlightCode(code, "yaml")
+		if result == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("unknown lexer returns code unchanged", func(t *testing.T) {
+		t.Parallel()
+		code := "some text"
+		result := highlightCode(code, "nonexistent-language-xyz123")
+		// Should return original code when lexer not found
+		if result != code {
+			t.Errorf("expected code unchanged, got %q", result)
+		}
+	})
+}
+
+func TestGetChromaStyle(t *testing.T) {
+	t.Parallel()
+
+	// Test that getChromaStyle returns a non-nil style
+	style := getChromaStyle()
+	if style == nil {
+		t.Error("getChromaStyle() returned nil")
+	}
+}

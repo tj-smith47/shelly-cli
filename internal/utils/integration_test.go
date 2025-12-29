@@ -26,6 +26,10 @@ func setupTestConfig(t *testing.T) func() {
 	// Save original HOME
 	originalHome := os.Getenv("HOME")
 
+	// Reset the config singleton BEFORE changing HOME
+	// This ensures the next call to getDefaultManager will use the new HOME
+	config.ResetDefaultManagerForTesting()
+
 	// Create temp directory for test config
 	tmpDir := t.TempDir()
 	if err := os.Setenv("HOME", tmpDir); err != nil {
@@ -50,6 +54,8 @@ groups: {}
 
 	// Return cleanup function
 	return func() {
+		// Reset singleton again before restoring HOME
+		config.ResetDefaultManagerForTesting()
 		if err := os.Setenv("HOME", originalHome); err != nil {
 			t.Logf("warning: failed to restore HOME: %v", err)
 		}

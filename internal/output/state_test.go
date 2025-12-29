@@ -408,3 +408,164 @@ func TestRenderDiffLabels(t *testing.T) {
 		}
 	})
 }
+
+func TestRenderAvailableState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("available", func(t *testing.T) {
+		t.Parallel()
+		got := RenderAvailableState(true, "N/A")
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("unavailable", func(t *testing.T) {
+		t.Parallel()
+		got := RenderAvailableState(false, "Not available")
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderRunningState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("running", func(t *testing.T) {
+		t.Parallel()
+		got := RenderRunningState(true)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("stopped", func(t *testing.T) {
+		t.Parallel()
+		got := RenderRunningState(false)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderNetworkState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("joined", func(t *testing.T) {
+		t.Parallel()
+		got := RenderNetworkState(LabelJoined)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("disconnected", func(t *testing.T) {
+		t.Parallel()
+		got := RenderNetworkState("disconnected")
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderErrorState(t *testing.T) {
+	t.Parallel()
+
+	got := RenderErrorState()
+	if got == "" {
+		t.Error("expected non-empty result")
+	}
+}
+
+func TestRenderValveState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("open", func(t *testing.T) {
+		t.Parallel()
+		got := RenderValveState(true)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		t.Parallel()
+		got := RenderValveState(false)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderLoggedInState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("logged in", func(t *testing.T) {
+		t.Parallel()
+		got := RenderLoggedInState(true)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("not logged in", func(t *testing.T) {
+		t.Parallel()
+		got := RenderLoggedInState(false)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderMuteState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("muted", func(t *testing.T) {
+		t.Parallel()
+		got := RenderMuteState(true)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("active", func(t *testing.T) {
+		t.Parallel()
+		got := RenderMuteState(false)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderRGBState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("on with brightness", func(t *testing.T) {
+		t.Parallel()
+		brightness := 75
+		status := &model.RGBStatus{Output: true, Brightness: &brightness}
+		got := RenderRGBState(status)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("off", func(t *testing.T) {
+		t.Parallel()
+		status := &model.RGBStatus{Output: false}
+		got := RenderRGBState(status)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("on without brightness", func(t *testing.T) {
+		t.Parallel()
+		status := &model.RGBStatus{Output: true}
+		got := RenderRGBState(status)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}

@@ -419,11 +419,25 @@ func (c *RateLimitConfig) IsZero() bool {
 var (
 	defaultManager     *Manager
 	defaultManagerOnce sync.Once
+	defaultManagerMu   sync.Mutex
 )
+
+// ResetDefaultManagerForTesting resets the default manager singleton.
+// This MUST only be called from tests to ensure proper isolation.
+// After calling this, the next call to getDefaultManager will re-initialize
+// with the current HOME directory.
+func ResetDefaultManagerForTesting() {
+	defaultManagerMu.Lock()
+	defer defaultManagerMu.Unlock()
+	defaultManager = nil
+	defaultManagerOnce = sync.Once{}
+}
 
 // getDefaultManager returns the package-level default manager.
 // This is used for backward compatibility with package-level functions.
 func getDefaultManager() *Manager {
+	defaultManagerMu.Lock()
+	defer defaultManagerMu.Unlock()
 	defaultManagerOnce.Do(func() {
 		defaultManager = NewManager("")
 		if err := defaultManager.Load(); err != nil {

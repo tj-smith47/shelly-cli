@@ -1025,3 +1025,1341 @@ func TestWithGenAwareAction_IsGen1Error(t *testing.T) {
 		t.Errorf("got error %v, want %v", err, expectedErr)
 	}
 }
+
+// mockDeviceClient implements DeviceClient for testing.
+type mockDeviceClient struct {
+	isGen1Val bool
+	gen1Cli   *client.Gen1Client
+	gen2Cli   *client.Client
+}
+
+func (m *mockDeviceClient) IsGen1() bool {
+	return m.isGen1Val
+}
+
+func (m *mockDeviceClient) Gen1() *client.Gen1Client {
+	return m.gen1Cli
+}
+
+func (m *mockDeviceClient) Gen2() *client.Client {
+	return m.gen2Cli
+}
+
+// ============== Switch Operation Tests ==============
+
+func TestSwitchOn_Gen2(t *testing.T) {
+	t.Parallel()
+
+	switchOnCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			switchOnCalled = true
+			// We don't have a real client, but the callback was invoked
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.SwitchOn(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !switchOnCalled {
+		t.Error("expected Gen2 switch on to be called")
+	}
+}
+
+func TestSwitchOn_Gen1(t *testing.T) {
+	t.Parallel()
+
+	switchOnCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			switchOnCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.SwitchOn(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !switchOnCalled {
+		t.Error("expected Gen1 switch on to be called")
+	}
+}
+
+func TestSwitchOn_Error(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection failed")
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{}, expectedErr
+		},
+	}
+
+	svc := New(provider)
+	err := svc.SwitchOn(context.Background(), "test-device", 0)
+
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestSwitchOff_Gen2(t *testing.T) {
+	t.Parallel()
+
+	switchOffCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			switchOffCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.SwitchOff(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !switchOffCalled {
+		t.Error("expected Gen2 switch off to be called")
+	}
+}
+
+func TestSwitchOff_Gen1(t *testing.T) {
+	t.Parallel()
+
+	switchOffCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			switchOffCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.SwitchOff(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !switchOffCalled {
+		t.Error("expected Gen1 switch off to be called")
+	}
+}
+
+func TestSwitchToggle_WithDeviceError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("device error")
+	provider := &mockConnectionProvider{
+		withDeviceFn: func(_ context.Context, _ string, fn func(DeviceClient) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.SwitchToggle(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestSwitchStatus_WithDeviceError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("device error")
+	provider := &mockConnectionProvider{
+		withDeviceFn: func(_ context.Context, _ string, fn func(DeviceClient) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.SwitchStatus(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestSwitchList_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.SwitchList(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+// ============== Light Operation Tests ==============
+
+func TestLightOn_Gen2(t *testing.T) {
+	t.Parallel()
+
+	lightOnCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			lightOnCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.LightOn(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !lightOnCalled {
+		t.Error("expected Gen2 light on to be called")
+	}
+}
+
+func TestLightOn_Gen1(t *testing.T) {
+	t.Parallel()
+
+	lightOnCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			lightOnCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.LightOn(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !lightOnCalled {
+		t.Error("expected Gen1 light on to be called")
+	}
+}
+
+func TestLightOff_Gen2(t *testing.T) {
+	t.Parallel()
+
+	lightOffCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			lightOffCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.LightOff(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !lightOffCalled {
+		t.Error("expected Gen2 light off to be called")
+	}
+}
+
+func TestLightOff_Gen1(t *testing.T) {
+	t.Parallel()
+
+	lightOffCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			lightOffCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.LightOff(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !lightOffCalled {
+		t.Error("expected Gen1 light off to be called")
+	}
+}
+
+func TestLightToggle_WithDeviceError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("device error")
+	provider := &mockConnectionProvider{
+		withDeviceFn: func(_ context.Context, _ string, fn func(DeviceClient) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.LightToggle(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestLightBrightness_Gen2(t *testing.T) {
+	t.Parallel()
+
+	brightnessCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			brightnessCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.LightBrightness(context.Background(), "test-device", 0, 75)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !brightnessCalled {
+		t.Error("expected Gen2 brightness to be called")
+	}
+}
+
+func TestLightBrightness_Gen1(t *testing.T) {
+	t.Parallel()
+
+	brightnessCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			brightnessCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.LightBrightness(context.Background(), "test-device", 0, 75)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !brightnessCalled {
+		t.Error("expected Gen1 brightness to be called")
+	}
+}
+
+func TestLightStatus_WithDeviceError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("device error")
+	provider := &mockConnectionProvider{
+		withDeviceFn: func(_ context.Context, _ string, fn func(DeviceClient) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.LightStatus(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestLightSet_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	brightness := 50
+	on := true
+	err := svc.LightSet(context.Background(), "test-device", 0, &brightness, &on)
+
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestLightList_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.LightList(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+// ============== Cover Operation Tests ==============
+
+func TestCoverOpen_Gen2(t *testing.T) {
+	t.Parallel()
+
+	coverOpenCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			coverOpenCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverOpen(context.Background(), "test-device", 0, nil)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverOpenCalled {
+		t.Error("expected Gen2 cover open to be called")
+	}
+}
+
+func TestCoverOpen_Gen1(t *testing.T) {
+	t.Parallel()
+
+	coverOpenCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			coverOpenCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverOpen(context.Background(), "test-device", 0, nil)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverOpenCalled {
+		t.Error("expected Gen1 cover open to be called")
+	}
+}
+
+func TestCoverOpen_Gen1WithDuration(t *testing.T) {
+	t.Parallel()
+
+	coverOpenCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			coverOpenCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	duration := 10
+	err := svc.CoverOpen(context.Background(), "test-device", 0, &duration)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverOpenCalled {
+		t.Error("expected Gen1 cover open with duration to be called")
+	}
+}
+
+func TestCoverClose_Gen2(t *testing.T) {
+	t.Parallel()
+
+	coverCloseCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			coverCloseCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverClose(context.Background(), "test-device", 0, nil)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverCloseCalled {
+		t.Error("expected Gen2 cover close to be called")
+	}
+}
+
+func TestCoverClose_Gen1(t *testing.T) {
+	t.Parallel()
+
+	coverCloseCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			coverCloseCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverClose(context.Background(), "test-device", 0, nil)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverCloseCalled {
+		t.Error("expected Gen1 cover close to be called")
+	}
+}
+
+func TestCoverClose_Gen1WithDuration(t *testing.T) {
+	t.Parallel()
+
+	coverCloseCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			coverCloseCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	duration := 5
+	err := svc.CoverClose(context.Background(), "test-device", 0, &duration)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverCloseCalled {
+		t.Error("expected Gen1 cover close with duration to be called")
+	}
+}
+
+func TestCoverStop_Gen2(t *testing.T) {
+	t.Parallel()
+
+	coverStopCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			coverStopCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverStop(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverStopCalled {
+		t.Error("expected Gen2 cover stop to be called")
+	}
+}
+
+func TestCoverStop_Gen1(t *testing.T) {
+	t.Parallel()
+
+	coverStopCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			coverStopCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverStop(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverStopCalled {
+		t.Error("expected Gen1 cover stop to be called")
+	}
+}
+
+func TestCoverPosition_Gen2(t *testing.T) {
+	t.Parallel()
+
+	coverPositionCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			coverPositionCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverPosition(context.Background(), "test-device", 0, 50)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverPositionCalled {
+		t.Error("expected Gen2 cover position to be called")
+	}
+}
+
+func TestCoverPosition_Gen1(t *testing.T) {
+	t.Parallel()
+
+	coverPositionCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			coverPositionCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverPosition(context.Background(), "test-device", 0, 50)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverPositionCalled {
+		t.Error("expected Gen1 cover position to be called")
+	}
+}
+
+func TestCoverStatus_WithDeviceError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("device error")
+	provider := &mockConnectionProvider{
+		withDeviceFn: func(_ context.Context, _ string, fn func(DeviceClient) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.CoverStatus(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestCoverCalibrate_Gen2(t *testing.T) {
+	t.Parallel()
+
+	coverCalibrateCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			coverCalibrateCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverCalibrate(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverCalibrateCalled {
+		t.Error("expected Gen2 cover calibrate to be called")
+	}
+}
+
+func TestCoverCalibrate_Gen1(t *testing.T) {
+	t.Parallel()
+
+	coverCalibrateCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			coverCalibrateCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.CoverCalibrate(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !coverCalibrateCalled {
+		t.Error("expected Gen1 cover calibrate to be called")
+	}
+}
+
+func TestCoverList_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.CoverList(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+// ============== RGB Operation Tests ==============
+
+func TestRGBOn_Gen2(t *testing.T) {
+	t.Parallel()
+
+	rgbOnCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			rgbOnCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBOn(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbOnCalled {
+		t.Error("expected Gen2 RGB on to be called")
+	}
+}
+
+func TestRGBOn_Gen1(t *testing.T) {
+	t.Parallel()
+
+	rgbOnCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			rgbOnCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBOn(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbOnCalled {
+		t.Error("expected Gen1 RGB on to be called")
+	}
+}
+
+func TestRGBOff_Gen2(t *testing.T) {
+	t.Parallel()
+
+	rgbOffCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			rgbOffCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBOff(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbOffCalled {
+		t.Error("expected Gen2 RGB off to be called")
+	}
+}
+
+func TestRGBOff_Gen1(t *testing.T) {
+	t.Parallel()
+
+	rgbOffCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			rgbOffCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBOff(context.Background(), "test-device", 0)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbOffCalled {
+		t.Error("expected Gen1 RGB off to be called")
+	}
+}
+
+func TestRGBToggle_WithDeviceError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("device error")
+	provider := &mockConnectionProvider{
+		withDeviceFn: func(_ context.Context, _ string, fn func(DeviceClient) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.RGBToggle(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestRGBBrightness_Gen2(t *testing.T) {
+	t.Parallel()
+
+	rgbBrightnessCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			rgbBrightnessCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBBrightness(context.Background(), "test-device", 0, 75)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbBrightnessCalled {
+		t.Error("expected Gen2 RGB brightness to be called")
+	}
+}
+
+func TestRGBBrightness_Gen1(t *testing.T) {
+	t.Parallel()
+
+	rgbBrightnessCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			rgbBrightnessCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBBrightness(context.Background(), "test-device", 0, 75)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbBrightnessCalled {
+		t.Error("expected Gen1 RGB brightness to be called")
+	}
+}
+
+func TestRGBColor_Gen2(t *testing.T) {
+	t.Parallel()
+
+	rgbColorCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			rgbColorCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBColor(context.Background(), "test-device", 0, 255, 128, 64)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbColorCalled {
+		t.Error("expected Gen2 RGB color to be called")
+	}
+}
+
+func TestRGBColor_Gen1(t *testing.T) {
+	t.Parallel()
+
+	rgbColorCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			rgbColorCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBColor(context.Background(), "test-device", 0, 255, 128, 64)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbColorCalled {
+		t.Error("expected Gen1 RGB color to be called")
+	}
+}
+
+func TestRGBColorAndBrightness_Gen2(t *testing.T) {
+	t.Parallel()
+
+	rgbColorAndBrightnessCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return false, model.Device{Generation: 2}, nil
+		},
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			rgbColorAndBrightnessCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBColorAndBrightness(context.Background(), "test-device", 0, 255, 128, 64, 80)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbColorAndBrightnessCalled {
+		t.Error("expected Gen2 RGB color and brightness to be called")
+	}
+}
+
+func TestRGBColorAndBrightness_Gen1(t *testing.T) {
+	t.Parallel()
+
+	rgbColorAndBrightnessCalled := false
+	provider := &mockConnectionProvider{
+		isGen1DeviceFn: func(_ context.Context, _ string) (bool, model.Device, error) {
+			return true, model.Device{Generation: 1}, nil
+		},
+		withGen1ConnectionFn: func(_ context.Context, _ string, fn func(*client.Gen1Client) error) error {
+			rgbColorAndBrightnessCalled = true
+			return nil
+		},
+	}
+
+	svc := New(provider)
+	err := svc.RGBColorAndBrightness(context.Background(), "test-device", 0, 255, 128, 64, 80)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !rgbColorAndBrightnessCalled {
+		t.Error("expected Gen1 RGB color and brightness to be called")
+	}
+}
+
+func TestRGBStatus_WithDeviceError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("device error")
+	provider := &mockConnectionProvider{
+		withDeviceFn: func(_ context.Context, _ string, fn func(DeviceClient) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.RGBStatus(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestRGBSet_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	red := 255
+	params := RGBSetParams{Red: &red}
+	err := svc.RGBSet(context.Background(), "test-device", 0, params)
+
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestRGBList_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.RGBList(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+// ============== Input Operation Tests ==============
+
+func TestInputStatus_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.InputStatus(context.Background(), "test-device", 0)
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestInputTrigger_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	err := svc.InputTrigger(context.Background(), "test-device", 0, "single_push")
+
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestInputList_WithConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	provider := &mockConnectionProvider{
+		withConnectionFn: func(_ context.Context, _ string, fn func(*client.Client) error) error {
+			return expectedErr
+		},
+	}
+
+	svc := New(provider)
+	result, err := svc.InputList(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+// ============== Additional Edge Case Tests ==============
+
+func TestRGBWInfo_Fields(t *testing.T) {
+	t.Parallel()
+
+	info := RGBInfo{
+		ID:         0,
+		Name:       "RGBW Strip",
+		Output:     true,
+		Brightness: 100,
+		Red:        255,
+		Green:      128,
+		Blue:       64,
+		Power:      25.5,
+	}
+
+	if info.ID != 0 {
+		t.Errorf("got ID=%d, want 0", info.ID)
+	}
+	if info.Name != "RGBW Strip" {
+		t.Errorf("got Name=%q, want %q", info.Name, "RGBW Strip")
+	}
+	if !info.Output {
+		t.Error("expected Output to be true")
+	}
+	if info.Brightness != 100 {
+		t.Errorf("got Brightness=%d, want 100", info.Brightness)
+	}
+}
+
+func TestCoverInfo_WithMaxPosition(t *testing.T) {
+	t.Parallel()
+
+	info := CoverInfo{
+		ID:       0,
+		Name:     "Motorized Blind",
+		State:    "open",
+		Position: 100,
+		Power:    150.0,
+	}
+
+	if info.Position != 100 {
+		t.Errorf("got Position=%d, want 100", info.Position)
+	}
+	if info.Power != 150.0 {
+		t.Errorf("got Power=%f, want 150.0", info.Power)
+	}
+}
+
+func TestLightInfo_WithMaxBrightness(t *testing.T) {
+	t.Parallel()
+
+	info := LightInfo{
+		ID:         0,
+		Name:       "Ceiling Light",
+		Output:     true,
+		Brightness: 100,
+		Power:      60.0,
+	}
+
+	if info.Brightness != 100 {
+		t.Errorf("got Brightness=%d, want 100", info.Brightness)
+	}
+}
+
+func TestBuildRGBSetParams_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		red        int
+		green      int
+		blue       int
+		brightness int
+		on         bool
+		checkRed   bool
+		checkGreen bool
+		checkBlue  bool
+		checkBri   bool
+		checkOn    bool
+	}{
+		{
+			name:       "exactly -1 for all",
+			red:        -1,
+			green:      -1,
+			blue:       -1,
+			brightness: -1,
+			on:         false,
+		},
+		{
+			name:       "exactly 0 for all colors",
+			red:        0,
+			green:      0,
+			blue:       0,
+			brightness: 0,
+			on:         false,
+			checkRed:   true,
+			checkGreen: true,
+			checkBlue:  true,
+			checkBri:   true,
+		},
+		{
+			name:       "max values for colors",
+			red:        255,
+			green:      255,
+			blue:       255,
+			brightness: 100,
+			on:         true,
+			checkRed:   true,
+			checkGreen: true,
+			checkBlue:  true,
+			checkBri:   true,
+			checkOn:    true,
+		},
+		{
+			name:       "just above max colors",
+			red:        256,
+			green:      256,
+			blue:       256,
+			brightness: 101,
+			on:         true,
+			checkOn:    true,
+		},
+		{
+			name:       "negative values other than -1",
+			red:        -2,
+			green:      -100,
+			blue:       -50,
+			brightness: -10,
+			on:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params := BuildRGBSetParams(tt.red, tt.green, tt.blue, tt.brightness, tt.on)
+
+			if tt.checkRed != (params.Red != nil) {
+				t.Errorf("Red: expected set=%v, got set=%v", tt.checkRed, params.Red != nil)
+			}
+			if tt.checkGreen != (params.Green != nil) {
+				t.Errorf("Green: expected set=%v, got set=%v", tt.checkGreen, params.Green != nil)
+			}
+			if tt.checkBlue != (params.Blue != nil) {
+				t.Errorf("Blue: expected set=%v, got set=%v", tt.checkBlue, params.Blue != nil)
+			}
+			if tt.checkBri != (params.Brightness != nil) {
+				t.Errorf("Brightness: expected set=%v, got set=%v", tt.checkBri, params.Brightness != nil)
+			}
+			if tt.checkOn != (params.On != nil) {
+				t.Errorf("On: expected set=%v, got set=%v", tt.checkOn, params.On != nil)
+			}
+		})
+	}
+}

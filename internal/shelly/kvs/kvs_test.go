@@ -4,6 +4,7 @@ package kvs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -356,5 +357,550 @@ func TestExport_JSONMarshaling(t *testing.T) {
 	}
 	if parsed.Rev != export.Rev {
 		t.Errorf("got Rev=%d, want %d", parsed.Rev, export.Rev)
+	}
+}
+
+// ============== Service Method Tests ==============
+
+func TestService_List_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	result, err := svc.List(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_List_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		if identifier != "test-device" {
+			t.Errorf("got identifier=%q, want %q", identifier, "test-device")
+		}
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	_, _ = svc.List(context.Background(), "test-device")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+func TestService_Get_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	result, err := svc.Get(context.Background(), "test-device", "test-key")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_Get_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		if identifier != "test-device" {
+			t.Errorf("got identifier=%q, want %q", identifier, "test-device")
+		}
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	_, _ = svc.Get(context.Background(), "test-device", "test-key")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+func TestService_GetMany_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	result, err := svc.GetMany(context.Background(), "test-device", "*")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_GetMany_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	_, _ = svc.GetMany(context.Background(), "test-device", "prefix_*")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+func TestService_GetAll_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	result, err := svc.GetAll(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_GetAll_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	_, _ = svc.GetAll(context.Background(), "test-device")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+func TestService_Set_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	err := svc.Set(context.Background(), "test-device", "key", "value")
+
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_Set_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	_ = svc.Set(context.Background(), "test-device", "key", "value")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+func TestService_Delete_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	err := svc.Delete(context.Background(), "test-device", "key")
+
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_Delete_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	_ = svc.Delete(context.Background(), "test-device", "key")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+func TestService_Export_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	result, err := svc.Export(context.Background(), "test-device")
+
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_Export_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	_, _ = svc.Export(context.Background(), "test-device")
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+func TestService_Import_ConnectionError(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := errors.New("connection error")
+	mockConn := func(_ context.Context, _ string, _ func(*client.Client) error) error {
+		return expectedErr
+	}
+
+	svc := NewService(mockConn)
+	data := &Export{Items: []Item{{Key: "key1", Value: "value1"}}}
+	imported, skipped, err := svc.Import(context.Background(), "test-device", data, true)
+
+	if imported != 0 {
+		t.Errorf("got imported=%d, want 0", imported)
+	}
+	if skipped != 0 {
+		t.Errorf("got skipped=%d, want 0", skipped)
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("got error %v, want %v", err, expectedErr)
+	}
+}
+
+func TestService_Import_CallbackInvoked(t *testing.T) {
+	t.Parallel()
+
+	callbackInvoked := false
+	mockConn := func(_ context.Context, identifier string, fn func(*client.Client) error) error {
+		callbackInvoked = true
+		return nil
+	}
+
+	svc := NewService(mockConn)
+	data := &Export{Items: []Item{{Key: "key1", Value: "value1"}}}
+	_, _, _ = svc.Import(context.Background(), "test-device", data, false)
+
+	if !callbackInvoked {
+		t.Error("expected callback to be invoked")
+	}
+}
+
+// ============== Additional Utility Tests ==============
+
+func TestParseValue_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		input       string
+		expectValue any
+	}{
+		{
+			name:        "empty string",
+			input:       "",
+			expectValue: "",
+		},
+		{
+			name:        "whitespace only",
+			input:       "   ",
+			expectValue: "   ",
+		},
+		{
+			name:        "negative number",
+			input:       "-42",
+			expectValue: float64(-42),
+		},
+		{
+			name:        "float number",
+			input:       "3.14159",
+			expectValue: 3.14159,
+		},
+		{
+			name:        "scientific notation",
+			input:       "1e10",
+			expectValue: float64(1e10),
+		},
+		{
+			name:        "nested JSON object",
+			input:       `{"a": {"b": {"c": 1}}}`,
+			expectValue: map[string]any{"a": map[string]any{"b": map[string]any{"c": float64(1)}}},
+		},
+		{
+			name:        "empty JSON object",
+			input:       `{}`,
+			expectValue: map[string]any{},
+		},
+		{
+			name:        "empty JSON array",
+			input:       `[]`,
+			expectValue: []any{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := ParseValue(tt.input)
+
+			// For complex types, compare JSON representation
+			expectedJSON, _ := json.Marshal(tt.expectValue)
+			resultJSON, _ := json.Marshal(result)
+			if string(expectedJSON) != string(resultJSON) {
+				t.Errorf("ParseValue(%q) = %v, want %v", tt.input, result, tt.expectValue)
+			}
+		})
+	}
+}
+
+func TestListResult_EmptyKeys(t *testing.T) {
+	t.Parallel()
+
+	result := ListResult{
+		Keys: []string{},
+		Rev:  0,
+	}
+
+	if len(result.Keys) != 0 {
+		t.Errorf("got %d keys, want 0", len(result.Keys))
+	}
+	if result.Rev != 0 {
+		t.Errorf("got Rev=%d, want 0", result.Rev)
+	}
+}
+
+func TestExport_EmptyItems(t *testing.T) {
+	t.Parallel()
+
+	export := Export{
+		Items:   []Item{},
+		Version: 1,
+		Rev:     0,
+	}
+
+	if len(export.Items) != 0 {
+		t.Errorf("got %d items, want 0", len(export.Items))
+	}
+}
+
+func TestItem_ComplexValue(t *testing.T) {
+	t.Parallel()
+
+	complexValue := map[string]any{
+		"nested": map[string]any{
+			"array": []any{1, 2, 3},
+			"bool":  true,
+		},
+	}
+
+	item := Item{
+		Key:   "complex",
+		Value: complexValue,
+		Etag:  "etag",
+	}
+
+	// Verify we can marshal and unmarshal
+	data, err := json.Marshal(item)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var parsed Item
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if parsed.Key != item.Key {
+		t.Errorf("got Key=%q, want %q", parsed.Key, item.Key)
+	}
+}
+
+func TestParseImportFile_EmptyFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "empty.json")
+
+	// Write empty JSON object
+	if err := os.WriteFile(filePath, []byte("{}"), 0o600); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	result, err := ParseImportFile(filePath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if len(result.Items) != 0 {
+		t.Errorf("got %d items, want 0", len(result.Items))
+	}
+}
+
+func TestParseImportFile_YAMLWithAllTypes(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "alltypes.yaml")
+
+	yamlContent := `
+items:
+  - key: string_key
+    value: hello
+  - key: number_key
+    value: 42
+  - key: bool_key
+    value: true
+  - key: float_key
+    value: 3.14
+  - key: null_key
+    value: null
+  - key: array_key
+    value: [1, 2, 3]
+  - key: object_key
+    value:
+      nested: value
+version: 1
+rev: 100
+`
+
+	if err := os.WriteFile(filePath, []byte(yamlContent), 0o600); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	result, err := ParseImportFile(filePath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if len(result.Items) != 7 {
+		t.Errorf("got %d items, want 7", len(result.Items))
+	}
+	if result.Rev != 100 {
+		t.Errorf("got Rev=%d, want 100", result.Rev)
+	}
+}
+
+func TestNewService_NilConnection(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(nil)
+
+	if svc == nil {
+		t.Fatal("expected non-nil service")
+	}
+	// withConnection will be nil, which should cause panic if used
+	// This tests that the service can be created but shouldn't be used without a connection
+}
+
+func TestGetResult_ZeroValue(t *testing.T) {
+	t.Parallel()
+
+	var result GetResult
+
+	if result.Value != nil {
+		t.Error("expected nil Value")
+	}
+	if result.Etag != "" {
+		t.Errorf("got Etag=%q, want empty", result.Etag)
+	}
+}
+
+func TestItem_EtagOmitEmpty(t *testing.T) {
+	t.Parallel()
+
+	item := Item{
+		Key:   "key",
+		Value: "value",
+		// Etag is empty
+	}
+
+	data, err := json.Marshal(item)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	// Check that etag is omitted in JSON
+	var parsed map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if _, exists := parsed["etag"]; exists {
+		t.Error("expected etag to be omitted when empty")
 	}
 }
