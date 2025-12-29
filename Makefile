@@ -73,6 +73,7 @@ docs:
 	@echo "Migrating docs to Hugo site..."
 	@./scripts/migrate-docs.sh
 	@./scripts/migrate-commands.sh
+	@./scripts/migrate-examples.sh
 	@echo "Hugo site updated in docs/site/"
 
 ## fmt: Format code

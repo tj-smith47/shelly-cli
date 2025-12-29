@@ -1,0 +1,652 @@
+---
+title: "Configuration Examples"
+description: "Configuration file examples from minimal to comprehensive"
+weight: 20
+---
+
+Example configuration files showing different levels of complexity.
+
+## Usage
+
+```bash
+# Copy a config to start with
+cp examples/config/minimal.yaml ~/.config/shelly/config.yaml
+
+# Edit to add your devices
+shelly config edit
+
+# Validate configuration
+shelly init --check
+```
+
+---
+
+## full.yaml
+
+yaml-language-server: $schema=../../cfg/config.schema.json
+
+```yaml
+# yaml-language-server: $schema=../../cfg/config.schema.json
+#
+# Shelly CLI - Full Configuration Reference
+#
+# This file documents ALL available configuration options.
+# Copy to ~/.config/shelly/config.yaml and customize as needed.
+#
+# For a minimal starting configuration, see: examples/config/minimal.yaml
+# For multi-location setups, see: examples/config/multi-site.yaml
+#
+# Run 'shelly init' for guided setup, or 'shelly init --check' to verify.
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+
+# Output format: table, json, yaml, text, template
+output: table
+
+# Enable colored output (respects NO_COLOR env var)
+color: true
+
+# Color theme (280+ themes available, run 'shelly theme list' to see all)
+# Popular choices: dracula, nord, tokyo-night, gruvbox, catppuccin, one-dark
+#
+# Simple format - just the theme name:
+theme: dracula
+#
+# Block format - theme name with color overrides:
+# theme:
+#   name: dracula
+#   colors:
+#     green: "#50fa7b"
+#     red: "#ff5555"
+#
+# External file format - load from a theme file:
+# theme:
+#   file: ~/.config/shelly/themes/my-theme.yaml
+#
+# Full custom format - only custom colors (no base theme):
+# theme:
+#   colors:
+#     foreground: "#f8f8f2"
+#     background: "#282a36"
+#     green: "#50fa7b"
+#     red: "#ff5555"
+#     yellow: "#f1fa8c"
+#     blue: "#6272a4"
+#     cyan: "#8be9fd"
+#     purple: "#bd93f9"
+#     bright_black: "#6272a4"
+#
+# Semantic color overrides - customize meaning-based colors:
+# theme:
+#   name: dracula
+#   semantic:
+#     # UI colors
+#     primary: "#ff79c6"       # Pink instead of purple for main actions
+#     secondary: "#6272a4"     # Supporting elements
+#     highlight: "#ffb86c"     # Orange for emphasis
+#     muted: "#6272a4"         # Less important content
+#
+#     # Feedback colors
+#     success: "#50fa7b"       # Green for success
+#     warning: "#f1fa8c"       # Yellow for warnings
+#     error: "#ff5555"         # Red for errors
+#     info: "#8be9fd"          # Cyan for info
+#
+#     # Device state colors
+#     online: "#50fa7b"        # Green when online
+#     offline: "#ff5555"       # Red when offline
+#     updating: "#f1fa8c"      # Yellow while updating
+#     idle: "#6272a4"          # Gray when idle
+#
+#     # Table styling colors
+#     table_header: "#8be9fd"  # Cyan headers
+#     table_cell: "#f1fa8c"    # Yellow cells
+#     table_alt_cell: "#ffb86c" # Orange alternating cells
+#     table_border: "#bd93f9"  # Purple borders
+
+# API mode: local (direct device access), cloud (via Shelly Cloud), auto
+api_mode: local
+
+# Verbosity level (0=silent, 1=info, 2=debug, 3=trace)
+# Can also be set via -v/-vv/-vvv flags
+verbosity: 0
+
+# Suppress non-essential output
+quiet: false
+
+# Preferred editor for 'shelly config edit'
+# Falls back to $EDITOR, $VISUAL, then nano
+# editor: vim
+
+# =============================================================================
+# Logging Settings (for debugging)
+# =============================================================================
+
+log:
+  # Log output format: false=human-readable, true=JSON (for log aggregation)
+  json: false
+
+  # Filter logs by category (comma-separated)
+  # Available: network, config, device, api, auth, plugin, discovery, firmware
+  # Example: "network,api" to only see network and API logs
+  # Leave empty to see all categories
+  categories: ""
+
+# =============================================================================
+# Discovery Settings
+# =============================================================================
+
+discovery:
+  # Discovery timeout
+  timeout: 10s
+
+  # Enable mDNS discovery (recommended for Gen2+ devices)
+  mdns: true
+
+  # Enable Bluetooth LE discovery
+  ble: false
+
+  # Enable CoIoT discovery (Gen1 devices)
+  coiot: false
+
+  # Default network for subnet scanning (CIDR notation)
+  # network: 192.168.1.0/24
+
+# =============================================================================
+# Shelly Cloud Settings (optional)
+# =============================================================================
+
+cloud:
+  # Enable cloud integration for remote access
+  enabled: false
+
+  # Cloud account email (set via 'shelly cloud login')
+  # email: user@example.com
+
+  # Tokens are managed automatically - do not edit manually
+  # access_token: ""
+  # refresh_token: ""
+
+  # Cloud server URL (default is Shelly's production server)
+  server_url: https://shelly-api.shelly.cloud
+
+# =============================================================================
+# Integrator Settings (for OEM/partners)
+# =============================================================================
+
+# Shelly Integrator API credentials for partner integrations.
+# Environment variables take precedence: SHELLY_INTEGRATOR_TAG, SHELLY_INTEGRATOR_TOKEN
+#
+# integrator:
+#   tag: my-partner-tag
+#   token: my-integrator-token
+
+# =============================================================================
+# Registered Devices
+# =============================================================================
+
+# Devices can be added via:
+#   shelly device add <name> <address>
+#   shelly discover mdns --register
+#   shelly init (guided setup)
+
+devices:
+  # Example device entries:
+  #
+  # kitchen-light:
+  #   address: 192.168.1.50
+  #   generation: 2
+  #   type: switch
+  #   model: SHSW-PM
+  #
+  # desk-lamp:
+  #   address: 192.168.1.51
+  #   generation: 2
+  #   type: plug
+  #   model: SHPLG-S
+  #   auth:
+  #     username: admin
+  #     password: secret123
+  #
+  # living-room-dimmer:
+  #   address: 192.168.1.52
+  #   generation: 2
+  #   type: light
+  #   model: SHDM-2
+
+# =============================================================================
+# Command Aliases
+# =============================================================================
+
+# Create shortcuts for frequently used commands.
+# Use $1, $2, etc. for positional arguments, $@ for all arguments.
+
+aliases:
+  # Example aliases:
+  #
+  # lights-off:
+  #   command: batch off kitchen-light living-room desk-lamp
+  #
+  # status:
+  #   command: device list --output table
+  #
+  # morning:
+  #   command: scene activate morning-routine
+  #
+  # # Shell alias (enables pipes and redirects)
+  # backup-all:
+  #   command: shelly backup create --all | gzip > ~/shelly-backup.gz
+  #   shell: true
+
+# =============================================================================
+# Device Groups
+# =============================================================================
+
+# Group devices for batch operations:
+#   shelly batch on --group living-room
+
+groups:
+  # Example groups:
+  #
+  # living-room:
+  #   devices:
+  #     - living-room-light
+  #     - living-room-lamp
+  #     - tv-backlight
+  #
+  # bedroom:
+  #   devices:
+  #     - bedroom-light
+  #     - nightstand-lamp
+  #
+  # all-lights:
+  #   devices:
+  #     - kitchen-light
+  #     - living-room-light
+  #     - bedroom-light
+
+# =============================================================================
+# Scenes
+# =============================================================================
+
+# Save and recall device states:
+#   shelly scene activate movie-time
+#   shelly scene save current-state
+
+scenes:
+  # Example scenes:
+  #
+  # movie-time:
+  #   description: Dim lights for movie watching
+  #   actions:
+  #     - device: living-room-dimmer
+  #       method: Light.Set
+  #       params:
+  #         id: 0
+  #         on: true
+  #         brightness: 20
+  #     - device: tv-backlight
+  #       method: Light.Set
+  #       params:
+  #         id: 0
+  #         on: true
+  #         brightness: 50
+  #
+  # all-off:
+  #   description: Turn off all lights
+  #   actions:
+  #     - device: kitchen-light
+  #       method: Switch.Set
+  #       params:
+  #         id: 0
+  #         on: false
+  #     - device: living-room-light
+  #       method: Switch.Set
+  #       params:
+  #         id: 0
+  #         on: false
+
+# =============================================================================
+# Templates
+# =============================================================================
+
+# Reusable configuration templates for devices and scripts.
+# Create templates with 'shelly template create' or 'shelly script template'.
+
+templates:
+  # Device configuration templates
+  # device:
+  #   my-switch-config:
+  #     name: my-switch-config
+  #     description: Standard switch configuration
+  #     model: SNSW-001X16EU
+  #     generation: 2
+  #     config:
+  #       switch:0:
+  #         name: Main Switch
+  #         initial_state: restore_last
+  #     source_device: living-room
+
+  # Script templates
+  # script:
+  #   motion-light:
+  #     name: motion-light
+  #     description: Turn on light when motion detected
+  #     code: |
+  #       // Motion-activated light script
+  #       let TIMEOUT = 300; // seconds
+  #       Shelly.addEventHandler(function(event) {
+  #         if (event.component === "input:0" && event.info.state) {
+  #           Shelly.call("Switch.Set", {id: 0, on: true});
+  #           Timer.set(TIMEOUT * 1000, false, function() {
+  #             Shelly.call("Switch.Set", {id: 0, on: false});
+  #           });
+  #         }
+  #       });
+  #     category: automation
+  #     variables:
+  #       - name: TIMEOUT
+  #         description: Auto-off timeout in seconds
+  #         type: number
+  #         default: 300
+  #     min_gen: 2
+
+# =============================================================================
+# Alerts
+# =============================================================================
+
+# Device monitoring alerts. Create with 'shelly alert create'.
+#
+# alerts:
+#   kitchen-offline:
+#     name: kitchen-offline
+#     description: Alert when kitchen device goes offline
+#     device: kitchen
+#     condition: offline
+#     action: notify
+#     enabled: true
+#
+#   high-power:
+#     name: high-power
+#     description: Alert when power exceeds threshold
+#     device: living-room
+#     condition: "power>1000"
+#     action: "webhook:https://example.com/alert"
+#     enabled: true
+
+# =============================================================================
+# Rate Limiting Settings
+# =============================================================================
+
+# Rate limiting prevents overloading Shelly devices.
+# Gen1 (ESP8266) supports max 2 concurrent connections.
+# Gen2 (ESP32) supports max 5 concurrent transactions.
+# These defaults are tuned for stability - customize only if needed.
+
+ratelimit:
+  gen1:
+    min_interval: 2s        # Min time between requests to same device
+    max_concurrent: 1       # Max in-flight requests per device
+    circuit_threshold: 5    # Failures before circuit breaker opens
+
+  gen2:
+    min_interval: 500ms
+    max_concurrent: 3
+    circuit_threshold: 5
+
+  global:
+    max_concurrent: 5               # Total concurrent requests across all devices
+    circuit_open_duration: 60s      # How long circuit stays open
+    circuit_success_threshold: 2    # Successes needed to close circuit
+
+# =============================================================================
+# Plugin Settings
+# =============================================================================
+
+plugins:
+  # Enable plugin system
+  enabled: false
+
+  # Additional plugin search paths (beyond ~/.config/shelly/plugins)
+  # path:
+  #   - /usr/local/share/shelly/plugins
+  #   - ~/my-shelly-plugins
+
+# =============================================================================
+# TUI Dashboard Settings
+# =============================================================================
+
+tui:
+  # Auto-refresh interval in seconds (1-300)
+  refresh_interval: 5
+
+  # TUI-specific theme (independent - completely replaces main theme when set)
+  # Supports same formats as main theme: string, block with colors, or file
+  # theme: nord
+  # theme:
+  #   name: tokyo-night
+  #   colors:
+  #     green: "#9ece6a"
+
+  # Custom keybindings (uncomment to override defaults)
+  # keybindings:
+  #   # Navigation (vim-style by default)
+  #   up: [up, k]
+  #   down: [down, j]
+  #   left: [left, h]
+  #   right: [right, l]
+  #
+  #   # Actions
+  #   toggle: [space, t]
+  #   turn_on: ["1", o]
+  #   turn_off: ["0", x]
+  #   refresh: [r, ctrl+r]
+  #   filter: ["/"]
+  #   command: [":"]
+  #   help: ["?"]
+  #   quit: [q, ctrl+c]
+  #
+  #   # View switching
+  #   tab: [tab]
+  #   shift_tab: [shift+tab]
+  #   view1: ["1"]
+  #   view2: ["2"]
+  #   view3: ["3"]
+  #   view4: ["4"]
+```
+
+---
+
+## minimal.yaml
+
+Minimal Shelly CLI Configuration
+
+```yaml
+# Minimal Shelly CLI Configuration
+#
+# This is the bare minimum needed to get started.
+# Copy to ~/.config/shelly/config.yaml
+#
+# For full options, see: cfg/config.example.yaml or run 'shelly init'
+
+# Register your devices
+devices:
+  living-room:
+    address: 192.168.1.50
+
+  kitchen:
+    address: 192.168.1.51
+
+  bedroom:
+    address: 192.168.1.52
+```
+
+---
+
+## multi-site.yaml
+
+Multi-Site Shelly CLI Configuration
+
+```yaml
+# Multi-Site Shelly CLI Configuration
+#
+# Example for users with devices across multiple locations.
+# Uses device groups and naming conventions to organize by location.
+#
+# Copy to ~/.config/shelly/config.yaml
+
+output: table
+color: true
+theme: nord
+
+# API mode: local requires network access to each site
+# Consider using cloud mode for remote sites
+api_mode: local
+
+# Devices organized by location using naming convention
+devices:
+  # === HOME ===
+  home-living-room:
+    address: 192.168.1.50
+    generation: 2
+    type: switch
+
+  home-kitchen:
+    address: 192.168.1.51
+    generation: 2
+    type: switch
+
+  home-bedroom:
+    address: 192.168.1.52
+    generation: 2
+    type: light
+
+  home-garage:
+    address: 192.168.1.53
+    generation: 2
+    type: switch
+
+  # === CABIN ===
+  # Note: Requires VPN or cloud mode when accessing remotely
+  cabin-main:
+    address: 10.20.30.50
+    generation: 2
+    type: switch
+
+  cabin-heater:
+    address: 10.20.30.51
+    generation: 2
+    type: switch
+
+  cabin-water-heater:
+    address: 10.20.30.52
+    generation: 2
+    type: switch
+
+  # === OFFICE ===
+  office-desk-lamp:
+    address: 172.16.0.50
+    generation: 2
+    type: light
+
+  office-server-room:
+    address: 172.16.0.51
+    generation: 2
+    type: switch
+
+# Device groups by location for batch operations
+groups:
+  home:
+    devices:
+      - home-living-room
+      - home-kitchen
+      - home-bedroom
+      - home-garage
+
+  cabin:
+    devices:
+      - cabin-main
+      - cabin-heater
+      - cabin-water-heater
+
+  office:
+    devices:
+      - office-desk-lamp
+      - office-server-room
+
+  # Cross-site groups
+  all-heaters:
+    devices:
+      - cabin-heater
+      - cabin-water-heater
+
+  all-lights:
+    devices:
+      - home-living-room
+      - home-kitchen
+      - home-bedroom
+      - office-desk-lamp
+
+# Scenes for different locations
+scenes:
+  cabin-arrival:
+    description: Prepare cabin for arrival
+    actions:
+      - device: cabin-main
+        method: Switch.Set
+        params:
+          id: 0
+          on: true
+      - device: cabin-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: true
+      - device: cabin-water-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: true
+
+  cabin-departure:
+    description: Shut down cabin when leaving
+    actions:
+      - device: cabin-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: false
+      - device: cabin-water-heater
+        method: Switch.Set
+        params:
+          id: 0
+          on: false
+      - device: cabin-main
+        method: Switch.Set
+        params:
+          id: 0
+          on: false
+
+  office-workday:
+    description: Start office workday
+    actions:
+      - device: office-desk-lamp
+        method: Light.Set
+        params:
+          id: 0
+          on: true
+          brightness: 80
+
+# Aliases for quick access to different sites
+aliases:
+  home: "batch status --group home"
+  cabin: "batch status --group cabin"
+  office: "batch status --group office"
+  cabin-on: "scene activate cabin-arrival"
+  cabin-off: "scene activate cabin-departure"
+```
+
+---
+
