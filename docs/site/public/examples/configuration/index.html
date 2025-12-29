@@ -1,0 +1,1229 @@
+<!doctype html><html lang=en-US data-bs-theme=auto><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="ie=edge"><meta name=viewport content="width=device-width,initial-scale=1"><link rel=preload href=https://tj-smith47.github.io/shelly-cli/fonts/vendor/jost/jost-v4-latin-regular.woff2 as=font type=font/woff2 crossorigin><link rel=preload href=https://tj-smith47.github.io/shelly-cli/fonts/vendor/jost/jost-v4-latin-500.woff2 as=font type=font/woff2 crossorigin><link rel=preload href=https://tj-smith47.github.io/shelly-cli/fonts/vendor/jost/jost-v4-latin-700.woff2 as=font type=font/woff2 crossorigin><script src=/shelly-cli/js/color-mode.86a91f050a481d0a3f0c72ac26543cb6228c770875981c58dcbc008fd3f875c8.js integrity="sha256-hqkfBQpIHQo/DHKsJlQ8tiKMdwh1mBxY3LwAj9P4dcg="></script><link rel=stylesheet href="/shelly-cli/main.3261b46b6cd1c89e0311ee7de87e11b70cd4705a1c47f9d5d70c412474687797018c86c6e61ab511be1958a1cb56580b62888ac053a91f43dbd62e6574c4205b.css" integrity="sha512-MmG0a2zRyJ4DEe596H4RtwzUcFocR/nV1wxBJHRod5cBjIbG5hq1Eb4ZWKHLVlgLYoiKwFOpH0Pb1i5ldMQgWw==" crossorigin=anonymous><noscript><style>img.lazyload{display:none}</style></noscript><base href=https://tj-smith47.github.io/shelly-cli/examples/configuration/><link rel=canonical href=https://tj-smith47.github.io/shelly-cli/examples/configuration/><link rel=alternate type=application/rss+xml href=https://tj-smith47.github.io/shelly-cli/examples/configuration/index.xml title="Configuration Examples | Shelly CLI"><title>Configuration Examples | Shelly CLI</title><meta name=description content="Configuration file examples from minimal to comprehensive"><link rel=icon href=/shelly-cli/favicon.ico sizes=32x32><link rel=apple-touch-icon href=/shelly-cli/shelly-cli/apple-touch-icon.png sizes=180x180 type=image/png><link rel=icon href=/shelly-cli/favicon-192x192.png sizes=192x192 type=image/png><link rel=icon href=/shelly-cli/favicon-512x512.png sizes=512x512 type=image/png><link rel=manifest href=/shelly-cli/manifest.webmanifest><meta property="og:url" content="https://tj-smith47.github.io/shelly-cli/examples/configuration/"><meta property="og:site_name" content="Shelly CLI"><meta property="og:title" content="Configuration Examples"><meta property="og:description" content="Configuration file examples from minimal to comprehensive"><meta property="og:locale" content="en_US"><meta property="og:type" content="website"><meta property="og:image" content="https://tj-smith47.github.io/shelly-cli/images/og-image.png"><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content="https://tj-smith47.github.io/shelly-cli/images/og-image.png"><meta name=twitter:title content="Configuration Examples"><meta name=twitter:description content="Configuration file examples from minimal to comprehensive"><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://tj-smith47.github.io/shelly-cli/","name":"Shelly CLI","position":1},{"@type":"ListItem","item":"https://tj-smith47.github.io/shelly-cli/examples/","name":"Examples","position":2},{"@type":"ListItem","name":"Configuration Examples","position":3}]}</script></head><body class="list section examples" data-bs-spy=scroll data-bs-target=#toc data-bs-root-margin="0px 0px -60%" data-bs-smooth-scroll=true tabindex=0><div class=sticky-top><header class="navbar navbar-expand-lg"><div class=container-lg><a class="navbar-brand me-auto me-lg-3" href=/shelly-cli/>Shelly CLI</a>
+<button type=button id=searchToggleMobile class="btn btn-link nav-link mx-2 d-lg-none" aria-label="Search website">
+<svg class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+</button>
+<button class="btn btn-link nav-link mx-2 order-3 d-lg-none" type=button data-bs-toggle=offcanvas data-bs-target=#offcanvasNavMain aria-controls=offcanvasNavMain aria-label="Open main navigation menu">
+<svg class="icon icon-tabler icon-tabler-menu" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/></svg></button><div class="offcanvas offcanvas-end h-auto" tabindex=-1 id=offcanvasNavMain aria-labelledby=offcanvasNavMainLabel><div class=offcanvas-header><h5 class=offcanvas-title id=offcanvasNavMainLabel>Shelly CLI</h5><button type=button class="btn btn-link nav-link p-0 ms-auto" data-bs-dismiss=offcanvas aria-label=Close>
+<svg class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div><div class="offcanvas-body d-flex flex-column flex-lg-row justify-content-between"><ul class="navbar-nav flex-grow-1"><li class=nav-item><a class=nav-link href=https://tj-smith47.github.io/shelly-cli/docs/>Docs</a></li><li class=nav-item><a class=nav-link href=https://tj-smith47.github.io/shelly-cli/docs/commands/>Commands</a></li><li class=nav-item><a class="nav-link active" href=https://tj-smith47.github.io/shelly-cli/examples/ aria-current=true>Examples</a></li><li class=nav-item><a class=nav-link href=https://github.com/tj-smith47/shelly-cli>GitHub</a></li></ul><button type=button id=searchToggleDesktop class="btn btn-link nav-link p-2 d-none d-lg-block" aria-label="Search website">
+<svg class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg></button><div class="dropdown mt-1 order-lg-3"><button class="btn btn-dropdown dropdown-toggle" id=doks-versions data-bs-toggle=dropdown aria-expanded=false data-bs-display=static aria-label="Toggle version menu">
+<span class=d-none>Doks</span> vlatest
+<span class=dropdown-caret><svg class="icon icon-tabler icon-tabler-chevron-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 9l6 6 6-6"/></svg></span></button><ul class="dropdown-menu dropdown-menu-lg-end me-lg-2 shadow rounded border-0" aria-labelledby=doks-versions><li><a class="dropdown-item current" aria-current=true href=/docs/latest/prologue/introduction/>Latest (latest.x)</a></li><li><hr class=dropdown-divider></li><li><a class=dropdown-item href=/docs/0.2/prologue/introduction/>v0.2.x</a></li><li><a class=dropdown-item href=/docs/0.1/prologue/introduction/>v0.1.x</a></li><li><hr class=dropdown-divider></li><li><a class=dropdown-item href=/docs/versions/>All versions</a></li></ul></div><button id=buttonColorMode class="btn btn-link mx-auto nav-link p-0 ms-lg-2 me-lg-1" type=button aria-label="Toggle theme">
+<svg data-bs-theme-value="dark" class="icon icon-tabler icon-tabler-moon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3c.132.0.263.0.393.0a7.5 7.5.0 007.92 12.446A9 9 0 1112 2.992z"/></svg>
+<svg data-bs-theme-value="light" class="icon icon-tabler icon-tabler-sun" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-4 0a4 4 0 108 0 4 4 0 10-8 0m-5 0h1m8-9v1m8 8h1m-9 8v1M5.6 5.6l.7.7m12.1-.7-.7.7m0 11.4.7.7m-12.1-.7-.7.7"/></svg></button></div></div></div></header></div><div class=modal id=searchModal tabindex=-1 aria-labelledby=searchModalLabel aria-hidden=true><div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down"><div class=modal-content><div class=modal-header><h1 class="modal-title fs-5 visually-hidden" id=searchModalLabel>Search</h1><button type=button class="btn-close visually-hidden" data-bs-dismiss=modal aria-label=Close></button><div class="search-input flex-grow-1 d-none"><form id=search-form class=search-form action=# method=post accept-charset=UTF-8 role=search><label for=query class=visually-hidden>Search</label><div class=d-flex><input type=search id=query name=query class="search-text form-control form-control-lg" placeholder=Search aria-label=Search maxlength=128 autocomplete=off>
+<button type=button class="btn btn-link text-decoration-none px-0 ms-3 d-md-none" data-bs-dismiss=modal aria-label=Close>Cancel</button></div></form></div></div><div class=modal-body><p class="search-loading status message d-none mt-3 text-center">Loading search index…</p><p class="search-no-recent message d-none mt-3 text-center">No recent searches</p><p class="search-no-results message d-none mt-3 text-center">No results for "<strong><span class=query-no-results>Query here</span></strong>"</p><div id=searchResults class=search-results></div><template><article class="search-result list-view"><div class="card my-3"><div class=card-body><header><h2 class="h5 title title-submitted mb-0"><a class="stretched-link text-decoration-none text-reset" href=#>Title here</a></h2><div class="submitted d-none"><time class=created-date>Date here</time></div></header><div class=content>Summary here</div></div></div></article></template></div><div class=modal-footer><ul class="list-inline me-auto d-none d-md-block"><li class=list-inline-item><kbd class=me-2><svg width="15" height="15" aria-label="Enter key" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M12 3.53088v3c0 1-1 2-2 2H4m3 3-3-3 3-3"/></g></svg></kbd><span class=DocSearch-Label>to select</span></li><li class=list-inline-item><kbd class=me-2><svg width="15" height="15" aria-label="Arrow down" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M7.5 3.5v8m3-3-3 3-3-3"/></g></svg></kbd><kbd class=me-2><svg width="15" height="15" aria-label="Arrow up" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M7.5 11.5v-8m3 3-3-3-3 3"/></g></svg></kbd><span class=DocSearch-Label>to navigate</span></li><li class=list-inline-item><kbd class=me-2><svg width="15" height="15" aria-label="Escape key" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M13.6167 8.936c-.1065.3583-.6883.962-1.4875.962-.7993.0-1.653-.9165-1.653-2.1258v-.5678c0-1.2548.7896-2.1016 1.653-2.1016s1.3601.4778 1.4875 1.0724M9 6c-.1352-.4735-.7506-.9219-1.46-.8972-.7092.0246-1.344.57-1.344 1.2166s.4198.8812 1.3445.9805C8.465 7.3992 8.968 7.9337 9 8.5s-.454 1.398-1.4595 1.398C6.6593 9.898 6 9 5.963 8.4851m-1.4748.5368c-.2635.5941-.8099.876-1.5443.876s-1.7073-.6248-1.7073-2.204v-.4603c0-1.0416.721-2.131 1.7073-2.131.9864.0 1.6425 1.031 1.5443 2.2492h-2.956"/></g></svg></kbd><span class=DocSearch-Label>to close</span></li></ul><p class=d-md-none>Search by <a class=text-decoration-none href=https://github.com/nextapps-de/flexsearch>FlexSearch</a></p></div></div></div></div><div class="wrap container-lg" role=document><div class=content><div class="row justify-content-center"><div class="col-md-12 col-lg-10 col-xl-8"><article><h1 class=text-center>Configuration Examples</h1><div class=text-center><p>Example configuration files showing different levels of complexity.</p><h2 id=usage>Usage</h2><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Copy a config to start with</span>
+</span></span><span style=display:flex><span>cp examples/config/minimal.yaml ~/.config/shelly/config.yaml
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Edit to add your devices</span>
+</span></span><span style=display:flex><span>shelly config edit
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Validate configuration</span>
+</span></span><span style=display:flex><span>shelly init --check</span></span></code></pre></td></tr></table></div></div></figure></div><hr><h2 id=fullyaml>full.yaml</h2><p>yaml-language-server: $schema=../../cfg/config.schema.json</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 33
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 34
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 35
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 36
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 37
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 38
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 39
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 40
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 41
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 42
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 43
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 44
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 45
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 46
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 47
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 48
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 49
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 50
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 51
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 52
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 53
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 54
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 55
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 56
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 57
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 58
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 59
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 60
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 61
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 62
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 63
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 64
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 65
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 66
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 67
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 68
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 69
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 70
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 71
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 72
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 73
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 74
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 75
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 76
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 77
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 78
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 79
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 80
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 81
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 82
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 83
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 84
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 85
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 86
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 87
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 88
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 89
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 90
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 91
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 92
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 93
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 94
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 95
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 96
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 97
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 98
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 99
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">100
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">101
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">102
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">103
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">104
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">105
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">106
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">107
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">108
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">109
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">110
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">111
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">112
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">113
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">114
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">115
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">116
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">117
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">118
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">119
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">120
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">121
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">122
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">123
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">124
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">125
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">126
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">127
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">128
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">129
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">130
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">131
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">132
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">133
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">134
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">135
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">136
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">137
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">138
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">139
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">140
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">141
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">142
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">143
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">144
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">145
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">146
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">147
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">148
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">149
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">150
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">151
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">152
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">153
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">154
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">155
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">156
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">157
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">158
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">159
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">160
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">161
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">162
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">163
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">164
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">165
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">166
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">167
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">168
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">169
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">170
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">171
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">172
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">173
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">174
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">175
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">176
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">177
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">178
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">179
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">180
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">181
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">182
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">183
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">184
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">185
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">186
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">187
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">188
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">189
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">190
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">191
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">192
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">193
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">194
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">195
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">196
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">197
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">198
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">199
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">200
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">201
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">202
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">203
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">204
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">205
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">206
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">207
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">208
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">209
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">210
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">211
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">212
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">213
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">214
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">215
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">216
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">217
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">218
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">219
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">220
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">221
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">222
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">223
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">224
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">225
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">226
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">227
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">228
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">229
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">230
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">231
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">232
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">233
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">234
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">235
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">236
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">237
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">238
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">239
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">240
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">241
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">242
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">243
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">244
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">245
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">246
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">247
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">248
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">249
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">250
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">251
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">252
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">253
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">254
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">255
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">256
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">257
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">258
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">259
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">260
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">261
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">262
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">263
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">264
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">265
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">266
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">267
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">268
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">269
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">270
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">271
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">272
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">273
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">274
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">275
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">276
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">277
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">278
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">279
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">280
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">281
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">282
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">283
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">284
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">285
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">286
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">287
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">288
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">289
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">290
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">291
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">292
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">293
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">294
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">295
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">296
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">297
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">298
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">299
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">300
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">301
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">302
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">303
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">304
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">305
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">306
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">307
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">308
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">309
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">310
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">311
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">312
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">313
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">314
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">315
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">316
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">317
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">318
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">319
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">320
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">321
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">322
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">323
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">324
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">325
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">326
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">327
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">328
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">329
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">330
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">331
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">332
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">333
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">334
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">335
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">336
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">337
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">338
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">339
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">340
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">341
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">342
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">343
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">344
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">345
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">346
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">347
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">348
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">349
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">350
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">351
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">352
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">353
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">354
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">355
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">356
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">357
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">358
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">359
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">360
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">361
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">362
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">363
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">364
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">365
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">366
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">367
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">368
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">369
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">370
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">371
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">372
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">373
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">374
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">375
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">376
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">377
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">378
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">379
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">380
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">381
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">382
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">383
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">384
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">385
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">386
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">387
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">388
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">389
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">390
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">391
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">392
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">393
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">394
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">395
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">396
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">397
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">398
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">399
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">400
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">401
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">402
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">403
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">404
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">405
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">406
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">407
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">408
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">409
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">410
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">411
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">412
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">413
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">414
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">415
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">416
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">417
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">418
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">419
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">420
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">421
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">422
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">423
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">424
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">425
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">426
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">427
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">428
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">429
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># yaml-language-server: $schema=../../cfg/config.schema.json</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Shelly CLI - Full Configuration Reference</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># This file documents ALL available configuration options.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Copy to ~/.config/shelly/config.yaml and customize as needed.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># For a minimal starting configuration, see: examples/config/minimal.yaml</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># For multi-location setups, see: examples/config/multi-site.yaml</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Run &#39;shelly init&#39; for guided setup, or &#39;shelly init --check&#39; to verify.</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Global Settings</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Output format: table, json, yaml, text, template</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>output</span>: table
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Enable colored output (respects NO_COLOR env var)</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>color</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Color theme (280+ themes available, run &#39;shelly theme list&#39; to see all)</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Popular choices: dracula, nord, tokyo-night, gruvbox, catppuccin, one-dark</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Simple format - just the theme name:</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>theme</span>: dracula
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Block format - theme name with color overrides:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># theme:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   name: dracula</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   colors:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     green: &#34;#50fa7b&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     red: &#34;#ff5555&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># External file format - load from a theme file:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># theme:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   file: ~/.config/shelly/themes/my-theme.yaml</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Full custom format - only custom colors (no base theme):</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># theme:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   colors:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     foreground: &#34;#f8f8f2&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     background: &#34;#282a36&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     green: &#34;#50fa7b&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     red: &#34;#ff5555&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     yellow: &#34;#f1fa8c&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     blue: &#34;#6272a4&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     cyan: &#34;#8be9fd&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     purple: &#34;#bd93f9&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     bright_black: &#34;#6272a4&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Semantic color overrides - customize meaning-based colors:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># theme:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   name: dracula</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   semantic:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     # UI colors</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     primary: &#34;#ff79c6&#34;       # Pink instead of purple for main actions</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     secondary: &#34;#6272a4&#34;     # Supporting elements</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     highlight: &#34;#ffb86c&#34;     # Orange for emphasis</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     muted: &#34;#6272a4&#34;         # Less important content</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     # Feedback colors</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     success: &#34;#50fa7b&#34;       # Green for success</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     warning: &#34;#f1fa8c&#34;       # Yellow for warnings</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     error: &#34;#ff5555&#34;         # Red for errors</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     info: &#34;#8be9fd&#34;          # Cyan for info</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     # Device state colors</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     online: &#34;#50fa7b&#34;        # Green when online</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     offline: &#34;#ff5555&#34;       # Red when offline</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     updating: &#34;#f1fa8c&#34;      # Yellow while updating</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     idle: &#34;#6272a4&#34;          # Gray when idle</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     # Table styling colors</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     table_header: &#34;#8be9fd&#34;  # Cyan headers</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     table_cell: &#34;#f1fa8c&#34;    # Yellow cells</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     table_alt_cell: &#34;#ffb86c&#34; # Orange alternating cells</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     table_border: &#34;#bd93f9&#34;  # Purple borders</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># API mode: local (direct device access), cloud (via Shelly Cloud), auto</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>api_mode</span>: local
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Verbosity level (0=silent, 1=info, 2=debug, 3=trace)</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Can also be set via -v/-vv/-vvv flags</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>verbosity</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Suppress non-essential output</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>quiet</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Preferred editor for &#39;shelly config edit&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Falls back to $EDITOR, $VISUAL, then nano</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># editor: vim</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Logging Settings (for debugging)</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>log</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Log output format: false=human-readable, true=JSON (for log aggregation)</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>json</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Filter logs by category (comma-separated)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Available: network, config, device, api, auth, plugin, discovery, firmware</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Example: &#34;network,api&#34; to only see network and API logs</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Leave empty to see all categories</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>categories</span>: <span style=color:#f1fa8c>&#34;&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Discovery Settings</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>discovery</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Discovery timeout</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>timeout</span>: 10s
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Enable mDNS discovery (recommended for Gen2+ devices)</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>mdns</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Enable Bluetooth LE discovery</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>ble</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Enable CoIoT discovery (Gen1 devices)</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>coiot</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Default network for subnet scanning (CIDR notation)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># network: 192.168.1.0/24</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Shelly Cloud Settings (optional)</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>cloud</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Enable cloud integration for remote access</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>enabled</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Cloud account email (set via &#39;shelly cloud login&#39;)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># email: user@example.com</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Tokens are managed automatically - do not edit manually</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># access_token: &#34;&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># refresh_token: &#34;&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Cloud server URL (default is Shelly&#39;s production server)</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>server_url</span>: https://shelly-api.shelly.cloud
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Integrator Settings (for OEM/partners)</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Shelly Integrator API credentials for partner integrations.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Environment variables take precedence: SHELLY_INTEGRATOR_TAG, SHELLY_INTEGRATOR_TOKEN</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># integrator:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   tag: my-partner-tag</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   token: my-integrator-token</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Registered Devices</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Devices can be added via:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   shelly device add &lt;name&gt; &lt;address&gt;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   shelly discover mdns --register</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   shelly init (guided setup)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Example device entries:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># kitchen-light:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   address: 192.168.1.50</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   generation: 2</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   type: switch</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   model: SHSW-PM</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># desk-lamp:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   address: 192.168.1.51</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   generation: 2</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   type: plug</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   model: SHPLG-S</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   auth:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     username: admin</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     password: secret123</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># living-room-dimmer:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   address: 192.168.1.52</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   generation: 2</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   type: light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   model: SHDM-2</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Command Aliases</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Create shortcuts for frequently used commands.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Use $1, $2, etc. for positional arguments, $@ for all arguments.</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>aliases</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Example aliases:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># lights-off:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   command: batch off kitchen-light living-room desk-lamp</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># status:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   command: device list --output table</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># morning:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   command: scene activate morning-routine</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># # Shell alias (enables pipes and redirects)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># backup-all:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   command: shelly backup create --all | gzip &gt; ~/shelly-backup.gz</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   shell: true</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Device Groups</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Group devices for batch operations:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   shelly batch on --group living-room</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>groups</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Example groups:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># living-room:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   devices:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - living-room-light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - living-room-lamp</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - tv-backlight</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># bedroom:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   devices:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - bedroom-light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - nightstand-lamp</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># all-lights:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   devices:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - kitchen-light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - living-room-light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - bedroom-light</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Scenes</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Save and recall device states:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   shelly scene activate movie-time</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   shelly scene save current-state</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>scenes</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Example scenes:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># movie-time:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   description: Dim lights for movie watching</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   actions:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - device: living-room-dimmer</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       method: Light.Set</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       params:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         id: 0</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         on: true</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         brightness: 20</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - device: tv-backlight</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       method: Light.Set</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       params:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         id: 0</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         on: true</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         brightness: 50</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># all-off:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   description: Turn off all lights</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   actions:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - device: kitchen-light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       method: Switch.Set</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       params:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         id: 0</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         on: false</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     - device: living-room-light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       method: Switch.Set</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       params:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         id: 0</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         on: false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Templates</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Reusable configuration templates for devices and scripts.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Create templates with &#39;shelly template create&#39; or &#39;shelly script template&#39;.</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>templates</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Device configuration templates</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># device:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   my-switch-config:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     name: my-switch-config</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     description: Standard switch configuration</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     model: SNSW-001X16EU</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     generation: 2</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     config:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       switch:0:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         name: Main Switch</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         initial_state: restore_last</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     source_device: living-room</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Script templates</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># script:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   motion-light:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     name: motion-light</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     description: Turn on light when motion detected</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     code: |</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       // Motion-activated light script</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       let TIMEOUT = 300; // seconds</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       Shelly.addEventHandler(function(event) {</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         if (event.component === &#34;input:0&#34; &amp;&amp; event.info.state) {</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#           Shelly.call(&#34;Switch.Set&#34;, {id: 0, on: true});</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#           Timer.set(TIMEOUT * 1000, false, function() {</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#             Shelly.call(&#34;Switch.Set&#34;, {id: 0, on: false});</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#           });</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         }</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       });</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     category: automation</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     variables:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#       - name: TIMEOUT</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         description: Auto-off timeout in seconds</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         type: number</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#         default: 300</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     min_gen: 2</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Alerts</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Device monitoring alerts. Create with &#39;shelly alert create&#39;.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># alerts:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   kitchen-offline:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     name: kitchen-offline</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     description: Alert when kitchen device goes offline</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     device: kitchen</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     condition: offline</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     action: notify</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     enabled: true</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#   high-power:</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     name: high-power</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     description: Alert when power exceeds threshold</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     device: living-room</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     condition: &#34;power&gt;1000&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     action: &#34;webhook:https://example.com/alert&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#     enabled: true</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Rate Limiting Settings</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Rate limiting prevents overloading Shelly devices.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Gen1 (ESP8266) supports max 2 concurrent connections.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Gen2 (ESP32) supports max 5 concurrent transactions.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># These defaults are tuned for stability - customize only if needed.</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>ratelimit</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>gen1</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>min_interval</span>: 2s        <span style=color:#6272a4># Min time between requests to same device</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>max_concurrent</span>: <span style=color:#bd93f9>1</span>       <span style=color:#6272a4># Max in-flight requests per device</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>circuit_threshold</span>: <span style=color:#bd93f9>5</span>    <span style=color:#6272a4># Failures before circuit breaker opens</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>gen2</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>min_interval</span>: 500ms
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>max_concurrent</span>: <span style=color:#bd93f9>3</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>circuit_threshold</span>: <span style=color:#bd93f9>5</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>global</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>max_concurrent</span>: <span style=color:#bd93f9>5</span>               <span style=color:#6272a4># Total concurrent requests across all devices</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>circuit_open_duration</span>: 60s      <span style=color:#6272a4># How long circuit stays open</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>circuit_success_threshold</span>: <span style=color:#bd93f9>2</span>    <span style=color:#6272a4># Successes needed to close circuit</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Plugin Settings</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>plugins</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Enable plugin system</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>enabled</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Additional plugin search paths (beyond ~/.config/shelly/plugins)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># path:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   - /usr/local/share/shelly/plugins</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   - ~/my-shelly-plugins</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># TUI Dashboard Settings</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># =============================================================================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>tui</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Auto-refresh interval in seconds (1-300)</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>refresh_interval</span>: <span style=color:#bd93f9>5</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># TUI-specific theme (independent - completely replaces main theme when set)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Supports same formats as main theme: string, block with colors, or file</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># theme: nord</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># theme:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   name: tokyo-night</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   colors:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#     green: &#34;#9ece6a&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Custom keybindings (uncomment to override defaults)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># keybindings:</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   # Navigation (vim-style by default)</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   up: [up, k]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   down: [down, j]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   left: [left, h]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   right: [right, l]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   # Actions</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   toggle: [space, t]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   turn_on: [&#34;1&#34;, o]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   turn_off: [&#34;0&#34;, x]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   refresh: [r, ctrl+r]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   filter: [&#34;/&#34;]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   command: [&#34;:&#34;]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   help: [&#34;?&#34;]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   quit: [q, ctrl+c]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   # View switching</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   tab: [tab]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   shift_tab: [shift+tab]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   view1: [&#34;1&#34;]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   view2: [&#34;2&#34;]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   view3: [&#34;3&#34;]</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4>#   view4: [&#34;4&#34;]</span></span></span></code></pre></td></tr></table></div></div></figure></div><hr><h2 id=minimalyaml>minimal.yaml</h2><p>Minimal Shelly CLI Configuration</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># Minimal Shelly CLI Configuration</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># This is the bare minimum needed to get started.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Copy to ~/.config/shelly/config.yaml</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># For full options, see: cfg/config.example.yaml or run &#39;shelly init&#39;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Register your devices</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>living-room</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>192.168.1.50</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>kitchen</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>192.168.1.51</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>bedroom</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>192.168.1.52</span></span></span></code></pre></td></tr></table></div></div></figure></div><hr><h2 id=multi-siteyaml>multi-site.yaml</h2><p>Multi-Site Shelly CLI Configuration</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">  9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 33
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 34
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 35
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 36
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 37
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 38
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 39
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 40
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 41
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 42
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 43
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 44
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 45
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 46
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 47
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 48
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 49
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 50
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 51
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 52
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 53
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 54
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 55
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 56
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 57
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 58
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 59
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 60
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 61
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 62
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 63
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 64
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 65
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 66
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 67
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 68
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 69
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 70
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 71
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 72
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 73
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 74
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 75
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 76
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 77
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 78
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 79
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 80
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 81
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 82
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 83
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 84
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 85
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 86
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 87
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 88
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 89
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 90
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 91
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 92
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 93
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 94
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 95
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 96
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 97
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 98
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 99
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">100
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">101
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">102
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">103
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">104
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">105
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">106
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">107
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">108
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">109
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">110
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">111
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">112
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">113
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">114
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">115
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">116
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">117
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">118
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">119
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">120
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">121
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">122
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">123
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">124
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">125
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">126
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">127
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">128
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">129
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">130
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">131
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">132
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">133
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">134
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">135
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">136
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">137
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">138
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">139
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">140
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">141
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">142
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">143
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">144
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">145
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">146
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">147
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">148
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">149
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">150
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">151
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">152
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">153
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">154
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">155
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">156
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># Multi-Site Shelly CLI Configuration</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Example for users with devices across multiple locations.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Uses device groups and naming conventions to organize by location.</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Copy to ~/.config/shelly/config.yaml</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>output</span>: table
+</span></span><span style=display:flex><span><span style=color:#ff79c6>color</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>theme</span>: nord
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># API mode: local requires network access to each site</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Consider using cloud mode for remote sites</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>api_mode</span>: local
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Devices organized by location using naming convention</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># === HOME ===</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>home-living-room</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>192.168.1.50</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: switch
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>home-kitchen</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>192.168.1.51</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: switch
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>home-bedroom</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>192.168.1.52</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: light
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>home-garage</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>192.168.1.53</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: switch
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># === CABIN ===</span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Note: Requires VPN or cloud mode when accessing remotely</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin-main</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>10.20.30.50</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: switch
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin-heater</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>10.20.30.51</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: switch
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin-water-heater</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>10.20.30.52</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: switch
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># === OFFICE ===</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>office-desk-lamp</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>172.16.0.50</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: light
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>office-server-room</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>address</span>: <span style=color:#bd93f9>172.16.0.51</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>generation</span>: <span style=color:#bd93f9>2</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>type</span>: switch
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Device groups by location for batch operations</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>groups</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>home</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>      - home-living-room
+</span></span><span style=display:flex><span>      - home-kitchen
+</span></span><span style=display:flex><span>      - home-bedroom
+</span></span><span style=display:flex><span>      - home-garage
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>      - cabin-main
+</span></span><span style=display:flex><span>      - cabin-heater
+</span></span><span style=display:flex><span>      - cabin-water-heater
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>office</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>      - office-desk-lamp
+</span></span><span style=display:flex><span>      - office-server-room
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Cross-site groups</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>all-heaters</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>      - cabin-heater
+</span></span><span style=display:flex><span>      - cabin-water-heater
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>all-lights</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>devices</span>:
+</span></span><span style=display:flex><span>      - home-living-room
+</span></span><span style=display:flex><span>      - home-kitchen
+</span></span><span style=display:flex><span>      - home-bedroom
+</span></span><span style=display:flex><span>      - office-desk-lamp
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Scenes for different locations</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>scenes</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin-arrival</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>description</span>: Prepare cabin for arrival
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>actions</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>device</span>: cabin-main
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>method</span>: Switch.Set
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>params</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>id</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>on</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>device</span>: cabin-heater
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>method</span>: Switch.Set
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>params</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>id</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>on</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>device</span>: cabin-water-heater
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>method</span>: Switch.Set
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>params</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>id</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>on</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin-departure</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>description</span>: Shut down cabin when leaving
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>actions</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>device</span>: cabin-heater
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>method</span>: Switch.Set
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>params</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>id</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>on</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>device</span>: cabin-water-heater
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>method</span>: Switch.Set
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>params</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>id</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>on</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>device</span>: cabin-main
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>method</span>: Switch.Set
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>params</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>id</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>on</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>office-workday</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>description</span>: Start office workday
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>actions</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>device</span>: office-desk-lamp
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>method</span>: Light.Set
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>params</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>id</span>: <span style=color:#bd93f9>0</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>on</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>brightness</span>: <span style=color:#bd93f9>80</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Aliases for quick access to different sites</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>aliases</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>home</span>: <span style=color:#f1fa8c>&#34;batch status --group home&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin</span>: <span style=color:#f1fa8c>&#34;batch status --group cabin&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>office</span>: <span style=color:#f1fa8c>&#34;batch status --group office&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin-on</span>: <span style=color:#f1fa8c>&#34;scene activate cabin-arrival&#34;</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>cabin-off</span>: <span style=color:#f1fa8c>&#34;scene activate cabin-departure&#34;</span></span></span></code></pre></td></tr></table></div></div></figure></div><hr></div><div class=card-list></div></article></div></div></div></div><footer class="footer text-muted"><div class=container-lg><div class=row><div class="col-lg-8 text-center text-lg-start"><ul class=list-inline><li class=list-inline-item><a class=text-muted href=/shelly-cli/docs/>Docs</a></li><li class=list-inline-item><a class=text-muted href=/shelly-cli/docs/commands/>Commands</a></li><li class=list-inline-item><a class=text-muted href=https://github.com/tj-smith47/shelly-cli>GitHub</a></li></ul></div><div class="col-lg-8 text-center text-lg-end"><ul class=list-inline><li class=list-inline-item></li></ul></div></div></div></footer><script async src=/shelly-cli/js/app.19b73e0182301dd61c9211c2f6890104740e2eb9eb12fe4ba8d4f31435b22ed6.js integrity="sha256-Gbc+AYIwHdYckhHC9okBBHQOLrnrEv5LqNTzFDWyLtY="></script><script async src=/shelly-cli/js/flexsearch.113b7edaabeb04644a4b0da964854226f135a5e10d3341884f25bd0ad1ee4def.js integrity="sha256-ETt+2qvrBGRKSw2pZIVCJvE1peENM0GITyW9CtHuTe8="></script><script async src=/shelly-cli/js/search-modal.96e662d8f691fe25c859a3437074b485f2d7bed0bca612725028c6cf4322e2f2.js integrity="sha256-luZi2PaR/iXIWaNDcHS0hfLXvtC8phJyUCjGz0Mi4vI="></script></body></html>

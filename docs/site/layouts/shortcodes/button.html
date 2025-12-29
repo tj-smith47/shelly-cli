@@ -21,6 +21,6 @@ Parameters:
   {{ $rel = "noopener noreferrer" }}
 {{ end }}
 
-<a href="{{ $href }}" class="{{ $class }}"{{ with $target }} target="{{ . }}"{{ end }}{{ with $rel }} rel="{{ . }}"{{ end }}>
+<a href="{{ $href | relURL }}" class="{{ $class }}"{{ with $target }} target="{{ . }}"{{ end }}{{ with $rel }} rel="{{ . }}"{{ end }}>
   {{ .Inner | markdownify }}
 </a>
