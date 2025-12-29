@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/schedules"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/scripts"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/virtuals"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/webhooks"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
@@ -585,6 +586,23 @@ func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 		a.scheduleEditor = a.scheduleEditor.SetSchedule(&msg.Schedule)
 		a.focusedPanel = PanelScheduleEditor
 		a.updateFocusStates()
+		return nil
+
+	case kvs.EditClosedMsg:
+		// Show toast when KVS edit modal closes with a save
+		if msg.Saved {
+			return toast.Success("KVS entry saved")
+		}
+		return nil
+
+	case kvs.ActionMsg:
+		// Show toast for KVS delete action
+		if msg.Action == "delete" {
+			if msg.Err != nil {
+				return toast.Error("Failed to delete: " + msg.Err.Error())
+			}
+			return toast.Success("KVS entry deleted")
+		}
 		return nil
 	}
 	return nil

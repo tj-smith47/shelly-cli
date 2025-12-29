@@ -62,19 +62,23 @@ type SelectMsg struct {
 
 // Model displays KVS items for a device.
 type Model struct {
-	ctx        context.Context
-	svc        *shellykvs.Service
-	device     string
-	items      []Item
-	scroller   *panel.Scroller
-	loading    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     Styles
-	loader     loading.Model
+	ctx              context.Context
+	svc              *shellykvs.Service
+	device           string
+	items            []Item
+	scroller         *panel.Scroller
+	loading          bool
+	editing          bool
+	confirmingDelete bool
+	deleteKey        string
+	err              error
+	width            int
+	height           int
+	focused          bool
+	panelIndex       int // 1-based panel index for Shift+N hotkey hint
+	styles           Styles
+	loader           loading.Model
+	editModal        EditModel
 }
 
 // Styles holds styles for the KVS browser component.
@@ -89,6 +93,8 @@ type Styles struct {
 	Selected lipgloss.Style
 	Error    lipgloss.Style
 	Muted    lipgloss.Style
+	Warning  lipgloss.Style
+	Confirm  lipgloss.Style
 }
 
 // DefaultStyles returns the default styles for the KVS browser.
@@ -118,6 +124,11 @@ func DefaultStyles() Styles {
 			Foreground(colors.Error),
 		Muted: lipgloss.NewStyle().
 			Foreground(colors.Muted),
+		Warning: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		Confirm: lipgloss.NewStyle().
+			Foreground(colors.Error).
+			Bold(true),
 	}
 }
 
@@ -138,6 +149,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModal: NewEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -212,6 +224,16 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
+	// Handle delete confirmation
+	if m.confirmingDelete {
+		return m.handleDeleteConfirmation(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		var cmd tea.Cmd
@@ -242,7 +264,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchItems())
+		return m, tea.Batch(m.loader.Tick(), m.fetchItems(), func() tea.Msg {
+			return EditClosedMsg{Saved: true}
+		})
 
 	case tea.KeyPressMsg:
 		if !m.focused {
@@ -251,6 +275,49 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleKey(msg)
 	}
 
+	return m, nil
+}
+
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.IsVisible() {
+		m.editing = false
+		// Refresh data after edit
+		m.loading = true
+		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchItems())
+	}
+
+	// Handle save result message
+	if saveMsg, ok := msg.(EditSaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			// Refresh data after successful save
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.fetchItems(), func() tea.Msg {
+				return EditClosedMsg{Saved: true}
+			})
+		}
+	}
+
+	return m, cmd
+}
+
+func (m Model) handleDeleteConfirmation(msg tea.Msg) (Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		switch keyMsg.String() {
+		case "y", "Y":
+			m.confirmingDelete = false
+			return m, m.executeDelete(m.deleteKey)
+		case "n", "N", "esc":
+			m.confirmingDelete = false
+			m.deleteKey = ""
+			return m, nil
+		}
+	}
 	return m, nil
 }
 
@@ -270,14 +337,67 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.scroller.PageUp()
 	case "enter":
 		return m, m.selectItem()
+	case "e":
+		return m.handleEditKey()
+	case "n":
+		return m.handleNewKey()
 	case "d":
-		return m, m.deleteItem()
+		return m.handleDeleteKey()
 	case "r":
 		m.loading = true
 		return m, tea.Batch(m.loader.Tick(), m.fetchItems())
 	}
 
 	return m, nil
+}
+
+func (m Model) handleEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || len(m.items) == 0 {
+		return m, nil
+	}
+	cursor := m.scroller.Cursor()
+	if cursor >= len(m.items) {
+		return m, nil
+	}
+	item := m.items[cursor]
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowEdit(m.device, &item)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
+func (m Model) handleNewKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowNew(m.device)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
+func (m Model) handleDeleteKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || len(m.items) == 0 {
+		return m, nil
+	}
+	cursor := m.scroller.Cursor()
+	if cursor >= len(m.items) {
+		return m, nil
+	}
+	// Start delete confirmation
+	m.confirmingDelete = true
+	m.deleteKey = m.items[cursor].Key
+	return m, nil
+}
+
+func (m Model) executeDelete(key string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.Delete(ctx, m.device, key)
+		return ActionMsg{Action: "delete", Key: key, Err: err}
+	}
 }
 
 func (m Model) selectItem() tea.Cmd {
@@ -291,24 +411,13 @@ func (m Model) selectItem() tea.Cmd {
 	}
 }
 
-func (m Model) deleteItem() tea.Cmd {
-	cursor := m.scroller.Cursor()
-	if len(m.items) == 0 || cursor >= len(m.items) {
-		return nil
-	}
-	item := m.items[cursor]
-
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		err := m.svc.Delete(ctx, m.device, item.Key)
-		return ActionMsg{Action: "delete", Key: item.Key, Err: err}
-	}
-}
-
 // View renders the KVS browser.
 func (m Model) View() string {
+	// Render edit modal if editing
+	if m.editing {
+		return m.editModal.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Key-Value Store").
 		SetFocused(m.focused).
@@ -333,6 +442,16 @@ func (m Model) View() string {
 		} else {
 			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
 		}
+		return r.Render()
+	}
+
+	// Show delete confirmation
+	if m.confirmingDelete {
+		var content strings.Builder
+		content.WriteString(m.styles.Confirm.Render("Delete key: " + m.deleteKey + "?"))
+		content.WriteString("\n\n")
+		content.WriteString(m.styles.Warning.Render("Press Y to confirm, N or Esc to cancel"))
+		r.SetContent(content.String())
 		return r.Render()
 	}
 
@@ -467,5 +586,10 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom enter:details d:delete"
+	return "j/k:scroll e:edit n:new d:delete r:refresh"
+}
+
+// IsEditing returns whether the edit modal is currently open.
+func (m Model) IsEditing() bool {
+	return m.editing
 }

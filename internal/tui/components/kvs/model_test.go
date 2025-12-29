@@ -593,9 +593,10 @@ func TestModel_DeleteItem_Empty(t *testing.T) {
 	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = true
 
-	cmd := m.deleteItem()
-	if cmd != nil {
-		t.Error("deleteItem() should return nil when no items")
+	// With no items, handleDeleteKey returns nil and doesn't start confirmation
+	m, _ = m.handleDeleteKey()
+	if m.confirmingDelete {
+		t.Error("confirmingDelete should be false when no items")
 	}
 }
 
