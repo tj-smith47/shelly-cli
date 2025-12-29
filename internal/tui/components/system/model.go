@@ -266,6 +266,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.toggleCurrentField()
 	case "e":
 		return m.handleEditKey()
+	case "z":
+		return m.handleTimezoneKey()
 	}
 
 	return m, nil
@@ -286,6 +288,16 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 	m.editing = true
 	m.editModal = m.editModal.SetSize(m.width, m.height)
 	m.editModal = m.editModal.Show(m.device, m.config)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
+func (m Model) handleTimezoneKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.config == nil {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowAtTimezone(m.device, m.config)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
 
@@ -403,7 +415,7 @@ func (m Model) View() string {
 
 	// Help text
 	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("e: edit | t: toggle | r: refresh"))
+	content.WriteString(m.styles.Muted.Render("e: edit | z: timezone | t: toggle | r: refresh"))
 
 	r.SetContent(content.String())
 

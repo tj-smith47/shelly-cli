@@ -191,9 +191,18 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 
 // Show displays the edit modal with the given device and config.
 func (m EditModel) Show(device string, sysConfig *shelly.SysConfig) EditModel {
+	return m.showAt(device, sysConfig, EditFieldName)
+}
+
+// ShowAtTimezone displays the edit modal focused on the timezone field.
+func (m EditModel) ShowAtTimezone(device string, sysConfig *shelly.SysConfig) EditModel {
+	return m.showAt(device, sysConfig, EditFieldTimezone)
+}
+
+func (m EditModel) showAt(device string, sysConfig *shelly.SysConfig, initialField EditField) EditModel {
 	m.device = device
 	m.visible = true
-	m.cursor = EditFieldName
+	m.cursor = initialField
 	m.saving = false
 	m.err = nil
 	m.original = sysConfig
@@ -204,10 +213,13 @@ func (m EditModel) Show(device string, sysConfig *shelly.SysConfig) EditModel {
 	// Load aliases for the device
 	m = m.loadAliases()
 
-	// Focus name input
-	m.nameInput.Focus()
+	// Blur all fields first
+	m.nameInput.Blur()
 	m.timezoneDropdown = m.timezoneDropdown.Blur()
 	m.newAliasInput.Blur()
+
+	// Focus the initial field
+	m = m.focusCurrentField()
 
 	return m
 }
