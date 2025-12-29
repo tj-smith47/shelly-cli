@@ -604,6 +604,28 @@ func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 			return toast.Success("KVS entry deleted")
 		}
 		return nil
+
+	case webhooks.EditClosedMsg:
+		// Show toast when webhook edit modal closes with a save
+		if msg.Saved {
+			return toast.Success("Webhook saved")
+		}
+		return nil
+
+	case webhooks.ActionMsg:
+		// Show toast for webhook actions
+		if msg.Err != nil {
+			return toast.Error("Webhook action failed: " + msg.Err.Error())
+		}
+		switch msg.Action {
+		case "enable":
+			return toast.Success("Webhook enabled")
+		case "disable":
+			return toast.Success("Webhook disabled")
+		case "delete":
+			return toast.Success("Webhook deleted")
+		}
+		return nil
 	}
 	return nil
 }
