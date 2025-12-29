@@ -55,6 +55,7 @@ type Model struct {
 	discovery  *shelly.BTHomeDiscovery
 	loading    bool
 	starting   bool
+	editing    bool
 	err        error
 	width      int
 	height     int
@@ -62,6 +63,7 @@ type Model struct {
 	panelIndex int // 1-based panel index for Shift+N hotkey hint
 	styles     Styles
 	loader     loading.Model
+	editModal  EditModel
 }
 
 // Styles holds styles for the BLE component.
@@ -119,6 +121,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModal: NewEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -201,6 +204,11 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		var cmd tea.Cmd
@@ -244,6 +252,34 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.Visible() {
+		m.editing = false
+		// Refresh data after edit
+		m.loading = true
+		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchStatus())
+	}
+
+	// Handle save result message
+	if saveMsg, ok := msg.(EditSaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			// Refresh data after successful save
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.fetchStatus(), func() tea.Msg {
+				return EditClosedMsg{Saved: true}
+			})
+		}
+	}
+
+	return m, cmd
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "r":
@@ -257,6 +293,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.err = nil
 			return m, m.startDiscovery()
 		}
+	case "e", "enter":
+		// Open edit modal
+		if m.device != "" && !m.loading && m.ble != nil {
+			m.editing = true
+			m.editModal = m.editModal.SetSize(m.width, m.height)
+			var cmd tea.Cmd
+			m.editModal, cmd = m.editModal.Show(m.device, m.ble)
+			return m, cmd
+		}
 	}
 
 	return m, nil
@@ -264,6 +309,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // View renders the BLE component.
 func (m Model) View() string {
+	// Render edit modal if editing
+	if m.editing {
+		return m.editModal.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Bluetooth").
 		SetFocused(m.focused).
@@ -295,9 +345,9 @@ func (m Model) View() string {
 
 	// Help text
 	content.WriteString("\n\n")
-	helpText := "r: refresh"
+	helpText := "e: edit | r: refresh"
 	if m.ble != nil && m.ble.Enable {
-		helpText += " | d: discover BTHome devices"
+		helpText += " | d: discover"
 	}
 	content.WriteString(m.styles.Muted.Render(helpText))
 

@@ -376,6 +376,10 @@ func (c *Config) handleEditClosedMsg(msg tea.Msg) tea.Cmd {
 		if editMsg.Saved {
 			return toast.Success("Input settings saved")
 		}
+	case ble.EditClosedMsg:
+		if editMsg.Saved {
+			return toast.Success("Bluetooth settings saved")
+		}
 	}
 	return nil
 }
