@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // EditField represents a field in the edit form.
@@ -297,7 +298,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	key := msg.String()
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
@@ -657,11 +658,24 @@ func (m EditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
+	// Build footer based on context
+	var footer string
+	switch {
+	case m.saving:
+		footer = "Saving..."
+	case m.cursor == EditFieldAliases && len(m.aliases) > 0:
+		footer = "d: Delete | Tab: Next | Esc: Cancel"
+	case m.cursor == EditFieldNewAlias:
+		footer = "Enter: Add alias | Tab: Next | Esc: Cancel"
+	default:
+		footer = "Enter: Save | Esc: Cancel | Tab: Next field"
+	}
 
-	// Title
-	content.WriteString(m.styles.Title.Render("Edit System Settings"))
-	content.WriteString("\n\n")
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, "Edit System Settings", footer)
+
+	// Build content
+	var content strings.Builder
 
 	// Name field
 	content.WriteString(m.renderField(EditFieldName, "Name:", m.nameInput.View()))
@@ -688,29 +702,9 @@ func (m EditModel) View() string {
 	// Error display
 	if m.err != nil {
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
-		content.WriteString("\n\n")
 	}
 
-	// Status/buttons
-	if m.saving {
-		content.WriteString(m.styles.Help.Render("Saving..."))
-	} else {
-		helpText := "Enter: Save | Esc: Cancel | Tab: Next field"
-		if m.cursor == EditFieldAliases && len(m.aliases) > 0 {
-			helpText = "d: Delete | Tab: Next | Esc: Cancel"
-		} else if m.cursor == EditFieldNewAlias {
-			helpText = "Enter: Add alias | Tab: Next | Esc: Cancel"
-		}
-		content.WriteString(m.styles.Help.Render(helpText))
-	}
-
-	// Render modal box
-	modalContent := content.String()
-	modalWidth := min(60, m.width-4)
-	modal := m.styles.Modal.Width(modalWidth).Render(modalContent)
-
-	// Center the modal
-	return m.centerModal(modal)
+	return r.SetContent(content.String()).Render()
 }
 
 func (m EditModel) renderField(field EditField, label, input string) string {
@@ -771,41 +765,4 @@ func (m EditModel) renderAliasesList() string {
 	}
 
 	return content.String()
-}
-
-func (m EditModel) centerModal(modal string) string {
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	// Calculate centering
-	topPad := (m.height - modalHeight) / 2
-	leftPad := (m.width - modalWidth) / 2
-
-	if topPad < 0 {
-		topPad = 0
-	}
-	if leftPad < 0 {
-		leftPad = 0
-	}
-
-	// Build centered output
-	var result strings.Builder
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	padding := strings.Repeat(" ", leftPad)
-	for _, line := range lines {
-		result.WriteString(padding)
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
 }

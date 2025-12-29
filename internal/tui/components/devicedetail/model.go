@@ -291,6 +291,7 @@ func (m Model) renderPowerMonitoring() string {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.loader = m.loader.SetSize(width-4, height-4)
 	// Account for container borders and padding
 	m.viewport.SetWidth(width - 8)
 	m.viewport.SetHeight(height - 6)

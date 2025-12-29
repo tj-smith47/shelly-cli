@@ -646,3 +646,11 @@ func (m Model) FooterText() string {
 func (m Model) IsEditing() bool {
 	return m.editing
 }
+
+// RenderEditModal returns the edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if !m.editing {
+		return ""
+	}
+	return m.editModal.View()
+}

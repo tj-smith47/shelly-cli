@@ -4,6 +4,8 @@ import "testing"
 
 const testTemplateName = "my-template"
 
+// testModelSHSW1 and testScriptCode are defined in manager_test.go
+
 func TestValidateTemplateName(t *testing.T) {
 	t.Parallel()
 
@@ -52,8 +54,8 @@ func TestParseDeviceTemplateFile_JSON(t *testing.T) {
 	if tpl.Name != testTemplateName {
 		t.Errorf("Name = %q, want %q", tpl.Name, testTemplateName)
 	}
-	if tpl.Model != "SHSW-1" {
-		t.Errorf("Model = %q, want %q", tpl.Model, "SHSW-1")
+	if tpl.Model != testModelSHSW1 {
+		t.Errorf("Model = %q, want %q", tpl.Model, testModelSHSW1)
 	}
 	if tpl.Generation != 2 {
 		t.Errorf("Generation = %d, want %d", tpl.Generation, 2)
@@ -79,8 +81,8 @@ config:
 	if tpl.Name != testTemplateName {
 		t.Errorf("Name = %q, want %q", tpl.Name, testTemplateName)
 	}
-	if tpl.Model != "SHSW-1" {
-		t.Errorf("Model = %q, want %q", tpl.Model, "SHSW-1")
+	if tpl.Model != testModelSHSW1 {
+		t.Errorf("Model = %q, want %q", tpl.Model, testModelSHSW1)
 	}
 }
 
@@ -176,11 +178,11 @@ func TestParseScriptTemplateFile_JSON(t *testing.T) {
 		t.Fatalf("ParseScriptTemplateFile() error: %v", err)
 	}
 
-	if tpl.Name != "my-script" {
-		t.Errorf("Name = %q, want %q", tpl.Name, "my-script")
+	if tpl.Name != testScriptName {
+		t.Errorf("Name = %q, want %q", tpl.Name, testScriptName)
 	}
-	if tpl.Code != "console.log('hello');" {
-		t.Errorf("Code = %q, want %q", tpl.Code, "console.log('hello');")
+	if tpl.Code != testScriptCode {
+		t.Errorf("Code = %q, want %q", tpl.Code, testScriptCode)
 	}
 }
 
@@ -199,8 +201,8 @@ category: utility
 		t.Fatalf("ParseScriptTemplateFile() error: %v", err)
 	}
 
-	if tpl.Name != "my-script" {
-		t.Errorf("Name = %q, want %q", tpl.Name, "my-script")
+	if tpl.Name != testScriptName {
+		t.Errorf("Name = %q, want %q", tpl.Name, testScriptName)
 	}
 }
 
@@ -243,10 +245,10 @@ func TestIsCompatibleModel(t *testing.T) {
 
 	tpl := DeviceTemplate{
 		Name:  "test",
-		Model: "SHSW-1",
+		Model: testModelSHSW1,
 	}
 
-	if !IsCompatibleModel(tpl, "SHSW-1") {
+	if !IsCompatibleModel(tpl, testModelSHSW1) {
 		t.Error("IsCompatibleModel() should return true for matching model")
 	}
 	if IsCompatibleModel(tpl, "SHSW-2") {
@@ -267,5 +269,176 @@ func TestIsCompatibleGeneration(t *testing.T) {
 	}
 	if IsCompatibleGeneration(tpl, 1) {
 		t.Error("IsCompatibleGeneration() should return false for non-matching generation")
+	}
+}
+
+func TestParseDeviceTemplateFile_UnknownExtBothFail(t *testing.T) {
+	t.Parallel()
+
+	// Invalid data that fails both YAML and JSON parsing
+	_, err := ParseDeviceTemplateFile("template.txt", []byte("{invalid{"))
+	if err == nil {
+		t.Error("expected error for invalid content with unknown extension")
+	}
+}
+
+func TestParseScriptTemplateFile_UnknownExt(t *testing.T) {
+	t.Parallel()
+
+	// Should try YAML first, then JSON
+	content := `name: my-script
+code: console.log('hello');
+`
+	tpl, err := ParseScriptTemplateFile("script.txt", []byte(content))
+	if err != nil {
+		t.Fatalf("ParseScriptTemplateFile() error: %v", err)
+	}
+	if tpl.Name != testScriptName {
+		t.Errorf("Name = %q, want %q", tpl.Name, testScriptName)
+	}
+}
+
+func TestParseScriptTemplateFile_UnknownExtBothFail(t *testing.T) {
+	t.Parallel()
+
+	// Invalid data that fails both YAML and JSON parsing
+	_, err := ParseScriptTemplateFile("script.txt", []byte("{invalid{"))
+	if err == nil {
+		t.Error("expected error for invalid content with unknown extension")
+	}
+}
+
+func TestParseScriptTemplateFile_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseScriptTemplateFile("test.json", []byte("not valid json"))
+	if err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestParseScriptTemplateFile_InvalidYAML(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseScriptTemplateFile("test.yaml", []byte(":\ninvalid yaml"))
+	if err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+}
+
+func TestPackageLevelDeviceTemplateFunctions(t *testing.T) {
+	// Note: This test modifies global state, cannot be parallel
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	ResetDefaultManagerForTesting()
+
+	// Test CreateDeviceTemplate
+	err := CreateDeviceTemplate("test-tpl", "Test template", testModelSHSW1, "", 2, map[string]any{"key": "value"}, "")
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate() error: %v", err)
+	}
+
+	// Test GetDeviceTemplate
+	tpl, ok := GetDeviceTemplate("test-tpl")
+	if !ok {
+		t.Fatal("GetDeviceTemplate() returned false for existing template")
+	}
+	if tpl.Name != "test-tpl" {
+		t.Errorf("GetDeviceTemplate() Name = %q, want %q", tpl.Name, "test-tpl")
+	}
+	if tpl.Model != testModelSHSW1 {
+		t.Errorf("GetDeviceTemplate() Model = %q, want %q", tpl.Model, testModelSHSW1)
+	}
+
+	// Test UpdateDeviceTemplate
+	if err := UpdateDeviceTemplate("test-tpl", "Updated description"); err != nil {
+		t.Fatalf("UpdateDeviceTemplate() error: %v", err)
+	}
+	tpl, _ = GetDeviceTemplate("test-tpl")
+	if tpl.Description != "Updated description" {
+		t.Errorf("UpdateDeviceTemplate() Description = %q, want %q", tpl.Description, "Updated description")
+	}
+
+	// Test ListDeviceTemplates
+	templates := ListDeviceTemplates()
+	if len(templates) != 1 {
+		t.Errorf("ListDeviceTemplates() returned %d templates, want 1", len(templates))
+	}
+	if _, ok := templates["test-tpl"]; !ok {
+		t.Error("ListDeviceTemplates() missing test-tpl")
+	}
+
+	// Test SaveDeviceTemplate
+	newTpl := DeviceTemplate{
+		Name:        "saved-tpl",
+		Description: "Saved template",
+		Model:       "SHSW-2",
+		Generation:  2,
+		Config:      map[string]any{"foo": "bar"},
+	}
+	if err := SaveDeviceTemplate(newTpl); err != nil {
+		t.Fatalf("SaveDeviceTemplate() error: %v", err)
+	}
+	saved, ok := GetDeviceTemplate("saved-tpl")
+	if !ok {
+		t.Fatal("SaveDeviceTemplate() template not found after save")
+	}
+	if saved.Model != "SHSW-2" {
+		t.Errorf("SaveDeviceTemplate() Model = %q, want %q", saved.Model, "SHSW-2")
+	}
+
+	// Test DeleteDeviceTemplate
+	if err := DeleteDeviceTemplate("test-tpl"); err != nil {
+		t.Fatalf("DeleteDeviceTemplate() error: %v", err)
+	}
+	if _, ok := GetDeviceTemplate("test-tpl"); ok {
+		t.Error("template still exists after DeleteDeviceTemplate()")
+	}
+}
+
+func TestPackageLevelScriptTemplateFunctions(t *testing.T) {
+	// Note: This test modifies global state, cannot be parallel
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	ResetDefaultManagerForTesting()
+
+	// Test SaveScriptTemplate
+	tpl := ScriptTemplate{
+		Name:        "test-script",
+		Description: "Test script",
+		Code:        "console.log('hello');",
+		Category:    "utility",
+	}
+	if err := SaveScriptTemplate(tpl); err != nil {
+		t.Fatalf("SaveScriptTemplate() error: %v", err)
+	}
+
+	// Test GetScriptTemplate
+	saved, ok := GetScriptTemplate("test-script")
+	if !ok {
+		t.Fatal("GetScriptTemplate() returned false for existing template")
+	}
+	if saved.Name != "test-script" {
+		t.Errorf("GetScriptTemplate() Name = %q, want %q", saved.Name, "test-script")
+	}
+	if saved.Code != "console.log('hello');" {
+		t.Errorf("GetScriptTemplate() Code = %q, want %q", saved.Code, "console.log('hello');")
+	}
+
+	// Test ListScriptTemplates
+	templates := ListScriptTemplates()
+	if len(templates) != 1 {
+		t.Errorf("ListScriptTemplates() returned %d templates, want 1", len(templates))
+	}
+	if _, ok := templates["test-script"]; !ok {
+		t.Error("ListScriptTemplates() missing test-script")
+	}
+
+	// Test DeleteScriptTemplate
+	if err := DeleteScriptTemplate("test-script"); err != nil {
+		t.Fatalf("DeleteScriptTemplate() error: %v", err)
+	}
+	if _, ok := GetScriptTemplate("test-script"); ok {
+		t.Error("template still exists after DeleteScriptTemplate()")
 	}
 }

@@ -155,3 +155,9 @@ test-coverage:
 	@go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+## cov: Quick coverage check (shows total %)
+cov:
+	@go test -coverprofile=coverage.out ./... 2>&1 | tail -5
+	@go tool cover -func=coverage.out | tail -1
+	@rm -f coverage.out

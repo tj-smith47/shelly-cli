@@ -146,7 +146,7 @@ func (d Dropdown) handleKey(keyMsg tea.KeyPressMsg) Dropdown {
 	switch keyMsg.String() {
 	case "enter", " ":
 		return d.handleEnter()
-	case "esc":
+	case "esc", "ctrl+[":
 		return d.handleEsc()
 	case "j", "down":
 		return d.handleDown()

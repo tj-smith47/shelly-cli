@@ -99,6 +99,9 @@ func New(c *cache.Cache) Model {
 
 // Init initializes the energy bars.
 func (m Model) Init() tea.Cmd {
+	if m.loading {
+		return m.loader.Tick()
+	}
 	return nil
 }
 

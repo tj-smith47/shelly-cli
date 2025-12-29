@@ -168,6 +168,7 @@ func (m Model) fetchInputs() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.loader = m.loader.SetSize(width-4, height-4)
 	visibleRows := height - 6 // Reserve space for header and footer
 	if visibleRows < 1 {
 		visibleRows = 1
@@ -436,4 +437,17 @@ func (m Model) SelectedInput() *shelly.InputInfo {
 		return nil
 	}
 	return &m.inputs[cursor]
+}
+
+// IsEditing returns whether the edit modal is currently visible.
+func (m Model) IsEditing() bool {
+	return m.editing
+}
+
+// RenderEditModal returns the edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if !m.editing {
+		return ""
+	}
+	return m.editModal.View()
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // EditSaveResultMsg signals a save operation completed.
@@ -181,7 +182,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	key := msg.String()
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
@@ -234,11 +235,17 @@ func (m EditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
+	// Build footer
+	footer := "Space: Toggle | Ctrl+S: Save | Esc: Cancel"
+	if m.saving {
+		footer = "Saving..."
+	}
 
-	// Title
-	content.WriteString(m.styles.Title.Render("Cloud Configuration"))
-	content.WriteString("\n\n")
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, "Cloud Configuration", footer)
+
+	// Build content
+	var content strings.Builder
 
 	// Connection status
 	content.WriteString(m.renderConnectionStatus())
@@ -252,32 +259,20 @@ func (m EditModel) View() string {
 
 	// Enable toggle
 	content.WriteString(m.renderToggle())
-	content.WriteString("\n")
 
 	// Show change indicator if modified
 	if m.pendingEnabled != m.enabled {
-		content.WriteString(m.renderChangeIndicator())
 		content.WriteString("\n")
+		content.WriteString(m.renderChangeIndicator())
 	}
 
 	// Error display
 	if m.err != nil {
 		content.WriteString("\n")
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
-		content.WriteString("\n")
 	}
 
-	// Help text
-	content.WriteString("\n")
-	content.WriteString(m.renderHelpText())
-
-	// Render modal box
-	modalContent := content.String()
-	modalWidth := min(50, m.width-4)
-	modal := m.styles.Modal.Width(modalWidth).Render(modalContent)
-
-	// Center the modal
-	return m.centerModal(modal)
+	return r.SetContent(content.String()).Render()
 }
 
 func (m EditModel) renderConnectionStatus() string {
@@ -328,48 +323,4 @@ func (m EditModel) renderChangeIndicator() string {
 		msg = "Will disable cloud connection"
 	}
 	return m.styles.Warning.Render(fmt.Sprintf("  ⚡ %s", msg))
-}
-
-func (m EditModel) renderHelpText() string {
-	if m.saving {
-		return m.styles.Help.Render("Saving...")
-	}
-	return m.styles.Help.Render("t/Space: Toggle | Enter: Save | Esc: Cancel")
-}
-
-func (m EditModel) centerModal(modal string) string {
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	// Calculate centering
-	topPad := (m.height - modalHeight) / 2
-	leftPad := (m.width - modalWidth) / 2
-
-	if topPad < 0 {
-		topPad = 0
-	}
-	if leftPad < 0 {
-		leftPad = 0
-	}
-
-	// Build centered output
-	var result strings.Builder
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	padding := strings.Repeat(" ", leftPad)
-	for _, line := range lines {
-		result.WriteString(padding)
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
 }

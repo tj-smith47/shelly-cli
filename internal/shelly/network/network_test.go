@@ -4,8 +4,12 @@ package network
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
@@ -1709,4 +1713,130 @@ func TestCloudLoginResult_ExpiryTimes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ----- Cloud WebSocket URL Edge Cases -----
+
+func TestBuildCloudWebSocketURL_InvalidServerURL(t *testing.T) {
+	t.Parallel()
+
+	// Test with malformed URL that fails url.Parse hostname extraction
+	url, err := BuildCloudWebSocketURL("://invalid", "token")
+	if err == nil {
+		t.Errorf("expected error for invalid URL, got URL=%q", url)
+	}
+}
+
+func TestBuildCloudWebSocketURL_PlainHostname(t *testing.T) {
+	t.Parallel()
+
+	// Test with plain hostname (no scheme) - url.Parse will fail to get hostname
+	url, err := BuildCloudWebSocketURL("api.shelly.cloud", "token")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should fallback to using serverURL as hostname
+	if !strings.Contains(url, "api.shelly.cloud") {
+		t.Errorf("URL should contain hostname, got %q", url)
+	}
+}
+
+// ----- Cloud Event Error Handling Tests -----
+
+func TestHandleCloudEventReadError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("normal close returns nil", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		err := &websocket.CloseError{Code: websocket.CloseNormalClosure}
+		result := handleCloudEventReadError(ctx, err)
+		if result != nil {
+			t.Errorf("expected nil for normal close, got %v", result)
+		}
+	})
+
+	t.Run("going away returns nil", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		err := &websocket.CloseError{Code: websocket.CloseGoingAway}
+		result := handleCloudEventReadError(ctx, err)
+		if result != nil {
+			t.Errorf("expected nil for going away, got %v", result)
+		}
+	})
+
+	t.Run("cancelled context returns nil", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := fmt.Errorf("read error")
+		result := handleCloudEventReadError(ctx, err)
+		if result != nil {
+			t.Errorf("expected nil for cancelled context, got %v", result)
+		}
+	})
+
+	t.Run("other error returns wrapped error", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		err := fmt.Errorf("network timeout")
+		result := handleCloudEventReadError(ctx, err)
+		if result == nil {
+			t.Error("expected error, got nil")
+		}
+		if !strings.Contains(result.Error(), "read error") {
+			t.Errorf("expected read error wrapper, got %v", result)
+		}
+	})
+}
+
+func TestIsExpectedCloudClosure(t *testing.T) {
+	t.Parallel()
+
+	t.Run("normal close is expected", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		err := &websocket.CloseError{Code: websocket.CloseNormalClosure}
+		if !isExpectedCloudClosure(ctx, err) {
+			t.Error("normal close should be expected")
+		}
+	})
+
+	t.Run("going away is expected", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		err := &websocket.CloseError{Code: websocket.CloseGoingAway}
+		if !isExpectedCloudClosure(ctx, err) {
+			t.Error("going away should be expected")
+		}
+	})
+
+	t.Run("cancelled context is expected", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := fmt.Errorf("any error")
+		if !isExpectedCloudClosure(ctx, err) {
+			t.Error("cancelled context should be expected")
+		}
+	})
+
+	t.Run("other error not expected", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		err := fmt.Errorf("network error")
+		if isExpectedCloudClosure(ctx, err) {
+			t.Error("network error should not be expected")
+		}
+	})
+
+	t.Run("other close code not expected", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		err := &websocket.CloseError{Code: websocket.CloseAbnormalClosure}
+		if isExpectedCloudClosure(ctx, err) {
+			t.Error("abnormal closure should not be expected")
+		}
+	})
 }

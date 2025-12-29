@@ -446,6 +446,7 @@ func (m Model) Visible() bool {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.loader = m.loader.SetSize(width-4, height-4)
 
 	// Subtract: 2 for borders, 2 for horizontal padding
 	contentWidth := width - 4

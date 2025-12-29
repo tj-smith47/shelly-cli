@@ -112,33 +112,58 @@ func New(c *cache.Cache) Model {
 
 // Init initializes the energy history.
 func (m *Model) Init() tea.Cmd {
+	if m.loading {
+		return m.loader.Tick()
+	}
 	return nil
 }
 
 // Update handles messages for the energy history.
-// Note: We only collect data via collectCurrentPower() at 5-second intervals
-// to maintain the 5-minute window (60 points * 5 seconds = 5 minutes).
-// We don't record on every DeviceUpdateMsg because cache updates can be more frequent.
+// Collects data from cache on DeviceUpdateMsg to ensure history is populated.
 func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
 		var cmd tea.Cmd
 		m.loader, cmd = m.loader.Update(msg)
-
-		// Auto-detect when we have history data
-		m.mu.RLock()
-		hasData := len(m.history) > 0
-		m.mu.RUnlock()
-		if hasData {
-			m.loading = false
-		}
-
 		if cmd != nil {
 			return *m, cmd
 		}
 	}
 
+	// Collect data on device updates - this is how history gets populated
+	switch msg.(type) {
+	case cache.DeviceUpdateMsg, cache.AllDevicesLoadedMsg:
+		m.handleDeviceUpdate()
+	}
+
 	return *m, nil
+}
+
+// handleDeviceUpdate collects power data when device updates arrive.
+func (m *Model) handleDeviceUpdate() {
+	if m.cache == nil {
+		return
+	}
+
+	devices := m.cache.GetOnlineDevices()
+	if len(devices) == 0 {
+		return
+	}
+
+	m.collectCurrentPower(devices)
+
+	// Exit loading once we have data
+	if !m.loading {
+		return
+	}
+
+	m.mu.RLock()
+	hasData := len(m.history) > 0
+	m.mu.RUnlock()
+
+	if hasData {
+		m.loading = false
+	}
 }
 
 // hasPMCapability checks if a device has power monitoring capability.

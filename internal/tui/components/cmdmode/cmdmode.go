@@ -114,7 +114,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
-		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("escape", "ctrl+["))):
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("esc", "ctrl+["))):
 			m.active = false
 			m.textInput.Blur()
 			m.textInput.SetValue("")

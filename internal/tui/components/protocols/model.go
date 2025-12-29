@@ -675,3 +675,11 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 func (m Model) IsEditing() bool {
 	return m.editing
 }
+
+// RenderEditModal returns the edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if !m.editing {
+		return ""
+	}
+	return m.mqttEdit.View()
+}

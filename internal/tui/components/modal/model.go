@@ -192,7 +192,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc":
+	case "esc", "ctrl+[":
 		if m.closeOnEsc {
 			m.visible = false
 			return m, func() tea.Msg { return CloseMsg{Confirmed: false} }

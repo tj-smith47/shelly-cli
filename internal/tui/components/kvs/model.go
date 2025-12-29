@@ -202,6 +202,7 @@ func (m Model) fetchItems() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.loader = m.loader.SetSize(width-4, height-4)
 	visibleRows := height - 4
 	if visibleRows < 1 {
 		visibleRows = 1
@@ -592,4 +593,12 @@ func (m Model) FooterText() string {
 // IsEditing returns whether the edit modal is currently open.
 func (m Model) IsEditing() bool {
 	return m.editing
+}
+
+// RenderEditModal returns the edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if !m.editing {
+		return ""
+	}
+	return m.editModal.View()
 }

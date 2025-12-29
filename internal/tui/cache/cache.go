@@ -42,8 +42,10 @@ type DeviceData struct {
 	TotalEnergy float64
 	Temperature float64
 
-	// Switch states
+	// Component states
 	Switches []SwitchState
+	Lights   []LightState
+	Covers   []CoverState
 
 	UpdatedAt time.Time
 
@@ -57,6 +59,18 @@ type SwitchState struct {
 	ID     int
 	On     bool
 	Source string
+}
+
+// LightState holds the state of a light component.
+type LightState struct {
+	ID int
+	On bool
+}
+
+// CoverState holds the state of a cover component.
+type CoverState struct {
+	ID    int
+	State string // "open", "closed", "opening", "closing", "stopped"
 }
 
 // DeviceUpdateMsg is sent when a single device's data is updated.
@@ -752,9 +766,11 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		// Populate and persist discovered device info
 		c.populateDeviceInfo(name, data, info)
 
-		// Get switch states (Gen2+ only - Gen1 uses different relay API)
+		// Get component states (Gen2+ only - Gen1 uses different relay API)
 		if info.Generation > 1 {
 			c.fetchSwitchStates(ctx, name, data)
+			c.fetchLightStates(ctx, name, data)
+			c.fetchCoverStates(ctx, name, data)
 		}
 
 		// Get monitoring snapshot for power metrics
@@ -817,6 +833,34 @@ func (c *Cache) fetchSwitchStates(ctx context.Context, name string, data *Device
 		data.Switches = append(data.Switches, SwitchState{
 			ID: sw.ID,
 			On: sw.Output,
+		})
+	}
+}
+
+// fetchLightStates fetches light states for Gen2+ devices.
+func (c *Cache) fetchLightStates(ctx context.Context, name string, data *DeviceData) {
+	lights, err := c.svc.LightList(ctx, name)
+	if err != nil {
+		return
+	}
+	for _, lt := range lights {
+		data.Lights = append(data.Lights, LightState{
+			ID: lt.ID,
+			On: lt.Output,
+		})
+	}
+}
+
+// fetchCoverStates fetches cover states for Gen2+ devices.
+func (c *Cache) fetchCoverStates(ctx context.Context, name string, data *DeviceData) {
+	covers, err := c.svc.CoverList(ctx, name)
+	if err != nil {
+		return
+	}
+	for _, cv := range covers {
+		data.Covers = append(data.Covers, CoverState{
+			ID:    cv.ID,
+			State: cv.State,
 		})
 	}
 }
@@ -1090,6 +1134,67 @@ func (c *Cache) TotalPower() float64 {
 		}
 	}
 	return total
+}
+
+// SwitchCounts returns the count of switches that are on and off across all online devices.
+func (c *Cache) SwitchCounts() (on, off int) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, data := range c.devices {
+		if !data.Online {
+			continue
+		}
+		for _, sw := range data.Switches {
+			if sw.On {
+				on++
+			} else {
+				off++
+			}
+		}
+	}
+	return on, off
+}
+
+// LightCounts returns the count of lights that are on and off across all online devices.
+func (c *Cache) LightCounts() (on, off int) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, data := range c.devices {
+		if !data.Online {
+			continue
+		}
+		for _, lt := range data.Lights {
+			if lt.On {
+				on++
+			} else {
+				off++
+			}
+		}
+	}
+	return on, off
+}
+
+// CoverCounts returns the count of covers by state across all online devices:
+// open, closed, moving (opening/closing/stopped).
+func (c *Cache) CoverCounts() (open, closed, moving int) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, data := range c.devices {
+		if !data.Online {
+			continue
+		}
+		for _, cv := range data.Covers {
+			switch cv.State {
+			case "open":
+				open++
+			case "closed":
+				closed++
+			default: // opening, closing, stopped
+				moving++
+			}
+		}
+	}
+	return open, closed, moving
 }
 
 // IsLoading returns true if initial load is in progress.

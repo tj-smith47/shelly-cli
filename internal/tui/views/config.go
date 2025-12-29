@@ -41,20 +41,21 @@ const (
 type configLoadPhase int
 
 const (
-	configLoadIdle configLoadPhase = iota
-	configLoadWifi
-	configLoadSystem
-	configLoadCloud
-	configLoadInputs
-	configLoadBLE
-	configLoadProtocols
-	configLoadSecurity
-	configLoadSmartHome
+	configLoadIdle      configLoadPhase = iota
+	configLoadWifi                      // Panel 2
+	configLoadSystem                    // Panel 3
+	configLoadCloud                     // Panel 4
+	configLoadSecurity                  // Panel 5
+	configLoadBLE                       // Panel 6
+	configLoadInputs                    // Panel 7
+	configLoadProtocols                 // Panel 8
+	configLoadSmartHome                 // Panel 9
 )
 
 // configLoadNextMsg triggers loading the next component in sequence.
 type configLoadNextMsg struct {
-	phase configLoadPhase
+	phase  configLoadPhase
+	device string // Track device to prevent stale messages from advancing phase
 }
 
 // ConfigDeps holds dependencies for the config view.
@@ -227,42 +228,44 @@ func (c *Config) SetDevice(device string) tea.Cmd {
 	// Start sequential loading with first component
 	c.loadPhase = configLoadWifi
 	return func() tea.Msg {
-		return configLoadNextMsg{phase: configLoadWifi}
+		return configLoadNextMsg{phase: configLoadWifi, device: device}
 	}
 }
 
 // loadNextComponent triggers loading for the current phase.
+// Order matches Shift+N panel order: WiFi(2), System(3), Cloud(4), Security(5),
+// BLE(6), Inputs(7), Protocols(8), SmartHome(9).
 func (c *Config) loadNextComponent() tea.Cmd {
 	switch c.loadPhase {
-	case configLoadWifi:
+	case configLoadWifi: // Panel 2
 		newWifi, cmd := c.wifi.SetDevice(c.device)
 		c.wifi = newWifi
 		return cmd
-	case configLoadSystem:
+	case configLoadSystem: // Panel 3
 		newSystem, cmd := c.system.SetDevice(c.device)
 		c.system = newSystem
 		return cmd
-	case configLoadCloud:
+	case configLoadCloud: // Panel 4
 		newCloud, cmd := c.cloud.SetDevice(c.device)
 		c.cloud = newCloud
 		return cmd
-	case configLoadInputs:
-		newInputs, cmd := c.inputs.SetDevice(c.device)
-		c.inputs = newInputs
-		return cmd
-	case configLoadBLE:
-		newBLE, cmd := c.ble.SetDevice(c.device)
-		c.ble = newBLE
-		return cmd
-	case configLoadProtocols:
-		newProtocols, cmd := c.protocols.SetDevice(c.device)
-		c.protocols = newProtocols
-		return cmd
-	case configLoadSecurity:
+	case configLoadSecurity: // Panel 5
 		newSecurity, cmd := c.security.SetDevice(c.device)
 		c.security = newSecurity
 		return cmd
-	case configLoadSmartHome:
+	case configLoadBLE: // Panel 6
+		newBLE, cmd := c.ble.SetDevice(c.device)
+		c.ble = newBLE
+		return cmd
+	case configLoadInputs: // Panel 7
+		newInputs, cmd := c.inputs.SetDevice(c.device)
+		c.inputs = newInputs
+		return cmd
+	case configLoadProtocols: // Panel 8
+		newProtocols, cmd := c.protocols.SetDevice(c.device)
+		c.protocols = newProtocols
+		return cmd
+	case configLoadSmartHome: // Panel 9
 		newSmartHome, cmd := c.smarthome.SetDevice(c.device)
 		c.smarthome = newSmartHome
 		return cmd
@@ -273,20 +276,22 @@ func (c *Config) loadNextComponent() tea.Cmd {
 
 // advanceLoadPhase moves to the next loading phase and returns command to trigger it.
 func (c *Config) advanceLoadPhase() tea.Cmd {
+	device := c.device // Capture current device for the closure
+	// Loading order follows Shift+N panel order: 2, 3, 4, 5, 6, 7, 8, 9
 	switch c.loadPhase {
-	case configLoadWifi:
+	case configLoadWifi: // Panel 2 -> Panel 3
 		c.loadPhase = configLoadSystem
-	case configLoadSystem:
+	case configLoadSystem: // Panel 3 -> Panel 4
 		c.loadPhase = configLoadCloud
-	case configLoadCloud:
-		c.loadPhase = configLoadInputs
-	case configLoadInputs:
-		c.loadPhase = configLoadBLE
-	case configLoadBLE:
-		c.loadPhase = configLoadProtocols
-	case configLoadProtocols:
+	case configLoadCloud: // Panel 4 -> Panel 5
 		c.loadPhase = configLoadSecurity
-	case configLoadSecurity:
+	case configLoadSecurity: // Panel 5 -> Panel 6
+		c.loadPhase = configLoadBLE
+	case configLoadBLE: // Panel 6 -> Panel 7
+		c.loadPhase = configLoadInputs
+	case configLoadInputs: // Panel 7 -> Panel 8
+		c.loadPhase = configLoadProtocols
+	case configLoadProtocols: // Panel 8 -> Panel 9
 		c.loadPhase = configLoadSmartHome
 	case configLoadSmartHome:
 		c.loadPhase = configLoadIdle
@@ -294,8 +299,9 @@ func (c *Config) advanceLoadPhase() tea.Cmd {
 	default:
 		return nil
 	}
+	nextPhase := c.loadPhase // Capture for closure
 	return func() tea.Msg {
-		return configLoadNextMsg{phase: c.loadPhase}
+		return configLoadNextMsg{phase: nextPhase, device: device}
 	}
 }
 
@@ -321,7 +327,8 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 
 	// Handle sequential loading messages
 	if loadMsg, ok := msg.(configLoadNextMsg); ok {
-		if loadMsg.phase == c.loadPhase {
+		// Only process if device matches current device (prevents stale messages)
+		if loadMsg.phase == c.loadPhase && loadMsg.device == c.device {
 			cmd := c.loadNextComponent()
 			cmds = append(cmds, cmd)
 		}
@@ -385,12 +392,45 @@ func (c *Config) handleEditClosedMsg(msg tea.Msg) tea.Cmd {
 }
 
 // handleComponentLoaded checks for component completion messages and advances loading.
+// Only advances if the message is for the current device to prevent stale responses.
 func (c *Config) handleComponentLoaded(msg tea.Msg) tea.Cmd {
 	expectedPhase := c.phaseForMessage(msg)
-	if expectedPhase != configLoadIdle && c.loadPhase == expectedPhase {
-		return c.advanceLoadPhase()
+	if expectedPhase == configLoadIdle || c.loadPhase != expectedPhase {
+		return nil
 	}
-	return nil
+
+	// Validate the component's device matches current device
+	// This prevents stale responses from advancing the phase
+	if !c.isComponentForCurrentDevice(expectedPhase) {
+		return nil
+	}
+
+	return c.advanceLoadPhase()
+}
+
+// isComponentForCurrentDevice checks if the component for the given phase
+// is configured for the current device.
+func (c *Config) isComponentForCurrentDevice(phase configLoadPhase) bool {
+	switch phase {
+	case configLoadWifi:
+		return c.wifi.Device() == c.device
+	case configLoadSystem:
+		return c.system.Device() == c.device
+	case configLoadCloud:
+		return c.cloud.Device() == c.device
+	case configLoadInputs:
+		return c.inputs.Device() == c.device
+	case configLoadBLE:
+		return c.ble.Device() == c.device
+	case configLoadProtocols:
+		return c.protocols.Device() == c.device
+	case configLoadSecurity:
+		return c.security.Device() == c.device
+	case configLoadSmartHome:
+		return c.smarthome.Device() == c.device
+	default:
+		return false
+	}
 }
 
 // phaseForMessage returns the load phase that corresponds to a message type.
@@ -718,4 +758,45 @@ func (c *Config) SetViewFocused(focused bool) *Config {
 	c.viewFocused = focused
 	c.updateFocusStates()
 	return c
+}
+
+// HasActiveModal returns true if any component has an edit modal visible.
+// Implements ModalProvider interface.
+func (c *Config) HasActiveModal() bool {
+	return c.wifi.IsEditing() ||
+		c.system.IsEditing() ||
+		c.cloud.IsEditing() ||
+		c.inputs.IsEditing() ||
+		c.ble.IsEditing() ||
+		c.protocols.IsEditing() ||
+		c.security.IsEditing()
+	// smarthome doesn't have an edit modal
+}
+
+// RenderModal returns the active modal's view for full-screen overlay rendering.
+// Implements ModalProvider interface.
+func (c *Config) RenderModal() string {
+	// Return the first active modal's view
+	if c.wifi.IsEditing() {
+		return c.wifi.RenderEditModal()
+	}
+	if c.system.IsEditing() {
+		return c.system.RenderEditModal()
+	}
+	if c.cloud.IsEditing() {
+		return c.cloud.RenderEditModal()
+	}
+	if c.inputs.IsEditing() {
+		return c.inputs.RenderEditModal()
+	}
+	if c.ble.IsEditing() {
+		return c.ble.RenderEditModal()
+	}
+	if c.protocols.IsEditing() {
+		return c.protocols.RenderEditModal()
+	}
+	if c.security.IsEditing() {
+		return c.security.RenderEditModal()
+	}
+	return ""
 }

@@ -183,7 +183,7 @@ func (d SearchableDropdown) handleKey(msg tea.KeyPressMsg) (SearchableDropdown, 
 		d.searchInput.SetValue("")
 		d = d.applyFilter()
 		return d, textinput.Blink
-	case "esc":
+	case "esc", "ctrl+[":
 		if d.expanded {
 			d.expanded = false
 			d.searchInput.Blur()

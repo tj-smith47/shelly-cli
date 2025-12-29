@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // EditField represents a field in the input edit form.
@@ -276,7 +277,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	key := msg.String()
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		if m.saving {
 			return m, nil
 		}
@@ -475,46 +476,34 @@ func (m EditModel) View() string {
 		return ""
 	}
 
+	// Build footer
+	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
+	if m.saving {
+		footer = "Saving..."
+	}
+
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, "Edit Input", footer)
+
+	// Build content
 	var content strings.Builder
 
-	// Title
-	content.WriteString(m.styles.Title.Render("Edit Input"))
-	content.WriteString("\n\n")
-
-	// Input ID info
+	// Input ID info (indented to align with form fields)
+	content.WriteString("  ")
 	content.WriteString(m.styles.Info.Render("Input ID: "))
 	content.WriteString(m.styles.Selector.Render(strconv.Itoa(m.inputID)))
 	content.WriteString("\n\n")
 
 	// Form fields
 	content.WriteString(m.renderFormFields())
-	content.WriteString("\n\n")
 
 	// Error message
 	if m.err != nil {
+		content.WriteString("\n")
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
-		content.WriteString("\n\n")
 	}
 
-	// Saving indicator
-	if m.saving {
-		content.WriteString(m.styles.Info.Render("Saving..."))
-		content.WriteString("\n\n")
-	}
-
-	// Help
-	content.WriteString(m.styles.Help.Render("Tab: next field • Enter/Ctrl+S: save • Esc: cancel"))
-
-	// Calculate modal dimensions
-	modalWidth := 50
-	if m.width > 0 && m.width < modalWidth+10 {
-		modalWidth = m.width - 10
-	}
-
-	modal := m.styles.Modal.Width(modalWidth).Render(content.String())
-
-	// Center the modal
-	return m.centerModal(modal)
+	return r.SetContent(content.String()).Render()
 }
 
 func (m EditModel) renderFormFields() string {
@@ -543,49 +532,15 @@ func (m EditModel) renderFormFields() string {
 }
 
 func (m EditModel) renderField(field EditField, label, value string) string {
-	labelStyle := m.styles.Label
+	var selector, labelStr string
 	if m.cursor == field {
-		labelStyle = m.styles.LabelFocus
+		selector = m.styles.Selector.Render("▶ ")
+		labelStr = m.styles.LabelFocus.Render(label)
+	} else {
+		selector = "  "
+		labelStr = m.styles.Label.Render(label)
 	}
-	return labelStyle.Render(label) + " " + value
-}
-
-func (m EditModel) centerModal(modal string) string {
-	if m.width == 0 || m.height == 0 {
-		return modal
-	}
-
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	// Calculate padding
-	topPadding := (m.height - modalHeight) / 2
-	if topPadding < 0 {
-		topPadding = 0
-	}
-	leftPadding := (m.width - modalWidth) / 2
-	if leftPadding < 0 {
-		leftPadding = 0
-	}
-
-	// Build centered output
-	var result strings.Builder
-	for range topPadding {
-		result.WriteString("\n")
-	}
-	for _, line := range lines {
-		result.WriteString(strings.Repeat(" ", leftPadding))
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
+	return selector + labelStr + " " + value
 }
 
 // InputID returns the current input ID being edited.

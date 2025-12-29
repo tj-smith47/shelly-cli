@@ -41,6 +41,17 @@ type View interface {
 	ID() ViewID
 }
 
+// ModalProvider is implemented by views that can show modal overlays.
+// When a modal is active, it should be rendered full-screen by the app
+// and global navigation keys should be blocked.
+type ModalProvider interface {
+	// HasActiveModal returns true if a modal overlay is currently visible.
+	HasActiveModal() bool
+	// RenderModal returns the modal content to be rendered as a full-screen overlay.
+	// This is only called when HasActiveModal returns true.
+	RenderModal() string
+}
+
 // ViewChangedMsg is sent when the active view changes.
 type ViewChangedMsg struct {
 	Previous ViewID
@@ -253,4 +264,25 @@ func (m *Manager) PropagateDevice(device string) tea.Cmd {
 		return nil
 	}
 	return tea.Batch(cmds...)
+}
+
+// HasActiveModal returns true if the active view has a modal overlay visible.
+func (m *Manager) HasActiveModal() bool {
+	if v := m.views[m.active]; v != nil {
+		if mp, ok := v.(ModalProvider); ok {
+			return mp.HasActiveModal()
+		}
+	}
+	return false
+}
+
+// RenderActiveModal returns the modal content from the active view.
+// Returns empty string if no modal is active.
+func (m *Manager) RenderActiveModal() string {
+	if v := m.views[m.active]; v != nil {
+		if mp, ok := v.(ModalProvider); ok && mp.HasActiveModal() {
+			return mp.RenderModal()
+		}
+	}
+	return ""
 }

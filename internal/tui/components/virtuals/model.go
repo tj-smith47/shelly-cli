@@ -705,3 +705,16 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 func (m Model) FooterText() string {
 	return "j/k:scroll g/G:top/bottom enter:details"
 }
+
+// IsEditing returns whether the edit modal is currently visible.
+func (m Model) IsEditing() bool {
+	return m.editing
+}
+
+// RenderEditModal returns the edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if !m.editing {
+		return ""
+	}
+	return m.editModal.View()
+}

@@ -14,6 +14,7 @@ import (
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // EditField represents a field in the KVS edit form.
@@ -78,22 +79,18 @@ type EditStyles struct {
 func DefaultEditStyles() EditStyles {
 	colors := theme.GetSemanticColors()
 	return EditStyles{
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
+		Modal: lipgloss.NewStyle(), // No longer used - using rendering package
 		Title: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true).
 			MarginBottom(1),
 		Label: lipgloss.NewStyle().
 			Foreground(colors.Muted).
-			Width(8),
+			Width(12),
 		LabelFocus: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true).
-			Width(8),
+			Width(12),
 		Error: lipgloss.NewStyle().
 			Foreground(colors.Error),
 		Help: lipgloss.NewStyle().
@@ -219,6 +216,15 @@ func (m EditModel) IsVisible() bool {
 func (m EditModel) SetSize(width, height int) EditModel {
 	m.width = width
 	m.height = height
+	// Use common modal helper for input sizing
+	inputWidth := rendering.ModalInputWidth(width)
+	m.keyInput = m.keyInput.SetWidth(inputWidth)
+	// Value textarea gets more height for JSON content
+	valueHeight := 10
+	if height > 40 {
+		valueHeight = 15
+	}
+	m.valueInput = m.valueInput.SetDimensions(inputWidth, valueHeight)
 	return m
 }
 
@@ -256,7 +262,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	key := msg.String()
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
@@ -398,26 +404,22 @@ func (m EditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
-
-	// Title
+	// Build title
+	title := "Edit KVS Entry"
 	if m.isNew {
-		content.WriteString(m.styles.Title.Render("New KVS Entry"))
-	} else {
-		content.WriteString(m.styles.Title.Render("Edit KVS Entry"))
+		title = "New KVS Entry"
 	}
-	content.WriteString("\n\n")
 
-	// Form fields
-	content.WriteString(m.renderFormFields())
+	// Build footer with keybindings
+	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
+	if m.saving {
+		footer = "Saving..."
+	}
 
-	// Render modal box
-	modalContent := content.String()
-	modalWidth := min(60, m.width-4)
-	modal := m.styles.Modal.Width(modalWidth).Render(modalContent)
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, title, footer)
 
-	// Center the modal
-	return m.centerModal(modal)
+	return r.SetContent(m.renderFormFields()).Render()
 }
 
 func (m EditModel) renderFormFields() string {
@@ -439,12 +441,7 @@ func (m EditModel) renderFormFields() string {
 	if m.err != nil {
 		content.WriteString("\n")
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
-		content.WriteString("\n")
 	}
-
-	// Help text
-	content.WriteString("\n")
-	content.WriteString(m.renderHelpText())
 
 	return content.String()
 }
@@ -461,48 +458,4 @@ func (m EditModel) renderField(field EditField, label, input string) string {
 	}
 
 	return selector + labelStr + " " + input
-}
-
-func (m EditModel) renderHelpText() string {
-	if m.saving {
-		return m.styles.Help.Render("Saving...")
-	}
-	return m.styles.Help.Render("Tab: Next | Ctrl+S: Save | Esc: Cancel")
-}
-
-func (m EditModel) centerModal(modal string) string {
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	// Calculate centering
-	topPad := (m.height - modalHeight) / 2
-	leftPad := (m.width - modalWidth) / 2
-
-	if topPad < 0 {
-		topPad = 0
-	}
-	if leftPad < 0 {
-		leftPad = 0
-	}
-
-	// Build centered output
-	var result strings.Builder
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	padding := strings.Repeat(" ", leftPad)
-	for _, line := range lines {
-		result.WriteString(padding)
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
 }

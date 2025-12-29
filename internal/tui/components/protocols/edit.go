@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // MQTTEditField represents a field in the MQTT edit form.
@@ -328,7 +329,7 @@ func (m MQTTEditModel) handleKey(msg tea.KeyPressMsg) (MQTTEditModel, tea.Cmd) {
 	}
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return MQTTEditClosedMsg{Saved: false} }
 
@@ -508,11 +509,17 @@ func (m MQTTEditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
+	// Build footer
+	footer := "Tab: Next | Enter: Save | Esc: Cancel"
+	if m.saving {
+		footer = "Saving..."
+	}
 
-	// Title
-	content.WriteString(m.styles.Title.Render("MQTT Configuration"))
-	content.WriteString("\n\n")
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, "MQTT Configuration", footer)
+
+	// Build content
+	var content strings.Builder
 
 	// Connection status (if we have original data)
 	if m.originalData != nil {
@@ -523,13 +530,7 @@ func (m MQTTEditModel) View() string {
 	// Form fields
 	content.WriteString(m.renderFormFields())
 
-	// Render modal box
-	modalContent := content.String()
-	modalWidth := min(60, m.width-4)
-	modal := m.styles.Modal.Width(modalWidth).Render(modalContent)
-
-	// Center the modal
-	return m.centerModal(modal)
+	return r.SetContent(content.String()).Render()
 }
 
 func (m MQTTEditModel) renderConnectionStatus() string {
@@ -579,18 +580,12 @@ func (m MQTTEditModel) renderFormFields() string {
 
 	// TLS settings
 	content.WriteString(m.renderField(MQTTFieldTLS, "TLS:", m.tlsDropdown.View()))
-	content.WriteString("\n")
 
 	// Error display
 	if m.err != nil {
-		content.WriteString("\n")
+		content.WriteString("\n\n")
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
-		content.WriteString("\n")
 	}
-
-	// Help text
-	content.WriteString("\n")
-	content.WriteString(m.renderHelpText())
 
 	return content.String()
 }
@@ -607,48 +602,4 @@ func (m MQTTEditModel) renderField(field MQTTEditField, label, input string) str
 	}
 
 	return selector + labelStr + " " + input
-}
-
-func (m MQTTEditModel) renderHelpText() string {
-	if m.saving {
-		return m.styles.Help.Render("Saving...")
-	}
-	return m.styles.Help.Render("Tab: Next | Enter: Save | Esc: Cancel")
-}
-
-func (m MQTTEditModel) centerModal(modal string) string {
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	// Calculate centering
-	topPad := (m.height - modalHeight) / 2
-	leftPad := (m.width - modalWidth) / 2
-
-	if topPad < 0 {
-		topPad = 0
-	}
-	if leftPad < 0 {
-		leftPad = 0
-	}
-
-	// Build centered output
-	var result strings.Builder
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	padding := strings.Repeat(" ", leftPad)
-	for _, line := range lines {
-		result.WriteString(padding)
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
 }

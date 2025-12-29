@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // EditMode represents which section is being edited.
@@ -298,7 +299,7 @@ func (m EditModel) handleKeyPress(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "esc":
+	case "esc", "ctrl+[":
 		return m.Hide(), nil
 
 	case "tab", "shift+tab":
@@ -431,11 +432,17 @@ func (m EditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
+	// Build footer with keybindings
+	footer := "Tab: Mode | ↑↓: Navigate | Space: Toggle | Ctrl+S: Save | Esc: Cancel"
+	if m.saving {
+		footer = "Saving..."
+	}
 
-	// Title
-	content.WriteString(m.styles.Title.Render("Edit WiFi Settings"))
-	content.WriteString("\n\n")
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, "Edit WiFi Settings", footer)
+
+	// Build content
+	var content strings.Builder
 
 	// Tab bar
 	content.WriteString(m.renderTabs())
@@ -454,27 +461,7 @@ func (m EditModel) View() string {
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
 	}
 
-	// Help
-	content.WriteString("\n\n")
-	if m.saving {
-		content.WriteString(m.styles.Help.Render("Saving..."))
-	} else {
-		content.WriteString(m.styles.Help.Render("Tab:switch mode | ↑↓:navigate | Space:toggle | Ctrl+S:save | Esc:cancel"))
-	}
-
-	// Apply container style
-	modalWidth := m.width * 60 / 100
-	if modalWidth < 50 {
-		modalWidth = 50
-	}
-	if modalWidth > 80 {
-		modalWidth = 80
-	}
-
-	modal := m.styles.Container.Width(modalWidth).Render(content.String())
-
-	// Center in container
-	return m.centerModal(modal, modalWidth)
+	return r.SetContent(content.String()).Render()
 }
 
 func (m EditModel) renderTabs() string {
@@ -564,38 +551,6 @@ func (m EditModel) networksHint() string {
 		hint += fmt.Sprintf(" (+%d more)", len(m.networks)-3)
 	}
 	return hint
-}
-
-func (m EditModel) centerModal(modal string, modalWidth int) string {
-	if m.width == 0 || m.height == 0 {
-		return modal
-	}
-
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-
-	leftPad := (m.width - modalWidth) / 2
-	topPad := (m.height - modalHeight) / 2
-
-	if leftPad < 0 {
-		leftPad = 0
-	}
-	if topPad < 0 {
-		topPad = 0
-	}
-
-	var result strings.Builder
-	leftPadStr := strings.Repeat(" ", leftPad)
-
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	for _, line := range lines {
-		result.WriteString(leftPadStr + line + "\n")
-	}
-
-	return result.String()
 }
 
 // Saving returns whether a save is in progress.

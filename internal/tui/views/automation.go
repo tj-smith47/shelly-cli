@@ -838,3 +838,24 @@ func (a *Automation) SetViewFocused(focused bool) *Automation {
 	a.updateFocusStates()
 	return a
 }
+
+// HasActiveModal returns true if any component has a modal overlay visible.
+// Implements ModalProvider interface.
+func (a *Automation) HasActiveModal() bool {
+	return a.webhooks.IsEditing() || a.virtuals.IsEditing() || a.kvs.IsEditing()
+}
+
+// RenderModal returns the active modal content for full-screen rendering.
+// Implements ModalProvider interface.
+func (a *Automation) RenderModal() string {
+	if a.webhooks.IsEditing() {
+		return a.webhooks.RenderEditModal()
+	}
+	if a.virtuals.IsEditing() {
+		return a.virtuals.RenderEditModal()
+	}
+	if a.kvs.IsEditing() {
+		return a.kvs.RenderEditModal()
+	}
+	return ""
+}

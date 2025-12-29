@@ -459,7 +459,7 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		newModel, cmd := m.handleCommand(msg)
 		return newModel, cmd, true
 	case cmdmode.ErrorMsg:
-		return m, statusbar.SetMessage(msg.Message, statusbar.MessageError), true
+		return m, toast.Error(msg.Message), true
 	default:
 		return m.handleViewAndComponentMsgs(msg)
 	}
@@ -656,6 +656,13 @@ func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool)
 		return m, cmd, true
 	}
 
+	// If a view has an active modal (edit modal, etc.), forward all keys to that view
+	// This blocks global navigation keys (Tab, Shift+N, etc.) when modals are open
+	if m.viewManager.HasActiveModal() {
+		cmd := m.viewManager.Update(msg)
+		return m, cmd, true
+	}
+
 	return m.handleKeyPress(msg)
 }
 
@@ -711,12 +718,12 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) Model {
 }
 
 // updateViewManagerSize recalculates and sets the view manager size
-// based on current input bar state (search or command mode).
+// based on current input bar state (search, command mode, or toast).
 func (m Model) updateViewManagerSize() Model {
 	tabBarHeight := 1
 	footerHeight := 2
 	inputHeight := 0
-	if m.search.IsActive() || m.cmdMode.IsActive() {
+	if m.search.IsActive() || m.cmdMode.IsActive() || m.toast.HasToasts() {
 		inputHeight = 3 // Input bar has top border, content, bottom border
 	}
 	contentHeight := m.height - branding.BannerHeight() - tabBarHeight - footerHeight - inputHeight
@@ -726,21 +733,15 @@ func (m Model) updateViewManagerSize() Model {
 
 // handleDeviceAction handles device action results.
 func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
-	var statusCmd tea.Cmd
+	var toastCmd tea.Cmd
 	var eventLevel, eventDesc string
 
 	if msg.Err != nil {
-		statusCmd = statusbar.SetMessage(
-			msg.Device+": "+msg.Action+" failed - "+msg.Err.Error(),
-			statusbar.MessageError,
-		)
+		toastCmd = toast.Error(msg.Device + ": " + msg.Action + " failed - " + msg.Err.Error())
 		eventLevel = "error"
 		eventDesc = msg.Action + " failed: " + msg.Err.Error()
 	} else {
-		statusCmd = statusbar.SetMessage(
-			msg.Device+": "+msg.Action+" success",
-			statusbar.MessageSuccess,
-		)
+		toastCmd = toast.Success(msg.Device + ": " + msg.Action + " success")
 		eventLevel = "info"
 		eventDesc = msg.Action + " executed successfully"
 	}
@@ -756,31 +757,28 @@ func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
 	var evtCmd tea.Cmd
 	m.events, evtCmd = m.events.Update(events.EventMsg{Events: []events.Event{evt}})
 
-	return m, tea.Batch(statusCmd, evtCmd)
+	return m, tea.Batch(toastCmd, evtCmd)
 }
 
 // updateStatusBarContext updates the status bar with context-specific items.
 func (m Model) updateStatusBarContext() Model {
-	total := m.cache.DeviceCount()
-	online := m.cache.OnlineCount()
+	// Get component counts from cache
+	switchesOn, switchesOff := m.cache.SwitchCounts()
+	lightsOn, lightsOff := m.cache.LightCounts()
+	coversOpen, coversClosed, coversMoving := m.cache.CoverCounts()
 
+	m.statusBar = m.statusBar.SetComponentCounts(statusbar.ComponentCounts{
+		SwitchesOn:   switchesOn,
+		SwitchesOff:  switchesOff,
+		LightsOn:     lightsOn,
+		LightsOff:    lightsOff,
+		CoversOpen:   coversOpen,
+		CoversClosed: coversClosed,
+		CoversMoving: coversMoving,
+	})
+
+	// Clear legacy items (device counts replaced by component counts)
 	m.statusBar = m.statusBar.ClearItems()
-
-	if total > 0 {
-		m.statusBar = m.statusBar.AddItem(
-			fmt.Sprintf("%d devices (%d online)", total, online),
-			fmt.Sprintf("%d (%d on)", total, online),
-			fmt.Sprintf("%d/%d", total, online),
-		)
-	}
-
-	if m.filter != "" {
-		m.statusBar = m.statusBar.AddItem(
-			fmt.Sprintf("Filter: %s", m.filter),
-			fmt.Sprintf("F: %s", m.filter),
-			"F",
-		)
-	}
 
 	return m
 }
@@ -798,20 +796,20 @@ func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
 		m.deviceList = m.deviceList.SetFilter(msg.Args)
 		m.deviceList = m.deviceList.SetCursor(0)
 		if msg.Args == "" {
-			return m, statusbar.SetMessage("Filter cleared", statusbar.MessageSuccess)
+			return m, toast.Success("Filter cleared")
 		}
-		return m, statusbar.SetMessage("Filter: "+msg.Args, statusbar.MessageSuccess)
+		return m, toast.Success("Filter: " + msg.Args)
 
 	case cmdmode.CmdTheme:
 		if !theme.SetTheme(msg.Args) {
-			return m, statusbar.SetMessage("Invalid theme: "+msg.Args, statusbar.MessageError)
+			return m, toast.Error("Invalid theme: " + msg.Args)
 		}
 		m.styles = DefaultStyles()
-		return m, statusbar.SetMessage("Theme: "+msg.Args, statusbar.MessageSuccess)
+		return m, toast.Success("Theme: " + msg.Args)
 
 	case cmdmode.CmdView:
 		// Views are collapsed - just acknowledge command
-		return m, statusbar.SetMessage("Single unified view", statusbar.MessageSuccess)
+		return m, toast.Info("Single unified view")
 
 	case cmdmode.CmdHelp:
 		m.help = m.help.SetSize(m.width, m.height)
@@ -823,10 +821,10 @@ func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
 		if cmd := m.executeDeviceAction("toggle"); cmd != nil {
 			return m, cmd
 		}
-		return m, statusbar.SetMessage("No device selected or device offline", statusbar.MessageError)
+		return m, toast.Error("No device selected or device offline")
 
 	default:
-		return m, statusbar.SetMessage("Unknown command", statusbar.MessageError)
+		return m, toast.Error("Unknown command")
 	}
 }
 
@@ -1691,6 +1689,11 @@ func (m Model) View() tea.View {
 		content = m.renderWithHelpOverlay(content, contentHeight)
 	}
 
+	// Render view modal overlay (edit modals from Config, Automation views)
+	if m.viewManager.HasActiveModal() {
+		content = m.renderWithModalOverlay(content, contentHeight)
+	}
+
 	// Compose the layout
 	result := m.composeLayout(headerBanner, tabBarView, inputBar, content)
 	result = m.applyOverlays(result)
@@ -1703,13 +1706,18 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// renderInputBar renders the search or command mode input bar.
+// renderInputBar renders the search, command mode, or toast input bar.
+// Priority: search > cmdmode > toast (only one shows at a time).
 func (m Model) renderInputBar() string {
 	if m.search.IsActive() {
 		return m.search.View()
 	}
 	if m.cmdMode.IsActive() {
 		return m.cmdMode.View()
+	}
+	// Show toast in input bar area when no other input is active
+	if m.toast.HasToasts() {
+		return m.toast.ViewAsInputBar()
 	}
 	return ""
 }
@@ -1782,11 +1790,9 @@ func (m Model) composeLayout(header, tabBar, inputBar, content string) string {
 	return lipgloss.JoinVertical(lipgloss.Left, header, tabBar, content, footer)
 }
 
-// applyOverlays applies toast, confirm, and device detail overlays.
+// applyOverlays applies confirm and device detail overlays.
+// Note: Toast is now rendered in the input bar area (renderInputBar), not as an overlay.
 func (m Model) applyOverlays(result string) string {
-	if m.toast.HasToasts() {
-		result = m.toast.Overlay(result)
-	}
 	if m.confirm.Visible() {
 		result = m.confirm.Overlay(result)
 	}
@@ -2268,6 +2274,25 @@ func (m Model) renderWithHelpOverlay(content string, contentHeight int) string {
 		lipgloss.Center,
 		lipgloss.Center,
 		helpView,
+		lipgloss.WithWhitespaceChars(" "),
+	)
+}
+
+// renderWithModalOverlay renders a view modal as a centered overlay on top of main content.
+// This handles edit modals from Config and Automation views.
+func (m Model) renderWithModalOverlay(content string, contentHeight int) string {
+	modalView := m.viewManager.RenderActiveModal()
+	if modalView == "" {
+		return content
+	}
+
+	// Center the modal overlay on top of the content (same as help overlay)
+	return lipgloss.Place(
+		m.width,
+		contentHeight,
+		lipgloss.Center,
+		lipgloss.Center,
+		modalView,
 		lipgloss.WithWhitespaceChars(" "),
 	)
 }

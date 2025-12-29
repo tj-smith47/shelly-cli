@@ -6,7 +6,11 @@ import (
 	"time"
 )
 
-const testModelSHSW1 = "SHSW-1"
+const (
+	testModelSHSW1 = "SHSW-1"
+	testScriptName = "my-script"
+	testScriptCode = "console.log('hello');"
+)
 
 func TestManager_Path(t *testing.T) {
 	t.Parallel()
@@ -296,7 +300,7 @@ func TestManager_ScriptTemplateOperations(t *testing.T) {
 	tpl := ScriptTemplate{
 		Name:        "my-script",
 		Description: "Test script",
-		Code:        "console.log('hello');",
+		Code:        testScriptCode,
 		Category:    "utility",
 	}
 	if err := m.SaveScriptTemplate(tpl); err != nil {
@@ -308,8 +312,8 @@ func TestManager_ScriptTemplateOperations(t *testing.T) {
 	if !ok {
 		t.Fatal("GetScriptTemplate() returned false")
 	}
-	if got.Code != "console.log('hello');" {
-		t.Errorf("Code = %q, want %q", got.Code, "console.log('hello');")
+	if got.Code != testScriptCode {
+		t.Errorf("Code = %q, want %q", got.Code, testScriptCode)
 	}
 
 	// List script templates

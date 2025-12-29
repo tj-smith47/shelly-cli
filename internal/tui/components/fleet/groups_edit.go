@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // GroupEditMode represents the mode of the group edit modal.
@@ -302,7 +303,7 @@ func (m GroupEditModel) handleKey(msg tea.KeyPressMsg) (GroupEditModel, tea.Cmd)
 	}
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return GroupEditClosedMsg{Saved: false} }
 
@@ -509,31 +510,50 @@ func (m GroupEditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
-
+	// Build title and footer based on mode
+	var title, footer string
 	switch m.mode {
 	case GroupEditModeDelete:
-		content.WriteString(m.renderDeleteConfirmation())
+		title = "Delete Group"
+		if m.saving {
+			footer = "Deleting..."
+		} else {
+			footer = "y: Delete | n/Esc: Cancel"
+		}
+	case GroupEditModeCreate:
+		title = "Create Group"
+		footer = m.buildEditFooter()
 	default:
-		content.WriteString(m.renderEditForm())
+		title = "Edit Group"
+		footer = m.buildEditFooter()
 	}
 
-	// Render modal box
-	modalWidth := min(60, m.width-4)
-	if modalWidth < 40 {
-		modalWidth = 40
-	}
-	modal := m.styles.Modal.Width(modalWidth).Render(content.String())
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, title, footer)
 
-	// Center the modal
-	return m.centerModal(modal)
+	// Build content based on mode
+	var content string
+	if m.mode == GroupEditModeDelete {
+		content = m.renderDeleteContent()
+	} else {
+		content = m.renderEditContent()
+	}
+
+	return r.SetContent(content).Render()
 }
 
-func (m GroupEditModel) renderDeleteConfirmation() string {
-	var content strings.Builder
+func (m GroupEditModel) buildEditFooter() string {
+	if m.saving {
+		return "Saving..."
+	}
+	if m.cursor == GroupEditFieldDevices {
+		return "j/k: Navigate | Space: Toggle | Ctrl+S/Enter: Save | Esc: Cancel"
+	}
+	return "Tab: Next field | Ctrl+S: Save | Esc: Cancel"
+}
 
-	content.WriteString(m.styles.Title.Render("Delete Group"))
-	content.WriteString("\n\n")
+func (m GroupEditModel) renderDeleteContent() string {
+	var content strings.Builder
 
 	if m.original != nil {
 		content.WriteString(m.styles.Warning.Render("Are you sure you want to delete this group?"))
@@ -543,33 +563,18 @@ func (m GroupEditModel) renderDeleteConfirmation() string {
 		content.WriteString("\n")
 		content.WriteString(m.styles.Label.Render("Devices: "))
 		content.WriteString(m.styles.DeviceName.Render(fmt.Sprintf("%d", len(m.original.DeviceIDs))))
-		content.WriteString("\n\n")
 	}
 
 	if m.err != nil {
-		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
 		content.WriteString("\n\n")
-	}
-
-	if m.saving {
-		content.WriteString(m.styles.Help.Render("Deleting..."))
-	} else {
-		content.WriteString(m.styles.Help.Render("y: Delete | n/Esc: Cancel"))
+		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
 	}
 
 	return content.String()
 }
 
-func (m GroupEditModel) renderEditForm() string {
+func (m GroupEditModel) renderEditContent() string {
 	var content strings.Builder
-
-	// Title
-	if m.mode == GroupEditModeCreate {
-		content.WriteString(m.styles.Title.Render("Create Group"))
-	} else {
-		content.WriteString(m.styles.Title.Render("Edit Group"))
-	}
-	content.WriteString("\n\n")
 
 	// Name field
 	content.WriteString(m.renderField(GroupEditFieldName, "Name:", m.nameInput.View()))
@@ -577,18 +582,12 @@ func (m GroupEditModel) renderEditForm() string {
 
 	// Devices field
 	content.WriteString(m.renderDevicesField())
-	content.WriteString("\n")
 
 	// Error display
 	if m.err != nil {
-		content.WriteString("\n")
+		content.WriteString("\n\n")
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
-		content.WriteString("\n")
 	}
-
-	// Help text
-	content.WriteString("\n")
-	content.WriteString(m.renderHelpText())
 
 	return content.String()
 }
@@ -688,55 +687,6 @@ func (m GroupEditModel) renderDeviceLine(device integrator.AccountDevice, isSele
 	}
 
 	return line.String()
-}
-
-func (m GroupEditModel) renderHelpText() string {
-	if m.saving {
-		return m.styles.Help.Render("Saving...")
-	}
-
-	if m.cursor == GroupEditFieldDevices {
-		return m.styles.Help.Render("j/k: Navigate | Space: Toggle | Ctrl+S/Enter: Save | Esc: Cancel")
-	}
-
-	return m.styles.Help.Render("Tab: Next field | Ctrl+S: Save | Esc: Cancel")
-}
-
-func (m GroupEditModel) centerModal(modal string) string {
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	// Calculate centering
-	topPad := (m.height - modalHeight) / 2
-	leftPad := (m.width - modalWidth) / 2
-
-	if topPad < 0 {
-		topPad = 0
-	}
-	if leftPad < 0 {
-		leftPad = 0
-	}
-
-	// Build centered output
-	var result strings.Builder
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	padding := strings.Repeat(" ", leftPad)
-	for _, line := range lines {
-		result.WriteString(padding)
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
 }
 
 // Mode returns the current edit mode.

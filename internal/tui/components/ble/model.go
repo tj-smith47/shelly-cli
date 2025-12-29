@@ -187,6 +187,7 @@ func (m Model) startDiscovery() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
+	m.loader = m.loader.SetSize(width-4, height-4)
 	return m
 }
 
@@ -465,4 +466,17 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 	}
 	m.loading = true
 	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+}
+
+// IsEditing returns whether the edit modal is currently visible.
+func (m Model) IsEditing() bool {
+	return m.editing
+}
+
+// RenderEditModal returns the edit modal view for full-screen overlay rendering.
+func (m Model) RenderEditModal() string {
+	if !m.editing {
+		return ""
+	}
+	return m.editModal.View()
 }

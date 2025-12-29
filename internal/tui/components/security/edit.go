@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // EditField represents a field in the edit form.
@@ -257,7 +258,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	key := msg.String()
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
@@ -508,11 +509,25 @@ func (m EditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
+	// Build footer based on mode
+	var footer string
+	switch {
+	case m.saving:
+		footer = "Saving..."
+	case m.disableMode:
+		footer = "Enter: Confirm | Esc: Cancel"
+	default:
+		footer = "Enter: Save | Tab: Next | Esc: Cancel"
+		if m.authEnabled {
+			footer += " | d: Disable auth"
+		}
+	}
 
-	// Title
-	content.WriteString(m.styles.Title.Render("Authentication Settings"))
-	content.WriteString("\n\n")
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, "Authentication Settings", footer)
+
+	// Build content
+	var content strings.Builder
 
 	// Current status
 	content.WriteString(m.renderStatus())
@@ -524,13 +539,7 @@ func (m EditModel) View() string {
 		content.WriteString(m.renderPasswordForm())
 	}
 
-	// Render modal box
-	modalContent := content.String()
-	modalWidth := min(55, m.width-4)
-	modal := m.styles.Modal.Width(modalWidth).Render(modalContent)
-
-	// Center the modal
-	return m.centerModal(modal)
+	return r.SetContent(content.String()).Render()
 }
 
 func (m EditModel) renderDisableConfirmation() string {
@@ -562,24 +571,9 @@ func (m EditModel) renderPasswordForm() string {
 	// Error display
 	if m.err != nil {
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
-		content.WriteString("\n\n")
 	}
-
-	// Status/help
-	content.WriteString(m.renderHelpText())
 
 	return content.String()
-}
-
-func (m EditModel) renderHelpText() string {
-	if m.saving {
-		return m.styles.Help.Render("Saving...")
-	}
-	helpText := "Enter: Save | Tab: Next | Esc: Cancel"
-	if m.authEnabled {
-		helpText += " | d: Disable auth"
-	}
-	return m.styles.Help.Render(helpText)
 }
 
 func (m EditModel) renderStatus() string {
@@ -627,41 +621,4 @@ func (m EditModel) renderStrength(strength PasswordStrength) string {
 	default:
 		return ""
 	}
-}
-
-func (m EditModel) centerModal(modal string) string {
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	// Calculate centering
-	topPad := (m.height - modalHeight) / 2
-	leftPad := (m.width - modalWidth) / 2
-
-	if topPad < 0 {
-		topPad = 0
-	}
-	if leftPad < 0 {
-		leftPad = 0
-	}
-
-	// Build centered output
-	var result strings.Builder
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	padding := strings.Repeat(" ", leftPad)
-	for _, line := range lines {
-		result.WriteString(padding)
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
 }

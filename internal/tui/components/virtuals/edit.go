@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // EditField represents a field in the virtual component edit form.
@@ -288,7 +289,7 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	key := msg.String()
 
 	switch key {
-	case "esc":
+	case "esc", "ctrl+[":
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: false} }
 
@@ -562,26 +563,22 @@ func (m EditModel) View() string {
 		return ""
 	}
 
-	var content strings.Builder
-
-	// Title
+	// Build title and footer
+	title := "Edit Virtual Component"
 	if m.isNew {
-		content.WriteString(m.styles.Title.Render("New Virtual Component"))
-	} else {
-		content.WriteString(m.styles.Title.Render("Edit Virtual Component"))
+		title = "New Virtual Component"
 	}
-	content.WriteString("\n\n")
 
-	// Form fields
-	content.WriteString(m.renderFormFields())
+	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
+	if m.saving {
+		footer = "Saving..."
+	}
 
-	// Render modal box
-	modalContent := content.String()
-	modalWidth := min(55, m.width-4)
-	modal := m.styles.Modal.Width(modalWidth).Render(modalContent)
+	// Use common modal helper
+	r := rendering.NewModal(m.width, m.height, title, footer)
 
-	// Center the modal
-	return m.centerModal(modal)
+	// Build content
+	return r.SetContent(m.renderFormFields()).Render()
 }
 
 func (m EditModel) renderFormFields() string {
@@ -626,10 +623,6 @@ func (m EditModel) renderFormFields() string {
 		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
 	}
 
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.renderHelpText())
-
 	return content.String()
 }
 
@@ -666,48 +659,6 @@ func (m EditModel) renderField(field EditField, label, input string) string {
 	}
 
 	return selector + labelStr + " " + input
-}
-
-func (m EditModel) renderHelpText() string {
-	if m.saving {
-		return m.styles.Help.Render("Saving...")
-	}
-	return m.styles.Help.Render("Tab: Next | Ctrl+S: Save | Esc: Cancel")
-}
-
-func (m EditModel) centerModal(modal string) string {
-	lines := strings.Split(modal, "\n")
-	modalHeight := len(lines)
-	modalWidth := 0
-	for _, line := range lines {
-		if lipgloss.Width(line) > modalWidth {
-			modalWidth = lipgloss.Width(line)
-		}
-	}
-
-	topPad := (m.height - modalHeight) / 2
-	leftPad := (m.width - modalWidth) / 2
-
-	if topPad < 0 {
-		topPad = 0
-	}
-	if leftPad < 0 {
-		leftPad = 0
-	}
-
-	var result strings.Builder
-	for range topPad {
-		result.WriteString("\n")
-	}
-
-	padding := strings.Repeat(" ", leftPad)
-	for _, line := range lines {
-		result.WriteString(padding)
-		result.WriteString(line)
-		result.WriteString("\n")
-	}
-
-	return result.String()
 }
 
 func (m EditModel) buildRangeInfo(vType shelly.VirtualComponentType) string {

@@ -22,6 +22,17 @@ type StatusItem struct {
 	Minimal string // Minimal text for narrow terminals (<80)
 }
 
+// ComponentCounts holds counts for various component types.
+type ComponentCounts struct {
+	SwitchesOn   int
+	SwitchesOff  int
+	LightsOn     int
+	LightsOff    int
+	CoversOpen   int
+	CoversClosed int
+	CoversMoving int
+}
+
 // Model holds the status bar state.
 type Model struct {
 	width       int
@@ -31,6 +42,7 @@ type Model struct {
 	styles      Styles
 	items       []StatusItem
 	debugActive bool
+	counts      ComponentCounts
 }
 
 // MessageType indicates the type of status message.
@@ -49,16 +61,19 @@ const (
 
 // Styles for the status bar.
 type Styles struct {
-	Bar     lipgloss.Style
-	Left    lipgloss.Style
-	Right   lipgloss.Style
-	Normal  lipgloss.Style
-	Success lipgloss.Style
-	Error   lipgloss.Style
-	Warning lipgloss.Style
-	Version lipgloss.Style
-	Time    lipgloss.Style
-	Debug   lipgloss.Style
+	Bar        lipgloss.Style
+	Left       lipgloss.Style
+	Right      lipgloss.Style
+	Normal     lipgloss.Style
+	Success    lipgloss.Style
+	Error      lipgloss.Style
+	Warning    lipgloss.Style
+	Version    lipgloss.Style
+	Time       lipgloss.Style
+	Debug      lipgloss.Style
+	CountOn    lipgloss.Style // For "on" state counts
+	CountOff   lipgloss.Style // For "off" state counts
+	CountLabel lipgloss.Style // For component type labels
 }
 
 // DefaultStyles returns default styles for the status bar.
@@ -88,6 +103,12 @@ func DefaultStyles() Styles {
 		Debug: lipgloss.NewStyle().
 			Foreground(colors.Error).
 			Bold(true),
+		CountOn: lipgloss.NewStyle().
+			Foreground(colors.Online),
+		CountOff: lipgloss.NewStyle().
+			Foreground(colors.Muted),
+		CountLabel: lipgloss.NewStyle().
+			Foreground(colors.Text),
 	}
 }
 
@@ -180,6 +201,12 @@ func (m Model) IsDebugActive() bool {
 	return m.debugActive
 }
 
+// SetComponentCounts sets the component state counts for display.
+func (m Model) SetComponentCounts(counts ComponentCounts) Model {
+	m.counts = counts
+	return m
+}
+
 // Tier represents the status bar display tier.
 type Tier int
 
@@ -207,19 +234,8 @@ func (m Model) GetTier() Tier {
 func (m Model) View() string {
 	tier := m.GetTier()
 
-	// Left side: status message
-	var msgStyle lipgloss.Style
-	switch m.messageType {
-	case MessageSuccess:
-		msgStyle = m.styles.Success
-	case MessageError:
-		msgStyle = m.styles.Error
-	case MessageWarning:
-		msgStyle = m.styles.Warning
-	default:
-		msgStyle = m.styles.Normal
-	}
-	left := msgStyle.Render(m.message)
+	// Left side: component counts
+	left := m.renderComponentCounts(tier)
 
 	// Debug indicator (recording dot + text)
 	if m.debugActive {
@@ -227,13 +243,19 @@ func (m Model) View() string {
 		if tier == TierFull {
 			debugText = "Debug active"
 		}
-		left += "  " + m.styles.Debug.Render("● "+debugText)
+		if left != "" {
+			left += "  "
+		}
+		left += m.styles.Debug.Render("● " + debugText)
 	}
 
 	// Middle: context-specific items (if any)
 	middle := m.renderItems(tier)
 	if middle != "" {
-		left += "  " + middle
+		if left != "" {
+			left += "  "
+		}
+		left += middle
 	}
 
 	// Right side: version and time (tier-dependent)
@@ -266,6 +288,73 @@ func (m Model) View() string {
 	content := left + lipgloss.NewStyle().Width(spacing).Render("") + right
 
 	return m.styles.Bar.Width(m.width).Render(content)
+}
+
+// renderComponentCounts renders the component state counts based on tier.
+func (m Model) renderComponentCounts(tier Tier) string {
+	c := m.counts
+	hasSwitches := c.SwitchesOn > 0 || c.SwitchesOff > 0
+	hasLights := c.LightsOn > 0 || c.LightsOff > 0
+	hasCovers := c.CoversOpen > 0 || c.CoversClosed > 0 || c.CoversMoving > 0
+
+	if !hasSwitches && !hasLights && !hasCovers {
+		return ""
+	}
+
+	var parts []string
+
+	if hasSwitches {
+		parts = append(parts, m.formatComponentCount(tier, "Switches", "Sw", c.SwitchesOn, c.SwitchesOff))
+	}
+	if hasLights {
+		parts = append(parts, m.formatComponentCount(tier, "Lights", "Lt", c.LightsOn, c.LightsOff))
+	}
+	if hasCovers {
+		parts = append(parts, m.formatCoverCount(tier, c.CoversOpen, c.CoversClosed, c.CoversMoving))
+	}
+
+	sep := " │ "
+	if tier == TierMinimal {
+		sep = " "
+	}
+
+	return joinStrings(parts, sep)
+}
+
+// formatComponentCount formats a component count for display (switches/lights).
+func (m Model) formatComponentCount(tier Tier, fullLabel, shortLabel string, on, off int) string {
+	total := on + off
+	onStr := m.styles.CountOn.Render(fmt.Sprintf("%d", on))
+	offStr := m.styles.CountOff.Render(fmt.Sprintf("%d", off))
+
+	switch tier {
+	case TierFull:
+		return m.styles.CountLabel.Render(fullLabel+": ") + onStr + "/" + offStr
+	case TierCompact:
+		return m.styles.CountLabel.Render(shortLabel+": ") + onStr + "/" + fmt.Sprintf("%d", total)
+	default: // TierMinimal
+		return shortLabel + ":" + fmt.Sprintf("%d", on)
+	}
+}
+
+// formatCoverCount formats cover counts for display.
+func (m Model) formatCoverCount(tier Tier, open, closed, moving int) string {
+	openStr := m.styles.CountOn.Render(fmt.Sprintf("%d", open))
+	closedStr := m.styles.CountOff.Render(fmt.Sprintf("%d", closed))
+
+	switch tier {
+	case TierFull:
+		if moving > 0 {
+			return m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓ " +
+				m.styles.Warning.Render(fmt.Sprintf("%d", moving)) + "~"
+		}
+		return m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓"
+	case TierCompact:
+		total := open + closed + moving
+		return m.styles.CountLabel.Render("Cv: ") + openStr + "/" + fmt.Sprintf("%d", total)
+	default: // TierMinimal
+		return "Cv:" + fmt.Sprintf("%d", open)
+	}
 }
 
 // renderItems renders the status items based on tier.

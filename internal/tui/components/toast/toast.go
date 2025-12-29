@@ -87,14 +87,16 @@ type phaseTransitionMsg struct {
 
 // Model holds the toast notification state.
 type Model struct {
-	toasts   []Toast
-	nextID   int
-	width    int
-	height   int
-	visible  bool
-	position Position
-	animate  bool
-	styles   Styles
+	toasts         []Toast
+	nextID         int
+	width          int
+	height         int
+	visible        bool
+	position       Position
+	animate        bool
+	styles         Styles
+	activeTimerID  int  // ID of toast with active dismiss timer (-1 if none)
+	pendingDismiss bool // True if first Escape was pressed, waiting for second
 }
 
 // Styles for toast notifications.
@@ -104,6 +106,11 @@ type Styles struct {
 	Success   lipgloss.Style
 	Warning   lipgloss.Style
 	Error     lipgloss.Style
+	// InputBar styles - match search/cmdmode design
+	InputBarInfo    lipgloss.Style
+	InputBarSuccess lipgloss.Style
+	InputBarWarning lipgloss.Style
+	InputBarError   lipgloss.Style
 }
 
 // DefaultStyles returns default styles for toasts.
@@ -114,6 +121,11 @@ func DefaultStyles() Styles {
 		Padding(0, 2).
 		MarginBottom(1).
 		Bold(true)
+
+	// Base input bar style matches search/cmdmode Container
+	inputBarBase := lipgloss.NewStyle().
+		Padding(0, 1).
+		BorderStyle(lipgloss.RoundedBorder())
 
 	return Styles{
 		Container: lipgloss.NewStyle().
@@ -131,6 +143,15 @@ func DefaultStyles() Styles {
 		Error: baseStyle.
 			Foreground(colors.Text).
 			Background(colors.Error),
+		// Input bar styles with colored borders
+		InputBarInfo: inputBarBase.
+			BorderForeground(colors.Info),
+		InputBarSuccess: inputBarBase.
+			BorderForeground(colors.Success),
+		InputBarWarning: inputBarBase.
+			BorderForeground(colors.Warning),
+		InputBarError: inputBarBase.
+			BorderForeground(colors.Error),
 	}
 }
 
@@ -161,11 +182,12 @@ func WithStyles(styles Styles) Option {
 // New creates a new toast notification model.
 func New(opts ...Option) Model {
 	m := Model{
-		toasts:   make([]Toast, 0),
-		visible:  true,
-		position: PositionTopRight,
-		animate:  true,
-		styles:   DefaultStyles(),
+		toasts:        make([]Toast, 0),
+		visible:       true,
+		position:      PositionTopRight,
+		animate:       true,
+		styles:        DefaultStyles(),
+		activeTimerID: -1,
 	}
 
 	for _, opt := range opts {
@@ -194,50 +216,108 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case ClearAllMsg:
 		m.toasts = make([]Toast, 0)
+		m.activeTimerID = -1
+		m.pendingDismiss = false
 		return m, nil
+
+	case resetPendingDismissMsg:
+		m.pendingDismiss = false
+		return m, nil
+
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
 	}
 
 	return m, nil
 }
 
+// handleKey handles key press messages for Escape×2 dismiss.
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	key := msg.String()
+
+	// Only handle Esc/Ctrl+[ for dismissing toasts
+	if key != "esc" && key != "ctrl+[" {
+		return m, nil
+	}
+
+	if len(m.toasts) == 0 {
+		return m, nil
+	}
+
+	if m.pendingDismiss {
+		// Second Escape - clear all
+		m.toasts = make([]Toast, 0)
+		m.activeTimerID = -1
+		m.pendingDismiss = false
+		return m, nil
+	}
+
+	// First Escape - dismiss current toast, set pending state
+	m.pendingDismiss = true
+
+	// Remove first (currently displayed) toast
+	m.toasts = m.toasts[1:]
+	m.activeTimerID = -1
+
+	var cmds []tea.Cmd
+
+	// Start timer for next toast if any
+	if len(m.toasts) > 0 {
+		m.activeTimerID = m.toasts[0].ID
+		cmds = append(cmds, m.startToastTimer(m.toasts[0]))
+	}
+
+	// Reset pending dismiss after 500ms
+	cmds = append(cmds, tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
+		return resetPendingDismissMsg{}
+	}))
+
+	return m, tea.Batch(cmds...)
+}
+
 func (m Model) handleShow(msg ShowMsg) (Model, tea.Cmd) {
-	toast := Toast{
+	t := Toast{
 		ID:       m.nextID,
 		Message:  msg.Message,
 		Level:    msg.Level,
 		Duration: msg.Duration,
 		Created:  time.Now(),
-		Phase:    PhaseEntering,
+		Phase:    PhaseVisible, // Start visible (no animation for queued toasts)
 	}
-	if toast.Duration == 0 {
-		toast.Duration = DefaultDuration
+	if t.Duration == 0 {
+		t.Duration = DefaultDuration
 	}
 	m.nextID++
-	m.toasts = append(m.toasts, toast)
+	m.toasts = append(m.toasts, t)
 
+	// If this is the only toast, start its timer immediately
+	if len(m.toasts) == 1 {
+		m.activeTimerID = t.ID
+		return m, m.startToastTimer(t)
+	}
+
+	// Otherwise, it's queued - timer will start when it becomes the first toast
+	return m, nil
+}
+
+// startToastTimer starts the dismiss timer for a toast (timer starts when shown).
+// Note: caller must set m.activeTimerID = t.ID before calling this method.
+func (m Model) startToastTimer(t Toast) tea.Cmd {
 	var cmds []tea.Cmd
 
-	if m.animate {
-		// Schedule transition to visible phase
-		cmds = append(cmds, schedulePhaseTransition(toast.ID, PhaseVisible, animationEnterDuration))
-	} else {
-		// Skip animation, set to visible immediately
-		m.toasts[len(m.toasts)-1].Phase = PhaseVisible
-	}
-
 	// Schedule exit animation before dismissal
-	exitTime := toast.Duration - animationExitDuration
-	if exitTime < 0 {
-		exitTime = toast.Duration / 2
-	}
 	if m.animate {
-		cmds = append(cmds, schedulePhaseTransition(toast.ID, PhaseExiting, exitTime))
+		exitTime := t.Duration - animationExitDuration
+		if exitTime < 0 {
+			exitTime = t.Duration / 2
+		}
+		cmds = append(cmds, schedulePhaseTransition(t.ID, PhaseExiting, exitTime))
 	}
 
 	// Schedule final dismissal
-	cmds = append(cmds, scheduleDismiss(toast.ID, toast.Duration))
+	cmds = append(cmds, scheduleDismiss(t.ID, t.Duration))
 
-	return m, tea.Batch(cmds...)
+	return tea.Batch(cmds...)
 }
 
 func (m Model) handlePhaseTransition(msg phaseTransitionMsg) (Model, tea.Cmd) {
@@ -251,9 +331,21 @@ func (m Model) handlePhaseTransition(msg phaseTransitionMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleDismiss(msg dismissMsg) (Model, tea.Cmd) {
+	// Only dismiss if it matches the current active timer (prevent stale dismissals)
+	if msg.ID != m.activeTimerID && m.activeTimerID != -1 {
+		return m, nil
+	}
+
 	for i, t := range m.toasts {
 		if t.ID == msg.ID {
 			m.toasts = append(m.toasts[:i], m.toasts[i+1:]...)
+			m.activeTimerID = -1
+
+			// Start timer for next toast if any
+			if len(m.toasts) > 0 {
+				m.activeTimerID = m.toasts[0].ID
+				return m, m.startToastTimer(m.toasts[0])
+			}
 			break
 		}
 	}
@@ -283,6 +375,9 @@ type ShowMsg struct {
 
 // ClearAllMsg clears all toasts.
 type ClearAllMsg struct{}
+
+// resetPendingDismissMsg resets the pending dismiss state after timeout.
+type resetPendingDismissMsg struct{}
 
 // Show returns a command to show a toast.
 func Show(message string, level Level) tea.Cmd {
@@ -364,6 +459,83 @@ func (m Model) View() string {
 	}
 
 	return m.styles.Container.Width(m.width).Render(rendered)
+}
+
+// ViewAsInputBar renders the current (first) toast in the same style as search/cmdmode.
+// This appears in the input bar area below the tab bar with a colored border.
+// Shows a badge (e.g., "(+2)") if there are more toasts queued.
+func (m Model) ViewAsInputBar() string {
+	if !m.visible || len(m.toasts) == 0 {
+		return ""
+	}
+
+	// Get the first toast (currently displayed)
+	t := m.toasts[0]
+
+	// Select style and icon based on level
+	var style lipgloss.Style
+	var icon string
+	colors := theme.GetSemanticColors()
+
+	switch t.Level {
+	case LevelSuccess:
+		style = m.styles.InputBarSuccess
+		icon = "✓ "
+	case LevelWarning:
+		style = m.styles.InputBarWarning
+		icon = "! "
+	case LevelError:
+		style = m.styles.InputBarError
+		icon = "✗ "
+	default:
+		style = m.styles.InputBarInfo
+		icon = "ℹ "
+	}
+
+	// Build the content with icon and styled message
+	iconStyle := lipgloss.NewStyle().Bold(true)
+	switch t.Level {
+	case LevelSuccess:
+		iconStyle = iconStyle.Foreground(colors.Success)
+	case LevelWarning:
+		iconStyle = iconStyle.Foreground(colors.Warning)
+	case LevelError:
+		iconStyle = iconStyle.Foreground(colors.Error)
+	default:
+		iconStyle = iconStyle.Foreground(colors.Info)
+	}
+
+	content := iconStyle.Render(icon) + t.Message
+
+	// Add badge if there are more toasts queued
+	if len(m.toasts) > 1 {
+		badgeStyle := lipgloss.NewStyle().Foreground(colors.Muted)
+		badge := badgeStyle.Render(" (+" + itoa(len(m.toasts)-1) + ")")
+		content += badge
+	}
+
+	// Apply animation effects
+	if t.Phase == PhaseEntering || t.Phase == PhaseExiting {
+		content = lipgloss.NewStyle().Faint(true).Render(content)
+	}
+
+	return style.Width(m.width).Render(content)
+}
+
+// itoa converts an int to string without importing strconv.
+func itoa(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	if i < 0 {
+		return "-" + itoa(-i)
+	}
+	var digits []byte
+	for i > 0 {
+		digits = append([]byte{byte('0' + i%10)}, digits...)
+		i /= 10
+	}
+	return string(digits)
 }
 
 func (m Model) renderToast(toast Toast) string {
