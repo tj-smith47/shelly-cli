@@ -29,10 +29,13 @@
   --link-hover-color: var(--shelly-blue-dark);
 }
 
-// Dark mode overrides
+// Dark mode overrides - keep blue vibrant
 [data-theme="dark"] {
-  --link-color: var(--shelly-blue-light);
-  --link-hover-color: var(--shelly-blue);
+  --shelly-blue: #5BA4E0;
+  --shelly-blue-dark: #4594D1;
+  --shelly-blue-light: #7FBEED;
+  --link-color: var(--shelly-blue);
+  --link-hover-color: var(--shelly-blue-light);
 }
 
 // -----------------------------------------------------------------------------
@@ -60,7 +63,7 @@
 .hero-section {
   position: relative;
   overflow: hidden;
-  padding: 4rem 0;
+  padding: 4rem 0 5rem;
 
   // ASCII banner as subtle background
   &::before {
@@ -73,7 +76,7 @@
     transform: translate(-50%, -50%);
     font-size: 0.55rem;
     line-height: 1.2;
-    opacity: 0.06;
+    opacity: 0.08;
     pointer-events: none;
     z-index: 0;
     color: var(--shelly-blue);
@@ -95,27 +98,29 @@
     font-size: 3rem;
     font-weight: 700;
     margin-bottom: 1rem;
+    color: var(--shelly-blue);
   }
 
   .hero-description {
     font-size: 1.25rem;
-    max-width: 600px;
-    margin: 0 auto 2rem;
+    max-width: 750px;
+    margin: 0 auto 2.5rem;
     opacity: 0.9;
   }
 
   .hero-buttons {
     display: flex;
-    gap: 1rem;
+    gap: 1.5rem;
     justify-content: center;
     flex-wrap: wrap;
+    margin-bottom: 1rem;
   }
 }
 
 // Responsive hero
 @media (max-width: 768px) {
   .hero-section {
-    padding: 2rem 0;
+    padding: 2rem 0 3rem;
 
     &::before {
       display: none; // Hide ASCII on mobile
@@ -127,6 +132,11 @@
 
     .hero-description {
       font-size: 1rem;
+      max-width: 100%;
+    }
+
+    .hero-buttons {
+      gap: 1rem;
     }
   }
 }
@@ -339,7 +349,7 @@ code:not(.highlight code) {
 // FEATURE CARDS (Homepage)
 // -----------------------------------------------------------------------------
 .features-section {
-  padding: 4rem 0;
+  padding: 3rem 0 4rem;
 
   .container {
     max-width: 1200px;
@@ -455,7 +465,6 @@ table {
     line-height: 1.15;
     white-space: pre;
     color: var(--shelly-blue);
-    opacity: 0.7;
     margin-bottom: 2rem;
 
     @media (max-width: 768px) {
