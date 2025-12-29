@@ -64,9 +64,7 @@ jobs:
           cache: true
 
       - name: Generate docs
-        run: |
-          go run ./cmd/docgen ./docs/commands
-          go run ./cmd/mangen ./docs/man
+        run: make docs
 
       - name: Check for changes
         id: diff

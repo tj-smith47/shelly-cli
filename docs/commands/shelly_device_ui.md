@@ -23,12 +23,16 @@ shelly device ui <device> [flags]
 
   # Using the 'web' alias
   shelly device web kitchen
+
+  # Copy URL to clipboard instead of opening
+  shelly device ui living-room --copy-url
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ui
+      --copy-url   Copy URL to clipboard instead of opening browser
+  -h, --help       help for ui
 ```
 
 ### Options inherited from parent commands

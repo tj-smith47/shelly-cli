@@ -17,6 +17,10 @@ The device can be specified by name (from config) or by IP address/hostname.
 
 
 .SH OPTIONS
+\fB--copy-url\fP[=false]
+	Copy URL to clipboard instead of opening browser
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for ui
 
@@ -72,6 +76,9 @@ The device can be specified by name (from config) or by IP address/hostname.
 
   # Using the 'web' alias
   shelly device web kitchen
+
+  # Copy URL to clipboard instead of opening
+  shelly device ui living-room --copy-url
 .EE
 
 

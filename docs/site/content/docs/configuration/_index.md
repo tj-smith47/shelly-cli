@@ -34,6 +34,7 @@ touch ~/.config/shelly/config.yaml
 | `api_mode` | string | `local` | API mode: `local`, `cloud`, or `auto` |
 | `verbosity` | int | `0` | Verbosity level: 0=silent, 1=info, 2=debug, 3=trace |
 | `quiet` | bool | `false` | Suppress non-essential output |
+| `editor` | string | - | Preferred editor for `shelly config edit`. Falls back to `$EDITOR`, `$VISUAL`, then `nano` |
 
 ```yaml
 output: table
@@ -42,6 +43,7 @@ theme: dracula
 api_mode: local
 verbosity: 0
 quiet: false
+editor: vim  # Optional: vim, code, nano, emacs, etc.
 ```
 
 ### Logging Settings
@@ -149,6 +151,25 @@ cloud:
 ```
 
 **Note:** Use `shelly cloud login` to authenticate interactively.
+
+### Integrator Settings
+
+Configure Shelly Integrator API credentials for OEM/partner integrations. These credentials are used for advanced API operations.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `integrator.tag` | string | - | Integrator tag (partner identifier) |
+| `integrator.token` | string | - | Integrator API token |
+
+```yaml
+integrator:
+  tag: my-partner-tag
+  token: my-integrator-token
+```
+
+**Environment variables take precedence:**
+- `SHELLY_INTEGRATOR_TAG` - Integrator tag
+- `SHELLY_INTEGRATOR_TOKEN` - Integrator token
 
 ### Device Registry
 
@@ -568,6 +589,7 @@ theme: dracula
 api_mode: local
 verbosity: 0
 quiet: false
+editor: vim  # Falls back to $EDITOR, $VISUAL, then nano
 
 # Logging settings (for debugging)
 log:
@@ -588,6 +610,11 @@ cloud:
   email: ""
   access_token: ""
   refresh_token: ""
+
+# Integrator settings (for OEM/partners)
+# integrator:
+#   tag: my-partner-tag
+#   token: my-integrator-token
 
 # Device registry
 devices:
