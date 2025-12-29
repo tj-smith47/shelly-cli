@@ -34,6 +34,16 @@ const (
 	dualColumnMinWidth = 80 // Lowered to fit in dashboard right column
 )
 
+// Column represents which column has focus in dual-column mode.
+type Column int
+
+const (
+	// ColumnUser is the left column showing user-relevant events.
+	ColumnUser Column = iota
+	// ColumnSystem is the right column showing system events.
+	ColumnSystem
+)
+
 // Deps holds the dependencies for the events component.
 type Deps struct {
 	Ctx         context.Context
@@ -109,6 +119,12 @@ type Model struct {
 	styles      Styles
 	paused      bool
 	autoScroll  bool // Auto-scroll to top when new events arrive (newest at top)
+	focused     bool // Whether this component has focus
+
+	// Dual column navigation
+	focusedColumn Column // Which column has focus (ColumnUser or ColumnSystem)
+	userCursor    int    // Cursor position in user events list
+	systemCursor  int    // Cursor position in system events list
 
 	// Paginators for dual column view
 	userPaginator   paginator.Model
@@ -212,7 +228,11 @@ func New(deps Deps) Model {
 		scroller:        panel.NewScroller(0, 10), // Will be updated by SetSize
 		maxItems:        50,                       // Per list - each category capped at 50
 		autoScroll:      true,                     // Start with auto-scroll enabled (cursor stays at top/newest)
-		perPage:         10,                       // Will be updated by SetSize
+		focused:         false,
+		focusedColumn:   ColumnUser, // Start with user column focused
+		userCursor:      0,
+		systemCursor:    0,
+		perPage:         10, // Will be updated by SetSize
 		userPaginator:   userPag,
 		systemPaginator: sysPag,
 		styles:          DefaultStyles(),
@@ -223,6 +243,12 @@ func New(deps Deps) Model {
 			connStatus:    make(map[string]bool),
 		},
 	}
+}
+
+// SetFocused sets whether the events component has focus.
+func (m Model) SetFocused(focused bool) Model {
+	m.focused = focused
+	return m
 }
 
 // Init returns the initial command for events.
@@ -411,47 +437,145 @@ func (m Model) handleSubscriptionStatus(msg SubscriptionStatusMsg) Model {
 // handleKeyPress handles keyboard input for scrolling, pagination, and clearing.
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
 	switch msg.String() {
-	case "j", "down":
-		m.scroller.CursorDown()
-		m.autoScroll = m.scroller.Cursor() == 0
-	case "k", "up":
-		m.scroller.CursorUp()
-		m.autoScroll = m.scroller.Cursor() == 0
-	case "n", "pgdown", "ctrl+d":
-		// Next page for both paginators (dual column)
-		m.userPaginator.NextPage()
-		m.systemPaginator.NextPage()
-		m.scroller.PageDown()
+	case "h", "left":
+		m.focusedColumn = ColumnUser
 		m.autoScroll = false
+	case "l", "right":
+		m.focusedColumn = ColumnSystem
+		m.autoScroll = false
+	case "j", "down":
+		m = m.moveCursorDown()
+	case "k", "up":
+		m = m.moveCursorUp()
+	case "n", "pgdown", "ctrl+d":
+		m = m.pageDown()
 	case "N", "pgup", "ctrl+u":
-		// Previous page for both paginators (dual column)
-		m.userPaginator.PrevPage()
-		m.systemPaginator.PrevPage()
-		m.scroller.PageUp()
-		m.autoScroll = m.scroller.Cursor() == 0
+		m = m.pageUp()
 	case "g":
-		// Go to first page
-		m.userPaginator.Page = 0
-		m.systemPaginator.Page = 0
-		m.scroller.CursorToStart()
-		m.autoScroll = true // User went to top (newest), enable auto-scroll
+		m = m.jumpToStart()
 	case "G":
-		// Go to last page
-		m.userPaginator.Page = m.userPaginator.TotalPages - 1
-		m.systemPaginator.Page = m.systemPaginator.TotalPages - 1
-		m.scroller.CursorToEnd()
-		m.autoScroll = false // User went to bottom (oldest), disable auto-scroll
+		m = m.jumpToEnd()
 	case "c":
-		m.Clear()
-		m.userPaginator.Page = 0
-		m.systemPaginator.Page = 0
-		m.scroller.SetItemCount(0)
-		m.autoScroll = true // After clear, re-enable auto-scroll
-	case "p":
-		m = m.togglePause()
+		m = m.clearEvents()
+	case "p", "space":
+		m.paused = !m.paused
 	case "f":
-		m = m.ToggleFilter()
+		m.filterByDevice = !m.filterByDevice
 	}
+	return m
+}
+
+// getEventCounts returns the number of user and system events.
+func (m Model) getEventCounts() (userCount, sysCount int) {
+	m.state.mu.RLock()
+	userCount = len(m.state.userEvents)
+	sysCount = len(m.state.systemEvents)
+	m.state.mu.RUnlock()
+	return userCount, sysCount
+}
+
+// moveCursorDown moves the cursor down in the focused column.
+func (m Model) moveCursorDown() Model {
+	userCount, sysCount := m.getEventCounts()
+
+	if m.focusedColumn == ColumnUser {
+		if m.userCursor < userCount-1 {
+			m.userCursor++
+		}
+		m.userPaginator.Page = m.userCursor / m.perPage
+	} else {
+		if m.systemCursor < sysCount-1 {
+			m.systemCursor++
+		}
+		m.systemPaginator.Page = m.systemCursor / m.perPage
+	}
+	m.scroller.CursorDown()
+	m.autoScroll = false
+	return m
+}
+
+// moveCursorUp moves the cursor up in the focused column.
+func (m Model) moveCursorUp() Model {
+	if m.focusedColumn == ColumnUser {
+		if m.userCursor > 0 {
+			m.userCursor--
+		}
+		m.userPaginator.Page = m.userCursor / m.perPage
+	} else {
+		if m.systemCursor > 0 {
+			m.systemCursor--
+		}
+		m.systemPaginator.Page = m.systemCursor / m.perPage
+	}
+	m.scroller.CursorUp()
+	m.autoScroll = m.userCursor == 0 && m.systemCursor == 0
+	return m
+}
+
+// pageDown moves to the next page in the focused column.
+func (m Model) pageDown() Model {
+	if m.focusedColumn == ColumnUser {
+		m.userPaginator.NextPage()
+		m.userCursor = m.userPaginator.Page * m.perPage
+	} else {
+		m.systemPaginator.NextPage()
+		m.systemCursor = m.systemPaginator.Page * m.perPage
+	}
+	m.scroller.PageDown()
+	m.autoScroll = false
+	return m
+}
+
+// pageUp moves to the previous page in the focused column.
+func (m Model) pageUp() Model {
+	if m.focusedColumn == ColumnUser {
+		m.userPaginator.PrevPage()
+		m.userCursor = m.userPaginator.Page * m.perPage
+	} else {
+		m.systemPaginator.PrevPage()
+		m.systemCursor = m.systemPaginator.Page * m.perPage
+	}
+	m.scroller.PageUp()
+	m.autoScroll = m.userCursor == 0 && m.systemCursor == 0
+	return m
+}
+
+// jumpToStart moves to the first item in both columns.
+func (m Model) jumpToStart() Model {
+	m.userPaginator.Page = 0
+	m.systemPaginator.Page = 0
+	m.userCursor = 0
+	m.systemCursor = 0
+	m.scroller.CursorToStart()
+	m.autoScroll = true
+	return m
+}
+
+// jumpToEnd moves to the last item in the focused column.
+func (m Model) jumpToEnd() Model {
+	userCount, sysCount := m.getEventCounts()
+
+	if m.focusedColumn == ColumnUser {
+		m.userPaginator.Page = m.userPaginator.TotalPages - 1
+		m.userCursor = max(0, userCount-1)
+	} else {
+		m.systemPaginator.Page = m.systemPaginator.TotalPages - 1
+		m.systemCursor = max(0, sysCount-1)
+	}
+	m.scroller.CursorToEnd()
+	m.autoScroll = false
+	return m
+}
+
+// clearEvents clears all events and resets cursors.
+func (m Model) clearEvents() Model {
+	m.Clear()
+	m.userPaginator.Page = 0
+	m.systemPaginator.Page = 0
+	m.userCursor = 0
+	m.systemCursor = 0
+	m.scroller.SetItemCount(0)
+	m.autoScroll = true
 	return m
 }
 
@@ -859,34 +983,76 @@ func computeColumnLayout(totalWidth int) columnLayout {
 	}
 }
 
+// dualColumnRenderState holds state for rendering dual columns.
+type dualColumnRenderState struct {
+	layout           columnLayout
+	separator        string
+	cursorStyle      lipgloss.Style
+	emptyLeft        string
+	emptyRight       string
+	userCursorInPage int
+	sysCursorInPage  int
+	maxLinesPerEvent int
+}
+
 // renderDualColumnsDirect renders events in two columns: User (left) and System (right).
 // Takes pre-split user and system event lists.
 func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string {
 	colors := theme.GetSemanticColors()
 	layout := computeColumnLayout(m.width)
 
-	// SetTotalPages takes total items count (not page count) and calculates pages internally
 	m.userPaginator.SetTotalPages(len(userEvents))
 	m.systemPaginator.SetTotalPages(len(systemEvents))
 
-	// Get page slices using paginator bounds
 	userStart, userEnd := m.userPaginator.GetSliceBounds(len(userEvents))
 	sysStart, sysEnd := m.systemPaginator.GetSliceBounds(len(systemEvents))
 
 	userPage := userEvents[userStart:userEnd]
 	sysPage := systemEvents[sysStart:sysEnd]
 
-	// Separator style (vertical bar)
 	separator := lipgloss.NewStyle().Foreground(colors.TableBorder).Render("│")
 
-	// Build section title row (no pagination in title)
-	leftTitle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple()).Render("User Events")
-	rightTitle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red()).Render("System Events")
+	// Build header lines
+	lines := m.buildDualColumnHeader(layout, separator)
 
-	leftTitle = output.PadRight(leftTitle, layout.colWidth)
-	rightTitle = output.PadRight(rightTitle, layout.colWidth)
+	// Create render state
+	rs := dualColumnRenderState{
+		layout:           layout,
+		separator:        separator,
+		cursorStyle:      lipgloss.NewStyle().Background(colors.AltBackground).Bold(true),
+		emptyLeft:        output.PadRight("", layout.colWidth),
+		emptyRight:       output.PadRight("", layout.colWidth),
+		userCursorInPage: m.userCursor - userStart,
+		sysCursorInPage:  m.systemCursor - sysStart,
+		maxLinesPerEvent: m.calcMaxLinesPerUserEvent(len(userPage)),
+	}
 
-	// Build column header row - USER has COMP, SYSTEM does not
+	// Render event rows
+	lines = m.renderEventRows(lines, userPage, sysPage, rs)
+
+	// Pagination dots
+	leftDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.userPaginator.View())
+	rightDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.systemPaginator.View())
+	lines = append(lines, leftDots+" "+separator+" "+rightDots)
+
+	return strings.Join(lines, "\n")
+}
+
+// buildDualColumnHeader builds the header section for dual column view.
+func (m Model) buildDualColumnHeader(layout columnLayout, separator string) []string {
+	colors := theme.GetSemanticColors()
+
+	userTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
+	sysTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red())
+	if m.focused && m.focusedColumn == ColumnUser {
+		userTitleStyle = userTitleStyle.Underline(true)
+	} else if m.focused {
+		sysTitleStyle = sysTitleStyle.Underline(true)
+	}
+
+	leftTitle := output.PadRight(userTitleStyle.Render("User Events"), layout.colWidth)
+	rightTitle := output.PadRight(sysTitleStyle.Render("System Events"), layout.colWidth)
+
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
 	leftColHeader := headerStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
 		headerStyle.Render(output.PadRight("DEVICE", layout.userDevW)) + " " +
@@ -894,7 +1060,6 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 		headerStyle.Render(output.PadRight("LEVEL", layout.levelW)) + " " +
 		headerStyle.Render("DESC")
 
-	// System events: no COMP column
 	sysHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red())
 	rightColHeader := sysHeaderStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
 		sysHeaderStyle.Render(output.PadRight("DEVICE", layout.sysDevW)) + " " +
@@ -904,72 +1069,89 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 	leftColHeader = output.PadRight(leftColHeader, layout.colWidth)
 	rightColHeader = output.PadRight(rightColHeader, layout.colWidth)
 
-	// Build all lines - reserve 1 line for pagination dots at bottom
-	lines := make([]string, 0, m.perPage+4)
-	lines = append(lines,
-		leftTitle+" "+separator+" "+rightTitle,
-		leftColHeader+" "+separator+" "+rightColHeader)
-
-	// Separator line
 	sepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", layout.colWidth))
-	lines = append(lines, sepLine+" "+separator+" "+sepLine)
 
-	// Calculate max lines per user event based on available space and event count
-	maxLinesPerUserEvent := m.calcMaxLinesPerUserEvent(len(userPage))
+	return []string{
+		leftTitle + " " + separator + " " + rightTitle,
+		leftColHeader + " " + separator + " " + rightColHeader,
+		sepLine + " " + separator + " " + sepLine,
+	}
+}
 
-	linesUsed := 0
-	userIdx := 0
-	sysIdx := 0
-	emptyLeft := output.PadRight("", layout.colWidth)
-	emptyRight := output.PadRight("", layout.colWidth)
+// renderEventRows renders the event data rows for dual column view.
+func (m Model) renderEventRows(lines []string, userPage, sysPage []Event, rs dualColumnRenderState) []string {
+	linesUsed, userIdx, sysIdx := 0, 0, 0
 
 	for linesUsed < m.perPage {
 		switch {
 		case userIdx < len(userPage):
-			// Render user event with wrapping
-			userLines := m.renderUserEventWrapped(userPage[userIdx], layout.timeW, layout.userDevW, layout.userCompW, layout.levelW, layout.userDescW, maxLinesPerUserEvent)
-
-			// Get corresponding system event (if any)
-			sysLine := ""
-			if sysIdx < len(sysPage) {
-				sysLine = m.renderSystemEvent(sysPage[sysIdx], layout.timeW, layout.sysDevW, layout.levelW, layout.sysDescW)
-				sysIdx++
-			}
-
-			// Add all lines for this user event
-			for i, uline := range userLines {
-				if linesUsed >= m.perPage {
-					break
-				}
-				leftCell := output.PadRight(uline, layout.colWidth)
-				rightCell := emptyRight
-				if i == 0 {
-					rightCell = output.PadRight(sysLine, layout.colWidth)
-				}
-				lines = append(lines, leftCell+" "+separator+" "+rightCell)
-				linesUsed++
-			}
+			newLines, newLinesUsed, newSysIdx := m.renderUserEventRow(
+				userPage[userIdx], sysPage, userIdx, sysIdx, linesUsed, rs)
+			lines = append(lines, newLines...)
+			linesUsed += newLinesUsed
+			sysIdx = newSysIdx
 			userIdx++
-
 		case sysIdx < len(sysPage):
-			leftCell := emptyLeft
-			rightCell := output.PadRight(m.renderSystemEvent(sysPage[sysIdx], layout.timeW, layout.sysDevW, layout.levelW, layout.sysDescW), layout.colWidth)
-			lines = append(lines, leftCell+" "+separator+" "+rightCell)
+			line := m.renderSystemOnlyRow(sysPage[sysIdx], sysIdx, rs)
+			lines = append(lines, line)
 			sysIdx++
 			linesUsed++
-
 		default:
-			lines = append(lines, emptyLeft+" "+separator+" "+emptyRight)
+			lines = append(lines, rs.emptyLeft+" "+rs.separator+" "+rs.emptyRight)
 			linesUsed++
 		}
 	}
+	return lines
+}
 
-	// Pagination dots
-	leftDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.userPaginator.View())
-	rightDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.systemPaginator.View())
-	lines = append(lines, leftDots+" "+separator+" "+rightDots)
+// renderUserEventRow renders a user event row with optional corresponding system event.
+func (m Model) renderUserEventRow(userEvt Event, sysPage []Event, userIdx, sysIdx, linesUsed int, rs dualColumnRenderState) (resultLines []string, linesAdded, newSysIdx int) {
+	isUserSelected := m.focused && m.focusedColumn == ColumnUser && userIdx == rs.userCursorInPage
 
-	return strings.Join(lines, "\n")
+	userLines := m.renderUserEventWrapped(userEvt, rs.layout.timeW, rs.layout.userDevW,
+		rs.layout.userCompW, rs.layout.levelW, rs.layout.userDescW, rs.maxLinesPerEvent)
+
+	sysLine := ""
+	isSysSelected := false
+	newSysIdx = sysIdx
+	if newSysIdx < len(sysPage) {
+		isSysSelected = m.focused && m.focusedColumn == ColumnSystem && newSysIdx == rs.sysCursorInPage
+		sysLine = m.renderSystemEvent(sysPage[newSysIdx], rs.layout.timeW, rs.layout.sysDevW,
+			rs.layout.levelW, rs.layout.sysDescW)
+		newSysIdx++
+	}
+
+	resultLines = make([]string, 0, len(userLines))
+	for i, uline := range userLines {
+		if linesUsed+linesAdded >= m.perPage {
+			break
+		}
+		leftCell := output.PadRight(uline, rs.layout.colWidth)
+		rightCell := rs.emptyRight
+		if i == 0 {
+			rightCell = output.PadRight(sysLine, rs.layout.colWidth)
+			if isUserSelected {
+				leftCell = rs.cursorStyle.Render(leftCell)
+			}
+			if isSysSelected {
+				rightCell = rs.cursorStyle.Render(rightCell)
+			}
+		}
+		resultLines = append(resultLines, leftCell+" "+rs.separator+" "+rightCell)
+		linesAdded++
+	}
+	return resultLines, linesAdded, newSysIdx
+}
+
+// renderSystemOnlyRow renders a row with only a system event (no user event).
+func (m Model) renderSystemOnlyRow(sysEvt Event, sysIdx int, rs dualColumnRenderState) string {
+	isSysSelected := m.focused && m.focusedColumn == ColumnSystem && sysIdx == rs.sysCursorInPage
+	rightCell := output.PadRight(m.renderSystemEvent(sysEvt, rs.layout.timeW, rs.layout.sysDevW,
+		rs.layout.levelW, rs.layout.sysDescW), rs.layout.colWidth)
+	if isSysSelected {
+		rightCell = rs.cursorStyle.Render(rightCell)
+	}
+	return rs.emptyLeft + " " + rs.separator + " " + rightCell
 }
 
 // calcMaxLinesPerUserEvent calculates how many lines each user event can use.

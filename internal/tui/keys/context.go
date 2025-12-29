@@ -21,6 +21,7 @@ const (
 	ContextAutomation
 	ContextConfig
 	ContextManage
+	ContextMonitor
 	ContextFleet
 	ContextHelp
 )
@@ -58,11 +59,17 @@ const (
 	ActionExpand
 	ActionRefresh
 	ActionFilterToggle
+	ActionEdit
+	ActionNew
+	ActionDelete
+	ActionBrowser
+	ActionDebug
 	ActionTab1
 	ActionTab2
 	ActionTab3
 	ActionTab4
 	ActionTab5
+	ActionTab6
 	ActionPanel1
 	ActionPanel2
 	ActionPanel3
@@ -102,13 +109,18 @@ func (m *ContextMap) initDefaults() {
 		"?":         ActionHelp,
 		"/":         ActionFilter,
 		":":         ActionCommand,
+		"esc":       ActionEscape,
+		"ctrl+[":    ActionEscape,
 		"tab":       ActionNextPanel,
 		"shift+tab": ActionPrevPanel,
+		"alt+]":     ActionNextPanel,
+		"alt+[":     ActionPrevPanel,
 		"1":         ActionTab1,
 		"2":         ActionTab2,
 		"3":         ActionTab3,
 		"4":         ActionTab4,
 		"5":         ActionTab5,
+		"6":         ActionTab6,
 		"!":         ActionPanel1, // Shift+1
 		"@":         ActionPanel2, // Shift+2
 		"#":         ActionPanel3, // Shift+3
@@ -118,20 +130,27 @@ func (m *ContextMap) initDefaults() {
 		"&":         ActionPanel7, // Shift+7
 		"*":         ActionPanel8, // Shift+8
 		"(":         ActionPanel9, // Shift+9
+		"D":         ActionDebug,
 		"ctrl+c":    ActionQuit,
 	}
 
-	// Events context
+	// Events context - dual column layout with h/l for column switching
 	m.bindings[ContextEvents] = map[string]Action{
 		"j":      ActionDown,
 		"k":      ActionUp,
 		"down":   ActionDown,
 		"up":     ActionUp,
+		"h":      ActionLeft,  // Switch to user (left) column
+		"l":      ActionRight, // Switch to system (right) column
+		"left":   ActionLeft,
+		"right":  ActionRight,
 		"space":  ActionPause,
 		"c":      ActionClear,
 		"f":      ActionFilterToggle,
 		"pgdown": ActionPageDown,
 		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
 		"g":      ActionHome,
 		"G":      ActionEnd,
 	}
@@ -150,10 +169,19 @@ func (m *ContextMap) initDefaults() {
 		"o":      ActionOn,
 		"O":      ActionOff,
 		"R":      ActionReboot,
+		"d":      ActionEnter, // Device detail (same as enter)
 		"enter":  ActionEnter,
 		"r":      ActionRefresh,
+		"ctrl+r": ActionRefresh,
+		"b":      ActionBrowser, // Open in browser
 		"pgdown": ActionPageDown,
 		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown, // Half-page down
+		"ctrl+u": ActionPageUp,   // Half-page up
+		"g":      ActionHome,
+		"G":      ActionEnd,
+		"home":   ActionHome,
+		"end":    ActionEnd,
 	}
 
 	// Info context
@@ -170,6 +198,12 @@ func (m *ContextMap) initDefaults() {
 		"a":      ActionExpand, // Toggle all/single view
 		"pgdown": ActionPageDown,
 		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
+		"g":      ActionHome,
+		"G":      ActionEnd,
+		"home":   ActionHome,
+		"end":    ActionEnd,
 	}
 
 	// Energy context
@@ -182,6 +216,10 @@ func (m *ContextMap) initDefaults() {
 		"e":      ActionExpand,
 		"pgdown": ActionPageDown,
 		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
+		"g":      ActionHome,
+		"G":      ActionEnd,
 	}
 
 	// JSON context
@@ -199,49 +237,114 @@ func (m *ContextMap) initDefaults() {
 		"ctrl+[": ActionEscape,
 		"y":      ActionCopy,
 		"r":      ActionRefresh,
+		"pgdown": ActionPageDown,
+		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
 		"g":      ActionHome,
 		"G":      ActionEnd,
 	}
 
-	// Automation context - navigation only; views handle action keys (e/d/n) directly
+	// Automation context - scripts, schedules, webhooks, KVS
 	m.bindings[ContextAutomation] = map[string]Action{
-		"j":     ActionDown,
-		"k":     ActionUp,
-		"down":  ActionDown,
-		"up":    ActionUp,
-		"enter": ActionEnter,
+		"j":      ActionDown,
+		"k":      ActionUp,
+		"down":   ActionDown,
+		"up":     ActionUp,
+		"enter":  ActionEnter,
+		"e":      ActionEdit,   // Edit script/schedule/webhook
+		"n":      ActionNew,    // Create new
+		"d":      ActionDelete, // Delete
+		"r":      ActionRefresh,
+		"pgdown": ActionPageDown,
+		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
+		"g":      ActionHome,
+		"G":      ActionEnd,
 	}
 
-	// Config context - navigation only; views handle action keys directly
+	// Config context - device configuration panels
 	m.bindings[ContextConfig] = map[string]Action{
-		"j":     ActionDown,
-		"k":     ActionUp,
-		"down":  ActionDown,
-		"up":    ActionUp,
-		"enter": ActionEnter,
+		"j":      ActionDown,
+		"k":      ActionUp,
+		"down":   ActionDown,
+		"up":     ActionUp,
+		"enter":  ActionEnter,
+		"e":      ActionEdit, // Edit configuration
+		"r":      ActionRefresh,
+		"pgdown": ActionPageDown,
+		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
+		"g":      ActionHome,
+		"G":      ActionEnd,
 	}
 
-	// Manage context
+	// Manage context - discovery, firmware, backup, batch operations
 	m.bindings[ContextManage] = map[string]Action{
-		"j":     ActionDown,
-		"k":     ActionUp,
-		"down":  ActionDown,
-		"up":    ActionUp,
-		"enter": ActionEnter,
-		"r":     ActionRefresh, // Refresh device list
-		"space": ActionToggle,  // Select device
-		"a":     ActionExpand,  // Select all
+		"j":      ActionDown,
+		"k":      ActionUp,
+		"down":   ActionDown,
+		"up":     ActionUp,
+		"enter":  ActionEnter,
+		"r":      ActionRefresh, // Refresh device list
+		"space":  ActionToggle,  // Select device
+		"a":      ActionExpand,  // Select all
+		"pgdown": ActionPageDown,
+		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
+		"g":      ActionHome,
+		"G":      ActionEnd,
 	}
 
-	// Fleet context
+	// Monitor context - real-time monitoring with device actions
+	m.bindings[ContextMonitor] = map[string]Action{
+		"j":      ActionDown,
+		"k":      ActionUp,
+		"down":   ActionDown,
+		"up":     ActionUp,
+		"h":      ActionLeft,
+		"l":      ActionRight,
+		"left":   ActionLeft,
+		"right":  ActionRight,
+		"t":      ActionToggle,
+		"o":      ActionOn,
+		"O":      ActionOff,
+		"R":      ActionReboot,
+		"d":      ActionEnter, // Device detail
+		"enter":  ActionEnter,
+		"r":      ActionRefresh,
+		"ctrl+r": ActionRefresh,
+		"b":      ActionBrowser, // Open in browser
+		"space":  ActionPause,   // Pause/resume monitoring
+		"pgdown": ActionPageDown,
+		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown, // Half-page down
+		"ctrl+u": ActionPageUp,   // Half-page up
+		"g":      ActionHome,
+		"G":      ActionEnd,
+		"home":   ActionHome,
+		"end":    ActionEnd,
+	}
+
+	// Fleet context - cloud fleet management
 	m.bindings[ContextFleet] = map[string]Action{
-		"j":     ActionDown,
-		"k":     ActionUp,
-		"down":  ActionDown,
-		"up":    ActionUp,
-		"enter": ActionEnter,
-		"space": ActionToggle, // Select device
-		"a":     ActionExpand, // Select all
+		"j":      ActionDown,
+		"k":      ActionUp,
+		"down":   ActionDown,
+		"up":     ActionUp,
+		"enter":  ActionEnter,
+		"r":      ActionRefresh,
+		"space":  ActionToggle, // Select device
+		"a":      ActionExpand, // Select all
+		"pgdown": ActionPageDown,
+		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
+		"g":      ActionHome,
+		"G":      ActionEnd,
 	}
 
 	// Help context
@@ -252,6 +355,14 @@ func (m *ContextMap) initDefaults() {
 		"ctrl+[": ActionEscape,
 		"j":      ActionDown,
 		"k":      ActionUp,
+		"down":   ActionDown,
+		"up":     ActionUp,
+		"pgdown": ActionPageDown,
+		"pgup":   ActionPageUp,
+		"ctrl+d": ActionPageDown,
+		"ctrl+u": ActionPageUp,
+		"g":      ActionHome,
+		"G":      ActionEnd,
 	}
 }
 
@@ -313,7 +424,7 @@ func ContextFromPanel(p focus.PanelID) Context {
 	case focus.PanelEnergyBars, focus.PanelEnergyHistory:
 		return ContextEnergy
 	case focus.PanelMonitor:
-		return ContextDevices // Monitor uses device-like navigation
+		return ContextMonitor
 	default:
 		return ContextGlobal
 	}
@@ -353,11 +464,17 @@ var actionDescriptions = map[Action]string{
 	ActionExpand:       "Expand/Toggle all",
 	ActionRefresh:      "Refresh",
 	ActionFilterToggle: "Toggle filter",
+	ActionEdit:         "Edit",
+	ActionNew:          "Create new",
+	ActionDelete:       "Delete",
+	ActionBrowser:      "Open in browser",
+	ActionDebug:        "Toggle debug",
 	ActionTab1:         "Dashboard tab",
 	ActionTab2:         "Automation tab",
 	ActionTab3:         "Config tab",
 	ActionTab4:         "Manage tab",
-	ActionTab5:         "Fleet tab",
+	ActionTab5:         "Monitor tab",
+	ActionTab6:         "Fleet tab",
 	ActionPanel1:       "Jump to panel 1",
 	ActionPanel2:       "Jump to panel 2",
 	ActionPanel3:       "Jump to panel 3",
@@ -370,10 +487,12 @@ var actionDescriptions = map[Action]string{
 }
 
 // contextActionDescriptions overrides action descriptions for specific contexts.
-// Note: Action keys like e/d/n are handled directly by views (scripts, schedules).
 var contextActionDescriptions = map[Context]map[Action]string{
 	ContextAutomation: {
-		ActionEnter: "View script",
+		ActionEnter:  "View script",
+		ActionEdit:   "Edit script/schedule",
+		ActionNew:    "Create new",
+		ActionDelete: "Delete item",
 	},
 	ContextEvents: {
 		ActionPause:        "Pause events",
@@ -383,6 +502,7 @@ var contextActionDescriptions = map[Context]map[Action]string{
 	ContextDevices: {
 		ActionEnter:   "View details",
 		ActionRefresh: "Refresh device",
+		ActionBrowser: "Open web UI",
 	},
 	ContextInfo: {
 		ActionEnter:  "View JSON",
@@ -392,13 +512,25 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionSort:   "Sort by power",
 		ActionExpand: "Expand details",
 	},
+	ContextConfig: {
+		ActionEdit:    "Edit configuration",
+		ActionRefresh: "Reload settings",
+	},
 	ContextManage: {
-		ActionToggle: "Select device",
-		ActionExpand: "Select all",
+		ActionToggle:  "Select device",
+		ActionExpand:  "Select all",
+		ActionRefresh: "Refresh list",
+	},
+	ContextMonitor: {
+		ActionEnter:   "View device details",
+		ActionPause:   "Pause monitoring",
+		ActionRefresh: "Refresh data",
+		ActionBrowser: "Open web UI",
 	},
 	ContextFleet: {
-		ActionToggle: "Select device",
-		ActionExpand: "Select all",
+		ActionToggle:  "Select device",
+		ActionExpand:  "Select all",
+		ActionRefresh: "Refresh fleet",
 	},
 }
 
@@ -439,6 +571,8 @@ func ContextName(ctx Context) string {
 		return "Config"
 	case ContextManage:
 		return "Manage"
+	case ContextMonitor:
+		return "Monitor"
 	case ContextFleet:
 		return "Fleet"
 	case ContextHelp:

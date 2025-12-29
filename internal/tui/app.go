@@ -835,6 +835,8 @@ func (m Model) getHelpContext() keys.Context {
 		return keys.ContextConfig
 	case tabs.TabManage:
 		return keys.ContextManage
+	case tabs.TabMonitor:
+		return keys.ContextMonitor
 	case tabs.TabFleet:
 		return keys.ContextFleet
 	default:
@@ -932,7 +934,7 @@ func (m Model) getCurrentKeyContext() keys.Context {
 	case tabs.TabFleet:
 		return keys.ContextFleet
 	case tabs.TabMonitor:
-		return keys.ContextDevices // Monitor uses device-like navigation
+		return keys.ContextMonitor
 	default:
 		return m.panelToContext(m.focusedPanel)
 	}
@@ -1151,11 +1153,6 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 		return newM, cmd, true
 	}
 
-	// Handle Shift+D for debug session toggle
-	if msg.String() == "D" {
-		return m.handleDebugToggle()
-	}
-
 	return m, nil, false
 }
 
@@ -1184,32 +1181,6 @@ func (m Model) handleViewSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, boo
 		}
 	}
 	return m, nil, false
-}
-
-// handleDebugToggle handles Shift+D to toggle debug session.
-func (m Model) handleDebugToggle() (tea.Model, tea.Cmd, bool) {
-	enabled, sessionDir := m.debugLogger.Toggle()
-	var desc string
-	var toastMsg string
-	if enabled {
-		desc = "Debug session started: " + sessionDir
-		toastMsg = "Debug ON: " + sessionDir
-	} else {
-		desc = "Debug session ended"
-		toastMsg = "Debug OFF: session saved"
-	}
-	debugEvent := events.EventMsg{
-		Events: []events.Event{{
-			Timestamp:   time.Now(),
-			Device:      "system",
-			Component:   "debug",
-			Type:        "info",
-			Description: desc,
-		}},
-	}
-	// Update status bar debug indicator
-	m.statusBar = m.statusBar.SetDebugActive(enabled)
-	return m, tea.Batch(toast.Success(toastMsg), func() tea.Msg { return debugEvent }), true
 }
 
 // dispatchAction handles an action from the context-sensitive keybinding system.
@@ -1294,12 +1265,39 @@ func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
 		}
 		return m, nil, false
 
+	case keys.ActionDebug:
+		return m.dispatchDebugAction()
+
 	default:
 		return m, nil, false
 	}
 }
 
-// dispatchTabAction handles tab switching actions (1-5).
+// dispatchDebugAction handles the debug toggle action.
+func (m Model) dispatchDebugAction() (Model, tea.Cmd, bool) {
+	enabled, sessionDir := m.debugLogger.Toggle()
+	var desc, toastMsg string
+	if enabled {
+		desc = "Debug session started: " + sessionDir
+		toastMsg = "Debug ON: " + sessionDir
+	} else {
+		desc = "Debug session ended"
+		toastMsg = "Debug OFF: session saved"
+	}
+	debugEvent := events.EventMsg{
+		Events: []events.Event{{
+			Timestamp:   time.Now(),
+			Device:      "system",
+			Component:   "debug",
+			Type:        "info",
+			Description: desc,
+		}},
+	}
+	m.statusBar = m.statusBar.SetDebugActive(enabled)
+	return m, tea.Batch(toast.Success(toastMsg), func() tea.Msg { return debugEvent }), true
+}
+
+// dispatchTabAction handles tab switching actions (1-6).
 func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 	switch action {
 	case keys.ActionTab1:
@@ -1327,12 +1325,18 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 
 	case keys.ActionTab4:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabManage)
+		m.focusedPanel = PanelDeviceList
 		return m, m.viewManager.SetActive(views.ViewManage), true
 
 	case keys.ActionTab5:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabMonitor)
 		m.focusedPanel = PanelDeviceList
 		return m, m.viewManager.SetActive(views.ViewMonitor), true
+
+	case keys.ActionTab6:
+		m.tabBar, _ = m.tabBar.SetActive(tabs.TabFleet)
+		m.focusedPanel = PanelDeviceList
+		return m, m.viewManager.SetActive(views.ViewFleet), true
 
 	default:
 		return m, nil, false
@@ -1368,7 +1372,7 @@ func (m Model) dispatchPanelAction(action keys.Action) (Model, tea.Cmd, bool) {
 	}
 }
 
-// dispatchDeviceKeyAction handles device control actions (toggle, on, off, reboot, enter).
+// dispatchDeviceKeyAction handles device control actions (toggle, on, off, reboot, enter, browser).
 func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool) {
 	switch action {
 	case keys.ActionToggle:
@@ -1381,9 +1385,23 @@ func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool
 		return m.dispatchDeviceAction("reboot")
 	case keys.ActionEnter:
 		return m.dispatchEnterAction()
+	case keys.ActionBrowser:
+		return m.dispatchBrowserAction()
 	default:
 		return m, nil, false
 	}
+}
+
+// dispatchBrowserAction opens the selected device's web UI in the browser.
+func (m Model) dispatchBrowserAction() (Model, tea.Cmd, bool) {
+	if !m.hasDeviceList() {
+		return m, nil, false
+	}
+	device := m.deviceList.SelectedDevice()
+	if device == nil || device.Device.Address == "" {
+		return m, nil, false
+	}
+	return m, m.openDeviceBrowser(device.Device.Address), true
 }
 
 // dispatchDeviceAction executes a device action on the selected device.
@@ -2125,7 +2143,7 @@ func (m Model) renderEventsColumn(width, height int) string {
 
 	// Resize events model to fit inside the border box
 	// Footer is embedded in border, not a separate line
-	m.events = m.events.SetSize(r.ContentWidth(), r.ContentHeight())
+	m.events = m.events.SetSize(r.ContentWidth(), r.ContentHeight()).SetFocused(focused)
 	eventsView := m.events.View()
 
 	return r.SetContent(eventsView).Render()
