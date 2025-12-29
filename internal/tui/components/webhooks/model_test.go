@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -306,6 +307,7 @@ func TestModel_View_Loading(t *testing.T) {
 		width:    40,
 		height:   10,
 		styles:   DefaultStyles(),
+		loader:   loading.New(),
 	}
 
 	view := m.View()

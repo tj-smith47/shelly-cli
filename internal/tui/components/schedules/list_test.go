@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 )
 
 func TestSchedule(t *testing.T) {
@@ -281,6 +282,7 @@ func TestListModel_View_Loading(t *testing.T) {
 		width:   40,
 		height:  10,
 		styles:  DefaultListStyles(),
+		loader:  loading.New(),
 	}
 
 	view := m.View()

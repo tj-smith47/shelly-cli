@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // NewCommand creates the alias export command.
@@ -49,13 +48,23 @@ The output format is:
 func run(f *cmdutil.Factory, filename string) error {
 	ios := f.IOStreams()
 
-	aliases := config.ListAliases()
+	cfg, err := f.Config()
+	if err != nil {
+		return fmt.Errorf("failed to get config: %w", err)
+	}
+
+	aliases := cfg.Aliases
 	if len(aliases) == 0 {
 		ios.Warning("No aliases to export")
 		return nil
 	}
 
-	output, err := config.ExportAliases(filename)
+	mgr, err := f.ConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to get config manager: %w", err)
+	}
+
+	output, err := mgr.ExportAliases(filename)
 	if err != nil {
 		return fmt.Errorf("failed to export aliases: %w", err)
 	}

@@ -15,6 +15,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GO_VERSION: "1.25.5"
+
 jobs:
   lint:
     name: Lint
@@ -26,23 +29,18 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.7.1
-          args: --timeout 5m
+          args: --timeout 10m
 
   test:
     name: Test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version:
-          - "1.25.5"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,25 +48,26 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Update coverage badge
-        if: github.ref == 'refs/heads/master' && matrix.go-version == '1.25.5'
+        if: github.ref == 'refs/heads/master'
         run: |
+          # Parse coverage
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           if (( $(echo "$COVERAGE >= 90" | bc -l) )); then COLOR="brightgreen"
           elif (( $(echo "$COVERAGE >= 80" | bc -l) )); then COLOR="green"
           elif (( $(echo "$COVERAGE >= 70" | bc -l) )); then COLOR="yellowgreen"
           elif (( $(echo "$COVERAGE >= 60" | bc -l) )); then COLOR="yellow"
           else COLOR="red"; fi
-          BADGE="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${COVERAGE}%\",\"color\":\"${COLOR}\"}"
+
+          # Setup git
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          # Fetch existing badges branch to preserve other badge files
           git fetch origin badges:badges 2>/dev/null || true
           if git show-ref --verify --quiet refs/heads/badges; then
             git checkout badges
@@ -76,7 +75,12 @@ jobs:
             git checkout --orphan badges
             git rm -rf . > /dev/null 2>&1 || true
           fi
+
+          # Store coverage
+          BADGE="{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${COVERAGE}%\",\"color\":\"${COLOR}\"}"
           echo "$BADGE" > coverage.json
+
+          # Commit & push changes
           git add coverage.json
           git diff --cached --quiet || git commit -m "Update coverage to ${COVERAGE}%"
           git push origin badges --force
@@ -94,7 +98,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Build
@@ -117,7 +121,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.5"
+          go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Run Gosec Security Scanner

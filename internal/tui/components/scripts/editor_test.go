@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 )
 
 func TestEditorDeps_Validate(t *testing.T) {
@@ -304,6 +305,7 @@ func TestEditorModel_View_Loading(t *testing.T) {
 		width:    50,
 		height:   20,
 		styles:   DefaultEditorStyles(),
+		loader:   loading.New(),
 	}
 
 	view := m.View()

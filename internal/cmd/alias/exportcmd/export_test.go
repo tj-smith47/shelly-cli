@@ -200,9 +200,9 @@ func TestRun_NoAliases(t *testing.T) {
 		t.Errorf("run() error = %v, want nil", err)
 	}
 
-	// Should print warning about no aliases
-	output := tf.OutString()
-	if output == "" {
+	// Warning is written to stderr, not stdout
+	errOutput := tf.ErrString()
+	if errOutput == "" {
 		t.Error("Expected warning output for empty alias list")
 	}
 }
