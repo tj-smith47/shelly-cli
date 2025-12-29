@@ -2,6 +2,7 @@ package iostreams_test
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -64,6 +65,25 @@ func TestIsColorDisabled_ShellyNoColorEnv(t *testing.T) {
 
 	if !iostreams.IsColorDisabled() {
 		t.Error("IsColorDisabled() should return true when SHELLY_NO_COLOR is set")
+	}
+}
+
+func TestIsColorDisabled_NothingSet(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+
+	// Unset environment variables that might be set
+	// Must use os.Unsetenv because t.Setenv("VAR", "") still counts as "set"
+	if err := os.Unsetenv("NO_COLOR"); err != nil {
+		t.Logf("warning: could not unset NO_COLOR: %v", err)
+	}
+	if err := os.Unsetenv("SHELLY_NO_COLOR"); err != nil {
+		t.Logf("warning: could not unset SHELLY_NO_COLOR: %v", err)
+	}
+	t.Setenv("TERM", "xterm-256color")
+
+	if iostreams.IsColorDisabled() {
+		t.Error("IsColorDisabled() should return false when no color-disable settings are present")
 	}
 }
 

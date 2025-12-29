@@ -273,3 +273,53 @@ func TestUpdateResult_Struct(t *testing.T) {
 		t.Errorf("CacheWriteErr = %v, want nil", result.CacheWriteErr)
 	}
 }
+
+func TestWriteCache_EmptyCachePath(t *testing.T) {
+	// Set HOME to invalid path to make CachePath return empty
+	originalHome := os.Getenv("HOME")
+	t.Setenv("HOME", "")
+	defer func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+	}()
+
+	// WriteCache should return nil when CachePath is empty (no-op)
+	err := WriteCache("1.0.0")
+	if err != nil {
+		t.Errorf("WriteCache() error = %v, want nil when cache path is empty", err)
+	}
+}
+
+func TestReadCachedVersion_EmptyCachePath(t *testing.T) {
+	// Set HOME to invalid path to make CachePath return empty
+	originalHome := os.Getenv("HOME")
+	t.Setenv("HOME", "")
+	defer func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+	}()
+
+	// ReadCachedVersion should return empty when CachePath is empty
+	cached := ReadCachedVersion()
+	if cached != "" {
+		t.Errorf("ReadCachedVersion() = %q, want empty when cache path is empty", cached)
+	}
+}
+
+func TestCachePath_NoHomeDir(t *testing.T) {
+	// Set HOME to empty to trigger the error path
+	originalHome := os.Getenv("HOME")
+	t.Setenv("HOME", "")
+	defer func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+	}()
+
+	path := CachePath()
+	if path != "" {
+		t.Errorf("CachePath() = %q, want empty when HOME is unset", path)
+	}
+}

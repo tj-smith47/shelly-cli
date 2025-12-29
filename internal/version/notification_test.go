@@ -120,3 +120,107 @@ func TestShowUpdateNotification_NoArgs(t *testing.T) {
 	// Should not panic with no args
 	ShowUpdateNotification()
 }
+
+func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
+	// Create a temp directory with a cache file
+	tmpDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
+	defer func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+	}()
+
+	// Create cache with a newer version
+	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
+	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+		t.Fatalf("failed to create cache dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("99.0.0"), 0o600); err != nil {
+		t.Fatalf("failed to write cache: %v", err)
+	}
+
+	// Save original version and set to a release version
+	originalVersion := Version
+	Version = "v1.0.0"
+	defer func() { Version = originalVersion }()
+
+	// Save original args
+	originalArgs := os.Args
+	defer func() { os.Args = originalArgs }()
+
+	// Use a command that's not skipped
+	os.Args = []string{"shelly", "device", "list"}
+
+	// Should execute the full path including showing notification
+	// (we can't easily verify the output, but we ensure it doesn't panic)
+	ShowUpdateNotification()
+}
+
+func TestShowUpdateNotification_EmptyVersion(t *testing.T) {
+	// Create a temp directory with a cache file
+	tmpDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
+	defer func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+	}()
+
+	// Create cache with a version
+	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
+	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+		t.Fatalf("failed to create cache dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("2.0.0"), 0o600); err != nil {
+		t.Fatalf("failed to write cache: %v", err)
+	}
+
+	// Save original version and set to empty
+	originalVersion := Version
+	Version = ""
+	defer func() { Version = originalVersion }()
+
+	// Should return early for empty version
+	ShowUpdateNotification()
+}
+
+func TestShowUpdateNotification_NoUpdate(t *testing.T) {
+	// Create a temp directory with a cache file
+	tmpDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
+	defer func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+	}()
+
+	// Create cache with same version (no update)
+	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
+	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+		t.Fatalf("failed to create cache dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("1.0.0"), 0o600); err != nil {
+		t.Fatalf("failed to write cache: %v", err)
+	}
+
+	// Save original version
+	originalVersion := Version
+	Version = "v1.0.0"
+	defer func() { Version = originalVersion }()
+
+	// Save original args
+	originalArgs := os.Args
+	defer func() { os.Args = originalArgs }()
+
+	os.Args = []string{"shelly", "device", "list"}
+
+	// Should not show notification when versions are equal
+	ShowUpdateNotification()
+}

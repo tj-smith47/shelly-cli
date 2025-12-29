@@ -863,3 +863,70 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestCapConcurrency(t *testing.T) {
+	t.Parallel()
+
+	t.Run("under limit", func(t *testing.T) {
+		t.Parallel()
+		ios, _, _ := testIOStreams()
+
+		// Request less than global limit - should return requested value
+		result := cmdutil.CapConcurrency(ios, 1)
+		if result != 1 {
+			t.Errorf("CapConcurrency(1) = %d, want 1", result)
+		}
+	})
+
+	t.Run("at limit", func(t *testing.T) {
+		t.Parallel()
+		ios, _, errOut := testIOStreams()
+
+		// Request exactly global limit (default is 5) - should return same value, no warning
+		result := cmdutil.CapConcurrency(ios, 5)
+		if result != 5 {
+			t.Errorf("CapConcurrency(5) = %d, want 5", result)
+		}
+		// Should not have warning
+		if contains(errOut.String(), "exceeds") {
+			t.Error("should not warn when at limit")
+		}
+	})
+
+	t.Run("exceeds limit", func(t *testing.T) {
+		t.Parallel()
+		ios, _, errOut := testIOStreams()
+
+		// Request more than global limit (default is 5) - should cap and warn
+		result := cmdutil.CapConcurrency(ios, 100)
+		if result > 5 {
+			t.Errorf("CapConcurrency(100) = %d, want <= 5", result)
+		}
+		// Should have warning
+		if !contains(errOut.String(), "exceeds") {
+			t.Error("should warn when exceeding limit")
+		}
+	})
+}
+
+func TestRunBatchWithResults_ConcurrencyCapped(t *testing.T) {
+	t.Parallel()
+
+	svc := shelly.NewService()
+	targets := []string{"device1", "device2", "device3"}
+
+	// Request very high concurrency - should be capped silently
+	results := cmdutil.RunBatchWithResults(context.Background(), svc, targets, 1000, func(_ context.Context, _ *shelly.Service, _ string) error {
+		return nil
+	})
+
+	if len(results) != 3 {
+		t.Fatalf("RunBatchWithResults() returned %d results, want 3", len(results))
+	}
+
+	for i, r := range results {
+		if !r.Success {
+			t.Errorf("results[%d].Success = false, want true", i)
+		}
+	}
+}

@@ -27,6 +27,47 @@ func testIOStreams() (*iostreams.IOStreams, *bytes.Buffer, *bytes.Buffer) {
 	return iostreams.Test(in, out, errOut), out, errOut
 }
 
+// setupTestConfig creates an isolated test config environment.
+// Returns a cleanup function that MUST be deferred.
+func setupTestConfig(t *testing.T) func() {
+	t.Helper()
+
+	// Save original HOME
+	originalHome := os.Getenv("HOME")
+
+	// Reset the config singleton BEFORE changing HOME
+	config.ResetDefaultManagerForTesting()
+
+	// Create temp directory for test config
+	tmpDir := t.TempDir()
+	if err := os.Setenv("HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+
+	// Create config directory
+	configDir := filepath.Join(tmpDir, ".config", "shelly")
+	if err := os.MkdirAll(configDir, 0o750); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+
+	// Write minimal config
+	configPath := filepath.Join(configDir, "config.yaml")
+	configContent := `devices: {}
+groups: {}
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Return cleanup function
+	return func() {
+		config.ResetDefaultManagerForTesting()
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+	}
+}
+
 func TestOptions_IsNonInteractive(t *testing.T) {
 	t.Parallel()
 
@@ -2588,6 +2629,9 @@ func TestSelectDiscoveryMethods_InteractiveWithParsing(t *testing.T) {
 //
 //nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestRunFlagDevicesStep(t *testing.T) {
+	cleanup := setupTestConfig(t)
+	defer cleanup()
+
 	tests := []struct {
 		name string
 		opts *Options
@@ -2698,6 +2742,9 @@ func TestRunDiscoveryStep(t *testing.T) {
 //
 //nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestStepFlagDevices(t *testing.T) {
+	cleanup := setupTestConfig(t)
+	defer cleanup()
+
 	tests := []struct {
 		name    string
 		opts    *Options
@@ -2710,7 +2757,7 @@ func TestStepFlagDevices(t *testing.T) {
 		},
 		{
 			name:    "valid device spec format",
-			opts:    &Options{Devices: []string{"kitchen=192.168.1.100"}},
+			opts:    &Options{Devices: []string{"test-device=192.168.99.100"}},
 			wantErr: false,
 		},
 		{
@@ -3014,11 +3061,14 @@ func TestRunDiscoveryStep_WithMethods(t *testing.T) {
 //
 //nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestStepFlagDevices_MoreCases(t *testing.T) {
+	cleanup := setupTestConfig(t)
+	defer cleanup()
+
 	ios, out, _ := testIOStreams()
 
 	// Test with valid JSON device
 	opts := &Options{
-		DevicesJSON: []string{`{"name":"test-device","address":"192.168.1.100"}`},
+		DevicesJSON: []string{`{"name":"test-json-device","address":"192.168.99.101"}`},
 	}
 	err := stepFlagDevices(ios, opts)
 	if err != nil {

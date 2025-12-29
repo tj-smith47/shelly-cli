@@ -2,12 +2,18 @@ package theme
 
 import (
 	"image/color"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/spf13/viper"
 )
 
-const testColorGreen = "#00ff00"
+const (
+	testColorGreen = "#00ff00"
+	testThemeNord  = "nord"
+)
 
 // TestColorCompatibility verifies theme colors work with lipgloss v2.
 func TestColorCompatibility(t *testing.T) {
@@ -65,7 +71,7 @@ func TestSetTheme(t *testing.T) {
 		want bool
 	}{
 		{"dracula", true},
-		{"nord", true},
+		{testThemeNord, true},
 		{"catppuccin_mocha", true},
 		{"nonexistent_theme_xyz", false},
 	}
@@ -221,12 +227,12 @@ func TestApplyConfig(t *testing.T) {
 
 	t.Run("set_theme_by_name", func(t *testing.T) {
 		ClearCustomColors()
-		err := ApplyConfig("nord", nil, nil, "")
+		err := ApplyConfig(testThemeNord, nil, nil, "")
 		if err != nil {
 			t.Errorf("ApplyConfig with valid theme failed: %v", err)
 		}
-		if Current().ID != "nord" {
-			t.Errorf("expected theme 'nord', got %q", Current().ID)
+		if Current().ID != testThemeNord {
+			t.Errorf("expected theme %q, got %q", testThemeNord, Current().ID)
 		}
 	})
 
@@ -333,7 +339,7 @@ func TestGetTheme(t *testing.T) {
 		wantOK bool
 	}{
 		{"dracula", true},
-		{"nord", true},
+		{testThemeNord, true},
 		{"nonexistent_theme_xyz", false},
 	}
 
@@ -644,6 +650,259 @@ func TestGetCustomColorAllFields(t *testing.T) {
 	for _, c := range colors {
 		if c.fn() == nil {
 			t.Errorf("%s() returned nil with custom override set", c.name)
+		}
+	}
+}
+
+// TestCurrentThemeName tests the CurrentThemeName function.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestCurrentThemeName(t *testing.T) {
+	// Save and restore
+	original := Current()
+	defer SetTheme(original.ID)
+
+	// Set a known theme
+	SetTheme("dracula")
+	name := CurrentThemeName()
+	if name != "dracula" {
+		t.Errorf("CurrentThemeName() = %q, want %q", name, "dracula")
+	}
+
+	// Test with different theme
+	SetTheme(testThemeNord)
+	name = CurrentThemeName()
+	if name != testThemeNord {
+		t.Errorf("CurrentThemeName() = %q, want %q", name, testThemeNord)
+	}
+}
+
+// TestSetThemeFromConfig tests SetThemeFromConfig function.
+//
+//nolint:paralleltest // Tests modify global viper/theme state
+func TestSetThemeFromConfig(t *testing.T) {
+	// Save and restore
+	original := Current()
+	originalViperTheme := viper.GetString("theme")
+	defer func() {
+		SetTheme(original.ID)
+		viper.Set("theme", originalViperTheme)
+	}()
+
+	// Test with empty config (should use default)
+	viper.Set("theme", "")
+	SetThemeFromConfig()
+	if CurrentThemeName() != DefaultTheme {
+		t.Errorf("SetThemeFromConfig() with empty config = %q, want %q", CurrentThemeName(), DefaultTheme)
+	}
+
+	// Test with specific theme
+	viper.Set("theme", testThemeNord)
+	SetThemeFromConfig()
+	if CurrentThemeName() != testThemeNord {
+		t.Errorf("SetThemeFromConfig() with %q config = %q, want %q", testThemeNord, CurrentThemeName(), testThemeNord)
+	}
+}
+
+// TestSaveTheme tests the SaveTheme function.
+//
+//nolint:paralleltest // Tests modify filesystem
+func TestSaveTheme(t *testing.T) {
+	// Create temp directory
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Set viper to use temp config
+	originalConfigFile := viper.ConfigFileUsed()
+	viper.SetConfigFile(configPath)
+	defer viper.SetConfigFile(originalConfigFile)
+
+	// Write initial config
+	if err := os.WriteFile(configPath, []byte("output: table\n"), 0o600); err != nil {
+		t.Fatalf("failed to write initial config: %v", err)
+	}
+
+	// Save theme
+	err := SaveTheme("dracula")
+	if err != nil {
+		t.Errorf("SaveTheme() error = %v", err)
+	}
+
+	// Verify theme was saved
+	savedTheme := viper.GetString("theme")
+	if savedTheme != "dracula" {
+		t.Errorf("SaveTheme() saved theme = %q, want %q", savedTheme, "dracula")
+	}
+}
+
+// TestApplyFromFile_ValidFile tests applyFromFile with a valid theme file.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestApplyFromFile_ValidFile(t *testing.T) {
+	// Create temp theme file
+	tmpDir := t.TempDir()
+	themePath := filepath.Join(tmpDir, "custom-theme.yaml")
+	themeContent := `name: nord
+colors:
+  green: "#50fa7b"
+`
+	if err := os.WriteFile(themePath, []byte(themeContent), 0o600); err != nil {
+		t.Fatalf("failed to write theme file: %v", err)
+	}
+
+	// Save and restore original state
+	originalTheme := Current()
+	originalColors := GetCustomColors()
+	defer func() {
+		SetTheme(originalTheme.ID)
+		SetCustomColors(originalColors)
+	}()
+
+	// Apply from file
+	err := ApplyConfig("", nil, nil, themePath)
+	if err != nil {
+		t.Errorf("ApplyConfig() with valid file error = %v", err)
+	}
+}
+
+// TestDefaultColor tests the defaultColor function branches.
+func TestDefaultColor(t *testing.T) {
+	t.Parallel()
+
+	// Purple and Orange use special fallback logic
+	t.Run("purple", func(t *testing.T) {
+		t.Parallel()
+		c := Purple()
+		if c == nil {
+			t.Error("Purple() returned nil")
+		}
+	})
+
+	t.Run("orange", func(t *testing.T) {
+		t.Parallel()
+		c := Orange()
+		if c == nil {
+			t.Error("Orange() returned nil")
+		}
+	})
+}
+
+// TestSaveTheme_WithExistingConfig tests SaveTheme with an existing config.
+//
+//nolint:paralleltest // Tests modify global viper state and filesystem
+func TestSaveTheme_WithExistingConfig(t *testing.T) {
+	// Create temp directory
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Write initial config
+	if err := os.WriteFile(configPath, []byte("output: json\n"), 0o600); err != nil {
+		t.Fatalf("failed to write initial config: %v", err)
+	}
+
+	// Set viper to use temp config
+	originalConfigFile := viper.ConfigFileUsed()
+	viper.SetConfigFile(configPath)
+	defer viper.SetConfigFile(originalConfigFile)
+
+	// Read config so viper knows about it
+	if err := viper.ReadInConfig(); err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+
+	// Save a different theme
+	err := SaveTheme(testThemeNord)
+	if err != nil {
+		t.Errorf("SaveTheme() error = %v", err)
+	}
+
+	// Verify the theme was saved
+	if viper.GetString("theme") != testThemeNord {
+		t.Errorf("SaveTheme() theme = %q, want %q", viper.GetString("theme"), testThemeNord)
+	}
+}
+
+// TestPurple_WithCustomColor tests Purple with custom color override.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestPurple_WithCustomColor(t *testing.T) {
+	// Save and restore
+	original := GetCustomColors()
+	defer SetCustomColors(original)
+
+	// Set custom purple color
+	SetCustomColors(&CustomColors{
+		Purple: "#9b59b6",
+	})
+
+	c := Purple()
+	if c == nil {
+		t.Error("Purple() with custom color returned nil")
+	}
+}
+
+// TestBrightBlack_WithCustomColor tests BrightBlack with custom color override.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestBrightBlack_WithCustomColor(t *testing.T) {
+	// Save and restore
+	original := GetCustomColors()
+	defer SetCustomColors(original)
+
+	// Set custom bright_black color
+	SetCustomColors(&CustomColors{
+		BrightBlack: "#666666",
+	})
+
+	c := BrightBlack()
+	if c == nil {
+		t.Error("BrightBlack() with custom color returned nil")
+	}
+}
+
+// TestColorFunctions_WithNilTheme tests color functions' fallback behavior.
+// This is hard to test directly since themes are always initialized,
+// so we test by verifying the color functions work correctly.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestColorFunctions_AllWithCustom(t *testing.T) {
+	// Save and restore
+	original := GetCustomColors()
+	defer SetCustomColors(original)
+
+	// Set all custom colors
+	SetCustomColors(&CustomColors{
+		Foreground:  "#ffffff",
+		Background:  "#000000",
+		Green:       "#00ff00",
+		Red:         "#ff0000",
+		Yellow:      "#ffff00",
+		Blue:        "#0000ff",
+		Cyan:        "#00ffff",
+		Purple:      "#ff00ff",
+		BrightBlack: "#808080",
+	})
+
+	// Verify all color functions return non-nil
+	tests := []struct {
+		name string
+		fn   func() color.Color
+	}{
+		{"Fg", Fg},
+		{"Bg", Bg},
+		{"Green", Green},
+		{"Red", Red},
+		{"Yellow", Yellow},
+		{"Blue", Blue},
+		{"Cyan", Cyan},
+		{"Purple", Purple},
+		{"BrightBlack", BrightBlack},
+	}
+
+	for _, tt := range tests {
+		c := tt.fn()
+		if c == nil {
+			t.Errorf("%s() with custom color returned nil", tt.name)
 		}
 	}
 }

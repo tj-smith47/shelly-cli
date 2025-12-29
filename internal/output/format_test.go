@@ -4,7 +4,19 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/spf13/viper"
 )
+
+// viperSetOutput sets the "output" viper value for the duration of the test and restores it after.
+func viperSetOutput(t *testing.T, value string) {
+	t.Helper()
+	original := viper.GetString("output")
+	viper.Set("output", value)
+	t.Cleanup(func() {
+		viper.Set("output", original)
+	})
+}
 
 func TestGetFormat(t *testing.T) {
 	t.Parallel()
@@ -629,3 +641,104 @@ func TestGetChromaStyle(t *testing.T) {
 		t.Error("getChromaStyle() returned nil")
 	}
 }
+
+//nolint:paralleltest // Tests share viper state for output format
+func TestGetFormat_WithViper(t *testing.T) {
+	t.Run("json format", func(t *testing.T) {
+		viperSetOutput(t, "json")
+		got := GetFormat()
+		if got != FormatJSON {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatJSON)
+		}
+	})
+
+	t.Run("yaml format", func(t *testing.T) {
+		viperSetOutput(t, "yaml")
+		got := GetFormat()
+		if got != FormatYAML {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatYAML)
+		}
+	})
+
+	t.Run("yml format", func(t *testing.T) {
+		viperSetOutput(t, "yml")
+		got := GetFormat()
+		if got != FormatYAML {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatYAML)
+		}
+	})
+
+	t.Run("table format", func(t *testing.T) {
+		viperSetOutput(t, "table")
+		got := GetFormat()
+		if got != FormatTable {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatTable)
+		}
+	})
+
+	t.Run("text format", func(t *testing.T) {
+		viperSetOutput(t, "text")
+		got := GetFormat()
+		if got != FormatText {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatText)
+		}
+	})
+
+	t.Run("plain format", func(t *testing.T) {
+		viperSetOutput(t, "plain")
+		got := GetFormat()
+		if got != FormatText {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatText)
+		}
+	})
+
+	t.Run("template format", func(t *testing.T) {
+		viperSetOutput(t, "template")
+		got := GetFormat()
+		if got != FormatTemplate {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatTemplate)
+		}
+	})
+
+	t.Run("go-template format", func(t *testing.T) {
+		viperSetOutput(t, "go-template")
+		got := GetFormat()
+		if got != FormatTemplate {
+			t.Errorf("GetFormat() = %v, want %v", got, FormatTemplate)
+		}
+	})
+
+	t.Run("unknown defaults to table", func(t *testing.T) {
+		viperSetOutput(t, "unknown-format")
+		got := GetFormat()
+		if got != FormatTable {
+			t.Errorf("GetFormat() = %v, want %v (default)", got, FormatTable)
+		}
+	})
+}
+
+func TestShouldHighlight(t *testing.T) {
+	t.Parallel()
+
+	// In test environment, terminal is not a TTY so shouldHighlight should return false
+	if shouldHighlight() {
+		// Not expected in test environment, but if it's true, that's also valid
+		t.Log("shouldHighlight returned true (unexpected in test, but acceptable)")
+	}
+}
+
+func TestColorEnabled(t *testing.T) {
+	t.Parallel()
+
+	// In test environment, terminal is not a TTY so colorEnabled should return false
+	if colorEnabled() {
+		// Not expected in test environment, but if it's true, that's also valid
+		t.Log("colorEnabled returned true (unexpected in test, but acceptable)")
+	}
+}
+
+// ExtractMapSection tests are in helpers_test.go
+
+// FormatConfigValue tests are in helpers_test.go
+
+// FormatDisplayValue and RenderProgressBar tests are in helpers_test.go

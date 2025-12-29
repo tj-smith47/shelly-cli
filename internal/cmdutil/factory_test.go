@@ -2,6 +2,7 @@ package cmdutil_test
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -578,5 +579,238 @@ func TestFactory_Logger(t *testing.T) {
 	logger := f.Logger()
 	if logger == nil {
 		t.Error("Logger should not return nil")
+	}
+}
+
+func TestFactory_MustConfig_Panic(t *testing.T) {
+	t.Parallel()
+
+	// Use a factory with an erroring ConfigManager
+	f := cmdutil.NewFactory()
+	f.ConfigManager = func() (*config.Manager, error) {
+		return nil, errors.New("config load failed")
+	}
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config load failed")
+	}
+
+	// MustConfig should panic when config fails
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustConfig should panic when config fails to load")
+		}
+	}()
+	f.MustConfig()
+}
+
+func TestFactory_MustConfigManager_Panic(t *testing.T) {
+	t.Parallel()
+
+	// Use a factory with an erroring ConfigManager
+	f := cmdutil.NewFactory()
+	f.ConfigManager = func() (*config.Manager, error) {
+		return nil, errors.New("config manager load failed")
+	}
+
+	// MustConfigManager should panic when config manager fails
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("MustConfigManager should panic when config manager fails to load")
+		}
+	}()
+	f.MustConfigManager()
+}
+
+func TestFactory_GetDevice_ConfigError(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config error")
+	}
+
+	// Should return nil when config fails
+	if f.GetDevice("any") != nil {
+		t.Error("GetDevice should return nil when config fails")
+	}
+}
+
+func TestFactory_GetGroup_ConfigError(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config error")
+	}
+
+	// Should return nil when config fails
+	if f.GetGroup("any") != nil {
+		t.Error("GetGroup should return nil when config fails")
+	}
+}
+
+func TestFactory_GetAlias_ConfigError(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config error")
+	}
+
+	// Should return nil when config fails
+	if f.GetAlias("any") != nil {
+		t.Error("GetAlias should return nil when config fails")
+	}
+}
+
+func TestFactory_GetScene_ConfigError(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config error")
+	}
+
+	// Should return nil when config fails
+	if f.GetScene("any") != nil {
+		t.Error("GetScene should return nil when config fails")
+	}
+}
+
+func TestFactory_GetDeviceTemplate_ConfigError(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config error")
+	}
+
+	// Should return nil when config fails
+	if f.GetDeviceTemplate("any") != nil {
+		t.Error("GetDeviceTemplate should return nil when config fails")
+	}
+}
+
+func TestFactory_ResolveDevice_ConfigError(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config error")
+	}
+
+	// Should return false when config fails
+	_, ok := f.ResolveDevice("any")
+	if ok {
+		t.Error("ResolveDevice should return false when config fails")
+	}
+}
+
+func TestFactory_ExpandTargets_ConfigError(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	f.Config = func() (*config.Config, error) {
+		return nil, errors.New("config error")
+	}
+
+	// Should return error when config fails
+	_, err := f.ExpandTargets([]string{"device1"}, "", false)
+	if err == nil {
+		t.Error("ExpandTargets should return error when config fails")
+	}
+}
+
+func TestFactory_SetBrowser_NilThenGet(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Get browser first to initialize
+	br1 := f.Browser()
+	if br1 == nil {
+		t.Fatal("Browser() returned nil")
+	}
+
+	// Clear cached browser instance by setting nil
+	f.SetBrowser(nil)
+
+	// Get browser again - should fall back to original
+	br2 := f.Browser()
+	if br2 == nil {
+		t.Error("Browser should not be nil after fallback")
+	}
+}
+
+func TestFactory_SetIOStreams_NilThenGet(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Get IOStreams first to initialize
+	ios1 := f.IOStreams()
+	if ios1 == nil {
+		t.Fatal("IOStreams() returned nil")
+	}
+
+	// Set to nil and create new factory method that clears cache
+	f.SetIOStreams(nil)
+
+	// Get IOStreams again - should fall back to original
+	ios2 := f.IOStreams()
+	if ios2 == nil {
+		t.Error("IOStreams should not be nil after fallback")
+	}
+}
+
+func TestFactory_SetConfigManager_NilThenGet(t *testing.T) {
+	t.Parallel()
+
+	// Create factory and set a config manager first
+	f := cmdutil.NewFactory()
+	cfg := &config.Config{}
+	mgr := config.NewTestManager(cfg)
+	f.SetConfigManager(mgr)
+
+	// Verify it works
+	gotMgr, err := f.ConfigManager()
+	if err != nil {
+		t.Fatalf("ConfigManager() error: %v", err)
+	}
+	if gotMgr != mgr {
+		t.Error("SetConfigManager should set the config manager")
+	}
+
+	// Now set to nil
+	f.SetConfigManager(nil)
+
+	// Get config manager again - should fall back to original
+	gotMgr2, err := f.ConfigManager()
+	if err != nil {
+		t.Fatalf("ConfigManager() after nil error: %v", err)
+	}
+	if gotMgr2 == nil {
+		t.Error("ConfigManager should not be nil after fallback")
+	}
+}
+
+func TestFactory_SetShellyService_NilThenGet(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	// Get service first to initialize
+	svc1 := f.ShellyService()
+	if svc1 == nil {
+		t.Fatal("ShellyService() returned nil")
+	}
+
+	// Set to nil
+	f.SetShellyService(nil)
+
+	// Get service again - should fall back to original
+	svc2 := f.ShellyService()
+	if svc2 == nil {
+		t.Error("ShellyService should not be nil after fallback")
 	}
 }
