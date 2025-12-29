@@ -64,19 +64,23 @@ type ActionMsg struct {
 
 // Model displays virtual components for a device.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	device     string
-	virtuals   []Virtual
-	scroller   *panel.Scroller
-	loading    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     Styles
-	loader     loading.Model
+	ctx              context.Context
+	svc              *shelly.Service
+	device           string
+	virtuals         []Virtual
+	scroller         *panel.Scroller
+	loading          bool
+	editing          bool
+	confirmingDelete bool
+	deleteKey        string
+	err              error
+	width            int
+	height           int
+	focused          bool
+	panelIndex       int // 1-based panel index for Shift+N hotkey hint
+	styles           Styles
+	loader           loading.Model
+	editModal        EditModel
 }
 
 // Styles holds styles for the virtual components list.
@@ -92,6 +96,8 @@ type Styles struct {
 	Selected    lipgloss.Style
 	Error       lipgloss.Style
 	Muted       lipgloss.Style
+	Warning     lipgloss.Style
+	Confirm     lipgloss.Style
 }
 
 // DefaultStyles returns the default styles for the virtual components list.
@@ -123,6 +129,11 @@ func DefaultStyles() Styles {
 			Foreground(colors.Error),
 		Muted: lipgloss.NewStyle().
 			Foreground(colors.Muted),
+		Warning: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		Confirm: lipgloss.NewStyle().
+			Foreground(colors.Error).
+			Bold(true),
 	}
 }
 
@@ -143,6 +154,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(true, true),
 		),
+		editModal: NewEditModel(deps.Ctx, deps.Svc),
 	}
 }
 
@@ -227,6 +239,16 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Handle edit modal if visible
+	if m.editing {
+		return m.handleEditModalUpdate(msg)
+	}
+
+	// Handle delete confirmation
+	if m.confirmingDelete {
+		return m.handleDeleteConfirmation(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		var cmd tea.Cmd
@@ -272,6 +294,49 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.IsVisible() {
+		m.editing = false
+		// Refresh data after edit
+		m.loading = true
+		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchVirtuals())
+	}
+
+	// Handle save result message
+	if saveMsg, ok := msg.(EditSaveResultMsg); ok {
+		if saveMsg.Err == nil {
+			m.editing = false
+			m.editModal = m.editModal.Hide()
+			// Refresh data after successful save
+			m.loading = true
+			return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals(), func() tea.Msg {
+				return EditClosedMsg{Saved: true}
+			})
+		}
+	}
+
+	return m, cmd
+}
+
+func (m Model) handleDeleteConfirmation(msg tea.Msg) (Model, tea.Cmd) {
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		switch keyMsg.String() {
+		case "y", "Y":
+			m.confirmingDelete = false
+			return m, m.executeDelete(m.deleteKey)
+		case "n", "N", "esc":
+			m.confirmingDelete = false
+			m.deleteKey = ""
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "j", "down":
@@ -288,18 +353,77 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.scroller.PageUp()
 	case "t", "enter":
 		return m, m.toggleOrTrigger()
+	case "e":
+		return m.handleEditKey()
+	case "n":
+		return m.handleNewKey()
 	case "h", "left":
 		return m, m.adjustValue(-1)
 	case "l", "right":
 		return m, m.adjustValue(1)
 	case "d":
-		return m, m.deleteVirtual()
+		return m.handleDeleteKey()
 	case "r":
 		m.loading = true
 		return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
 	}
 
 	return m, nil
+}
+
+func (m Model) handleEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || len(m.virtuals) == 0 {
+		return m, nil
+	}
+	cursor := m.scroller.Cursor()
+	if cursor >= len(m.virtuals) {
+		return m, nil
+	}
+	v := m.virtuals[cursor]
+
+	// Can't edit groups
+	if v.Type == shelly.VirtualGroup {
+		return m, nil
+	}
+
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowEdit(m.device, &v)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
+func (m Model) handleNewKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.ShowNew(m.device)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
+func (m Model) handleDeleteKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || len(m.virtuals) == 0 {
+		return m, nil
+	}
+	cursor := m.scroller.Cursor()
+	if cursor >= len(m.virtuals) {
+		return m, nil
+	}
+	// Start delete confirmation
+	m.confirmingDelete = true
+	m.deleteKey = m.virtuals[cursor].Key
+	return m, nil
+}
+
+func (m Model) executeDelete(key string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		err := m.svc.DeleteVirtualComponent(ctx, m.device, key)
+		return ActionMsg{Action: "delete", Key: key, Err: err}
+	}
 }
 
 func (m Model) toggleOrTrigger() tea.Cmd {
@@ -379,24 +503,13 @@ func findIndex(slice []string, val string) int {
 	return -1
 }
 
-func (m Model) deleteVirtual() tea.Cmd {
-	cursor := m.scroller.Cursor()
-	if len(m.virtuals) == 0 || cursor >= len(m.virtuals) {
-		return nil
-	}
-	v := m.virtuals[cursor]
-
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
-		defer cancel()
-
-		err := m.svc.DeleteVirtualComponent(ctx, m.device, v.Key)
-		return ActionMsg{Action: "delete", Key: v.Key, Err: err}
-	}
-}
-
 // View renders the virtual components list.
 func (m Model) View() string {
+	// Render edit modal if editing
+	if m.editing {
+		return m.editModal.View()
+	}
+
 	r := rendering.New(m.width, m.height).
 		SetTitle("Virtual Components").
 		SetFocused(m.focused).
@@ -421,6 +534,16 @@ func (m Model) View() string {
 		} else {
 			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
 		}
+		return r.Render()
+	}
+
+	// Show delete confirmation
+	if m.confirmingDelete {
+		var content strings.Builder
+		content.WriteString(m.styles.Confirm.Render("Delete virtual component: " + m.deleteKey + "?"))
+		content.WriteString("\n\n")
+		content.WriteString(m.styles.Warning.Render("Press Y to confirm, N or Esc to cancel"))
+		r.SetContent(content.String())
 		return r.Render()
 	}
 

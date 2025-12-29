@@ -82,17 +82,17 @@ type MQTTEditModel struct {
 
 // MQTTEditStyles holds styles for the MQTT edit modal.
 type MQTTEditStyles struct {
-	Modal          lipgloss.Style
-	Title          lipgloss.Style
-	Label          lipgloss.Style
-	LabelFocus     lipgloss.Style
-	Error          lipgloss.Style
-	Help           lipgloss.Style
-	Selector       lipgloss.Style
-	StatusOn       lipgloss.Style
-	StatusOff      lipgloss.Style
-	ChangeWarning  lipgloss.Style
-	TestButton     lipgloss.Style
+	Modal           lipgloss.Style
+	Title           lipgloss.Style
+	Label           lipgloss.Style
+	LabelFocus      lipgloss.Style
+	Error           lipgloss.Style
+	Help            lipgloss.Style
+	Selector        lipgloss.Style
+	StatusOn        lipgloss.Style
+	StatusOff       lipgloss.Style
+	ChangeWarning   lipgloss.Style
+	TestButton      lipgloss.Style
 	TestButtonFocus lipgloss.Style
 }
 
@@ -538,11 +538,12 @@ func (m MQTTEditModel) renderConnectionStatus() string {
 	content.WriteString(m.styles.Label.Render("Status:"))
 	content.WriteString(" ")
 
-	if m.originalData.Connected {
+	switch {
+	case m.originalData.Connected:
 		content.WriteString(m.styles.StatusOn.Render("● Connected"))
-	} else if m.originalData.Enable {
+	case m.originalData.Enable:
 		content.WriteString(m.styles.ChangeWarning.Render("◐ Enabled (disconnected)"))
-	} else {
+	default:
 		content.WriteString(m.styles.StatusOff.Render("○ Disabled"))
 	}
 

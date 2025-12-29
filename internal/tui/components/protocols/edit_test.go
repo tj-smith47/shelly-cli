@@ -214,12 +214,10 @@ func TestMQTTEditModel_ValidationTopicPrefix(t *testing.T) {
 			if tc.wantErr {
 				testutil.AssertError(t, updated.err)
 				testutil.AssertContains(t, updated.err.Error(), tc.errContains)
-			} else {
+			} else if updated.err != nil && !updated.saving {
 				// Note: saving will still fail because we're using a nil service
 				// but the validation should pass
-				if updated.err != nil && !updated.saving {
-					t.Errorf("unexpected validation error: %v", updated.err)
-				}
+				t.Errorf("unexpected validation error: %v", updated.err)
 			}
 		})
 	}

@@ -75,6 +75,11 @@ const (
 	keyShiftTab = "shift+tab"
 )
 
+// Action string constants for component messages.
+const (
+	actionDelete = "delete"
+)
+
 // AutomationDeps holds dependencies for the automation view.
 type AutomationDeps struct {
 	Ctx     context.Context
@@ -534,98 +539,143 @@ func (a *Automation) updateAllComponents(msg tea.Msg) tea.Cmd {
 func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case scripts.SelectScriptMsg:
-		// When a script is selected, load it in the viewer
-		var cmd tea.Cmd
-		a.scriptEditor, cmd = a.scriptEditor.SetScript(a.device, msg.Script)
-		a.focusedPanel = PanelScriptEditor
-		a.updateFocusStates()
-		return cmd
-
+		return a.handleScriptSelect(msg)
 	case scripts.EditScriptMsg:
-		// When edit is requested, set pending flag and load the script
-		a.pendingEdit = true
-		var loadCmd tea.Cmd
-		a.scriptEditor, loadCmd = a.scriptEditor.SetScript(a.device, msg.Script)
-		return loadCmd
-
+		return a.handleScriptEdit(msg)
 	case scripts.CodeLoadedMsg:
-		// Code loaded - if we have a pending edit, launch the external editor
-		if a.pendingEdit {
-			a.pendingEdit = false
-			return a.scriptEditor.Edit()
-		}
-		return nil
-
+		return a.handleCodeLoaded()
 	case scripts.EditorFinishedMsg:
-		// External editor closed, upload the modified code
-		if msg.Err != nil {
-			// Editor failed - could show error toast here
-			return nil
-		}
-		// Upload the modified code to the device
-		return a.uploadScriptCode(msg.Device, msg.ScriptID, msg.Code)
-
+		return a.handleEditorFinished(msg)
 	case scripts.CodeUploadedMsg:
-		// Code upload completed
-		if msg.Err != nil {
-			// Upload failed - could show error toast here
-			return nil
-		}
-		// Refresh the script list and editor
-		var cmds []tea.Cmd
-		var scriptsCmd tea.Cmd
-		a.scripts, scriptsCmd = a.scripts.Refresh()
-		cmds = append(cmds, scriptsCmd)
-		var editorCmd tea.Cmd
-		a.scriptEditor, editorCmd = a.scriptEditor.Refresh()
-		cmds = append(cmds, editorCmd)
-		return tea.Batch(cmds...)
-
+		return a.handleCodeUploaded(msg)
 	case schedules.SelectScheduleMsg:
-		// When a schedule is selected, load it in the editor
-		a.scheduleEditor = a.scheduleEditor.SetSchedule(&msg.Schedule)
-		a.focusedPanel = PanelScheduleEditor
-		a.updateFocusStates()
-		return nil
-
+		return a.handleScheduleSelect(msg)
 	case kvs.EditClosedMsg:
-		// Show toast when KVS edit modal closes with a save
-		if msg.Saved {
-			return toast.Success("KVS entry saved")
-		}
-		return nil
-
+		return handleKVSEditClosed(msg)
 	case kvs.ActionMsg:
-		// Show toast for KVS delete action
-		if msg.Action == "delete" {
-			if msg.Err != nil {
-				return toast.Error("Failed to delete: " + msg.Err.Error())
-			}
-			return toast.Success("KVS entry deleted")
-		}
-		return nil
-
+		return handleKVSAction(msg)
 	case webhooks.EditClosedMsg:
-		// Show toast when webhook edit modal closes with a save
-		if msg.Saved {
-			return toast.Success("Webhook saved")
-		}
-		return nil
-
+		return handleWebhookEditClosed(msg)
 	case webhooks.ActionMsg:
-		// Show toast for webhook actions
-		if msg.Err != nil {
-			return toast.Error("Webhook action failed: " + msg.Err.Error())
-		}
-		switch msg.Action {
-		case "enable":
-			return toast.Success("Webhook enabled")
-		case "disable":
-			return toast.Success("Webhook disabled")
-		case "delete":
-			return toast.Success("Webhook deleted")
-		}
+		return handleWebhookAction(msg)
+	case virtuals.EditClosedMsg:
+		return handleVirtualEditClosed(msg)
+	case virtuals.ActionMsg:
+		return handleVirtualAction(msg)
+	}
+	return nil
+}
+
+func (a *Automation) handleScriptSelect(msg scripts.SelectScriptMsg) tea.Cmd {
+	var cmd tea.Cmd
+	a.scriptEditor, cmd = a.scriptEditor.SetScript(a.device, msg.Script)
+	a.focusedPanel = PanelScriptEditor
+	a.updateFocusStates()
+	return cmd
+}
+
+func (a *Automation) handleScriptEdit(msg scripts.EditScriptMsg) tea.Cmd {
+	a.pendingEdit = true
+	var loadCmd tea.Cmd
+	a.scriptEditor, loadCmd = a.scriptEditor.SetScript(a.device, msg.Script)
+	return loadCmd
+}
+
+func (a *Automation) handleCodeLoaded() tea.Cmd {
+	if a.pendingEdit {
+		a.pendingEdit = false
+		return a.scriptEditor.Edit()
+	}
+	return nil
+}
+
+func (a *Automation) handleEditorFinished(msg scripts.EditorFinishedMsg) tea.Cmd {
+	if msg.Err != nil {
 		return nil
+	}
+	return a.uploadScriptCode(msg.Device, msg.ScriptID, msg.Code)
+}
+
+func (a *Automation) handleCodeUploaded(msg scripts.CodeUploadedMsg) tea.Cmd {
+	if msg.Err != nil {
+		return nil
+	}
+	var cmds []tea.Cmd
+	var scriptsCmd tea.Cmd
+	a.scripts, scriptsCmd = a.scripts.Refresh()
+	cmds = append(cmds, scriptsCmd)
+	var editorCmd tea.Cmd
+	a.scriptEditor, editorCmd = a.scriptEditor.Refresh()
+	cmds = append(cmds, editorCmd)
+	return tea.Batch(cmds...)
+}
+
+func (a *Automation) handleScheduleSelect(msg schedules.SelectScheduleMsg) tea.Cmd {
+	a.scheduleEditor = a.scheduleEditor.SetSchedule(&msg.Schedule)
+	a.focusedPanel = PanelScheduleEditor
+	a.updateFocusStates()
+	return nil
+}
+
+func handleKVSEditClosed(msg kvs.EditClosedMsg) tea.Cmd {
+	if msg.Saved {
+		return toast.Success("KVS entry saved")
+	}
+	return nil
+}
+
+func handleKVSAction(msg kvs.ActionMsg) tea.Cmd {
+	if msg.Action != actionDelete {
+		return nil
+	}
+	if msg.Err != nil {
+		return toast.Error("Failed to delete: " + msg.Err.Error())
+	}
+	return toast.Success("KVS entry deleted")
+}
+
+func handleWebhookEditClosed(msg webhooks.EditClosedMsg) tea.Cmd {
+	if msg.Saved {
+		return toast.Success("Webhook saved")
+	}
+	return nil
+}
+
+func handleWebhookAction(msg webhooks.ActionMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Webhook action failed: " + msg.Err.Error())
+	}
+	switch msg.Action {
+	case "enable":
+		return toast.Success("Webhook enabled")
+	case "disable":
+		return toast.Success("Webhook disabled")
+	case actionDelete:
+		return toast.Success("Webhook deleted")
+	}
+	return nil
+}
+
+func handleVirtualEditClosed(msg virtuals.EditClosedMsg) tea.Cmd {
+	if msg.Saved {
+		return toast.Success("Virtual component saved")
+	}
+	return nil
+}
+
+func handleVirtualAction(msg virtuals.ActionMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Action failed: " + msg.Err.Error())
+	}
+	switch msg.Action {
+	case "toggle":
+		return toast.Success("Value toggled")
+	case "trigger":
+		return toast.Success("Button triggered")
+	case "set":
+		return toast.Success("Value updated")
+	case actionDelete:
+		return toast.Success("Virtual component deleted")
 	}
 	return nil
 }

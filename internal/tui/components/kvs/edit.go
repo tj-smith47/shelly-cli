@@ -356,8 +356,11 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 
 	// Validate key format (alphanumeric and underscores only)
 	for _, c := range key {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-			(c >= '0' && c <= '9') || c == '_') {
+		isLower := c >= 'a' && c <= 'z'
+		isUpper := c >= 'A' && c <= 'Z'
+		isDigit := c >= '0' && c <= '9'
+		isUnderscore := c == '_'
+		if !isLower && !isUpper && !isDigit && !isUnderscore {
 			m.err = fmt.Errorf("key must contain only alphanumeric characters and underscores")
 			return m, nil
 		}
