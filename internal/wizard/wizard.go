@@ -39,6 +39,9 @@ type Options struct {
 	CloudEmail    string
 	CloudPassword string
 
+	// Telemetry flags
+	Telemetry bool
+
 	// Control flags
 	Force bool
 }
@@ -56,6 +59,7 @@ func (o *Options) IsNonInteractive() bool {
 		o.Completions != "" ||
 		o.Aliases ||
 		o.Discover ||
+		o.Telemetry ||
 		o.Force
 }
 

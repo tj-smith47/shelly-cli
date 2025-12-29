@@ -138,6 +138,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: ${{ matrix.cgo }}
           CC: ${{ matrix.cc }}
+          TELEMETRY_ENDPOINT: ${{ secrets.TELEMETRY_ENDPOINT }}
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
           COMMIT="${{ github.sha }}"
@@ -148,6 +149,11 @@ jobs:
           LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/version.Commit=${COMMIT}"
           LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/version.Date=${DATE}"
           LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/version.BuiltBy=github-actions"
+
+          # Add telemetry endpoint if configured
+          if [ -n "$TELEMETRY_ENDPOINT" ]; then
+            LDFLAGS="$LDFLAGS -X github.com/tj-smith47/shelly-cli/internal/telemetry.Endpoint=${TELEMETRY_ENDPOINT}"
+          fi
 
           BINARY_NAME="shelly"
           if [ "${{ matrix.goos }}" = "windows" ]; then

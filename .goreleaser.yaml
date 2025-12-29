@@ -29,6 +29,7 @@ builds:
       - -X github.com/tj-smith47/shelly-cli/internal/version.Commit={{.Commit}}
       - -X github.com/tj-smith47/shelly-cli/internal/version.Date={{.Date}}
       - -X github.com/tj-smith47/shelly-cli/internal/version.BuiltBy=goreleaser
+      - -X github.com/tj-smith47/shelly-cli/internal/telemetry.Endpoint={{ .Env.TELEMETRY_ENDPOINT }}
     flags:
       - -trimpath
 

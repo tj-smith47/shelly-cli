@@ -71,6 +71,11 @@
       "description": "Preferred editor command for 'shelly config edit'. Falls back to $EDITOR, $VISUAL, then nano.",
       "examples": ["vim", "code", "nano", "emacs"]
     },
+    "telemetry": {
+      "type": "boolean",
+      "description": "Opt-in anonymous usage telemetry. When enabled, sends anonymous command usage statistics (command name, success/failure) to help improve the CLI. No device information, IP addresses, or personal data is collected.",
+      "default": false
+    },
     "integrator": {
       "type": "object",
       "description": "Shelly Integrator API credentials for OEM/partner integrations. Environment variables SHELLY_INTEGRATOR_TAG and SHELLY_INTEGRATOR_TOKEN take precedence.",

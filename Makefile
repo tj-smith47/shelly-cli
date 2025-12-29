@@ -11,6 +11,11 @@ LDFLAGS := -s -w \
 	-X github.com/tj-smith47/shelly-cli/internal/version.Date=$(DATE) \
 	-X github.com/tj-smith47/shelly-cli/internal/version.BuiltBy=make
 
+# Optional telemetry endpoint (set via TELEMETRY_ENDPOINT env var for production builds)
+ifdef TELEMETRY_ENDPOINT
+LDFLAGS += -X github.com/tj-smith47/shelly-cli/internal/telemetry.Endpoint=$(TELEMETRY_ENDPOINT)
+endif
+
 # Default target
 all: build
 

@@ -15,12 +15,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
+	"github.com/tj-smith47/shelly-cli/internal/telemetry"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
-const defaultTheme = "dracula"
+const (
+	defaultTheme = "dracula"
+	totalSteps   = 5
+)
 
 func runSetupSteps(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Command, opts *Options) error {
 	ios := f.IOStreams()
@@ -34,6 +38,7 @@ func runSetupSteps(ctx context.Context, f *cmdutil.Factory, rootCmd *cobra.Comma
 	runRegistrationStep(f, opts, discoveredDevices)
 	runCompletionsStep(ios, rootCmd, opts)
 	runCloudStep(ctx, ios, opts)
+	runTelemetryStep(ios, opts)
 
 	PrintSummary(ios)
 	return nil
@@ -91,6 +96,20 @@ func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) 
 	}
 }
 
+func runTelemetryStep(ios *iostreams.IOStreams, opts *Options) {
+	var err error
+	if opts.IsNonInteractive() {
+		if opts.Telemetry {
+			err = stepTelemetryNonInteractive(ios)
+		}
+	} else {
+		err = stepTelemetry(ios)
+	}
+	if err != nil {
+		ios.Warning("Telemetry setup failed: %v", err)
+	}
+}
+
 func runDiscoveryStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) []discovery.DiscoveredDevice {
 	devices, err := stepDiscovery(ctx, ios, opts)
 	if err != nil {
@@ -129,7 +148,7 @@ func stepConfiguration(ios *iostreams.IOStreams, opts *Options) error {
 	nonInteractive := opts.IsNonInteractive()
 
 	if !nonInteractive {
-		ios.Println(theme.Bold().Render("Step 1/4: Configuration"))
+		ios.Println(theme.Bold().Render(fmt.Sprintf("Step 1/%d: Configuration", totalSteps)))
 		ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
 		ios.Println("")
 	}
@@ -193,7 +212,7 @@ func stepDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options)
 	nonInteractive := opts.IsNonInteractive()
 
 	if !nonInteractive {
-		ios.Println(theme.Bold().Render("Step 2/4: Device Discovery"))
+		ios.Println(theme.Bold().Render(fmt.Sprintf("Step 2/%d: Device Discovery", totalSteps)))
 		ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
 		ios.Println("")
 
@@ -334,7 +353,7 @@ func stepRegistration(f *cmdutil.Factory, opts *Options, devices []discovery.Dis
 }
 
 func stepCompletions(ios *iostreams.IOStreams, rootCmd *cobra.Command) error {
-	ios.Println(theme.Bold().Render("Step 3/4: Shell Completions"))
+	ios.Println(theme.Bold().Render(fmt.Sprintf("Step 3/%d: Shell Completions", totalSteps)))
 	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
 	ios.Println("")
 
@@ -404,7 +423,7 @@ func stepCompletionsNonInteractive(ios *iostreams.IOStreams, rootCmd *cobra.Comm
 }
 
 func stepCloud(ctx context.Context, ios *iostreams.IOStreams) error {
-	ios.Println(theme.Bold().Render("Step 4/4: Cloud Access (Optional)"))
+	ios.Println(theme.Bold().Render(fmt.Sprintf("Step 4/%d: Cloud Access (Optional)", totalSteps)))
 	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
 	ios.Println("")
 
@@ -552,4 +571,60 @@ func selectTheme(ios *iostreams.IOStreams, opts *Options) (string, error) {
 		return defaultTheme, nil
 	}
 	return strings.Split(selected, " ")[0], nil
+}
+
+func stepTelemetry(ios *iostreams.IOStreams) error {
+	ios.Println(theme.Bold().Render(fmt.Sprintf("Step %d/%d: Anonymous Usage Statistics (Optional)", totalSteps, totalSteps)))
+	ios.Println(theme.Dim().Render(strings.Repeat("━", 40)))
+	ios.Println("")
+	ios.Println("Help improve Shelly CLI by sharing anonymous usage statistics.")
+	ios.Println("")
+	ios.Println(theme.Dim().Render("What we collect:"))
+	ios.Println(theme.Dim().Render("  • Command names (e.g., 'device info', 'switch on')"))
+	ios.Println(theme.Dim().Render("  • Success/failure status"))
+	ios.Println(theme.Dim().Render("  • CLI version, OS, and architecture"))
+	ios.Println("")
+	ios.Println(theme.Dim().Render("What we DON'T collect:"))
+	ios.Println(theme.Dim().Render("  • Device names, IP addresses, or network info"))
+	ios.Println(theme.Dim().Render("  • Personal data or credentials"))
+	ios.Println(theme.Dim().Render("  • Command arguments or parameters"))
+	ios.Println("")
+
+	proceed, err := ios.Confirm("Enable anonymous usage statistics?", false)
+	if err != nil {
+		return err
+	}
+
+	if proceed {
+		if err := enableTelemetry(); err != nil {
+			return err
+		}
+		ios.Success("Telemetry enabled")
+		ios.Info("You can disable it anytime with: shelly config set telemetry false")
+	} else {
+		ios.Info("Telemetry disabled")
+		ios.Info("You can enable it later with: shelly config set telemetry true")
+	}
+	ios.Println("")
+	return nil
+}
+
+func stepTelemetryNonInteractive(ios *iostreams.IOStreams) error {
+	if err := enableTelemetry(); err != nil {
+		return err
+	}
+	ios.Success("Telemetry enabled")
+	ios.Println("")
+	return nil
+}
+
+func enableTelemetry() error {
+	cfg := config.Get()
+	cfg.Telemetry = true
+	viper.Set("telemetry", true)
+	if err := config.Save(); err != nil {
+		return fmt.Errorf("failed to save telemetry setting: %w", err)
+	}
+	telemetry.SetEnabled(true)
+	return nil
 }

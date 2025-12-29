@@ -29,6 +29,7 @@ touch ~/.config/shelly/config.yaml
 | `api_mode` | string | `local` | API mode: `local`, `cloud`, or `auto` |
 | `verbosity` | int | `0` | Verbosity level: 0=silent, 1=info, 2=debug, 3=trace |
 | `quiet` | bool | `false` | Suppress non-essential output |
+| `telemetry` | bool | `false` | Opt-in anonymous usage telemetry |
 | `editor` | string | - | Preferred editor for `shelly config edit`. Falls back to `$EDITOR`, `$VISUAL`, then `nano` |
 
 ```yaml
@@ -38,7 +39,37 @@ theme: dracula
 api_mode: local
 verbosity: 0
 quiet: false
+telemetry: false  # Opt-in anonymous usage telemetry
 editor: vim  # Optional: vim, code, nano, emacs, etc.
+```
+
+### Telemetry
+
+Shelly CLI includes opt-in anonymous usage telemetry to help improve the CLI. This is disabled by default.
+
+**What is collected (when enabled):**
+- Command name (e.g., "device list", "switch on")
+- Whether the command succeeded or failed
+- CLI version, OS, and architecture
+- Command execution duration
+
+**What is NOT collected:**
+- Device information (names, addresses, configurations)
+- IP addresses or network information
+- Authentication credentials
+- Command arguments or parameters
+
+See the [Event payload definition](../internal/telemetry/telemetry.go) for the exact data structure.
+
+```bash
+# Enable via config command
+shelly config set telemetry=true
+
+# Disable
+shelly config set telemetry=false
+
+# Or enable during setup wizard
+shelly init
 ```
 
 ### Logging Settings
@@ -584,6 +615,7 @@ theme: dracula
 api_mode: local
 verbosity: 0
 quiet: false
+telemetry: false  # Opt-in anonymous usage telemetry
 editor: vim  # Falls back to $EDITOR, $VISUAL, then nano
 
 # Logging settings (for debugging)

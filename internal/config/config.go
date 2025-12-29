@@ -33,13 +33,14 @@ type ThemeConfig struct {
 // Config holds all CLI configuration.
 type Config struct {
 	// Global settings
-	Output  string `mapstructure:"output" yaml:"output,omitempty"`
-	Color   bool   `mapstructure:"color" yaml:"color,omitempty"`
-	Theme   any    `mapstructure:"theme" yaml:"theme,omitempty"` // Can be string or ThemeConfig
-	APIMode string `mapstructure:"api_mode" yaml:"api_mode,omitempty"`
-	Verbose bool   `mapstructure:"verbose" yaml:"verbose,omitempty"`
-	Quiet   bool   `mapstructure:"quiet" yaml:"quiet,omitempty"`
-	Editor  string `mapstructure:"editor" yaml:"editor,omitempty"` // Preferred editor command (falls back to $EDITOR, $VISUAL, then nano)
+	Output    string `mapstructure:"output" yaml:"output,omitempty"`
+	Color     bool   `mapstructure:"color" yaml:"color,omitempty"`
+	Theme     any    `mapstructure:"theme" yaml:"theme,omitempty"` // Can be string or ThemeConfig
+	APIMode   string `mapstructure:"api_mode" yaml:"api_mode,omitempty"`
+	Verbose   bool   `mapstructure:"verbose" yaml:"verbose,omitempty"`
+	Quiet     bool   `mapstructure:"quiet" yaml:"quiet,omitempty"`
+	Editor    string `mapstructure:"editor" yaml:"editor,omitempty"`       // Preferred editor command (falls back to $EDITOR, $VISUAL, then nano)
+	Telemetry bool   `mapstructure:"telemetry" yaml:"telemetry,omitempty"` // Opt-in anonymous usage telemetry
 
 	// Discovery settings
 	Discovery DiscoveryConfig `mapstructure:"discovery" yaml:"discovery,omitempty"`

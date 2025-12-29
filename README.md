@@ -307,8 +307,43 @@ Environment variables override config file values for the current execution.
 | `SHELLY_CLOUD_EMAIL` | Cloud login email | - |
 | `SHELLY_CLOUD_PASSWORD` | Cloud login password | - |
 | `NO_COLOR` | Standard color disable (https://no-color.org) | unset |
+| `SHELLY_TELEMETRY_ENDPOINT` | Custom telemetry endpoint URL | - |
 
 **Note:** Nested config values use underscores: `SHELLY_CLOUD_ACCESS_TOKEN` maps to `cloud.access_token`.
+
+## Telemetry
+
+Shelly CLI includes **opt-in** anonymous usage telemetry to help improve the CLI. This is disabled by default and must be explicitly enabled.
+
+**What we collect (when enabled):**
+- Command name (e.g., "device list", "switch on")
+- Whether the command succeeded or failed
+- CLI version, OS, and architecture
+- Command execution duration
+
+See the full payload definition: [`internal/telemetry/telemetry.go#Event`](internal/telemetry/telemetry.go)
+
+**What we DO NOT collect:**
+- Device information (names, addresses, configurations)
+- IP addresses or network information
+- Personal data of any kind
+- Authentication credentials
+- Command arguments or parameters
+
+**How to enable/disable:**
+
+```bash
+# Enable during setup wizard
+shelly init
+
+# Enable via config command
+shelly config set telemetry=true
+
+# Disable
+shelly config set telemetry=false
+```
+
+The telemetry data is sent to a self-hosted endpoint and is used solely for understanding which commands are most useful and identifying issues.
 
 ## Output Formats
 

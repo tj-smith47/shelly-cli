@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
@@ -93,6 +94,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/telemetry"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 	"github.com/tj-smith47/shelly-cli/internal/version"
@@ -142,6 +144,9 @@ func Execute() {
 // execute runs the root command and returns an exit code.
 // Separating this allows proper cleanup via defer before exit.
 func execute() int {
+	// Ensure telemetry client is closed gracefully
+	defer telemetry.Close()
+
 	// Create a cancellable context that responds to signals
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -157,7 +162,17 @@ func execute() int {
 	// Set the expanded args for cobra to process
 	rootCmd.SetArgs(expandedArgs)
 
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+	// Track command execution for telemetry
+	start := time.Now()
+	err := rootCmd.ExecuteContext(ctx)
+	duration := time.Since(start)
+
+	// Get the executed command path and track (non-blocking, respects opt-in setting)
+	cmdPath := telemetry.GetCommandPath(rootCmd, expandedArgs)
+	success := err == nil && ctx.Err() == nil
+	telemetry.Track(cmdPath, success, duration)
+
+	if err != nil {
 		// Check if we were cancelled by signal
 		if ctx.Err() != nil {
 			// Exit quietly for signal-based cancellation
@@ -383,6 +398,11 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 
 	// Configure structured logging based on verbosity and log settings
 	iostreams.ConfigureLogger()
+
+	// Enable telemetry if configured
+	if config.Get().Telemetry {
+		telemetry.SetEnabled(true)
+	}
 
 	return nil
 }
