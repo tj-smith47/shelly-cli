@@ -74,3 +74,65 @@ func FixturesToConfig(fixtures *Fixtures) *config.Config {
 
 	return cfg
 }
+
+// FixturesToConfigWithMockURLs converts fixtures to config with mock server URLs.
+func FixturesToConfigWithMockURLs(fixtures *Fixtures, server *DeviceServer) *config.Config {
+	cfg := &config.Config{
+		Devices: make(map[string]model.Device),
+		Groups:  make(map[string]config.Group),
+		Scenes:  make(map[string]config.Scene),
+		Aliases: make(map[string]config.Alias),
+	}
+
+	for _, d := range fixtures.Config.Devices {
+		key := config.NormalizeDeviceName(d.Name)
+		dev := model.Device{
+			Name:       d.Name,
+			Address:    server.DeviceURL(d.Name),
+			MAC:        d.MAC,
+			Model:      d.Model,
+			Type:       d.Type,
+			Generation: d.Generation,
+		}
+		if d.AuthUser != "" || d.AuthPass != "" {
+			dev.Auth = &model.Auth{
+				Username: d.AuthUser,
+				Password: d.AuthPass,
+			}
+		}
+		cfg.Devices[key] = dev
+	}
+
+	for _, g := range fixtures.Config.Groups {
+		cfg.Groups[g.Name] = config.Group{
+			Name:    g.Name,
+			Devices: g.Devices,
+		}
+	}
+
+	for _, s := range fixtures.Config.Scenes {
+		actions := make([]config.SceneAction, len(s.Actions))
+		for i, a := range s.Actions {
+			actions[i] = config.SceneAction{
+				Device: a.Device,
+				Method: a.Method,
+				Params: a.Params,
+			}
+		}
+		cfg.Scenes[s.Name] = config.Scene{
+			Name:        s.Name,
+			Description: s.Description,
+			Actions:     actions,
+		}
+	}
+
+	for _, a := range fixtures.Config.Aliases {
+		cfg.Aliases[a.Name] = config.Alias{
+			Name:    a.Name,
+			Command: a.Command,
+			Shell:   a.Shell,
+		}
+	}
+
+	return cfg
+}

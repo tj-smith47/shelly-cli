@@ -9,9 +9,10 @@ import (
 
 // Demo coordinates all mock components for demo mode.
 type Demo struct {
-	Fixtures  *Fixtures
-	ConfigMgr *config.Manager
-	cleanup   []func()
+	Fixtures     *Fixtures
+	ConfigMgr    *config.Manager
+	DeviceServer *DeviceServer
+	cleanup      []func()
 }
 
 // IsDemoMode returns true if demo mode is enabled via environment variable.
@@ -37,17 +38,26 @@ func StartWithPath(path string) (*Demo, error) {
 
 // StartWithFixtures initializes demo mode from pre-loaded fixtures.
 func StartWithFixtures(fixtures *Fixtures) (*Demo, error) {
+	deviceServer := NewDeviceServer(fixtures)
+
+	cfg := FixturesToConfigWithMockURLs(fixtures, deviceServer)
+	configMgr := config.NewTestManager(cfg)
+
 	d := &Demo{
-		Fixtures:  fixtures,
-		ConfigMgr: NewConfigManager(fixtures),
+		Fixtures:     fixtures,
+		ConfigMgr:    configMgr,
+		DeviceServer: deviceServer,
+		cleanup:      []func(){deviceServer.Close},
 	}
 
 	return d, nil
 }
 
 // InjectIntoFactory configures a cmdutil.Factory to use mock components.
+// It also sets the global default config manager for the shelly service resolver.
 func (d *Demo) InjectIntoFactory(f *cmdutil.Factory) {
 	f.SetConfigManager(d.ConfigMgr)
+	config.SetDefaultManager(d.ConfigMgr)
 }
 
 // Cleanup shuts down all mock servers and resources.
@@ -57,7 +67,7 @@ func (d *Demo) Cleanup() {
 	}
 }
 
-// GetDeviceAddress returns the address for a device.
+// GetDeviceAddress returns the mock server URL for a device.
 func (d *Demo) GetDeviceAddress(deviceName string) string {
 	if dev, ok := d.ConfigMgr.GetDevice(deviceName); ok {
 		return dev.Address

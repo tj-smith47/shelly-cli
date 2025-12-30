@@ -192,13 +192,13 @@ func TestDemo_GetDeviceAddress(t *testing.T) {
 	t.Run("returns address for existing device", func(t *testing.T) {
 		t.Parallel()
 		addr := demo.GetDeviceAddress("Test Device")
-		assert.Equal(t, "192.168.1.100", addr)
+		assert.Contains(t, addr, "/devices/Test Device")
 	})
 
 	t.Run("returns address using normalized name", func(t *testing.T) {
 		t.Parallel()
 		addr := demo.GetDeviceAddress("test-device")
-		assert.Equal(t, "192.168.1.100", addr)
+		assert.Contains(t, addr, "/devices/Test Device")
 	})
 
 	t.Run("returns empty for non-existent device", func(t *testing.T) {

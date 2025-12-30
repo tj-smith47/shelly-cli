@@ -105,9 +105,9 @@ type KeybindingsConfig struct {
 	Refresh    []string `mapstructure:"refresh" yaml:"refresh,omitempty"`
 	RefreshAll []string `mapstructure:"refresh_all" yaml:"refresh_all,omitempty"`
 	Filter     []string `mapstructure:"filter" yaml:"filter,omitempty"`
-	Command []string `mapstructure:"command" yaml:"command,omitempty"`
-	Help    []string `mapstructure:"help" yaml:"help,omitempty"`
-	Quit    []string `mapstructure:"quit" yaml:"quit,omitempty"`
+	Command    []string `mapstructure:"command" yaml:"command,omitempty"`
+	Help       []string `mapstructure:"help" yaml:"help,omitempty"`
+	Quit       []string `mapstructure:"quit" yaml:"quit,omitempty"`
 
 	// Device actions
 	Toggle  []string `mapstructure:"toggle" yaml:"toggle,omitempty"`
@@ -432,6 +432,15 @@ func ResetDefaultManagerForTesting() {
 	defer defaultManagerMu.Unlock()
 	defaultManager = nil
 	defaultManagerOnce = sync.Once{}
+}
+
+// SetDefaultManager sets a custom manager as the default.
+// This is used for demo mode to inject mock configuration.
+func SetDefaultManager(mgr *Manager) {
+	defaultManagerMu.Lock()
+	defer defaultManagerMu.Unlock()
+	defaultManager = mgr
+	defaultManagerOnce.Do(func() {})
 }
 
 // getDefaultManager returns the package-level default manager.

@@ -249,7 +249,9 @@ func init() {
 	// Inject mock config if demo mode is enabled
 	if mockpkg.IsDemoMode() {
 		demo, err := mockpkg.Start()
-		if err == nil {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "demo mode initialization failed: %v\n", err)
+		} else {
 			demo.InjectIntoFactory(factory)
 		}
 	}

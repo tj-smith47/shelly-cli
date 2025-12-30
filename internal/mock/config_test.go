@@ -226,3 +226,66 @@ func TestFixturesToConfig(t *testing.T) {
 		assert.Empty(t, d.Auth.Password)
 	})
 }
+
+func TestFixturesToConfigWithMockURLs(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &Fixtures{
+		Config: ConfigFixture{
+			Devices: []DeviceFixture{
+				{
+					Name:       "Device 1",
+					Address:    "192.168.1.1",
+					Generation: 2,
+					AuthUser:   "admin",
+					AuthPass:   "secret",
+				},
+			},
+			Groups: []GroupFixture{
+				{Name: "test-group", Devices: []string{"device-1"}},
+			},
+			Scenes: []SceneFixture{
+				{
+					Name:        "test-scene",
+					Description: "Test",
+					Actions: []SceneActionFixture{
+						{Device: "device-1", Method: "Switch.Set", Params: map[string]any{"on": true}},
+					},
+				},
+			},
+			Aliases: []AliasFixture{
+				{Name: "on", Command: "switch on", Shell: true},
+			},
+		},
+	}
+
+	server := NewDeviceServer(fixtures)
+	defer server.Close()
+
+	cfg := FixturesToConfigWithMockURLs(fixtures, server)
+
+	require.NotNil(t, cfg)
+	assert.Len(t, cfg.Devices, 1)
+	assert.Len(t, cfg.Groups, 1)
+	assert.Len(t, cfg.Scenes, 1)
+	assert.Len(t, cfg.Aliases, 1)
+
+	d, ok := cfg.Devices["device-1"]
+	require.True(t, ok)
+	assert.Contains(t, d.Address, server.URL)
+	require.NotNil(t, d.Auth)
+	assert.Equal(t, "admin", d.Auth.Username)
+
+	g, ok := cfg.Groups["test-group"]
+	require.True(t, ok)
+	assert.Equal(t, []string{"device-1"}, g.Devices)
+
+	s, ok := cfg.Scenes["test-scene"]
+	require.True(t, ok)
+	require.Len(t, s.Actions, 1)
+	assert.Equal(t, "Switch.Set", s.Actions[0].Method)
+
+	a, ok := cfg.Aliases["on"]
+	require.True(t, ok)
+	assert.True(t, a.Shell)
+}
