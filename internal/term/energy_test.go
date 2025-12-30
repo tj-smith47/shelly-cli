@@ -6,7 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 func TestDisplayEMDataHistory(t *testing.T) {
@@ -242,7 +242,7 @@ func TestDisplayEMStatus(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		status := &shelly.EMStatus{
+		status := &model.EMStatus{
 			ID:               0,
 			AVoltage:         230.0,
 			BVoltage:         231.0,
@@ -281,7 +281,7 @@ func TestDisplayEMStatus(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		pf := 0.95
 		freq := 50.0
-		status := &shelly.EMStatus{
+		status := &model.EMStatus{
 			ID:           0,
 			AVoltage:     230.0,
 			BVoltage:     231.0,
@@ -310,7 +310,7 @@ func TestDisplayEMStatus(t *testing.T) {
 
 		ios, out, _ := testIOStreams()
 		nc := 0.5
-		status := &shelly.EMStatus{
+		status := &model.EMStatus{
 			ID:       0,
 			NCurrent: &nc,
 		}
@@ -327,7 +327,7 @@ func TestDisplayEMStatus(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		status := &shelly.EMStatus{
+		status := &model.EMStatus{
 			ID:     0,
 			Errors: []string{"phase_error"},
 		}
@@ -348,7 +348,7 @@ func TestDisplayEM1Status(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		status := &shelly.EM1Status{
+		status := &model.EM1Status{
 			ID:        0,
 			Voltage:   230.0,
 			Current:   5.0,
@@ -376,7 +376,7 @@ func TestDisplayEM1Status(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		pf := 0.96
 		freq := 60.0
-		status := &shelly.EM1Status{
+		status := &model.EM1Status{
 			ID:      0,
 			Voltage: 120.0,
 			Current: 10.0,
@@ -399,7 +399,7 @@ func TestDisplayEM1Status(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		status := &shelly.EM1Status{
+		status := &model.EM1Status{
 			ID:     0,
 			Errors: []string{"overload"},
 		}

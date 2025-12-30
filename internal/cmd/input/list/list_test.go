@@ -1,10 +1,12 @@
-// Package list provides the input list subcommand.
 package list
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -35,5 +37,91 @@ func TestNewCommand_Args(t *testing.T) {
 	// The command should require exactly 1 argument
 	if cmd.Args == nil {
 		t.Error("Args validator not set")
+	}
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{"no args", []string{}, true},
+		{"one arg valid", []string{"device"}, false},
+		{"two args", []string{"device", "extra"}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := cmd.Args(cmd, tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Args() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestNewCommand_Structure(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Test Aliases
+	wantAliases := []string{"ls"}
+	if len(cmd.Aliases) != len(wantAliases) {
+		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
+	} else {
+		for i, alias := range wantAliases {
+			if cmd.Aliases[i] != alias {
+				t.Errorf("Aliases[%d] = %q, want %q", i, cmd.Aliases[i], alias)
+			}
+		}
+	}
+
+	// Test Example
+	if cmd.Example == "" {
+		t.Error("Example is empty")
+	}
+}
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+func TestNewCommand_ValidArgsFunction(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.ValidArgsFunction == nil {
+		t.Error("ValidArgsFunction should be set for device completion")
+	}
+}
+
+func TestNewCommand_ExampleContent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"shelly input list",
+		"-o json",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Example, pattern) {
+			t.Errorf("expected Example to contain %q", pattern)
+		}
 	}
 }

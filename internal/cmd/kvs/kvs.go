@@ -4,7 +4,7 @@ package kvs
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs/del"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs/get"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/kvs/importcmd"
@@ -54,7 +54,7 @@ Limits:
 	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(get.NewCommand(f))
 	cmd.AddCommand(set.NewCommand(f))
-	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
 	cmd.AddCommand(export.NewCommand(f))
 	cmd.AddCommand(importcmd.NewCommand(f))
 

@@ -34,7 +34,7 @@ type DeviceData struct {
 
 	// Status data (populated once online)
 	Info     *shelly.DeviceInfo
-	Snapshot *shelly.MonitoringSnapshot
+	Snapshot *model.MonitoringSnapshot
 
 	// Derived metrics (for quick access)
 	Power       float64
@@ -313,9 +313,9 @@ func (c *Cache) applyStatusChangeMetrics(data *DeviceData, status *statusChangeD
 
 // parsedComponents holds parsed power component data from a full status event.
 type parsedComponents struct {
-	pm  []shelly.PMStatus
-	em  []shelly.EMStatus
-	em1 []shelly.EM1Status
+	pm  []model.PMStatus
+	em  []model.EMStatus
+	em1 []model.EM1Status
 }
 
 // updateFromFullStatus updates cache from a full status event.
@@ -384,8 +384,8 @@ func (c *Cache) parseComponentByType(data *DeviceData, key string, rawStatus jso
 }
 
 // parsePMStatus parses a PM component status.
-func (c *Cache) parsePMStatus(rawStatus json.RawMessage) *shelly.PMStatus {
-	var pm shelly.PMStatus
+func (c *Cache) parsePMStatus(rawStatus json.RawMessage) *model.PMStatus {
+	var pm model.PMStatus
 	if err := json.Unmarshal(rawStatus, &pm); err != nil {
 		return nil
 	}
@@ -393,8 +393,8 @@ func (c *Cache) parsePMStatus(rawStatus json.RawMessage) *shelly.PMStatus {
 }
 
 // parseEMStatus parses an EM component status.
-func (c *Cache) parseEMStatus(rawStatus json.RawMessage) *shelly.EMStatus {
-	var em shelly.EMStatus
+func (c *Cache) parseEMStatus(rawStatus json.RawMessage) *model.EMStatus {
+	var em model.EMStatus
 	if err := json.Unmarshal(rawStatus, &em); err != nil {
 		return nil
 	}
@@ -402,8 +402,8 @@ func (c *Cache) parseEMStatus(rawStatus json.RawMessage) *shelly.EMStatus {
 }
 
 // parseEM1Status parses an EM1 component status.
-func (c *Cache) parseEM1Status(rawStatus json.RawMessage) *shelly.EM1Status {
-	var em1 shelly.EM1Status
+func (c *Cache) parseEM1Status(rawStatus json.RawMessage) *model.EM1Status {
+	var em1 model.EM1Status
 	if err := json.Unmarshal(rawStatus, &em1); err != nil {
 		return nil
 	}
@@ -418,7 +418,7 @@ func (c *Cache) aggregateComponentMetrics(data *DeviceData, components parsedCom
 }
 
 // aggregatePMMetrics aggregates PM component metrics.
-func (c *Cache) aggregatePMMetrics(data *DeviceData, pms []shelly.PMStatus) {
+func (c *Cache) aggregatePMMetrics(data *DeviceData, pms []model.PMStatus) {
 	for _, pm := range pms {
 		data.Power += pm.APower
 		if data.Voltage == 0 && pm.Voltage > 0 {
@@ -434,7 +434,7 @@ func (c *Cache) aggregatePMMetrics(data *DeviceData, pms []shelly.PMStatus) {
 }
 
 // aggregateEMMetrics aggregates EM component metrics.
-func (c *Cache) aggregateEMMetrics(data *DeviceData, ems []shelly.EMStatus) {
+func (c *Cache) aggregateEMMetrics(data *DeviceData, ems []model.EMStatus) {
 	for _, em := range ems {
 		data.Power += em.TotalActivePower
 		data.Current += em.TotalCurrent
@@ -445,7 +445,7 @@ func (c *Cache) aggregateEMMetrics(data *DeviceData, ems []shelly.EMStatus) {
 }
 
 // aggregateEM1Metrics aggregates EM1 component metrics.
-func (c *Cache) aggregateEM1Metrics(data *DeviceData, em1s []shelly.EM1Status) {
+func (c *Cache) aggregateEM1Metrics(data *DeviceData, em1s []model.EM1Status) {
 	for _, em1 := range em1s {
 		data.Power += em1.ActPower
 		if data.Voltage == 0 && em1.Voltage > 0 {
@@ -463,7 +463,7 @@ func (c *Cache) updateDeviceSnapshot(data *DeviceData, components parsedComponen
 		return
 	}
 	if data.Snapshot == nil {
-		data.Snapshot = &shelly.MonitoringSnapshot{}
+		data.Snapshot = &model.MonitoringSnapshot{}
 	}
 	data.Snapshot.PM = components.pm
 	data.Snapshot.EM = components.em
@@ -990,7 +990,7 @@ func preserveSnapshotFromExisting(newData, existing *DeviceData) {
 }
 
 // aggregateMetrics extracts metrics from the monitoring snapshot.
-func (c *Cache) aggregateMetrics(data *DeviceData, snapshot *shelly.MonitoringSnapshot) {
+func (c *Cache) aggregateMetrics(data *DeviceData, snapshot *model.MonitoringSnapshot) {
 	// Power meters (PM) - most common for switches with power monitoring
 	for _, pm := range snapshot.PM {
 		data.Power += pm.APower

@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -147,7 +148,7 @@ func displayEM1MetricsSummary(ios *iostreams.IOStreams, data *components.EM1Data
 }
 
 // DisplayEMStatus shows 3-phase energy monitor status.
-func DisplayEMStatus(ios *iostreams.IOStreams, status *shelly.EMStatus) {
+func DisplayEMStatus(ios *iostreams.IOStreams, status *model.EMStatus) {
 	if output.WantsStructured() {
 		if err := output.FormatOutput(ios.Out, status); err != nil {
 			ios.DebugErr("format output", err)
@@ -226,7 +227,7 @@ func DisplayEMStatus(ios *iostreams.IOStreams, status *shelly.EMStatus) {
 }
 
 // DisplayEM1Status shows single-phase energy monitor status.
-func DisplayEM1Status(ios *iostreams.IOStreams, status *shelly.EM1Status) {
+func DisplayEM1Status(ios *iostreams.IOStreams, status *model.EM1Status) {
 	if output.WantsStructured() {
 		if err := output.FormatOutput(ios.Out, status); err != nil {
 			ios.DebugErr("format output", err)

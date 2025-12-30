@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual/create"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual/del"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual/get"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual/set"
@@ -44,7 +44,7 @@ Virtual component IDs are automatically assigned in the range 200-299.`,
 	cmd.AddCommand(create.NewCommand(f))
 	cmd.AddCommand(get.NewCommand(f))
 	cmd.AddCommand(set.NewCommand(f))
-	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
 
 	return cmd
 }

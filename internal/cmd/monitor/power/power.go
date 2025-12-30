@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -54,7 +55,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios := f.IOStreams()
 	svc := f.ShellyService()
 
-	opts := shelly.MonitorOptions{
+	opts := shelly.MonitoringOptions{
 		Interval: intervalFlag,
 		Count:    countFlag,
 	}
@@ -62,8 +63,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	ios.Title("Power Monitoring: %s", device)
 	ios.Printf("Press Ctrl+C to stop\n\n")
 
-	var lastSnapshot *shelly.MonitoringSnapshot
-	return svc.MonitorDevice(ctx, device, opts, func(snapshot shelly.MonitoringSnapshot) error {
+	var lastSnapshot *model.MonitoringSnapshot
+	return svc.MonitorDevice(ctx, device, opts, func(snapshot model.MonitoringSnapshot) error {
 		term.DisplayPowerSnapshot(ios, &snapshot, lastSnapshot)
 		lastSnapshot = &snapshot
 		return nil

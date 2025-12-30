@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/current"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/exportcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/importcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/theme/next"
@@ -60,7 +60,7 @@ Popular themes include:
 	cmd.AddCommand(current.NewCommand(f))
 	cmd.AddCommand(next.NewCommand(f))
 	cmd.AddCommand(prev.NewCommand(f))
-	cmd.AddCommand(exportcmd.NewCommand(f))
+	cmd.AddCommand(export.NewCommand(f))
 	cmd.AddCommand(importcmd.NewCommand(f))
 	cmd.AddCommand(semantic.NewCommand(f))
 

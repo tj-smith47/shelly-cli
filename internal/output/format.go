@@ -13,9 +13,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/viper"
 
-	"github.com/tj-smith47/shelly-cli/internal/output/jsonf"
-	"github.com/tj-smith47/shelly-cli/internal/output/template"
-	yamlf "github.com/tj-smith47/shelly-cli/internal/output/yaml"
+	"github.com/tj-smith47/shelly-cli/internal/output/jsonfmt"
+	"github.com/tj-smith47/shelly-cli/internal/output/tmplfmt"
+	"github.com/tj-smith47/shelly-cli/internal/output/yamlfmt"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -73,37 +73,37 @@ func PrintTo(w io.Writer, data any) error {
 
 // PrintJSON outputs data as JSON.
 func PrintJSON(data any) error {
-	return jsonf.New().Format(os.Stdout, data)
+	return jsonfmt.New().Format(os.Stdout, data)
 }
 
 // PrintYAML outputs data as YAML.
 func PrintYAML(data any) error {
-	return yamlf.New().Format(os.Stdout, data)
+	return yamlfmt.New().Format(os.Stdout, data)
 }
 
 // JSON outputs data as JSON to the specified writer.
 func JSON(w io.Writer, data any) error {
-	return jsonf.New().Format(w, data)
+	return jsonfmt.New().Format(w, data)
 }
 
 // YAML outputs data as YAML to the specified writer.
 func YAML(w io.Writer, data any) error {
-	return yamlf.New().Format(w, data)
+	return yamlfmt.New().Format(w, data)
 }
 
 // NewFormatter creates a formatter for the given format.
 func NewFormatter(format Format) Formatter {
 	switch format {
 	case FormatJSON:
-		return jsonf.New()
+		return jsonfmt.New()
 	case FormatYAML:
-		return yamlf.New()
+		return yamlfmt.New()
 	case FormatTable:
 		return NewTableFormatter()
 	case FormatText:
 		return NewTextFormatter()
 	case FormatTemplate:
-		return template.New(GetTemplate())
+		return tmplfmt.New(GetTemplate())
 	default:
 		return NewTableFormatter()
 	}
@@ -190,7 +190,7 @@ func ValidFormats() []string {
 
 // Template outputs data using the specified template to the given writer.
 func Template(w io.Writer, tmpl string, data any) error {
-	return template.New(tmpl).Format(w, data)
+	return tmplfmt.New(tmpl).Format(w, data)
 }
 
 // PrintTemplate outputs data using the specified template to stdout.

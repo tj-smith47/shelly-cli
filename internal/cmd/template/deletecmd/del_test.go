@@ -1,4 +1,4 @@
-package del
+package deletecmd
 
 import (
 	"testing"

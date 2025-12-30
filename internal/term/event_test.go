@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 //nolint:gocyclo // comprehensive test coverage
@@ -16,7 +16,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "state_changed",
 			Component:   "switch",
 			ComponentID: 0,
@@ -45,7 +45,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "error",
 			Component:   "system",
 			ComponentID: 0,
@@ -68,7 +68,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "notification",
 			Component:   "input",
 			ComponentID: 0,
@@ -91,7 +91,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "state_changed",
 			Component:   "switch",
 			ComponentID: 0,
@@ -114,7 +114,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "state_changed",
 			Component:   "temperature",
 			ComponentID: 0,
@@ -139,7 +139,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "state_changed",
 			Component:   "switch",
 			ComponentID: 0,
@@ -162,7 +162,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "custom",
 			Component:   "custom",
 			ComponentID: 0,
@@ -185,7 +185,7 @@ func TestDisplayEvent(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "custom",
 			Component:   "switch",
 			ComponentID: 1,
@@ -212,7 +212,7 @@ func TestOutputEventJSON(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		event := shelly.DeviceEvent{
+		event := model.DeviceEvent{
 			Event:       "state_changed",
 			Component:   "switch",
 			ComponentID: 0,

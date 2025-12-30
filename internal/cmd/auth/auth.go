@@ -6,7 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/disable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/export"
-	importcmd "github.com/tj-smith47/shelly-cli/internal/cmd/auth/import"
+	importcmd "github.com/tj-smith47/shelly-cli/internal/cmd/auth/importcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/rotate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth/status"

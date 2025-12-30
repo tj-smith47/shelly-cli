@@ -7,7 +7,6 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -199,7 +198,7 @@ func FormatEMPhase(label string, power, voltage, current float64, pf, prevPower 
 }
 
 // FormatEMLines returns formatted lines for a 3-phase energy meter.
-func FormatEMLines(em, prev *shelly.EMStatus) []string {
+func FormatEMLines(em, prev *model.EMStatus) []string {
 	var prevA, prevB, prevC *float64
 	if prev != nil {
 		prevA = &prev.AActivePower
@@ -217,7 +216,7 @@ func FormatEMLines(em, prev *shelly.EMStatus) []string {
 }
 
 // FormatEM1Line returns formatted line for a single-phase energy meter.
-func FormatEM1Line(em1, prev *shelly.EM1Status) string {
+func FormatEM1Line(em1, prev *model.EM1Status) string {
 	var prevPower *float64
 	if prev != nil {
 		prevPower = &prev.ActPower
@@ -226,7 +225,7 @@ func FormatEM1Line(em1, prev *shelly.EM1Status) string {
 }
 
 // FormatPMLine returns formatted line for a power meter.
-func FormatPMLine(pm, prev *shelly.PMStatus) string {
+func FormatPMLine(pm, prev *model.PMStatus) string {
 	var prevPower *float64
 	if prev != nil {
 		prevPower = &prev.APower
@@ -249,32 +248,32 @@ func FindPrevious[T any](id int, items []T, getID func(*T) int) *T {
 }
 
 // FindPreviousEM finds matching EM status by ID from previous snapshot.
-func FindPreviousEM(id int, prev *shelly.MonitoringSnapshot) *shelly.EMStatus {
+func FindPreviousEM(id int, prev *model.MonitoringSnapshot) *model.EMStatus {
 	if prev == nil {
 		return nil
 	}
-	return FindPrevious(id, prev.EM, func(e *shelly.EMStatus) int { return e.ID })
+	return FindPrevious(id, prev.EM, func(e *model.EMStatus) int { return e.ID })
 }
 
 // FindPreviousEM1 finds matching EM1 status by ID from previous snapshot.
-func FindPreviousEM1(id int, prev *shelly.MonitoringSnapshot) *shelly.EM1Status {
+func FindPreviousEM1(id int, prev *model.MonitoringSnapshot) *model.EM1Status {
 	if prev == nil {
 		return nil
 	}
-	return FindPrevious(id, prev.EM1, func(e *shelly.EM1Status) int { return e.ID })
+	return FindPrevious(id, prev.EM1, func(e *model.EM1Status) int { return e.ID })
 }
 
 // FindPreviousPM finds matching PM status by ID from previous snapshot.
-func FindPreviousPM(id int, prev *shelly.MonitoringSnapshot) *shelly.PMStatus {
+func FindPreviousPM(id int, prev *model.MonitoringSnapshot) *model.PMStatus {
 	if prev == nil {
 		return nil
 	}
-	return FindPrevious(id, prev.PM, func(e *shelly.PMStatus) int { return e.ID })
+	return FindPrevious(id, prev.PM, func(e *model.PMStatus) int { return e.ID })
 }
 
 // GetPrevEMPhasePower returns previous phase power values for an EM by ID.
 // Returns nil pointers if previous snapshot is nil or EM not found.
-func GetPrevEMPhasePower(id int, prev *shelly.MonitoringSnapshot) (prevA, prevB, prevC *float64) {
+func GetPrevEMPhasePower(id int, prev *model.MonitoringSnapshot) (prevA, prevB, prevC *float64) {
 	em := FindPreviousEM(id, prev)
 	if em == nil {
 		return nil, nil, nil
@@ -283,7 +282,7 @@ func GetPrevEMPhasePower(id int, prev *shelly.MonitoringSnapshot) (prevA, prevB,
 }
 
 // GetPrevEM1Power returns previous power value for an EM1 by ID.
-func GetPrevEM1Power(id int, prev *shelly.MonitoringSnapshot) *float64 {
+func GetPrevEM1Power(id int, prev *model.MonitoringSnapshot) *float64 {
 	em1 := FindPreviousEM1(id, prev)
 	if em1 == nil {
 		return nil
@@ -292,7 +291,7 @@ func GetPrevEM1Power(id int, prev *shelly.MonitoringSnapshot) *float64 {
 }
 
 // GetPrevPMPower returns previous power value for a PM by ID.
-func GetPrevPMPower(id int, prev *shelly.MonitoringSnapshot) *float64 {
+func GetPrevPMPower(id int, prev *model.MonitoringSnapshot) *float64 {
 	pm := FindPreviousPM(id, prev)
 	if pm == nil {
 		return nil
@@ -301,7 +300,7 @@ func GetPrevPMPower(id int, prev *shelly.MonitoringSnapshot) *float64 {
 }
 
 // CalculateSnapshotTotals calculates total power and energy from a monitoring snapshot.
-func CalculateSnapshotTotals(snapshot *shelly.MonitoringSnapshot) (totalPower, totalEnergy float64) {
+func CalculateSnapshotTotals(snapshot *model.MonitoringSnapshot) (totalPower, totalEnergy float64) {
 	if snapshot == nil {
 		return 0, 0
 	}

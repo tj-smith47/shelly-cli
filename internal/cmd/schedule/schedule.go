@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/create"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/del"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/deleteall"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/disable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/schedule/enable"
@@ -49,7 +49,7 @@ Note: Maximum 20 schedules per device.`,
 	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(create.NewCommand(f))
 	cmd.AddCommand(update.NewCommand(f))
-	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
 	cmd.AddCommand(deleteall.NewCommand(f))
 	cmd.AddCommand(enable.NewCommand(f))
 	cmd.AddCommand(disable.NewCommand(f))

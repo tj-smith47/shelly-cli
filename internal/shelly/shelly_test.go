@@ -2394,7 +2394,7 @@ func TestService_tryIPRemap_NonConnectionError(t *testing.T) {
 	if conn != nil {
 		t.Error("expected nil connection for non-connection error")
 	}
-	if err != nonConnErr {
+	if !errors.Is(err, nonConnErr) {
 		t.Errorf("expected original error %v, got %v", nonConnErr, err)
 	}
 }
@@ -2467,7 +2467,7 @@ func TestService_tryGen1IPRemap_NonConnectionError(t *testing.T) {
 	if conn != nil {
 		t.Error("expected nil connection for non-connection error")
 	}
-	if err != nonConnErr {
+	if !errors.Is(err, nonConnErr) {
 		t.Errorf("expected original error %v, got %v", nonConnErr, err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
@@ -75,7 +76,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Collect device data using shared helper
-	var deviceData []shelly.DeviceData
+	var deviceData []model.DeviceData
 	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching device data...", func(ctx context.Context) error {
 		deviceData = svc.CollectDeviceData(ctx, devices)
 		return nil

@@ -127,7 +127,7 @@ func TestMsgHandling(t *testing.T) {
 		Model:      "SHSW-25",
 	}
 
-	status := &shelly.MonitoringSnapshot{
+	status := &model.MonitoringSnapshot{
 		Device:    "test-device",
 		Timestamp: time.Now(),
 		Online:    true,

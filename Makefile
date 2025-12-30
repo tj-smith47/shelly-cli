@@ -50,6 +50,7 @@ clean:
 	@rm -rf bin/
 	@rm -rf dist/
 	@rm -f coverage.out coverage.html
+	@rm -f *.test
 
 ## completions: Generate shell completions
 completions: build

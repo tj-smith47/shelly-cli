@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
 func TestGetEMDataCSVURL(t *testing.T) {
@@ -239,7 +240,7 @@ func TestEMStatus_Fields(t *testing.T) {
 	freq := 50.0
 	ncurrent := 0.1
 
-	status := EMStatus{
+	status := model.EMStatus{
 		ID:               0,
 		AVoltage:         230.5,
 		ACurrent:         10.0,
@@ -282,7 +283,7 @@ func TestEM1Status_Fields(t *testing.T) {
 	pf := 0.98
 	freq := 60.0
 
-	status := EM1Status{
+	status := model.EM1Status{
 		ID:        0,
 		Voltage:   120.5,
 		Current:   5.0,
@@ -311,12 +312,12 @@ func TestPMStatus_Fields(t *testing.T) {
 	t.Parallel()
 
 	freq := 50.0
-	aenergy := &EnergyCounters{
+	aenergy := &model.PMEnergyCounters{
 		Total:    12345.67,
 		ByMinute: []float64{10.0, 10.5, 11.0},
 	}
 
-	status := PMStatus{
+	status := model.PMStatus{
 		ID:      0,
 		Voltage: 230.0,
 		Current: 5.5,
@@ -336,11 +337,11 @@ func TestPMStatus_Fields(t *testing.T) {
 	}
 }
 
-func TestEnergyCounters_Fields(t *testing.T) {
+func TestPMEnergyCounters_Fields(t *testing.T) {
 	t.Parallel()
 
 	ts := int64(1234567890)
-	ec := EnergyCounters{
+	ec := model.PMEnergyCounters{
 		Total:    5000.0,
 		ByMinute: []float64{10.0, 12.0, 8.0},
 		MinuteTs: &ts,
@@ -357,45 +358,10 @@ func TestEnergyCounters_Fields(t *testing.T) {
 	}
 }
 
-func TestEnergyHistory_Fields(t *testing.T) {
-	t.Parallel()
-
-	eh := EnergyHistory{
-		Period:   "day",
-		DeviceID: testDevice,
-		Data:     []EnergyRecord{},
-	}
-
-	if eh.Period != "day" {
-		t.Errorf("Period = %q, want day", eh.Period)
-	}
-	if eh.DeviceID != testDevice {
-		t.Errorf("DeviceID = %q, want testDevice", eh.DeviceID)
-	}
-}
-
-func TestEnergyRecord_Fields(t *testing.T) {
-	t.Parallel()
-
-	rec := EnergyRecord{
-		Energy:  100.5,
-		Power:   50.0,
-		Voltage: 230.0,
-		Current: 0.5,
-	}
-
-	if rec.Energy != 100.5 {
-		t.Errorf("Energy = %f, want 100.5", rec.Energy)
-	}
-	if rec.Power != 50.0 {
-		t.Errorf("Power = %f, want 50.0", rec.Power)
-	}
-}
-
 func TestDeviceEvent_Fields(t *testing.T) {
 	t.Parallel()
 
-	event := DeviceEvent{
+	event := model.DeviceEvent{
 		Device:      testDevice,
 		Event:       "switch.on",
 		Component:   "switch",
@@ -417,10 +383,10 @@ func TestDeviceEvent_Fields(t *testing.T) {
 	}
 }
 
-func TestMonitorOptions_Fields(t *testing.T) {
+func TestMonitoringOptions_Fields(t *testing.T) {
 	t.Parallel()
 
-	opts := MonitorOptions{
+	opts := MonitoringOptions{
 		Count:         10,
 		IncludePower:  true,
 		IncludeEnergy: true,
@@ -440,11 +406,11 @@ func TestMonitorOptions_Fields(t *testing.T) {
 func TestMonitoringSnapshot_Fields(t *testing.T) {
 	t.Parallel()
 
-	snapshot := MonitoringSnapshot{
+	snapshot := model.MonitoringSnapshot{
 		Device: testDevice,
-		EM:     []EMStatus{{ID: 0}},
-		EM1:    []EM1Status{{ID: 0}},
-		PM:     []PMStatus{{ID: 0}},
+		EM:     []model.EMStatus{{ID: 0}},
+		EM1:    []model.EM1Status{{ID: 0}},
+		PM:     []model.PMStatus{{ID: 0}},
 		Online: true,
 		Error:  "",
 	}
@@ -567,41 +533,41 @@ func TestPMStatus_MeterReading(t *testing.T) {
 
 	energy := 1000.0
 	freq := 50.0
-	pm := &PMStatus{
+	pm := &model.PMStatus{
 		APower:  500.0,
 		Voltage: 230.0,
 		Current: 2.2,
-		AEnergy: &EnergyCounters{Total: energy},
+		AEnergy: &model.PMEnergyCounters{Total: energy},
 		Freq:    &freq,
 	}
 
-	if pm.getPower() != 500.0 {
-		t.Errorf("getPower() = %f, want 500.0", pm.getPower())
+	if pm.GetPower() != 500.0 {
+		t.Errorf("GetPower() = %f, want 500.0", pm.GetPower())
 	}
-	if pm.getVoltage() != 230.0 {
-		t.Errorf("getVoltage() = %f, want 230.0", pm.getVoltage())
+	if pm.GetVoltage() != 230.0 {
+		t.Errorf("GetVoltage() = %f, want 230.0", pm.GetVoltage())
 	}
-	if pm.getCurrent() != 2.2 {
-		t.Errorf("getCurrent() = %f, want 2.2", pm.getCurrent())
+	if pm.GetCurrent() != 2.2 {
+		t.Errorf("GetCurrent() = %f, want 2.2", pm.GetCurrent())
 	}
-	if e := pm.getEnergy(); e == nil || *e != 1000.0 {
-		t.Errorf("getEnergy() = %v, want 1000.0", e)
+	if e := pm.GetEnergy(); e == nil || *e != 1000.0 {
+		t.Errorf("GetEnergy() = %v, want 1000.0", e)
 	}
-	if f := pm.getFreq(); f == nil || *f != 50.0 {
-		t.Errorf("getFreq() = %v, want 50.0", f)
+	if f := pm.GetFreq(); f == nil || *f != 50.0 {
+		t.Errorf("GetFreq() = %v, want 50.0", f)
 	}
 }
 
 func TestPMStatus_MeterReadingNilEnergy(t *testing.T) {
 	t.Parallel()
 
-	pm := &PMStatus{
+	pm := &model.PMStatus{
 		APower:  100.0,
 		AEnergy: nil,
 	}
 
-	if pm.getEnergy() != nil {
-		t.Error("getEnergy() should return nil when AEnergy is nil")
+	if pm.GetEnergy() != nil {
+		t.Error("GetEnergy() should return nil when AEnergy is nil")
 	}
 }
 
@@ -609,27 +575,27 @@ func TestEMStatus_MeterReading(t *testing.T) {
 	t.Parallel()
 
 	freq := 50.0
-	em := &EMStatus{
+	em := &model.EMStatus{
 		TotalActivePower: 5000.0,
 		AVoltage:         230.0,
 		TotalCurrent:     22.0,
 		AFreq:            &freq,
 	}
 
-	if em.getPower() != 5000.0 {
-		t.Errorf("getPower() = %f, want 5000.0", em.getPower())
+	if em.GetPower() != 5000.0 {
+		t.Errorf("GetPower() = %f, want 5000.0", em.GetPower())
 	}
-	if em.getVoltage() != 230.0 {
-		t.Errorf("getVoltage() = %f, want 230.0", em.getVoltage())
+	if em.GetVoltage() != 230.0 {
+		t.Errorf("GetVoltage() = %f, want 230.0", em.GetVoltage())
 	}
-	if em.getCurrent() != 22.0 {
-		t.Errorf("getCurrent() = %f, want 22.0", em.getCurrent())
+	if em.GetCurrent() != 22.0 {
+		t.Errorf("GetCurrent() = %f, want 22.0", em.GetCurrent())
 	}
-	if em.getEnergy() != nil {
-		t.Error("getEnergy() should return nil for EMStatus")
+	if em.GetEnergy() != nil {
+		t.Error("GetEnergy() should return nil for EMStatus")
 	}
-	if f := em.getFreq(); f == nil || *f != 50.0 {
-		t.Errorf("getFreq() = %v, want 50.0", f)
+	if f := em.GetFreq(); f == nil || *f != 50.0 {
+		t.Errorf("GetFreq() = %v, want 50.0", f)
 	}
 }
 
@@ -637,31 +603,31 @@ func TestEM1Status_MeterReading(t *testing.T) {
 	t.Parallel()
 
 	freq := 60.0
-	em1 := &EM1Status{
+	em1 := &model.EM1Status{
 		ActPower: 1000.0,
 		Voltage:  120.0,
 		Current:  8.5,
 		Freq:     &freq,
 	}
 
-	if em1.getPower() != 1000.0 {
-		t.Errorf("getPower() = %f, want 1000.0", em1.getPower())
+	if em1.GetPower() != 1000.0 {
+		t.Errorf("GetPower() = %f, want 1000.0", em1.GetPower())
 	}
-	if em1.getVoltage() != 120.0 {
-		t.Errorf("getVoltage() = %f, want 120.0", em1.getVoltage())
+	if em1.GetVoltage() != 120.0 {
+		t.Errorf("GetVoltage() = %f, want 120.0", em1.GetVoltage())
 	}
-	if em1.getCurrent() != 8.5 {
-		t.Errorf("getCurrent() = %f, want 8.5", em1.getCurrent())
+	if em1.GetCurrent() != 8.5 {
+		t.Errorf("GetCurrent() = %f, want 8.5", em1.GetCurrent())
 	}
-	if em1.getEnergy() != nil {
-		t.Error("getEnergy() should return nil for EM1Status")
+	if em1.GetEnergy() != nil {
+		t.Error("GetEnergy() should return nil for EM1Status")
 	}
 }
 
 func TestPrometheusMetric_Fields(t *testing.T) {
 	t.Parallel()
 
-	metric := PrometheusMetric{
+	metric := export.PrometheusMetric{
 		Name:   "shelly_power_watts",
 		Help:   "Current power in watts",
 		Type:   "gauge",
@@ -683,8 +649,8 @@ func TestPrometheusMetric_Fields(t *testing.T) {
 func TestPrometheusMetrics_Fields(t *testing.T) {
 	t.Parallel()
 
-	metrics := PrometheusMetrics{
-		Metrics: []PrometheusMetric{
+	metrics := export.PrometheusMetrics{
+		Metrics: []export.PrometheusMetric{
 			{Name: "test1", Value: 1.0},
 			{Name: "test2", Value: 2.0},
 		},
@@ -700,7 +666,7 @@ func TestComponentReading_Fields(t *testing.T) {
 
 	energy := 5000.0
 	freq := 50.0
-	reading := ComponentReading{
+	reading := model.ComponentReading{
 		Device:  testDevice,
 		Type:    "pm",
 		ID:      0,
@@ -726,7 +692,7 @@ func TestComponentReading_Fields(t *testing.T) {
 func TestInfluxDBPoint_Fields(t *testing.T) {
 	t.Parallel()
 
-	point := InfluxDBPoint{
+	point := export.InfluxDBPoint{
 		Measurement: "shelly_power",
 		Tags:        map[string]string{"device": "test"},
 		Fields:      map[string]float64{"power": 100.0},
@@ -747,7 +713,7 @@ func TestBuildPowerPromMetrics(t *testing.T) {
 	t.Parallel()
 
 	labels := map[string]string{"device": "test"}
-	metrics := buildPowerPromMetrics(labels, 100.0, 230.0, 0.5)
+	metrics := export.BuildPowerPromMetrics(labels, 100.0, 230.0, 0.5)
 
 	if len(metrics) != 3 {
 		t.Fatalf("expected 3 metrics, got %d", len(metrics))
@@ -771,7 +737,7 @@ func TestReadingsToPrometheusMetrics(t *testing.T) {
 
 	energy := 5000.0
 	freq := 50.0
-	readings := []ComponentReading{
+	readings := []model.ComponentReading{
 		{
 			Device:  "test",
 			Type:    "pm",
@@ -784,7 +750,7 @@ func TestReadingsToPrometheusMetrics(t *testing.T) {
 		},
 	}
 
-	metrics := ReadingsToPrometheusMetrics(readings)
+	metrics := export.ReadingsToPrometheusMetrics(readings)
 
 	// Should have power, voltage, current, energy, frequency = 5 metrics
 	if len(metrics) < 5 {
@@ -796,7 +762,7 @@ func TestReadingsToInfluxDBPoints(t *testing.T) {
 	t.Parallel()
 
 	energy := 5000.0
-	readings := []ComponentReading{
+	readings := []model.ComponentReading{
 		{
 			Device:  "test",
 			Type:    "pm",
@@ -809,7 +775,7 @@ func TestReadingsToInfluxDBPoints(t *testing.T) {
 	}
 
 	// Use time.Now() for conversion
-	points := ReadingsToInfluxDBPoints(readings, time.Now())
+	points := export.ReadingsToInfluxDBPoints(readings, time.Now())
 	if len(points) != 1 {
 		t.Errorf("expected 1 point, got %d", len(points))
 	}
@@ -821,8 +787,8 @@ func TestReadingsToInfluxDBPoints(t *testing.T) {
 func TestFormatPrometheusMetrics(t *testing.T) {
 	t.Parallel()
 
-	metrics := &PrometheusMetrics{
-		Metrics: []PrometheusMetric{
+	metrics := &export.PrometheusMetrics{
+		Metrics: []export.PrometheusMetric{
 			{
 				Name:   "shelly_power_watts",
 				Help:   "Power in watts",
@@ -833,7 +799,7 @@ func TestFormatPrometheusMetrics(t *testing.T) {
 		},
 	}
 
-	result := FormatPrometheusMetrics(metrics)
+	result := export.FormatPrometheusMetrics(metrics)
 
 	if result == "" {
 		t.Error("expected non-empty result")
@@ -846,7 +812,7 @@ func TestFormatPrometheusMetrics(t *testing.T) {
 func TestFormatInfluxDBLineProtocol(t *testing.T) {
 	t.Parallel()
 
-	points := []InfluxDBPoint{
+	points := []export.InfluxDBPoint{
 		{
 			Measurement: "shelly",
 			Tags:        map[string]string{"device": "test"},
@@ -854,7 +820,7 @@ func TestFormatInfluxDBLineProtocol(t *testing.T) {
 		},
 	}
 
-	result := FormatInfluxDBLineProtocol(points)
+	result := export.FormatInfluxDBLineProtocol(points)
 
 	if result == "" {
 		t.Error("expected non-empty result")
@@ -864,13 +830,13 @@ func TestFormatInfluxDBLineProtocol(t *testing.T) {
 func TestFormatInfluxDBPoint(t *testing.T) {
 	t.Parallel()
 
-	point := InfluxDBPoint{
+	point := export.InfluxDBPoint{
 		Measurement: "shelly",
 		Tags:        map[string]string{"device": "test"},
 		Fields:      map[string]float64{"power": 100.0},
 	}
 
-	result := FormatInfluxDBPoint(point)
+	result := export.FormatInfluxDBPoint(point)
 
 	if result == "" {
 		t.Error("expected non-empty result")
@@ -895,7 +861,7 @@ func TestEscapeInfluxTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := escapeInfluxTag(tt.input)
+			got := export.EscapeInfluxTag(tt.input)
 			if got != tt.want {
 				t.Errorf("escapeInfluxTag(%q) = %q, want %q", tt.input, got, tt.want)
 			}
@@ -906,10 +872,10 @@ func TestEscapeInfluxTag(t *testing.T) {
 func TestJSONMetricsDevice_Fields(t *testing.T) {
 	t.Parallel()
 
-	device := JSONMetricsDevice{
+	device := export.JSONMetricsDevice{
 		Device:     testDevice,
 		Online:     true,
-		Components: []ComponentReading{{Device: "test", Type: "pm", ID: 0}},
+		Components: []model.ComponentReading{{Device: "test", Type: "pm", ID: 0}},
 	}
 
 	if device.Device != testDevice {
@@ -923,8 +889,8 @@ func TestJSONMetricsDevice_Fields(t *testing.T) {
 func TestJSONMetricsOutput_Fields(t *testing.T) {
 	t.Parallel()
 
-	output := JSONMetricsOutput{
-		Devices: []JSONMetricsDevice{
+	output := export.JSONMetricsOutput{
+		Devices: []export.JSONMetricsDevice{
 			{Device: "test1", Online: true},
 			{Device: "test2", Online: false},
 		},

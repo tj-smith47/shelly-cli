@@ -84,11 +84,11 @@ func TestDisplayPowerSnapshot(t *testing.T) {
 	t.Run("first snapshot", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		current := &shelly.MonitoringSnapshot{
+		current := &model.MonitoringSnapshot{
 			Timestamp: time.Now(),
-			EM:        []shelly.EMStatus{},
-			EM1:       []shelly.EM1Status{},
-			PM:        []shelly.PMStatus{},
+			EM:        []model.EMStatus{},
+			EM1:       []model.EM1Status{},
+			PM:        []model.PMStatus{},
 		}
 
 		DisplayPowerSnapshot(ios, current, nil)
@@ -102,9 +102,9 @@ func TestDisplayPowerSnapshot(t *testing.T) {
 	t.Run("with EM data", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		current := &shelly.MonitoringSnapshot{
+		current := &model.MonitoringSnapshot{
 			Timestamp: time.Now(),
-			EM: []shelly.EMStatus{
+			EM: []model.EMStatus{
 				{
 					ID:               0,
 					AActivePower:     100.0,
@@ -132,9 +132,9 @@ func TestDisplayPowerSnapshot(t *testing.T) {
 	t.Run("with EM1 data", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		current := &shelly.MonitoringSnapshot{
+		current := &model.MonitoringSnapshot{
 			Timestamp: time.Now(),
-			EM1: []shelly.EM1Status{
+			EM1: []model.EM1Status{
 				{
 					ID:       0,
 					ActPower: 50.0,
@@ -155,9 +155,9 @@ func TestDisplayPowerSnapshot(t *testing.T) {
 	t.Run("with PM data", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		current := &shelly.MonitoringSnapshot{
+		current := &model.MonitoringSnapshot{
 			Timestamp: time.Now(),
-			PM: []shelly.PMStatus{
+			PM: []model.PMStatus{
 				{
 					ID:      0,
 					APower:  75.0,
@@ -182,7 +182,7 @@ func TestDisplayStatusSnapshot(t *testing.T) {
 	t.Run("first snapshot", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		current := &shelly.MonitoringSnapshot{
+		current := &model.MonitoringSnapshot{
 			Timestamp: time.Now(),
 		}
 
@@ -197,10 +197,10 @@ func TestDisplayStatusSnapshot(t *testing.T) {
 	t.Run("with previous", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		current := &shelly.MonitoringSnapshot{
+		current := &model.MonitoringSnapshot{
 			Timestamp: time.Now(),
 		}
-		previous := &shelly.MonitoringSnapshot{
+		previous := &model.MonitoringSnapshot{
 			Timestamp: time.Now().Add(-time.Second),
 		}
 
@@ -418,13 +418,13 @@ func TestDisplayPMStatusDetails(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		freq := 50.0
-		status := &shelly.PMStatus{
+		status := &model.PMStatus{
 			ID:      0,
 			APower:  100.0,
 			Voltage: 230.0,
 			Current: 0.43,
 			Freq:    &freq,
-			AEnergy: &shelly.EnergyCounters{Total: 1500.0},
+			AEnergy: &model.PMEnergyCounters{Total: 1500.0},
 		}
 
 		DisplayPMStatusDetails(ios, status, shelly.ComponentTypePM)
@@ -438,7 +438,7 @@ func TestDisplayPMStatusDetails(t *testing.T) {
 	t.Run("PM1 type", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		status := &shelly.PMStatus{
+		status := &model.PMStatus{
 			ID:      0,
 			APower:  50.0,
 			Voltage: 220.0,
@@ -456,12 +456,12 @@ func TestDisplayPMStatusDetails(t *testing.T) {
 	t.Run("with return energy", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		status := &shelly.PMStatus{
+		status := &model.PMStatus{
 			ID:         0,
 			APower:     -50.0,
 			Voltage:    230.0,
 			Current:    0.22,
-			RetAEnergy: &shelly.EnergyCounters{Total: 500.0},
+			RetAEnergy: &model.PMEnergyCounters{Total: 500.0},
 		}
 
 		DisplayPMStatusDetails(ios, status, shelly.ComponentTypePM)
@@ -475,7 +475,7 @@ func TestDisplayPMStatusDetails(t *testing.T) {
 	t.Run("with errors", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		status := &shelly.PMStatus{
+		status := &model.PMStatus{
 			ID:      0,
 			APower:  100.0,
 			Voltage: 230.0,

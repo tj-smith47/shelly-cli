@@ -7,7 +7,6 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -219,8 +218,8 @@ func TestFindPreviousEM(t *testing.T) {
 
 	t.Run("finds existing EM", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			EM: []shelly.EMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			EM: []model.EMStatus{
 				{ID: 0, TotalActivePower: 100},
 				{ID: 1, TotalActivePower: 200},
 			},
@@ -249,15 +248,15 @@ func TestCalculateSnapshotTotals(t *testing.T) {
 	t.Run("calculates totals", func(t *testing.T) {
 		t.Parallel()
 		total := 100.0
-		snapshot := &shelly.MonitoringSnapshot{
-			EM: []shelly.EMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			EM: []model.EMStatus{
 				{ID: 0, TotalActivePower: 100},
 			},
-			EM1: []shelly.EM1Status{
+			EM1: []model.EM1Status{
 				{ID: 0, ActPower: 50},
 			},
-			PM: []shelly.PMStatus{
-				{ID: 0, APower: 25, AEnergy: &shelly.EnergyCounters{Total: total}},
+			PM: []model.PMStatus{
+				{ID: 0, APower: 25, AEnergy: &model.PMEnergyCounters{Total: total}},
 			},
 		}
 		power, energy := CalculateSnapshotTotals(snapshot)
@@ -416,7 +415,7 @@ func TestFormatEMLines(t *testing.T) {
 	t.Run("without previous", func(t *testing.T) {
 		t.Parallel()
 		pf := 0.95
-		em := &shelly.EMStatus{
+		em := &model.EMStatus{
 			ID:               0,
 			AActivePower:     100,
 			AVoltage:         230,
@@ -441,7 +440,7 @@ func TestFormatEMLines(t *testing.T) {
 	t.Run("with previous", func(t *testing.T) {
 		t.Parallel()
 		pf := 0.95
-		em := &shelly.EMStatus{
+		em := &model.EMStatus{
 			ID:               0,
 			AActivePower:     100,
 			AVoltage:         230,
@@ -457,7 +456,7 @@ func TestFormatEMLines(t *testing.T) {
 			CPowerFactor:     &pf,
 			TotalActivePower: 450,
 		}
-		prev := &shelly.EMStatus{
+		prev := &model.EMStatus{
 			ID:           0,
 			AActivePower: 90,
 			BActivePower: 180,
@@ -476,7 +475,7 @@ func TestFormatEM1Line(t *testing.T) {
 	t.Run("without previous", func(t *testing.T) {
 		t.Parallel()
 		pf := 0.95
-		em1 := &shelly.EM1Status{
+		em1 := &model.EM1Status{
 			ID:       0,
 			ActPower: 100,
 			Voltage:  230,
@@ -495,14 +494,14 @@ func TestFormatEM1Line(t *testing.T) {
 	t.Run("with previous", func(t *testing.T) {
 		t.Parallel()
 		pf := 0.95
-		em1 := &shelly.EM1Status{
+		em1 := &model.EM1Status{
 			ID:       0,
 			ActPower: 100,
 			Voltage:  230,
 			Current:  0.5,
 			PF:       &pf,
 		}
-		prev := &shelly.EM1Status{
+		prev := &model.EM1Status{
 			ID:       0,
 			ActPower: 80,
 		}
@@ -518,7 +517,7 @@ func TestFormatPMLine(t *testing.T) {
 
 	t.Run("without energy and previous", func(t *testing.T) {
 		t.Parallel()
-		pm := &shelly.PMStatus{
+		pm := &model.PMStatus{
 			ID:      0,
 			APower:  100,
 			Voltage: 230,
@@ -535,12 +534,12 @@ func TestFormatPMLine(t *testing.T) {
 
 	t.Run("with energy", func(t *testing.T) {
 		t.Parallel()
-		pm := &shelly.PMStatus{
+		pm := &model.PMStatus{
 			ID:      0,
 			APower:  100,
 			Voltage: 230,
 			Current: 0.5,
-			AEnergy: &shelly.EnergyCounters{Total: 500},
+			AEnergy: &model.PMEnergyCounters{Total: 500},
 		}
 		got := FormatPMLine(pm, nil)
 		if !containsSubstring(got, "500.00 Wh") {
@@ -550,13 +549,13 @@ func TestFormatPMLine(t *testing.T) {
 
 	t.Run("with previous", func(t *testing.T) {
 		t.Parallel()
-		pm := &shelly.PMStatus{
+		pm := &model.PMStatus{
 			ID:      0,
 			APower:  100,
 			Voltage: 230,
 			Current: 0.5,
 		}
-		prev := &shelly.PMStatus{
+		prev := &model.PMStatus{
 			ID:     0,
 			APower: 80,
 		}
@@ -580,8 +579,8 @@ func TestFindPreviousEM1(t *testing.T) {
 
 	t.Run("finds existing EM1", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			EM1: []shelly.EM1Status{
+		snapshot := &model.MonitoringSnapshot{
+			EM1: []model.EM1Status{
 				{ID: 0, ActPower: 100},
 				{ID: 1, ActPower: 200},
 			},
@@ -597,8 +596,8 @@ func TestFindPreviousEM1(t *testing.T) {
 
 	t.Run("returns nil for missing EM1", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			EM1: []shelly.EM1Status{
+		snapshot := &model.MonitoringSnapshot{
+			EM1: []model.EM1Status{
 				{ID: 0, ActPower: 100},
 			},
 		}
@@ -622,8 +621,8 @@ func TestFindPreviousPM(t *testing.T) {
 
 	t.Run("finds existing PM", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			PM: []shelly.PMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			PM: []model.PMStatus{
 				{ID: 0, APower: 100},
 				{ID: 1, APower: 200},
 			},
@@ -639,8 +638,8 @@ func TestFindPreviousPM(t *testing.T) {
 
 	t.Run("returns nil for missing PM", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			PM: []shelly.PMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			PM: []model.PMStatus{
 				{ID: 0, APower: 100},
 			},
 		}
@@ -664,8 +663,8 @@ func TestGetPrevEMPhasePower(t *testing.T) {
 
 	t.Run("returns phase powers for existing EM", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			EM: []shelly.EMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			EM: []model.EMStatus{
 				{ID: 0, AActivePower: 100, BActivePower: 200, CActivePower: 300},
 			},
 		}
@@ -680,8 +679,8 @@ func TestGetPrevEMPhasePower(t *testing.T) {
 
 	t.Run("returns nil for missing EM", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			EM: []shelly.EMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			EM: []model.EMStatus{
 				{ID: 0, AActivePower: 100, BActivePower: 200, CActivePower: 300},
 			},
 		}
@@ -705,8 +704,8 @@ func TestGetPrevEM1Power(t *testing.T) {
 
 	t.Run("returns power for existing EM1", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			EM1: []shelly.EM1Status{
+		snapshot := &model.MonitoringSnapshot{
+			EM1: []model.EM1Status{
 				{ID: 0, ActPower: 100},
 			},
 		}
@@ -721,8 +720,8 @@ func TestGetPrevEM1Power(t *testing.T) {
 
 	t.Run("returns nil for missing EM1", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			EM1: []shelly.EM1Status{
+		snapshot := &model.MonitoringSnapshot{
+			EM1: []model.EM1Status{
 				{ID: 0, ActPower: 100},
 			},
 		}
@@ -746,8 +745,8 @@ func TestGetPrevPMPower(t *testing.T) {
 
 	t.Run("returns power for existing PM", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			PM: []shelly.PMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			PM: []model.PMStatus{
 				{ID: 0, APower: 100},
 			},
 		}
@@ -762,8 +761,8 @@ func TestGetPrevPMPower(t *testing.T) {
 
 	t.Run("returns nil for missing PM", func(t *testing.T) {
 		t.Parallel()
-		snapshot := &shelly.MonitoringSnapshot{
-			PM: []shelly.PMStatus{
+		snapshot := &model.MonitoringSnapshot{
+			PM: []model.PMStatus{
 				{ID: 0, APower: 100},
 			},
 		}

@@ -26,7 +26,7 @@ type Deps struct {
 // Msg signals that device details were loaded.
 type Msg struct {
 	Device model.Device
-	Status *shelly.MonitoringSnapshot
+	Status *model.MonitoringSnapshot
 	Config map[string]any
 	Err    error
 }
@@ -39,7 +39,7 @@ type Model struct {
 	ctx      context.Context
 	svc      *shelly.Service
 	device   *model.Device
-	status   *shelly.MonitoringSnapshot
+	status   *model.MonitoringSnapshot
 	config   map[string]any
 	viewport viewport.Model
 	visible  bool

@@ -1,9 +1,12 @@
 package create
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -48,5 +51,42 @@ func TestNewCommand_Args(t *testing.T) {
 	}
 	if err := cmd.Args(cmd, []string{"name", "extra"}); err == nil {
 		t.Error("expected error with 2 args")
+	}
+}
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+// Note: TestRun_CreateGroup is skipped because config.CreateGroup modifies
+// global config state which persists across test runs, causing "already exists"
+// errors in parallel test execution.
+
+func TestNewCommand_ExampleContent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"shelly group create",
+		"shelly group new",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Example, pattern) {
+			t.Errorf("expected Example to contain %q", pattern)
+		}
 	}
 }

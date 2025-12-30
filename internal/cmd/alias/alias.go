@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias/deletecmd"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/alias/exportcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/alias/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias/importcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias/set"
@@ -51,7 +51,7 @@ Shell command aliases are prefixed with ! and execute in your shell.`,
 	cmd.AddCommand(set.NewCommand(f))
 	cmd.AddCommand(deletecmd.NewCommand(f))
 	cmd.AddCommand(importcmd.NewCommand(f))
-	cmd.AddCommand(exportcmd.NewCommand(f))
+	cmd.AddCommand(export.NewCommand(f))
 
 	return cmd
 }

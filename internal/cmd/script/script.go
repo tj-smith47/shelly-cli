@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/create"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/script/del"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/script/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/download"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/eval"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script/get"
@@ -51,7 +51,7 @@ Note: Scripts are only available on Gen2+ devices.`,
 	cmd.AddCommand(get.NewCommand(f))
 	cmd.AddCommand(create.NewCommand(f))
 	cmd.AddCommand(update.NewCommand(f))
-	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
 	cmd.AddCommand(start.NewCommand(f))
 	cmd.AddCommand(stop.NewCommand(f))
 	cmd.AddCommand(eval.NewCommand(f))

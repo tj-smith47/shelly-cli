@@ -8,8 +8,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -56,7 +56,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 		ios.Printf("Press Ctrl+C to stop\n\n")
 	}
 
-	return svc.SubscribeEvents(ctx, device, func(event shelly.DeviceEvent) error {
+	return svc.SubscribeEvents(ctx, device, func(event model.DeviceEvent) error {
 		// Apply filter if set
 		if filterFlag != "" && event.Component != filterFlag {
 			return nil

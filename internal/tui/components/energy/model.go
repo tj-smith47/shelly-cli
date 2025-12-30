@@ -290,7 +290,7 @@ func (m Model) fetchDeviceEnergy(ctx context.Context, device model.Device) Devic
 }
 
 // aggregateEnergyFromPM aggregates energy data from PM components.
-func aggregateEnergyFromPM(energy *DeviceEnergy, pms []shelly.PMStatus) {
+func aggregateEnergyFromPM(energy *DeviceEnergy, pms []model.PMStatus) {
 	for _, pm := range pms {
 		energy.Power += pm.APower
 		if energy.Voltage == 0 && pm.Voltage > 0 {
@@ -309,7 +309,7 @@ func aggregateEnergyFromPM(energy *DeviceEnergy, pms []shelly.PMStatus) {
 }
 
 // aggregateEnergyFromEM aggregates energy data from EM components (3-phase meters).
-func aggregateEnergyFromEM(energy *DeviceEnergy, ems []shelly.EMStatus) {
+func aggregateEnergyFromEM(energy *DeviceEnergy, ems []model.EMStatus) {
 	for _, em := range ems {
 		energy.Power += em.TotalActivePower
 		energy.Current += em.TotalCurrent
@@ -323,7 +323,7 @@ func aggregateEnergyFromEM(energy *DeviceEnergy, ems []shelly.EMStatus) {
 }
 
 // aggregateEnergyFromEM1 aggregates energy data from EM1 components (single-phase meters).
-func aggregateEnergyFromEM1(energy *DeviceEnergy, em1s []shelly.EM1Status) {
+func aggregateEnergyFromEM1(energy *DeviceEnergy, em1s []model.EM1Status) {
 	for _, em1 := range em1s {
 		energy.Power += em1.ActPower
 		if energy.Voltage == 0 && em1.Voltage > 0 {

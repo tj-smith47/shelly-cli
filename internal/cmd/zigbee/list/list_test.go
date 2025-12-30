@@ -1,9 +1,12 @@
 package list
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -20,5 +23,105 @@ func TestNewCommand(t *testing.T) {
 
 	if cmd.Short == "" {
 		t.Error("Short description is empty")
+	}
+}
+
+func TestNewCommand_Structure(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Test Use
+	if cmd.Use != "list" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "list")
+	}
+
+	// Test Aliases
+	wantAliases := []string{"ls", "devices"}
+	if len(cmd.Aliases) != len(wantAliases) {
+		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
+	} else {
+		for i, alias := range wantAliases {
+			if cmd.Aliases[i] != alias {
+				t.Errorf("Aliases[%d] = %q, want %q", i, cmd.Aliases[i], alias)
+			}
+		}
+	}
+
+	// Test Long
+	if cmd.Long == "" {
+		t.Error("Long description is empty")
+	}
+
+	// Test Example
+	if cmd.Example == "" {
+		t.Error("Example is empty")
+	}
+}
+
+func TestNewCommand_Flags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// AddOutputFlagsCustom adds "format" flag
+	flag := cmd.Flags().Lookup("format")
+	if flag == nil {
+		t.Fatal("--format flag not found")
+	}
+	if flag.DefValue != "text" {
+		t.Errorf("--format default = %q, want %q", flag.DefValue, "text")
+	}
+}
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+func TestNewCommand_ExampleContent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"shelly zigbee list",
+		"--json",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Example, pattern) {
+			t.Errorf("expected Example to contain %q", pattern)
+		}
+	}
+}
+
+func TestOptions(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	opts := &Options{
+		Factory: f,
+	}
+
+	if opts.Factory == nil {
+		t.Error("Factory is nil")
+	}
+
+	// Test OutputFlags
+	opts.Format = "json"
+	if opts.Format != "json" {
+		t.Errorf("Format = %q, want %q", opts.Format, "json")
 	}
 }

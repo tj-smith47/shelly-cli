@@ -37,7 +37,7 @@ func displayPowerMetricsWithWidth(ios *iostreams.IOStreams, power, voltage, curr
 
 // DisplayPowerSnapshot displays a power monitoring snapshot with all energy meters.
 // Handles 3-phase EM, single-phase EM1, and power meters with change indicators.
-func DisplayPowerSnapshot(ios *iostreams.IOStreams, current, previous *shelly.MonitoringSnapshot) {
+func DisplayPowerSnapshot(ios *iostreams.IOStreams, current, previous *model.MonitoringSnapshot) {
 	// Clear screen for non-first updates
 	if previous != nil {
 		ios.ClearScreen()
@@ -105,7 +105,7 @@ func displayMeter(ios *iostreams.IOStreams, power, voltage, current float64, pf,
 
 // DisplayStatusSnapshot displays a device status monitoring snapshot.
 // Shows energy meters in a simpler format than power monitoring.
-func DisplayStatusSnapshot(ios *iostreams.IOStreams, current, previous *shelly.MonitoringSnapshot) {
+func DisplayStatusSnapshot(ios *iostreams.IOStreams, current, previous *model.MonitoringSnapshot) {
 	// Clear screen for non-first updates
 	if previous != nil {
 		ios.ClearScreen()
@@ -124,7 +124,7 @@ func DisplayStatusSnapshot(ios *iostreams.IOStreams, current, previous *shelly.M
 	ios.Println()
 }
 
-func displayEMStatus(ios *iostreams.IOStreams, statuses []shelly.EMStatus, previous *shelly.MonitoringSnapshot) {
+func displayEMStatus(ios *iostreams.IOStreams, statuses []model.EMStatus, previous *model.MonitoringSnapshot) {
 	if len(statuses) == 0 {
 		return
 	}
@@ -140,7 +140,7 @@ func displayEMStatus(ios *iostreams.IOStreams, statuses []shelly.EMStatus, previ
 	ios.Println()
 }
 
-func displayEM1Status(ios *iostreams.IOStreams, statuses []shelly.EM1Status, previous *shelly.MonitoringSnapshot) {
+func displayEM1Status(ios *iostreams.IOStreams, statuses []model.EM1Status, previous *model.MonitoringSnapshot) {
 	if len(statuses) == 0 {
 		return
 	}
@@ -154,7 +154,7 @@ func displayEM1Status(ios *iostreams.IOStreams, statuses []shelly.EM1Status, pre
 	ios.Println()
 }
 
-func displayPMStatus(ios *iostreams.IOStreams, statuses []shelly.PMStatus, previous *shelly.MonitoringSnapshot) {
+func displayPMStatus(ios *iostreams.IOStreams, statuses []model.PMStatus, previous *model.MonitoringSnapshot) {
 	if len(statuses) == 0 {
 		return
 	}
@@ -316,7 +316,7 @@ func displayBarChart(ios *iostreams.IOStreams, devices []model.DeviceEnergy, max
 }
 
 // DisplayPMStatusDetails shows detailed power meter status in human-readable format.
-func DisplayPMStatusDetails(ios *iostreams.IOStreams, status *shelly.PMStatus, componentType string) {
+func DisplayPMStatusDetails(ios *iostreams.IOStreams, status *model.PMStatus, componentType string) {
 	typeLabel := "Power Meter (PM)"
 	if componentType == shelly.ComponentTypePM1 {
 		typeLabel = "Power Meter (PM1)"

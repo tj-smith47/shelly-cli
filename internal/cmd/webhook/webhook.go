@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/create"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/del"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/server"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/webhook/update"
@@ -37,7 +37,7 @@ enabling integration with external services and automation systems.`,
 
 	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(create.NewCommand(f))
-	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
 	cmd.AddCommand(update.NewCommand(f))
 	cmd.AddCommand(server.NewCommand(f))
 

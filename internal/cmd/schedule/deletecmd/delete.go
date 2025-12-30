@@ -1,5 +1,5 @@
 // Package del provides the schedule delete subcommand.
-package del
+package deletecmd
 
 import (
 	"context"

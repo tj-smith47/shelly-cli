@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
 // LineProtocolWriter writes metrics in InfluxDB line protocol format.
@@ -147,9 +148,9 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 	}
 
 	// Write points to output
-	writePoints := func(points []shelly.InfluxDBPoint) {
+	writePoints := func(points []export.InfluxDBPoint) {
 		for _, p := range points {
-			line := shelly.FormatInfluxDBPoint(p)
+			line := export.FormatInfluxDBPoint(p)
 			if _, err := fmt.Fprintln(writer.out, line); err != nil {
 				writer.ios.DebugErr("writing line", err)
 			}
@@ -166,7 +167,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 	return nil
 }
 
-func runContinuous(ctx context.Context, svc *shelly.Service, devices []string, measurement string, tags map[string]string, interval time.Duration, writePoints func([]shelly.InfluxDBPoint)) error {
+func runContinuous(ctx context.Context, svc *shelly.Service, devices []string, measurement string, tags map[string]string, interval time.Duration, writePoints func([]export.InfluxDBPoint)) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 

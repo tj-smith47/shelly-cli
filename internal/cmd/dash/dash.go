@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/dash/devices"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/dash/eventscmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/dash/events"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/tui"
 )
@@ -57,7 +57,7 @@ Navigation:
 
 	// Add subcommands
 	cmd.AddCommand(devices.NewCommand(f))
-	cmd.AddCommand(eventscmd.NewCommand(f))
+	cmd.AddCommand(events.NewCommand(f))
 
 	return cmd
 }

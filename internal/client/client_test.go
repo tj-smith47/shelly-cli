@@ -3,10 +3,14 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -2324,4 +2328,6194 @@ func containsSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// mockRPCServer creates a test server that handles Gen2 RPC endpoints.
+// It responds to both GET /rpc/<method> and POST /rpc requests.
+type mockRPCServer struct {
+	handlers map[string]func(params map[string]any) (any, error)
+	authUser string
+	authPass string
+}
+
+func newMockRPCServer() *mockRPCServer {
+	return &mockRPCServer{
+		handlers: make(map[string]func(params map[string]any) (any, error)),
+	}
+}
+
+func (m *mockRPCServer) withAuth(user, pass string) *mockRPCServer {
+	m.authUser = user
+	m.authPass = pass
+	return m
+}
+
+func (m *mockRPCServer) handle(method string, handler func(params map[string]any) (any, error)) *mockRPCServer {
+	m.handlers[method] = handler
+	return m
+}
+
+func (m *mockRPCServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Check auth if configured
+	if m.authUser != "" {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != m.authUser || pass != m.authPass {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+
+	// Handle GET /rpc/<method> format
+	if r.Method == http.MethodGet && len(r.URL.Path) > 5 && r.URL.Path[:5] == "/rpc/" {
+		method := r.URL.Path[5:]
+		if handler, ok := m.handlers[method]; ok {
+			result, err := handler(nil)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(result)
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
+
+	// Handle POST /rpc format (JSON-RPC)
+	if r.Method == http.MethodPost && r.URL.Path == "/rpc" {
+		var req struct {
+			ID     int            `json:"id"`
+			Method string         `json:"method"`
+			Params map[string]any `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if handler, ok := m.handlers[req.Method]; ok {
+			result, err := handler(req.Params)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id":    req.ID,
+					"error": map[string]any{"code": -1, "message": err.Error()},
+				})
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":     req.ID,
+				"result": result,
+			})
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
+func (m *mockRPCServer) start(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(m)
+	t.Cleanup(server.Close)
+	return server
+}
+
+// Standard device info response for tests
+func standardDeviceInfo() map[string]any {
+	return map[string]any{
+		"id":      "shellyplus1pm-test123",
+		"mac":     "AA:BB:CC:DD:EE:FF",
+		"model":   "SNSW-001P16EU",
+		"gen":     2,
+		"fw_id":   "20231107-164738/1.0.0-g1234567",
+		"ver":     "1.0.0",
+		"app":     "Plus1PM",
+		"auth_en": false,
+	}
+}
+
+func TestConnect_Success(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	info := client.Info()
+	if info == nil {
+		t.Fatal("Info() returned nil")
+	}
+	if info.ID != "shellyplus1pm-test123" {
+		t.Errorf("Info().ID = %q, want shellyplus1pm-test123", info.ID)
+	}
+	if info.MAC != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("Info().MAC = %q, want AA:BB:CC:DD:EE:FF", info.MAC)
+	}
+	if info.Model != "SNSW-001P16EU" {
+		t.Errorf("Info().Model = %q, want SNSW-001P16EU", info.Model)
+	}
+	if info.Generation != 2 {
+		t.Errorf("Info().Generation = %d, want 2", info.Generation)
+	}
+	if info.Firmware != "1.0.0" {
+		t.Errorf("Info().Firmware = %q, want 1.0.0", info.Firmware)
+	}
+	if info.App != "Plus1PM" {
+		t.Errorf("Info().App = %q, want Plus1PM", info.App)
+	}
+}
+
+func TestConnect_WithAuth(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		withAuth("admin", "secret").
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			info := standardDeviceInfo()
+			info["auth_en"] = true
+			return info, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{
+		Address: server.URL,
+		Auth:    &model.Auth{Username: "admin", Password: "secret"},
+	}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() with auth error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	if !client.Info().AuthEn {
+		t.Error("Info().AuthEn = false, want true")
+	}
+}
+
+func TestConnect_AuthRequired(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		withAuth("admin", "secret").
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Try without auth - should fail
+	device := model.Device{Address: server.URL}
+	_, err := Connect(ctx, device)
+	if err == nil {
+		t.Error("Connect() without auth should fail when auth required")
+	}
+}
+
+func TestConnect_AddressNormalization(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Test with address without http:// prefix
+	addr := server.URL[7:] // Remove "http://"
+	device := model.Device{Address: addr}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() with bare address error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	if client.Info().ID != "shellyplus1pm-test123" {
+		t.Errorf("Info().ID = %q, want shellyplus1pm-test123", client.Info().ID)
+	}
+}
+
+func TestConnect_ConnectionFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Use an address that won't connect
+	device := model.Device{Address: "http://127.0.0.1:1"}
+	_, err := Connect(ctx, device)
+	if err == nil {
+		t.Error("Connect() to bad address should fail")
+	}
+}
+
+func TestClient_ListComponents_Success(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.GetComponents", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"components": []any{
+					map[string]any{"key": "switch:0"},
+					map[string]any{"key": "switch:1"},
+					map[string]any{"key": "input:0"},
+					map[string]any{"key": "cover:0"},
+					map[string]any{"key": "light:0"},
+					map[string]any{"key": "sys"},      // Should be filtered out
+					map[string]any{"key": "wifi:sta"}, // Should be filtered out
+				},
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	comps, err := client.ListComponents(ctx)
+	if err != nil {
+		t.Fatalf("ListComponents() error = %v", err)
+	}
+
+	// Should only include parseable component types
+	if len(comps) != 5 {
+		t.Errorf("len(comps) = %d, want 5 (sys and wifi filtered out)", len(comps))
+	}
+
+	// Check specific components
+	switchCount := 0
+	for _, c := range comps {
+		if c.Type == model.ComponentSwitch {
+			switchCount++
+		}
+	}
+	if switchCount != 2 {
+		t.Errorf("switch count = %d, want 2", switchCount)
+	}
+}
+
+func TestClient_FilterComponents_Success(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.GetComponents", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"components": []any{
+					map[string]any{"key": "switch:0"},
+					map[string]any{"key": "switch:1"},
+					map[string]any{"key": "input:0"},
+					map[string]any{"key": "cover:0"},
+				},
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	// Filter for switches only
+	switches, err := client.FilterComponents(ctx, model.ComponentSwitch)
+	if err != nil {
+		t.Fatalf("FilterComponents() error = %v", err)
+	}
+	if len(switches) != 2 {
+		t.Errorf("len(switches) = %d, want 2", len(switches))
+	}
+	for _, sw := range switches {
+		if sw.Type != model.ComponentSwitch {
+			t.Errorf("filtered component type = %q, want switch", sw.Type)
+		}
+	}
+
+	// Filter for covers only
+	covers, err := client.FilterComponents(ctx, model.ComponentCover)
+	if err != nil {
+		t.Fatalf("FilterComponents(cover) error = %v", err)
+	}
+	if len(covers) != 1 {
+		t.Errorf("len(covers) = %d, want 1", len(covers))
+	}
+
+	// Filter for type that doesn't exist
+	lights, err := client.FilterComponents(ctx, model.ComponentLight)
+	if err != nil {
+		t.Fatalf("FilterComponents(light) error = %v", err)
+	}
+	if len(lights) != 0 {
+		t.Errorf("len(lights) = %d, want 0", len(lights))
+	}
+}
+
+func TestClient_GetStatus_Success(t *testing.T) {
+	t.Parallel()
+
+	expectedStatus := map[string]any{
+		"sys": map[string]any{
+			"mac":            "AA:BB:CC:DD:EE:FF",
+			"restart_reason": "power_on",
+			"uptime":         12345,
+		},
+		"wifi": map[string]any{
+			"sta_ip": "192.168.1.100",
+			"status": "connected",
+			"ssid":   "MyNetwork",
+			"rssi":   -55,
+		},
+		"switch:0": map[string]any{
+			"id":      0,
+			"output":  true,
+			"source":  "button",
+			"apower":  150.5,
+			"voltage": 230.1,
+		},
+	}
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.GetStatus", func(_ map[string]any) (any, error) {
+			return expectedStatus, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	status, err := client.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	// Check sys status
+	sys, ok := status["sys"].(map[string]any)
+	if !ok {
+		t.Fatal("status[sys] not a map")
+	}
+	if sys["mac"] != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("sys.mac = %v, want AA:BB:CC:DD:EE:FF", sys["mac"])
+	}
+
+	// Check switch status
+	sw, ok := status["switch:0"].(map[string]any)
+	if !ok {
+		t.Fatal("status[switch:0] not a map")
+	}
+	if sw["output"] != true {
+		t.Errorf("switch:0.output = %v, want true", sw["output"])
+	}
+}
+
+func TestClient_GetConfig_Success(t *testing.T) {
+	t.Parallel()
+
+	expectedConfig := map[string]any{
+		"sys": map[string]any{
+			"device": map[string]any{
+				"name":  "My Shelly",
+				"eco":   false,
+				"fw_id": "1.0.0",
+			},
+		},
+		"wifi": map[string]any{
+			"sta": map[string]any{
+				"ssid":   "MyNetwork",
+				"pass":   "****",
+				"enable": true,
+			},
+		},
+		"switch:0": map[string]any{
+			"id":            0,
+			"name":          "Kitchen Light",
+			"initial_state": "restore_last",
+			"auto_on":       false,
+			"auto_off":      false,
+		},
+	}
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.GetConfig", func(_ map[string]any) (any, error) {
+			return expectedConfig, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	config, err := client.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	// Check sys config
+	sys, ok := config["sys"].(map[string]any)
+	if !ok {
+		t.Fatal("config[sys] not a map")
+	}
+	sysDevice, ok := sys["device"].(map[string]any)
+	if !ok {
+		t.Fatal("sys.device not a map")
+	}
+	if sysDevice["name"] != "My Shelly" {
+		t.Errorf("sys.device.name = %v, want My Shelly", sysDevice["name"])
+	}
+
+	// Check switch config
+	sw, ok := config["switch:0"].(map[string]any)
+	if !ok {
+		t.Fatal("config[switch:0] not a map")
+	}
+	if sw["name"] != "Kitchen Light" {
+		t.Errorf("switch:0.name = %v, want Kitchen Light", sw["name"])
+	}
+}
+
+func TestClient_SetConfig_Success(t *testing.T) {
+	t.Parallel()
+
+	var receivedConfig map[string]any
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.SetConfig", func(params map[string]any) (any, error) {
+			if cfg, ok := params["config"].(map[string]any); ok {
+				receivedConfig = cfg
+			}
+			return map[string]any{"restart_required": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	newConfig := map[string]any{
+		"sys": map[string]any{
+			"device": map[string]any{
+				"name": "New Name",
+			},
+		},
+	}
+
+	err = client.SetConfig(ctx, newConfig)
+	if err != nil {
+		t.Fatalf("SetConfig() error = %v", err)
+	}
+
+	// Verify the config was sent
+	if receivedConfig == nil {
+		t.Fatal("SetConfig did not send config")
+	}
+	sysConfig, ok := receivedConfig["sys"].(map[string]any)
+	if !ok {
+		t.Fatal("received config sys not a map")
+	}
+	deviceConfig, ok := sysConfig["device"].(map[string]any)
+	if !ok {
+		t.Fatal("received config sys.device not a map")
+	}
+	if deviceConfig["name"] != "New Name" {
+		t.Errorf("received config name = %v, want New Name", deviceConfig["name"])
+	}
+}
+
+func TestClient_Reboot_Immediate(t *testing.T) {
+	t.Parallel()
+
+	var receivedDelayMS int
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.Reboot", func(params map[string]any) (any, error) {
+			if delay, ok := params["delay_ms"].(float64); ok {
+				receivedDelayMS = int(delay)
+			}
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	err = client.Reboot(ctx, 0)
+	if err != nil {
+		t.Fatalf("Reboot() error = %v", err)
+	}
+
+	// With delay 0, no delay_ms should be sent
+	if receivedDelayMS != 0 {
+		t.Errorf("receivedDelayMS = %d, want 0 (not sent)", receivedDelayMS)
+	}
+}
+
+func TestClient_Reboot_WithDelay(t *testing.T) {
+	t.Parallel()
+
+	var receivedDelayMS int
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.Reboot", func(params map[string]any) (any, error) {
+			if delay, ok := params["delay_ms"].(float64); ok {
+				receivedDelayMS = int(delay)
+			}
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	err = client.Reboot(ctx, 5000)
+	if err != nil {
+		t.Fatalf("Reboot() error = %v", err)
+	}
+
+	if receivedDelayMS != 5000 {
+		t.Errorf("receivedDelayMS = %d, want 5000", receivedDelayMS)
+	}
+}
+
+func TestClient_FactoryReset_Success(t *testing.T) {
+	t.Parallel()
+
+	factoryResetCalled := false
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.FactoryReset", func(_ map[string]any) (any, error) {
+			factoryResetCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	err = client.FactoryReset(ctx)
+	if err != nil {
+		t.Fatalf("FactoryReset() error = %v", err)
+	}
+
+	if !factoryResetCalled {
+		t.Error("FactoryReset was not called")
+	}
+}
+
+func TestClient_Call_Success(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Custom.Method", func(params map[string]any) (any, error) {
+			return map[string]any{
+				"received_param": params["test_param"],
+				"custom_result":  "success",
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	result, err := client.Call(ctx, "Custom.Method", map[string]any{"test_param": "test_value"})
+	if err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+
+	// The RPC client may return json.RawMessage, so we need to handle that
+	var resultMap map[string]any
+	switch v := result.(type) {
+	case map[string]any:
+		resultMap = v
+	case json.RawMessage:
+		if err := json.Unmarshal(v, &resultMap); err != nil {
+			t.Fatalf("failed to unmarshal json.RawMessage: %v", err)
+		}
+	default:
+		t.Fatalf("result is not map[string]any or json.RawMessage, got %T", result)
+	}
+
+	if resultMap["custom_result"] != "success" {
+		t.Errorf("custom_result = %v, want success", resultMap["custom_result"])
+	}
+	if resultMap["received_param"] != "test_value" {
+		t.Errorf("received_param = %v, want test_value", resultMap["received_param"])
+	}
+}
+
+func TestClient_ListComponents_Error(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		})
+	// Note: Shelly.GetComponents is NOT handled, so it will return 404
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	_, err = client.ListComponents(ctx)
+	if err == nil {
+		t.Error("ListComponents() should fail when handler not found")
+	}
+}
+
+func TestClient_GetStatus_Error(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		})
+	// Note: Shelly.GetStatus is NOT handled
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	_, err = client.GetStatus(ctx)
+	if err == nil {
+		t.Error("GetStatus() should fail when handler not found")
+	}
+}
+
+func TestClient_GetConfig_Error(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		})
+	// Note: Shelly.GetConfig is NOT handled
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	_, err = client.GetConfig(ctx)
+	if err == nil {
+		t.Error("GetConfig() should fail when handler not found")
+	}
+}
+
+// mockGen1Server creates a test server that handles Gen1 HTTP endpoints.
+type mockGen1Server struct {
+	handlers map[string]func(query string) (any, int)
+	authUser string
+	authPass string
+}
+
+func newMockGen1Server() *mockGen1Server {
+	return &mockGen1Server{
+		handlers: make(map[string]func(query string) (any, int)),
+	}
+}
+
+func (m *mockGen1Server) withAuth(user, pass string) *mockGen1Server {
+	m.authUser = user
+	m.authPass = pass
+	return m
+}
+
+func (m *mockGen1Server) handle(path string, handler func(query string) (any, int)) *mockGen1Server {
+	m.handlers[path] = handler
+	return m
+}
+
+func (m *mockGen1Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Check auth if configured
+	if m.authUser != "" {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != m.authUser || pass != m.authPass {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+
+	// Handle GET requests
+	if r.Method == http.MethodGet {
+		path := r.URL.Path
+		if handler, ok := m.handlers[path]; ok {
+			result, status := handler(r.URL.RawQuery)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			if result != nil {
+				_ = json.NewEncoder(w).Encode(result)
+			}
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
+func (m *mockGen1Server) start(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(m)
+	t.Cleanup(server.Close)
+	return server
+}
+
+// Standard Gen1 device info response
+func standardGen1DeviceInfo() map[string]any {
+	return map[string]any{
+		"type":        "SHSW-1",
+		"mac":         "11:22:33:44:55:66",
+		"auth":        false,
+		"fw":          "20230913-114351/v1.14.0-gcb84623",
+		"num_outputs": 1,
+		"num_meters":  0,
+	}
+}
+
+func TestConnectGen1_Success(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	info := client.Info()
+	if info == nil {
+		t.Fatal("Info() returned nil")
+	}
+	if info.MAC != "11:22:33:44:55:66" {
+		t.Errorf("Info().MAC = %q, want 11:22:33:44:55:66", info.MAC)
+	}
+	if info.Model != "SHSW-1" {
+		t.Errorf("Info().Model = %q, want SHSW-1", info.Model)
+	}
+	if info.Generation != 1 {
+		t.Errorf("Info().Generation = %d, want 1", info.Generation)
+	}
+}
+
+func TestConnectGen1_WithAuth(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		withAuth("admin", "password").
+		handle("/shelly", func(_ string) (any, int) {
+			info := standardGen1DeviceInfo()
+			info["auth"] = true
+			return info, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{
+		Address: server.URL,
+		Auth:    &model.Auth{Username: "admin", Password: "password"},
+	}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() with auth error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	if !client.Info().AuthEn {
+		t.Error("Info().AuthEn = false, want true")
+	}
+}
+
+func TestConnectGen1_AuthRequired(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		withAuth("admin", "secret").
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Try without auth - should fail
+	device := model.Device{Address: server.URL}
+	_, err := ConnectGen1(ctx, device)
+	if err == nil {
+		t.Error("ConnectGen1() without auth should fail when auth required")
+	}
+}
+
+func TestConnectGen1_AddressNormalization(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Test with address without http:// prefix
+	addr := server.URL[7:] // Remove "http://"
+	device := model.Device{Address: addr}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() with bare address error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	if client.Info().MAC != "11:22:33:44:55:66" {
+		t.Errorf("Info().MAC = %q, want 11:22:33:44:55:66", client.Info().MAC)
+	}
+}
+
+func TestConnectGen1_ConnectionFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Use an address that won't connect
+	device := model.Device{Address: "http://127.0.0.1:1"}
+	_, err := ConnectGen1(ctx, device)
+	if err == nil {
+		t.Error("ConnectGen1() to bad address should fail")
+	}
+}
+
+func TestGen1Client_GetStatus_Success(t *testing.T) {
+	t.Parallel()
+
+	statusResponse := map[string]any{
+		"relays": []any{
+			map[string]any{
+				"ison":      true,
+				"has_timer": false,
+				"source":    "button",
+			},
+		},
+		"meters": []any{
+			map[string]any{
+				"power": 150.5,
+			},
+		},
+		"wifi_sta": map[string]any{
+			"connected": true,
+			"ssid":      "MyNetwork",
+			"ip":        "192.168.1.100",
+			"rssi":      -55,
+		},
+		"update": map[string]any{
+			"status": "idle",
+		},
+		"uptime": 12345,
+	}
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/status", func(_ string) (any, int) {
+			return statusResponse, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	status, err := client.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if status.Uptime != 12345 {
+		t.Errorf("status.Uptime = %d, want 12345", status.Uptime)
+	}
+}
+
+func TestGen1Client_GetSettings_Success(t *testing.T) {
+	t.Parallel()
+
+	settingsResponse := map[string]any{
+		"device": map[string]any{
+			"type":     "SHSW-1",
+			"mac":      "11:22:33:44:55:66",
+			"hostname": "shelly1-123456",
+		},
+		"wifi_sta": map[string]any{
+			"enabled": true,
+			"ssid":    "MyNetwork",
+		},
+		"relays": []any{
+			map[string]any{
+				"name":           "Kitchen Light",
+				"default_state":  "last",
+				"btn_type":       "toggle",
+				"auto_on":        0,
+				"auto_off":       0,
+				"schedule":       false,
+				"schedule_rules": []any{},
+			},
+		},
+	}
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/settings", func(_ string) (any, int) {
+			return settingsResponse, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	settings, err := client.GetSettings(ctx)
+	if err != nil {
+		t.Fatalf("GetSettings() error = %v", err)
+	}
+
+	if settings == nil {
+		t.Fatal("GetSettings() returned nil")
+	}
+}
+
+func TestGen1Client_Reboot_Success(t *testing.T) {
+	t.Parallel()
+
+	rebootCalled := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/reboot", func(_ string) (any, int) {
+			rebootCalled = true
+			return map[string]any{}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	err = client.Reboot(ctx)
+	if err != nil {
+		t.Fatalf("Reboot() error = %v", err)
+	}
+
+	if !rebootCalled {
+		t.Error("Reboot was not called")
+	}
+}
+
+func TestGen1Client_FactoryReset_Success(t *testing.T) {
+	t.Parallel()
+
+	factoryResetCalled := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		// Gen1 factory reset uses /reset endpoint
+		handle("/reset", func(_ string) (any, int) {
+			factoryResetCalled = true
+			return map[string]any{}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	err = client.FactoryReset(ctx)
+	if err != nil {
+		t.Fatalf("FactoryReset() error = %v", err)
+	}
+
+	if !factoryResetCalled {
+		t.Error("FactoryReset was not called")
+	}
+}
+
+func TestGen1Client_Call_Success(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/custom/endpoint", func(_ string) (any, int) {
+			return map[string]any{"result": "success"}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	result, err := client.Call(ctx, "/custom/endpoint")
+	if err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+
+	if len(result) == 0 {
+		t.Error("Call() returned empty result")
+	}
+}
+
+func TestGen1Client_Relay_ValidID(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+	if relay == nil {
+		t.Fatal("Relay(0) returned nil")
+	}
+	if relay.ID() != 0 {
+		t.Errorf("relay.ID() = %d, want 0", relay.ID())
+	}
+}
+
+func TestGen1Client_Roller_ValidID(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("Roller(0) error = %v", err)
+	}
+	if roller == nil {
+		t.Fatal("Roller(0) returned nil")
+	}
+	if roller.ID() != 0 {
+		t.Errorf("roller.ID() = %d, want 0", roller.ID())
+	}
+}
+
+func TestGen1Client_Light_ValidID(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("Light(0) error = %v", err)
+	}
+	if light == nil {
+		t.Fatal("Light(0) returned nil")
+	}
+	if light.ID() != 0 {
+		t.Errorf("light.ID() = %d, want 0", light.ID())
+	}
+}
+
+func TestGen1Client_Color_ValidID(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("Color(0) error = %v", err)
+	}
+	if color == nil {
+		t.Fatal("Color(0) returned nil")
+	}
+	if color.ID() != 0 {
+		t.Errorf("color.ID() = %d, want 0", color.ID())
+	}
+}
+
+func TestGen1Client_White_ValidID(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	white, err := client.White(0)
+	if err != nil {
+		t.Fatalf("White(0) error = %v", err)
+	}
+	if white == nil {
+		t.Fatal("White(0) returned nil")
+	}
+	if white.ID() != 0 {
+		t.Errorf("white.ID() = %d, want 0", white.ID())
+	}
+}
+
+func TestGen1Client_CheckForUpdate_Success(t *testing.T) {
+	t.Parallel()
+
+	updateResponse := map[string]any{
+		"status":      "idle",
+		"has_update":  true,
+		"new_version": "1.15.0",
+		"old_version": "1.14.0",
+	}
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/ota/check", func(_ string) (any, int) {
+			return updateResponse, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	update, err := client.CheckForUpdate(ctx)
+	if err != nil {
+		t.Fatalf("CheckForUpdate() error = %v", err)
+	}
+
+	if update == nil {
+		t.Fatal("CheckForUpdate() returned nil")
+	}
+}
+
+func TestGen1Client_DeviceAccessor(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	gen1Device := client.Device()
+	if gen1Device == nil {
+		t.Error("Device() returned nil")
+	}
+}
+
+func TestGen1Relay_TurnOn(t *testing.T) {
+	t.Parallel()
+
+	turnOnCalled := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/relay/0", func(query string) (any, int) {
+			if query == "turn=on" {
+				turnOnCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	err = relay.TurnOn(ctx)
+	if err != nil {
+		t.Fatalf("TurnOn() error = %v", err)
+	}
+
+	if !turnOnCalled {
+		t.Error("TurnOn was not called")
+	}
+}
+
+func TestGen1Relay_TurnOff(t *testing.T) {
+	t.Parallel()
+
+	turnOffCalled := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/relay/0", func(query string) (any, int) {
+			if query == "turn=off" {
+				turnOffCalled = true
+			}
+			return map[string]any{"ison": false}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	err = relay.TurnOff(ctx)
+	if err != nil {
+		t.Fatalf("TurnOff() error = %v", err)
+	}
+
+	if !turnOffCalled {
+		t.Error("TurnOff was not called")
+	}
+}
+
+func TestGen1Relay_Toggle(t *testing.T) {
+	t.Parallel()
+
+	toggleCalled := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/relay/0", func(query string) (any, int) {
+			if query == "turn=toggle" {
+				toggleCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	err = relay.Toggle(ctx)
+	if err != nil {
+		t.Fatalf("Toggle() error = %v", err)
+	}
+
+	if !toggleCalled {
+		t.Error("Toggle was not called")
+	}
+}
+
+func TestGen1Relay_Set(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/relay/0", func(query string) (any, int) {
+			if query == "turn=on" || query == "turn=off" {
+				setCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	err = relay.Set(ctx, true)
+	if err != nil {
+		t.Fatalf("Set(true) error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("Set was not called")
+	}
+}
+
+func TestGen1Relay_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/relay/0", func(_ string) (any, int) {
+			return map[string]any{
+				"ison":             true,
+				"has_timer":        false,
+				"timer_started_at": 0,
+				"timer_duration":   0,
+				"timer_remaining":  0,
+				"source":           "button",
+			}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	status, err := relay.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if !status.IsOn {
+		t.Error("status.IsOn = false, want true")
+	}
+}
+
+func TestGen1Relay_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/settings/relay/0", func(_ string) (any, int) {
+			return map[string]any{
+				"name":          "Kitchen Light",
+				"default_state": "last",
+				"btn_type":      "toggle",
+				"auto_on":       0,
+				"auto_off":      0,
+			}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	config, err := relay.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+	if config.Name != "Kitchen Light" {
+		t.Errorf("config.Name = %q, want Kitchen Light", config.Name)
+	}
+}
+
+func TestGen1Relay_TurnOnForDuration(t *testing.T) {
+	t.Parallel()
+
+	called := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/relay/0", func(query string) (any, int) {
+			if query != "" {
+				called = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	err = relay.TurnOnForDuration(ctx, 30)
+	if err != nil {
+		t.Fatalf("TurnOnForDuration() error = %v", err)
+	}
+
+	if !called {
+		t.Error("TurnOnForDuration was not called")
+	}
+}
+
+func TestGen1Relay_TurnOffForDuration(t *testing.T) {
+	t.Parallel()
+
+	called := false
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/relay/0", func(query string) (any, int) {
+			if query != "" {
+				called = true
+			}
+			return map[string]any{"ison": false}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	relay, err := client.Relay(0)
+	if err != nil {
+		t.Fatalf("Relay(0) error = %v", err)
+	}
+
+	err = relay.TurnOffForDuration(ctx, 30)
+	if err != nil {
+		t.Fatalf("TurnOffForDuration() error = %v", err)
+	}
+
+	if !called {
+		t.Error("TurnOffForDuration was not called")
+	}
+}
+
+// Gen2 Switch Component Tests
+
+func TestGen2Switch_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Switch.GetStatus", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":      0,
+				"output":  true,
+				"source":  "button",
+				"apower":  125.5,
+				"voltage": 230.1,
+				"current": 0.55,
+				"aenergy": map[string]any{
+					"total":     1234.5,
+					"by_minute": []float64{50.0, 50.1, 50.0},
+				},
+				"temperature": map[string]any{
+					"tC": 45.5,
+					"tF": 113.9,
+				},
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	sw := client.Switch(0)
+	status, err := sw.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if !status.Output {
+		t.Error("status.Output = false, want true")
+	}
+}
+
+func TestGen2Switch_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Switch.GetConfig", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":             0,
+				"name":           "Kitchen Light",
+				"initial_state":  "restore_last",
+				"auto_on":        false,
+				"auto_on_delay":  0,
+				"auto_off":       false,
+				"auto_off_delay": 0,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	sw := client.Switch(0)
+	config, err := sw.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+	if config.Name == nil || *config.Name != "Kitchen Light" {
+		var name string
+		if config.Name != nil {
+			name = *config.Name
+		}
+		t.Errorf("config.Name = %q, want Kitchen Light", name)
+	}
+}
+
+func TestGen2Switch_On(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	var receivedOn bool
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Switch.Set", func(params map[string]any) (any, error) {
+			setCalled = true
+			if on, ok := params["on"].(bool); ok {
+				receivedOn = on
+			}
+			return map[string]any{"was_on": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	sw := client.Switch(0)
+	err = sw.On(ctx)
+	if err != nil {
+		t.Fatalf("On() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("Switch.Set was not called")
+	}
+	if !receivedOn {
+		t.Error("receivedOn = false, want true")
+	}
+}
+
+func TestGen2Switch_Off(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	var receivedOn bool
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Switch.Set", func(params map[string]any) (any, error) {
+			setCalled = true
+			if on, ok := params["on"].(bool); ok {
+				receivedOn = on
+			}
+			return map[string]any{"was_on": true}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	sw := client.Switch(0)
+	err = sw.Off(ctx)
+	if err != nil {
+		t.Fatalf("Off() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("Switch.Set was not called")
+	}
+	if receivedOn {
+		t.Error("receivedOn = true, want false")
+	}
+}
+
+func TestGen2Switch_Toggle(t *testing.T) {
+	t.Parallel()
+
+	toggleCalled := false
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Switch.Toggle", func(_ map[string]any) (any, error) {
+			toggleCalled = true
+			return map[string]any{"was_on": true}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	sw := client.Switch(0)
+	_, err = sw.Toggle(ctx)
+	if err != nil {
+		t.Fatalf("Toggle() error = %v", err)
+	}
+
+	if !toggleCalled {
+		t.Error("Switch.Toggle was not called")
+	}
+}
+
+func TestGen2Switch_Set(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Switch.Set", func(_ map[string]any) (any, error) {
+			return map[string]any{"was_on": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	sw := client.Switch(0)
+	err = sw.Set(ctx, true)
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+}
+
+// Gen2 Cover Component Tests
+
+func TestGen2Cover_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Cover.GetStatus", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":          0,
+				"state":       "stopped",
+				"source":      "button",
+				"current_pos": 75,
+				"target_pos":  75,
+				"apower":      0,
+				"voltage":     230.0,
+				"current":     0,
+				"pos_control": true,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	cover := client.Cover(0)
+	status, err := cover.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if status.State != "stopped" {
+		t.Errorf("status.State = %q, want stopped", status.State)
+	}
+	if status.CurrentPosition == nil || *status.CurrentPosition != 75 {
+		t.Errorf("status.CurrentPosition = %v, want 75", status.CurrentPosition)
+	}
+}
+
+func TestGen2Cover_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Cover.GetConfig", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":            0,
+				"name":          "Living Room Blinds",
+				"initial_state": "stopped",
+				"invert_dir":    false,
+				"pos_control":   true,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	cover := client.Cover(0)
+	config, err := cover.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+	if config.Name == nil || *config.Name != "Living Room Blinds" {
+		var name string
+		if config.Name != nil {
+			name = *config.Name
+		}
+		t.Errorf("config.Name = %q, want Living Room Blinds", name)
+	}
+}
+
+func TestGen2Cover_Open(t *testing.T) {
+	t.Parallel()
+
+	openCalled := false
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Cover.Open", func(_ map[string]any) (any, error) {
+			openCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	cover := client.Cover(0)
+	err = cover.Open(ctx, nil)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+
+	if !openCalled {
+		t.Error("Cover.Open was not called")
+	}
+}
+
+func TestGen2Cover_Close(t *testing.T) {
+	t.Parallel()
+
+	closeCalled := false
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Cover.Close", func(_ map[string]any) (any, error) {
+			closeCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	cover := client.Cover(0)
+	err = cover.Close(ctx, nil)
+	if err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	if !closeCalled {
+		t.Error("Cover.Close was not called")
+	}
+}
+
+func TestGen2Cover_Stop(t *testing.T) {
+	t.Parallel()
+
+	stopCalled := false
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Cover.Stop", func(_ map[string]any) (any, error) {
+			stopCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	cover := client.Cover(0)
+	err = cover.Stop(ctx)
+	if err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+
+	if !stopCalled {
+		t.Error("Cover.Stop was not called")
+	}
+}
+
+func TestGen2Cover_GoToPosition(t *testing.T) {
+	t.Parallel()
+
+	var receivedPos int
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Cover.GoToPosition", func(params map[string]any) (any, error) {
+			if pos, ok := params["pos"].(float64); ok {
+				receivedPos = int(pos)
+			}
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	cover := client.Cover(0)
+	err = cover.GoToPosition(ctx, 50)
+	if err != nil {
+		t.Fatalf("GoToPosition() error = %v", err)
+	}
+
+	if receivedPos != 50 {
+		t.Errorf("receivedPos = %d, want 50", receivedPos)
+	}
+}
+
+func TestGen2Cover_Calibrate(t *testing.T) {
+	t.Parallel()
+
+	calibrateCalled := false
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Cover.Calibrate", func(_ map[string]any) (any, error) {
+			calibrateCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	cover := client.Cover(0)
+	err = cover.Calibrate(ctx)
+	if err != nil {
+		t.Fatalf("Calibrate() error = %v", err)
+	}
+
+	if !calibrateCalled {
+		t.Error("Cover.Calibrate was not called")
+	}
+}
+
+// ============================================
+// Gen1 Roller Component Tests
+// ============================================
+
+func TestGen1Roller_Open(t *testing.T) {
+	t.Parallel()
+
+	openCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0", func(_ string) (any, int) {
+			openCalled = true
+			return map[string]any{"state": "open"}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+	err = roller.Open(ctx)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+
+	if !openCalled {
+		t.Error("Roller Open was not called")
+	}
+}
+
+func TestGen1Roller_Close(t *testing.T) {
+	t.Parallel()
+
+	closeCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0", func(_ string) (any, int) {
+			closeCalled = true
+			return map[string]any{"state": "close"}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+	err = roller.Close(ctx)
+	if err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	if !closeCalled {
+		t.Error("Roller Close was not called")
+	}
+}
+
+func TestGen1Roller_Stop(t *testing.T) {
+	t.Parallel()
+
+	stopCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0", func(_ string) (any, int) {
+			stopCalled = true
+			return map[string]any{"state": "stop"}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+	err = roller.Stop(ctx)
+	if err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+
+	if !stopCalled {
+		t.Error("Roller Stop was not called")
+	}
+}
+
+func TestGen1Roller_GoToPosition(t *testing.T) {
+	t.Parallel()
+
+	positionCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0", func(_ string) (any, int) {
+			positionCalled = true
+			return map[string]any{"current_pos": 50}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+	err = roller.GoToPosition(ctx, 50)
+	if err != nil {
+		t.Fatalf("GoToPosition() error = %v", err)
+	}
+
+	if !positionCalled {
+		t.Error("Roller GoToPosition was not called")
+	}
+}
+
+func TestGen1Roller_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0", func(_ string) (any, int) {
+			return map[string]any{
+				"state":           "stop",
+				"power":           0.0,
+				"is_valid":        true,
+				"safety_switch":   false,
+				"overtemperature": false,
+				"stop_reason":     "normal",
+				"last_direction":  "open",
+				"current_pos":     75,
+				"calibrating":     false,
+				"positioning":     true,
+			}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+	status, err := roller.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if status.State != "stop" {
+		t.Errorf("status.State = %q, want stop", status.State)
+	}
+}
+
+func TestGen1Roller_Calibrate(t *testing.T) {
+	t.Parallel()
+
+	calibrateCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0/calibrate", func(_ string) (any, int) {
+			calibrateCalled = true
+			return map[string]any{"calibrating": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+	err = roller.Calibrate(ctx)
+	if err != nil {
+		t.Fatalf("Calibrate() error = %v", err)
+	}
+
+	if !calibrateCalled {
+		t.Error("Roller Calibrate was not called")
+	}
+}
+
+// ============================================
+// Gen1 Light Component Tests
+// ============================================
+
+func TestGen1Light_TurnOn(t *testing.T) {
+	t.Parallel()
+
+	turnOnCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(_ string) (any, int) {
+			turnOnCalled = true
+			return map[string]any{"ison": true, "brightness": 100}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+	err = light.TurnOn(ctx)
+	if err != nil {
+		t.Fatalf("TurnOn() error = %v", err)
+	}
+
+	if !turnOnCalled {
+		t.Error("Light TurnOn was not called")
+	}
+}
+
+func TestGen1Light_TurnOff(t *testing.T) {
+	t.Parallel()
+
+	turnOffCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(_ string) (any, int) {
+			turnOffCalled = true
+			return map[string]any{"ison": false, "brightness": 0}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+	err = light.TurnOff(ctx)
+	if err != nil {
+		t.Fatalf("TurnOff() error = %v", err)
+	}
+
+	if !turnOffCalled {
+		t.Error("Light TurnOff was not called")
+	}
+}
+
+func TestGen1Light_Toggle(t *testing.T) {
+	t.Parallel()
+
+	toggleCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(_ string) (any, int) {
+			toggleCalled = true
+			return map[string]any{"ison": true, "brightness": 100}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+	err = light.Toggle(ctx)
+	if err != nil {
+		t.Fatalf("Toggle() error = %v", err)
+	}
+
+	if !toggleCalled {
+		t.Error("Light Toggle was not called")
+	}
+}
+
+func TestGen1Light_SetBrightness(t *testing.T) {
+	t.Parallel()
+
+	setBrightnessCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(_ string) (any, int) {
+			setBrightnessCalled = true
+			return map[string]any{"ison": true, "brightness": 75}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+	err = light.SetBrightness(ctx, 75)
+	if err != nil {
+		t.Fatalf("SetBrightness() error = %v", err)
+	}
+
+	if !setBrightnessCalled {
+		t.Error("Light SetBrightness was not called")
+	}
+}
+
+func TestGen1Light_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(_ string) (any, int) {
+			return map[string]any{
+				"ison":       true,
+				"brightness": 85,
+				"mode":       "white",
+			}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+	status, err := light.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if !status.IsOn {
+		t.Error("status.IsOn = false, want true")
+	}
+	if status.Brightness != 85 {
+		t.Errorf("status.Brightness = %d, want 85", status.Brightness)
+	}
+}
+
+// ============================================
+// Gen2 Light Component Tests
+// ============================================
+
+func TestGen2Light_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Light.GetStatus", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":         0,
+				"output":     true,
+				"source":     "button",
+				"brightness": 80,
+				"apower":     5.5,
+				"voltage":    120.0,
+				"current":    0.046,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light := client.Light(0)
+	status, err := light.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if !status.Output {
+		t.Error("status.Output = false, want true")
+	}
+	if status.Brightness == nil || *status.Brightness != 80 {
+		t.Errorf("status.Brightness = %v, want 80", status.Brightness)
+	}
+}
+
+func TestGen2Light_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Light.GetConfig", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":                 0,
+				"name":               "Living Room Light",
+				"initial_state":      "on",
+				"auto_on":            false,
+				"auto_on_delay":      0.0,
+				"auto_off":           true,
+				"auto_off_delay":     300.0,
+				"default_brightness": 100,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light := client.Light(0)
+	config, err := light.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+	if config.Name == nil || *config.Name != "Living Room Light" {
+		t.Errorf("config.Name = %v, want Living Room Light", config.Name)
+	}
+}
+
+func TestGen2Light_On(t *testing.T) {
+	t.Parallel()
+
+	onCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Light.Set", func(_ map[string]any) (any, error) {
+			onCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light := client.Light(0)
+	err = light.On(ctx)
+	if err != nil {
+		t.Fatalf("On() error = %v", err)
+	}
+
+	if !onCalled {
+		t.Error("Light.Set was not called")
+	}
+}
+
+func TestGen2Light_Off(t *testing.T) {
+	t.Parallel()
+
+	offCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Light.Set", func(_ map[string]any) (any, error) {
+			offCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light := client.Light(0)
+	err = light.Off(ctx)
+	if err != nil {
+		t.Fatalf("Off() error = %v", err)
+	}
+
+	if !offCalled {
+		t.Error("Light.Set was not called")
+	}
+}
+
+func TestGen2Light_Toggle(t *testing.T) {
+	t.Parallel()
+
+	toggleCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Light.Toggle", func(_ map[string]any) (any, error) {
+			toggleCalled = true
+			return map[string]any{"was_on": true}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light := client.Light(0)
+	status, err := light.Toggle(ctx)
+	if err != nil {
+		t.Fatalf("Toggle() error = %v", err)
+	}
+
+	if !toggleCalled {
+		t.Error("Light.Toggle was not called")
+	}
+	if status == nil {
+		t.Fatal("Toggle() returned nil status")
+	}
+}
+
+func TestGen2Light_SetBrightness(t *testing.T) {
+	t.Parallel()
+
+	setBrightnessCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Light.Set", func(_ map[string]any) (any, error) {
+			setBrightnessCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light := client.Light(0)
+	err = light.SetBrightness(ctx, 75)
+	if err != nil {
+		t.Fatalf("SetBrightness() error = %v", err)
+	}
+
+	if !setBrightnessCalled {
+		t.Error("Light.Set was not called")
+	}
+}
+
+func TestGen2Light_Set(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Light.Set", func(_ map[string]any) (any, error) {
+			setCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light := client.Light(0)
+	brightness := 50
+	on := true
+	err = light.Set(ctx, &brightness, &on)
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("Light.Set was not called")
+	}
+}
+
+// ============================================
+// Gen2 RGB Component Tests
+// ============================================
+
+func TestGen2RGB_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.GetStatus", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":         0,
+				"output":     true,
+				"source":     "button",
+				"brightness": 80,
+				"rgb":        []any{255.0, 128.0, 64.0},
+				"apower":     5.5,
+				"voltage":    120.0,
+				"current":    0.046,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	status, err := rgb.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if !status.Output {
+		t.Error("status.Output = false, want true")
+	}
+	if status.Brightness == nil || *status.Brightness != 80 {
+		t.Errorf("status.Brightness = %v, want 80", status.Brightness)
+	}
+}
+
+func TestGen2RGB_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.GetConfig", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":                 0,
+				"name":               "RGB Strip",
+				"initial_state":      "restore_last",
+				"auto_on":            false,
+				"auto_off":           false,
+				"default_brightness": 100,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	config, err := rgb.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+	if config.Name == nil || *config.Name != "RGB Strip" {
+		t.Errorf("config.Name = %v, want RGB Strip", config.Name)
+	}
+}
+
+func TestGen2RGB_On(t *testing.T) {
+	t.Parallel()
+
+	onCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.Set", func(_ map[string]any) (any, error) {
+			onCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	err = rgb.On(ctx)
+	if err != nil {
+		t.Fatalf("On() error = %v", err)
+	}
+
+	if !onCalled {
+		t.Error("RGB.Set was not called")
+	}
+}
+
+func TestGen2RGB_Off(t *testing.T) {
+	t.Parallel()
+
+	offCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.Set", func(_ map[string]any) (any, error) {
+			offCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	err = rgb.Off(ctx)
+	if err != nil {
+		t.Fatalf("Off() error = %v", err)
+	}
+
+	if !offCalled {
+		t.Error("RGB.Set was not called")
+	}
+}
+
+func TestGen2RGB_Toggle(t *testing.T) {
+	t.Parallel()
+
+	toggleCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.Toggle", func(_ map[string]any) (any, error) {
+			toggleCalled = true
+			return map[string]any{"was_on": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	status, err := rgb.Toggle(ctx)
+	if err != nil {
+		t.Fatalf("Toggle() error = %v", err)
+	}
+
+	if !toggleCalled {
+		t.Error("RGB.Toggle was not called")
+	}
+	if status == nil {
+		t.Fatal("Toggle() returned nil status")
+	}
+}
+
+func TestGen2RGB_SetBrightness(t *testing.T) {
+	t.Parallel()
+
+	setBrightnessCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.Set", func(_ map[string]any) (any, error) {
+			setBrightnessCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	err = rgb.SetBrightness(ctx, 50)
+	if err != nil {
+		t.Fatalf("SetBrightness() error = %v", err)
+	}
+
+	if !setBrightnessCalled {
+		t.Error("RGB.Set was not called")
+	}
+}
+
+func TestGen2RGB_SetColor(t *testing.T) {
+	t.Parallel()
+
+	setColorCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.Set", func(_ map[string]any) (any, error) {
+			setColorCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	err = rgb.SetColor(ctx, 255, 128, 64)
+	if err != nil {
+		t.Fatalf("SetColor() error = %v", err)
+	}
+
+	if !setColorCalled {
+		t.Error("RGB.Set was not called")
+	}
+}
+
+func TestGen2RGB_SetColorAndBrightness(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.Set", func(_ map[string]any) (any, error) {
+			setCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	err = rgb.SetColorAndBrightness(ctx, 255, 128, 64, 75)
+	if err != nil {
+		t.Fatalf("SetColorAndBrightness() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("RGB.Set was not called")
+	}
+}
+
+func TestGen2RGB_Set(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGB.Set", func(_ map[string]any) (any, error) {
+			setCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgb := client.RGB(0)
+	r, g, b := 200, 100, 50
+	brightness := 80
+	on := true
+	err = rgb.Set(ctx, &r, &g, &b, &brightness, &on)
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("RGB.Set was not called")
+	}
+}
+
+// ============================================
+// Gen2 RGBW Component Tests
+// ============================================
+
+func TestGen2RGBW_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.GetStatus", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":         0,
+				"output":     true,
+				"source":     "button",
+				"brightness": 80,
+				"white":      50,
+				"rgb":        []any{255.0, 128.0, 64.0},
+				"apower":     5.5,
+				"voltage":    120.0,
+				"current":    0.046,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	status, err := rgbw.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if !status.Output {
+		t.Error("status.Output = false, want true")
+	}
+	if status.Brightness == nil || *status.Brightness != 80 {
+		t.Errorf("status.Brightness = %v, want 80", status.Brightness)
+	}
+	if status.White == nil || *status.White != 50 {
+		t.Errorf("status.White = %v, want 50", status.White)
+	}
+}
+
+func TestGen2RGBW_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.GetConfig", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":                 0,
+				"name":               "RGBW Strip",
+				"initial_state":      "restore_last",
+				"auto_on":            false,
+				"auto_off":           false,
+				"default_brightness": 100,
+				"default_white":      50,
+				"night_mode": map[string]any{
+					"enable":     true,
+					"brightness": 30,
+					"white":      20,
+				},
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	config, err := rgbw.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+	if config.Name == nil || *config.Name != "RGBW Strip" {
+		t.Errorf("config.Name = %v, want RGBW Strip", config.Name)
+	}
+}
+
+func TestGen2RGBW_On(t *testing.T) {
+	t.Parallel()
+
+	onCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Set", func(_ map[string]any) (any, error) {
+			onCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	err = rgbw.On(ctx)
+	if err != nil {
+		t.Fatalf("On() error = %v", err)
+	}
+
+	if !onCalled {
+		t.Error("RGBW.Set was not called")
+	}
+}
+
+func TestGen2RGBW_Off(t *testing.T) {
+	t.Parallel()
+
+	offCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Set", func(_ map[string]any) (any, error) {
+			offCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	err = rgbw.Off(ctx)
+	if err != nil {
+		t.Fatalf("Off() error = %v", err)
+	}
+
+	if !offCalled {
+		t.Error("RGBW.Set was not called")
+	}
+}
+
+func TestGen2RGBW_Toggle(t *testing.T) {
+	t.Parallel()
+
+	toggleCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Toggle", func(_ map[string]any) (any, error) {
+			toggleCalled = true
+			return map[string]any{"was_on": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	status, err := rgbw.Toggle(ctx)
+	if err != nil {
+		t.Fatalf("Toggle() error = %v", err)
+	}
+
+	if !toggleCalled {
+		t.Error("RGBW.Toggle was not called")
+	}
+	if status == nil {
+		t.Fatal("Toggle() returned nil status")
+	}
+}
+
+func TestGen2RGBW_SetBrightness(t *testing.T) {
+	t.Parallel()
+
+	setBrightnessCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Set", func(_ map[string]any) (any, error) {
+			setBrightnessCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	err = rgbw.SetBrightness(ctx, 50)
+	if err != nil {
+		t.Fatalf("SetBrightness() error = %v", err)
+	}
+
+	if !setBrightnessCalled {
+		t.Error("RGBW.Set was not called")
+	}
+}
+
+func TestGen2RGBW_SetWhite(t *testing.T) {
+	t.Parallel()
+
+	setWhiteCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Set", func(_ map[string]any) (any, error) {
+			setWhiteCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	err = rgbw.SetWhite(ctx, 75)
+	if err != nil {
+		t.Fatalf("SetWhite() error = %v", err)
+	}
+
+	if !setWhiteCalled {
+		t.Error("RGBW.Set was not called")
+	}
+}
+
+func TestGen2RGBW_SetColor(t *testing.T) {
+	t.Parallel()
+
+	setColorCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Set", func(_ map[string]any) (any, error) {
+			setColorCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	err = rgbw.SetColor(ctx, 255, 128, 64)
+	if err != nil {
+		t.Fatalf("SetColor() error = %v", err)
+	}
+
+	if !setColorCalled {
+		t.Error("RGBW.Set was not called")
+	}
+}
+
+func TestGen2RGBW_SetColorAndBrightness(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Set", func(_ map[string]any) (any, error) {
+			setCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	white := 40
+	err = rgbw.SetColorAndBrightness(ctx, 255, 128, 64, 75, &white)
+	if err != nil {
+		t.Fatalf("SetColorAndBrightness() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("RGBW.Set was not called")
+	}
+}
+
+func TestGen2RGBW_Set(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("RGBW.Set", func(_ map[string]any) (any, error) {
+			setCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	rgbw := client.RGBW(0)
+	r, g, b := 200, 100, 50
+	brightness := 80
+	white := 30
+	on := true
+	err = rgbw.Set(ctx, &r, &g, &b, &brightness, &white, &on)
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("RGBW.Set was not called")
+	}
+}
+
+// ============================================
+// Gen2 Input Component Tests
+// ============================================
+
+func TestGen2Input_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Input.GetStatus", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":    0,
+				"state": true,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	input := client.Input(0)
+	status, err := input.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+	if !status.State {
+		t.Error("status.State = false, want true")
+	}
+}
+
+func TestGen2Input_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Input.GetConfig", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":            0,
+				"name":          "Wall Switch",
+				"type":          "switch",
+				"enable":        true,
+				"invert":        false,
+				"factory_reset": true,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	input := client.Input(0)
+	config, err := input.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+	if config.Name == nil || *config.Name != "Wall Switch" {
+		t.Errorf("config.Name = %v, want Wall Switch", config.Name)
+	}
+	if config.Type != "switch" {
+		t.Errorf("config.Type = %q, want switch", config.Type)
+	}
+}
+
+func TestGen2Input_SetConfig(t *testing.T) {
+	t.Parallel()
+
+	setConfigCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Input.SetConfig", func(_ map[string]any) (any, error) {
+			setConfigCalled = true
+			return map[string]any{"restart_required": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	input := client.Input(0)
+	name := "Updated Switch"
+	cfg := &model.InputConfig{
+		ID:     0,
+		Name:   &name,
+		Type:   "switch",
+		Enable: true,
+		Invert: false,
+	}
+	err = input.SetConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("SetConfig() error = %v", err)
+	}
+
+	if !setConfigCalled {
+		t.Error("Input.SetConfig was not called")
+	}
+}
+
+func TestGen2Input_Trigger(t *testing.T) {
+	t.Parallel()
+
+	triggerCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Input.Trigger", func(_ map[string]any) (any, error) {
+			triggerCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	input := client.Input(0)
+	err = input.Trigger(ctx, "single_push")
+	if err != nil {
+		t.Fatalf("Trigger() error = %v", err)
+	}
+
+	if !triggerCalled {
+		t.Error("Input.Trigger was not called")
+	}
+}
+
+func TestGen2Input_ResetCounters(t *testing.T) {
+	t.Parallel()
+
+	resetCountersCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Input.ResetCounters", func(_ map[string]any) (any, error) {
+			resetCountersCalled = true
+			return map[string]any{"counts": map[string]any{"total": 0}}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	input := client.Input(0)
+	err = input.ResetCounters(ctx, []string{"total"})
+	if err != nil {
+		t.Fatalf("ResetCounters() error = %v", err)
+	}
+
+	if !resetCountersCalled {
+		t.Error("Input.ResetCounters was not called")
+	}
+}
+
+// ============================================
+// Gen2 Thermostat Component Tests
+// ============================================
+
+func TestGen2Thermostat_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.GetStatus", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":              0,
+				"enable":          true,
+				"target_C":        21.5,
+				"current_C":       20.2,
+				"output":          true,
+				"boost_minutes":   0,
+				"mode":            "heat",
+				"schedule_active": false,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	status, err := thermostat.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if status == nil {
+		t.Fatal("GetStatus() returned nil")
+	}
+}
+
+func TestGen2Thermostat_GetConfig(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.GetConfig", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"id":         0,
+				"enable":     true,
+				"target_C":   21.5,
+				"min_C":      5.0,
+				"max_C":      30.0,
+				"mode":       "heat",
+				"hysteresis": 0.5,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	config, err := thermostat.GetConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("GetConfig() returned nil")
+	}
+}
+
+func TestGen2Thermostat_SetTarget(t *testing.T) {
+	t.Parallel()
+
+	setTargetCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
+			setTargetCalled = true
+			return map[string]any{"restart_required": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.SetTarget(ctx, 22.0)
+	if err != nil {
+		t.Fatalf("SetTarget() error = %v", err)
+	}
+
+	if !setTargetCalled {
+		t.Error("Thermostat.SetTarget was not called")
+	}
+}
+
+func TestGen2Thermostat_Enable(t *testing.T) {
+	t.Parallel()
+
+	enableCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
+			enableCalled = true
+			return map[string]any{"restart_required": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.Enable(ctx, true)
+	if err != nil {
+		t.Fatalf("Enable() error = %v", err)
+	}
+
+	if !enableCalled {
+		t.Error("Thermostat.Enable was not called")
+	}
+}
+
+func TestGen2Thermostat_SetMode(t *testing.T) {
+	t.Parallel()
+
+	setModeCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
+			setModeCalled = true
+			return map[string]any{"restart_required": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.SetMode(ctx, "heat")
+	if err != nil {
+		t.Fatalf("SetMode() error = %v", err)
+	}
+
+	if !setModeCalled {
+		t.Error("Thermostat.SetMode was not called")
+	}
+}
+
+func TestGen2Thermostat_Boost(t *testing.T) {
+	t.Parallel()
+
+	boostCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.Boost", func(_ map[string]any) (any, error) {
+			boostCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.Boost(ctx, 30)
+	if err != nil {
+		t.Fatalf("Boost() error = %v", err)
+	}
+
+	if !boostCalled {
+		t.Error("Thermostat.Boost was not called")
+	}
+}
+
+func TestGen2Thermostat_CancelBoost(t *testing.T) {
+	t.Parallel()
+
+	cancelBoostCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.CancelBoost", func(_ map[string]any) (any, error) {
+			cancelBoostCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.CancelBoost(ctx)
+	if err != nil {
+		t.Fatalf("CancelBoost() error = %v", err)
+	}
+
+	if !cancelBoostCalled {
+		t.Error("Thermostat.CancelBoost was not called")
+	}
+}
+
+func TestGen2Thermostat_Override(t *testing.T) {
+	t.Parallel()
+
+	overrideCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.Override", func(_ map[string]any) (any, error) {
+			overrideCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.Override(ctx, 24.0, 3600)
+	if err != nil {
+		t.Fatalf("Override() error = %v", err)
+	}
+
+	if !overrideCalled {
+		t.Error("Thermostat.Override was not called")
+	}
+}
+
+func TestGen2Thermostat_CancelOverride(t *testing.T) {
+	t.Parallel()
+
+	cancelOverrideCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.CancelOverride", func(_ map[string]any) (any, error) {
+			cancelOverrideCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.CancelOverride(ctx)
+	if err != nil {
+		t.Fatalf("CancelOverride() error = %v", err)
+	}
+
+	if !cancelOverrideCalled {
+		t.Error("Thermostat.CancelOverride was not called")
+	}
+}
+
+func TestGen2Thermostat_Calibrate(t *testing.T) {
+	t.Parallel()
+
+	calibrateCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.Calibrate", func(_ map[string]any) (any, error) {
+			calibrateCalled = true
+			return map[string]any{}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	err = thermostat.Calibrate(ctx)
+	if err != nil {
+		t.Fatalf("Calibrate() error = %v", err)
+	}
+
+	if !calibrateCalled {
+		t.Error("Thermostat.Calibrate was not called")
+	}
+}
+
+func TestGen2Thermostat_ID(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(5)
+	if thermostat.ID() != 5 {
+		t.Errorf("Thermostat.ID() = %d, want 5", thermostat.ID())
+	}
+}
+
+// =============================================================================
+// KVS Component Tests
+// =============================================================================
+
+func TestKVS_List(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("KVS.List", func(_ map[string]any) (any, error) {
+			return map[string]any{
+				"keys": []string{"key1", "key2", "key3"},
+				"rev":  42,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	kvs := client.KVS()
+	result, err := kvs.List(ctx)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if len(result.Keys) != 3 {
+		t.Errorf("List() keys count = %d, want 3", len(result.Keys))
+	}
+	if result.Rev != 42 {
+		t.Errorf("List() rev = %d, want 42", result.Rev)
+	}
+}
+
+func TestKVS_Get(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("KVS.Get", func(params map[string]any) (any, error) {
+			key := params["key"].(string)
+			if key != "testkey" {
+				return nil, fmt.Errorf("unexpected key: %s", key)
+			}
+			return map[string]any{
+				"value": "testvalue",
+				"etag":  "abc123",
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	kvs := client.KVS()
+	result, err := kvs.Get(ctx, "testkey")
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+
+	if result.Value != "testvalue" {
+		t.Errorf("Get() value = %v, want testvalue", result.Value)
+	}
+	if result.Etag != "abc123" {
+		t.Errorf("Get() etag = %s, want abc123", result.Etag)
+	}
+}
+
+func TestKVS_GetMany(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("KVS.GetMany", func(_ map[string]any) (any, error) {
+			etag1 := "etag1"
+			return map[string]any{
+				"items": []map[string]any{
+					{"key": "key1", "value": "value1", "etag": &etag1},
+					{"key": "key2", "value": "value2"},
+				},
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	kvs := client.KVS()
+	items, err := kvs.GetMany(ctx, "key*")
+	if err != nil {
+		t.Fatalf("GetMany() error = %v", err)
+	}
+
+	if len(items) != 2 {
+		t.Errorf("GetMany() items count = %d, want 2", len(items))
+	}
+}
+
+func TestKVS_Set(t *testing.T) {
+	t.Parallel()
+
+	setCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("KVS.Set", func(params map[string]any) (any, error) {
+			setCalled = true
+			key := params["key"].(string)
+			if key != "mykey" {
+				return nil, fmt.Errorf("unexpected key: %s", key)
+			}
+			return map[string]any{
+				"etag": "newetag",
+				"rev":  43,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	kvs := client.KVS()
+	result, err := kvs.Set(ctx, "mykey", "myvalue")
+	if err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	if !setCalled {
+		t.Error("KVS.Set was not called")
+	}
+	if result.Etag != "newetag" {
+		t.Errorf("Set() etag = %s, want newetag", result.Etag)
+	}
+	if result.Rev != 43 {
+		t.Errorf("Set() rev = %d, want 43", result.Rev)
+	}
+}
+
+func TestKVS_Delete(t *testing.T) {
+	t.Parallel()
+
+	deleteCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("KVS.Delete", func(params map[string]any) (any, error) {
+			deleteCalled = true
+			key := params["key"].(string)
+			if key != "deletekey" {
+				return nil, fmt.Errorf("unexpected key: %s", key)
+			}
+			return map[string]any{
+				"rev": 44,
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	kvs := client.KVS()
+	result, err := kvs.Delete(ctx, "deletekey")
+	if err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+
+	if !deleteCalled {
+		t.Error("KVS.Delete was not called")
+	}
+	if result.Rev != 44 {
+		t.Errorf("Delete() rev = %d, want 44", result.Rev)
+	}
+}
+
+func TestKVS_GetAll(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("KVS.GetMany", func(params map[string]any) (any, error) {
+			// GetAll calls GetMany with "*"
+			match := params["match"].(string)
+			if match != "*" {
+				return nil, fmt.Errorf("unexpected match: %s", match)
+			}
+			return map[string]any{
+				"items": []map[string]any{
+					{"key": "key1", "value": "value1"},
+					{"key": "key2", "value": "value2"},
+				},
+			}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	kvs := client.KVS()
+	items, err := kvs.GetAll(ctx)
+	if err != nil {
+		t.Fatalf("GetAll() error = %v", err)
+	}
+
+	if len(items) != 2 {
+		t.Errorf("GetAll() items count = %d, want 2", len(items))
+	}
+}
+
+// =============================================================================
+// Gen1 Color Component Tests
+// =============================================================================
+
+func TestGen1Color_TurnOn(t *testing.T) {
+	t.Parallel()
+
+	turnOnCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=on") {
+				turnOnCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.TurnOn(ctx)
+	if err != nil {
+		t.Fatalf("TurnOn() error = %v", err)
+	}
+
+	if !turnOnCalled {
+		t.Error("Color turn=on was not called")
+	}
+}
+
+func TestGen1Color_TurnOff(t *testing.T) {
+	t.Parallel()
+
+	turnOffCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=off") {
+				turnOffCalled = true
+			}
+			return map[string]any{"ison": false}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.TurnOff(ctx)
+	if err != nil {
+		t.Fatalf("TurnOff() error = %v", err)
+	}
+
+	if !turnOffCalled {
+		t.Error("Color turn=off was not called")
+	}
+}
+
+func TestGen1Color_Toggle(t *testing.T) {
+	t.Parallel()
+
+	toggleCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=toggle") {
+				toggleCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.Toggle(ctx)
+	if err != nil {
+		t.Fatalf("Toggle() error = %v", err)
+	}
+
+	if !toggleCalled {
+		t.Error("Color turn=toggle was not called")
+	}
+}
+
+func TestGen1Color_SetRGB(t *testing.T) {
+	t.Parallel()
+
+	setRGBCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "red=255") && strings.Contains(query, "green=128") && strings.Contains(query, "blue=64") {
+				setRGBCalled = true
+			}
+			return map[string]any{"ison": true, "red": 255, "green": 128, "blue": 64}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.SetRGB(ctx, 255, 128, 64)
+	if err != nil {
+		t.Fatalf("SetRGB() error = %v", err)
+	}
+
+	if !setRGBCalled {
+		t.Error("Color SetRGB was not called with correct values")
+	}
+}
+
+func TestGen1Color_SetRGBW(t *testing.T) {
+	t.Parallel()
+
+	setRGBWCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "red=255") && strings.Contains(query, "green=128") && strings.Contains(query, "blue=64") && strings.Contains(query, "white=100") {
+				setRGBWCalled = true
+			}
+			return map[string]any{"ison": true, "red": 255, "green": 128, "blue": 64, "white": 100}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.SetRGBW(ctx, 255, 128, 64, 100)
+	if err != nil {
+		t.Fatalf("SetRGBW() error = %v", err)
+	}
+
+	if !setRGBWCalled {
+		t.Error("Color SetRGBW was not called with correct values")
+	}
+}
+
+func TestGen1Color_SetGain(t *testing.T) {
+	t.Parallel()
+
+	setGainCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "gain=75") {
+				setGainCalled = true
+			}
+			return map[string]any{"ison": true, "gain": 75}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.SetGain(ctx, 75)
+	if err != nil {
+		t.Fatalf("SetGain() error = %v", err)
+	}
+
+	if !setGainCalled {
+		t.Error("Color SetGain was not called with correct value")
+	}
+}
+
+func TestGen1Color_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(_ string) (any, int) {
+			return map[string]any{
+				"ison":  true,
+				"red":   255,
+				"green": 128,
+				"blue":  64,
+				"white": 50,
+				"gain":  80,
+			}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	status, err := color.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if !status.IsOn {
+		t.Error("GetStatus() IsOn = false, want true")
+	}
+	if status.Red != 255 {
+		t.Errorf("GetStatus() Red = %d, want 255", status.Red)
+	}
+}
+
+func TestGen1Color_TurnOnForDuration(t *testing.T) {
+	t.Parallel()
+
+	turnOnForDurationCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=on") && strings.Contains(query, "timer=60") {
+				turnOnForDurationCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.TurnOnForDuration(ctx, 60)
+	if err != nil {
+		t.Fatalf("TurnOnForDuration() error = %v", err)
+	}
+
+	if !turnOnForDurationCalled {
+		t.Error("Color TurnOnForDuration was not called")
+	}
+}
+
+func TestGen1Color_TurnOnWithRGB(t *testing.T) {
+	t.Parallel()
+
+	turnOnWithRGBCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/color/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=on") && strings.Contains(query, "red=200") && strings.Contains(query, "green=100") && strings.Contains(query, "blue=50") && strings.Contains(query, "gain=90") {
+				turnOnWithRGBCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	color, err := client.Color(0)
+	if err != nil {
+		t.Fatalf("client.Color() error = %v", err)
+	}
+
+	err = color.TurnOnWithRGB(ctx, 200, 100, 50, 90)
+	if err != nil {
+		t.Fatalf("TurnOnWithRGB() error = %v", err)
+	}
+
+	if !turnOnWithRGBCalled {
+		t.Error("Color TurnOnWithRGB was not called with correct values")
+	}
+}
+
+// =============================================================================
+// Gen1 White Component Tests
+// =============================================================================
+
+func TestGen1White_TurnOn(t *testing.T) {
+	t.Parallel()
+
+	turnOnCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/white/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=on") {
+				turnOnCalled = true
+			}
+			return map[string]any{"ison": true, "brightness": 100}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	white, err := client.White(0)
+	if err != nil {
+		t.Fatalf("client.White() error = %v", err)
+	}
+
+	err = white.TurnOn(ctx)
+	if err != nil {
+		t.Fatalf("TurnOn() error = %v", err)
+	}
+
+	if !turnOnCalled {
+		t.Error("White turn=on was not called")
+	}
+}
+
+func TestGen1White_TurnOff(t *testing.T) {
+	t.Parallel()
+
+	turnOffCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/white/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=off") {
+				turnOffCalled = true
+			}
+			return map[string]any{"ison": false, "brightness": 100}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	white, err := client.White(0)
+	if err != nil {
+		t.Fatalf("client.White() error = %v", err)
+	}
+
+	err = white.TurnOff(ctx)
+	if err != nil {
+		t.Fatalf("TurnOff() error = %v", err)
+	}
+
+	if !turnOffCalled {
+		t.Error("White turn=off was not called")
+	}
+}
+
+func TestGen1White_SetBrightness(t *testing.T) {
+	t.Parallel()
+
+	setBrightnessCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/white/0", func(query string) (any, int) {
+			if strings.Contains(query, "brightness=75") {
+				setBrightnessCalled = true
+			}
+			return map[string]any{"ison": true, "brightness": 75}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	white, err := client.White(0)
+	if err != nil {
+		t.Fatalf("client.White() error = %v", err)
+	}
+
+	err = white.SetBrightness(ctx, 75)
+	if err != nil {
+		t.Fatalf("SetBrightness() error = %v", err)
+	}
+
+	if !setBrightnessCalled {
+		t.Error("White SetBrightness was not called")
+	}
+}
+
+func TestGen1White_GetStatus(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/white/0", func(_ string) (any, int) {
+			return map[string]any{
+				"ison":       true,
+				"brightness": 80,
+			}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	white, err := client.White(0)
+	if err != nil {
+		t.Fatalf("client.White() error = %v", err)
+	}
+
+	status, err := white.GetStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+
+	if !status.IsOn {
+		t.Error("GetStatus() IsOn = false, want true")
+	}
+	if status.Brightness != 80 {
+		t.Errorf("GetStatus() Brightness = %d, want 80", status.Brightness)
+	}
+}
+
+// =============================================================================
+// Gen1 Extended Methods Tests
+// =============================================================================
+
+func TestGen1Roller_OpenForDuration(t *testing.T) {
+	t.Parallel()
+
+	openForDurationCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0", func(query string) (any, int) {
+			if strings.Contains(query, "go=open") && strings.Contains(query, "duration=10") {
+				openForDurationCalled = true
+			}
+			return map[string]any{"state": "open"}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+
+	err = roller.OpenForDuration(ctx, 10.0)
+	if err != nil {
+		t.Fatalf("OpenForDuration() error = %v", err)
+	}
+
+	if !openForDurationCalled {
+		t.Error("Roller OpenForDuration was not called")
+	}
+}
+
+func TestGen1Roller_CloseForDuration(t *testing.T) {
+	t.Parallel()
+
+	closeForDurationCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/roller/0", func(query string) (any, int) {
+			if strings.Contains(query, "go=close") && strings.Contains(query, "duration=15") {
+				closeForDurationCalled = true
+			}
+			return map[string]any{"state": "close"}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	roller, err := client.Roller(0)
+	if err != nil {
+		t.Fatalf("client.Roller() error = %v", err)
+	}
+
+	err = roller.CloseForDuration(ctx, 15.0)
+	if err != nil {
+		t.Fatalf("CloseForDuration() error = %v", err)
+	}
+
+	if !closeForDurationCalled {
+		t.Error("Roller CloseForDuration was not called")
+	}
+}
+
+func TestGen1Light_TurnOnWithBrightness(t *testing.T) {
+	t.Parallel()
+
+	turnOnWithBrightnessCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=on") && strings.Contains(query, "brightness=50") {
+				turnOnWithBrightnessCalled = true
+			}
+			return map[string]any{"ison": true, "brightness": 50}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+
+	err = light.TurnOnWithBrightness(ctx, 50)
+	if err != nil {
+		t.Fatalf("TurnOnWithBrightness() error = %v", err)
+	}
+
+	if !turnOnWithBrightnessCalled {
+		t.Error("Light TurnOnWithBrightness was not called")
+	}
+}
+
+func TestGen1Light_TurnOnForDuration(t *testing.T) {
+	t.Parallel()
+
+	turnOnForDurationCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(query string) (any, int) {
+			if strings.Contains(query, "turn=on") && strings.Contains(query, "timer=30") {
+				turnOnForDurationCalled = true
+			}
+			return map[string]any{"ison": true}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+
+	err = light.TurnOnForDuration(ctx, 30)
+	if err != nil {
+		t.Fatalf("TurnOnForDuration() error = %v", err)
+	}
+
+	if !turnOnForDurationCalled {
+		t.Error("Light TurnOnForDuration was not called")
+	}
+}
+
+func TestGen1Light_SetBrightnessWithTransition(t *testing.T) {
+	t.Parallel()
+
+	setBrightnessWithTransitionCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/light/0", func(query string) (any, int) {
+			if strings.Contains(query, "brightness=80") && strings.Contains(query, "transition=1000") {
+				setBrightnessWithTransitionCalled = true
+			}
+			return map[string]any{"ison": true, "brightness": 80}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	light, err := client.Light(0)
+	if err != nil {
+		t.Fatalf("client.Light() error = %v", err)
+	}
+
+	err = light.SetBrightnessWithTransition(ctx, 80, 1000)
+	if err != nil {
+		t.Fatalf("SetBrightnessWithTransition() error = %v", err)
+	}
+
+	if !setBrightnessWithTransitionCalled {
+		t.Error("Light SetBrightnessWithTransition was not called")
+	}
+}
+
+// =============================================================================
+// Gen1 Client Action Methods Tests
+// =============================================================================
+
+func TestGen1Client_GetDebugLog(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/debug/log", func(_ string) (any, int) {
+			return "Debug log line 1\nDebug log line 2", http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	_, err = client.GetDebugLog(ctx)
+	if err != nil {
+		t.Fatalf("GetDebugLog() error = %v", err)
+	}
+}
+
+func TestGen1Client_GetActions(t *testing.T) {
+	t.Parallel()
+
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/settings/actions", func(_ string) (any, int) {
+			// Return valid action settings format per shelly-go library expectations
+			return map[string]any{
+				"actions": []any{
+					map[string]any{
+						"index":   0,
+						"name":    "relay_on_url",
+						"enabled": true,
+						"urls":    []string{"http://example.com"},
+					},
+				},
+			}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	_, err = client.GetActions(ctx)
+	if err != nil {
+		t.Fatalf("GetActions() error = %v", err)
+	}
+}
+
+func TestGen1Client_Update(t *testing.T) {
+	t.Parallel()
+
+	updateCalled := false
+	mock := newMockGen1Server().
+		handle("/shelly", func(_ string) (any, int) {
+			return standardGen1DeviceInfo(), http.StatusOK
+		}).
+		handle("/ota", func(query string) (any, int) {
+			if strings.Contains(query, "url=") {
+				updateCalled = true
+			}
+			return map[string]any{"status": "ok"}, http.StatusOK
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := ConnectGen1(ctx, device)
+	if err != nil {
+		t.Fatalf("ConnectGen1() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	err = client.Update(ctx, "http://example.com/firmware.bin")
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	if !updateCalled {
+		t.Error("Update was not called")
+	}
+}
+
+// =============================================================================
+// Thermostat.SetConfig Test
+// =============================================================================
+
+func TestGen2Thermostat_SetConfig(t *testing.T) {
+	t.Parallel()
+
+	setConfigCalled := false
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Thermostat.SetConfig", func(_ map[string]any) (any, error) {
+			setConfigCalled = true
+			return map[string]any{"restart_required": false}, nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	thermostat := client.Thermostat(0)
+	enable := true
+	err = thermostat.SetConfig(ctx, &components.ThermostatConfig{
+		ID:     0,
+		Enable: &enable,
+	})
+	if err != nil {
+		t.Fatalf("SetConfig() error = %v", err)
+	}
+
+	if !setConfigCalled {
+		t.Error("Thermostat.SetConfig was not called")
+	}
 }

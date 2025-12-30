@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 func TestDisplayBackupsTable(t *testing.T) {
@@ -65,7 +65,7 @@ func TestDisplayBackupExportResults(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		results := []export.BackupResult{
+		results := []shelly.BackupResult{
 			{DeviceName: "device1", Address: "192.168.1.101", Success: true},
 			{DeviceName: "device2", Address: "192.168.1.102", Success: true},
 		}
@@ -85,7 +85,7 @@ func TestDisplayBackupExportResults(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		results := []export.BackupResult{
+		results := []shelly.BackupResult{
 			{DeviceName: "device1", Address: "192.168.1.101", Success: true},
 			{DeviceName: "device2", Address: "192.168.1.102", Success: false},
 		}
@@ -102,7 +102,7 @@ func TestDisplayBackupExportResults(t *testing.T) {
 		t.Parallel()
 
 		ios, out, _ := testIOStreams()
-		DisplayBackupExportResults(ios, []export.BackupResult{})
+		DisplayBackupExportResults(ios, []shelly.BackupResult{})
 
 		output := out.String()
 		// Empty results should produce no output
@@ -150,7 +150,7 @@ func TestBackupResult_Fields(t *testing.T) {
 	t.Run("success result", func(t *testing.T) {
 		t.Parallel()
 
-		result := export.BackupResult{
+		result := shelly.BackupResult{
 			DeviceName: "device1",
 			Address:    "192.168.1.100",
 			Success:    true,
@@ -170,7 +170,7 @@ func TestBackupResult_Fields(t *testing.T) {
 	t.Run("failure result", func(t *testing.T) {
 		t.Parallel()
 
-		result := export.BackupResult{
+		result := shelly.BackupResult{
 			DeviceName: "device2",
 			Address:    "192.168.1.101",
 			Success:    false,

@@ -1,5 +1,5 @@
 // Package del provides the kvs delete subcommand.
-package del
+package deletecmd
 
 import (
 	"context"

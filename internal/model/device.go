@@ -118,3 +118,14 @@ func NormalizeMAC(mac string) string {
 	return cleaned[0:2] + ":" + cleaned[2:4] + ":" + cleaned[4:6] + ":" +
 		cleaned[6:8] + ":" + cleaned[8:10] + ":" + cleaned[10:12]
 }
+
+// DeviceData holds collected device information from config and live connection.
+// Used for export operations (Ansible, Terraform, CSV).
+type DeviceData struct {
+	Name       string
+	Address    string
+	Model      string
+	Generation int
+	App        string
+	Online     bool
+}

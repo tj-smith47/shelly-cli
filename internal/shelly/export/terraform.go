@@ -5,7 +5,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // TerraformDevice represents a device in Terraform format.
@@ -53,7 +53,7 @@ type TerraformData struct {
 
 // BuildTerraformConfig builds Terraform configuration from device data.
 // The resourceName parameter sets the local variable name (default: "shelly_devices").
-func BuildTerraformConfig(devices []shelly.DeviceData, resourceName string) (string, error) {
+func BuildTerraformConfig(devices []model.DeviceData, resourceName string) (string, error) {
 	// Convert to terraform Device format with normalized names
 	tfDevices := make([]TerraformDevice, 0, len(devices))
 	for _, d := range devices {

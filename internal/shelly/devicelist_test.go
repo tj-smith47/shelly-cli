@@ -112,6 +112,7 @@ func TestMatchesDeviceFilters(t *testing.T) {
 	device := model.Device{
 		Generation: 2,
 		Type:       "switch",
+		Platform:   "shelly",
 	}
 
 	tests := []struct {
@@ -153,6 +154,21 @@ func TestMatchesDeviceFilters(t *testing.T) {
 			name: "one filter not matching",
 			opts: DeviceListFilterOptions{Generation: 2, DeviceType: "dimmer"},
 			want: false,
+		},
+		{
+			name: "matching platform",
+			opts: DeviceListFilterOptions{Platform: "shelly"},
+			want: true,
+		},
+		{
+			name: "non-matching platform",
+			opts: DeviceListFilterOptions{Platform: "tasmota"},
+			want: false,
+		},
+		{
+			name: "all filters including platform",
+			opts: DeviceListFilterOptions{Generation: 2, DeviceType: "switch", Platform: "shelly"},
+			want: true,
 		},
 	}
 

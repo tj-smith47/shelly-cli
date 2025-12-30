@@ -1,5 +1,5 @@
 // Package del provides the template delete subcommand.
-package del
+package deletecmd
 
 import (
 	"fmt"

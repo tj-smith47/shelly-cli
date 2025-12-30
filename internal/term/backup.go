@@ -4,8 +4,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
-	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
 // DisplayBackupSummary prints a summary of a created backup.
@@ -120,7 +120,7 @@ func DisplayBackupsTable(ios *iostreams.IOStreams, backups []model.BackupFileInf
 }
 
 // DisplayBackupExportResults prints the results of a backup export operation.
-func DisplayBackupExportResults(ios *iostreams.IOStreams, results []export.BackupResult) {
+func DisplayBackupExportResults(ios *iostreams.IOStreams, results []shelly.BackupResult) {
 	for _, r := range results {
 		if r.Success {
 			ios.Printf("  Backing up %s (%s)... OK\n", r.DeviceName, r.Address)

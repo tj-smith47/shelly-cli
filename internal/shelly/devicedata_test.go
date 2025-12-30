@@ -2,12 +2,14 @@ package shelly
 
 import (
 	"testing"
+
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 func TestDeviceData_Fields(t *testing.T) {
 	t.Parallel()
 
-	data := DeviceData{
+	data := model.DeviceData{
 		Name:       "kitchen-switch",
 		Address:    testIP,
 		Model:      testModel,

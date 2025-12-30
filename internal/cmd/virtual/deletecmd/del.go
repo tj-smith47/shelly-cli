@@ -1,5 +1,5 @@
 // Package del provides the virtual delete command.
-package del
+package deletecmd
 
 import (
 	"context"

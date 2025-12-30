@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // DisplayEvent displays a single device event with color-coded type.
-func DisplayEvent(ios *iostreams.IOStreams, event shelly.DeviceEvent) error {
+func DisplayEvent(ios *iostreams.IOStreams, event model.DeviceEvent) error {
 	timestamp := event.Timestamp.Format("15:04:05.000")
 
 	// Color code by event type
@@ -35,7 +35,7 @@ func DisplayEvent(ios *iostreams.IOStreams, event shelly.DeviceEvent) error {
 }
 
 // OutputEventJSON outputs a device event as JSON.
-func OutputEventJSON(ios *iostreams.IOStreams, event shelly.DeviceEvent) error {
+func OutputEventJSON(ios *iostreams.IOStreams, event model.DeviceEvent) error {
 	enc := json.NewEncoder(ios.Out)
 	return enc.Encode(event)
 }

@@ -367,7 +367,7 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 }
 
 // aggregateStatusFromPM aggregates status data from PM components.
-func aggregateStatusFromPM(status *DeviceStatus, pms []shelly.PMStatus) {
+func aggregateStatusFromPM(status *DeviceStatus, pms []model.PMStatus) {
 	for _, pm := range pms {
 		status.Power += pm.APower
 		if status.Voltage == 0 && pm.Voltage > 0 {
@@ -386,7 +386,7 @@ func aggregateStatusFromPM(status *DeviceStatus, pms []shelly.PMStatus) {
 }
 
 // aggregateStatusFromEM aggregates status data from EM components (3-phase meters).
-func aggregateStatusFromEM(status *DeviceStatus, ems []shelly.EMStatus) {
+func aggregateStatusFromEM(status *DeviceStatus, ems []model.EMStatus) {
 	for _, em := range ems {
 		status.Power += em.TotalActivePower
 		status.Current += em.TotalCurrent
@@ -400,7 +400,7 @@ func aggregateStatusFromEM(status *DeviceStatus, ems []shelly.EMStatus) {
 }
 
 // aggregateStatusFromEM1 aggregates status data from EM1 components (single-phase meters).
-func aggregateStatusFromEM1(status *DeviceStatus, em1s []shelly.EM1Status) {
+func aggregateStatusFromEM1(status *DeviceStatus, em1s []model.EM1Status) {
 	for _, em1 := range em1s {
 		status.Power += em1.ActPower
 		if status.Voltage == 0 && em1.Voltage > 0 {
@@ -545,7 +545,7 @@ func (m Model) parseStatusChange(status *DeviceStatus, component string, data js
 
 // parseFullStatus parses a full device status event.
 func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
-	var fullStatus shelly.MonitoringSnapshot
+	var fullStatus model.MonitoringSnapshot
 	if err := json.Unmarshal(data, &fullStatus); err != nil {
 		return
 	}

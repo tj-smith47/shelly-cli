@@ -1,5 +1,5 @@
 // Package del provides the webhook delete subcommand.
-package del
+package deletecmd
 
 import (
 	"context"

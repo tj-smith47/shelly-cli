@@ -6,26 +6,17 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
-
-// DeviceData holds collected device information from config and live connection.
-type DeviceData struct {
-	Name       string
-	Address    string
-	Model      string
-	Generation int
-	App        string
-	Online     bool
-}
 
 // CollectDeviceData gathers device information for the given device names.
 // It first checks config for static data, then tries to connect to get live data.
 // Devices that can't be reached use config data with Online=false.
-func (s *Service) CollectDeviceData(ctx context.Context, deviceNames []string) []DeviceData {
-	result := make([]DeviceData, 0, len(deviceNames))
+func (s *Service) CollectDeviceData(ctx context.Context, deviceNames []string) []model.DeviceData {
+	result := make([]model.DeviceData, 0, len(deviceNames))
 
 	for _, device := range deviceNames {
-		data := DeviceData{Name: device}
+		data := model.DeviceData{Name: device}
 
 		// Get device config for address and static data
 		deviceCfg, exists := config.GetDevice(device)

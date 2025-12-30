@@ -1,10 +1,12 @@
 package activate
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -255,3 +257,23 @@ func TestNewCommand_FlagTimeoutDefault(t *testing.T) {
 		t.Errorf("timeout default = %q, want \"10s\"", timeoutFlag.DefValue)
 	}
 }
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+// Note: TestRun_EmptyScene and TestRun_DryRun are skipped because config.GetScene
+// uses global config state and the test manager doesn't propagate to those functions.
+// The run function logic is covered by TestNewCommand_RunE_SceneNotFound.

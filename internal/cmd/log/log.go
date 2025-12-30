@@ -4,7 +4,7 @@ package log
 import (
 	"github.com/spf13/cobra"
 
-	logclear "github.com/tj-smith47/shelly-cli/internal/cmd/log/clear"
+	logclear "github.com/tj-smith47/shelly-cli/internal/cmd/log/clearcmd"
 	logexport "github.com/tj-smith47/shelly-cli/internal/cmd/log/export"
 	logpath "github.com/tj-smith47/shelly-cli/internal/cmd/log/path"
 	logshow "github.com/tj-smith47/shelly-cli/internal/cmd/log/show"

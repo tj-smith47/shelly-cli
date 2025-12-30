@@ -7,7 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/config/diff"
 	configexport "github.com/tj-smith47/shelly-cli/internal/cmd/device/config/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/config/get"
-	configimport "github.com/tj-smith47/shelly-cli/internal/cmd/device/config/import"
+	configimport "github.com/tj-smith47/shelly-cli/internal/cmd/device/config/importcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/config/reset"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/device/config/set"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"

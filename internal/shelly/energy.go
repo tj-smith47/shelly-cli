@@ -285,23 +285,23 @@ func (s *Service) collectDashboardDeviceStatus(ctx context.Context, device strin
 	status := model.DashboardDeviceEntry{Device: device, Online: true}
 
 	// Collect each component type using the generic collector
-	collectComponents(ctx, device, componentCollector[*EMStatus]{
+	collectComponents(ctx, device, componentCollector[*model.EMStatus]{
 		compType: "EM", listIDs: s.ListEMComponents, getStatus: s.GetEMStatus,
-		toPower: func(st *EMStatus, id int) (model.ComponentPower, float64, float64) {
+		toPower: func(st *model.EMStatus, id int) (model.ComponentPower, float64, float64) {
 			return model.ComponentPower{Voltage: st.AVoltage, Current: st.TotalCurrent, Power: st.TotalActivePower}, st.TotalActivePower, 0
 		},
 	}, &status)
 
-	collectComponents(ctx, device, componentCollector[*EM1Status]{
+	collectComponents(ctx, device, componentCollector[*model.EM1Status]{
 		compType: "EM1", listIDs: s.ListEM1Components, getStatus: s.GetEM1Status,
-		toPower: func(st *EM1Status, id int) (model.ComponentPower, float64, float64) {
+		toPower: func(st *model.EM1Status, id int) (model.ComponentPower, float64, float64) {
 			return model.ComponentPower{Voltage: st.Voltage, Current: st.Current, Power: st.ActPower}, st.ActPower, 0
 		},
 	}, &status)
 
-	collectComponents(ctx, device, componentCollector[*PMStatus]{
+	collectComponents(ctx, device, componentCollector[*model.PMStatus]{
 		compType: "PM", listIDs: s.ListPMComponents, getStatus: s.GetPMStatus,
-		toPower: func(st *PMStatus, id int) (model.ComponentPower, float64, float64) {
+		toPower: func(st *model.PMStatus, id int) (model.ComponentPower, float64, float64) {
 			energy := 0.0
 			if st.AEnergy != nil {
 				energy = st.AEnergy.Total
@@ -310,9 +310,9 @@ func (s *Service) collectDashboardDeviceStatus(ctx context.Context, device strin
 		},
 	}, &status)
 
-	collectComponents(ctx, device, componentCollector[*PMStatus]{
+	collectComponents(ctx, device, componentCollector[*model.PMStatus]{
 		compType: "PM1", listIDs: s.ListPM1Components, getStatus: s.GetPM1Status,
-		toPower: func(st *PMStatus, id int) (model.ComponentPower, float64, float64) {
+		toPower: func(st *model.PMStatus, id int) (model.ComponentPower, float64, float64) {
 			energy := 0.0
 			if st.AEnergy != nil {
 				energy = st.AEnergy.Total

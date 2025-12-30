@@ -73,17 +73,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/script"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sensor"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sensoraddon"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/shellcmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/shell"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sleep"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/statuscmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/switchcmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/sync"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template"
 	themecmd "github.com/tj-smith47/shelly-cli/internal/cmd/theme"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/thermostat"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/togglecmd"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/toggle"
 	updatecmd "github.com/tj-smith47/shelly-cli/internal/cmd/update"
-	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/versioncmd"
+	versioncmd "github.com/tj-smith47/shelly-cli/internal/cmd/version"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/virtual"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wait"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/wake"
@@ -260,8 +260,8 @@ func init() {
 	cmdutil.AddCommandsToGroup(rootCmd, groupShortcuts,
 		on.NewCommand(factory),
 		off.NewCommand(factory),
-		togglecmd.NewCommand(factory),
-		statuscmd.NewCommand(factory),
+		toggle.NewCommand(factory),
+		status.NewCommand(factory),
 		qr.NewCommand(factory),
 		sleep.NewCommand(factory),
 		wake.NewCommand(factory),
@@ -339,7 +339,7 @@ func init() {
 		doctor.NewCommand(factory),
 		repl.NewCommand(factory),
 		mock.NewCommand(factory),
-		shellcmd.NewCommand(factory),
+		shell.NewCommand(factory),
 	)
 
 	// Utility commands - CLI utilities

@@ -890,13 +890,13 @@ func TestComponentListItem(t *testing.T) {
 
 	item := ComponentListItem{
 		ID:   0,
-		Type: "switch",
+		Type: string(ComponentSwitch),
 	}
 
 	if item.ID != 0 {
 		t.Errorf("ID = %d, want 0", item.ID)
 	}
-	if item.Type != "switch" {
-		t.Errorf("Type = %q, want %q", item.Type, "switch")
+	if item.Type != string(ComponentSwitch) {
+		t.Errorf("Type = %q, want %q", item.Type, ComponentSwitch)
 	}
 }

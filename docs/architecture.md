@@ -70,7 +70,7 @@ internal/
 │   ├── batch/          # shelly batch (on/off/command)
 │   ├── discover/       # shelly discover (scan/mdns/ble)
 │   ├── monitor/        # shelly monitor (power/status/events)
-│   ├── versioncmd/     # shelly version
+│   ├── version/        # shelly version
 │   └── ...
 │
 ├── cmdutil/            # Command infrastructure
@@ -310,8 +310,8 @@ internal/
 │
 ├── testutil/           # Testing utilities
 │   ├── testutil.go     # Test helpers
-│   ├── mock_client.go  # MockClient for testing
-│   └── mock_resolver.go # MockResolver for testing
+│   ├── mockclient.go   # MockClient for testing
+│   └── mockresolver.go # MockResolver for testing
 │
 ├── theme/              # Theming (bubbletint)
 │   └── theme.go        # Style builders

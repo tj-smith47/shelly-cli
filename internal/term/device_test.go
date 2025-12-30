@@ -53,9 +53,9 @@ func TestDisplayAllSnapshots(t *testing.T) {
 					ID:    "device1",
 					Model: "Shelly Pro 1PM",
 				},
-				Snapshot: &shelly.MonitoringSnapshot{
+				Snapshot: &model.MonitoringSnapshot{
 					Timestamp: time.Now(),
-					PM: []shelly.PMStatus{
+					PM: []model.PMStatus{
 						{ID: 0, APower: 100.0},
 					},
 				},

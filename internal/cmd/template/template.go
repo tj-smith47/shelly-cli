@@ -6,7 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template/apply"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template/create"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/template/del"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/template/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template/diff"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template/export"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/template/importcmd"
@@ -56,7 +56,7 @@ Templates store:
 	cmd.AddCommand(diff.NewCommand(f))
 	cmd.AddCommand(export.NewCommand(f))
 	cmd.AddCommand(importcmd.NewCommand(f))
-	cmd.AddCommand(del.NewCommand(f))
+	cmd.AddCommand(deletecmd.NewCommand(f))
 
 	return cmd
 }

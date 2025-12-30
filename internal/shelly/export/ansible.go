@@ -6,7 +6,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 // AnsibleInventory represents an Ansible inventory structure.
@@ -31,7 +31,7 @@ type AnsibleHost struct {
 // BuildAnsibleInventory builds an Ansible inventory from device data.
 // The groupName parameter sets the top-level group name (default: "shelly").
 // Devices are grouped by model under the main group.
-func BuildAnsibleInventory(devices []shelly.DeviceData, groupName string) (*AnsibleInventory, []byte, error) {
+func BuildAnsibleInventory(devices []model.DeviceData, groupName string) (*AnsibleInventory, []byte, error) {
 	// Group by model
 	hostsByModel := make(map[string]map[string]AnsibleHost)
 	for _, d := range devices {
@@ -41,11 +41,11 @@ func BuildAnsibleInventory(devices []shelly.DeviceData, groupName string) (*Ansi
 			ShellyGen:   d.Generation,
 			ShellyApp:   d.App,
 		}
-		model := d.Model
-		if hostsByModel[model] == nil {
-			hostsByModel[model] = make(map[string]AnsibleHost)
+		deviceModel := d.Model
+		if hostsByModel[deviceModel] == nil {
+			hostsByModel[deviceModel] = make(map[string]AnsibleHost)
 		}
-		hostsByModel[model][d.Name] = host
+		hostsByModel[deviceModel][d.Name] = host
 	}
 
 	// Build inventory structure
@@ -69,8 +69,8 @@ func BuildAnsibleInventory(devices []shelly.DeviceData, groupName string) (*Ansi
 	}
 
 	// Add subgroups by model
-	for model, hosts := range hostsByModel {
-		subGroupName := NormalizeGroupName(model)
+	for modelName, hosts := range hostsByModel {
+		subGroupName := NormalizeGroupName(modelName)
 		mainGroup.Children[subGroupName] = AnsibleGroup{Hosts: hosts}
 	}
 
@@ -86,8 +86,8 @@ func BuildAnsibleInventory(devices []shelly.DeviceData, groupName string) (*Ansi
 }
 
 // NormalizeGroupName converts a model name to a valid Ansible group name.
-func NormalizeGroupName(model string) string {
-	name := strings.ToLower(model)
+func NormalizeGroupName(modelStr string) string {
+	name := strings.ToLower(modelStr)
 	name = strings.ReplaceAll(name, " ", "_")
 	name = strings.ReplaceAll(name, "-", "_")
 	name = strings.ReplaceAll(name, ".", "_")
