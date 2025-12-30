@@ -112,6 +112,10 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 }
 
 func TestRun_NotFound(t *testing.T) {
+	// Set up temp config dir to avoid polluting real config
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
 	tf := factory.NewTestFactory(t)
 
 	err := run(context.Background(), tf.Factory, "nonexistent-device-12345")
@@ -124,6 +128,10 @@ func TestRun_NotFound(t *testing.T) {
 }
 
 func TestRun_DeleteExisting(t *testing.T) {
+	// Set up temp config dir to avoid polluting real config
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
 	tf := factory.NewTestFactory(t)
 
 	// Create a mock device file
