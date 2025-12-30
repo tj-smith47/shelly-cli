@@ -1,4 +1,4 @@
-package shelly
+package auth
 
 import (
 	"testing"

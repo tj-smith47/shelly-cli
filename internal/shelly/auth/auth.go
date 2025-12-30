@@ -4,9 +4,18 @@ package auth
 import (
 	"context"
 	"crypto/md5" //nolint:gosec // Required for Shelly digest auth (HA1 hash)
+	"crypto/rand"
 	"encoding/hex"
+	"math/big"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+)
+
+const (
+	// DefaultPasswordLength is the default length for generated passwords.
+	DefaultPasswordLength = 16
+	// PasswordCharset contains characters used for password generation.
+	PasswordCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
 )
 
 // Status holds authentication status information.
@@ -90,4 +99,25 @@ func CalculateHA1(user, realm, password string) string {
 	data := user + ":" + realm + ":" + password
 	hash := md5.Sum([]byte(data)) //nolint:gosec // Required by Shelly digest auth protocol
 	return hex.EncodeToString(hash[:])
+}
+
+// GeneratePassword creates a cryptographically secure random password of the specified length.
+// If length is less than 8, it defaults to 8 for security.
+func GeneratePassword(length int) (string, error) {
+	if length < 8 {
+		length = 8
+	}
+
+	result := make([]byte, length)
+	charsetLen := big.NewInt(int64(len(PasswordCharset)))
+
+	for i := range length {
+		n, err := rand.Int(rand.Reader, charsetLen)
+		if err != nil {
+			return "", err
+		}
+		result[i] = PasswordCharset[n.Int64()]
+	}
+
+	return string(result), nil
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/auth"
 )
 
 // Options holds the command options.
@@ -25,7 +25,7 @@ type Options struct {
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
 		User:   "admin",
-		Length: shelly.DefaultPasswordLength,
+		Length: auth.DefaultPasswordLength,
 	}
 
 	cmd := &cobra.Command{
@@ -61,7 +61,7 @@ For security best practices:
 
 	cmd.Flags().StringVar(&opts.User, "user", "admin", "Username for authentication")
 	cmd.Flags().StringVar(&opts.Password, "password", "", "New password (or use --generate)")
-	cmd.Flags().IntVar(&opts.Length, "length", shelly.DefaultPasswordLength, "Generated password length")
+	cmd.Flags().IntVar(&opts.Length, "length", auth.DefaultPasswordLength, "Generated password length")
 	cmd.Flags().BoolVar(&opts.Generate, "generate", false, "Generate a random password")
 	cmd.Flags().BoolVar(&opts.ShowSecret, "show", false, "Show the new password in output")
 
@@ -76,7 +76,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	password := opts.Password
 	if opts.Generate {
 		var err error
-		password, err = shelly.GeneratePassword(opts.Length)
+		password, err = auth.GeneratePassword(opts.Length)
 		if err != nil {
 			return fmt.Errorf("failed to generate password: %w", err)
 		}
