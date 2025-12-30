@@ -85,13 +85,6 @@ type PanelWidths struct {
 	DeviceInfo int // Device info/detail panel width
 }
 
-// PanelConstraints defines min/max widths for each panel.
-type PanelConstraints struct {
-	MinPercent int // Minimum width as percentage of total
-	MaxPercent int // Maximum width as percentage of total
-	MinChars   int // Minimum absolute character width
-}
-
 // EventStreamStartedMsg is sent when the event stream starts successfully.
 type EventStreamStartedMsg struct{}
 
@@ -449,6 +442,12 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, m.cache.Update(msg), true
 	case cache.AllDevicesLoadedMsg:
 		return m.handleAllDevicesLoaded(msg)
+	case EventStreamStartedMsg:
+		m.factory.IOStreams().Debug("event stream started successfully")
+		return m, nil, true
+	case EventStreamErrorMsg:
+		m.factory.IOStreams().DebugErr("event stream start", msg.Err)
+		return m, toast.Error("Event stream failed: " + msg.Err.Error()), true
 	case events.EventMsg, events.SubscriptionStatusMsg:
 		var cmd tea.Cmd
 		m.events, cmd = m.events.Update(msg)

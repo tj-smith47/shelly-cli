@@ -171,6 +171,7 @@ func DefaultStyles() Styles {
 // New creates a new energy model.
 func New(deps Deps) Model {
 	if err := deps.validate(); err != nil {
+		iostreams.DebugErr("energy component init", err)
 		panic(fmt.Sprintf("energy: invalid deps: %v", err))
 	}
 

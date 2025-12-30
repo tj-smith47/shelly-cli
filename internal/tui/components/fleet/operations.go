@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/tj-smith47/shelly-go/integrator"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -117,6 +118,7 @@ func DefaultOperationsStyles() OperationsStyles {
 // NewOperations creates a new Operations model.
 func NewOperations(deps OperationsDeps) OperationsModel {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("fleet/operations component init", err)
 		panic(fmt.Sprintf("fleet/operations: invalid deps: %v", err))
 	}
 

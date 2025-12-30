@@ -178,6 +178,7 @@ func DefaultStyles() Styles {
 // New creates a new Backup model.
 func New(deps Deps) Model {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("backup component init", err)
 		panic(fmt.Sprintf("backup: invalid deps: %v", err))
 	}
 

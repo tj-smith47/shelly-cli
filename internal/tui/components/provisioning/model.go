@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -144,6 +145,7 @@ func DefaultStyles() Styles {
 // New creates a new Provisioning model.
 func New(deps Deps) Model {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("provisioning component init", err)
 		panic(fmt.Sprintf("provisioning: invalid deps: %v", err))
 	}
 

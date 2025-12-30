@@ -51,6 +51,7 @@ type Monitor struct {
 // NewMonitor creates a new monitor view.
 func NewMonitor(deps MonitorDeps) *Monitor {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("monitor view init", err)
 		panic("monitor: " + err.Error())
 	}
 

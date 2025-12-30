@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -59,6 +60,7 @@ type Dashboard struct {
 // NewDashboard creates a new Dashboard view.
 func NewDashboard(deps DashboardDeps) *Dashboard {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("dashboard view init", err)
 		panic("views/dashboard: invalid deps: " + err.Error())
 	}
 

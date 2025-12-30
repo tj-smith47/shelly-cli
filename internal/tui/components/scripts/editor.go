@@ -141,6 +141,7 @@ func DefaultEditorStyles() EditorStyles {
 // NewEditor creates a new script editor model.
 func NewEditor(deps EditorDeps) EditorModel {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("scripts editor component init", err)
 		panic(fmt.Sprintf("scripts editor: invalid deps: %v", err))
 	}
 

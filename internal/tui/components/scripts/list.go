@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -128,6 +129,7 @@ func DefaultListStyles() ListStyles {
 // NewList creates a new scripts list model.
 func NewList(deps ListDeps) ListModel {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("scripts list component init", err)
 		panic(fmt.Sprintf("scripts: invalid deps: %v", err))
 	}
 

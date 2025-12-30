@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/tj-smith47/shelly-go/integrator"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -96,6 +97,7 @@ func DefaultHealthStyles() HealthStyles {
 // NewHealth creates a new Health model.
 func NewHealth(deps HealthDeps) HealthModel {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("fleet/health component init", err)
 		panic(fmt.Sprintf("fleet/health: invalid deps: %v", err))
 	}
 

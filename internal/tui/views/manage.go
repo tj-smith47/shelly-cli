@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/backup"
@@ -102,6 +103,7 @@ func DefaultManageStyles() ManageStyles {
 // NewManage creates a new manage view.
 func NewManage(deps ManageDeps) *Manage {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("manage view init", err)
 		panic("manage: " + err.Error())
 	}
 

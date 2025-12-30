@@ -150,6 +150,7 @@ func DefaultStyles() Styles {
 // New creates a new Batch model.
 func New(deps Deps) Model {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("batch component init", err)
 		panic(fmt.Sprintf("batch: invalid deps: %v", err))
 	}
 

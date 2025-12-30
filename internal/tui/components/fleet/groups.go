@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/tj-smith47/shelly-go/integrator"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
@@ -94,6 +95,7 @@ func DefaultGroupsStyles() GroupsStyles {
 // NewGroups creates a new Groups model.
 func NewGroups(deps GroupsDeps) GroupsModel {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("fleet/groups component init", err)
 		panic(fmt.Sprintf("fleet/groups: invalid deps: %v", err))
 	}
 

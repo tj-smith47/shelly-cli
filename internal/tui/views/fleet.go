@@ -120,6 +120,7 @@ func DefaultFleetStyles() FleetStyles {
 // NewFleet creates a new fleet view.
 func NewFleet(deps FleetDeps) *Fleet {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("fleet view init", err)
 		panic("fleet: " + err.Error())
 	}
 

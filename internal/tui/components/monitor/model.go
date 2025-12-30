@@ -187,6 +187,7 @@ func DefaultStyles() Styles {
 // New creates a new monitor model.
 func New(deps Deps) Model {
 	if err := deps.validate(); err != nil {
+		iostreams.DebugErr("monitor component init", err)
 		panic(fmt.Sprintf("monitor: invalid deps: %v", err))
 	}
 

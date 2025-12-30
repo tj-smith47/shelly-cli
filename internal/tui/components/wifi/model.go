@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -126,6 +127,7 @@ func DefaultStyles() Styles {
 // New creates a new WiFi model.
 func New(deps Deps) Model {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("wifi component init", err)
 		panic(fmt.Sprintf("wifi: invalid deps: %v", err))
 	}
 

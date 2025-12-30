@@ -133,6 +133,7 @@ func DefaultStyles() Styles {
 // New creates a new Firmware model.
 func New(deps Deps) Model {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("firmware component init", err)
 		panic(fmt.Sprintf("firmware: invalid deps: %v", err))
 	}
 

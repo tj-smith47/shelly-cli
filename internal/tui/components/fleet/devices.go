@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/tj-smith47/shelly-go/integrator"
 
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
@@ -104,6 +105,7 @@ func DefaultDevicesStyles() DevicesStyles {
 // NewDevices creates a new Devices model.
 func NewDevices(deps DevicesDeps) DevicesModel {
 	if err := deps.Validate(); err != nil {
+		iostreams.DebugErr("fleet/devices component init", err)
 		panic(fmt.Sprintf("fleet/devices: invalid deps: %v", err))
 	}
 
