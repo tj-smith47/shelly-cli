@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/discovery"
+	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/ble"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/coiot"
@@ -17,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -108,6 +110,11 @@ plugin detection, or --platform to filter by specific platform.`,
 //nolint:gocyclo // Complexity from handling multiple discovery methods and plugin integration
 func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
+
+	// Check for demo mode
+	if mock.IsDemoMode() && mock.HasDiscoveryFixtures() {
+		return runDemoMode(f, opts)
+	}
 
 	// If platform is specified (and not "shelly"), skip native Shelly discovery
 	// and only run plugin detection for that platform
@@ -370,6 +377,57 @@ func registerPluginDevices(devices []term.PluginDiscoveredDevice, skipExisting b
 		}
 	}
 	return utils.RegisterPluginDiscoveredDevices(pluginDevices, skipExisting)
+}
+
+// runDemoMode returns mock discovery results from fixtures.
+func runDemoMode(f *cmdutil.Factory, opts *Options) error {
+	ios := f.IOStreams()
+
+	// Get mock discovered devices
+	mockDevices := mock.GetDiscoveredDevices()
+
+	// Convert to discovery.DiscoveredDevice for display compatibility
+	shellyDevices := make([]discovery.DiscoveredDevice, len(mockDevices))
+	for i, d := range mockDevices {
+		shellyDevices[i] = discovery.DiscoveredDevice{
+			ID:         d.ID,
+			Name:       d.Name,
+			Model:      d.Model,
+			Address:    d.Address,
+			MACAddress: d.MACAddress,
+			Generation: types.Generation(d.Generation),
+			Protocol:   discovery.ProtocolManual, // Demo devices use "manual" protocol
+		}
+	}
+
+	if len(shellyDevices) == 0 {
+		ios.NoResults("devices", "No discovery fixtures defined in demo mode")
+		return nil
+	}
+
+	ios.Success("Discovered %d device(s) (demo mode)", len(shellyDevices))
+	ios.Println()
+	term.DisplayDiscoveredDevices(ios, shellyDevices)
+
+	// Save to completion cache
+	addresses := make([]string, len(shellyDevices))
+	for i, d := range shellyDevices {
+		addresses[i] = d.Address.String()
+	}
+	if err := completion.SaveDiscoveryCache(addresses); err != nil {
+		ios.DebugErr("saving discovery cache", err)
+	}
+
+	// Register devices if requested
+	if opts.register {
+		added, err := utils.RegisterDiscoveredDevices(shellyDevices, opts.skipExisting)
+		if err != nil {
+			ios.Warning("Registration error: %v", err)
+		}
+		ios.Added("device", added)
+	}
+
+	return nil
 }
 
 // runHTTPDiscovery performs HTTP subnet scanning discovery.

@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -56,8 +57,14 @@ Requires an active fleet connection. Run 'shelly fleet connect' first.`,
 	return cmd
 }
 
+//nolint:gocyclo // Complexity from handling demo mode and filtering options
 func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	ios := f.IOStreams()
+
+	// Check for demo mode
+	if mock.IsDemoMode() && mock.HasFleetFixtures() {
+		return runDemoMode(f, opts)
+	}
 
 	// Get credentials
 	cfg, cfgErr := f.Config()
@@ -107,6 +114,49 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 		return nil
 	}
 
+	ios.Success("Fleet Status (%d devices)", len(statuses))
+	ios.Println()
+	term.DisplayFleetStatus(ios, statuses)
+
+	return nil
+}
+
+func runDemoMode(f *cmdutil.Factory, opts *Options) error {
+	ios := f.IOStreams()
+
+	// Get mock fleet devices
+	mockDevices := mock.GetFleetDevices()
+
+	// Convert to integrator.DeviceStatus for display compatibility
+	statuses := make([]*integrator.DeviceStatus, 0, len(mockDevices))
+	for _, d := range mockDevices {
+		if opts.Online && !d.Online {
+			continue
+		}
+		if opts.Offline && d.Online {
+			continue
+		}
+		statuses = append(statuses, &integrator.DeviceStatus{
+			DeviceID: d.DeviceID,
+			Online:   d.Online,
+			LastSeen: d.LastSeen,
+			Host:     d.Host,
+		})
+	}
+
+	if output.WantsStructured() {
+		return output.FormatOutput(ios.Out, statuses)
+	}
+
+	if len(statuses) == 0 {
+		ios.Warning("No devices found matching criteria")
+		return nil
+	}
+
+	org := mock.GetFleetOrganization()
+	if org != "" {
+		ios.Info("Organization: %s", org)
+	}
 	ios.Success("Fleet Status (%d devices)", len(statuses))
 	ios.Println()
 	term.DisplayFleetStatus(ios, statuses)

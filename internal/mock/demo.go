@@ -2,6 +2,7 @@ package mock
 
 import (
 	"os"
+	"sync"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -13,6 +14,25 @@ type Demo struct {
 	ConfigMgr    *config.Manager
 	DeviceServer *DeviceServer
 	cleanup      []func()
+}
+
+var (
+	currentDemo   *Demo
+	currentDemoMu sync.RWMutex
+)
+
+// GetCurrentDemo returns the current demo instance if demo mode is active.
+func GetCurrentDemo() *Demo {
+	currentDemoMu.RLock()
+	defer currentDemoMu.RUnlock()
+	return currentDemo
+}
+
+// setCurrentDemo sets the current demo instance.
+func setCurrentDemo(d *Demo) {
+	currentDemoMu.Lock()
+	defer currentDemoMu.Unlock()
+	currentDemo = d
 }
 
 // IsDemoMode returns true if demo mode is enabled via environment variable.
@@ -50,6 +70,9 @@ func StartWithFixtures(fixtures *Fixtures) (*Demo, error) {
 		cleanup:      []func(){deviceServer.Close},
 	}
 
+	// Set as current demo for global access
+	setCurrentDemo(d)
+
 	return d, nil
 }
 
@@ -65,6 +88,8 @@ func (d *Demo) Cleanup() {
 	for _, fn := range d.cleanup {
 		fn()
 	}
+	// Clear global reference
+	setCurrentDemo(nil)
 }
 
 // GetDeviceAddress returns the mock server URL for a device.
