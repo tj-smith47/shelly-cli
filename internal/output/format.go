@@ -95,42 +95,18 @@ func YAML(w io.Writer, data any) error {
 func NewFormatter(format Format) Formatter {
 	switch format {
 	case FormatJSON:
-		return NewJSONFormatter()
+		return jsonf.New()
 	case FormatYAML:
-		return NewYAMLFormatter()
+		return yamlf.New()
 	case FormatTable:
 		return NewTableFormatter()
 	case FormatText:
 		return NewTextFormatter()
 	case FormatTemplate:
-		return NewTemplateFormatter(GetTemplate())
+		return template.New(GetTemplate())
 	default:
 		return NewTableFormatter()
 	}
-}
-
-// JSONFormatter wraps jsonf.Formatter for backward compatibility.
-type JSONFormatter = jsonf.Formatter
-
-// NewJSONFormatter creates a new JSON formatter with syntax highlighting.
-func NewJSONFormatter() *jsonf.Formatter {
-	return jsonf.New()
-}
-
-// YAMLFormatter wraps yamlf.Formatter for backward compatibility.
-type YAMLFormatter = yamlf.Formatter
-
-// NewYAMLFormatter creates a new YAML formatter with syntax highlighting.
-func NewYAMLFormatter() *yamlf.Formatter {
-	return yamlf.New()
-}
-
-// TemplateFormatter wraps template.Formatter for backward compatibility.
-type TemplateFormatter = template.Formatter
-
-// NewTemplateFormatter creates a new template formatter with the given template string.
-func NewTemplateFormatter(tmpl string) *template.Formatter {
-	return template.New(tmpl)
 }
 
 // TextFormatter formats output as plain text.

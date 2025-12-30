@@ -8,7 +8,10 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/tj-smith47/shelly-cli/internal/output/jsonf"
 	"github.com/tj-smith47/shelly-cli/internal/output/syntax"
+	"github.com/tj-smith47/shelly-cli/internal/output/template"
+	yamlf "github.com/tj-smith47/shelly-cli/internal/output/yaml"
 )
 
 // viperSetOutput sets the "output" viper value for the duration of the test and restores it after.
@@ -100,7 +103,7 @@ func TestJSONFormatter(t *testing.T) {
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
-	f := NewJSONFormatter()
+	f := jsonf.New()
 	// Disable highlighting for tests to get predictable output
 	f.Highlight = false
 	err := f.Format(&buf, data)
@@ -123,7 +126,7 @@ func TestYAMLFormatter(t *testing.T) {
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
-	f := NewYAMLFormatter()
+	f := yamlf.New()
 	// Disable highlighting for tests to get predictable output
 	f.Highlight = false
 	err := f.Format(&buf, data)
@@ -271,7 +274,7 @@ func TestTemplateFormatter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf bytes.Buffer
-			f := NewTemplateFormatter(tt.template)
+			f := template.New(tt.template)
 			err := f.Format(&buf, tt.data)
 
 			if (err != nil) != tt.wantErr {
@@ -324,7 +327,7 @@ func TestTemplateFormatter_ComplexData(t *testing.T) {
 {{end}}`
 
 	var buf bytes.Buffer
-	f := NewTemplateFormatter(tmpl)
+	f := template.New(tmpl)
 	err := f.Format(&buf, devices)
 	if err != nil {
 		t.Fatalf("Format() error: %v", err)
@@ -757,7 +760,7 @@ func TestJSONFormatter_WithHighlight(t *testing.T) {
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
-	f := &JSONFormatter{Indent: true, Highlight: true}
+	f := &jsonf.Formatter{Indent: true, Highlight: true}
 	err := f.Format(&buf, data)
 	if err != nil {
 		t.Fatalf("Format() error: %v", err)
@@ -774,7 +777,7 @@ func TestJSONFormatter_NoIndent(t *testing.T) {
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
-	f := &JSONFormatter{Indent: false, Highlight: false}
+	f := &jsonf.Formatter{Indent: false, Highlight: false}
 	err := f.Format(&buf, data)
 	if err != nil {
 		t.Fatalf("Format() error: %v", err)
@@ -792,7 +795,7 @@ func TestYAMLFormatter_WithHighlight(t *testing.T) {
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
-	f := &YAMLFormatter{Highlight: true}
+	f := &yamlf.Formatter{Highlight: true}
 	err := f.Format(&buf, data)
 	if err != nil {
 		t.Fatalf("Format() error: %v", err)
@@ -810,7 +813,7 @@ func TestTemplateFormatter_ExecutionError(t *testing.T) {
 	data := struct{ Name string }{"test"}
 
 	var buf bytes.Buffer
-	f := NewTemplateFormatter(tmpl)
+	f := template.New(tmpl)
 	err := f.Format(&buf, data)
 	// Should return an error for missing field
 	if err == nil {
@@ -1021,7 +1024,7 @@ func TestYAMLFormatter_MarshalError(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	f := NewYAMLFormatter()
+	f := yamlf.New()
 	err := f.Format(&buf, errorMarshaler{})
 	if err == nil {
 		t.Error("expected error for unmarshalable type")
@@ -1032,7 +1035,7 @@ func TestJSONFormatter_MarshalError(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	f := NewJSONFormatter()
+	f := jsonf.New()
 	err := f.Format(&buf, errorMarshaler{})
 	if err == nil {
 		t.Error("expected error for unmarshalable type")
@@ -1165,7 +1168,7 @@ func TestNewJSONFormatter_WithTTY(t *testing.T) {
 	viper.Set("no-color", false)
 	t.Setenv("TERM", "xterm-256color")
 
-	f := NewJSONFormatter()
+	f := jsonf.New()
 	if !f.Highlight {
 		t.Error("expected Highlight=true when TTY with no restrictions")
 	}
@@ -1194,7 +1197,7 @@ func TestNewYAMLFormatter_WithTTY(t *testing.T) {
 	viper.Set("no-color", false)
 	t.Setenv("TERM", "xterm-256color")
 
-	f := NewYAMLFormatter()
+	f := yamlf.New()
 	if !f.Highlight {
 		t.Error("expected Highlight=true when TTY with no restrictions")
 	}
