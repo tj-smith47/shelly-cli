@@ -501,7 +501,8 @@ func (m Model) renderConfig() string {
 	}
 
 	var content strings.Builder
-	content.WriteString(m.styles.Label.Render("Configuration:\n"))
+	content.WriteString(m.styles.Label.Render("Configuration:"))
+	content.WriteString("\n")
 
 	// Station config
 	if m.config.STA != nil {
@@ -534,7 +535,8 @@ func (m Model) renderNetworks() string {
 		return content.String()
 	}
 
-	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Available Networks (%d):\n", len(m.networks))))
+	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Available Networks (%d):", len(m.networks))))
+	content.WriteString("\n")
 
 	start, end := m.scroller.VisibleRange()
 	for i := start; i < end; i++ {

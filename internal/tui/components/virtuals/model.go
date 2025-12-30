@@ -571,6 +571,11 @@ func (m Model) View() string {
 	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		r.SetFooter("e:edit d:delete r:refresh")
+	}
 	return r.Render()
 }
 

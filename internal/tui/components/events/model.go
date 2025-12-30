@@ -39,9 +39,9 @@ const (
 type Column int
 
 const (
-	// ColumnUser is the left column showing user-relevant events.
+	// ColumnUser is the left column showing device events.
 	ColumnUser Column = iota
-	// ColumnSystem is the right column showing system events.
+	// ColumnSystem is the right column showing cache update events.
 	ColumnSystem
 )
 
@@ -260,7 +260,7 @@ func (m Model) Init() tea.Cmd {
 	// Add initial "subscribed" event
 	m.addEvent(Event{
 		Timestamp:   time.Now(),
-		Device:      "system",
+		Device:      "User",
 		Type:        "info",
 		Description: "Subscribed to event stream",
 	})
@@ -578,11 +578,6 @@ func (m Model) clearEvents() Model {
 	return m
 }
 
-func (m Model) togglePause() Model {
-	m.paused = !m.paused
-	return m
-}
-
 // eventCount returns the total number of events (thread-safe).
 func (m Model) eventCount() int {
 	m.state.mu.RLock()
@@ -731,18 +726,18 @@ func (m Model) renderHeaderRow(colTime, colDevice, colComp, colLevel int) string
 	cellStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Highlight)
 
 	timeStr := cellStyle.Render(output.PadRight("TIME", colTime))
-	deviceStr := cellStyle.Render(output.PadRight("DEVICE", colDevice))
+	entityStr := cellStyle.Render(output.PadRight("ENTITY", colDevice))
 	compStr := cellStyle.Render(output.PadRight("COMPONENT", colComp))
 	levelStr := cellStyle.Render(output.PadRight("LEVEL", colLevel))
 	descStr := cellStyle.Render("DESCRIPTION")
 
-	return timeStr + deviceStr + compStr + levelStr + descStr + "\n"
+	return timeStr + entityStr + compStr + levelStr + descStr + "\n"
 }
 
 // formatComponent formats the component field for display.
 func (m Model) formatComponent(e Event) string {
 	if e.Component == "" {
-		return "-"
+		return "system"
 	}
 	if e.ComponentID > 0 {
 		return fmt.Sprintf("%s:%d", e.Component, e.ComponentID)
@@ -970,87 +965,64 @@ func mergeEventsByTime(user, system []Event) []Event {
 
 // columnLayout holds width calculations for event columns.
 type columnLayout struct {
-	colWidth  int
-	sysColW   int
+	colWidth  int // Device events column width
+	sysColW   int // Cache updates column width (TIME + ENTITY only)
 	timeW     int
 	levelW    int
 	userDevW  int
 	userCompW int
 	userDescW int
-	sysDevW   int
-	sysDescW  int
 }
 
-// computeColumnLayout calculates column widths with dynamic sizing.
-// Columns distribute space based on content needs, defaulting to 50/50.
-// Neither column caps artificially - they expand/shrink to fit content.
+// computeColumnLayout calculates column widths.
+// Cache updates column is compact (TIME + ENTITY only), device events get remaining space.
+// Only DESC truncates on the device events side; all other columns expand to fit content.
 func computeColumnLayout(totalWidth int, userEvents, systemEvents []Event) columnLayout {
 	const timeW = 8
 	const levelW = 12
 	const minDeviceW, minDescW = 10, 8
-	const headerCompW = 4 // "COMP"
-	const spacesUser, spacesSys = 4, 3
-	const separatorW = 3 // " │ "
+	const headerCompW = 6 // "system" is 6 chars
+	const spacesUser = 4  // spaces between user columns
+	const separatorW = 3  // " │ "
 
-	availableWidth := totalWidth - separatorW
-	halfWidth := availableWidth / 2
+	// Cache updates column: TIME + space + ENTITY (no LEVEL, no DESC)
+	sysMaxDevLen := 10 // minimum
+	for _, e := range systemEvents {
+		if len(e.Device) > sysMaxDevLen {
+			sysMaxDevLen = len(e.Device)
+		}
+	}
+	sysDeviceW := sysMaxDevLen + 1
+	sysColWidth := timeW + 1 + sysDeviceW // TIME + space + ENTITY
 
-	// Calculate system content needs
-	sysContentWidth, sysMaxDevLen := calculateSystemContentWidth(systemEvents, timeW, levelW, spacesSys)
-	sysDeviceW := max(minDeviceW, sysMaxDevLen+1)
+	// Device events get the rest
+	userColWidth := totalWidth - separatorW - sysColWidth
+	userColWidth = max(60, userColWidth) // Minimum for device events
 
-	// Calculate user content needs
-	maxCompLen := 0
-	maxUserDescLen := 0
-	maxUserDeviceLen := 0
+	// Calculate device events column widths - expand to fit, only DESC truncates
+	maxCompLen := headerCompW
+	maxUserDeviceLen := minDeviceW
 	for _, e := range userEvents {
 		compLen := len(e.Component)
+		if compLen == 0 {
+			compLen = 6 // "system"
+		}
 		if e.ComponentID > 0 {
 			compLen += 2 // ":N" suffix
 		}
-		maxCompLen = max(maxCompLen, compLen)
-		maxUserDescLen = max(maxUserDescLen, len(e.Description))
-		maxUserDeviceLen = max(maxUserDeviceLen, len(e.Device))
+		if compLen > maxCompLen {
+			maxCompLen = compLen
+		}
+		if len(e.Device) > maxUserDeviceLen {
+			maxUserDeviceLen = len(e.Device)
+		}
 	}
-	userCompW := max(headerCompW, min(maxCompLen, 12))
-	userDeviceW := max(minDeviceW, min(maxUserDeviceLen+1, 20))
-	// Cap user description to reasonable max
-	maxUserDescLen = min(maxUserDescLen, 80)
-	userContentWidth := timeW + userDeviceW + userCompW + levelW + maxUserDescLen + spacesUser
+	userCompW := min(maxCompLen+1, 15)         // Cap component at reasonable max
+	userDeviceW := min(maxUserDeviceLen+1, 20) // Cap device at reasonable max
 
-	// Distribute space: each column can expand up to 50%, or more if the other needs less
-	var userColWidth, sysColWidth int
-
-	switch {
-	case userContentWidth <= halfWidth && sysContentWidth <= halfWidth:
-		// Both fit in 50% - split evenly
-		userColWidth = halfWidth
-		sysColWidth = halfWidth
-	case userContentWidth > halfWidth && sysContentWidth <= halfWidth:
-		// User needs more, system can shrink
-		userColWidth = min(userContentWidth, availableWidth-30) // System gets at least 30
-		sysColWidth = availableWidth - userColWidth
-	case sysContentWidth > halfWidth && userContentWidth <= halfWidth:
-		// System needs more, user can shrink
-		sysColWidth = min(sysContentWidth, availableWidth-30) // User gets at least 30
-		userColWidth = availableWidth - sysColWidth
-	default:
-		// Both need more than 50% - split evenly and let content truncate
-		userColWidth = halfWidth
-		sysColWidth = halfWidth
-	}
-
-	// Ensure minimums
-	userColWidth = max(30, userColWidth)
-	sysColWidth = max(30, sysColWidth)
-
-	// User column layout
-	remainingUser := userColWidth - timeW - levelW - spacesUser - userCompW
-	userDescW := max(minDescW, remainingUser-userDeviceW)
-
-	// System column layout (no COMP)
-	remainingSys := sysColWidth - timeW - levelW - spacesSys
-	sysDescW := max(minDescW, remainingSys-sysDeviceW)
+	// DESC gets all remaining space
+	fixedWidth := timeW + userDeviceW + userCompW + levelW + spacesUser
+	userDescW := max(minDescW, userColWidth-fixedWidth)
 
 	return columnLayout{
 		colWidth:  userColWidth,
@@ -1059,38 +1031,8 @@ func computeColumnLayout(totalWidth int, userEvents, systemEvents []Event) colum
 		userDevW:  userDeviceW,
 		userCompW: userCompW,
 		userDescW: userDescW,
-		sysDevW:   sysDeviceW,
-		sysDescW:  sysDescW,
 		sysColW:   sysColWidth,
 	}
-}
-
-// calculateSystemContentWidth determines the width needed for system events.
-// Returns the width and the max device length (device names should never truncate).
-func calculateSystemContentWidth(sysEvents []Event, timeW, levelW, spaces int) (width, maxDevLen int) {
-	if len(sysEvents) == 0 {
-		return 30, 10 // Minimum defaults
-	}
-
-	maxDeviceLen := 0
-	maxDescLen := 0
-
-	for _, e := range sysEvents {
-		deviceLen := len(e.Device)
-		if deviceLen > maxDeviceLen {
-			maxDeviceLen = deviceLen
-		}
-		descLen := len(e.Description)
-		if descLen > maxDescLen {
-			maxDescLen = descLen
-		}
-	}
-
-	// Device names should NEVER truncate - only description should
-	// Cap description at reasonable max
-	maxDescLen = min(maxDescLen, 60)
-
-	return timeW + maxDeviceLen + levelW + maxDescLen + spaces, maxDeviceLen
 }
 
 // dualColumnRenderState holds state for rendering dual columns.
@@ -1158,21 +1100,19 @@ func (m Model) buildDualColumnHeader(layout columnLayout, separator string) []st
 		sysTitleStyle = sysTitleStyle.Underline(true)
 	}
 
-	leftTitle := output.PadRight(userTitleStyle.Render("User Events"), layout.colWidth)
-	rightTitle := output.PadRight(sysTitleStyle.Render("System Events"), layout.sysColW)
+	leftTitle := output.PadRight(userTitleStyle.Render("Device Events"), layout.colWidth)
+	rightTitle := output.PadRight(sysTitleStyle.Render("Cache Updates"), layout.sysColW)
 
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
 	leftColHeader := headerStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
-		headerStyle.Render(output.PadRight("DEVICE", layout.userDevW)) + " " +
+		headerStyle.Render(output.PadRight("ENTITY", layout.userDevW)) + " " +
 		headerStyle.Render(output.PadRight("COMP", layout.userCompW)) + " " +
 		headerStyle.Render(output.PadRight("LEVEL", layout.levelW)) + " " +
 		headerStyle.Render("DESC")
 
 	sysHeaderStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Red())
 	rightColHeader := sysHeaderStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
-		sysHeaderStyle.Render(output.PadRight("DEVICE", layout.sysDevW)) + " " +
-		sysHeaderStyle.Render(output.PadRight("LEVEL", layout.levelW)) + " " +
-		sysHeaderStyle.Render("DESC")
+		sysHeaderStyle.Render("ENTITY")
 
 	leftColHeader = output.PadRight(leftColHeader, layout.colWidth)
 	rightColHeader = output.PadRight(rightColHeader, layout.sysColW)
@@ -1224,8 +1164,7 @@ func (m Model) renderUserEventRow(userEvt Event, sysPage []Event, userIdx, sysId
 	newSysIdx = sysIdx
 	if newSysIdx < len(sysPage) {
 		isSysSelected := m.focused && m.focusedColumn == ColumnSystem && newSysIdx == rs.sysCursorInPage
-		sysLine = m.renderSystemEvent(sysPage[newSysIdx], rs.layout.timeW, rs.layout.sysDevW,
-			rs.layout.levelW, rs.layout.sysDescW, isSysSelected)
+		sysLine = m.renderSystemEvent(sysPage[newSysIdx], rs.layout.timeW, isSysSelected)
 		newSysIdx++
 	}
 
@@ -1245,11 +1184,10 @@ func (m Model) renderUserEventRow(userEvt Event, sysPage []Event, userIdx, sysId
 	return resultLines, linesAdded, newSysIdx
 }
 
-// renderSystemOnlyRow renders a row with only a system event (no user event).
+// renderSystemOnlyRow renders a row with only a cache update event (no device event).
 func (m Model) renderSystemOnlyRow(sysEvt Event, sysIdx int, rs dualColumnRenderState) string {
 	isSysSelected := m.focused && m.focusedColumn == ColumnSystem && sysIdx == rs.sysCursorInPage
-	rightCell := output.PadRight(m.renderSystemEvent(sysEvt, rs.layout.timeW, rs.layout.sysDevW,
-		rs.layout.levelW, rs.layout.sysDescW, isSysSelected), rs.layout.sysColW)
+	rightCell := output.PadRight(m.renderSystemEvent(sysEvt, rs.layout.timeW, isSysSelected), rs.layout.sysColW)
 	return rs.emptyLeft + " " + rs.separator + " " + rightCell
 }
 
@@ -1350,44 +1288,26 @@ func (m Model) renderUserEventWrapped(e Event, timeW, deviceW, compW, levelW, de
 	return result
 }
 
-// renderSystemEvent renders a system event row (no COMP column).
+// renderSystemEvent renders a cache update event row (TIME and ENTITY only).
 // When selected is true, applies a background highlight to the entire row.
-func (m Model) renderSystemEvent(e Event, timeW, deviceW, levelW, descW int, selected bool) string {
+func (m Model) renderSystemEvent(e Event, timeW int, selected bool) string {
 	colors := theme.GetSemanticColors()
 
 	// Base styles - add background when selected
 	timeStyle := m.styles.Time
 	deviceStyle := m.styles.Device
-	levelStyle := m.getTypeStyle(e.Type)
-	descStyle := m.styles.Description
 
 	if selected {
 		bg := colors.AltBackground
 		timeStyle = timeStyle.Background(bg).Bold(true)
 		deviceStyle = deviceStyle.Background(bg).Bold(true)
-		levelStyle = levelStyle.Background(bg).Bold(true)
-		descStyle = descStyle.Background(bg).Bold(true)
 	}
 
 	// Time column
 	timeStr := timeStyle.Width(timeW).Render(e.Timestamp.Format("15:04:05"))
 
-	// Device column - truncate if needed
-	device := e.Device
-	if len(device) > deviceW {
-		device = device[:deviceW-1] + "…"
-	}
-	deviceStr := deviceStyle.Width(deviceW).Render(device)
+	// Device column - never truncate, expand to fit
+	deviceStr := deviceStyle.Render(e.Device)
 
-	// Level column
-	levelStr := levelStyle.Width(levelW).Render(e.Type)
-
-	// Description column
-	desc := e.Description
-	if len(desc) > descW {
-		desc = desc[:descW-1] + "…"
-	}
-	descStr := descStyle.Render(desc)
-
-	return timeStr + " " + deviceStr + " " + levelStr + " " + descStr
+	return timeStr + " " + deviceStr
 }

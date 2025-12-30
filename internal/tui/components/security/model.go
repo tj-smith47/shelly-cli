@@ -305,11 +305,12 @@ func (m Model) View() string {
 	// Debug Mode Section
 	content.WriteString(m.renderDebug())
 
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("a: auth | r: refresh"))
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		r.SetFooter("a:auth r:refresh")
+	}
 	return r.Render()
 }
 

@@ -328,7 +328,8 @@ func (m Model) View() string {
 	var content strings.Builder
 
 	// Header
-	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Inputs (%d):\n\n", len(m.inputs))))
+	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Inputs (%d):", len(m.inputs))))
+	content.WriteString("\n\n")
 
 	// Input list
 	start, end := m.scroller.VisibleRange()
@@ -345,11 +346,12 @@ func (m Model) View() string {
 	content.WriteString("\n")
 	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
 
-	// Help text
-	content.WriteString("\n\n")
-	content.WriteString(m.styles.Muted.Render("r: refresh"))
-
 	r.SetContent(content.String())
+
+	// Footer with keybindings (shown when focused)
+	if m.focused {
+		r.SetFooter("r:refresh")
+	}
 	return r.Render()
 }
 
