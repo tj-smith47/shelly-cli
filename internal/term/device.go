@@ -20,9 +20,13 @@ func DisplayDeviceStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) 
 	ios.Info("Firmware: %s", status.Info.Firmware)
 	ios.Println()
 
-	table := output.NewTable("Component", "Value")
+	table := output.NewTable("Component", "Status")
 	for key, value := range status.Status {
-		table.AddRow(key, output.FormatDisplayValue(value))
+		if m, ok := value.(map[string]any); ok {
+			table.AddRow(key, output.FormatComponentStatus(key, m))
+		} else {
+			table.AddRow(key, output.FormatDisplayValue(value))
+		}
 	}
 	printTable(ios, table)
 }
@@ -115,7 +119,7 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 	if len(status.Components) > 0 {
 		ios.Printf("%s\n", theme.Bold().Render("Components"))
 
-		table := output.NewTable("Component", "State")
+		table := output.NewTable("Component", "Status")
 
 		// Sort component keys for consistent output
 		keys := make([]string, 0, len(status.Components))
@@ -126,7 +130,11 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 
 		for _, key := range keys {
 			value := status.Components[key]
-			table.AddRow(key, output.FormatDisplayValue(value))
+			if m, ok := value.(map[string]any); ok {
+				table.AddRow(key, output.FormatComponentStatus(key, m))
+			} else {
+				table.AddRow(key, output.FormatDisplayValue(value))
+			}
 		}
 		printTable(ios, table)
 		ios.Println()
@@ -147,7 +155,11 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 
 		for _, key := range keys {
 			value := status.Sensors[key]
-			table.AddRow(key, output.FormatDisplayValue(value))
+			if m, ok := value.(map[string]any); ok {
+				table.AddRow(key, output.FormatComponentStatus(key, m))
+			} else {
+				table.AddRow(key, output.FormatDisplayValue(value))
+			}
 		}
 		printTable(ios, table)
 		ios.Println()

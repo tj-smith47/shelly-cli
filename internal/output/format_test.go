@@ -1253,3 +1253,171 @@ func TestGetChromaStyle_AllThemes(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatComponentStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		component string
+		status    map[string]any
+		contains  []string
+	}{
+		{
+			name:      "empty status",
+			component: "switch:0",
+			status:    map[string]any{},
+			contains:  []string{"-"},
+		},
+		{
+			name:      "nil status",
+			component: "switch:0",
+			status:    nil,
+			contains:  []string{"-"},
+		},
+		{
+			name:      "switch on with power",
+			component: "switch:0",
+			status:    map[string]any{"output": true, "apower": 45.2, "voltage": 121.3},
+			contains:  []string{"ON", "45.2W", "121.3V"},
+		},
+		{
+			name:      "switch off",
+			component: "switch:0",
+			status:    map[string]any{"output": false},
+			contains:  []string{"off"},
+		},
+		{
+			name:      "cover open with position",
+			component: "cover:0",
+			status:    map[string]any{"state": "open", "current_pos": float64(75)},
+			contains:  []string{"open", "75%"},
+		},
+		{
+			name:      "cover closed",
+			component: "cover:0",
+			status:    map[string]any{"state": "closed"},
+			contains:  []string{"closed"},
+		},
+		{
+			name:      "input triggered",
+			component: "input:0",
+			status:    map[string]any{"state": true},
+			contains:  []string{"triggered"},
+		},
+		{
+			name:      "input idle",
+			component: "input:0",
+			status:    map[string]any{"state": false},
+			contains:  []string{"idle"},
+		},
+		{
+			name:      "light on with brightness",
+			component: "light:0",
+			status:    map[string]any{"output": true, "brightness": float64(80)},
+			contains:  []string{"ON", "80%"},
+		},
+		{
+			name:      "sys with update",
+			component: "sys",
+			status:    map[string]any{"available_updates": map[string]any{"stable": map[string]any{"version": "1.5.0"}}},
+			contains:  []string{"update:", "1.5.0"},
+		},
+		{
+			name:      "cloud connected",
+			component: "cloud",
+			status:    map[string]any{"connected": true},
+			contains:  []string{"connected"},
+		},
+		{
+			name:      "cloud disconnected",
+			component: "cloud",
+			status:    map[string]any{"connected": false},
+			contains:  []string{"disconnected"},
+		},
+		{
+			name:      "wifi with ssid",
+			component: "wifi",
+			status:    map[string]any{"ssid": "MyNetwork", "rssi": float64(-55)},
+			contains:  []string{"MyNetwork", "-55dBm"},
+		},
+		{
+			name:      "pm1 power meter",
+			component: "pm1:0",
+			status:    map[string]any{"apower": 1500.5, "voltage": 240.1, "current": 6.25},
+			contains:  []string{"1.5kW", "240.1V", "6.25A"},
+		},
+		{
+			name:      "unknown component shows fields",
+			component: "unknown:0",
+			status:    map[string]any{"foo": "bar", "count": float64(42)},
+			contains:  []string{"foo=bar", "count=42"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := FormatComponentStatus(tt.component, tt.status)
+			for _, want := range tt.contains {
+				if !strings.Contains(result, want) {
+					t.Errorf("FormatComponentStatus(%q, %v) = %q, want to contain %q",
+						tt.component, tt.status, result, want)
+				}
+			}
+		})
+	}
+}
+
+func TestExtractComponentType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"switch:0", "switch"},
+		{"cover:1", "cover"},
+		{"input:2", "input"},
+		{"light:0", "light"},
+		{"sys", "sys"},
+		{"wifi", "wifi"},
+		{"pm1:0", "pm1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := extractComponentType(tt.name)
+			if got != tt.want {
+				t.Errorf("extractComponentType(%q) = %q, want %q", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatPowerCompact(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		watts float64
+		want  string
+	}{
+		{0, "0W"},
+		{45.2, "45.2W"},
+		{999.9, "999.9W"},
+		{1000, "1.0kW"},
+		{1500.5, "1.5kW"},
+		{2500, "2.5kW"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
+			got := FormatPowerCompact(tt.watts)
+			if got != tt.want {
+				t.Errorf("FormatPowerCompact(%v) = %q, want %q", tt.watts, got, tt.want)
+			}
+		})
+	}
+}
