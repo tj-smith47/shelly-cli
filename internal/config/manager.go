@@ -27,15 +27,15 @@ type Manager struct {
 }
 
 // NewManager creates a config manager for the given path.
-// If path is empty, uses default (~/.config/shelly/config.yaml).
+// If path is empty, uses default config directory from Dir().
 func NewManager(path string) *Manager {
 	if path == "" {
-		home, err := os.UserHomeDir()
+		dir, err := Dir()
 		if err != nil {
-			// Fall back to current directory if home is unavailable
+			// Fall back to current directory if config dir is unavailable
 			path = "config.yaml"
 		} else {
-			path = filepath.Join(home, ".config", "shelly", "config.yaml")
+			path = filepath.Join(dir, "config.yaml")
 		}
 	}
 	return &Manager{path: path}

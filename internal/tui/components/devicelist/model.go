@@ -152,11 +152,14 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles messages for the device list.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	// Update loader for spinner animation when loading
-	if m.cache != nil && m.cache.IsLoading() && len(m.getFilteredDevices()) == 0 {
+	// Update loader for spinner animation when loading (needed for header spinner)
+	if m.cache != nil && m.cache.IsLoading() {
 		var cmd tea.Cmd
 		m.loader, cmd = m.loader.Update(msg)
-		return m, cmd
+		// Continue processing for key events so navigation works during loading
+		if _, ok := msg.(tea.KeyPressMsg); !ok {
+			return m, cmd
+		}
 	}
 
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
@@ -680,4 +683,14 @@ func (m Model) MaxDeviceNameLen() int {
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
 	return "j/k:scroll g/G:top/bottom /:filter"
+}
+
+// IsLoading returns true if the device list is in a loading state.
+func (m Model) IsLoading() bool {
+	return m.cache != nil && m.cache.IsLoading()
+}
+
+// SpinnerFrame returns the current spinner frame for use in headers/badges.
+func (m Model) SpinnerFrame() string {
+	return m.loader.SpinnerFrame()
 }

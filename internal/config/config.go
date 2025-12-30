@@ -100,10 +100,11 @@ type KeybindingsConfig struct {
 	End      []string `mapstructure:"end" yaml:"end,omitempty"`
 
 	// Actions
-	Enter   []string `mapstructure:"enter" yaml:"enter,omitempty"`
-	Escape  []string `mapstructure:"escape" yaml:"escape,omitempty"`
-	Refresh []string `mapstructure:"refresh" yaml:"refresh,omitempty"`
-	Filter  []string `mapstructure:"filter" yaml:"filter,omitempty"`
+	Enter      []string `mapstructure:"enter" yaml:"enter,omitempty"`
+	Escape     []string `mapstructure:"escape" yaml:"escape,omitempty"`
+	Refresh    []string `mapstructure:"refresh" yaml:"refresh,omitempty"`
+	RefreshAll []string `mapstructure:"refresh_all" yaml:"refresh_all,omitempty"`
+	Filter     []string `mapstructure:"filter" yaml:"filter,omitempty"`
 	Command []string `mapstructure:"command" yaml:"command,omitempty"`
 	Help    []string `mapstructure:"help" yaml:"help,omitempty"`
 	Quit    []string `mapstructure:"quit" yaml:"quit,omitempty"`
@@ -608,6 +609,11 @@ func Save() error {
 
 // Dir returns the configuration directory path.
 func Dir() (string, error) {
+	// Respect XDG_CONFIG_HOME if set (standard for Linux config directories)
+	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+		return filepath.Join(xdgConfig, "shelly"), nil
+	}
+	// Fall back to ~/.config/shelly
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)

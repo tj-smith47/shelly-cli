@@ -2,7 +2,6 @@
 package toast
 
 import (
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -25,44 +24,21 @@ const (
 	LevelError
 )
 
-// Position indicates where toasts appear on screen.
-type Position int
-
-const (
-	// PositionTopRight places toasts at the top-right corner.
-	PositionTopRight Position = iota
-	// PositionTopLeft places toasts at the top-left corner.
-	PositionTopLeft
-	// PositionTopCenter places toasts at the top-center.
-	PositionTopCenter
-	// PositionBottomRight places toasts at the bottom-right corner.
-	PositionBottomRight
-	// PositionBottomLeft places toasts at the bottom-left corner.
-	PositionBottomLeft
-	// PositionBottomCenter places toasts at the bottom-center.
-	PositionBottomCenter
-)
-
 // AnimationPhase tracks the animation state of a toast.
 type AnimationPhase int
 
 const (
-	// PhaseEntering is when the toast is appearing.
-	PhaseEntering AnimationPhase = iota
 	// PhaseVisible is when the toast is fully visible.
-	PhaseVisible
+	PhaseVisible AnimationPhase = iota
 	// PhaseExiting is when the toast is disappearing.
 	PhaseExiting
 )
 
 // DefaultDuration is the default toast display duration.
-const DefaultDuration = 3 * time.Second
+const DefaultDuration = 5 * time.Second
 
-// Animation timing constants.
-const (
-	animationEnterDuration = 150 * time.Millisecond
-	animationExitDuration  = 150 * time.Millisecond
-)
+// Animation timing constant.
+const animationExitDuration = 150 * time.Millisecond
 
 // Toast represents a single toast notification.
 type Toast struct {
@@ -92,7 +68,6 @@ type Model struct {
 	width          int
 	height         int
 	visible        bool
-	position       Position
 	animate        bool
 	styles         Styles
 	activeTimerID  int  // ID of toast with active dismiss timer (-1 if none)
@@ -101,69 +76,29 @@ type Model struct {
 
 // Styles for toast notifications.
 type Styles struct {
-	Container lipgloss.Style
-	Info      lipgloss.Style
-	Success   lipgloss.Style
-	Warning   lipgloss.Style
-	Error     lipgloss.Style
-	// InputBar styles - match search/cmdmode design
-	InputBarInfo    lipgloss.Style
-	InputBarSuccess lipgloss.Style
-	InputBarWarning lipgloss.Style
-	InputBarError   lipgloss.Style
+	Info    lipgloss.Style
+	Success lipgloss.Style
+	Warning lipgloss.Style
+	Error   lipgloss.Style
 }
 
 // DefaultStyles returns default styles for toasts.
-// Uses semantic colors for consistent theming.
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	baseStyle := lipgloss.NewStyle().
-		Padding(0, 2).
-		MarginBottom(1).
-		Bold(true)
-
-	// Base input bar style matches search/cmdmode Container
-	inputBarBase := lipgloss.NewStyle().
 		Padding(0, 1).
 		BorderStyle(lipgloss.RoundedBorder())
 
 	return Styles{
-		Container: lipgloss.NewStyle().
-			Align(lipgloss.Right).
-			Padding(1),
-		Info: baseStyle.
-			Foreground(colors.Text).
-			Background(colors.Info),
-		Success: baseStyle.
-			Foreground(colors.Primary).
-			Background(colors.Success),
-		Warning: baseStyle.
-			Foreground(colors.Primary).
-			Background(colors.Warning),
-		Error: baseStyle.
-			Foreground(colors.Text).
-			Background(colors.Error),
-		// Input bar styles with colored borders
-		InputBarInfo: inputBarBase.
-			BorderForeground(colors.Info),
-		InputBarSuccess: inputBarBase.
-			BorderForeground(colors.Success),
-		InputBarWarning: inputBarBase.
-			BorderForeground(colors.Warning),
-		InputBarError: inputBarBase.
-			BorderForeground(colors.Error),
+		Info:    baseStyle.BorderForeground(colors.Info),
+		Success: baseStyle.BorderForeground(colors.Success),
+		Warning: baseStyle.BorderForeground(colors.Warning),
+		Error:   baseStyle.BorderForeground(colors.Error),
 	}
 }
 
 // Option configures the toast model.
 type Option func(*Model)
-
-// WithPosition sets the toast position.
-func WithPosition(pos Position) Option {
-	return func(m *Model) {
-		m.position = pos
-	}
-}
 
 // WithAnimation enables or disables animation.
 func WithAnimation(enabled bool) Option {
@@ -184,7 +119,6 @@ func New(opts ...Option) Model {
 	m := Model{
 		toasts:        make([]Toast, 0),
 		visible:       true,
-		position:      PositionTopRight,
 		animate:       true,
 		styles:        DefaultStyles(),
 		activeTimerID: -1,
@@ -282,7 +216,7 @@ func (m Model) handleShow(msg ShowMsg) (Model, tea.Cmd) {
 		Level:    msg.Level,
 		Duration: msg.Duration,
 		Created:  time.Now(),
-		Phase:    PhaseVisible, // Start visible (no animation for queued toasts)
+		Phase:    PhaseVisible,
 	}
 	if t.Duration == 0 {
 		t.Duration = DefaultDuration
@@ -440,31 +374,9 @@ func (m Model) HasToasts() bool {
 	return len(m.toasts) > 0
 }
 
-// View renders the toast notifications.
-func (m Model) View() string {
-	if !m.visible || len(m.toasts) == 0 {
-		return ""
-	}
-
-	// Render toasts (max 5 visible)
-	maxVisible := 5
-	startIdx := 0
-	if len(m.toasts) > maxVisible {
-		startIdx = len(m.toasts) - maxVisible
-	}
-
-	var rendered string
-	for _, toast := range m.toasts[startIdx:] {
-		rendered += m.renderToast(toast) + "\n"
-	}
-
-	return m.styles.Container.Width(m.width).Render(rendered)
-}
-
-// ViewAsInputBar renders the current (first) toast in the same style as search/cmdmode.
-// This appears in the input bar area below the tab bar with a colored border.
+// View renders the current toast in the input bar style with a colored border.
 // Shows a badge (e.g., "(+2)") if there are more toasts queued.
-func (m Model) ViewAsInputBar() string {
+func (m Model) View() string {
 	if !m.visible || len(m.toasts) == 0 {
 		return ""
 	}
@@ -479,16 +391,16 @@ func (m Model) ViewAsInputBar() string {
 
 	switch t.Level {
 	case LevelSuccess:
-		style = m.styles.InputBarSuccess
+		style = m.styles.Success
 		icon = "✓ "
 	case LevelWarning:
-		style = m.styles.InputBarWarning
+		style = m.styles.Warning
 		icon = "! "
 	case LevelError:
-		style = m.styles.InputBarError
+		style = m.styles.Error
 		icon = "✗ "
 	default:
-		style = m.styles.InputBarInfo
+		style = m.styles.Info
 		icon = "ℹ "
 	}
 
@@ -515,11 +427,16 @@ func (m Model) ViewAsInputBar() string {
 	}
 
 	// Apply animation effects
-	if t.Phase == PhaseEntering || t.Phase == PhaseExiting {
+	if t.Phase == PhaseExiting {
 		content = lipgloss.NewStyle().Faint(true).Render(content)
 	}
 
 	return style.Width(m.width).Render(content)
+}
+
+// ViewAsInputBar is an alias for View for backwards compatibility.
+func (m Model) ViewAsInputBar() string {
+	return m.View()
 }
 
 // itoa converts an int to string without importing strconv.
@@ -536,136 +453,6 @@ func itoa(i int) string {
 		i /= 10
 	}
 	return string(digits)
-}
-
-func (m Model) renderToast(toast Toast) string {
-	var style lipgloss.Style
-	var icon string
-	switch toast.Level {
-	case LevelSuccess:
-		style = m.styles.Success
-		icon = "✓ "
-	case LevelWarning:
-		style = m.styles.Warning
-		icon = "! "
-	case LevelError:
-		style = m.styles.Error
-		icon = "✗ "
-	default:
-		style = m.styles.Info
-		icon = "i "
-	}
-
-	content := icon + toast.Message
-
-	// Apply animation effects based on phase
-	switch toast.Phase {
-	case PhaseEntering:
-		// Fade in effect using dimmed style
-		style = style.Faint(true)
-	case PhaseVisible:
-		// Normal visible state - no changes
-	case PhaseExiting:
-		// Fade out effect using dimmed style
-		style = style.Faint(true)
-	}
-
-	return style.Render(content)
-}
-
-// Overlay renders the toasts as an overlay positioned at the configured location.
-func (m Model) Overlay(base string) string {
-	if !m.visible || len(m.toasts) == 0 {
-		return base
-	}
-
-	toastView := m.View()
-	if toastView == "" {
-		return base
-	}
-
-	return m.positionOverlay(base, toastView)
-}
-
-func (m Model) positionOverlay(base, overlay string) string {
-	if m.width == 0 || m.height == 0 {
-		return base
-	}
-
-	baseLines := strings.Split(base, "\n")
-	overlayLines := strings.Split(strings.TrimSuffix(overlay, "\n"), "\n")
-
-	overlayWidth := lipgloss.Width(overlay)
-	overlayHeight := len(overlayLines)
-
-	startRow, startCol := m.calculatePosition(overlayWidth, overlayHeight)
-
-	return m.applyOverlay(baseLines, overlayLines, startRow, startCol, overlayWidth)
-}
-
-func (m Model) calculatePosition(overlayWidth, overlayHeight int) (row, col int) {
-	switch m.position {
-	case PositionTopRight:
-		return 1, m.width - overlayWidth - 1
-	case PositionTopLeft:
-		return 1, 1
-	case PositionTopCenter:
-		return 1, (m.width - overlayWidth) / 2
-	case PositionBottomRight:
-		return m.height - overlayHeight - 2, m.width - overlayWidth - 1
-	case PositionBottomLeft:
-		return m.height - overlayHeight - 2, 1
-	case PositionBottomCenter:
-		return m.height - overlayHeight - 2, (m.width - overlayWidth) / 2
-	default:
-		return 1, m.width - overlayWidth - 1
-	}
-}
-
-func (m Model) applyOverlay(baseLines, overlayLines []string, startRow, startCol, overlayWidth int) string {
-	// Clamp positions
-	if startRow < 0 {
-		startRow = 0
-	}
-	if startCol < 0 {
-		startCol = 0
-	}
-
-	// Overlay the toast on the base
-	for i, overlayLine := range overlayLines {
-		lineIdx := startRow + i
-		if lineIdx >= len(baseLines) {
-			break
-		}
-		baseLines[lineIdx] = m.overlayLine(baseLines[lineIdx], overlayLine, startCol, overlayWidth)
-	}
-
-	return strings.Join(baseLines, "\n")
-}
-
-func (m Model) overlayLine(baseLine, overlayLine string, startCol, overlayWidth int) string {
-	baseRunes := []rune(baseLine)
-
-	// Pad base line if needed
-	for len(baseRunes) < startCol+overlayWidth {
-		baseRunes = append(baseRunes, ' ')
-	}
-
-	// Insert overlay
-	overlayRunes := []rune(overlayLine)
-	for j, r := range overlayRunes {
-		if startCol+j < len(baseRunes) {
-			baseRunes[startCol+j] = r
-		}
-	}
-
-	return string(baseRunes)
-}
-
-// SetPosition sets the toast position.
-func (m Model) SetPosition(pos Position) Model {
-	m.position = pos
-	return m
 }
 
 // SetAnimate enables or disables animation.

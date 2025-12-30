@@ -13,6 +13,38 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
+// setupTestEnv sets up an isolated config environment for tests.
+// Returns the temp directory path and a cleanup function.
+func setupTestEnv(t *testing.T) (string, func()) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	originalXDG := os.Getenv("XDG_CONFIG_HOME")
+
+	if err := os.Setenv("HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
+	}
+
+	cleanup := func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+		if originalXDG != "" {
+			if err := os.Setenv("XDG_CONFIG_HOME", originalXDG); err != nil {
+				t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
+			}
+		} else {
+			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+				t.Logf("warning: failed to unset XDG_CONFIG_HOME: %v", err)
+			}
+		}
+	}
+	return tmpDir, cleanup
+}
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -168,22 +200,13 @@ func TestOptions_Struct(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_NoLogFile(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
-	// Create shelly config directory (at ~/.config/shelly) but no log file
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	// Create shelly config directory but no log file
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -208,22 +231,13 @@ func TestRun_NoLogFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_WithLogFile(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
-	// Create shelly config directory and log file (at ~/.config/shelly)
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	// Create shelly config directory and log file
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -262,22 +276,13 @@ func TestRun_WithLogFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_ShowsLast20Lines(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
-	// Create shelly config directory and log file (at ~/.config/shelly)
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	// Create shelly config directory and log file
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -340,22 +345,13 @@ func TestNewCommand_CommandChain(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_EmptyLogFile(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
 	// Create shelly config directory and empty log file
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -385,22 +381,13 @@ func TestRun_EmptyLogFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_FewerThan20Lines(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -437,22 +424,13 @@ func TestRun_FewerThan20Lines(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_Exactly20Lines(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -489,22 +467,13 @@ func TestRun_Exactly20Lines(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestCommand_Execute(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -537,22 +506,13 @@ func TestCommand_Execute(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_SingleLine(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
@@ -582,22 +542,13 @@ func TestRun_SingleLine(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME env var
+//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_NoTrailingNewline(t *testing.T) {
-	// Create a temporary directory for home
-	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	tmpDir, cleanup := setupTestEnv(t)
+	t.Cleanup(cleanup)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, ".config", "shelly")
+	shellyDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}

@@ -60,12 +60,10 @@ func DefaultStyles() Styles {
 			MarginBottom(1),
 		Section: lipgloss.NewStyle().
 			Foreground(colors.Warning).
-			Bold(true).
-			MarginTop(1),
+			Bold(true),
 		Key: lipgloss.NewStyle().
 			Foreground(colors.Success).
-			Bold(true).
-			Width(12),
+			Bold(true),
 		Desc: lipgloss.NewStyle().
 			Foreground(colors.Text),
 		Footer: lipgloss.NewStyle().
@@ -124,15 +122,38 @@ func (m Model) View() string {
 		return ""
 	}
 
-	// Calculate overlay dimensions (2/3 of screen)
-	overlayWidth := m.width * 2 / 3
-	overlayHeight := m.height * 2 / 3
-	if overlayWidth < 60 {
-		overlayWidth = 60
+	// Get bindings for current context
+	sections := m.getContextBindings()
+
+	// Build content first to measure it
+	var content string
+	gap := 4
+	if m.width >= 120 && len(sections) == 2 {
+		content = m.renderTwoColumnLayout(sections, gap)
+	} else {
+		content = m.renderSingleColumnLayout(sections)
 	}
-	if overlayHeight < 20 {
-		overlayHeight = 20
+
+	// Footer
+	footer := m.styles.Footer.Render("Press ? or Esc to close")
+
+	// Measure content dimensions
+	contentLines := strings.Split(content, "\n")
+	maxLineWidth := lipgloss.Width(footer)
+	for _, line := range contentLines {
+		if w := lipgloss.Width(line); w > maxLineWidth {
+			maxLineWidth = w
+		}
 	}
+
+	// Calculate overlay dimensions based on content
+	// Add padding: 2 for border, 4 for internal padding (2 each side)
+	overlayWidth := maxLineWidth + 6
+	overlayHeight := len(contentLines) + 5 // +5 for border, title, footer, padding
+
+	// Ensure minimum size and don't exceed screen
+	overlayWidth = max(40, min(overlayWidth, m.width-4))
+	overlayHeight = max(10, min(overlayHeight, m.height-4))
 
 	colors := theme.GetSemanticColors()
 	r := rendering.New(overlayWidth, overlayHeight).
@@ -140,24 +161,12 @@ func (m Model) View() string {
 		SetFocused(true).
 		SetFocusColor(colors.Highlight)
 
-	var content strings.Builder
+	// Center footer within content width
+	contentWidth := overlayWidth - 6
+	footerCentered := lipgloss.NewStyle().Width(contentWidth).Align(lipgloss.Center).Render(footer)
+	content += "\n" + footerCentered
 
-	// Get bindings for current context
-	sections := m.getContextBindings()
-
-	for i, section := range sections {
-		if i > 0 {
-			content.WriteString("\n")
-		}
-		content.WriteString(m.styles.Section.Render(section.Name) + "\n")
-		content.WriteString(m.formatBindings(section.Bindings))
-	}
-
-	// Footer
-	content.WriteString("\n")
-	content.WriteString(m.styles.Footer.Render("Press ? or Esc to close"))
-
-	return r.SetContent(content.String()).Render()
+	return r.SetContent(content).Render()
 }
 
 // ViewCompact renders a compact help bar at the bottom of the screen.
@@ -232,7 +241,13 @@ func (m Model) sortBindings(bindings []keys.KeyBinding) []keys.KeyBinding {
 	return sorted
 }
 
-func (m Model) formatBindings(bindings []keys.KeyBinding) string {
+// keyDescPair holds a key string and its description for alignment.
+type keyDescPair struct {
+	key  string
+	desc string
+}
+
+func (m Model) formatBindings(bindings []keys.KeyBinding) []string {
 	// Group bindings by description (action) to collapse duplicates
 	descToKeys := make(map[string][]string)
 	descOrder := make([]string, 0)
@@ -247,20 +262,102 @@ func (m Model) formatBindings(bindings []keys.KeyBinding) string {
 		descToKeys[b.Desc] = append(descToKeys[b.Desc], b.Key)
 	}
 
-	lines := make([]string, 0, len(descOrder))
+	// Build pairs and find max key width
+	pairs := make([]keyDescPair, 0, len(descOrder))
+	maxKeyLen := 0
 	for _, desc := range descOrder {
 		keysList := descToKeys[desc]
-		// Sort keys for consistent display
 		sort.Strings(keysList)
-		// Join keys with / separator, limit to 3 for readability
 		keyStr := strings.Join(keysList, "/")
 		if len(keysList) > 3 {
 			keyStr = strings.Join(keysList[:3], "/") + "..."
 		}
-		line := m.styles.Key.Render(keyStr) + " " + m.styles.Desc.Render(desc)
+		if len(keyStr) > maxKeyLen {
+			maxKeyLen = len(keyStr)
+		}
+		pairs = append(pairs, keyDescPair{key: keyStr, desc: desc})
+	}
+
+	// Format lines with aligned keys and descriptions
+	lines := make([]string, 0, len(pairs))
+	for _, p := range pairs {
+		// Left-align key, pad to max width, then description
+		paddedKey := p.key + strings.Repeat(" ", maxKeyLen-len(p.key))
+		line := m.styles.Key.Render(paddedKey) + " " + m.styles.Desc.Render(p.desc)
 		lines = append(lines, line)
 	}
-	return strings.Join(lines, "\n")
+	return lines
+}
+
+func (m Model) renderSingleColumnLayout(sections []BindingSection) string {
+	var content strings.Builder
+
+	for i, section := range sections {
+		if i > 0 {
+			content.WriteString("\n")
+		}
+		// Section title (will be centered by View)
+		content.WriteString(m.styles.Section.Render(section.Name) + "\n")
+
+		// Build the keybindings block (left-aligned internally)
+		lines := m.formatBindings(section.Bindings)
+
+		// Add each line
+		for _, line := range lines {
+			content.WriteString(line + "\n")
+		}
+	}
+	return content.String()
+}
+
+func (m Model) renderTwoColumnLayout(sections []BindingSection, gap int) string {
+	// Format each section's bindings (internally left-aligned)
+	leftLines := m.formatBindings(sections[0].Bindings)
+	rightLines := m.formatBindings(sections[1].Bindings)
+
+	// Find max width in left column for padding
+	leftMaxW := 0
+	for _, line := range leftLines {
+		if w := lipgloss.Width(line); w > leftMaxW {
+			leftMaxW = w
+		}
+	}
+
+	var content strings.Builder
+
+	// Section headers side by side
+	leftHeaderText := m.styles.Section.Render(sections[0].Name)
+	rightHeaderText := m.styles.Section.Render(sections[1].Name)
+	leftHeaderW := lipgloss.Width(leftHeaderText)
+
+	// Pad left header to match left column width
+	leftHeaderPadded := leftHeaderText + strings.Repeat(" ", leftMaxW-leftHeaderW)
+	content.WriteString(leftHeaderPadded + strings.Repeat(" ", gap) + rightHeaderText + "\n")
+
+	// Render rows side-by-side
+	maxRows := max(len(leftLines), len(rightLines))
+
+	for i := range maxRows {
+		// Left column - pad to max width
+		var leftCell string
+		if i < len(leftLines) {
+			line := leftLines[i]
+			lineWidth := lipgloss.Width(line)
+			leftCell = line + strings.Repeat(" ", leftMaxW-lineWidth)
+		} else {
+			leftCell = strings.Repeat(" ", leftMaxW)
+		}
+
+		// Right column
+		var rightCell string
+		if i < len(rightLines) {
+			rightCell = rightLines[i]
+		}
+
+		content.WriteString(leftCell + strings.Repeat(" ", gap) + rightCell + "\n")
+	}
+
+	return content.String()
 }
 
 // ViewHeight returns the height the compact help bar will take.

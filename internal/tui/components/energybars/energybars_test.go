@@ -102,7 +102,7 @@ func TestModel_renderBar(t *testing.T) {
 	m := New(nil).SetSize(80, 20)
 	bar := Bar{Label: "Test Device", Value: 50, Unit: "W", Color: theme.Orange()}
 
-	result := m.renderBar(bar, 100, 20)
+	result := m.renderBar(bar, 100, 20, 16)
 	if result == "" {
 		t.Error("renderBar() returned empty string")
 	}

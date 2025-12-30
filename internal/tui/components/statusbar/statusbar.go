@@ -3,6 +3,8 @@ package statusbar
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,15 +14,38 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
+// IconType determines the style of icons used in the status bar.
+type IconType int
+
+const (
+	// IconTypeColor uses full-color emojis (⚡️ 💡 🪟).
+	IconTypeColor IconType = iota
+	// IconTypeOutline uses simple outline symbols (⏻ ☀ ↕).
+	IconTypeOutline
+)
+
+// getIconType returns the icon type based on ICON_TYPE environment variable.
+// Returns IconTypeColor for "color" (default), IconTypeOutline for "outline".
+func getIconType() IconType {
+	switch strings.ToLower(os.Getenv("ICON_TYPE")) {
+	case "outline":
+		return IconTypeOutline
+	default:
+		return IconTypeColor
+	}
+}
+
+// componentIcons returns the icons for switches, lights, and covers based on icon type.
+func componentIcons() (switchIcon, lightIcon, coverIcon string) {
+	if getIconType() == IconTypeOutline {
+		return "⏻", "☀", "↕"
+	}
+	// Color emojis (with variation selector for ⚡️)
+	return "⚡️", "💡", "🪟"
+}
+
 // tickMsg is sent on each tick for time updates.
 type tickMsg time.Time
-
-// StatusItem represents a piece of information in the status bar.
-type StatusItem struct {
-	Full    string // Full text for wide terminals (>120)
-	Compact string // Compact text for medium terminals (>80)
-	Minimal string // Minimal text for narrow terminals (<80)
-}
 
 // ComponentCounts holds counts for various component types.
 type ComponentCounts struct {
@@ -33,6 +58,22 @@ type ComponentCounts struct {
 	CoversMoving int
 }
 
+// ContextType identifies which view's context to display.
+type ContextType int
+
+const (
+	// ContextNone shows no context.
+	ContextNone ContextType = iota
+	// ContextDevice shows device info (Dashboard, Automation, Config views).
+	ContextDevice
+	// ContextMonitor shows WebSocket/refresh info (Monitor view).
+	ContextMonitor
+	// ContextManage shows firmware update info (Manage view).
+	ContextManage
+	// ContextFleet shows group info (Fleet view).
+	ContextFleet
+)
+
 // Model holds the status bar state.
 type Model struct {
 	width       int
@@ -40,9 +81,27 @@ type Model struct {
 	messageType MessageType
 	lastUpdate  time.Time
 	styles      Styles
-	items       []StatusItem
 	debugActive bool
 	counts      ComponentCounts
+
+	// Context display
+	contextType ContextType
+	panelName   string // Active panel/view name (used by all context types)
+
+	// Device context (Dashboard, Automation, Config)
+	deviceName string
+	deviceIP   string
+
+	// Monitor context
+	wsConnected     int
+	wsTotal         int
+	refreshInterval time.Duration
+
+	// Manage context
+	firmwareUpdates int
+
+	// Fleet context
+	groupName string
 }
 
 // MessageType indicates the type of status message.
@@ -168,25 +227,57 @@ func (m Model) SetWidth(width int) Model {
 	return m
 }
 
-// SetItems sets the context-specific status items.
-func (m Model) SetItems(items []StatusItem) Model {
-	m.items = items
+// SetDeviceContext sets device context for Dashboard, Automation, Config views.
+// Full: "Device: Name (IP) │ Panel", Compact: "Name (IP)", Minimal: none.
+func (m Model) SetDeviceContext(name, ip, panel string) Model {
+	m.contextType = ContextDevice
+	m.deviceName = name
+	m.deviceIP = ip
+	m.panelName = panel
 	return m
 }
 
-// AddItem adds a status item.
-func (m Model) AddItem(full, compact, minimal string) Model {
-	m.items = append(m.items, StatusItem{
-		Full:    full,
-		Compact: compact,
-		Minimal: minimal,
-	})
+// SetMonitorContext sets monitor context for the Monitor view.
+// Full: "WS: X/Y Connected (⟳ Xs) │ Panel", Compact: "X/Y Connected (⟳ Xs)", Minimal: none.
+func (m Model) SetMonitorContext(connected, total int, refreshInterval time.Duration, panel string) Model {
+	m.contextType = ContextMonitor
+	m.wsConnected = connected
+	m.wsTotal = total
+	m.refreshInterval = refreshInterval
+	m.panelName = panel
 	return m
 }
 
-// ClearItems clears all status items.
-func (m Model) ClearItems() Model {
-	m.items = nil
+// SetManageContext sets manage context for the Manage view.
+// Full: "Firmware Updates: X │ Panel", Compact: "X Updates Available", Minimal: none.
+func (m Model) SetManageContext(firmwareUpdates int, panel string) Model {
+	m.contextType = ContextManage
+	m.firmwareUpdates = firmwareUpdates
+	m.panelName = panel
+	return m
+}
+
+// SetFleetContext sets fleet context for the Fleet view.
+// Full: "Group: Name │ Panel", Compact: "Name", Minimal: none.
+// Pass empty groupName when no group is selected or fleet not configured.
+func (m Model) SetFleetContext(groupName, panel string) Model {
+	m.contextType = ContextFleet
+	m.groupName = groupName
+	m.panelName = panel
+	return m
+}
+
+// ClearContext clears all context (shows nothing in center).
+func (m Model) ClearContext() Model {
+	m.contextType = ContextNone
+	m.panelName = ""
+	m.deviceName = ""
+	m.deviceIP = ""
+	m.wsConnected = 0
+	m.wsTotal = 0
+	m.refreshInterval = 0
+	m.firmwareUpdates = 0
+	m.groupName = ""
 	return m
 }
 
@@ -234,8 +325,19 @@ func (m Model) GetTier() Tier {
 func (m Model) View() string {
 	tier := m.GetTier()
 
-	// Left side: component counts
-	left := m.renderComponentCounts(tier)
+	// Left side: status message first
+	var msgStyle lipgloss.Style
+	switch m.messageType {
+	case MessageSuccess:
+		msgStyle = m.styles.Success
+	case MessageError:
+		msgStyle = m.styles.Error
+	case MessageWarning:
+		msgStyle = m.styles.Warning
+	default:
+		msgStyle = m.styles.Normal
+	}
+	left := msgStyle.Render(m.message)
 
 	// Debug indicator (recording dot + text)
 	if m.debugActive {
@@ -243,19 +345,13 @@ func (m Model) View() string {
 		if tier == TierFull {
 			debugText = "Debug active"
 		}
-		if left != "" {
-			left += "  "
-		}
-		left += m.styles.Debug.Render("● " + debugText)
+		left += "  " + m.styles.Debug.Render("● "+debugText)
 	}
 
-	// Middle: context-specific items (if any)
-	middle := m.renderItems(tier)
-	if middle != "" {
-		if left != "" {
-			left += "  "
-		}
-		left += middle
+	// Component counts section (icon-prefixed)
+	componentSection := m.renderComponentCounts(tier)
+	if componentSection != "" {
+		left += "  │ " + componentSection
 	}
 
 	// Right side: version and time (tier-dependent)
@@ -276,21 +372,162 @@ func (m Model) View() string {
 		right = m.styles.Time.Render(timeStr[:5])
 	}
 
-	// Calculate spacing
+	// Center section: Active device and panel context
+	center := m.renderContext(tier)
+
+	// Calculate widths
 	leftWidth := lipgloss.Width(left)
 	rightWidth := lipgloss.Width(right)
-	spacing := m.width - leftWidth - rightWidth - 4 // Account for padding
-	if spacing < 1 {
-		spacing = 1
+	centerWidth := lipgloss.Width(center)
+
+	// Available space for center (minus padding)
+	availableWidth := m.width - 4
+	sideSpace := availableWidth - leftWidth - rightWidth - centerWidth
+
+	if sideSpace < 2 {
+		// Not enough space for center - just left and right with minimal gap
+		spacing := availableWidth - leftWidth - rightWidth
+		if spacing < 1 {
+			spacing = 1
+		}
+		content := left + strings.Repeat(" ", spacing) + right
+		return m.styles.Bar.Width(m.width).Render(content)
 	}
 
-	// Build the bar
-	content := left + lipgloss.NewStyle().Width(spacing).Render("") + right
+	// Center the context between left and right
+	leftPad := sideSpace / 2
+	rightPad := sideSpace - leftPad
+
+	content := left + strings.Repeat(" ", leftPad) + center + strings.Repeat(" ", rightPad) + right
 
 	return m.styles.Bar.Width(m.width).Render(content)
 }
 
+// renderContext renders the centered context based on context type and tier.
+func (m Model) renderContext(tier Tier) string {
+	if tier == TierMinimal {
+		return "" // All context types show nothing in minimal tier
+	}
+
+	switch m.contextType {
+	case ContextDevice:
+		return m.renderDeviceContext(tier)
+	case ContextMonitor:
+		return m.renderMonitorContext(tier)
+	case ContextManage:
+		return m.renderManageContext(tier)
+	case ContextFleet:
+		return m.renderFleetContext(tier)
+	default:
+		return ""
+	}
+}
+
+// renderDeviceContext renders device context.
+// Full: "Device: Name (IP) │ Panel", Compact: "Name (IP)".
+func (m Model) renderDeviceContext(tier Tier) string {
+	if m.deviceName == "" {
+		return ""
+	}
+
+	deviceInfo := m.deviceName
+	if m.deviceIP != "" {
+		deviceInfo += " (" + m.deviceIP + ")"
+	}
+
+	switch tier {
+	case TierFull:
+		result := m.styles.Normal.Render("Device: " + deviceInfo)
+		if m.panelName != "" {
+			result += " │ " + m.styles.Normal.Render(m.panelName)
+		}
+		return result
+	case TierCompact:
+		return m.styles.Normal.Render(deviceInfo)
+	default:
+		return ""
+	}
+}
+
+// renderMonitorContext renders monitor context.
+// Full: "WS: X/Y Connected (⟳ Xs) │ Panel", Compact: "X/Y Connected (⟳ Xs)".
+func (m Model) renderMonitorContext(tier Tier) string {
+	if m.wsTotal == 0 && m.refreshInterval == 0 {
+		return ""
+	}
+
+	// Format refresh interval
+	refreshStr := ""
+	if m.refreshInterval > 0 {
+		secs := int(m.refreshInterval.Seconds())
+		refreshStr = fmt.Sprintf(" (⟳ %ds)", secs)
+	}
+
+	connStr := fmt.Sprintf("%d/%d Connected%s", m.wsConnected, m.wsTotal, refreshStr)
+
+	switch tier {
+	case TierFull:
+		result := m.styles.Normal.Render("WS: " + connStr)
+		if m.panelName != "" {
+			result += " │ " + m.styles.Normal.Render(m.panelName)
+		}
+		return result
+	case TierCompact:
+		return m.styles.Normal.Render(connStr)
+	default:
+		return ""
+	}
+}
+
+// renderManageContext renders manage context.
+// Full: "Firmware Updates: X │ Panel", Compact: "X Updates Available".
+func (m Model) renderManageContext(tier Tier) string {
+	if m.firmwareUpdates == 0 {
+		// No updates available - show nothing special
+		if tier == TierFull && m.panelName != "" {
+			return m.styles.Normal.Render(m.panelName)
+		}
+		return ""
+	}
+
+	switch tier {
+	case TierFull:
+		result := m.styles.Normal.Render(fmt.Sprintf("Firmware Updates: %d", m.firmwareUpdates))
+		if m.panelName != "" {
+			result += " │ " + m.styles.Normal.Render(m.panelName)
+		}
+		return result
+	case TierCompact:
+		return m.styles.Normal.Render(fmt.Sprintf("%d Updates Available", m.firmwareUpdates))
+	default:
+		return ""
+	}
+}
+
+// renderFleetContext renders fleet context.
+// Full: "Group: Name │ Panel", Compact: "Name".
+func (m Model) renderFleetContext(tier Tier) string {
+	if m.groupName == "" {
+		// No group selected - show nothing
+		return ""
+	}
+
+	switch tier {
+	case TierFull:
+		result := m.styles.Normal.Render("Group: " + m.groupName)
+		if m.panelName != "" {
+			result += " │ " + m.styles.Normal.Render(m.panelName)
+		}
+		return result
+	case TierCompact:
+		return m.styles.Normal.Render(m.groupName)
+	default:
+		return ""
+	}
+}
+
 // renderComponentCounts renders the component state counts based on tier.
+// Icons are determined by the ICON_TYPE environment variable.
 func (m Model) renderComponentCounts(tier Tier) string {
 	c := m.counts
 	hasSwitches := c.SwitchesOn > 0 || c.SwitchesOff > 0
@@ -301,16 +538,17 @@ func (m Model) renderComponentCounts(tier Tier) string {
 		return ""
 	}
 
+	switchIcon, lightIcon, coverIcon := componentIcons()
 	var parts []string
 
 	if hasSwitches {
-		parts = append(parts, m.formatComponentCount(tier, "Switches", "Sw", c.SwitchesOn, c.SwitchesOff))
+		parts = append(parts, m.formatComponentCount(tier, switchIcon, "Switches", "Sw", c.SwitchesOn, c.SwitchesOff))
 	}
 	if hasLights {
-		parts = append(parts, m.formatComponentCount(tier, "Lights", "Lt", c.LightsOn, c.LightsOff))
+		parts = append(parts, m.formatComponentCount(tier, lightIcon, "Lights", "Lt", c.LightsOn, c.LightsOff))
 	}
 	if hasCovers {
-		parts = append(parts, m.formatCoverCount(tier, c.CoversOpen, c.CoversClosed, c.CoversMoving))
+		parts = append(parts, m.formatCoverCount(tier, coverIcon, c.CoversOpen, c.CoversClosed, c.CoversMoving))
 	}
 
 	sep := " │ "
@@ -322,73 +560,39 @@ func (m Model) renderComponentCounts(tier Tier) string {
 }
 
 // formatComponentCount formats a component count for display (switches/lights).
-func (m Model) formatComponentCount(tier Tier, fullLabel, shortLabel string, on, off int) string {
+func (m Model) formatComponentCount(tier Tier, icon, fullLabel, shortLabel string, on, off int) string {
 	total := on + off
 	onStr := m.styles.CountOn.Render(fmt.Sprintf("%d", on))
 	offStr := m.styles.CountOff.Render(fmt.Sprintf("%d", off))
 
 	switch tier {
 	case TierFull:
-		return m.styles.CountLabel.Render(fullLabel+": ") + onStr + "/" + offStr
+		return icon + " " + m.styles.CountLabel.Render(fullLabel+": ") + onStr + "/" + offStr
 	case TierCompact:
-		return m.styles.CountLabel.Render(shortLabel+": ") + onStr + "/" + fmt.Sprintf("%d", total)
+		return icon + " " + m.styles.CountLabel.Render(shortLabel+": ") + onStr + "/" + fmt.Sprintf("%d", total)
 	default: // TierMinimal
-		return shortLabel + ":" + fmt.Sprintf("%d", on)
+		return icon + fmt.Sprintf("%d", on)
 	}
 }
 
 // formatCoverCount formats cover counts for display.
-func (m Model) formatCoverCount(tier Tier, open, closed, moving int) string {
+func (m Model) formatCoverCount(tier Tier, icon string, open, closed, moving int) string {
 	openStr := m.styles.CountOn.Render(fmt.Sprintf("%d", open))
 	closedStr := m.styles.CountOff.Render(fmt.Sprintf("%d", closed))
 
 	switch tier {
 	case TierFull:
 		if moving > 0 {
-			return m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓ " +
+			return icon + " " + m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓ " +
 				m.styles.Warning.Render(fmt.Sprintf("%d", moving)) + "~"
 		}
-		return m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓"
+		return icon + " " + m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓"
 	case TierCompact:
 		total := open + closed + moving
-		return m.styles.CountLabel.Render("Cv: ") + openStr + "/" + fmt.Sprintf("%d", total)
+		return icon + " " + m.styles.CountLabel.Render("Cv: ") + openStr + "/" + fmt.Sprintf("%d", total)
 	default: // TierMinimal
-		return "Cv:" + fmt.Sprintf("%d", open)
+		return icon + fmt.Sprintf("%d", open)
 	}
-}
-
-// renderItems renders the status items based on tier.
-func (m Model) renderItems(tier Tier) string {
-	if len(m.items) == 0 {
-		return ""
-	}
-
-	separator := " │ "
-	if tier == TierMinimal {
-		separator = " "
-	}
-
-	var parts []string
-	for _, item := range m.items {
-		var text string
-		switch tier {
-		case TierFull:
-			text = item.Full
-		case TierCompact:
-			text = item.Compact
-		default:
-			text = item.Minimal
-		}
-		if text != "" {
-			parts = append(parts, m.styles.Normal.Render(text))
-		}
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return m.styles.Normal.Render(fmt.Sprintf("│ %s", joinStrings(parts, separator)))
 }
 
 // joinStrings joins strings with a separator.

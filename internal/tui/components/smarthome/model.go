@@ -166,11 +166,6 @@ func (m Model) fetchStatus() tea.Cmd {
 		msg.Zigbee = m.fetchZigbee(ctx)
 		msg.LoRa = m.fetchLoRa(ctx)
 
-		// If we got nothing at all, set an error
-		if msg.Matter == nil && msg.Zigbee == nil && msg.LoRa == nil {
-			msg.Err = fmt.Errorf("no smart home protocols available")
-		}
-
 		return msg
 	}
 }

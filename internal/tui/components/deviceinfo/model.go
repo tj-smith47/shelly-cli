@@ -409,7 +409,7 @@ func (m Model) getComponents() []ComponentInfo {
 	}
 
 	// Estimate capacity based on known components
-	capacity := len(m.device.Switches)
+	capacity := len(m.device.Switches) + len(m.device.Lights) + len(m.device.Covers)
 	if m.device.Snapshot != nil {
 		capacity += len(m.device.Snapshot.PM) + len(m.device.Snapshot.EM) + len(m.device.Snapshot.EM1)
 	}
@@ -426,6 +426,34 @@ func (m Model) getComponents() []ComponentInfo {
 			Type:     "Switch",
 			State:    state,
 			Endpoint: fmt.Sprintf("Switch.GetStatus?id=%d", sw.ID),
+		})
+	}
+
+	// Add light components from cache (includes dimmers)
+	for _, lt := range m.device.Lights {
+		state := "off"
+		if lt.On {
+			state = "on"
+		}
+		components = append(components, ComponentInfo{
+			Name:     fmt.Sprintf("Light:%d", lt.ID),
+			Type:     "Light",
+			State:    state,
+			Endpoint: fmt.Sprintf("Light.GetStatus?id=%d", lt.ID),
+		})
+	}
+
+	// Add cover components from cache
+	for _, cv := range m.device.Covers {
+		state := cv.State
+		if state == "" {
+			state = "stopped"
+		}
+		components = append(components, ComponentInfo{
+			Name:     fmt.Sprintf("Cover:%d", cv.ID),
+			Type:     "Cover",
+			State:    state,
+			Endpoint: fmt.Sprintf("Cover.GetStatus?id=%d", cv.ID),
 		})
 	}
 

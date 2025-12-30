@@ -268,3 +268,8 @@ func (m Model) SetSpinnerStyle(style Style) Model {
 func (m Model) Tick() tea.Cmd {
 	return m.spinner.Tick
 }
+
+// SpinnerFrame returns the current spinner character for embedding in headers/badges.
+func (m Model) SpinnerFrame() string {
+	return m.spinner.View()
+}

@@ -1,7 +1,10 @@
 package output
 
 import (
+	"os"
 	"testing"
+
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -566,6 +569,264 @@ func TestRenderRGBState(t *testing.T) {
 		got := RenderRGBState(status)
 		if got == "" {
 			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderInputTriggeredState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("triggered", func(t *testing.T) {
+		t.Parallel()
+		got := RenderInputTriggeredState(true)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("idle", func(t *testing.T) {
+		t.Parallel()
+		got := RenderInputTriggeredState(false)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderOnOffStateWithBrightness(t *testing.T) {
+	t.Parallel()
+
+	t.Run("on with brightness 0", func(t *testing.T) {
+		t.Parallel()
+		brightness := 0
+		got := RenderOnOffStateWithBrightness(true, &brightness)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("on with no brightness pointer", func(t *testing.T) {
+		t.Parallel()
+		got := RenderOnOffStateWithBrightness(true, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("on with positive brightness", func(t *testing.T) {
+		t.Parallel()
+		brightness := 75
+		got := RenderOnOffStateWithBrightness(true, &brightness)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("off", func(t *testing.T) {
+		t.Parallel()
+		got := RenderOnOffStateWithBrightness(false, nil)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+func TestRenderCoverStatusState_NegativePosition(t *testing.T) {
+	t.Parallel()
+
+	// Test with negative position (should not show percentage)
+	neg := -1
+	status := &model.CoverStatus{State: "calibrating", CurrentPosition: &neg}
+	got := RenderCoverStatusState(status)
+	if got != "calibrating" {
+		t.Errorf("expected 'calibrating', got %q", got)
+	}
+}
+
+func TestCaseConstants(t *testing.T) {
+	t.Parallel()
+
+	// Test that case constants are distinct
+	if CaseLower == CaseTitle {
+		t.Error("CaseLower and CaseTitle should be different")
+	}
+	if CaseTitle == CaseUpper {
+		t.Error("CaseTitle and CaseUpper should be different")
+	}
+	if CaseLower == CaseUpper {
+		t.Error("CaseLower and CaseUpper should be different")
+	}
+}
+
+//nolint:paralleltest // Tests modify shared viper and isTTY state
+func TestRenderFunctions_WithColor(t *testing.T) {
+	// Save and restore isTTY
+	oldIsTTY := isTTY
+	defer func() { isTTY = oldIsTTY }()
+
+	// Enable TTY mode to test color output
+	isTTY = func() bool { return true }
+	viper.Set("plain", false)
+	viper.Set("no-color", false)
+	t.Setenv("TERM", "xterm-256color")
+
+	// RenderOnOff tests
+	t.Run("RenderOnOff on with color", func(t *testing.T) {
+		got := RenderOnOff(true, CaseTitle, theme.FalseDim)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("RenderOnOff off with color", func(t *testing.T) {
+		got := RenderOnOff(false, CaseLower, theme.FalseDim)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	// RenderOnline tests
+	t.Run("RenderOnline online with color", func(t *testing.T) {
+		got := RenderOnline(true, CaseTitle)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("RenderOnline offline with color", func(t *testing.T) {
+		got := RenderOnline(false, CaseLower)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	// RenderAuthRequired tests
+	t.Run("RenderAuthRequired required with color", func(t *testing.T) {
+		got := RenderAuthRequired(true)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+
+	t.Run("RenderAuthRequired not required with color", func(t *testing.T) {
+		got := RenderAuthRequired(false)
+		if got == "" {
+			t.Error("expected non-empty result")
+		}
+	})
+}
+
+//nolint:paralleltest // Tests modify shared isTTY and viper state
+func TestColorEnabled_TTY(t *testing.T) {
+	// Save and restore isTTY
+	oldIsTTY := isTTY
+	defer func() { isTTY = oldIsTTY }()
+
+	t.Run("non-TTY returns false", func(t *testing.T) {
+		isTTY = func() bool { return false }
+		if colorEnabled() {
+			t.Error("expected colorEnabled() = false for non-TTY")
+		}
+	})
+
+	t.Run("TTY with plain flag returns false", func(t *testing.T) {
+		isTTY = func() bool { return true }
+		viper.Set("plain", true)
+		defer viper.Set("plain", false)
+		if colorEnabled() {
+			t.Error("expected colorEnabled() = false when plain=true")
+		}
+	})
+
+	t.Run("TTY with no-color flag returns false", func(t *testing.T) {
+		isTTY = func() bool { return true }
+		viper.Set("no-color", true)
+		defer viper.Set("no-color", false)
+		if colorEnabled() {
+			t.Error("expected colorEnabled() = false when no-color=true")
+		}
+	})
+
+	t.Run("TTY with NO_COLOR env returns false", func(t *testing.T) {
+		isTTY = func() bool { return true }
+		if err := os.Setenv("NO_COLOR", "1"); err != nil {
+			t.Fatalf("failed to set NO_COLOR: %v", err)
+		}
+		defer func() {
+			if err := os.Unsetenv("NO_COLOR"); err != nil {
+				t.Logf("warning: failed to unset NO_COLOR: %v", err)
+			}
+		}()
+		if colorEnabled() {
+			t.Error("expected colorEnabled() = false when NO_COLOR is set")
+		}
+	})
+
+	t.Run("TTY with SHELLY_NO_COLOR env returns false", func(t *testing.T) {
+		isTTY = func() bool { return true }
+		if err := os.Setenv("SHELLY_NO_COLOR", "1"); err != nil {
+			t.Fatalf("failed to set SHELLY_NO_COLOR: %v", err)
+		}
+		defer func() {
+			if err := os.Unsetenv("SHELLY_NO_COLOR"); err != nil {
+				t.Logf("warning: failed to unset SHELLY_NO_COLOR: %v", err)
+			}
+		}()
+		if colorEnabled() {
+			t.Error("expected colorEnabled() = false when SHELLY_NO_COLOR is set")
+		}
+	})
+
+	t.Run("TTY with TERM=dumb returns false", func(t *testing.T) {
+		isTTY = func() bool { return true }
+		oldTerm := os.Getenv("TERM")
+		if err := os.Setenv("TERM", "dumb"); err != nil {
+			t.Fatalf("failed to set TERM: %v", err)
+		}
+		defer func() {
+			if oldTerm == "" {
+				if err := os.Unsetenv("TERM"); err != nil {
+					t.Logf("warning: failed to unset TERM: %v", err)
+				}
+			} else {
+				if err := os.Setenv("TERM", oldTerm); err != nil {
+					t.Logf("warning: failed to restore TERM: %v", err)
+				}
+			}
+		}()
+		if colorEnabled() {
+			t.Error("expected colorEnabled() = false when TERM=dumb")
+		}
+	})
+
+	t.Run("TTY with no restrictions returns true", func(t *testing.T) {
+		isTTY = func() bool { return true }
+		// Clear all flags and env vars
+		viper.Set("plain", false)
+		viper.Set("no-color", false)
+		if err := os.Unsetenv("NO_COLOR"); err != nil {
+			t.Logf("warning: failed to unset NO_COLOR: %v", err)
+		}
+		if err := os.Unsetenv("SHELLY_NO_COLOR"); err != nil {
+			t.Logf("warning: failed to unset SHELLY_NO_COLOR: %v", err)
+		}
+		oldTerm := os.Getenv("TERM")
+		if err := os.Setenv("TERM", "xterm-256color"); err != nil {
+			t.Fatalf("failed to set TERM: %v", err)
+		}
+		defer func() {
+			if oldTerm == "" {
+				if err := os.Unsetenv("TERM"); err != nil {
+					t.Logf("warning: failed to unset TERM: %v", err)
+				}
+			} else {
+				if err := os.Setenv("TERM", oldTerm); err != nil {
+					t.Logf("warning: failed to restore TERM: %v", err)
+				}
+			}
+		}()
+		if !colorEnabled() {
+			t.Error("expected colorEnabled() = true when TTY with no restrictions")
 		}
 	})
 }

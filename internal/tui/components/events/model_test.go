@@ -366,7 +366,7 @@ func TestScrollInfo(t *testing.T) {
 		t.Parallel()
 		m := createTestModel(20)
 		m.scroller.SetVisibleRows(10)
-		m.scroller.SetCursor(5)
+		m.userCursor = 5
 
 		info := m.ScrollInfo()
 

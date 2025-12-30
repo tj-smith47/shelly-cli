@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // ErrMock is a standard mock error for testing.
@@ -67,8 +68,9 @@ type TestFactory struct {
 }
 
 // NewTestFactory creates a Factory with test dependencies.
-// The factory is pre-configured with test IOStreams and an empty config.
-// The ShellyService is lazily initialized by the factory when first accessed.
+// The factory is pre-configured with test IOStreams, an empty config,
+// and a shelly service without plugin support (to avoid creating directories
+// in the real config directory).
 func NewTestFactory(t *testing.T) *TestFactory {
 	t.Helper()
 
@@ -82,10 +84,15 @@ func NewTestFactory(t *testing.T) *TestFactory {
 	}
 	mgr := config.NewTestManager(cfg)
 
-	// ShellyService is lazily initialized by factory when first accessed
+	// Create a simple shelly service without plugin support
+	// This prevents the factory from creating the plugins directory
+	// in the real config location during tests.
+	testService := shelly.New(shelly.NewConfigResolver())
+
 	f := cmdutil.NewFactory().
 		SetIOStreams(testIO.IOStreams).
-		SetConfigManager(mgr)
+		SetConfigManager(mgr).
+		SetShellyService(testService)
 
 	return &TestFactory{
 		Factory: f,

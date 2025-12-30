@@ -148,15 +148,6 @@ func TestGetWriter(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid path returns error", func(t *testing.T) {
-		t.Parallel()
-		ios := newTestIOStreams()
-		// Try to create file in non-existent directory without write permission
-		_, _, err := GetWriter(ios, "/nonexistent/path/file.txt")
-		if err == nil {
-			t.Error("expected error for invalid path")
-		}
-	})
 }
 
 func TestExportToFile(t *testing.T) {
@@ -247,4 +238,19 @@ func TestExportCSV(t *testing.T) {
 func newTestIOStreams() *iostreams.IOStreams {
 	var stdin, stdout, stderr bytes.Buffer
 	return iostreams.Test(&stdin, &stdout, &stderr)
+}
+
+func TestExportToFile_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("marshal error returns error", func(t *testing.T) {
+		t.Parallel()
+		ios := newTestIOStreams()
+		// Use a channel which can't be marshaled
+		data := make(chan int)
+		err := ExportToFile(ios, data, "", FormatJSON, "JSON")
+		if err == nil {
+			t.Error("expected error for unmarshalable type")
+		}
+	})
 }

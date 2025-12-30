@@ -846,6 +846,7 @@ func (c *Cache) fetchSwitchStates(ctx context.Context, name string, data *Device
 func (c *Cache) fetchLightStates(ctx context.Context, name string, data *DeviceData) {
 	lights, err := c.svc.LightList(ctx, name)
 	if err != nil {
+		c.ios.DebugCat(iostreams.CategoryDevice, "cache: light list for %s failed: %v", name, err)
 		return
 	}
 	for _, lt := range lights {

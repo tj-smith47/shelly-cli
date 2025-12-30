@@ -156,6 +156,7 @@ func TestFormatAlarmSensors(t *testing.T) {
 		sensors := []model.AlarmSensorReading{
 			{ID: 0, Alarm: false, Mute: false},
 			{ID: 1, Alarm: true, Mute: false},
+			{ID: 2, Alarm: false, Mute: true}, // Test mute case
 		}
 		// Use theme.StyleFunc compatible functions - get Render method from styles
 		okStyle := theme.StatusOK().Render
@@ -163,8 +164,8 @@ func TestFormatAlarmSensors(t *testing.T) {
 		dimStyle := theme.Dim().Render
 
 		result := FormatAlarmSensors(sensors, "Flood", "WATER!", okStyle, errStyle, dimStyle)
-		if len(result) != 2 {
-			t.Fatalf("expected 2 lines, got %d", len(result))
+		if len(result) != 3 {
+			t.Fatalf("expected 3 lines, got %d", len(result))
 		}
 	})
 }

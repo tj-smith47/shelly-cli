@@ -1,6 +1,7 @@
 package mock_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
@@ -80,16 +81,22 @@ func TestDevice_FullDevice(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies the filesystem
 func TestDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
 	dir, err := mock.Dir()
 	if err != nil {
-		t.Logf("Dir() error = %v (may be expected in restricted environments)", err)
-		return
+		t.Fatalf("Dir() error = %v", err)
 	}
 
 	if dir == "" {
 		t.Error("Dir() returned empty string")
+	}
+
+	// Verify it's in the temp directory, not real config
+	if !strings.HasPrefix(dir, tmpDir) {
+		t.Errorf("Dir() = %q, expected to be under %q", dir, tmpDir)
 	}
 }
 

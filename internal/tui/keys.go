@@ -22,10 +22,11 @@ type KeyMap struct {
 	End      key.Binding
 
 	// Actions
-	Enter     key.Binding
-	Escape    key.Binding
-	Refresh   key.Binding
-	Filter    key.Binding
+	Enter      key.Binding
+	Escape     key.Binding
+	Refresh    key.Binding
+	RefreshAll key.Binding
+	Filter     key.Binding
 	Command   key.Binding
 	Help      key.Binding
 	Quit      key.Binding
@@ -98,8 +99,12 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("esc", "back"),
 		),
 		Refresh: key.NewBinding(
-			key.WithKeys("r", "ctrl+r"),
-			key.WithHelp("r", "refresh"),
+			key.WithKeys("r"),
+			key.WithHelp("r", "refresh device"),
+		),
+		RefreshAll: key.NewBinding(
+			key.WithKeys("ctrl+r"),
+			key.WithHelp("ctrl+r", "refresh all"),
 		),
 		Filter: key.NewBinding(
 			key.WithKeys("/"),
@@ -192,7 +197,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Left, k.Right},
 		{k.PageUp, k.PageDown, k.Home, k.End},
-		{k.Enter, k.Escape, k.Refresh, k.Filter},
+		{k.Enter, k.Escape, k.Refresh, k.RefreshAll, k.Filter},
 		{k.Toggle, k.TurnOn, k.TurnOff, k.Reboot},
 		{k.Tab, k.View1, k.View2, k.View3, k.View4, k.View5, k.View6},
 		{k.Command, k.Help, k.Debug, k.Quit},
@@ -240,7 +245,8 @@ func applyNavigationBindings(km *KeyMap, kb *config.KeybindingsConfig) {
 func applyActionBindings(km *KeyMap, kb *config.KeybindingsConfig) {
 	applyBinding(&km.Enter, kb.Enter, "select")
 	applyBinding(&km.Escape, kb.Escape, "back")
-	applyBinding(&km.Refresh, kb.Refresh, "refresh")
+	applyBinding(&km.Refresh, kb.Refresh, "refresh device")
+	applyBinding(&km.RefreshAll, kb.RefreshAll, "refresh all")
 	applyBinding(&km.Filter, kb.Filter, "filter")
 	applyBinding(&km.Command, kb.Command, "command")
 	applyBinding(&km.Help, kb.Help, "help")

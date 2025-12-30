@@ -32,8 +32,9 @@ func testIOStreams() (*iostreams.IOStreams, *bytes.Buffer, *bytes.Buffer) {
 func setupTestConfig(t *testing.T) func() {
 	t.Helper()
 
-	// Save original HOME
+	// Save original environment
 	originalHome := os.Getenv("HOME")
+	originalXDG := os.Getenv("XDG_CONFIG_HOME")
 
 	// Reset the config singleton BEFORE changing HOME
 	config.ResetDefaultManagerForTesting()
@@ -43,9 +44,12 @@ func setupTestConfig(t *testing.T) func() {
 	if err := os.Setenv("HOME", tmpDir); err != nil {
 		t.Fatalf("failed to set HOME: %v", err)
 	}
+	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
+	}
 
-	// Create config directory
-	configDir := filepath.Join(tmpDir, ".config", "shelly")
+	// Create config directory (XDG_CONFIG_HOME/shelly since XDG takes precedence)
+	configDir := filepath.Join(tmpDir, "shelly")
 	if err := os.MkdirAll(configDir, 0o750); err != nil {
 		t.Fatalf("failed to create config dir: %v", err)
 	}
@@ -64,6 +68,15 @@ groups: {}
 		config.ResetDefaultManagerForTesting()
 		if err := os.Setenv("HOME", originalHome); err != nil {
 			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+		if originalXDG != "" {
+			if err := os.Setenv("XDG_CONFIG_HOME", originalXDG); err != nil {
+				t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
+			}
+		} else {
+			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+				t.Logf("warning: failed to unset XDG_CONFIG_HOME: %v", err)
+			}
 		}
 	}
 }

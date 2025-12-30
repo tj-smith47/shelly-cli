@@ -12,10 +12,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// isTTY is a package-level function for TTY detection, overridable in tests.
+var isTTY = func() bool {
+	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+}
+
 // colorEnabled returns true if colored output should be used.
 // Returns false for --no-color, --plain, NO_COLOR env, or non-TTY.
 func colorEnabled() bool {
-	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+	if !isTTY() {
 		return false
 	}
 	if viper.GetBool("plain") || viper.GetBool("no-color") {

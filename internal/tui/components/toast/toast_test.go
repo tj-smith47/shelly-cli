@@ -257,27 +257,292 @@ func TestClearAll(t *testing.T) {
 	}
 }
 
-func TestModel_Overlay(t *testing.T) {
-	t.Parallel()
-	m := New()
-
-	base := "base content"
-	result := m.Overlay(base)
-
-	// Overlay with no toasts should return base unchanged
-	if result != base {
-		t.Errorf("Overlay() = %q, want %q", result, base)
-	}
-}
-
 func TestDefaultStyles(t *testing.T) {
 	t.Parallel()
 	styles := DefaultStyles()
 
 	// Just verify styles are created without panicking
-	_ = styles.Container
 	_ = styles.Info
 	_ = styles.Success
 	_ = styles.Warning
 	_ = styles.Error
+}
+
+func TestModel_QueueBehavior_TimerStartsOnFirstToastOnly(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Add first toast - should return a command (timer starts)
+	m, cmd1 := m.Update(ShowMsg{Message: "First", Level: LevelInfo, Duration: time.Second})
+	if cmd1 == nil {
+		t.Error("first toast should return a command (timer)")
+	}
+	if m.activeTimerID != m.toasts[0].ID {
+		t.Errorf("activeTimerID = %d, want %d", m.activeTimerID, m.toasts[0].ID)
+	}
+
+	// Add second toast - should NOT return a command (queued, no timer)
+	m, cmd2 := m.Update(ShowMsg{Message: "Second", Level: LevelInfo, Duration: time.Second})
+	if cmd2 != nil {
+		t.Error("queued toast should not return a command")
+	}
+	if len(m.toasts) != 2 {
+		t.Errorf("toasts count = %d, want 2", len(m.toasts))
+	}
+	// activeTimerID should still be first toast
+	if m.activeTimerID != m.toasts[0].ID {
+		t.Errorf("activeTimerID should still be first toast")
+	}
+}
+
+func TestModel_DismissStartsNextToastTimer(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Add two toasts
+	m, _ = m.Update(ShowMsg{Message: "First", Level: LevelInfo, Duration: time.Second})
+	m, _ = m.Update(ShowMsg{Message: "Second", Level: LevelInfo, Duration: time.Second})
+
+	firstID := m.toasts[0].ID
+	secondID := m.toasts[1].ID
+
+	// Dismiss first toast
+	m, cmd := m.Update(dismissMsg{ID: firstID})
+
+	// Should have one toast remaining
+	if len(m.toasts) != 1 {
+		t.Fatalf("expected 1 toast after dismiss, got %d", len(m.toasts))
+	}
+
+	// activeTimerID should now be second toast
+	if m.activeTimerID != secondID {
+		t.Errorf("activeTimerID = %d, want %d", m.activeTimerID, secondID)
+	}
+
+	// Should return a command for next toast's timer
+	if cmd == nil {
+		t.Error("dismiss should return a command to start next toast's timer")
+	}
+}
+
+func TestModel_StaleDismissIgnored(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Add toast
+	m, _ = m.Update(ShowMsg{Message: "Test", Level: LevelInfo, Duration: time.Second})
+	currentID := m.toasts[0].ID
+
+	// Try to dismiss with wrong ID (stale dismiss message)
+	staleID := currentID + 100
+	m, _ = m.Update(dismissMsg{ID: staleID})
+
+	// Toast should NOT be dismissed
+	if len(m.toasts) != 1 {
+		t.Error("stale dismiss should be ignored")
+	}
+}
+
+func TestModel_HandleKey_FirstEscapeDismissesCurrentToast(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Add two toasts
+	m, _ = m.Update(ShowMsg{Message: "First", Level: LevelInfo})
+	m, _ = m.Update(ShowMsg{Message: "Second", Level: LevelInfo})
+
+	// Press Escape
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	// First toast should be dismissed
+	if len(m.toasts) != 1 {
+		t.Errorf("expected 1 toast after first Esc, got %d", len(m.toasts))
+	}
+	if m.toasts[0].Message != "Second" {
+		t.Errorf("remaining toast should be Second, got %q", m.toasts[0].Message)
+	}
+
+	// pendingDismiss should be set
+	if !m.pendingDismiss {
+		t.Error("pendingDismiss should be true after first Esc")
+	}
+}
+
+func TestModel_HandleKey_SecondEscapeClearsAll(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Add three toasts
+	m, _ = m.Update(ShowMsg{Message: "First", Level: LevelInfo})
+	m, _ = m.Update(ShowMsg{Message: "Second", Level: LevelInfo})
+	m, _ = m.Update(ShowMsg{Message: "Third", Level: LevelInfo})
+
+	// Simulate first Escape - dismiss current, set pendingDismiss
+	m.pendingDismiss = true
+	m.toasts = m.toasts[1:] // Remove first toast
+
+	// Second Escape (within 500ms window)
+	m, _ = m.handleKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	// All toasts should be cleared
+	if len(m.toasts) != 0 {
+		t.Errorf("expected 0 toasts after second Esc, got %d", len(m.toasts))
+	}
+	if m.pendingDismiss {
+		t.Error("pendingDismiss should be false after clearing all")
+	}
+	if m.activeTimerID != -1 {
+		t.Errorf("activeTimerID should be -1 after clearing all, got %d", m.activeTimerID)
+	}
+}
+
+func TestModel_HandleKey_NoToastsNoOp(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	// Press Escape with no toasts
+	newM, cmd := m.handleKey(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+	if cmd != nil {
+		t.Error("Esc with no toasts should return nil cmd")
+	}
+	if newM.pendingDismiss {
+		t.Error("pendingDismiss should not be set with no toasts")
+	}
+}
+
+func TestModel_HandleKey_NonEscapeKeyIgnored(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m, _ = m.Update(ShowMsg{Message: "Test", Level: LevelInfo})
+
+	// Press a different key
+	m, _ = m.handleKey(tea.KeyPressMsg{Code: 'a'})
+
+	// Toast should still be there
+	if len(m.toasts) != 1 {
+		t.Error("non-Esc key should not dismiss toast")
+	}
+}
+
+func TestModel_ViewAsInputBar_Empty(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	view := m.ViewAsInputBar()
+	if view != "" {
+		t.Error("ViewAsInputBar should return empty string when no toasts")
+	}
+}
+
+func TestModel_ViewAsInputBar_SingleToast(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(80, 40)
+	m, _ = m.Update(ShowMsg{Message: "Success message", Level: LevelSuccess})
+
+	view := m.ViewAsInputBar()
+	if view == "" {
+		t.Error("ViewAsInputBar should not be empty with a toast")
+	}
+	// Should not have badge since only one toast
+	if contains(view, "(+") {
+		t.Error("ViewAsInputBar should not show badge for single toast")
+	}
+}
+
+func TestModel_ViewAsInputBar_WithBadge(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m = m.SetSize(80, 40)
+
+	// Add multiple toasts
+	m, _ = m.Update(ShowMsg{Message: "First", Level: LevelInfo})
+	m, _ = m.Update(ShowMsg{Message: "Second", Level: LevelInfo})
+	m, _ = m.Update(ShowMsg{Message: "Third", Level: LevelInfo})
+
+	view := m.ViewAsInputBar()
+
+	// Should show badge "(+2)" for 2 remaining queued toasts
+	if !contains(view, "(+2)") {
+		t.Errorf("ViewAsInputBar should show badge (+2), got: %s", view)
+	}
+}
+
+func TestModel_ViewAsInputBar_LevelIcons(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		level Level
+		icon  string
+	}{
+		{LevelSuccess, "✓"},
+		{LevelWarning, "!"},
+		{LevelError, "✗"},
+		{LevelInfo, "ℹ"},
+	}
+
+	for _, tt := range tests {
+		m := New()
+		m = m.SetSize(80, 40)
+		m, _ = m.Update(ShowMsg{Message: "Test", Level: tt.level})
+
+		view := m.ViewAsInputBar()
+		if !contains(view, tt.icon) {
+			t.Errorf("ViewAsInputBar for level %v should contain icon %s", tt.level, tt.icon)
+		}
+	}
+}
+
+func TestModel_ResetPendingDismissMsg(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m.pendingDismiss = true
+
+	m, _ = m.Update(resetPendingDismissMsg{})
+
+	if m.pendingDismiss {
+		t.Error("pendingDismiss should be false after resetPendingDismissMsg")
+	}
+}
+
+func TestModel_ClearAllResetsPendingDismiss(t *testing.T) {
+	t.Parallel()
+	m := New()
+	m, _ = m.Update(ShowMsg{Message: "Test", Level: LevelInfo})
+	m.pendingDismiss = true
+	m.activeTimerID = 5
+
+	m, _ = m.Update(ClearAllMsg{})
+
+	if m.pendingDismiss {
+		t.Error("ClearAllMsg should reset pendingDismiss")
+	}
+	if m.activeTimerID != -1 {
+		t.Errorf("ClearAllMsg should reset activeTimerID to -1, got %d", m.activeTimerID)
+	}
+}
+
+func TestModel_New_InitializesActiveTimerID(t *testing.T) {
+	t.Parallel()
+	m := New()
+
+	if m.activeTimerID != -1 {
+		t.Errorf("new model should have activeTimerID = -1, got %d", m.activeTimerID)
+	}
+}
+
+// contains checks if s contains substr.
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || substr == "" ||
+		(s != "" && substr != "" && findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

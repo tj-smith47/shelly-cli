@@ -239,8 +239,9 @@ func TestCacheDir(t *testing.T) {
 func setupPackageTest(t *testing.T) func() {
 	t.Helper()
 
-	// Save original HOME
+	// Save original values
 	originalHome := os.Getenv("HOME")
+	originalXDGConfig := os.Getenv("XDG_CONFIG_HOME")
 
 	// Reset the default manager
 	ResetDefaultManagerForTesting()
@@ -250,9 +251,13 @@ func setupPackageTest(t *testing.T) func() {
 	if err := os.Setenv("HOME", tmpDir); err != nil {
 		t.Fatalf("failed to set HOME: %v", err)
 	}
+	// Also set XDG_CONFIG_HOME to temp directory to ensure config isolation
+	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
+	}
 
-	// Create config directory and minimal config
-	configDir := tmpDir + "/.config/shelly"
+	// Create config directory and minimal config (XDG_CONFIG_HOME takes precedence)
+	configDir := tmpDir + "/shelly"
 	if err := os.MkdirAll(configDir, 0o750); err != nil {
 		t.Fatalf("failed to create config dir: %v", err)
 	}
@@ -266,6 +271,15 @@ func setupPackageTest(t *testing.T) func() {
 		ResetDefaultManagerForTesting()
 		if err := os.Setenv("HOME", originalHome); err != nil {
 			t.Logf("warning: failed to restore HOME: %v", err)
+		}
+		if originalXDGConfig != "" {
+			if err := os.Setenv("XDG_CONFIG_HOME", originalXDGConfig); err != nil {
+				t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
+			}
+		} else {
+			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+				t.Logf("warning: failed to unset XDG_CONFIG_HOME: %v", err)
+			}
 		}
 	}
 }

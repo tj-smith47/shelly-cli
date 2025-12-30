@@ -445,6 +445,7 @@ func TestPackageLevelAliasFunctions(t *testing.T) {
 	// Note: This test modifies global state, cannot be parallel
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 	ResetDefaultManagerForTesting()
 
 	// Test AddAlias

@@ -7,7 +7,8 @@ import (
 )
 
 func TestNewRegistry(t *testing.T) {
-	t.Parallel()
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	registry, err := NewRegistry()
 	if err != nil {
@@ -24,7 +25,8 @@ func TestNewRegistry(t *testing.T) {
 }
 
 func TestRegistry_PluginsDir(t *testing.T) {
-	t.Parallel()
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	registry, err := NewRegistry()
 	if err != nil {

@@ -255,24 +255,26 @@ func (m *Model) View() string {
 
 	var content strings.Builder
 
-	// Calculate label width (same logic as renderDeviceSparkline)
-	labelWidth := 16
-	if m.width < 60 {
-		labelWidth = 12
+	// Calculate max label width from actual device names - never truncate
+	maxLabelLen := 0
+	for _, d := range devices {
+		if len(d.Device.Name) > maxLabelLen {
+			maxLabelLen = len(d.Device.Name)
+		}
 	}
+	labelWidth := max(10, maxLabelLen+1) // +1 for spacing
 
-	// Sparkline width calculation:
+	// Sparkline width calculation (shrinks to accommodate full names):
 	// - Borders: 2 (left + right)
 	// - Horizontal padding: 2 (1 each side inside border)
-	// - Label: labelWidth (16 or 12)
+	// - Label: labelWidth (dynamic)
 	// - Spaces: 2 (after label, after sparkline)
 	// - Value: 10
-	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = labelWidth + 16
-	sparkWidth := m.width - labelWidth - 16
+	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = 16 + labelWidth
+	sparkWidth := m.width - 16 - labelWidth
 	if sparkWidth < 10 {
-		sparkWidth = 10
+		sparkWidth = 10 // Absolute minimum sparkline width
 	}
-	// Don't cap at maxItems - generateSparkline will pad with low bars if we don't have enough data
 
 	debug.TraceLock("energyhistory", "RLock", "View")
 	m.mu.RLock()
@@ -291,7 +293,7 @@ func (m *Model) View() string {
 		history := m.history[d.Device.Name]
 		if len(history) > 0 {
 			hasData = true
-			content.WriteString(m.renderDeviceSparkline(d.Device.Name, history, sparkWidth) + "\n")
+			content.WriteString(m.renderDeviceSparkline(d.Device.Name, history, sparkWidth, labelWidth) + "\n")
 		}
 	}
 
@@ -341,23 +343,12 @@ func (m *Model) collectCurrentPower(devices []*cache.DeviceData) {
 	}
 }
 
-func (m *Model) renderDeviceSparkline(name string, history []DataPoint, width int) string {
-	// Label width based on available space (max 16, min truncated)
-	labelWidth := 16
-	if m.width < 60 {
-		labelWidth = 12
-	}
-
-	// Truncate/pad label
-	label := name
-	maxLabel := labelWidth - 2 // Leave room for spacing
-	if len(label) > maxLabel {
-		label = label[:maxLabel-3] + "..."
-	}
-	labelStr := m.styles.Label.Width(labelWidth).Render(label)
+func (m *Model) renderDeviceSparkline(name string, history []DataPoint, sparkWidth, labelWidth int) string {
+	// Use full name with dynamic label width - no truncation
+	labelStr := m.styles.Label.Width(labelWidth).Render(name)
 
 	// Generate sparkline (already styled with gradient colors)
-	sparkStr := m.generateSparkline(history, width)
+	sparkStr := m.generateSparkline(history, sparkWidth)
 
 	// Current value (right-aligned)
 	current := history[len(history)-1].Value

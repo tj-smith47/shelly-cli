@@ -17,7 +17,6 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
@@ -660,7 +659,7 @@ func FormatDeviceGeneration(gen int) string {
 // Returns false for --no-color, --plain, non-TTY output, or test environments.
 func shouldHighlight() bool {
 	// Require stdout to be a TTY (disables in tests and pipes)
-	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+	if !isTTY() {
 		return false
 	}
 	// Disabled for --plain or --no-color

@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -211,7 +212,7 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 
 // TestRun_NoPushOrPull tests that run fails without --push or --pull.
 func TestRun_NoPushOrPull(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -235,7 +236,7 @@ func TestRun_NoPushOrPull(t *testing.T) {
 
 // TestRun_BothPushAndPull tests that run fails with both --push and --pull.
 func TestRun_BothPushAndPull(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -259,7 +260,7 @@ func TestRun_BothPushAndPull(t *testing.T) {
 
 // TestRun_PullNoDevices tests pull with no configured devices.
 func TestRun_PullNoDevices(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -278,7 +279,7 @@ func TestRun_PullNoDevices(t *testing.T) {
 
 // TestRun_PushNoSyncDir tests push when no sync directory exists.
 func TestRun_PushNoSyncDir(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -301,7 +302,7 @@ func TestRun_PushNoSyncDir(t *testing.T) {
 
 // TestRun_PullWithDryRun tests pull with dry-run flag.
 func TestRun_PullWithDryRun(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -324,7 +325,7 @@ func TestRun_PullWithDryRun(t *testing.T) {
 
 // TestRun_PushWithDryRun tests push with dry-run flag.
 func TestRun_PushWithDryRun(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -343,7 +344,7 @@ func TestRun_PushWithDryRun(t *testing.T) {
 
 // TestRun_PullSpecificDevices tests pull with specific devices.
 func TestRun_PullSpecificDevices(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -354,15 +355,19 @@ func TestRun_PullSpecificDevices(t *testing.T) {
 		Devices: []string{"living-room", "kitchen"},
 	}
 
-	err := run(context.Background(), f, opts)
+	// Use short timeout to prevent hanging on network operations
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
 
-	// May fail due to config loading or device not found
+	err := run(ctx, f, opts)
+
+	// May fail due to config loading, device not found, or context timeout
 	_ = err
 }
 
 // TestRun_PushSpecificDevices tests push with specific devices.
 func TestRun_PushSpecificDevices(t *testing.T) {
-	t.Parallel()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -373,7 +378,11 @@ func TestRun_PushSpecificDevices(t *testing.T) {
 		Devices: []string{"living-room"},
 	}
 
-	err := run(context.Background(), f, opts)
+	// Use short timeout to prevent hanging on network operations
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	err := run(ctx, f, opts)
 
 	// Should fail since no sync directory exists
 	_ = err

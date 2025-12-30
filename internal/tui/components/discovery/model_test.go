@@ -288,9 +288,10 @@ func TestModel_HandleKey_MethodSwitch(t *testing.T) {
 		key  string
 		want shelly.DiscoveryMethod
 	}{
-		{"1", shelly.DiscoveryMDNS},
-		{"2", shelly.DiscoveryHTTP},
-		{"3", shelly.DiscoveryCoIoT},
+		{"m", shelly.DiscoveryMDNS},
+		{"h", shelly.DiscoveryHTTP},
+		{"c", shelly.DiscoveryCoIoT},
+		{"b", shelly.DiscoveryBLE},
 	}
 
 	for _, tt := range tests {
@@ -299,15 +300,7 @@ func TestModel_HandleKey_MethodSwitch(t *testing.T) {
 			m := newTestModel()
 			m.focused = true
 
-			var msg tea.KeyPressMsg
-			switch tt.key {
-			case "1":
-				msg = tea.KeyPressMsg{Code: '1'}
-			case "2":
-				msg = tea.KeyPressMsg{Code: '2'}
-			case "3":
-				msg = tea.KeyPressMsg{Code: '3'}
-			}
+			msg := tea.KeyPressMsg{Code: rune(tt.key[0])}
 
 			updated, _ := m.Update(msg)
 

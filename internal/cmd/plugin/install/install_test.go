@@ -227,7 +227,9 @@ func TestRun_NonExistentLocalFile(t *testing.T) {
 }
 
 func TestRun_ValidLocalFile(t *testing.T) {
-	t.Parallel()
+	// Set XDG_CONFIG_HOME to use temp directory for plugins
+	configDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configDir)
 
 	// Create a temp directory and file with shelly- prefix
 	tmpDir := t.TempDir()
@@ -253,7 +255,8 @@ func TestRun_ValidLocalFile(t *testing.T) {
 }
 
 func TestRun_GitHubSourceParsing(t *testing.T) {
-	t.Parallel()
+	configDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configDir)
 
 	tests := []struct {
 		name   string
@@ -269,10 +272,8 @@ func TestRun_GitHubSourceParsing(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest // uses t.Setenv
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
 			ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
@@ -296,7 +297,8 @@ func TestRun_GitHubSourceParsing(t *testing.T) {
 }
 
 func TestRun_URLSourceParsing(t *testing.T) {
-	t.Parallel()
+	configDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configDir)
 
 	tests := []struct {
 		name   string
@@ -312,10 +314,8 @@ func TestRun_URLSourceParsing(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest // uses t.Setenv
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
 			ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
@@ -372,7 +372,8 @@ func TestRun_SourceTypeDetection(t *testing.T) {
 }
 
 func TestRun_ForceFlag(t *testing.T) {
-	t.Parallel()
+	configDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configDir)
 
 	// Create a temp file
 	tmpDir := t.TempDir()

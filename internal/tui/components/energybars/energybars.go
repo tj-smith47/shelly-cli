@@ -168,21 +168,30 @@ func (m Model) View() string {
 		maxVal = 100 // Minimum scale for visibility
 	}
 
-	// Bar width calculation:
+	// Calculate max label width - never truncate names, shrink bars instead
+	maxLabelLen := 0
+	for _, bar := range m.bars {
+		if len(bar.Label) > maxLabelLen {
+			maxLabelLen = len(bar.Label)
+		}
+	}
+	labelWidth := max(10, maxLabelLen+1) // +1 for spacing
+
+	// Bar width calculation (shrinks to accommodate full names):
 	// - Borders: 2 (left + right)
 	// - Horizontal padding: 2 (1 each side inside border)
-	// - Label: 16
+	// - Label: labelWidth (dynamic)
 	// - Spaces: 2 (after label, after bar)
 	// - Value: 10
-	// Total overhead = 2 + 2 + 16 + 2 + 10 = 32
-	barWidth := m.width - 32
-	if barWidth < 10 {
-		barWidth = 10
+	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = 16 + labelWidth
+	barWidth := m.width - 16 - labelWidth
+	if barWidth < 5 {
+		barWidth = 5 // Absolute minimum bar width
 	}
 
 	var totalPower float64
 	for _, bar := range m.bars {
-		content.WriteString(m.renderBar(bar, maxVal, barWidth) + "\n")
+		content.WriteString(m.renderBar(bar, maxVal, barWidth, labelWidth) + "\n")
 		totalPower += bar.Value
 	}
 
@@ -298,7 +307,7 @@ func (m Model) findMaxValue() float64 {
 	return maxValue
 }
 
-func (m Model) renderBar(bar Bar, maxVal float64, barWidth int) string {
+func (m Model) renderBar(bar Bar, maxVal float64, barWidth, labelWidth int) string {
 	// Calculate fill percentage
 	fillPct := bar.Value / maxVal
 	if fillPct > 1 {
@@ -318,12 +327,8 @@ func (m Model) renderBar(bar Bar, maxVal float64, barWidth int) string {
 	fill := m.styles.BarFill.Foreground(bar.Color).Render(strings.Repeat(fillChar, fillCount))
 	empty := m.styles.BarEmpty.Render(strings.Repeat(emptyChar, emptyCount))
 
-	// Label and value
-	label := bar.Label
-	if len(label) > 14 {
-		label = label[:11] + "..."
-	}
-	labelStr := m.styles.Label.Render(label)
+	// Label - use full name, left-aligned with dynamic width
+	labelStr := m.styles.Label.Width(labelWidth).Render(bar.Label)
 
 	valueStr := formatValue(bar.Value, bar.Unit)
 	valueRender := m.styles.Value.Render(valueStr)

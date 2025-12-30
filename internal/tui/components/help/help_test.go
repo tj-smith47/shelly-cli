@@ -215,11 +215,12 @@ func TestFormatBindings(t *testing.T) {
 	}
 
 	formatted := m.formatBindings(bindings)
-	if formatted == "" {
+	if len(formatted) == 0 {
 		t.Error("expected non-empty formatted bindings")
 	}
 
-	if !strings.Contains(formatted, "Quit") {
+	joined := strings.Join(formatted, "\n")
+	if !strings.Contains(joined, "Quit") {
 		t.Error("expected formatted output to contain 'Quit'")
 	}
 }

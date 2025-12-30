@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/views"
 )
@@ -28,9 +29,15 @@ func newTestModel(t *testing.T) Model {
 	cfg := &config.Config{}
 	mgr := config.NewTestManager(cfg)
 
+	// Create a simple shelly service without plugin support
+	// This prevents the factory from creating the plugins directory
+	// in the real config location during tests.
+	testService := shelly.New(shelly.NewConfigResolver())
+
 	f := cmdutil.NewFactory().
 		SetIOStreams(ios).
-		SetConfigManager(mgr)
+		SetConfigManager(mgr).
+		SetShellyService(testService)
 
 	opts := DefaultOptions()
 	opts.RefreshInterval = 1 * time.Hour // Long interval for testing

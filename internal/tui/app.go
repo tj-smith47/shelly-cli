@@ -405,6 +405,9 @@ func (m Model) Init() tea.Cmd {
 		m.toast.Init(),
 		m.events.Init(),
 		m.viewManager.Init(),
+		m.energyBars.Init(),
+		m.energyHistory.Init(),
+		m.deviceList.Init(),
 	)
 }
 
@@ -1184,7 +1187,21 @@ func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) 
 		m = m.updateViewManagerSize()
 		return m, cmd, true
 	case key.Matches(msg, m.keys.Refresh):
-		return m, func() tea.Msg { return cache.RefreshTickMsg{} }, true
+		// Refresh selected device only
+		device := m.deviceList.SelectedDevice()
+		if device == nil {
+			return m, toast.Show("No device selected", toast.LevelWarning), true
+		}
+		return m, tea.Batch(
+			func() tea.Msg { return cache.DeviceRefreshMsg{Name: device.Device.Name} },
+			toast.Show(fmt.Sprintf("Refreshing %s", device.Device.Name), toast.LevelInfo),
+		), true
+	case key.Matches(msg, m.keys.RefreshAll):
+		// Refresh all devices
+		return m, tea.Batch(
+			func() tea.Msg { return cache.RefreshTickMsg{} },
+			toast.Show("Refreshing all devices", toast.LevelInfo),
+		), true
 	case key.Matches(msg, m.keys.Escape):
 		if m.filter != "" {
 			m.filter = ""
@@ -2169,9 +2186,12 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 	deviceCount := m.cache.DeviceCount()
 	onlineCount := m.cache.OnlineCount()
 
+	// Format count in yellow
+	badge := theme.SemanticWarning().Render(fmt.Sprintf("%d/%d", onlineCount, deviceCount))
+
 	r := rendering.New(width, height).
 		SetTitle("Devices").
-		SetBadge(fmt.Sprintf("%d/%d", onlineCount, deviceCount)).
+		SetBadge(badge).
 		SetFocused(focused).
 		SetPanelIndex(1)
 
@@ -2249,7 +2269,8 @@ func (m Model) renderHeader() string {
 	// Line 1: Device counts (moved up, no blank line after title)
 	if m.cache.IsLoading() {
 		fetched := m.cache.FetchedCount()
-		metaLines[1] = labelStyle.Render("Devices: ") + valueStyle.Render(fmt.Sprintf("Loading... %d/%d", fetched, total))
+		spinner := m.deviceList.SpinnerFrame()
+		metaLines[1] = labelStyle.Render("Devices: ") + valueStyle.Render(fmt.Sprintf("%s Loading... %d/%d", spinner, fetched, total))
 	} else {
 		metaLines[1] = labelStyle.Render("Devices: ") +
 			onlineStyle.Render(fmt.Sprintf("%d online", online))
