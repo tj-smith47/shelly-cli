@@ -775,6 +775,19 @@ func (m Model) EventCount() int {
 	return m.eventCount()
 }
 
+// ConnectionCounts returns the number of connected and total devices via WebSocket.
+func (m Model) ConnectionCounts() (connected, total int) {
+	m.state.mu.RLock()
+	defer m.state.mu.RUnlock()
+	total = len(m.state.connStatus)
+	for _, isConnected := range m.state.connStatus {
+		if isConnected {
+			connected++
+		}
+	}
+	return connected, total
+}
+
 // Clear clears all events.
 func (m Model) Clear() {
 	m.state.mu.Lock()
@@ -942,6 +955,7 @@ func mergeEventsByTime(user, system []Event) []Event {
 // columnLayout holds width calculations for event columns.
 type columnLayout struct {
 	colWidth  int
+	sysColW   int
 	timeW     int
 	levelW    int
 	userDevW  int
@@ -951,28 +965,58 @@ type columnLayout struct {
 	sysDescW  int
 }
 
-// computeColumnLayout calculates column widths based on total width.
-func computeColumnLayout(totalWidth int) columnLayout {
+// computeColumnLayout calculates column widths with dynamic sizing.
+// System events can shrink below 50% to give user events more room.
+// Component column collapses when empty and expands as needed.
+func computeColumnLayout(totalWidth int, userEvents, systemEvents []Event) columnLayout {
 	const timeW = 8
 	const levelW = 12
-	const minDeviceW, minCompW, minDescW = 10, 8, 8
+	const minDeviceW, minDescW = 10, 8
+	const headerCompW = 4 // "COMP"
 	const spacesUser, spacesSys = 4, 3
+	const separatorW = 3 // " │ "
 
-	colWidth := max(30, (totalWidth-3)/2)
+	// Calculate available width for both columns
+	availableWidth := totalWidth - separatorW
+	maxSysColWidth := availableWidth / 2 // System column caps at 50%
+	minSysColWidth := 30                 // Minimum system column width
 
-	// User column layout (with COMP)
-	remainingUser := colWidth - timeW - levelW - spacesUser
-	userDeviceW := max(minDeviceW, remainingUser*20/100)
-	userCompW := max(minCompW, remainingUser*20/100)
-	userDescW := max(minDescW, remainingUser-userDeviceW-userCompW)
+	// Calculate actual system content width needed
+	sysContentWidth := calculateSystemContentWidth(systemEvents, timeW, levelW, spacesSys)
+
+	// System column: use content width, capped at 50%, with minimum
+	sysColWidth := max(minSysColWidth, min(sysContentWidth, maxSysColWidth))
+
+	// User column gets the rest
+	userColWidth := max(30, availableWidth-sysColWidth)
+
+	// Calculate component column width dynamically
+	// Collapse to header width when no events have components
+	maxCompLen := 0
+	for _, e := range userEvents {
+		compLen := len(e.Component)
+		if e.ComponentID > 0 {
+			compLen += 2 // ":N" suffix
+		}
+		if compLen > maxCompLen {
+			maxCompLen = compLen
+		}
+	}
+	// Use header width as minimum, cap at reasonable max
+	userCompW := max(headerCompW, min(maxCompLen, 12))
+
+	// User column layout
+	remainingUser := userColWidth - timeW - levelW - spacesUser - userCompW
+	userDeviceW := max(minDeviceW, remainingUser*30/100)
+	userDescW := max(minDescW, remainingUser-userDeviceW)
 
 	// System column layout (no COMP)
-	remainingSys := colWidth - timeW - levelW - spacesSys
+	remainingSys := sysColWidth - timeW - levelW - spacesSys
 	sysDeviceW := max(minDeviceW, remainingSys*25/100)
 	sysDescW := max(minDescW, remainingSys-sysDeviceW)
 
 	return columnLayout{
-		colWidth:  colWidth,
+		colWidth:  userColWidth,
 		timeW:     timeW,
 		levelW:    levelW,
 		userDevW:  userDeviceW,
@@ -980,7 +1024,36 @@ func computeColumnLayout(totalWidth int) columnLayout {
 		userDescW: userDescW,
 		sysDevW:   sysDeviceW,
 		sysDescW:  sysDescW,
+		sysColW:   sysColWidth,
 	}
+}
+
+// calculateSystemContentWidth determines the width needed for system events.
+func calculateSystemContentWidth(sysEvents []Event, timeW, levelW, spaces int) int {
+	if len(sysEvents) == 0 {
+		return 30 // Minimum default
+	}
+
+	maxDeviceLen := 0
+	maxDescLen := 0
+
+	for _, e := range sysEvents {
+		deviceLen := len(e.Device)
+		if deviceLen > maxDeviceLen {
+			maxDeviceLen = deviceLen
+		}
+		descLen := len(e.Description)
+		if descLen > maxDescLen {
+			maxDescLen = descLen
+		}
+	}
+
+	// Total: TIME + DEVICE + LEVEL + DESC + spaces
+	// Cap device and desc at reasonable maximums
+	maxDeviceLen = min(maxDeviceLen, 16)
+	maxDescLen = min(maxDescLen, 40)
+
+	return timeW + maxDeviceLen + levelW + maxDescLen + spaces
 }
 
 // dualColumnRenderState holds state for rendering dual columns.
@@ -999,7 +1072,7 @@ type dualColumnRenderState struct {
 // Takes pre-split user and system event lists.
 func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string {
 	colors := theme.GetSemanticColors()
-	layout := computeColumnLayout(m.width)
+	layout := computeColumnLayout(m.width, userEvents, systemEvents)
 
 	m.userPaginator.SetTotalPages(len(userEvents))
 	m.systemPaginator.SetTotalPages(len(systemEvents))
@@ -1021,7 +1094,7 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 		separator:        separator,
 		cursorStyle:      lipgloss.NewStyle().Background(colors.AltBackground).Bold(true),
 		emptyLeft:        output.PadRight("", layout.colWidth),
-		emptyRight:       output.PadRight("", layout.colWidth),
+		emptyRight:       output.PadRight("", layout.sysColW),
 		userCursorInPage: m.userCursor - userStart,
 		sysCursorInPage:  m.systemCursor - sysStart,
 		maxLinesPerEvent: m.calcMaxLinesPerUserEvent(len(userPage)),
@@ -1032,7 +1105,7 @@ func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string 
 
 	// Pagination dots
 	leftDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.userPaginator.View())
-	rightDots := lipgloss.NewStyle().Width(layout.colWidth).Align(lipgloss.Center).Render(m.systemPaginator.View())
+	rightDots := lipgloss.NewStyle().Width(layout.sysColW).Align(lipgloss.Center).Render(m.systemPaginator.View())
 	lines = append(lines, leftDots+" "+separator+" "+rightDots)
 
 	return strings.Join(lines, "\n")
@@ -1051,7 +1124,7 @@ func (m Model) buildDualColumnHeader(layout columnLayout, separator string) []st
 	}
 
 	leftTitle := output.PadRight(userTitleStyle.Render("User Events"), layout.colWidth)
-	rightTitle := output.PadRight(sysTitleStyle.Render("System Events"), layout.colWidth)
+	rightTitle := output.PadRight(sysTitleStyle.Render("System Events"), layout.sysColW)
 
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Purple())
 	leftColHeader := headerStyle.Render(output.PadRight("TIME", layout.timeW)) + " " +
@@ -1067,14 +1140,15 @@ func (m Model) buildDualColumnHeader(layout columnLayout, separator string) []st
 		sysHeaderStyle.Render("DESC")
 
 	leftColHeader = output.PadRight(leftColHeader, layout.colWidth)
-	rightColHeader = output.PadRight(rightColHeader, layout.colWidth)
+	rightColHeader = output.PadRight(rightColHeader, layout.sysColW)
 
-	sepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", layout.colWidth))
+	leftSepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", layout.colWidth))
+	rightSepLine := lipgloss.NewStyle().Foreground(colors.TableBorder).Render(strings.Repeat("-", layout.sysColW))
 
 	return []string{
 		leftTitle + " " + separator + " " + rightTitle,
 		leftColHeader + " " + separator + " " + rightColHeader,
-		sepLine + " " + separator + " " + sepLine,
+		leftSepLine + " " + separator + " " + rightSepLine,
 	}
 }
 
@@ -1129,7 +1203,7 @@ func (m Model) renderUserEventRow(userEvt Event, sysPage []Event, userIdx, sysId
 		leftCell := output.PadRight(uline, rs.layout.colWidth)
 		rightCell := rs.emptyRight
 		if i == 0 {
-			rightCell = output.PadRight(sysLine, rs.layout.colWidth)
+			rightCell = output.PadRight(sysLine, rs.layout.sysColW)
 			if isUserSelected {
 				leftCell = rs.cursorStyle.Render(leftCell)
 			}
@@ -1147,7 +1221,7 @@ func (m Model) renderUserEventRow(userEvt Event, sysPage []Event, userIdx, sysId
 func (m Model) renderSystemOnlyRow(sysEvt Event, sysIdx int, rs dualColumnRenderState) string {
 	isSysSelected := m.focused && m.focusedColumn == ColumnSystem && sysIdx == rs.sysCursorInPage
 	rightCell := output.PadRight(m.renderSystemEvent(sysEvt, rs.layout.timeW, rs.layout.sysDevW,
-		rs.layout.levelW, rs.layout.sysDescW), rs.layout.colWidth)
+		rs.layout.levelW, rs.layout.sysDescW), rs.layout.sysColW)
 	if isSysSelected {
 		rightCell = rs.cursorStyle.Render(rightCell)
 	}

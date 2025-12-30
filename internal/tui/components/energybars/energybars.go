@@ -188,7 +188,12 @@ func (m Model) View() string {
 
 	// Use rendering package for consistent embedded title styling
 	// Show PM device count and legend in badge
-	badge := fmt.Sprintf("%d devices │ Legend: ██ high ░░ low", len(m.bars))
+	// Text in border color (yellow), Unicode chars in actual bar colors
+	borderStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
+	barFillStyle := lipgloss.NewStyle().Foreground(theme.Orange())
+	badge := borderStyle.Render(fmt.Sprintf("%d devices │ Legend: ", len(m.bars))) +
+		barFillStyle.Render("██") + borderStyle.Render(" high ") +
+		barFillStyle.Render("░░") + borderStyle.Render(" low")
 	r := rendering.New(m.width, m.height).
 		SetTitle("Power Consumption").
 		SetBadge(badge).

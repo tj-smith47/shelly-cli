@@ -260,12 +260,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.StartScan()
 	case "a", "enter":
 		return m.addSelectedDevice()
-	case "1":
+	case "m":
 		m.method = shelly.DiscoveryMDNS
-	case "2":
+	case "h":
 		m.method = shelly.DiscoveryHTTP
-	case "3":
+	case "c":
 		m.method = shelly.DiscoveryCoIoT
+	case "b":
+		m.method = shelly.DiscoveryBLE
 	}
 
 	return m, nil
@@ -297,7 +299,7 @@ func (m Model) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("s:scan a:add p:provision 1-3:method")
+		r.SetFooter("s:scan a:add p:provision m/h/c/b:method")
 	}
 
 	var content strings.Builder
@@ -369,9 +371,10 @@ func (m Model) renderMethodSelector() string {
 		key    string
 		name   string
 	}{
-		{shelly.DiscoveryMDNS, "1", "mDNS"},
-		{shelly.DiscoveryHTTP, "2", "HTTP"},
-		{shelly.DiscoveryCoIoT, "3", "CoIoT"},
+		{shelly.DiscoveryMDNS, "m", "mDNS"},
+		{shelly.DiscoveryHTTP, "h", "HTTP"},
+		{shelly.DiscoveryCoIoT, "c", "CoIoT"},
+		{shelly.DiscoveryBLE, "b", "BLE"},
 	}
 
 	parts := make([]string, 0, len(methods))

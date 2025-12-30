@@ -248,10 +248,6 @@ func (m *Model) View() string {
 		return m.renderEmpty()
 	}
 
-	// Collect current power data from online devices with PM capability
-	// This ensures we always record data on each render cycle
-	m.collectCurrentPower(devices)
-
 	var content strings.Builder
 
 	// Calculate label width (same logic as renderDeviceSparkline)
@@ -294,11 +290,12 @@ func (m *Model) View() string {
 		return m.renderNoData()
 	}
 
-	// Build gradient legend showing color scale
-	legend := "Legend: " +
-		m.styles.SparkGradient[0].Render("▁") +
-		m.styles.SparkGradient[3].Render("▄") +
-		m.styles.SparkGradient[7].Render("█")
+	// Build legend: text in border color (yellow), Unicode chars in gradient colors
+	borderStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
+	legend := borderStyle.Render("Legend:") + " " +
+		m.styles.SparkGradient[0].Render("▁") + borderStyle.Render(" low ") +
+		m.styles.SparkGradient[3].Render("▄") + borderStyle.Render(" mid ") +
+		m.styles.SparkGradient[7].Render("█") + borderStyle.Render(" high")
 
 	// Use rendering package for consistent embedded title styling
 	r := rendering.New(m.width, m.height).

@@ -227,12 +227,17 @@ func (m Model) checkAllDevices() tea.Cmd {
 		)
 
 		// Rate limiting is handled at the service layer
-		g, gctx := errgroup.WithContext(ctx)
+		// Don't use errgroup.WithContext - it would cancel all on first error
+		var g errgroup.Group
 
 		for _, dev := range m.devices {
 			device := dev
 			g.Go(func() error {
-				info, checkErr := m.svc.CheckFirmware(gctx, device.Name)
+				// Per-device timeout to avoid blocking on unreachable devices
+				deviceCtx, deviceCancel := context.WithTimeout(ctx, 15*time.Second)
+				defer deviceCancel()
+
+				info, checkErr := m.svc.CheckFirmware(deviceCtx, device.Name)
 				mu.Lock()
 				result := DeviceFirmware{
 					Name:    device.Name,
@@ -296,7 +301,11 @@ func (m Model) updateDevices(devices []DeviceFirmware) tea.Cmd {
 				continue
 			}
 
-			err := m.svc.UpdateFirmwareStable(ctx, dev.Name)
+			// Per-device timeout to avoid blocking on unreachable devices
+			// Firmware updates can take longer, so use 60 seconds
+			deviceCtx, deviceCancel := context.WithTimeout(ctx, 60*time.Second)
+			err := m.svc.UpdateFirmwareStable(deviceCtx, dev.Name)
+			deviceCancel()
 			if err != nil {
 				// Log but continue with remaining devices
 				iostreams.DebugErr("firmware update "+dev.Name, err)
@@ -477,7 +486,18 @@ func (m Model) View() string {
 
 	// Action buttons
 	content.WriteString(m.renderActions())
-	content.WriteString("\n\n")
+	content.WriteString("\n")
+
+	// Status indicator (under actions, above device list)
+	if m.checking {
+		content.WriteString(m.checkLoader.View())
+		content.WriteString("\n")
+	} else if m.updating {
+		content.WriteString(m.updateLoader.View())
+		content.WriteString("\n")
+	}
+
+	content.WriteString("\n")
 
 	// Device list
 	if len(m.devices) == 0 {
@@ -495,15 +515,6 @@ func (m Model) View() string {
 		content.WriteString(m.styles.Muted.Render("  " + hint))
 		content.WriteString("\n")
 		content.WriteString(m.styles.Muted.Render("  Press 'r' to retry"))
-	}
-
-	// Status indicator
-	if m.checking {
-		content.WriteString("\n")
-		content.WriteString(m.checkLoader.View())
-	} else if m.updating {
-		content.WriteString("\n")
-		content.WriteString(m.updateLoader.View())
 	}
 
 	r.SetContent(content.String())

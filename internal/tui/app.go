@@ -762,23 +762,61 @@ func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
 
 // updateStatusBarContext updates the status bar with context-specific items.
 func (m Model) updateStatusBarContext() Model {
-	// Get component counts from cache
-	switchesOn, switchesOff := m.cache.SwitchCounts()
-	lightsOn, lightsOff := m.cache.LightCounts()
-	coversOpen, coversClosed, coversMoving := m.cache.CoverCounts()
+	// Get all component counts in a single lock acquisition
+	counts := m.cache.ComponentCounts()
 
 	m.statusBar = m.statusBar.SetComponentCounts(statusbar.ComponentCounts{
-		SwitchesOn:   switchesOn,
-		SwitchesOff:  switchesOff,
-		LightsOn:     lightsOn,
-		LightsOff:    lightsOff,
-		CoversOpen:   coversOpen,
-		CoversClosed: coversClosed,
-		CoversMoving: coversMoving,
+		SwitchesOn:   counts.SwitchesOn,
+		SwitchesOff:  counts.SwitchesOff,
+		LightsOn:     counts.LightsOn,
+		LightsOff:    counts.LightsOff,
+		CoversOpen:   counts.CoversOpen,
+		CoversClosed: counts.CoversClosed,
+		CoversMoving: counts.CoversMoving,
 	})
 
-	// Clear legacy items (device counts replaced by component counts)
-	m.statusBar = m.statusBar.ClearItems()
+	// Set view-specific context based on active tab
+	activeTab := m.tabBar.ActiveTabID()
+	panelName := m.focusedPanelName()
+
+	switch activeTab {
+	case tabs.TabDashboard, tabs.TabAutomation, tabs.TabConfig:
+		// Device-based views: show selected device info
+		devices := m.getFilteredDevices()
+		if len(devices) > 0 && m.cursor >= 0 && m.cursor < len(devices) {
+			d := devices[m.cursor]
+			m.statusBar = m.statusBar.SetDeviceContext(d.Device.DisplayName(), d.Device.Address, panelName)
+		} else {
+			m.statusBar = m.statusBar.ClearContext()
+		}
+
+	case tabs.TabMonitor:
+		// Monitor view: show WebSocket connection status and refresh interval
+		wsConnected, wsTotal := m.events.ConnectionCounts()
+		refreshInterval := 5 * time.Second // Events refresh interval
+		m.statusBar = m.statusBar.SetMonitorContext(wsConnected, wsTotal, refreshInterval, panelName)
+
+	case tabs.TabManage:
+		// Manage view: show firmware update count from firmware component
+		firmwareUpdates := 0
+		if manageView, ok := m.viewManager.Get(views.ViewManage).(*views.Manage); ok {
+			firmwareUpdates = manageView.Firmware().UpdateCount()
+		}
+		m.statusBar = m.statusBar.SetManageContext(firmwareUpdates, panelName)
+
+	case tabs.TabFleet:
+		// Fleet view: show selected group from groups model
+		groupName := ""
+		if fleetView, ok := m.viewManager.Get(views.ViewFleet).(*views.Fleet); ok {
+			if group := fleetView.Groups().SelectedGroup(); group != nil {
+				groupName = group.Name
+			}
+		}
+		m.statusBar = m.statusBar.SetFleetContext(groupName, panelName)
+
+	default:
+		m.statusBar = m.statusBar.ClearContext()
+	}
 
 	return m
 }
