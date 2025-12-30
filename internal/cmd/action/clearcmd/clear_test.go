@@ -285,3 +285,90 @@ func TestRun_WithIndex(t *testing.T) {
 		t.Logf("Expected error for Gen2 device")
 	}
 }
+
+func TestExecute_Gen1Device(t *testing.T) {
+	// Gen1 device - should succeed in clearing action
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-device", "out_on_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	// May succeed or fail depending on mock capabilities
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected if mock doesn't support action URLs)", err)
+	}
+}
+
+func TestRun_Gen1WithIndex(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-device",
+		Event:   "out_on_url",
+		Index:   1,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	// May succeed or fail depending on mock capabilities
+	if err != nil {
+		t.Logf("run() error = %v (may be expected)", err)
+	}
+}

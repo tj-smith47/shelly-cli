@@ -228,8 +228,12 @@ internal/
 │   │                   #   ResolveWithGeneration() - Gen1/Gen2 detection
 │   │                   #   Service accessors for subpackages
 │   │
-│   ├── connection.go   # Connection management helpers
-│   │                   #   DeviceClient, WithDevice(), WithDevices()
+│   ├── connection/     # Connection management subpackage
+│   │   ├── connection.go # Manager struct, Provider/Resolver/Discoverer interfaces
+│   │   ├── client.go     # DeviceClient - unified Gen1/Gen2 wrapper
+│   │   ├── executor.go   # ExecuteGen2(), ExecuteGen1() with IP remapping
+│   │   ├── remap.go      # tryIPRemap(), isConnectionError() helpers
+│   │   └── batch.go      # WithDevice(), WithDevices() batch operations
 │   │
 │   ├── resolver.go     # DeviceResolver interface
 │   ├── device.go       # Device operations

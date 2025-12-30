@@ -1,4 +1,4 @@
-package shelly
+package connection
 
 import (
 	"testing"
@@ -13,7 +13,7 @@ func TestDeviceClient_Gen1(t *testing.T) {
 		t.Parallel()
 
 		// Create a mock Gen1Client (nil pointer for testing purposes, but we're testing the wrapper)
-		dc := &DeviceClient{gen1: &client.Gen1Client{}}
+		dc := NewGen1Client(&client.Gen1Client{})
 
 		if !dc.IsGen1() {
 			t.Error("expected IsGen1() to be true")
@@ -26,7 +26,7 @@ func TestDeviceClient_Gen1(t *testing.T) {
 	t.Run("IsGen2 with gen2 client", func(t *testing.T) {
 		t.Parallel()
 
-		dc := &DeviceClient{gen2: &client.Client{}}
+		dc := NewGen2Client(&client.Client{})
 
 		if dc.IsGen1() {
 			t.Error("expected IsGen1() to be false")
@@ -101,7 +101,7 @@ func TestDeviceClient_Gen1Panic(t *testing.T) {
 	t.Run("Gen1 panics when not gen1 connection", func(t *testing.T) {
 		t.Parallel()
 
-		dc := &DeviceClient{gen2: &client.Client{}}
+		dc := NewGen2Client(&client.Client{})
 
 		defer func() {
 			if r := recover(); r == nil {
@@ -119,7 +119,7 @@ func TestDeviceClient_Gen2Panic(t *testing.T) {
 	t.Run("Gen2 panics when not gen2 connection", func(t *testing.T) {
 		t.Parallel()
 
-		dc := &DeviceClient{gen1: &client.Gen1Client{}}
+		dc := NewGen1Client(&client.Gen1Client{})
 
 		defer func() {
 			if r := recover(); r == nil {

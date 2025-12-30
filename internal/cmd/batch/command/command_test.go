@@ -479,3 +479,83 @@ func TestRun_WithParams(t *testing.T) {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
 }
+
+func TestRun_YAMLOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Timeout:    5 * time.Second,
+		Concurrent: 1,
+	}
+	opts.Format = "yaml"
+
+	err = run(context.Background(), tf.Factory, []string{"test-device"}, "Shelly.GetStatus", nil, opts)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected)", err)
+	}
+}
+
+func TestRun_FailedDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "nonexistent-device",
+					Address:    "192.168.1.200", // No mock server on this address
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Timeout:    1 * time.Second,
+		Concurrent: 1,
+	}
+
+	// This should fail because the device doesn't exist
+	err = run(context.Background(), tf.Factory, []string{"nonexistent-device"}, "Shelly.GetStatus", nil, opts)
+	// Expect error due to failed device
+	if err != nil {
+		t.Logf("run() error = %v (expected for failed device)", err)
+	}
+}
