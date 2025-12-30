@@ -22,6 +22,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
 // DeviceData holds cached data for a single device.
@@ -212,8 +213,12 @@ func (c *Cache) SubscribeToEvents(es *automation.EventStream) {
 func (c *Cache) handleDeviceEvent(evt events.Event) {
 	deviceID := evt.DeviceID()
 
+	debug.TraceLock("cache", "Lock", "handleDeviceEvent:"+deviceID)
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	defer func() {
+		c.mu.Unlock()
+		debug.TraceUnlock("cache", "Lock", "handleDeviceEvent:"+deviceID)
+	}()
 
 	data, exists := c.devices[deviceID]
 	if !exists {
@@ -878,17 +883,19 @@ func (c *Cache) fetchMonitoringSnapshot(ctx context.Context, name string, data *
 
 // handleDeviceUpdate processes a device update message.
 func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
+	debug.TraceLock("cache", "Lock", "handleDeviceUpdate:"+msg.Name)
 	c.mu.Lock()
 	existing := c.devices[msg.Name]
 
 	// Discard stale responses - only accept newer request IDs
 	if existing != nil && msg.RequestID > 0 && msg.RequestID < existing.lastRequestID {
 		c.mu.Unlock()
+		debug.TraceUnlock("cache", "Lock", "handleDeviceUpdate:"+msg.Name+":stale")
 		return nil // Stale response, discard
 	}
 
-	// Apply update with preservation logic
-	c.applyDeviceUpdate(msg, existing)
+	// Apply update with preservation logic - returns deferred event to publish after unlock
+	deferredEvent := c.applyDeviceUpdate(msg, existing)
 	c.deviceRefreshTimes[msg.Name] = time.Now()
 	c.pendingCount--
 	allDone := c.pendingCount <= 0 && c.initialLoad
@@ -896,6 +903,13 @@ func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
 		c.initialLoad = false
 	}
 	c.mu.Unlock()
+	debug.TraceUnlock("cache", "Lock", "handleDeviceUpdate:"+msg.Name)
+
+	// Publish deferred event AFTER releasing lock to avoid deadlock
+	// (eventStream.Publish is synchronous and may call handleDeviceEvent)
+	if deferredEvent != nil && c.eventStream != nil {
+		c.eventStream.Publish(deferredEvent)
+	}
 
 	// Schedule next refresh for this device (adaptive interval)
 	var cmds []tea.Cmd
@@ -913,7 +927,8 @@ func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
 
 // applyDeviceUpdate applies the update, preserving existing data where appropriate.
 // Must be called with c.mu held.
-func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) {
+// Returns a deferred event to publish AFTER releasing the lock (to avoid deadlock).
+func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) events.Event {
 	// If refresh failed but we have existing good data, preserve it
 	if shouldPreserveExisting(msg.Data, existing) {
 		wasOnline := existing.Online
@@ -923,18 +938,18 @@ func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) {
 		existing.lastRequestID = msg.RequestID
 		c.devices[msg.Name] = existing
 
-		// Emit synthetic offline event if device was previously online
-		if wasOnline && c.eventStream != nil {
+		// Return synthetic offline event if device was previously online
+		// (caller will publish after releasing lock to avoid deadlock)
+		if wasOnline {
 			reason := "HTTP polling failed"
 			if msg.Data.Error != nil {
 				reason = msg.Data.Error.Error()
 			}
-			offlineEvt := events.NewDeviceOfflineEvent(msg.Name).
+			return events.NewDeviceOfflineEvent(msg.Name).
 				WithReason(reason).
 				WithSource(events.EventSourceLocal)
-			c.eventStream.Publish(offlineEvt)
 		}
-		return
+		return nil
 	}
 
 	// Normal update - preserve snapshot if new one is nil
@@ -948,6 +963,7 @@ func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) {
 			c.macToIP[mac] = msg.Data.Device.Address
 		}
 	}
+	return nil
 }
 
 // shouldPreserveExisting returns true if the existing data should be preserved.
@@ -1077,8 +1093,12 @@ func (c *Cache) GetDevice(name string) *DeviceData {
 
 // GetAllDevices returns all cached devices in sorted order.
 func (c *Cache) GetAllDevices() []*DeviceData {
+	debug.TraceLock("cache", "RLock", "GetAllDevices")
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	defer func() {
+		c.mu.RUnlock()
+		debug.TraceUnlock("cache", "RLock", "GetAllDevices")
+	}()
 
 	result := make([]*DeviceData, 0, len(c.order))
 	for _, name := range c.order {
@@ -1091,8 +1111,12 @@ func (c *Cache) GetAllDevices() []*DeviceData {
 
 // GetOnlineDevices returns only online devices.
 func (c *Cache) GetOnlineDevices() []*DeviceData {
+	debug.TraceLock("cache", "RLock", "GetOnlineDevices")
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	defer func() {
+		c.mu.RUnlock()
+		debug.TraceUnlock("cache", "RLock", "GetOnlineDevices")
+	}()
 
 	result := make([]*DeviceData, 0, len(c.order))
 	for _, name := range c.order {
@@ -1136,65 +1160,77 @@ func (c *Cache) TotalPower() float64 {
 	return total
 }
 
-// SwitchCounts returns the count of switches that are on and off across all online devices.
-func (c *Cache) SwitchCounts() (on, off int) {
+// ComponentCountsResult holds all component counts.
+type ComponentCountsResult struct {
+	SwitchesOn   int
+	SwitchesOff  int
+	LightsOn     int
+	LightsOff    int
+	CoversOpen   int
+	CoversClosed int
+	CoversMoving int
+}
+
+// ComponentCounts returns all component counts in a single lock acquisition.
+// This is more efficient than calling SwitchCounts, LightCounts, CoverCounts separately.
+func (c *Cache) ComponentCounts() ComponentCountsResult {
+	debug.TraceLock("cache", "RLock", "ComponentCounts")
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	defer func() {
+		c.mu.RUnlock()
+		debug.TraceUnlock("cache", "RLock", "ComponentCounts")
+	}()
+
+	var result ComponentCountsResult
 	for _, data := range c.devices {
 		if !data.Online {
 			continue
 		}
 		for _, sw := range data.Switches {
 			if sw.On {
-				on++
+				result.SwitchesOn++
 			} else {
-				off++
+				result.SwitchesOff++
+			}
+		}
+		for _, lt := range data.Lights {
+			if lt.On {
+				result.LightsOn++
+			} else {
+				result.LightsOff++
+			}
+		}
+		for _, cv := range data.Covers {
+			switch cv.State {
+			case "open":
+				result.CoversOpen++
+			case "closed":
+				result.CoversClosed++
+			default: // opening, closing, stopped
+				result.CoversMoving++
 			}
 		}
 	}
-	return on, off
+	return result
+}
+
+// SwitchCounts returns the count of switches that are on and off across all online devices.
+func (c *Cache) SwitchCounts() (on, off int) {
+	counts := c.ComponentCounts()
+	return counts.SwitchesOn, counts.SwitchesOff
 }
 
 // LightCounts returns the count of lights that are on and off across all online devices.
 func (c *Cache) LightCounts() (on, off int) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, data := range c.devices {
-		if !data.Online {
-			continue
-		}
-		for _, lt := range data.Lights {
-			if lt.On {
-				on++
-			} else {
-				off++
-			}
-		}
-	}
-	return on, off
+	counts := c.ComponentCounts()
+	return counts.LightsOn, counts.LightsOff
 }
 
 // CoverCounts returns the count of covers by state across all online devices:
 // open, closed, moving (opening/closing/stopped).
 func (c *Cache) CoverCounts() (open, closed, moving int) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, data := range c.devices {
-		if !data.Online {
-			continue
-		}
-		for _, cv := range data.Covers {
-			switch cv.State {
-			case "open":
-				open++
-			case "closed":
-				closed++
-			default: // opening, closing, stopped
-				moving++
-			}
-		}
-	}
-	return open, closed, moving
+	counts := c.ComponentCounts()
+	return counts.CoversOpen, counts.CoversClosed, counts.CoversMoving
 }
 
 // IsLoading returns true if initial load is in progress.

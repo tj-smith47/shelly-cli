@@ -296,7 +296,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Load keybindings from config or use defaults
 	keymap := KeyMapFromConfig(cfg)
 
-	return Model{
+	m := Model{
 		ctx:             ctx,
 		factory:         f,
 		cfg:             cfg,
@@ -327,6 +327,11 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		deviceDetail:    deviceDetailModel,
 		debugLogger:     debug.New(), // nil if SHELLY_TUI_DEBUG not set
 	}
+
+	// Set global debug logger for trace logging from components
+	debug.SetGlobal(m.debugLogger)
+
+	return m
 }
 
 // Close cleans up resources used by the TUI.
@@ -1318,6 +1323,12 @@ func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
 // dispatchDebugAction handles the debug toggle action.
 func (m Model) dispatchDebugAction() (Model, tea.Cmd, bool) {
 	enabled, sessionDir := m.debugLogger.Toggle()
+	// Update global logger for trace logging from components
+	if enabled {
+		debug.SetGlobal(m.debugLogger)
+	} else {
+		debug.SetGlobal(nil)
+	}
 	var desc, toastMsg string
 	if enabled {
 		desc = "Debug session started: " + sessionDir

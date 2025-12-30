@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -354,8 +355,12 @@ func (m Model) addEvent(e Event) {
 	if m.paused {
 		return
 	}
+	debug.TraceLock("events", "Lock", "addEvent")
 	m.state.mu.Lock()
-	defer m.state.mu.Unlock()
+	defer func() {
+		m.state.mu.Unlock()
+		debug.TraceUnlock("events", "Lock", "addEvent")
+	}()
 
 	// Add to appropriate list based on event type
 	if isUserEvent(e) {
@@ -618,12 +623,14 @@ func (m Model) SetSize(width, height int) Model {
 
 // View renders the events (content only - wrapper handles title/footer).
 func (m Model) View() string {
+	debug.TraceLock("events", "RLock", "View")
 	m.state.mu.RLock()
 	userEvents := make([]Event, len(m.state.userEvents))
 	copy(userEvents, m.state.userEvents)
 	systemEvents := make([]Event, len(m.state.systemEvents))
 	copy(systemEvents, m.state.systemEvents)
 	m.state.mu.RUnlock()
+	debug.TraceUnlock("events", "RLock", "View")
 
 	if len(userEvents) == 0 && len(systemEvents) == 0 {
 		return lipgloss.NewStyle().
@@ -777,8 +784,12 @@ func (m Model) EventCount() int {
 
 // ConnectionCounts returns the number of connected and total devices via WebSocket.
 func (m Model) ConnectionCounts() (connected, total int) {
+	debug.TraceLock("events", "RLock", "ConnectionCounts")
 	m.state.mu.RLock()
-	defer m.state.mu.RUnlock()
+	defer func() {
+		m.state.mu.RUnlock()
+		debug.TraceUnlock("events", "RLock", "ConnectionCounts")
+	}()
 	total = len(m.state.connStatus)
 	for _, isConnected := range m.state.connStatus {
 		if isConnected {

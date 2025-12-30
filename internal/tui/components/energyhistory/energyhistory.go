@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -213,8 +214,12 @@ func modelHasPM(model string) bool {
 }
 
 func (m *Model) addDataPoint(deviceName string, power float64) {
+	debug.TraceLock("energyhistory", "Lock", "addDataPoint:"+deviceName)
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer func() {
+		m.mu.Unlock()
+		debug.TraceUnlock("energyhistory", "Lock", "addDataPoint:"+deviceName)
+	}()
 
 	point := DataPoint{
 		Value:     power,
@@ -269,8 +274,12 @@ func (m *Model) View() string {
 	}
 	// Don't cap at maxItems - generateSparkline will pad with low bars if we don't have enough data
 
+	debug.TraceLock("energyhistory", "RLock", "View")
 	m.mu.RLock()
-	defer m.mu.RUnlock()
+	defer func() {
+		m.mu.RUnlock()
+		debug.TraceUnlock("energyhistory", "RLock", "View")
+	}()
 
 	// Sort devices by power (highest first) to match power consumption order
 	slices.SortFunc(devices, func(a, b *cache.DeviceData) int {

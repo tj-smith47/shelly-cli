@@ -41,6 +41,36 @@ type Logger struct {
 	startTime  time.Time
 }
 
+// globalLogger is the shared logger instance for trace logging.
+var globalLogger *Logger
+
+// SetGlobal sets the global logger instance for trace logging.
+// This should be called once when the app starts.
+func SetGlobal(l *Logger) {
+	globalLogger = l
+}
+
+// TraceLock logs a lock acquisition from any component.
+func TraceLock(component, lockType, caller string) {
+	if globalLogger != nil {
+		globalLogger.LogLock(component, lockType, caller)
+	}
+}
+
+// TraceUnlock logs a lock release from any component.
+func TraceUnlock(component, lockType, caller string) {
+	if globalLogger != nil {
+		globalLogger.LogUnlock(component, lockType, caller)
+	}
+}
+
+// TraceNetwork logs a network operation from any component.
+func TraceNetwork(operation, device, method string, err error) {
+	if globalLogger != nil {
+		globalLogger.LogNetwork(operation, device, method, err)
+	}
+}
+
 // New creates a new Logger.
 // If SHELLY_TUI_DEBUG=1 is set, creates an active session immediately.
 // Otherwise returns a disabled logger that can be toggled on with Shift+D.
@@ -151,6 +181,64 @@ func (l *Logger) LogEvent(event string) {
 
 	if _, err := l.file.WriteString(entry); err != nil {
 		iostreams.DebugErr("write log event", err)
+	}
+}
+
+// LogLock writes a lock acquisition trace message.
+// component is the component name (e.g., "cache", "events"), lockType is "Lock" or "RLock".
+func (l *Logger) LogLock(component, lockType, caller string) {
+	if l == nil || !l.enabled {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	timestamp := time.Now().Format("2006-01-02T15:04:05.000")
+	entry := fmt.Sprintf("[%s] LOCK: %s.%s() from %s\n", timestamp, component, lockType, caller)
+
+	if _, err := l.file.WriteString(entry); err != nil {
+		iostreams.DebugErr("write lock trace", err)
+	}
+}
+
+// LogUnlock writes a lock release trace message.
+func (l *Logger) LogUnlock(component, lockType, caller string) {
+	if l == nil || !l.enabled {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	timestamp := time.Now().Format("2006-01-02T15:04:05.000")
+	entry := fmt.Sprintf("[%s] UNLOCK: %s.%s() from %s\n", timestamp, component, lockType, caller)
+
+	if _, err := l.file.WriteString(entry); err != nil {
+		iostreams.DebugErr("write unlock trace", err)
+	}
+}
+
+// LogNetwork writes a network operation trace message.
+// operation is "start" or "end", device is the device name/address, method is the API call.
+func (l *Logger) LogNetwork(operation, device, method string, err error) {
+	if l == nil || !l.enabled {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	timestamp := time.Now().Format("2006-01-02T15:04:05.000")
+	var entry string
+	if err != nil {
+		entry = fmt.Sprintf("[%s] NET %s: %s %s (err: %v)\n", timestamp, operation, device, method, err)
+	} else {
+		entry = fmt.Sprintf("[%s] NET %s: %s %s\n", timestamp, operation, device, method)
+	}
+
+	if _, err := l.file.WriteString(entry); err != nil {
+		iostreams.DebugErr("write network trace", err)
 	}
 }
 
