@@ -194,6 +194,14 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 	case "Cover.Open", "Cover.Close", "Cover.Stop":
 		result = map[string]any{}
 
+	case "Input.GetStatus":
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getComponentState(state, fmt.Sprintf("input:%d", id))
+
+	case "Input.GetConfig":
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getInputConfig(state, id)
+
 	case "Light.GetStatus":
 		id := ds.getIDFromParams(req.Params)
 		result = ds.getComponentState(state, fmt.Sprintf("light:%d", id))
@@ -211,6 +219,105 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		key := fmt.Sprintf("light:%d", id)
 		ds.updateLightState(device.Name, key, on, brightness)
 		result = map[string]any{}
+
+	case "Schedule.DeleteAll":
+		result = map[string]any{}
+
+	case "Script.GetCode":
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getScriptCode(state, id)
+
+	case "Script.List":
+		result = ds.getScriptList(state)
+
+	case "Script.Start", "Script.Stop":
+		result = map[string]any{"was_running": false}
+
+	case "Script.Create":
+		result = map[string]any{"id": 1}
+
+	case "Script.PutCode":
+		// Mock script code upload - return success
+		result = map[string]any{"len": 0}
+
+	case "Script.SetConfig":
+		// Mock script config update - return success
+		result = map[string]any{"restart_required": false}
+
+	case "Shelly.SetAuth":
+		// Mock auth enable/disable - return success
+		result = map[string]any{}
+
+	case "Zigbee.SetConfig":
+		// Return success for Zigbee config operations
+		result = map[string]any{"restart_required": false}
+
+	case "Zigbee.GetConfig":
+		// Return mock Zigbee config
+		result = map[string]any{"enable": true}
+
+	case "Zigbee.GetStatus":
+		// Return mock Zigbee status
+		result = map[string]any{
+			"network_state": "joined",
+			"eui64":         "0x00124B001234ABCD",
+			"pan_id":        float64(12345),
+			"channel":       float64(15),
+		}
+
+	case "Wifi.GetStatus":
+		// Return mock WiFi status
+		result = map[string]any{
+			"sta_ip":          "192.168.1.100",
+			"status":          "got ip",
+			"ssid":            "HomeNetwork",
+			"rssi":            float64(-45),
+			"ap_client_count": float64(0),
+		}
+
+	case "MQTT.GetStatus":
+		// Return MQTT status from device state or default
+		if mqttState, ok := state["mqtt"].(map[string]any); ok {
+			result = mqttState
+		} else {
+			result = map[string]any{"connected": false}
+		}
+
+	case "MQTT.GetConfig":
+		// Return MQTT config from device state or default
+		if mqttConfig, ok := state["mqtt_config"].(map[string]any); ok {
+			result = mqttConfig
+		} else {
+			result = map[string]any{
+				"enable":       false,
+				"server":       "",
+				"client_id":    "",
+				"topic_prefix": "",
+				"rpc_ntf":      true,
+				"status_ntf":   false,
+			}
+		}
+
+	case "MQTT.SetConfig":
+		// Return success for MQTT config operations
+		result = map[string]any{"restart_required": false}
+
+	case "Eth.GetStatus":
+		// Return mock Ethernet status from device state or default
+		if ethState, ok := state["eth"].(map[string]any); ok {
+			result = ethState
+		} else {
+			result = map[string]any{
+				"ip": "192.168.1.50",
+			}
+		}
+
+	case "Eth.GetConfig":
+		// Return mock Ethernet config
+		result = map[string]any{
+			"enable":   true,
+			"ipv4mode": "dhcp",
+		}
 
 	default:
 		ds.writeRPCError(w, req.ID, "method not found")
@@ -300,6 +407,9 @@ func (ds *DeviceServer) handleGen1(w http.ResponseWriter, r *http.Request, endpo
 
 	case strings.HasPrefix(endpoint, "/light/"):
 		ds.handleGen1Light(w, r, endpoint, state, device)
+
+	case strings.HasPrefix(endpoint, "/settings/actions"):
+		ds.handleGen1Actions(w, r, device)
 
 	default:
 		http.NotFound(w, r)
@@ -440,6 +550,44 @@ func (ds *DeviceServer) handleGen1Light(w http.ResponseWriter, _ *http.Request, 
 	}
 }
 
+// handleGen1Actions handles Gen1 /settings/actions endpoint for action URL management.
+func (ds *DeviceServer) handleGen1Actions(w http.ResponseWriter, r *http.Request, device *DeviceFixture) {
+	// Parse query parameters
+	index := r.URL.Query().Get("index")
+	name := r.URL.Query().Get("name")
+	enabled := r.URL.Query().Get("enabled")
+
+	ds.mu.Lock()
+	if ds.state[device.Name] == nil {
+		ds.state[device.Name] = make(DeviceState)
+	}
+	if ds.state[device.Name]["actions"] == nil {
+		ds.state[device.Name]["actions"] = make(map[string]any)
+	}
+
+	// Store the action state
+	actionKey := index + "_" + name
+	actions := ds.state[device.Name]["actions"].(map[string]any)
+	actions[actionKey] = map[string]any{
+		"index":   index,
+		"name":    name,
+		"enabled": enabled == "true",
+	}
+	ds.mu.Unlock()
+
+	// Return success response (Gen1 actions endpoint returns the action settings)
+	ds.writeJSON(w, map[string]any{
+		"actions": []map[string]any{
+			{
+				"index":   index,
+				"name":    name,
+				"enabled": enabled == "true",
+				"urls":    []string{},
+			},
+		},
+	})
+}
+
 func (ds *DeviceServer) parseIDParam(r *http.Request) int {
 	var req struct {
 		ID int `json:"id"`
@@ -527,4 +675,53 @@ func (ds *DeviceServer) GetState(deviceName string) DeviceState {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
 	return ds.state[deviceName]
+}
+
+// getInputConfig returns mock input configuration.
+func (ds *DeviceServer) getInputConfig(_ DeviceState, id int) map[string]any {
+	return map[string]any{
+		"id":            id,
+		"name":          fmt.Sprintf("Input %d", id),
+		"type":          "switch",
+		"enable":        true,
+		"invert":        false,
+		"factory_reset": true,
+	}
+}
+
+// getScriptCode returns mock script code.
+func (ds *DeviceServer) getScriptCode(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("script:%d", id)
+	if script, ok := state[key].(map[string]any); ok {
+		if code, ok := script["code"].(string); ok {
+			return map[string]any{"data": code}
+		}
+	}
+	// Return empty string for non-existent scripts (matches real behavior)
+	return map[string]any{"data": ""}
+}
+
+// getScriptList returns mock script list.
+func (ds *DeviceServer) getScriptList(state DeviceState) map[string]any {
+	var scripts []map[string]any
+	for key := range state {
+		if strings.HasPrefix(key, "script:") {
+			parts := strings.SplitN(key, ":", 2)
+			if len(parts) == 2 {
+				id := 0
+				if _, err := fmt.Sscanf(parts[1], "%d", &id); err == nil {
+					scripts = append(scripts, map[string]any{
+						"id":      id,
+						"name":    fmt.Sprintf("Script %d", id),
+						"enable":  true,
+						"running": false,
+					})
+				}
+			}
+		}
+	}
+	if len(scripts) == 0 {
+		scripts = []map[string]any{}
+	}
+	return map[string]any{"scripts": scripts}
 }

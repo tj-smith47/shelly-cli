@@ -1,4 +1,4 @@
-// Package del provides the template delete subcommand.
+// Package deletecmd provides the template delete subcommand.
 package deletecmd
 
 import (

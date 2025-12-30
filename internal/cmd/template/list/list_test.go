@@ -145,3 +145,24 @@ func TestNewCommand_LongDescription(t *testing.T) {
 		}
 	}
 }
+
+func TestExecute_Default(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	// Output goes to IOStreams, check it there
+	output := tf.TestIO.Out.String()
+	if !strings.Contains(output, "No templates") && output == "" {
+		t.Logf("output = %q", output)
+	}
+}

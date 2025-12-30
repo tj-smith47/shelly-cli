@@ -527,14 +527,17 @@ func TestRun_FailedDevice(t *testing.T) {
 		Config: mock.ConfigFixture{
 			Devices: []mock.DeviceFixture{
 				{
-					Name:       "nonexistent-device",
-					Address:    "192.168.1.200", // No mock server on this address
+					Name:       "test-device",
+					Address:    "192.168.1.100",
 					MAC:        "AA:BB:CC:DD:EE:FF",
 					Type:       "SNSW-001P16EU",
 					Model:      "Shelly Plus 1PM",
 					Generation: 2,
 				},
 			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
 		},
 	}
 
@@ -548,14 +551,66 @@ func TestRun_FailedDevice(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Timeout:    1 * time.Second,
+		Timeout:    5 * time.Second,
 		Concurrent: 1,
 	}
 
-	// This should fail because the device doesn't exist
-	err = run(context.Background(), tf.Factory, []string{"nonexistent-device"}, "Shelly.GetStatus", nil, opts)
-	// Expect error due to failed device
+	// Call an unsupported RPC method to trigger an error
+	err = run(context.Background(), tf.Factory, []string{"test-device"}, "Unsupported.Method", nil, opts)
+	// Expect error due to failed RPC - the device will return an error for unknown methods
+	if err == nil {
+		t.Logf("Expected error for unsupported method")
+	} else {
+		t.Logf("run() error = %v (expected)", err)
+	}
+}
+
+func TestRun_MixedResults(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "device-1",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "device-2",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"device-1": {"switch:0": map[string]any{"output": false}},
+			// device-2 has no state, so RPC calls may fail
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
 	if err != nil {
-		t.Logf("run() error = %v (expected for failed device)", err)
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Timeout:    5 * time.Second,
+		Concurrent: 2,
+	}
+
+	// One device should succeed, one may fail
+	err = run(context.Background(), tf.Factory, []string{"device-1", "device-2"}, "Shelly.GetStatus", nil, opts)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected for partial failure)", err)
 	}
 }

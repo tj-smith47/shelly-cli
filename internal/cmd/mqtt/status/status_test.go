@@ -2,10 +2,12 @@ package status
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -125,5 +127,255 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 		if !strings.Contains(cmd.Example, pattern) {
 			t.Errorf("expected Example to contain %q", pattern)
 		}
+	}
+}
+
+func TestExecute_NoArgs(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for missing device argument")
+	}
+}
+
+func TestExecute_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "status <device>") {
+		t.Error("help should show usage")
+	}
+	if !strings.Contains(output, "MQTT") {
+		t.Error("help should mention MQTT")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"mqtt":     map[string]any{"connected": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"test-device"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	// Output goes to TestIO, not cmd stdout
+	output := tf.OutString()
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"nonexistent-device"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_MQTTDisconnected(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "disconnected-mqtt",
+					Address:    "192.168.1.101",
+					MAC:        "BB:CC:DD:EE:FF:00",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"disconnected-mqtt": {
+				"switch:0": map[string]any{"output": false},
+				"mqtt":     map[string]any{"connected": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"disconnected-mqtt"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	// Output goes to TestIO, not cmd stdout
+	output := tf.OutString()
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_WithContext(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "context-device",
+					Address:    "192.168.1.102",
+					MAC:        "CC:DD:EE:FF:00:11",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"context-device": {
+				"mqtt": map[string]any{"connected": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	ctx := context.Background()
+	err = run(ctx, tf.Factory, "context-device")
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_CanceledContext(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "cancel-device",
+					Address:    "192.168.1.103",
+					MAC:        "DD:EE:FF:00:11:22",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	err = run(ctx, tf.Factory, "cancel-device")
+	if err == nil {
+		t.Error("expected error for canceled context")
 	}
 }

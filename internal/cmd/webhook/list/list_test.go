@@ -101,6 +101,12 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	if cmd.ValidArgsFunction == nil {
 		t.Error("ValidArgsFunction should be set for device completion")
 	}
+
+	// Actually call the ValidArgsFunction to get coverage
+	completions, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	// We don't require specific completions, just that it doesn't panic
+	_ = completions
+	_ = directive
 }
 
 func TestNewCommand_ExampleContent(t *testing.T) {

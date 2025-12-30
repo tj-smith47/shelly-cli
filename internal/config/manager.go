@@ -137,9 +137,15 @@ func (m *Manager) Save() error {
 }
 
 // saveWithoutLock writes config to file. Caller must hold m.mu.Lock().
+// For test managers (path is empty), this is a no-op.
 func (m *Manager) saveWithoutLock() error {
 	if m.config == nil {
 		return errors.New("config not loaded")
+	}
+
+	// Skip disk write for test managers (no path set)
+	if m.path == "" {
+		return nil
 	}
 
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {

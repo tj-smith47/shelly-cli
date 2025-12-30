@@ -2,10 +2,12 @@ package deleteall
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -159,5 +161,187 @@ func TestOptions(t *testing.T) {
 	}
 	if !opts.Yes {
 		t.Error("Yes should be true")
+	}
+}
+
+func TestExecute_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"unknown-device", "--yes"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for unknown device")
+	}
+	if !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "unknown") {
+		t.Errorf("Expected 'not found' or 'unknown' error, got: %v", err)
+	}
+}
+
+func TestExecute_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--yes"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "deleted") {
+		t.Errorf("Expected output to contain 'deleted', got: %s", output)
+	}
+}
+
+func TestExecute_Cancelled(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// In test mode, CanPrompt() returns false, so Confirm returns false (the default)
+	// This simulates user declining confirmation
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device"}) // No --yes flag
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v (expected nil for cancelled)", err)
+	}
+
+	// Warning messages go to ErrOut
+	output := tf.ErrString()
+	if !strings.Contains(output, "cancelled") {
+		t.Errorf("Expected output to contain 'cancelled', got: %s", output)
+	}
+}
+
+func TestRun_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+	opts.Yes = true
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "deleted") {
+		t.Errorf("Expected output to contain 'deleted', got: %s", output)
+	}
+}
+
+func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "unknown-device",
+	}
+	opts.Yes = true
+
+	err := run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for unknown device")
 	}
 }

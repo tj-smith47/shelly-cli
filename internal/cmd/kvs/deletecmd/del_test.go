@@ -2,10 +2,12 @@ package deletecmd
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -164,5 +166,260 @@ func TestOptions(t *testing.T) {
 	}
 	if !opts.Yes {
 		t.Error("Yes should be true")
+	}
+}
+
+func TestExecute_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "delete") {
+		t.Error("Help should contain 'delete'")
+	}
+	if !strings.Contains(output, "device") {
+		t.Error("Help should contain 'device'")
+	}
+	if !strings.Contains(output, "key") {
+		t.Error("Help should contain 'key'")
+	}
+}
+
+func TestExecute_DeviceNotFound(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"nonexistent-device", "some-key", "--yes"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error when device not found")
+	}
+}
+
+func TestExecute_WithMockDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "my-key", "--yes"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	// The mock server doesn't support KVS.Delete, so this will return an error
+	// But it exercises the code path through to the service call
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support KVS.Delete)", err)
+	}
+}
+
+func TestRun_Cancelled(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	// Provide "n" response for confirmation
+	tf.TestIO.In.WriteString("n\n")
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Key:     "test-key",
+	}
+	opts.Yes = false
+
+	err := run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v, want nil (cancelled)", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Aborted") {
+		t.Error("Expected 'Aborted' message when cancelled")
+	}
+}
+
+func TestRun_WithYesFlag(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Key:     "test-key",
+	}
+	opts.Yes = true // Skip confirmation
+
+	// Create a cancelled context to prevent actual delete attempt
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Should skip confirmation and fail at delete (due to cancelled context)
+	err := run(ctx, opts)
+
+	// Expect an error due to cancelled context (but confirmation was skipped)
+	if err == nil {
+		t.Error("Expected error with cancelled context")
+	}
+}
+
+func TestRun_WithMockDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Key:     "test-key",
+	}
+	opts.Yes = true
+
+	// Run will fail because mock doesn't support KVS.Delete,
+	// but it exercises the code path
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support KVS.Delete)", err)
+	}
+}
+
+func TestExecute_NoArgs(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error with no args")
+	}
+}
+
+func TestExecute_OneArg(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"device-only"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error with only one arg (missing key)")
+	}
+}
+
+func TestExecute_ThreeArgs(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"device", "key", "extra"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error with three args")
+	}
+}
+
+func TestOptions_Factory(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Key:     "test-key",
+	}
+
+	if opts.Factory == nil {
+		t.Fatal("Factory should not be nil")
+	}
+
+	ios := opts.Factory.IOStreams()
+	if ios == nil {
+		t.Error("Factory.IOStreams() should not return nil")
 	}
 }

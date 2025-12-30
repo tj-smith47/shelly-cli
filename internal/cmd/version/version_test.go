@@ -198,3 +198,26 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 		}
 	}
 }
+
+func TestRun_Check(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{"--check"})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	// Execute (may fail due to network, but exercises the code path)
+	_ = cmd.Execute()
+
+	// Just verify the code path was exercised
+	output := out.String()
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+}

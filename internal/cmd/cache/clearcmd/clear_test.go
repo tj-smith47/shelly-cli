@@ -440,6 +440,61 @@ func TestRun(t *testing.T) {
 	}
 }
 
+// TestRun_RemoveAllError tests the DebugErr path when os.RemoveAll fails.
+// This test is NOT parallel because it modifies environment variables.
+//
+//nolint:paralleltest // Modifies environment variables
+func TestRun_RemoveAllError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Permission test not reliable on Windows")
+	}
+
+	tempDir := t.TempDir()
+	setCacheHome(t, tempDir)
+
+	cacheDir := getCacheDir(tempDir)
+	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
+		t.Fatalf("Failed to create cache dir: %v", err)
+	}
+
+	// Create a subdirectory with a file
+	subDir := filepath.Join(cacheDir, "protected")
+	if err := os.MkdirAll(subDir, 0o750); err != nil {
+		t.Fatalf("Failed to create subdir: %v", err)
+	}
+	testFile := filepath.Join(subDir, "file.json")
+	if err := os.WriteFile(testFile, []byte(`{}`), 0o600); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Make parent directory read-only to prevent deletion
+	if err := os.Chmod(subDir, 0o500); err != nil {
+		t.Fatalf("Failed to chmod: %v", err)
+	}
+	t.Cleanup(func() {
+		// Restore permissions for cleanup
+		if err := os.Chmod(subDir, 0o750); err != nil {
+			t.Logf("warning: failed to restore permissions: %v", err)
+		}
+	})
+
+	var stdout, stderr bytes.Buffer
+	ios := iostreams.Test(nil, &stdout, &stderr)
+	f := cmdutil.NewWithIOStreams(ios)
+
+	// Run should still succeed (error is logged via DebugErr, not returned)
+	err := run(context.Background(), f)
+	if err != nil {
+		t.Errorf("run should not return error for RemoveAll failures: %v", err)
+	}
+
+	// Should still print "Cache cleared" even if some removals failed
+	combined := stdout.String() + stderr.String()
+	if !strings.Contains(combined, "Cache cleared") {
+		t.Errorf("Expected 'Cache cleared' message, got: %q", combined)
+	}
+}
+
 // TestRun_ViaCommand tests run by executing through the cobra command.
 // This test is NOT parallel because it modifies environment variables.
 //
