@@ -1,13 +1,16 @@
 package test
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -748,5 +751,944 @@ func TestOptions_ZeroValue(t *testing.T) {
 	}
 	if opts.Factory != nil {
 		t.Error("Zero Factory should be nil")
+	}
+}
+
+// Execute-based tests using mock.StartWithFixtures
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen2Device_ReturnsError(t *testing.T) {
+	// Gen2 device - should fail with "action test only available for Gen1 devices"
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen2-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen2-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen2-device", "out_on_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("Expected error for Gen2 device")
+	}
+	if !strings.Contains(err.Error(), "Gen1") {
+		t.Errorf("Expected error to mention Gen1, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_OutOnUrl_Success(t *testing.T) {
+	// Gen1 device with out_on_url - should turn relay on
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-relay",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-relay": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-relay", "out_on_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	// Check success message
+	output := tf.OutString()
+	if !strings.Contains(output, "triggered") {
+		t.Errorf("Expected success message containing 'triggered', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_OutOffUrl_Success(t *testing.T) {
+	// Gen1 device with out_off_url - should turn relay off
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-relay",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-relay": {"relay": map[string]any{"ison": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-relay", "out_off_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	// Check success message
+	output := tf.OutString()
+	if !strings.Contains(output, "triggered") {
+		t.Errorf("Expected success message containing 'triggered', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_ButtonEvent_ShowsWarning(t *testing.T) {
+	// Gen1 device with button event - should show warning about physical button
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-relay",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-relay": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-relay", "longpush_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	// Check for physical button warning
+	output := tf.OutString()
+	if !strings.Contains(output, "physical button") {
+		t.Errorf("Expected warning about physical button, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_RollerEvent_ShowsWarning(t *testing.T) {
+	// Gen1 device with roller event - should show warning about cover commands
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-roller",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-25",
+					Model:      "Shelly 2.5",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-roller": {"roller": map[string]any{"state": "stop"}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-roller", "roller_open_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	// Check for cover command warning
+	output := tf.OutString()
+	if !strings.Contains(output, "shelly cover") {
+		t.Errorf("Expected warning about cover commands, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_SensorEvent_ShowsWarning(t *testing.T) {
+	// Gen1 device with sensor event - should show warning about physical interaction
+	// Note: Sensor events trigger the "physical interaction" warning since they can't be programmatically triggered
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-sensor",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-sensor": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-sensor", "sensor_motion"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	// Check for warning about physical interaction (covers sensor, button, and other event types)
+	output := tf.OutString()
+	if !strings.Contains(output, "physical interaction") {
+		t.Errorf("Expected warning about physical interaction, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_UnknownEvent_ShowsDefaultWarning(t *testing.T) {
+	// Gen1 device with unknown event - should show default warning
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-device", "unknown_event"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	// Check for default warning about device event (includes "cannot be triggered programmatically" or "physical interaction")
+	output := tf.OutString()
+	if !strings.Contains(output, "physical interaction") && !strings.Contains(output, "cannot be triggered") {
+		t.Errorf("Expected warning about triggering, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"nonexistent-device", "out_on_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_WithIndex(t *testing.T) {
+	// Gen1 device with index flag
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-multi",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-25",
+					Model:      "Shelly 2.5",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-multi": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-multi", "out_on_url", "--index", "1"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	// May succeed or fail depending on mock capabilities for index 1
+	if err := cmd.Execute(); err != nil {
+		t.Logf("Execute error (may be expected): %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen2Device(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen2-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen2-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen2-device",
+		Event:   "out_on_url",
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for Gen2 device")
+	}
+	if err != nil && !strings.Contains(err.Error(), "Gen1") {
+		t.Errorf("Expected error to mention Gen1, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen1Device_OutOnUrl(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-device",
+		Event:   "out_on_url",
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "triggered") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen1Device_OutOffUrl(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-device",
+		Event:   "out_off_url",
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "triggered") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen1Device_ButtonEvent(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-device",
+		Event:   "shortpush_url",
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "physical button") {
+		t.Errorf("Expected physical button warning, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen1Device_RollerEvent(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-roller",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-25",
+					Model:      "Shelly 2.5",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-roller": {"roller": map[string]any{"state": "stop"}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-roller",
+		Event:   "roller_close_url",
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "shelly cover") {
+		t.Errorf("Expected cover command warning, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen1Device_SensorEvent(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-sensor",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-sensor": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-sensor",
+		Event:   "flood_detected_url", // Matches gen1.ActionSensorFlood
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "sensor condition") {
+		t.Errorf("Expected sensor condition warning, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen1Device_UnknownEvent(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-device",
+		Event:   "custom_event",
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	// "cannot be triggered" goes to stderr via Warning()
+	// "physical interaction" goes to stdout via Info()
+	if !strings.Contains(output, "physical interaction") {
+		t.Errorf("Expected physical interaction warning in output, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "nonexistent-device",
+		Event:   "out_on_url",
+		Index:   0,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_Gen1Device_WithIndex(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-multi",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-25",
+					Model:      "Shelly 2.5",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-multi": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen1-multi",
+		Event:   "out_on_url",
+		Index:   1,
+		Factory: tf.Factory,
+	}
+
+	// May succeed or fail depending on mock capabilities for index 1
+	if err := run(context.Background(), opts); err != nil {
+		t.Logf("run() error (may be expected): %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Help(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"--help"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_OutputOnAlias(t *testing.T) {
+	// Test with out_on (alternative to out_on_url)
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-relay",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-relay": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-relay", "out_on"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "triggered") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_Gen1Device_OutputOffAlias(t *testing.T) {
+	// Test with out_off (alternative to out_off_url)
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-relay",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-relay": {"relay": map[string]any{"ison": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-relay", "out_off"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute returned error: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "triggered") {
+		t.Errorf("Expected success message, got: %s", output)
 	}
 }

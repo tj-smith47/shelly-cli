@@ -2,11 +2,14 @@ package logout
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const cmdName = "logout"
@@ -210,33 +213,6 @@ func TestNewCommand_LongMentionsLogin(t *testing.T) {
 	}
 }
 
-func TestRun_WithIOStreams(t *testing.T) {
-	t.Parallel()
-
-	// This test exercises the run function with custom IOStreams
-	// The output depends on global config.Get() state
-
-	in := &bytes.Buffer{}
-	out := &bytes.Buffer{}
-	errOut := &bytes.Buffer{}
-	ios := iostreams.Test(in, out, errOut)
-
-	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	// Run will use global config state
-	err := run(f)
-
-	// Should not error (either logs out or says not logged in)
-	if err != nil {
-		t.Errorf("run() error = %v, want nil", err)
-	}
-
-	// Should produce some output
-	if out.Len() == 0 && errOut.Len() == 0 {
-		t.Log("no output produced - may depend on global config state")
-	}
-}
-
 func TestNewCommand_ExampleContainsCloud(t *testing.T) {
 	t.Parallel()
 
@@ -289,47 +265,6 @@ func TestNewCommand_LongHasMultipleLines(t *testing.T) {
 	}
 }
 
-func TestNewCommand_LongMentionsConfiguration(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if !strings.Contains(cmd.Long, "configuration") && !strings.Contains(cmd.Long, "config") {
-		t.Log("Long description may not explicitly mention configuration")
-	}
-}
-
-func TestNewCommand_LongMentionsRemoval(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if !strings.Contains(cmd.Long, "remove") && !strings.Contains(cmd.Long, "clear") {
-		t.Log("Long description should mention removal or clearing")
-	}
-}
-
-func TestNewCommand_ShortMentionsCloud(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if !strings.Contains(strings.ToLower(cmd.Short), "cloud") {
-		t.Log("Short description may not explicitly mention cloud")
-	}
-}
-
-func TestNewCommand_MultipleAliasesWork(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Verify we have at least 1 alias
-	if len(cmd.Aliases) < 1 {
-		t.Errorf("expected at least 1 alias, got %d", len(cmd.Aliases))
-	}
-}
-
 func TestNewCommand_ExampleShowsBasicUsage(t *testing.T) {
 	t.Parallel()
 
@@ -338,6 +273,452 @@ func TestNewCommand_ExampleShowsBasicUsage(t *testing.T) {
 	// Should show the basic logout command
 	if !strings.Contains(cmd.Example, "shelly cloud logout") {
 		t.Error("Example should show 'shelly cloud logout' command")
+	}
+}
+
+func TestNewCommand_CommandName(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.Name() != cmdName {
+		t.Errorf("Name() = %q, want '%s'", cmd.Name(), cmdName)
+	}
+}
+
+func TestNewCommand_CommandPath(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	path := cmd.CommandPath()
+	if !strings.Contains(path, cmdName) {
+		t.Errorf("CommandPath() = %q, should contain '%s'", path, cmdName)
+	}
+}
+
+func TestNewCommand_UsageString(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	usage := cmd.UsageString()
+	if !strings.Contains(usage, cmdName) {
+		t.Error("UsageString should contain command name")
+	}
+}
+
+func TestNewCommand_SilentUnknownFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Try parsing unknown flag - should fail
+	err := cmd.ParseFlags([]string{"--unknown-flag"})
+	if err == nil {
+		t.Error("Expected error for unknown flag")
+	}
+}
+
+// setupTestManagerWithCloud creates a test manager with cloud credentials set.
+func setupTestManagerWithCloud(t *testing.T, email, token, refreshToken, serverURL string, enabled bool) *config.Manager {
+	t.Helper()
+	cfg := &config.Config{
+		Cloud: config.CloudConfig{
+			Enabled:      enabled,
+			Email:        email,
+			AccessToken:  token,
+			RefreshToken: refreshToken,
+			ServerURL:    serverURL,
+		},
+	}
+	return config.NewTestManager(cfg)
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_NotLoggedIn(t *testing.T) {
+	// Setup manager with no cloud credentials (not logged in)
+	mgr := setupTestManagerWithCloud(t, "", "", "", "", false)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Not logged in") {
+		t.Errorf("Expected 'Not logged in' message, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_LoggedInWithEmail(t *testing.T) {
+	// Setup manager with cloud credentials including email
+	mgr := setupTestManagerWithCloud(t, "user@example.com", "test-token", "refresh-token", "https://api.shelly.cloud", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Logged out from user@example.com") {
+		t.Errorf("Expected 'Logged out from user@example.com', got: %s", output)
+	}
+
+	// Verify credentials were cleared
+	cfg := mgr.Get()
+	if cfg.Cloud.AccessToken != "" {
+		t.Error("AccessToken should be cleared")
+	}
+	if cfg.Cloud.RefreshToken != "" {
+		t.Error("RefreshToken should be cleared")
+	}
+	if cfg.Cloud.Email != "" {
+		t.Error("Email should be cleared")
+	}
+	if cfg.Cloud.ServerURL != "" {
+		t.Error("ServerURL should be cleared")
+	}
+	if cfg.Cloud.Enabled {
+		t.Error("Enabled should be false")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_LoggedInWithoutEmail(t *testing.T) {
+	// Setup manager with cloud credentials but no email
+	mgr := setupTestManagerWithCloud(t, "", "test-token", "refresh-token", "https://api.shelly.cloud", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Logged out from Shelly Cloud") {
+		t.Errorf("Expected 'Logged out from Shelly Cloud', got: %s", output)
+	}
+
+	// Verify credentials were cleared
+	cfg := mgr.Get()
+	if cfg.Cloud.AccessToken != "" {
+		t.Error("AccessToken should be cleared")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_ClearsAllCloudFields(t *testing.T) {
+	// Setup manager with all cloud fields populated
+	mgr := setupTestManagerWithCloud(t, "test@example.com", "access-token-123", "refresh-token-456", "https://custom.shelly.cloud", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	// Verify all cloud fields are cleared
+	cfg := mgr.Get()
+	if cfg.Cloud.Enabled {
+		t.Error("Cloud.Enabled should be false")
+	}
+	if cfg.Cloud.Email != "" {
+		t.Errorf("Cloud.Email should be empty, got: %s", cfg.Cloud.Email)
+	}
+	if cfg.Cloud.AccessToken != "" {
+		t.Errorf("Cloud.AccessToken should be empty, got: %s", cfg.Cloud.AccessToken)
+	}
+	if cfg.Cloud.RefreshToken != "" {
+		t.Errorf("Cloud.RefreshToken should be empty, got: %s", cfg.Cloud.RefreshToken)
+	}
+	if cfg.Cloud.ServerURL != "" {
+		t.Errorf("Cloud.ServerURL should be empty, got: %s", cfg.Cloud.ServerURL)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_WithHelp(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "", "", "", "", false)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute with --help error = %v, want nil", err)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_NotLoggedIn(t *testing.T) {
+	// Setup manager with no cloud credentials
+	mgr := setupTestManagerWithCloud(t, "", "", "", "", false)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(tf.Factory)
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Not logged in") {
+		t.Errorf("Expected 'Not logged in' message, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_LoggedInWithEmail(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "admin@shelly.cloud", "my-token", "", "", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(tf.Factory)
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Logged out from admin@shelly.cloud") {
+		t.Errorf("Expected success message with email, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_LoggedInWithoutEmail(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "", "token-only", "", "", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(tf.Factory)
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Logged out from Shelly Cloud") {
+		t.Errorf("Expected generic success message, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_MultipleLogouts(t *testing.T) {
+	// First logout with credentials
+	mgr := setupTestManagerWithCloud(t, "user@test.com", "token", "", "", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+
+	// First execute - should logout successfully
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("First Execute() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Logged out from user@test.com") {
+		t.Errorf("First execute should show logout message, got: %s", output)
+	}
+
+	// Reset output buffer
+	tf.Reset()
+
+	// Second execute - should show not logged in
+	cmd2 := NewCommand(tf.Factory)
+	cmd2.SetContext(context.Background())
+	cmd2.SetArgs([]string{})
+
+	err = cmd2.Execute()
+	if err != nil {
+		t.Errorf("Second Execute() error = %v, want nil", err)
+	}
+
+	output = tf.OutString()
+	if !strings.Contains(output, "Not logged in") {
+		t.Errorf("Second execute should show not logged in, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_WithContext(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "ctx@test.com", "ctx-token", "", "", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	ctx := context.Background()
+	cmd.SetContext(ctx)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() with context error = %v, want nil", err)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_OutputFormat(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "format@test.com", "format-token", "", "", true)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	// Verify output goes to stdout, not stderr
+	output := tf.OutString()
+	errOutput := tf.ErrString()
+
+	if output == "" {
+		t.Error("Expected output on stdout")
+	}
+	if errOutput != "" {
+		t.Errorf("Unexpected output on stderr: %s", errOutput)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_PreservesOtherConfig(t *testing.T) {
+	// Setup manager with cloud credentials and other config
+	cfg := &config.Config{
+		Output: "json",
+		Color:  true,
+		Cloud: config.CloudConfig{
+			Enabled:     true,
+			Email:       "preserve@test.com",
+			AccessToken: "preserve-token",
+		},
+	}
+	mgr := config.NewTestManager(cfg)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(tf.Factory)
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	// Verify cloud is cleared but other config is preserved
+	updatedCfg := mgr.Get()
+	if updatedCfg.Cloud.AccessToken != "" {
+		t.Error("Cloud token should be cleared")
+	}
+	if updatedCfg.Output != "json" {
+		t.Errorf("Output should be preserved as 'json', got: %s", updatedCfg.Output)
+	}
+	if !updatedCfg.Color {
+		t.Error("Color should be preserved as true")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_PartialCloudConfig(t *testing.T) {
+	// Setup manager with only access token (no email, refresh token, etc.)
+	mgr := setupTestManagerWithCloud(t, "", "partial-token", "", "", false)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Logged out from Shelly Cloud") {
+		t.Errorf("Expected generic logout message for partial config, got: %s", output)
+	}
+}
+
+func TestRun_WithIOStreams(t *testing.T) {
+	t.Parallel()
+
+	// This test exercises the run function with custom IOStreams
+	// The output depends on global config.Get() state
+
+	in := &bytes.Buffer{}
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(in, out, errOut)
+
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	// Run will use global config state
+	err := run(f)
+
+	// Should not error (either logs out or says not logged in)
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	// Should produce some output
+	if out.Len() == 0 && errOut.Len() == 0 {
+		t.Log("no output produced - may depend on global config state")
 	}
 }
 
@@ -424,20 +805,6 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	}
 }
 
-func TestNewCommand_ExampleStartsWithIndent(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	lines := strings.Split(cmd.Example, "\n")
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "shelly") {
-			t.Logf("Example line: %s", line)
-		}
-	}
-}
-
 func TestNewCommand_LongMentionsNeedToLogin(t *testing.T) {
 	t.Parallel()
 
@@ -445,18 +812,6 @@ func TestNewCommand_LongMentionsNeedToLogin(t *testing.T) {
 
 	if !strings.Contains(cmd.Long, "need") && !strings.Contains(cmd.Long, "again") {
 		t.Log("Long description may mention needing to login again")
-	}
-}
-
-func TestNewCommand_SilentUnknownFlags(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	// Try parsing unknown flag - should fail
-	err := cmd.ParseFlags([]string{"--unknown-flag"})
-	if err == nil {
-		t.Error("Expected error for unknown flag")
 	}
 }
 
@@ -501,38 +856,6 @@ func TestNewCommand_OutputGoesToStreams(t *testing.T) {
 	combined := out.String() + errOut.String()
 	if combined == "" {
 		t.Log("No output captured - command may use global config")
-	}
-}
-
-func TestNewCommand_CommandName(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	if cmd.Name() != cmdName {
-		t.Errorf("Name() = %q, want '%s'", cmd.Name(), cmdName)
-	}
-}
-
-func TestNewCommand_CommandPath(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	path := cmd.CommandPath()
-	if !strings.Contains(path, cmdName) {
-		t.Errorf("CommandPath() = %q, should contain '%s'", path, cmdName)
-	}
-}
-
-func TestNewCommand_UsageString(t *testing.T) {
-	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
-
-	usage := cmd.UsageString()
-	if !strings.Contains(usage, cmdName) {
-		t.Error("UsageString should contain command name")
 	}
 }
 
@@ -647,5 +970,60 @@ func TestNewCommand_PersistentFlags(t *testing.T) {
 	// Check persistent flags
 	if cmd.HasPersistentFlags() {
 		t.Log("Command has persistent flags")
+	}
+}
+
+func TestNewCommand_LongMentionsConfiguration(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if !strings.Contains(cmd.Long, "configuration") && !strings.Contains(cmd.Long, "config") {
+		t.Log("Long description may not explicitly mention configuration")
+	}
+}
+
+func TestNewCommand_LongMentionsRemoval(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if !strings.Contains(cmd.Long, "remove") && !strings.Contains(cmd.Long, "clear") {
+		t.Log("Long description should mention removal or clearing")
+	}
+}
+
+func TestNewCommand_ShortMentionsCloud(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if !strings.Contains(strings.ToLower(cmd.Short), "cloud") {
+		t.Log("Short description may not explicitly mention cloud")
+	}
+}
+
+func TestNewCommand_MultipleAliasesWork(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Verify we have at least 1 alias
+	if len(cmd.Aliases) < 1 {
+		t.Errorf("expected at least 1 alias, got %d", len(cmd.Aliases))
+	}
+}
+
+func TestNewCommand_ExampleStartsWithIndent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	lines := strings.Split(cmd.Example, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "shelly") {
+			t.Logf("Example line: %s", line)
+		}
 	}
 }

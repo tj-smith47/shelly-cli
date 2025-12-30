@@ -17,6 +17,39 @@ import (
 // DefaultTimeout is the default BLE discovery timeout.
 const DefaultTimeout = 15 * time.Second
 
+// Discoverer is the interface for BLE device discovery.
+// This interface allows for dependency injection in tests.
+type Discoverer interface {
+	DiscoverWithContext(ctx context.Context) ([]discovery.DiscoveredDevice, error)
+	GetDiscoveredDevices() []discovery.BLEDiscoveredDevice
+	Stop() error
+	SetIncludeBTHome(include bool)
+	SetFilterPrefix(prefix string)
+}
+
+// bleDiscovererAdapter wraps discovery.BLEDiscoverer to implement Discoverer interface.
+type bleDiscovererAdapter struct {
+	*discovery.BLEDiscoverer
+}
+
+func (a *bleDiscovererAdapter) SetIncludeBTHome(include bool) {
+	a.IncludeBTHome = include
+}
+
+func (a *bleDiscovererAdapter) SetFilterPrefix(prefix string) {
+	a.FilterPrefix = prefix
+}
+
+// newBLEDiscoverer is the factory function for creating BLE discoverers.
+// This can be replaced in tests.
+var newBLEDiscoverer = func() (Discoverer, error) {
+	d, err := discovery.NewBLEDiscoverer()
+	if err != nil {
+		return nil, err
+	}
+	return &bleDiscovererAdapter{BLEDiscoverer: d}, nil
+}
+
 // NewCommand creates the BLE discovery command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
@@ -68,7 +101,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 
 	ios := f.IOStreams()
 
-	bleDiscoverer, err := discovery.NewBLEDiscoverer()
+	bleDiscoverer, err := newBLEDiscoverer()
 	if err != nil {
 		if wireless.IsBLENotSupportedError(err) {
 			ios.Error("BLE discovery is not available on this system")
@@ -85,9 +118,9 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	}()
 
 	// Configure discoverer
-	bleDiscoverer.IncludeBTHome = includeBTHome
+	bleDiscoverer.SetIncludeBTHome(includeBTHome)
 	if filterPrefix != "" {
-		bleDiscoverer.FilterPrefix = filterPrefix
+		bleDiscoverer.SetFilterPrefix(filterPrefix)
 	}
 
 	var devices []discovery.DiscoveredDevice

@@ -52,13 +52,13 @@ Use with auth import to restore credentials on another system.`,
 
 func run(_ context.Context, f *cmdutil.Factory, devices []string, opts *Options) error {
 	ios := f.IOStreams()
-	cfg, err := f.Config()
+	mgr, err := f.ConfigManager()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
 	// Collect credentials
-	creds := cfg.GetAllDeviceCredentials()
+	creds := mgr.GetAllDeviceCredentials()
 	if len(creds) == 0 {
 		ios.Warning("No credentials found to export")
 		return nil

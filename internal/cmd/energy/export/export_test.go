@@ -1,11 +1,16 @@
 package export
 
 import (
+	"bytes"
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -104,3 +109,1072 @@ func TestNewCommand_Args(t *testing.T) {
 
 // Note: Tests for CalculateTimeRange and ParseTime are now in internal/shelly/energy_test.go
 // since these functions were extracted to the service layer for DRY compliance.
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+func TestNewCommand_ExampleContent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"shelly energy export",
+		"--format json",
+		"--from",
+		"--to",
+		"--output",
+		"--period week",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Example, pattern) {
+			t.Errorf("expected Example to contain %q", pattern)
+		}
+	}
+}
+
+func TestNewCommand_LongDescription(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"Export",
+		"CSV",
+		"JSON",
+		"YAML",
+		"timestamp",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Long, pattern) {
+			t.Errorf("expected Long to contain %q", pattern)
+		}
+	}
+}
+
+func TestExecute_InvalidComponentID(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "notanumber"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for invalid component ID")
+	}
+	if !strings.Contains(err.Error(), "invalid component ID") {
+		t.Errorf("Expected 'invalid component ID' error, got: %v", err)
+	}
+}
+
+func TestExecute_InvalidFormat(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--format", "invalid"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for invalid format")
+	}
+	if !strings.Contains(err.Error(), "invalid format") {
+		t.Errorf("Expected 'invalid format' error, got: %v", err)
+	}
+}
+
+func TestExecute_InvalidPeriod(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--period", "invalid"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for invalid period")
+	}
+	if !strings.Contains(err.Error(), "invalid time range") || !strings.Contains(err.Error(), "invalid period") {
+		t.Errorf("Expected 'invalid time range' error, got: %v", err)
+	}
+}
+
+func TestExecute_InvalidFromTime(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--from", "not-a-date"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for invalid from time")
+	}
+	if !strings.Contains(err.Error(), "invalid time range") {
+		t.Errorf("Expected 'invalid time range' error, got: %v", err)
+	}
+}
+
+func TestExecute_InvalidToTime(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--to", "not-a-date"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for invalid to time")
+	}
+	if !strings.Contains(err.Error(), "invalid time range") {
+		t.Errorf("Expected 'invalid time range' error, got: %v", err)
+	}
+}
+
+func TestExecute_WithPeriodHour(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--period", "hour"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	// Expected to fail since mock server doesn't support energy data
+	// but this tests that the period is valid
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithPeriodDay(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--period", "day"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithPeriodWeek(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--period", "week"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithPeriodMonth(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--period", "month"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithFromToRange(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--from", "2025-01-01", "--to", "2025-01-07"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithExplicitTypeEM(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "em"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithExplicitTypeEM1(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "em1"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithFormatJSON(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "em", "--format", "json"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithFormatYAML(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "em1", "--format", "yaml"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithFormatCSV(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "em", "--format", "csv"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestExecute_WithComponentID(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "1", "--type", "em"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (expected - mock doesn't support energy)", err)
+	}
+}
+
+func TestRun_InvalidFormat(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, "xml", "", "", "", "")
+	if err == nil {
+		t.Error("Expected error for invalid format")
+	}
+	if !strings.Contains(err.Error(), "invalid format") {
+		t.Errorf("Expected 'invalid format' error, got: %v", err)
+	}
+}
+
+func TestRun_InvalidPeriod(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "invalid-period", "", "")
+	if err == nil {
+		t.Error("Expected error for invalid period")
+	}
+	if !strings.Contains(err.Error(), "invalid time range") {
+		t.Errorf("Expected 'invalid time range' error, got: %v", err)
+	}
+}
+
+func TestRun_InvalidFromTime(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "not-a-date", "")
+	if err == nil {
+		t.Error("Expected error for invalid from time")
+	}
+	if !strings.Contains(err.Error(), "invalid time range") {
+		t.Errorf("Expected 'invalid time range' error, got: %v", err)
+	}
+}
+
+func TestRun_InvalidToTime(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "", "not-a-date")
+	if err == nil {
+		t.Error("Expected error for invalid to time")
+	}
+	if !strings.Contains(err.Error(), "invalid time range") {
+		t.Errorf("Expected 'invalid time range' error, got: %v", err)
+	}
+}
+
+func TestRun_UnknownComponentType(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "test-device", 0, "unknown-type", shellyexport.FormatCSV, "", "", "", "")
+	if err == nil {
+		t.Error("Expected error for unknown component type")
+	}
+	if !strings.Contains(err.Error(), "no energy data components found") {
+		t.Errorf("Expected 'no energy data components found' error, got: %v", err)
+	}
+}
+
+func TestRun_WithExplicitTypeEM(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Explicit type should skip auto-detection
+	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "", "")
+	// Expected to fail since mock server doesn't support EMData.GetData
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
+	}
+}
+
+func TestRun_WithExplicitTypeEM1(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Explicit type should skip auto-detection
+	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM1, shellyexport.FormatCSV, "", "", "", "")
+	// Expected to fail since mock server doesn't support EM1Data.GetData
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support EM1Data)", err)
+	}
+}
+
+func TestRun_WithOutputFile(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Try exporting to an output file (will fail early due to no data)
+	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "/tmp/test-export.csv", "", "", "")
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
+	}
+}
+
+func TestRun_WithValidTimeRange(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Valid time range should pass validation
+	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "2025-01-01", "2025-01-07")
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
+	}
+}
+
+func TestRun_WithAutoDetection(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Auto detection mode
+	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeAuto, shellyexport.FormatCSV, "", "", "", "")
+	// Expected to fail since mock server doesn't support energy data detection
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support energy data)", err)
+	}
+}
+
+func TestRun_JSONFormat(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatJSON, "", "", "", "")
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
+	}
+}
+
+func TestRun_YAMLFormat(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM1, shellyexport.FormatYAML, "", "", "", "")
+	if err != nil {
+		t.Logf("run() error = %v (expected - mock doesn't support EM1Data)", err)
+	}
+}

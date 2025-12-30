@@ -2,12 +2,15 @@ package install
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const testStringType = "string"
@@ -533,5 +536,374 @@ func TestOptions_LoadCertData_NoFiles(t *testing.T) {
 	}
 	if len(data.KeyData) != 0 {
 		t.Errorf("expected empty key data, got %d bytes", len(data.KeyData))
+	}
+}
+
+// Execute-based tests for the run function.
+
+func TestExecute_ValidationError_NoFlags(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected validation error when no flags provided")
+	}
+
+	if !strings.Contains(err.Error(), "--ca") && !strings.Contains(err.Error(), "--client-cert") {
+		t.Errorf("error should mention --ca or --client-cert, got: %v", err)
+	}
+}
+
+func TestExecute_ValidationError_ClientCertWithoutKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	if err := os.WriteFile(certFile, []byte("test cert"), 0o600); err != nil {
+		t.Fatalf("failed to create cert file: %v", err)
+	}
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--client-cert", certFile})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected validation error when --client-cert provided without --client-key")
+	}
+
+	if !strings.Contains(err.Error(), "--client-key") {
+		t.Errorf("error should mention --client-key, got: %v", err)
+	}
+}
+
+func TestExecute_LoadCertDataError_NonexistentCAFile(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--ca", "/nonexistent/path/to/ca.pem"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when CA file doesn't exist")
+	}
+
+	if !strings.Contains(err.Error(), "read CA file") {
+		t.Errorf("error should mention 'read CA file', got: %v", err)
+	}
+}
+
+func TestExecute_Gen1DeviceError(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create temp CA file
+	tmpDir := t.TempDir()
+	caFile := filepath.Join(tmpDir, "ca.pem")
+	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create CA file: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-device", "--ca", caFile})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for Gen1 device")
+	}
+
+	if !strings.Contains(err.Error(), "Gen2") {
+		t.Errorf("error should mention Gen2+ requirement, got: %v", err)
+	}
+}
+
+func TestExecute_Gen2DeviceWithCA(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen2-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen2-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create temp CA file
+	tmpDir := t.TempDir()
+	caFile := filepath.Join(tmpDir, "ca.pem")
+	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create CA file: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen2-device", "--ca", caFile})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check output contains success message
+	output := tf.OutString()
+	if !strings.Contains(output, "Installed CA certificate") {
+		t.Errorf("output should contain success message, got: %s", output)
+	}
+}
+
+func TestExecute_Gen2DeviceWithClientCert(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen2-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen2-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create temp cert and key files
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create cert file: %v", err)
+	}
+	if err := os.WriteFile(keyFile, []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"), 0o600); err != nil {
+		t.Fatalf("failed to create key file: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen2-device", "--client-cert", certFile, "--client-key", keyFile})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check output contains success message
+	output := tf.OutString()
+	if !strings.Contains(output, "Installed client certificate") {
+		t.Errorf("output should contain success message, got: %s", output)
+	}
+}
+
+func TestExecute_Gen2DeviceWithBothCerts(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen2-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen2-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create temp files
+	tmpDir := t.TempDir()
+	caFile := filepath.Join(tmpDir, "ca.pem")
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	keyFile := filepath.Join(tmpDir, "key.pem")
+	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create CA file: %v", err)
+	}
+	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create cert file: %v", err)
+	}
+	if err := os.WriteFile(keyFile, []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"), 0o600); err != nil {
+		t.Fatalf("failed to create key file: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen2-device", "--ca", caFile, "--client-cert", certFile, "--client-key", keyFile})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check output contains both success messages
+	output := tf.OutString()
+	if !strings.Contains(output, "Installed CA certificate") {
+		t.Errorf("output should contain CA success message, got: %s", output)
+	}
+	if !strings.Contains(output, "Installed client certificate") {
+		t.Errorf("output should contain client cert success message, got: %s", output)
+	}
+}
+
+func TestExecute_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "install") {
+		t.Error("help output should contain 'install'")
+	}
+	if !strings.Contains(output, "--ca") {
+		t.Error("help output should mention --ca flag")
+	}
+	if !strings.Contains(output, "--client-cert") {
+		t.Error("help output should mention --client-cert flag")
+	}
+}
+
+func TestExecute_DeviceNotFound(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	// Create temp CA file
+	tmpDir := t.TempDir()
+	caFile := filepath.Join(tmpDir, "ca.pem")
+	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create CA file: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"nonexistent-device", "--ca", caFile})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when device not found")
+	}
+}
+
+func TestExecute_LoadCertDataError_NonexistentClientKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+		t.Fatalf("failed to create cert file: %v", err)
+	}
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--client-cert", certFile, "--client-key", "/nonexistent/key.pem"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when client key file doesn't exist")
+	}
+
+	if !strings.Contains(err.Error(), "read client key") {
+		t.Errorf("error should mention 'read client key', got: %v", err)
 	}
 }

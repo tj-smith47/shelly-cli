@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -404,5 +405,574 @@ func TestRun_TextFormat(t *testing.T) {
 	// We expect a device-related error, not a format error
 	if err != nil && strings.Contains(err.Error(), "format") {
 		t.Errorf("Unexpected format error for text: %v", err)
+	}
+}
+
+// Execute-based tests with mock server
+// These tests use mock.StartWithFixtures which sets a global demo singleton,
+// so they cannot run in parallel.
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_Gen2Device_JSONOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"coiot": map[string]any{
+					"enable":        true,
+					"update_period": 30,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device", "--format", "json"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "coiot") {
+		t.Errorf("JSON output should contain 'coiot', got: %s", output)
+	}
+	if !strings.Contains(output, "device") {
+		t.Errorf("JSON output should contain 'device', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_Gen2Device_TextOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"coiot": map[string]any{
+					"enable":        true,
+					"update_period": 30,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device"}) // default is text format
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "CoIoT") {
+		t.Errorf("Text output should contain 'CoIoT', got: %s", output)
+	}
+	if !strings.Contains(output, "Configuration") {
+		t.Errorf("Text output should contain 'Configuration', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_Gen1Device_ReturnsError(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.101",
+					MAC:        "11:22:33:44:55:66",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"gen1-device"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("Expected error for Gen1 device")
+	}
+
+	if !strings.Contains(err.Error(), "Gen2+") && !strings.Contains(err.Error(), "only supported") {
+		t.Errorf("Error should mention Gen2+ support, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_Gen2Device_WithoutCoIoTSection(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				// No coiot section
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	output := tf.OutString()
+	// Should show "not configured" message when no CoIoT section
+	if !strings.Contains(output, "not configured") && !strings.Contains(output, "not available") {
+		t.Errorf("Output should mention CoIoT not configured, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_Gen2Device_WithSysSection(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"sys": map[string]any{
+					"device": map[string]any{
+						"name": "Test Device",
+						"mac":  "AABBCCDDEEFF",
+					},
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device", "--format", "json"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "sys") {
+		t.Errorf("JSON output should contain 'sys' section, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_Gen2Device_WithDeviceSection(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	output := tf.OutString()
+	// Device section comes from mock getSysConfig
+	if !strings.Contains(output, "Device") {
+		t.Errorf("Text output should contain 'Device' section, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_Gen2Device_AllSectionsPresent(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"coiot": map[string]any{
+					"enable":        true,
+					"update_period": 15,
+				},
+				"sys": map[string]any{
+					"device": map[string]any{
+						"name": "Living Room Light",
+					},
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device", "-f", "json"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	output := tf.OutString()
+	// Verify all sections are present in JSON output
+	if !strings.Contains(output, "coiot") {
+		t.Errorf("JSON output should contain 'coiot', got: %s", output)
+	}
+	if !strings.Contains(output, "device") {
+		t.Errorf("JSON output should contain 'device', got: %s", output)
+	}
+	if !strings.Contains(output, "sys") {
+		t.Errorf("JSON output should contain 'sys', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestRun_Gen2Device_SuccessfulTextOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"coiot": map[string]any{
+					"enable":        true,
+					"update_period": 30,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "CoIoT") {
+		t.Errorf("Output should contain 'CoIoT', got: %s", output)
+	}
+	// Verify info messages appear
+	if !strings.Contains(output, "Note:") {
+		t.Errorf("Output should contain note about Gen1, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestRun_Gen2Device_SuccessfulJSONOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"coiot": map[string]any{
+					"enable":        true,
+					"update_period": 30,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+	opts.Format = formatJSON
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	output := tf.OutString()
+	// JSON output should be valid JSON with expected fields
+	if !strings.Contains(output, "{") || !strings.Contains(output, "}") {
+		t.Errorf("Output should be JSON, got: %s", output)
+	}
+	if !strings.Contains(output, "coiot") {
+		t.Errorf("JSON output should contain 'coiot', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestRun_Gen1Device_ReturnsError(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.101",
+					MAC:        "11:22:33:44:55:66",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {"relay": map[string]any{"ison": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "gen1-device",
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Fatal("Expected error for Gen1 device")
+	}
+
+	if !strings.Contains(err.Error(), "Gen2+") {
+		t.Errorf("Error should mention Gen2+ support, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global mock singleton
+func TestExecute_WithCoAPAlias(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"coiot": map[string]any{"enable": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// The command should work via alias "coap"
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
 	}
 }

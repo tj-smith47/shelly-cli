@@ -3,10 +3,14 @@ package export
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -166,6 +170,8 @@ func TestExecute_NoDevicesNoAll(t *testing.T) {
 }
 
 func TestRun_AllWithNoCredentials(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -181,5 +187,390 @@ func TestRun_AllWithNoCredentials(t *testing.T) {
 	out := tf.OutString()
 	if strings.Contains(out, "No credentials") {
 		t.Logf("Output shows no credentials")
+	}
+}
+
+func TestRun_NoDevicesNoAll_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	// Add a device with credentials so creds is non-empty
+	tf.Config.Devices["test-device"] = model.Device{
+		Name:    "test-device",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "secret",
+		},
+	}
+
+	opts := &Options{
+		Output: filepath.Join(t.TempDir(), "test-export.json"),
+	}
+	// All is false (default), no devices provided
+
+	err := run(t.Context(), tf.Factory, []string{}, opts)
+	if err == nil {
+		t.Fatal("expected error when no devices specified and --all not set")
+	}
+	if !strings.Contains(err.Error(), "specify devices or use --all") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestRun_AllWithCredentials_Success(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	// Add devices with credentials
+	tf.Config.Devices["kitchen"] = model.Device{
+		Name:    "kitchen",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "kitchen-secret",
+		},
+	}
+	tf.Config.Devices["bedroom"] = model.Device{
+		Name:    "bedroom",
+		Address: "192.168.1.101",
+		Auth: &model.Auth{
+			Username: "user",
+			Password: "bedroom-secret",
+		},
+	}
+
+	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
+	opts := &Options{
+		Output: outputPath,
+	}
+	opts.All = true
+
+	err := run(t.Context(), tf.Factory, []string{}, opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	// Verify success message
+	out := tf.OutString()
+	if !strings.Contains(out, "Exported 2 credential(s)") {
+		t.Errorf("expected success message with 2 credentials, got: %s", out)
+	}
+
+	// Verify file was created
+	data, err := os.ReadFile(outputPath) //nolint:gosec // Test file with known path
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	// Verify JSON structure
+	var export map[string]any
+	if err := json.Unmarshal(data, &export); err != nil {
+		t.Fatalf("invalid JSON output: %v", err)
+	}
+	if export["version"] != "1.0" {
+		t.Errorf("expected version 1.0, got %v", export["version"])
+	}
+	if _, ok := export["exported_at"]; !ok {
+		t.Error("expected exported_at field")
+	}
+	creds, ok := export["credentials"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected credentials map, got %T", export["credentials"])
+	}
+	if len(creds) != 2 {
+		t.Errorf("expected 2 credentials, got %d", len(creds))
+	}
+}
+
+func TestRun_FilterSpecificDevices_Success(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	// Add multiple devices with credentials
+	tf.Config.Devices["kitchen"] = model.Device{
+		Name:    "kitchen",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "kitchen-secret",
+		},
+	}
+	tf.Config.Devices["bedroom"] = model.Device{
+		Name:    "bedroom",
+		Address: "192.168.1.101",
+		Auth: &model.Auth{
+			Username: "user",
+			Password: "bedroom-secret",
+		},
+	}
+	tf.Config.Devices["living-room"] = model.Device{
+		Name:    "living-room",
+		Address: "192.168.1.102",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "living-secret",
+		},
+	}
+
+	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
+	opts := &Options{
+		Output: outputPath,
+	}
+	opts.All = false // Not --all, filter by device names
+
+	// Export only kitchen and bedroom
+	err := run(t.Context(), tf.Factory, []string{"kitchen", "bedroom"}, opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	// Verify success message
+	out := tf.OutString()
+	if !strings.Contains(out, "Exported 2 credential(s)") {
+		t.Errorf("expected success message with 2 credentials, got: %s", out)
+	}
+
+	// Verify file was created and contains only filtered devices
+	data, err := os.ReadFile(outputPath) //nolint:gosec // Test file with known path
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	var export map[string]any
+	if err := json.Unmarshal(data, &export); err != nil {
+		t.Fatalf("invalid JSON output: %v", err)
+	}
+	creds, ok := export["credentials"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected credentials map, got %T", export["credentials"])
+	}
+	if len(creds) != 2 {
+		t.Errorf("expected 2 credentials, got %d", len(creds))
+	}
+	if _, ok := creds["kitchen"]; !ok {
+		t.Error("expected kitchen in credentials")
+	}
+	if _, ok := creds["bedroom"]; !ok {
+		t.Error("expected bedroom in credentials")
+	}
+	if _, ok := creds["living-room"]; ok {
+		t.Error("unexpected living-room in credentials")
+	}
+}
+
+func TestRun_FilterNoMatchingDevices_Warning(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	// Add device with credentials
+	tf.Config.Devices["kitchen"] = model.Device{
+		Name:    "kitchen",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "kitchen-secret",
+		},
+	}
+
+	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
+	opts := &Options{
+		Output: outputPath,
+	}
+	opts.All = false
+
+	// Try to export a device that doesn't exist
+	err := run(t.Context(), tf.Factory, []string{"nonexistent"}, opts)
+	if err != nil {
+		t.Fatalf("run() should not error for non-matching filter: %v", err)
+	}
+
+	// Warning messages go to stderr
+	errOut := tf.ErrString()
+	if !strings.Contains(errOut, "No matching credentials found") {
+		t.Errorf("expected warning about no matching credentials, got: %s", errOut)
+	}
+}
+
+func TestRun_CreateNestedDirectory_Success(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	tf.Config.Devices["test-device"] = model.Device{
+		Name:    "test-device",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "secret",
+		},
+	}
+
+	// Use a nested path that needs to be created
+	outputPath := filepath.Join(t.TempDir(), "nested", "dir", "creds.json")
+	opts := &Options{
+		Output: outputPath,
+	}
+	opts.All = true
+
+	err := run(t.Context(), tf.Factory, []string{}, opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Errorf("expected output file to exist: %v", err)
+	}
+}
+
+func TestRun_WriteFileError(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	tf.Config.Devices["test-device"] = model.Device{
+		Name:    "test-device",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "secret",
+		},
+	}
+
+	// Use an invalid path (write to a directory that exists as a file)
+	tmpFile := filepath.Join(t.TempDir(), "file-not-dir")
+	if err := os.WriteFile(tmpFile, []byte("content"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	outputPath := filepath.Join(tmpFile, "creds.json")
+	opts := &Options{
+		Output: outputPath,
+	}
+	opts.All = true
+
+	err := run(t.Context(), tf.Factory, []string{}, opts)
+	if err == nil {
+		t.Fatal("expected error when writing to invalid path")
+	}
+	// Error could be "create directory" or "write file" depending on OS
+	if !strings.Contains(err.Error(), "create directory") && !strings.Contains(err.Error(), "write file") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestExecute_WithAllFlag(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	tf.Config.Devices["test-device"] = model.Device{
+		Name:    "test-device",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "secret",
+		},
+	}
+
+	outputPath := filepath.Join(t.TempDir(), "creds.json")
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{"--all", "-o", outputPath})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Errorf("expected output file to exist: %v", err)
+	}
+}
+
+func TestExecute_WithSpecificDevices(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	tf.Config.Devices["kitchen"] = model.Device{
+		Name:    "kitchen",
+		Address: "192.168.1.100",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "secret",
+		},
+	}
+	tf.Config.Devices["bedroom"] = model.Device{
+		Name:    "bedroom",
+		Address: "192.168.1.101",
+		Auth: &model.Auth{
+			Username: "admin",
+			Password: "secret2",
+		},
+	}
+
+	outputPath := filepath.Join(t.TempDir(), "creds.json")
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{"kitchen", "-o", outputPath})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	// Verify file was created with only kitchen
+	data, err := os.ReadFile(outputPath) //nolint:gosec // Test file with known path
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+
+	var export map[string]any
+	if err := json.Unmarshal(data, &export); err != nil {
+		t.Fatalf("invalid JSON output: %v", err)
+	}
+	creds, ok := export["credentials"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected credentials map, got %T", export["credentials"])
+	}
+	if len(creds) != 1 {
+		t.Errorf("expected 1 credential, got %d", len(creds))
+	}
+	if _, ok := creds["kitchen"]; !ok {
+		t.Error("expected kitchen in credentials")
+	}
+}
+
+func TestExecute_NoCredentialsWarning(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	// No devices with credentials
+
+	outputPath := filepath.Join(t.TempDir(), "creds.json")
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{"--all", "-o", outputPath})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() should not error: %v", err)
+	}
+
+	// Warning messages go to stderr
+	errOut := tf.ErrString()
+	if !strings.Contains(errOut, "No credentials found") {
+		t.Errorf("expected warning about no credentials, got: %s", errOut)
 	}
 }

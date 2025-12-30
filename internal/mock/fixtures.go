@@ -35,14 +35,15 @@ type ConfigFixture struct {
 
 // DeviceFixture represents a registered device.
 type DeviceFixture struct {
-	Name       string `yaml:"name"`
-	Address    string `yaml:"address"`
-	MAC        string `yaml:"mac"`
-	Model      string `yaml:"model"`
-	Type       string `yaml:"type"`
-	Generation int    `yaml:"generation"`
-	AuthUser   string `yaml:"auth_user,omitempty"`
-	AuthPass   string `yaml:"auth_pass,omitempty"`
+	Name        string `yaml:"name"`
+	Address     string `yaml:"address"`
+	MAC         string `yaml:"mac"`
+	Model       string `yaml:"model"`
+	Type        string `yaml:"type"`
+	Generation  int    `yaml:"generation"`
+	AuthUser    string `yaml:"auth_user,omitempty"`
+	AuthPass    string `yaml:"auth_pass,omitempty"`
+	AuthEnabled bool   `yaml:"auth_enabled,omitempty"`
 }
 
 // GroupFixture represents a device group.

@@ -18,6 +18,18 @@ import (
 // DefaultTimeout is the default mDNS discovery timeout.
 const DefaultTimeout = 10 * time.Second
 
+// Discoverer is the interface for mDNS device discovery.
+type Discoverer interface {
+	Discover(timeout time.Duration) ([]discovery.DiscoveredDevice, error)
+	Stop() error
+}
+
+// discovererFactory creates a new Discoverer instance.
+// This can be overridden in tests.
+var discovererFactory = func() Discoverer {
+	return discovery.NewMDNSDiscoverer()
+}
+
 // NewCommand creates the mDNS discovery command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	var (
@@ -78,7 +90,7 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, registe
 		timeout = DefaultTimeout
 	}
 
-	mdnsDiscoverer := discovery.NewMDNSDiscoverer()
+	mdnsDiscoverer := discovererFactory()
 	defer func() {
 		if err := mdnsDiscoverer.Stop(); err != nil {
 			ios.DebugErrCat(iostreams.CategoryDiscovery, "stopping mDNS discoverer", err)

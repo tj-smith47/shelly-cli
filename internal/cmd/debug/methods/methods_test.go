@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -577,5 +578,536 @@ func TestRun_WithFilter(t *testing.T) {
 	// We expect a device-related error, not a filter error
 	if err != nil && strings.Contains(err.Error(), "filter") {
 		t.Errorf("Unexpected filter error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_ListMethods_TextFormat(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Filter:  "",
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Available RPC Methods") {
+		t.Error("Output should contain 'Available RPC Methods' header")
+	}
+	if !strings.Contains(output, "Switch") {
+		t.Error("Output should contain 'Switch' namespace")
+	}
+	if !strings.Contains(output, "Shelly") {
+		t.Error("Output should contain 'Shelly' namespace")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_ListMethods_JSONFormat(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Filter:  "",
+	}
+	opts.Format = formatJSON
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "[") {
+		t.Error("JSON output should contain array bracket")
+	}
+	if !strings.Contains(output, "Switch.Set") {
+		t.Error("JSON output should contain Switch.Set method")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_ListMethods_WithFilter(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Filter:  "switch",
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Should contain Switch methods
+	if !strings.Contains(output, "Switch") {
+		t.Error("Output should contain filtered Switch namespace")
+	}
+	// Should NOT contain unmatched methods
+	if strings.Contains(output, "Cover:") {
+		t.Error("Output should NOT contain Cover namespace when filtering for switch")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_ListMethods_CaseInsensitiveFilter(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Filter:  "SHELLY", // Upper case filter
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Case insensitive match should find Shelly methods
+	if !strings.Contains(output, "Shelly") {
+		t.Error("Case-insensitive filter should find Shelly namespace")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_ListMethods_FilterNoMatch(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Filter:  "nonexistentmethod",
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Should show 0 methods in header
+	if !strings.Contains(output, "(0)") {
+		t.Error("Output should show 0 methods when no match")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_ListMethods_JSONWithFilter(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Filter:  "Switch",
+	}
+	opts.Format = formatJSON
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Switch") {
+		t.Error("JSON output should contain filtered Switch methods")
+	}
+	// Should only contain Switch methods, not Shelly methods
+	if strings.Contains(output, "Shelly.GetStatus") {
+		t.Error("Filtered JSON should NOT contain Shelly.GetStatus")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_ListMethods_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "living-room",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"living-room": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"living-room"})
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Available RPC Methods") {
+		t.Error("Output should contain 'Available RPC Methods'")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_ListMethods_WithFilterFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-switch",
+					Address:    "192.168.1.101",
+					MAC:        "11:22:33:44:55:66",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-switch": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-switch", "--filter", "Switch"})
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Switch") {
+		t.Error("Output should contain Switch methods")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_ListMethods_JSONFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "json-test",
+					Address:    "192.168.1.102",
+					MAC:        "AA:11:BB:22:CC:33",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"json-test": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"json-test", "--format", "json"})
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "[") || !strings.Contains(output, "]") {
+		t.Error("JSON output should contain array brackets")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestExecute_ListMethods_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device"})
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	// Should fail because device doesn't exist
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
+func TestRun_NamespacesGrouping(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Filter:  "",
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+
+	// Verify namespace grouping in output
+	namespaces := []string{"Cover:", "Input:", "Light:", "MQTT:", "Script:", "Shelly:", "Switch:", "Wifi:"}
+	for _, ns := range namespaces {
+		if !strings.Contains(output, ns) {
+			t.Errorf("Output should contain namespace %q", ns)
+		}
 	}
 }

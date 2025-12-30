@@ -1,10 +1,15 @@
 package history
 
 import (
+	"bytes"
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -97,6 +102,806 @@ func TestNewCommand_Args(t *testing.T) {
 	err = cmd.Args(cmd, []string{"device1", "0", "extra"})
 	if err == nil {
 		t.Error("expected error with 3 args")
+	}
+}
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+func TestNewCommand_ExampleContent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"shelly energy history",
+		"--from",
+		"--to",
+		"--period",
+		"--limit",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Example, pattern) {
+			t.Errorf("expected Example to contain %q", pattern)
+		}
+	}
+}
+
+func TestNewCommand_LongDescription(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"energy",
+		"historical",
+		"EM",
+		"EM1",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Long, pattern) {
+			t.Errorf("expected Long to contain %q", pattern)
+		}
+	}
+}
+
+func TestNewCommand_InvalidComponentID(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"device", "not-a-number"})
+	cmd.SetContext(context.Background())
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for invalid component ID")
+	}
+
+	if !strings.Contains(err.Error(), "invalid component ID") {
+		t.Errorf("expected 'invalid component ID' error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_EMType(t *testing.T) {
+	// Device with EM data component
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "em-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"em-device": {
+				"em:0": map[string]any{
+					"id":              0,
+					"a_voltage":       230.5,
+					"b_voltage":       231.2,
+					"c_voltage":       229.8,
+					"total_act_power": 1500.0,
+					"total_current":   6.5,
+				},
+				"em:0_records": map[string]any{
+					"records": []map[string]any{
+						{"ts": 1735500000 - 3600, "period": 60},
+						{"ts": 1735500000, "period": 60},
+					},
+				},
+				"em:0_history": map[string]any{
+					"data": []map[string]any{
+						{
+							"ts":     1735500000 - 3600,
+							"period": 60,
+							"values": []map[string]any{
+								{
+									"ts":              1735500000 - 3600,
+									"a_voltage":       230.5,
+									"b_voltage":       231.2,
+									"c_voltage":       229.8,
+									"a_act_power":     500.0,
+									"b_act_power":     500.0,
+									"c_act_power":     500.0,
+									"total_act_power": 1500.0,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"em-device", "--type", "em"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	// May succeed or fail depending on mock, but should not panic
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected)", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_EM1Type(t *testing.T) {
+	// Device with EM1 data component
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "em1-device",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Type:       "SNEM-001X8EU",
+					Model:      "Shelly Pro EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"em1-device": {
+				"em1:0": map[string]any{
+					"id":        0,
+					"voltage":   230.5,
+					"current":   2.5,
+					"act_power": 575.0,
+				},
+				"em1:0_records": map[string]any{
+					"records": []map[string]any{
+						{"ts": 1735500000 - 3600, "period": 60},
+						{"ts": 1735500000, "period": 60},
+					},
+				},
+				"em1:0_history": map[string]any{
+					"data": []map[string]any{
+						{
+							"ts":     1735500000 - 3600,
+							"period": 60,
+							"values": []map[string]any{
+								{
+									"ts":        1735500000 - 3600,
+									"voltage":   230.5,
+									"current":   2.5,
+									"act_power": 575.0,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"em1-device", "--type", "em1"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected)", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithComponentID(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "multi-em-device",
+					Address:    "192.168.1.102",
+					MAC:        "AA:BB:CC:DD:EE:03",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"multi-em-device": {
+				"em:0": map[string]any{"id": 0, "total_act_power": 1000.0},
+				"em:1": map[string]any{"id": 1, "total_act_power": 2000.0},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"multi-em-device", "1", "--type", "em"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected)", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithPeriodFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"em:0": map[string]any{"id": 0, "total_act_power": 1000.0},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	periods := []string{"hour", "day", "week", "month"}
+	for _, period := range periods { //nolint:paralleltest // subtest shares global state
+		t.Run(period, func(t *testing.T) {
+			var buf bytes.Buffer
+			cmd := NewCommand(tf.Factory)
+			cmd.SetContext(context.Background())
+			cmd.SetArgs([]string{"test-device", "--type", "em", "--period", period})
+			cmd.SetOut(&buf)
+			cmd.SetErr(&buf)
+
+			err := cmd.Execute()
+			if err != nil {
+				t.Logf("Execute error for period %s = %v (may be expected)", period, err)
+			}
+		})
+	}
+}
+
+//nolint:paralleltest // Uses factory.NewTestFactory which is not parallel-safe
+func TestExecute_InvalidPeriod(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"some-device", "--type", "em", "--period", "invalid-period"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid period")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid") {
+		t.Logf("Error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithFromToFlags(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"em:0": map[string]any{"id": 0, "total_act_power": 1000.0},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "em", "--from", "2025-01-01", "--to", "2025-01-07"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected)", err)
+	}
+}
+
+//nolint:paralleltest // Uses factory.NewTestFactory which is not parallel-safe
+func TestExecute_InvalidFromTime(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"some-device", "--type", "em", "--from", "invalid-time"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid from time")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid") {
+		t.Logf("Error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses factory.NewTestFactory which is not parallel-safe
+func TestExecute_InvalidToTime(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"some-device", "--type", "em", "--to", "invalid-time"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid to time")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid") {
+		t.Logf("Error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithLimitFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"em:0": map[string]any{"id": 0, "total_act_power": 1000.0},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "em", "--limit", "10"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected)", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_AutoDetectType(t *testing.T) {
+	// Test auto-detection when neither EM nor EM1 data found
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "no-energy-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"no-energy-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"no-energy-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	// Should fail because no energy data components
+	if err == nil {
+		t.Error("expected error when no energy data components found")
+	}
+	if err != nil && !strings.Contains(err.Error(), "no energy data components") {
+		t.Logf("Error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses factory.NewTestFactory which is not parallel-safe
+func TestExecute_UnknownDevice(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"unknown-device", "--type", "em"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for unknown device")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_InvalidTypeFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "--type", "invalid"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	// Should fail because invalid component type
+	if err == nil {
+		t.Error("expected error for invalid type flag")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_EMDataHistory(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "em-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"em-device": {
+				"em:0": map[string]any{
+					"id": 0,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "em-device", 0, "em", "day", "", "", 0)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected with mock)", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_EM1DataHistory(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "em1-device",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Type:       "SNEM-001X8EU",
+					Model:      "Shelly Pro EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"em1-device": {
+				"em1:0": map[string]any{
+					"id": 0,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "em1-device", 0, "em1", "day", "", "", 0)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected with mock)", err)
+	}
+}
+
+//nolint:paralleltest // Uses factory.NewTestFactory which is not parallel-safe
+func TestRun_InvalidTimeRange(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	// Test with invalid period
+	err := run(context.Background(), tf.Factory, "any-device", 0, "em", "invalid", "", "", 0)
+	if err == nil {
+		t.Error("expected error for invalid time range")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid") {
+		t.Errorf("expected 'invalid' in error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_UnknownComponentType(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "test-device", 0, "unknown", "day", "", "", 0)
+	if err == nil {
+		t.Error("expected error for unknown component type")
+	}
+	if err != nil && !strings.Contains(err.Error(), "no energy data components") {
+		t.Errorf("expected 'no energy data components' error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_WithFromToTimes(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNEM-001X16EU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"em:0": map[string]any{"id": 0},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "test-device", 0, "em", "", "2025-01-01", "2025-01-07", 0)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected with mock)", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_AutoDetectFails(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "no-energy-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"no-energy-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Use "auto" type to trigger auto-detection
+	err = run(context.Background(), tf.Factory, "no-energy-device", 0, shelly.ComponentTypeAuto, "day", "", "", 0)
+	if err == nil {
+		t.Error("expected error when auto-detection fails")
+	}
+	if err != nil {
+		t.Logf("Expected error: %v", err)
 	}
 }
 

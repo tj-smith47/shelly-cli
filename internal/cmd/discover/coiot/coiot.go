@@ -18,6 +18,18 @@ import (
 // DefaultTimeout is the default discovery timeout.
 const DefaultTimeout = 10 * time.Second
 
+// Discoverer defines the interface for CoIoT discovery.
+type Discoverer interface {
+	Discover(timeout time.Duration) ([]discovery.DiscoveredDevice, error)
+	Stop() error
+}
+
+// newDiscoverer is the factory function for creating discoverers.
+// It can be replaced in tests to inject mock discoverers.
+var newDiscoverer = func() Discoverer {
+	return discovery.NewCoIoTDiscoverer()
+}
+
 // Options holds command options.
 type Options struct {
 	Factory      *cmdutil.Factory
@@ -82,7 +94,7 @@ func run(ctx context.Context, opts *Options) error {
 		timeout = DefaultTimeout
 	}
 
-	coiotDiscoverer := discovery.NewCoIoTDiscoverer()
+	coiotDiscoverer := newDiscoverer()
 	defer func() {
 		if err := coiotDiscoverer.Stop(); err != nil {
 			ios.DebugErr("stopping CoIoT discoverer", err)

@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -871,5 +873,704 @@ func TestNewCommand_IntegrationWithFactory(t *testing.T) {
 	}
 	if found != cmd {
 		t.Error("Found wrong command")
+	}
+}
+
+// ============================================================================
+// Execute-based tests with mock server for comprehensive coverage
+// ============================================================================
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_Gen2Device_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-gen2",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-gen2": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-gen2"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+	// Check for success message indicating TLS config was fetched
+	if !strings.Contains(output, "TLS Configuration") {
+		t.Errorf("output should contain 'TLS Configuration', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_Gen1Device_Error(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-gen1",
+					Address:    "192.168.1.101",
+					MAC:        "BB:CC:DD:EE:FF:00",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-gen1": {
+				"relay": map[string]any{"ison": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-gen1"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("expected error for Gen1 device")
+	}
+	if !strings.Contains(err.Error(), "Gen2+") {
+		t.Errorf("error should mention Gen2+, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_NoCustomCA_ShowsGuidance(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "no-ca-device",
+					Address:    "192.168.1.102",
+					MAC:        "CC:DD:EE:FF:00:11",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"no-ca-device": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"no-ca-device"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Should show guidance about installing custom CA
+	if !strings.Contains(output, "cert install") {
+		t.Errorf("output should contain guidance about 'cert install', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_WithCustomCA_MQTT(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "mqtt-ca-device",
+					Address:    "192.168.1.103",
+					MAC:        "DD:EE:FF:00:11:22",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"mqtt-ca-device": {
+				"switch:0": map[string]any{"output": true},
+				// Note: MQTT config with ssl_ca would need to be part of the GetConfig response
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"mqtt-ca-device"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "TLS Configuration") {
+		t.Errorf("output should contain 'TLS Configuration', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_CancelledContext(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "cancel-test",
+					Address:    "192.168.1.104",
+					MAC:        "EE:FF:00:11:22:33",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	err = run(ctx, tf.Factory, "cancel-test")
+	if err == nil {
+		t.Error("expected error for cancelled context")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_VerboseMode(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "verbose-test",
+					Address:    "192.168.1.105",
+					MAC:        "FF:00:11:22:33:44",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"verbose-test": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Set verbose mode via viper
+	viper.Set("verbose", true)
+	defer viper.Set("verbose", false)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"verbose-test"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Verbose mode should show raw configuration info
+	if !strings.Contains(output, "Raw configuration") {
+		t.Errorf("verbose output should contain 'Raw configuration', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithMockDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "kitchen",
+					Address:    "192.168.1.106",
+					MAC:        "00:11:22:33:44:55",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"kitchen": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"kitchen"})
+	cmd.SetContext(context.Background())
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "TLS Configuration") {
+		t.Errorf("output should contain 'TLS Configuration', got: %s", output)
+	}
+	if !strings.Contains(output, "kitchen") {
+		t.Errorf("output should contain device name 'kitchen', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_MultipleDevices(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "device1",
+					Address:    "192.168.1.107",
+					MAC:        "11:22:33:44:55:66",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "device2",
+					Address:    "192.168.1.108",
+					MAC:        "22:33:44:55:66:77",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"device1": {"switch:0": map[string]any{"output": true}},
+			"device2": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Test first device
+	err = run(context.Background(), tf.Factory, "device1")
+	if err != nil {
+		t.Errorf("run(device1) error = %v", err)
+	}
+
+	// Reset output
+	tf.Reset()
+
+	// Test second device
+	err = run(context.Background(), tf.Factory, "device2")
+	if err != nil {
+		t.Errorf("run(device2) error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_VerboseMode_ShowsRawConfig(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "verbose-dev",
+					Address:    "192.168.1.110",
+					MAC:        "A0:B1:C2:D3:E4:F5",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"verbose-dev": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Enable verbose mode
+	viper.Set("verbose", true)
+	defer viper.Set("verbose", false)
+
+	err = run(context.Background(), tf.Factory, "verbose-dev")
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Should contain "Raw configuration" text
+	if !strings.Contains(output, "Raw configuration") {
+		t.Errorf("verbose output should contain 'Raw configuration', got: %s", output)
+	}
+	// Should contain JSON-like output with "sys"
+	if !strings.Contains(output, "sys") {
+		t.Errorf("verbose output should contain 'sys' from config, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_NoCustomCA_ShowsCertInstall(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "no-cert-dev",
+					Address:    "192.168.1.111",
+					MAC:        "B0:C1:D2:E3:F4:05",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"no-cert-dev": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "no-cert-dev")
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Should contain guidance about cert install
+	if !strings.Contains(output, "cert install") {
+		t.Errorf("output should contain 'cert install', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_Gen2Success_OutputFormat(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "output-fmt-dev",
+					Address:    "192.168.1.112",
+					MAC:        "C0:D1:E2:F3:04:15",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"output-fmt-dev": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "output-fmt-dev")
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Output should contain device name
+	if !strings.Contains(output, "output-fmt-dev") {
+		t.Errorf("output should contain device name, got: %s", output)
+	}
+	// Output should contain TLS Configuration header
+	if !strings.Contains(output, "TLS Configuration") {
+		t.Errorf("output should contain 'TLS Configuration', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_WithMQTTConfig(t *testing.T) {
+	// Test with MQTT configuration in device state
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "mqtt-dev",
+					Address:    "192.168.1.113",
+					MAC:        "D0:E1:F2:03:14:25",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"mqtt-dev": {
+				"switch:0": map[string]any{"output": true},
+				"mqtt":     map[string]any{"connected": true, "server": "mqtt.example.com:1883"},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	err = run(context.Background(), tf.Factory, "mqtt-dev")
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Should contain TLS Configuration
+	if !strings.Contains(output, "TLS Configuration") {
+		t.Errorf("output should contain 'TLS Configuration', got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_VerboseWithValidConfig(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "verbose-cfg-dev",
+					Address:    "192.168.1.114",
+					MAC:        "E0:F1:02:13:24:35",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"verbose-cfg-dev": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Enable verbose mode
+	viper.Set("verbose", true)
+	defer viper.Set("verbose", false)
+
+	err = run(context.Background(), tf.Factory, "verbose-cfg-dev")
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Verbose mode should produce output with the config data
+	if !strings.Contains(output, "Raw configuration") {
+		t.Errorf("verbose output should contain 'Raw configuration', got: %s", output)
+	}
+	// Config should be displayed as JSON
+	if !strings.Contains(output, "{") {
+		t.Errorf("verbose output should contain JSON braces, got: %s", output)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_DirectCallToRun(t *testing.T) {
+	// Directly test the run function for additional coverage
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "direct-call-dev",
+					Address:    "192.168.1.115",
+					MAC:        "F0:01:12:23:34:45",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"direct-call-dev": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	ctx := context.Background()
+	err = run(ctx, tf.Factory, "direct-call-dev")
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "TLS Configuration") {
+		t.Errorf("output should contain 'TLS Configuration', got: %s", output)
+	}
+	if !strings.Contains(output, "cert install") {
+		t.Errorf("output should contain 'cert install' guidance, got: %s", output)
 	}
 }

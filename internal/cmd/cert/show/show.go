@@ -50,10 +50,16 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 				return fmt.Errorf("get config: %w", callErr)
 			}
 
-			var ok bool
-			config, ok = result.(map[string]any)
-			if !ok {
-				return fmt.Errorf("unexpected response type")
+			// Handle different result types from RPC client
+			switch v := result.(type) {
+			case map[string]any:
+				config = v
+			case json.RawMessage:
+				if err := json.Unmarshal(v, &config); err != nil {
+					return fmt.Errorf("unmarshal config: %w", err)
+				}
+			default:
+				return fmt.Errorf("unexpected response type: %T", result)
 			}
 
 			return nil

@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+
+	"github.com/gorilla/websocket"
 )
 
 // DeviceServer mocks Shelly device HTTP endpoints.
@@ -15,6 +17,7 @@ type DeviceServer struct {
 	fixtures *Fixtures
 	mu       sync.RWMutex
 	state    map[string]DeviceState
+	upgrader websocket.Upgrader
 }
 
 // NewDeviceServer creates a mock HTTP server for device requests.
@@ -22,6 +25,9 @@ func NewDeviceServer(fixtures *Fixtures) *DeviceServer {
 	ds := &DeviceServer{
 		fixtures: fixtures,
 		state:    make(map[string]DeviceState),
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool { return true },
+		},
 	}
 
 	for name, state := range fixtures.DeviceStates {
@@ -105,6 +111,12 @@ type rpcResponse struct {
 }
 
 func (ds *DeviceServer) handleGen2(w http.ResponseWriter, r *http.Request, endpoint string, state DeviceState, device *DeviceFixture) {
+	// Handle WebSocket upgrade on /rpc endpoint
+	if endpoint == "/rpc" && websocket.IsWebSocketUpgrade(r) {
+		ds.handleWebSocketRPC(w, r, state, device)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	// Handle JSON-RPC endpoint
@@ -163,6 +175,9 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		result = map[string]any{
 			"sys": map[string]any{"device": map[string]any{"name": device.Name}},
 		}
+
+	case "Sys.GetConfig":
+		result = ds.getSysConfig(state, device)
 
 	case "Shelly.GetComponents":
 		result = ds.getComponents(state)
@@ -318,6 +333,141 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 			"enable":   true,
 			"ipv4mode": "dhcp",
 		}
+
+	case "Cloud.GetStatus":
+		// Return cloud status from device state or default
+		if cloudState, ok := state["cloud"].(map[string]any); ok {
+			result = cloudState
+		} else {
+			result = map[string]any{"connected": false}
+		}
+
+	case "Cloud.GetConfig":
+		// Return cloud config from device state or default
+		if cloudConfig, ok := state["cloud_config"].(map[string]any); ok {
+			result = cloudConfig
+		} else {
+			result = map[string]any{
+				"enable": false,
+				"server": "shelly-13-eu.shelly.cloud:6022/jrpc",
+			}
+		}
+
+	case "Ws.GetConfig":
+		// Return WebSocket config from device state or default
+		if wsConfig, ok := state["ws_config"].(map[string]any); ok {
+			result = wsConfig
+		} else {
+			result = map[string]any{
+				"enable": true,
+				"server": "",
+				"ssl_ca": "*",
+			}
+		}
+
+	case "Ws.GetStatus":
+		// Return WebSocket status from device state or default
+		if wsStatus, ok := state["ws_status"].(map[string]any); ok {
+			result = wsStatus
+		} else {
+			result = map[string]any{
+				"connected": false,
+			}
+		}
+
+	case "EMData.GetRecords":
+		// Return EMData records from device state or default
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getEMDataRecords(state, id)
+
+	case "EMData.GetData":
+		// Return EMData history from device state or default
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getEMDataHistory(state, id)
+
+	case "EM1Data.GetRecords":
+		// Return EM1Data records from device state or default
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getEM1DataRecords(state, id)
+
+	case "EM1Data.GetData":
+		// Return EM1Data history from device state or default
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getEM1DataHistory(state, id)
+
+	case "BTHome.GetStatus":
+		// Return BTHome component status from device state
+		result = ds.getBTHomeStatus(state)
+
+	case "BTHomeDevice.GetStatus":
+		// Return BTHome device status from device state
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getBTHomeDeviceStatus(state, id)
+
+	case "BTHomeDevice.GetConfig":
+		// Return BTHome device config from device state
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getBTHomeDeviceConfig(state, id)
+
+	case "BTHomeDevice.GetKnownObjects":
+		// Return BTHome device known objects from device state
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getBTHomeDeviceKnownObjects(state, id)
+
+	case "BTHome.StartDeviceDiscovery":
+		// Return success for BTHome discovery start
+		result = map[string]any{}
+
+	case "BTHome.AddDevice":
+		// Return success for BTHome device add
+		result = map[string]any{"key": "mock-key-12345"}
+
+	case "BTHome.DeleteDevice":
+		// Return success for BTHome device delete
+		result = map[string]any{}
+
+	case "Shelly.ListMethods":
+		// Return mock list of available methods for debug/methods command
+		result = map[string]any{
+			"methods": []string{
+				"Shelly.GetDeviceInfo",
+				"Shelly.GetStatus",
+				"Shelly.GetConfig",
+				"Shelly.Reboot",
+				"Shelly.ListMethods",
+				"Switch.GetStatus",
+				"Switch.Set",
+				"Switch.Toggle",
+				"Cover.GetStatus",
+				"Cover.Open",
+				"Cover.Close",
+				"Light.GetStatus",
+				"Light.Set",
+				"Script.List",
+				"Script.GetCode",
+				"Script.Start",
+				"Script.Stop",
+				"Sys.GetConfig",
+				"Wifi.GetStatus",
+				"MQTT.GetStatus",
+				"MQTT.GetConfig",
+				"Input.GetStatus",
+				"Input.GetConfig",
+				"Input.SetConfig",
+			},
+		}
+
+	case "Shelly.PutUserCA":
+		// Return success for CA certificate installation
+		result = map[string]any{"len": 1024}
+
+	case "Shelly.PutTLSClientCert":
+		// Return success for client certificate installation
+		result = map[string]any{"len": 2048}
+
+	case "Shelly.SetConfig":
+		// Return success for device configuration import
+		result = map[string]any{"restart_required": false}
 
 	default:
 		ds.writeRPCError(w, req.ID, "method not found")
@@ -724,4 +874,180 @@ func (ds *DeviceServer) getScriptList(state DeviceState) map[string]any {
 		scripts = []map[string]any{}
 	}
 	return map[string]any{"scripts": scripts}
+}
+
+// getSysConfig returns mock Sys.GetConfig response for CoIoT and other system config.
+func (ds *DeviceServer) getSysConfig(state DeviceState, device *DeviceFixture) map[string]any {
+	result := map[string]any{
+		"device": map[string]any{
+			"name":         device.Name,
+			"mac":          device.MAC,
+			"model":        device.Model,
+			"fw_id":        "20241210-092317/1.4.4-g6d2a586",
+			"discoverable": true,
+			"eco_mode":     false,
+		},
+		"location": map[string]any{
+			"tz":  "UTC",
+			"lat": 0.0,
+			"lon": 0.0,
+		},
+		"debug": map[string]any{
+			"level": 2,
+		},
+		"ui_data": map[string]any{},
+		"rpc_udp": map[string]any{
+			"dst_addr":    "",
+			"listen_port": nil,
+		},
+		"sntp": map[string]any{
+			"server": "time.google.com",
+		},
+		"cfg_rev": 0,
+	}
+
+	// Add CoIoT section if present in state
+	if coiot, ok := state["coiot"].(map[string]any); ok {
+		result["coiot"] = coiot
+	}
+
+	// Add sys section if present in state (overrides default)
+	if sys, ok := state["sys"].(map[string]any); ok {
+		result["sys"] = sys
+	} else {
+		result["sys"] = map[string]any{
+			"device": map[string]any{
+				"name": device.Name,
+			},
+		}
+	}
+
+	return result
+}
+
+// getEMDataRecords returns mock EMData records.
+func (ds *DeviceServer) getEMDataRecords(_ DeviceState, _ int) map[string]any {
+	return map[string]any{
+		"data_blocks": []map[string]any{},
+	}
+}
+
+// getEMDataHistory returns mock EMData history with valid sample data.
+func (ds *DeviceServer) getEMDataHistory(_ DeviceState, _ int) map[string]any {
+	return map[string]any{
+		"data": []map[string]any{
+			{
+				"ts":     1700000000,
+				"period": 60,
+				"values": []map[string]any{
+					{
+						"total_act_power": 1500.0,
+						"a_act_power":     500.0,
+						"b_act_power":     500.0,
+						"c_act_power":     500.0,
+						"a_voltage":       230.0,
+						"b_voltage":       230.0,
+						"c_voltage":       230.0,
+					},
+				},
+			},
+		},
+	}
+}
+
+// getEM1DataRecords returns mock EM1Data records.
+func (ds *DeviceServer) getEM1DataRecords(_ DeviceState, _ int) map[string]any {
+	return map[string]any{
+		"data_blocks": []map[string]any{},
+	}
+}
+
+// getEM1DataHistory returns mock EM1Data history with valid sample data.
+func (ds *DeviceServer) getEM1DataHistory(_ DeviceState, _ int) map[string]any {
+	return map[string]any{
+		"data": []map[string]any{
+			{
+				"ts":     1700000000,
+				"period": 60,
+				"values": []map[string]any{
+					{
+						"act_power": 575.0,
+						"voltage":   230.0,
+						"current":   2.5,
+						"pf":        0.99,
+						"freq":      50.0,
+					},
+				},
+			},
+		},
+	}
+}
+
+// getBTHomeStatus returns BTHome component status from device state.
+func (ds *DeviceServer) getBTHomeStatus(state DeviceState) map[string]any {
+	if bthome, ok := state["bthome"].(map[string]any); ok {
+		return bthome
+	}
+	return map[string]any{
+		"errors": []any{},
+	}
+}
+
+// getBTHomeDeviceStatus returns BTHome device status from device state.
+func (ds *DeviceServer) getBTHomeDeviceStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("bthomedevice:%d", id)
+	if dev, ok := state[key].(map[string]any); ok {
+		return dev
+	}
+	return map[string]any{
+		"id": id,
+	}
+}
+
+// getBTHomeDeviceConfig returns BTHome device config from device state.
+func (ds *DeviceServer) getBTHomeDeviceConfig(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("bthomedevice:%d_config", id)
+	if cfg, ok := state[key].(map[string]any); ok {
+		return cfg
+	}
+	return map[string]any{
+		"id":   id,
+		"addr": "",
+		"name": nil,
+	}
+}
+
+// getBTHomeDeviceKnownObjects returns BTHome device known objects from device state.
+func (ds *DeviceServer) getBTHomeDeviceKnownObjects(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("bthomedevice:%d_known_objects", id)
+	if objs, ok := state[key].(map[string]any); ok {
+		return objs
+	}
+	return map[string]any{
+		"objects": []any{},
+	}
+}
+
+// handleWebSocketRPC handles WebSocket RPC connections for Gen2 devices.
+func (ds *DeviceServer) handleWebSocketRPC(w http.ResponseWriter, r *http.Request, _ DeviceState, _ *DeviceFixture) {
+	conn, err := ds.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = conn.Close() // Ignore close errors in mock server
+	}()
+
+	// Simple echo-style WebSocket handler for testing
+	for {
+		messageType, message, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		// Echo the message back (basic stub for WebSocket RPC)
+		if err := conn.WriteMessage(messageType, message); err != nil {
+			break
+		}
+	}
 }
