@@ -52,3 +52,4 @@ dist/
 # Temporary files
 tmp/
 temp/
+docgen

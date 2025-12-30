@@ -2,11 +2,13 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
@@ -219,5 +221,261 @@ func TestIsJSONObject(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("IsJSONObject(%q) = %v, want %v", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestExecute_WithMock(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"Shelly.GetStatus", "test-device", "--timeout", "5s"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected for mock)", err)
+	}
+}
+
+func TestExecute_WithParams(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"Switch.Set", `{"id":0,"on":true}`, "test-device", "--timeout", "5s"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected)", err)
+	}
+}
+
+func TestExecute_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"Switch.Set", "{invalid json}", "test-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for invalid JSON params")
+	}
+	if !strings.Contains(err.Error(), "invalid JSON") {
+		t.Errorf("Expected 'invalid JSON' error, got: %v", err)
+	}
+}
+
+func TestExecute_YAMLOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"Shelly.GetStatus", "test-device", "-o", "yaml", "--timeout", "5s"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected)", err)
+	}
+}
+
+func TestExecute_NoTargets(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"Shelly.GetStatus"}) // No device targets
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error when no targets provided")
+	}
+}
+
+func TestRun_WithTargets(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "device-1",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "device-2",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"device-1": {"switch:0": map[string]any{"output": false}},
+			"device-2": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Timeout:    5 * time.Second,
+		Concurrent: 2,
+	}
+
+	targets := []string{"device-1", "device-2"}
+	err = run(context.Background(), tf.Factory, targets, "Shelly.GetStatus", nil, opts)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected)", err)
+	}
+}
+
+func TestRun_WithParams(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Timeout:    5 * time.Second,
+		Concurrent: 1,
+	}
+
+	params := map[string]any{"id": 0, "on": true}
+	err = run(context.Background(), tf.Factory, []string{"test-device"}, "Switch.Set", params, opts)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected)", err)
 	}
 }

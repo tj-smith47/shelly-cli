@@ -80,16 +80,3 @@ func DisplayUpdateStatus(ios *iostreams.IOStreams, currentVersion, availableVers
 	}
 }
 
-// DisplayUpdateInfo shows version info and release notes before update confirmation.
-func DisplayUpdateInfo(ios *iostreams.IOStreams, currentVersion, availableVersion, releaseNotes string) {
-	ios.Printf("\nCurrent version: %s\n", currentVersion)
-	ios.Printf("Available version: %s\n", availableVersion)
-	if releaseNotes != "" {
-		ios.Printf("\nRelease notes:\n%s\n", releaseNotes)
-	}
-}
-
-// DisplayRollbackInfo shows rollback version info.
-func DisplayRollbackInfo(ios *iostreams.IOStreams, currentVersion, targetVersion string) {
-	ios.Printf("Rolling back from %s to %s\n", currentVersion, targetVersion)
-}

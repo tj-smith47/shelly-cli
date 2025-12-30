@@ -10,7 +10,6 @@ import (
 	"runtime"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // InstallRelease downloads and installs a release binary.
@@ -199,7 +198,7 @@ func (c *Client) PerformRollback(ctx context.Context, ios *iostreams.IOStreams, 
 		return fmt.Errorf("no previous version available for rollback")
 	}
 
-	term.DisplayRollbackInfo(ios, currentVersion, release.Version())
+	ios.RollbackInfo(currentVersion, release.Version())
 
 	confirmed, err := confirm("Proceed with rollback?", skipConfirm)
 	if err != nil {
@@ -215,7 +214,7 @@ func (c *Client) PerformRollback(ctx context.Context, ios *iostreams.IOStreams, 
 
 // PerformUpdate handles the complete update flow including confirmation.
 func (c *Client) PerformUpdate(ctx context.Context, ios *iostreams.IOStreams, release *Release, currentVersion, releaseNotes string, confirm ConfirmFunc, skipConfirm bool) error {
-	term.DisplayUpdateInfo(ios, currentVersion, release.Version(), releaseNotes)
+	ios.UpdateInfo(currentVersion, release.Version(), releaseNotes)
 
 	confirmed, err := confirm("\nProceed with update?", skipConfirm)
 	if err != nil {

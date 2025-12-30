@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
-	"github.com/tj-smith47/shelly-cli/internal/pluginupgrade"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -56,7 +55,7 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, all bool) error {
 		return err
 	}
 
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	if all {
 		extensionList, listErr := registry.List()

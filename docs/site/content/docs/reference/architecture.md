@@ -129,8 +129,29 @@ internal/
 │   ├── alerts.go       # Alert configuration
 │   └── validation.go   # ValidateName() - shared validation
 │
+├── download/           # HTTP download utilities
+│   └── download.go     # Download(), DownloadWithProgress()
+│
 ├── github/             # GitHub integration
-│   └── releases.go     # Release checking, downloads
+│   ├── releases.go     # Release checking, downloads
+│   ├── updates.go      # Update checking, FindPreviousRelease()
+│   └── install.go      # InstallRelease(), binary replacement
+│
+├── mock/               # Demo mode mock server
+│   ├── server.go       # MockServer for demo/testing
+│   ├── demo.go         # Demo mode utilities
+│   ├── config.go       # Mock device configuration
+│   ├── fixtures.go     # Test fixtures
+│   ├── fleet.go        # Fleet mock data
+│   └── discovery.go    # Mock discovery responses
+│
+├── ratelimit/          # Rate limiting with circuit breaker
+│   ├── ratelimit.go    # RateLimiter, TokenBucket
+│   ├── circuit.go      # CircuitBreaker
+│   └── options.go      # Configuration options
+│
+├── telemetry/          # Opt-in anonymous usage analytics
+│   └── telemetry.go    # Telemetry collection (disabled by default)
 │
 ├── utils/              # Shared utilities (batch, device conversion)
 │   ├── batch.go        # ResolveBatchTargets() - args/stdin/group/all
@@ -170,8 +191,7 @@ internal/
 ├── output/             # Pure formatters (data → string, NO IOStreams)
 │   ├── format.go       # Output format routing
 │   │                   #   Format type (JSON, YAML, Table, Text, Template)
-│   │                   #   FormatOutput(), PrintJSON(), PrintYAML()
-│   │                   #   FormatConfigValue(), FormatSize()
+│   │                   #   FormatOutput()
 │   │
 │   ├── state.go        # Boolean/state renderers
 │   │                   #   Case enum (CaseLower, CaseTitle, CaseUpper)
@@ -182,18 +202,30 @@ internal/
 │   ├── devices.go      # Device formatters
 │   │                   #   FormatDiscoveredDevices(), FormatAlarmSensors()
 │   │                   #   FormatPower(), FormatPowerColored(), FormatEnergy()
-│   │                   #   FormatEMLines(), FormatEM1Line(), FormatPMLine()
 │   │
 │   ├── table.go        # Table builder utilities
+│   ├── backup.go       # FormatBackupsTable()
+│   ├── benchmark.go    # Benchmark result formatters
+│   ├── diff.go         # Config/script diff formatters
+│   ├── prompt.go       # Prompt formatting helpers
+│   ├── report.go       # Report formatters
+│   ├── writer.go       # Writer utilities
 │   │
-│   └── backup.go       # FormatBackupsTable()
+│   ├── jsonfmt/        # JSON formatting with syntax highlighting
+│   ├── yamlfmt/        # YAML formatting with syntax highlighting
+│   ├── synfmt/         # Syntax highlighting utilities
+│   └── tmplfmt/        # Go template formatting
 │
 ├── plugins/            # Plugin system
 │   ├── registry.go     # Registry - plugin management
 │   ├── loader.go       # Plugin loading
 │   ├── executor.go     # Plugin execution
 │   ├── manifest.go     # Plugin metadata
-│   └── migrate.go      # Plugin migration
+│   ├── migrate.go      # Plugin migration
+│   ├── upgrader.go     # Upgrader - plugin upgrade functionality
+│   ├── hooks.go        # Plugin hooks
+│   ├── types.go        # Shared types
+│   └── scaffold/       # Plugin scaffolding
 │
 ├── shelly/             # Business logic service layer
 │   ├── shelly.go       # Service struct
@@ -278,6 +310,9 @@ internal/
 │   │                     # GetBTHomeStatus(), StartBTHomeDiscovery()
 │   │                     # DeviceInfo, BTHomeDiscovery types
 │   │
+│   ├── sensoraddon/    # Sensor add-on operations
+│   │   └── ...           # Temperature/humidity sensor add-on handling
+│   │
 │   └── wireless/       # Wireless protocol services
 │       └── ...           # BLE, BTHome, Matter, Zigbee, LoRa
 │
@@ -329,18 +364,56 @@ internal/
 │   ├── app.go          # Main TUI application
 │   ├── keys.go         # Key bindings
 │   ├── styles.go       # TUI styles
-│   └── components/     # TUI components
-│       ├── devicelist/   # Device list component
-│       ├── devicedetail/ # Device detail component
+│   └── components/     # TUI components (39 total)
+│       ├── backup/       # Backup management
+│       ├── batch/        # Batch operations
+│       ├── ble/          # BLE device management
+│       ├── cloud/        # Cloud integration
+│       ├── cmdmode/      # Command mode input
+│       ├── confirm/      # Confirmation dialogs
+│       ├── devicedetail/ # Device detail view
+│       ├── deviceinfo/   # Device info panel
+│       ├── devicelist/   # Device list
+│       ├── discovery/    # Device discovery
 │       ├── energy/       # Energy dashboard
-│       ├── monitor/      # Monitoring component
-│       ├── events/       # Events component
-│       ├── search/       # Search component
-│       ├── tabs/         # Tab navigation
-│       ├── statusbar/    # Status bar
+│       ├── energybars/   # Energy bar charts
+│       ├── energyhistory/# Energy history view
+│       ├── errorview/    # Error display
+│       ├── events/       # Events stream
+│       ├── firmware/     # Firmware management
+│       ├── fleet/        # Fleet management
+│       ├── form/         # Form inputs
 │       ├── help/         # Help overlay
+│       ├── inputs/       # Input components
+│       ├── jsonviewer/   # JSON viewer
+│       ├── kvs/          # KVS management
+│       ├── loading/      # Loading indicators
+│       ├── modal/        # Modal dialogs
+│       ├── monitor/      # Real-time monitoring
+│       ├── protocols/    # Protocol views
+│       ├── provisioning/ # Device provisioning
+│       ├── schedules/    # Schedule management
+│       ├── scripts/      # Script management
+│       ├── search/       # Search interface
+│       ├── security/     # Security settings
+│       ├── smarthome/    # Smart home integrations
+│       ├── statusbar/    # Status bar
+│       ├── system/       # System info
+│       ├── tabs/         # Tab navigation
 │       ├── toast/        # Toast notifications
-│       └── cmdmode/      # Command mode
+│       ├── virtuals/     # Virtual components
+│       ├── webhooks/     # Webhook management
+│       └── wifi/         # WiFi configuration
+│
+├── webhook/            # Webhook server
+│   └── server.go       # HTTP webhook receiver
+│
+├── wizard/             # Interactive setup wizard
+│   ├── wizard.go       # Main wizard flow
+│   ├── steps.go        # Wizard step definitions
+│   ├── discovery.go    # Device discovery step
+│   ├── check.go        # Validation checks
+│   └── helpers.go      # Wizard utilities
 │
 └── version/            # Build-time version info
     ├── version.go      # Version, Commit, Date variables

@@ -1,7 +1,4 @@
-// Package pluginupgrade provides plugin upgrade functionality.
-// This package exists separately from plugins to avoid import cycles
-// (plugins → github → term → shelly → plugins).
-package pluginupgrade
+package plugins
 
 import (
 	"context"
@@ -10,7 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/github"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/plugins"
+	
 )
 
 // Result contains the result of an upgrade attempt.
@@ -25,21 +22,21 @@ type Result struct {
 
 // Upgrader handles plugin upgrade operations.
 type Upgrader struct {
-	registry *plugins.Registry
-	loader   *plugins.Loader
+	registry *Registry
+	loader   *Loader
 	ios      *iostreams.IOStreams
 }
 
 // New creates a new plugin upgrader.
-func New(registry *plugins.Registry, ios *iostreams.IOStreams) *Upgrader {
+func New(registry *Registry, ios *iostreams.IOStreams) *Upgrader {
 	return &Upgrader{
 		registry: registry,
-		loader:   plugins.NewLoader(),
+		loader:   NewLoader(),
 		ios:      ios,
 	}
 }
 
-// UpgradeAll upgrades all installed plugins.
+// UpgradeAll upgrades all installed 
 func (u *Upgrader) UpgradeAll(ctx context.Context) ([]Result, error) {
 	extensionList, err := u.registry.List()
 	if err != nil {
@@ -72,16 +69,16 @@ func (u *Upgrader) UpgradeOne(ctx context.Context, name string) (Result, error) 
 	return u.upgradeExtension(ctx, name, plugin.Version, plugin.Manifest), nil
 }
 
-func (u *Upgrader) upgradeExtension(ctx context.Context, name, currentVersion string, manifest *plugins.Manifest) Result {
+func (u *Upgrader) upgradeExtension(ctx context.Context, name, currentVersion string, manifest *Manifest) Result {
 	result := Result{
 		Name:       name,
 		OldVersion: currentVersion,
 	}
 
-	binaryName := plugins.PluginPrefix + name
+	binaryName := PluginPrefix + name
 
 	// If we have a manifest with GitHub source, use it directly
-	if manifest != nil && manifest.Source.Type == plugins.SourceTypeGitHub && manifest.Source.URL != "" {
+	if manifest != nil && manifest.Source.Type == SourceTypeGitHub && manifest.Source.URL != "" {
 		return u.upgradeFromManifest(ctx, name, binaryName, currentVersion, manifest)
 	}
 
@@ -96,7 +93,7 @@ func (u *Upgrader) upgradeExtension(ctx context.Context, name, currentVersion st
 	return u.upgradeWithHeuristics(ctx, name, binaryName, currentVersion)
 }
 
-func (u *Upgrader) upgradeFromManifest(ctx context.Context, name, binaryName, currentVersion string, manifest *plugins.Manifest) Result {
+func (u *Upgrader) upgradeFromManifest(ctx context.Context, name, binaryName, currentVersion string, manifest *Manifest) Result {
 	result := Result{
 		Name:       name,
 		OldVersion: currentVersion,
@@ -143,7 +140,7 @@ func (u *Upgrader) upgradeFromManifest(ctx context.Context, name, binaryName, cu
 	defer cleanup()
 
 	// Create updated manifest with new version info
-	newManifest := plugins.NewManifest(name, plugins.ParseGitHubSource(owner+"/"+repo, release.TagName, asset.Name))
+	newManifest := NewManifest(name, ParseGitHubSource(owner+"/"+repo, release.TagName, asset.Name))
 	newManifest.Version = latestClean
 	newManifest.Description = manifest.Description
 	newManifest.InstalledAt = manifest.InstalledAt // Preserve original install time
@@ -211,7 +208,7 @@ func (u *Upgrader) upgradeWithHeuristics(ctx context.Context, name, binaryName, 
 		}
 
 		// Create manifest for previously manifest-less plugin
-		newManifest := plugins.NewManifest(name, plugins.ParseGitHubSource(owner+"/"+repo, release.TagName, asset.Name))
+		newManifest := NewManifest(name, ParseGitHubSource(owner+"/"+repo, release.TagName, asset.Name))
 		newManifest.Version = latestClean
 
 		// Install with new manifest

@@ -1,4 +1,4 @@
-package pluginupgrade_test
+package plugins_test
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
-	"github.com/tj-smith47/shelly-cli/internal/pluginupgrade"
 )
 
 const testVersion = "1.0.0"
@@ -20,11 +19,11 @@ func TestResult_Fields(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		result pluginupgrade.Result
+		result plugins.Result
 	}{
 		{
 			name: "upgraded result",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "myext",
 				OldVersion: testVersion,
 				NewVersion: "1.1.0",
@@ -35,7 +34,7 @@ func TestResult_Fields(t *testing.T) {
 		},
 		{
 			name: "skipped result",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "myext",
 				OldVersion: testVersion,
 				NewVersion: "",
@@ -46,7 +45,7 @@ func TestResult_Fields(t *testing.T) {
 		},
 		{
 			name: "up to date result",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "myext",
 				OldVersion: testVersion,
 				NewVersion: testVersion,
@@ -85,7 +84,7 @@ func TestNew(t *testing.T) {
 	}()
 
 	// Pass nil - this tests the function signature
-	upgrader := pluginupgrade.New(nil, ios)
+	upgrader := plugins.New(nil, ios)
 	if upgrader == nil {
 		t.Error("New() returned nil")
 	}
@@ -98,7 +97,7 @@ func TestNew_WithRegistry(t *testing.T) {
 	tmpDir := t.TempDir()
 	registry := plugins.NewRegistryWithDir(tmpDir)
 
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 	if upgrader == nil {
 		t.Error("New() returned nil with valid registry")
 	}
@@ -160,7 +159,7 @@ func TestResult_IsUpToDate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := pluginupgrade.Result{
+			result := plugins.Result{
 				OldVersion: tt.oldVersion,
 				NewVersion: tt.newVersion,
 				Upgraded:   tt.upgraded,
@@ -204,7 +203,7 @@ func TestResult_HasError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := pluginupgrade.Result{
+			result := plugins.Result{
 				Error: tt.err,
 			}
 
@@ -221,7 +220,7 @@ func TestUpgrader_Fields(t *testing.T) {
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 
-	upgrader := pluginupgrade.New(nil, ios)
+	upgrader := plugins.New(nil, ios)
 	if upgrader == nil {
 		t.Error("New() returned nil")
 	}
@@ -232,11 +231,11 @@ func TestResult_String(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		result pluginupgrade.Result
+		result plugins.Result
 	}{
 		{
 			name: "full result",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "test-plugin",
 				OldVersion: "1.0.0",
 				NewVersion: "2.0.0",
@@ -247,7 +246,7 @@ func TestResult_String(t *testing.T) {
 		},
 		{
 			name: "result with error",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "error-plugin",
 				OldVersion: "1.0.0",
 				NewVersion: "",
@@ -318,7 +317,7 @@ func TestResult_UpgradedFlag(t *testing.T) {
 				err = errors.New("test error")
 			}
 
-			result := pluginupgrade.Result{
+			result := plugins.Result{
 				Upgraded: tt.upgraded,
 				Skipped:  tt.skipped,
 				Error:    err,
@@ -389,7 +388,7 @@ func TestResult_VersionComparison(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := pluginupgrade.Result{
+			result := plugins.Result{
 				OldVersion: tt.oldVersion,
 				NewVersion: tt.newVersion,
 			}
@@ -420,7 +419,7 @@ func TestNew_WithIOStreams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			upgrader := pluginupgrade.New(nil, tt.ios)
+			upgrader := plugins.New(nil, tt.ios)
 			if upgrader == nil {
 				t.Error("New() returned nil with valid IOStreams")
 			}
@@ -433,7 +432,7 @@ func TestResult_AllFieldsCombinations(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		result     pluginupgrade.Result
+		result     plugins.Result
 		wantName   string
 		wantOld    string
 		wantNew    string
@@ -443,7 +442,7 @@ func TestResult_AllFieldsCombinations(t *testing.T) {
 	}{
 		{
 			name: "successful upgrade",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "myext",
 				OldVersion: "1.0.0",
 				NewVersion: "2.0.0",
@@ -460,7 +459,7 @@ func TestResult_AllFieldsCombinations(t *testing.T) {
 		},
 		{
 			name: "skipped non-github source",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "localext",
 				OldVersion: "1.0.0",
 				NewVersion: "",
@@ -477,7 +476,7 @@ func TestResult_AllFieldsCombinations(t *testing.T) {
 		},
 		{
 			name: "already up to date",
-			result: pluginupgrade.Result{
+			result: plugins.Result{
 				Name:       "current",
 				OldVersion: "3.0.0",
 				NewVersion: "3.0.0",
@@ -533,7 +532,7 @@ func TestUpgradeAll_EmptyRegistry(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {
@@ -553,7 +552,7 @@ func TestUpgradeOne_NotInstalled(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	_, err := upgrader.UpgradeOne(context.Background(), "nonexistent")
 	if err == nil {
@@ -591,7 +590,7 @@ func TestUpgradeAll_WithLocalPlugin(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {
@@ -640,7 +639,7 @@ func TestUpgradeOne_WithLocalPlugin(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// UpgradeOne uses a Loader that searches default paths (not our temp dir)
 	// So it may not find the plugin. This is expected behavior - it tests
@@ -686,7 +685,7 @@ func TestUpgradeAll_WithGitHubPlugin(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// Use a context with very short timeout to avoid actual network calls
 	ctx, cancel := context.WithTimeout(context.Background(), 1)
@@ -736,7 +735,7 @@ func TestUpgradeOne_WithGitHubPlugin(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// Use a context with very short timeout to avoid actual network calls
 	ctx, cancel := context.WithTimeout(context.Background(), 1)
@@ -778,7 +777,7 @@ func TestUpgradeAll_WithNoManifest(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// Use a context with very short timeout to avoid actual network calls
 	ctx, cancel := context.WithTimeout(context.Background(), 1)
@@ -821,7 +820,7 @@ func TestUpgradeAll_WithUnknownSourceManifest(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {
@@ -866,7 +865,7 @@ func TestUpgradeAll_WithURLSourceManifest(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {
@@ -911,7 +910,7 @@ func TestUpgradeAll_MultiplePlugins(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {
@@ -939,7 +938,7 @@ func TestUpgradeOne_PluginFoundInLoaderButNotRegistry(t *testing.T) {
 
 	// Create empty registry (plugin not installed according to registry)
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// Try to upgrade a plugin that's not in registry
 	_, err := upgrader.UpgradeOne(context.Background(), "notinregistry")
@@ -957,7 +956,7 @@ func TestResult_ZeroValue(t *testing.T) {
 	t.Parallel()
 
 	// Test zero value result
-	var result pluginupgrade.Result
+	var result plugins.Result
 
 	if result.Name != "" {
 		t.Errorf("zero value Name = %q, want empty", result.Name)
@@ -1009,7 +1008,7 @@ func TestUpgradeAll_WithInvalidGitHubURL(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {
@@ -1052,7 +1051,7 @@ func TestUpgradeAll_ContextCanceled(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// Create already-cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1096,7 +1095,7 @@ func TestUpgradeAll_WithValidGitHubManifest(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// Use very short timeout - will fail on network but exercise code paths
 	ctx, cancel := context.WithTimeout(context.Background(), 10)
@@ -1144,7 +1143,7 @@ func TestUpgradeAll_PluginWithEmptyVersion(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {
@@ -1169,7 +1168,7 @@ func TestUpgradeOne_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	// Try to upgrade an extension that doesn't exist
 	result, err := upgrader.UpgradeOne(context.Background(), "nonexistent-plugin")
@@ -1219,7 +1218,7 @@ func TestUpgradeAll_SourceTypeFiltering(t *testing.T) {
 	}
 
 	registry := plugins.NewRegistryWithDir(tmpDir)
-	upgrader := pluginupgrade.New(registry, ios)
+	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
 	if err != nil {

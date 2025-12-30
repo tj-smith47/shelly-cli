@@ -108,6 +108,20 @@ func (s *IOStreams) Added(noun string, count int) {
 	s.Success("Added %d %s%s", count, noun, suffix)
 }
 
+// UpdateInfo displays version information before an update.
+func (s *IOStreams) UpdateInfo(currentVersion, availableVersion, releaseNotes string) {
+	s.Printf("\nCurrent version: %s\n", currentVersion)
+	s.Printf("Available version: %s\n", availableVersion)
+	if releaseNotes != "" {
+		s.Printf("\nRelease notes:\n%s\n", releaseNotes)
+	}
+}
+
+// RollbackInfo displays version information before a rollback.
+func (s *IOStreams) RollbackInfo(currentVersion, targetVersion string) {
+	s.Printf("Rolling back from %s to %s\n", currentVersion, targetVersion)
+}
+
 // Static message functions that write to specific writers.
 // These are useful when you don't have an IOStreams instance but need styled output.
 

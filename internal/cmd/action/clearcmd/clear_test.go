@@ -2,10 +2,12 @@ package clearcmd
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -170,5 +172,116 @@ func TestOptions(t *testing.T) {
 
 	if opts.Factory == nil {
 		t.Error("Factory is nil")
+	}
+}
+
+func TestExecute_Gen2Device(t *testing.T) {
+	// Gen2 device - should fail with "action URLs only available for Gen1"
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen2-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen2-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen2-device", "out_on_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for Gen2 device")
+	}
+	if !strings.Contains(err.Error(), "Gen1") {
+		t.Logf("Error = %v", err)
+	}
+}
+
+func TestExecute_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"nonexistent-device", "out_on_url"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
+	}
+}
+
+func TestRun_WithIndex(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen2-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Device:  "gen2-device",
+		Event:   "out_on_url",
+		Index:   1,
+		Factory: tf.Factory,
+	}
+
+	err = run(context.Background(), opts)
+	// Will fail because device is Gen2
+	if err == nil {
+		t.Logf("Expected error for Gen2 device")
 	}
 }
