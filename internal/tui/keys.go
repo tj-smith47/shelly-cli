@@ -27,10 +27,10 @@ type KeyMap struct {
 	Refresh    key.Binding
 	RefreshAll key.Binding
 	Filter     key.Binding
-	Command   key.Binding
-	Help      key.Binding
-	Quit      key.Binding
-	ForceQuit key.Binding
+	Command    key.Binding
+	Help       key.Binding
+	Quit       key.Binding
+	ForceQuit  key.Binding
 
 	// Device actions
 	Toggle  key.Binding

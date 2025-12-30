@@ -603,6 +603,11 @@ func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
 	*m.energyHistory, energyHistoryCmd = m.energyHistory.Update(msg)
 	cmds = append(cmds, energyBarsCmd, energyHistoryCmd)
 
+	// Update deviceList for spinner animation during loading
+	var deviceListCmd tea.Cmd
+	m.deviceList, deviceListCmd = m.deviceList.Update(msg)
+	cmds = append(cmds, deviceListCmd)
+
 	// Forward non-key messages to ALL views so async results can be processed
 	// (e.g., Config's wifi.StatusLoadedMsg needs to reach Config even if Dashboard is active)
 	if _, isKey := msg.(tea.KeyPressMsg); !isKey {

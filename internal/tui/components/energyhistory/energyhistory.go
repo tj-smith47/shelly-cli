@@ -401,17 +401,14 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 		return strings.Repeat(lowestChar, width)
 	}
 
-	// Get the last 'width' points
-	data := history
-	if len(data) > width {
-		data = data[len(data)-width:]
-	}
+	// Scale data to fit width - ensures full 5-minute history is always visible
+	data := scaleDataToWidth(history, width)
 
 	p := computeSparklineParams(data)
 
 	var spark strings.Builder
 
-	// Pad at the start if we don't have enough data
+	// Pad at the start if we don't have enough data to fill width
 	if padCount := width - len(data); padCount > 0 {
 		padLevel := 0
 		if p.flatLine {
@@ -429,6 +426,46 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 	}
 
 	return spark.String()
+}
+
+// scaleDataToWidth scales the data points to fit the target width.
+// If we have more points than width, we sample/average them.
+// If we have fewer points than width, we return as-is (padding handled elsewhere).
+func scaleDataToWidth(history []DataPoint, width int) []DataPoint {
+	histLen := len(history)
+	if histLen <= width {
+		return history
+	}
+
+	// Scale down: group points and take the average value for each group
+	result := make([]DataPoint, width)
+	ratio := float64(histLen) / float64(width)
+
+	for i := range width {
+		startIdx := int(float64(i) * ratio)
+		endIdx := int(float64(i+1) * ratio)
+		if endIdx > histLen {
+			endIdx = histLen
+		}
+		if startIdx >= endIdx {
+			startIdx = endIdx - 1
+		}
+
+		// Average the values in this bucket
+		var sum float64
+		count := 0
+		for j := startIdx; j < endIdx; j++ {
+			sum += history[j].Value
+			count++
+		}
+
+		result[i] = DataPoint{
+			Value:     sum / float64(count),
+			Timestamp: history[endIdx-1].Timestamp, // Use last timestamp in bucket
+		}
+	}
+
+	return result
 }
 
 func (m *Model) renderEmpty() string {
