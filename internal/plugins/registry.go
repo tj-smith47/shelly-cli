@@ -23,8 +23,9 @@ func NewRegistry() (*Registry, error) {
 		return nil, fmt.Errorf("failed to get plugins directory: %w", err)
 	}
 
-	// Ensure plugins directory exists
-	if err := os.MkdirAll(pluginsDir, 0o750); err != nil {
+	// Ensure plugins directory exists using afero (allows test isolation)
+	fs := config.Fs()
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create plugins directory: %w", err)
 	}
 

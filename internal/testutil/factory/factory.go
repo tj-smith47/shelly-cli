@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/browser"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -178,3 +180,29 @@ func NewTestFactoryWithMockBrowser(t *testing.T) (*TestFactory, *MockBrowser) {
 
 // Ensure MockBrowser implements browser.Browser.
 var _ browser.Browser = (*MockBrowser)(nil)
+
+// SetupTestFs configures an in-memory filesystem for the test.
+// It sets the package-level filesystem in config to use afero.MemMapFs
+// and sets XDG_CONFIG_HOME to /testconfig for consistent path resolution.
+// It also resets the default manager so package-level config functions work correctly.
+// The cleanup function is registered automatically with t.Cleanup.
+// Returns the in-memory filesystem for additional setup if needed.
+func SetupTestFs(t *testing.T) afero.Fs {
+	t.Helper()
+
+	memFs := afero.NewMemMapFs()
+	config.SetFs(memFs)
+
+	// Set XDG_CONFIG_HOME so config.Dir() returns /testconfig/shelly
+	t.Setenv("XDG_CONFIG_HOME", "/testconfig")
+
+	// Reset the default manager so it uses the new filesystem
+	config.ResetDefaultManagerForTesting()
+
+	t.Cleanup(func() {
+		config.SetFs(nil)                      // Reset to OS filesystem
+		config.ResetDefaultManagerForTesting() // Reset default manager
+	})
+
+	return memFs
+}

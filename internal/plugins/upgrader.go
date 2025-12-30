@@ -7,7 +7,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/github"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	
 )
 
 // Result contains the result of an upgrade attempt.
@@ -36,7 +35,7 @@ func New(registry *Registry, ios *iostreams.IOStreams) *Upgrader {
 	}
 }
 
-// UpgradeAll upgrades all installed 
+// UpgradeAll upgrades all installed plugins.
 func (u *Upgrader) UpgradeAll(ctx context.Context) ([]Result, error) {
 	extensionList, err := u.registry.List()
 	if err != nil {

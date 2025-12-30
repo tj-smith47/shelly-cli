@@ -4,14 +4,47 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
+
+// defaultFs is the package-level filesystem used for directory operations.
+// This can be replaced in tests with an in-memory filesystem.
+var (
+	defaultFs   afero.Fs = afero.NewOsFs()
+	defaultFsMu sync.RWMutex
+)
+
+// SetFs sets the package-level filesystem for testing.
+// Pass nil to reset to the real OS filesystem.
+func SetFs(fs afero.Fs) {
+	defaultFsMu.Lock()
+	defer defaultFsMu.Unlock()
+	if fs == nil {
+		defaultFs = afero.NewOsFs()
+	} else {
+		defaultFs = fs
+	}
+}
+
+// getFs returns the current package-level filesystem.
+func getFs() afero.Fs {
+	defaultFsMu.RLock()
+	defer defaultFsMu.RUnlock()
+	return defaultFs
+}
+
+// Fs returns the package-level filesystem for use by other packages.
+// In production, this returns the real OS filesystem.
+// In tests, this can be replaced with an in-memory filesystem via SetFs.
+func Fs() afero.Fs {
+	return getFs()
+}
 
 // Manager handles config loading, saving, and access with proper locking.
 // It replaces the package-level global singleton to eliminate deadlocks
@@ -29,6 +62,16 @@ type Manager struct {
 	config *Config
 	path   string
 	loaded bool
+	fs     afero.Fs // filesystem for file operations (nil uses package default)
+}
+
+// Fs returns the filesystem used by this manager.
+// Returns the manager's fs if set, otherwise the package default.
+func (m *Manager) Fs() afero.Fs {
+	if m.fs != nil {
+		return m.fs
+	}
+	return getFs()
 }
 
 // NewManager creates a config manager for the given path.
@@ -88,7 +131,7 @@ func (m *Manager) Load() error {
 	c := &Config{}
 
 	// Read config file directly (not via viper) to enable parallel tests
-	if data, err := os.ReadFile(m.path); err == nil {
+	if data, err := afero.ReadFile(m.Fs(), m.path); err == nil {
 		if err := yaml.Unmarshal(data, c); err != nil {
 			return fmt.Errorf("unmarshal config: %w", err)
 		}
@@ -148,7 +191,8 @@ func (m *Manager) saveWithoutLock() error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
+	fs := m.Fs()
+	if err := fs.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
@@ -157,7 +201,7 @@ func (m *Manager) saveWithoutLock() error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(m.path, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, m.path, data, 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	return nil

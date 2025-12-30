@@ -3,10 +3,11 @@ package deletecmd
 import (
 	"bytes"
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -112,9 +113,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 }
 
 func TestRun_NotFound(t *testing.T) {
-	// Set up temp config dir to avoid polluting real config
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	// Set up in-memory filesystem
+	factory.SetupTestFs(t)
 
 	tf := factory.NewTestFactory(t)
 
@@ -128,31 +128,29 @@ func TestRun_NotFound(t *testing.T) {
 }
 
 func TestRun_DeleteExisting(t *testing.T) {
-	// Set up temp config dir to avoid polluting real config
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	// Set up in-memory filesystem
+	fs := factory.SetupTestFs(t)
 
 	tf := factory.NewTestFactory(t)
 
-	// Create a mock device file
+	// Create a mock device file in the in-memory filesystem
 	mockDir, err := mock.Dir()
 	if err != nil {
 		t.Fatalf("mock.Dir: %v", err)
 	}
 
-	// Ensure mock directory exists
-	if err := os.MkdirAll(mockDir, 0755); err != nil {
+	// Ensure mock directory exists in the in-memory filesystem
+	if err := fs.MkdirAll(mockDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
 	testName := "test-delete-device"
 	filename := filepath.Join(mockDir, testName+".json")
 
-	// Create the file
-	if err := os.WriteFile(filename, []byte(`{"name":"test"}`), 0644); err != nil {
+	// Create the file in the in-memory filesystem
+	if err := afero.WriteFile(fs, filename, []byte(`{"name":"test"}`), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	defer os.Remove(filename) // cleanup in case test fails
 
 	// Delete it
 	err = run(context.Background(), tf.Factory, testName)
@@ -160,8 +158,8 @@ func TestRun_DeleteExisting(t *testing.T) {
 		t.Errorf("run() error = %v", err)
 	}
 
-	// Verify it's gone
-	if _, err := os.Stat(filename); !os.IsNotExist(err) {
+	// Verify it's gone from the in-memory filesystem
+	if _, err := fs.Stat(filename); err == nil {
 		t.Error("File should have been deleted")
 	}
 

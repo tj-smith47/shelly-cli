@@ -3,8 +3,9 @@ package mock
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
@@ -19,13 +20,27 @@ type Device struct {
 }
 
 // Dir returns the mock devices directory path, creating it if needed.
+// Uses the package-level filesystem from config.
 func Dir() (string, error) {
+	return DirWithFs(nil)
+}
+
+// DirWithFs returns the mock devices directory path, creating it if needed.
+// If fs is nil, uses the package-level filesystem from config.
+func DirWithFs(fs afero.Fs) (string, error) {
 	configDir, err := config.Dir()
 	if err != nil {
 		return "", err
 	}
 	mockDir := filepath.Join(configDir, "mock")
-	if err := os.MkdirAll(mockDir, 0o700); err != nil {
+
+	// Use provided fs or fall back to a new manager's fs (which uses package default)
+	if fs == nil {
+		mgr := config.NewManager("")
+		fs = mgr.Fs()
+	}
+
+	if err := fs.MkdirAll(mockDir, 0o700); err != nil {
 		return "", err
 	}
 	return mockDir, nil

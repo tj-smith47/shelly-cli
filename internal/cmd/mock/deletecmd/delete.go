@@ -4,12 +4,12 @@ package deletecmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
@@ -38,12 +38,13 @@ func run(_ context.Context, f *cmdutil.Factory, name string) error {
 		return err
 	}
 
+	fs := config.Fs()
 	filename := filepath.Join(mockDir, name+".json")
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
+	if _, err := fs.Stat(filename); err != nil {
 		return fmt.Errorf("mock device not found: %s", name)
 	}
 
-	if err := os.Remove(filename); err != nil {
+	if err := fs.Remove(filename); err != nil {
 		return err
 	}
 
