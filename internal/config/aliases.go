@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // ReservedCommands are built-in commands that cannot be aliased.
@@ -199,4 +202,174 @@ func ExecuteShellAlias(ctx context.Context, args []string) int {
 	}
 
 	return 0
+}
+
+// =============================================================================
+// Manager Alias Methods
+// =============================================================================
+
+// AddAlias adds or updates an alias.
+func (m *Manager) AddAlias(name, command string, shell bool) error {
+	if err := ValidateAliasName(name); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.config.Aliases == nil {
+		m.config.Aliases = make(map[string]Alias)
+	}
+
+	m.config.Aliases[name] = Alias{
+		Name:    name,
+		Command: command,
+		Shell:   shell,
+	}
+	return m.saveWithoutLock()
+}
+
+// RemoveAlias removes an alias by name.
+func (m *Manager) RemoveAlias(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.config.Aliases[name]; !exists {
+		return fmt.Errorf("alias %q not found", name)
+	}
+	delete(m.config.Aliases, name)
+	return m.saveWithoutLock()
+}
+
+// GetAlias returns an alias by name.
+func (m *Manager) GetAlias(name string) (Alias, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	alias, ok := m.config.Aliases[name]
+	return alias, ok
+}
+
+// ListAliases returns all aliases sorted by name.
+func (m *Manager) ListAliases() []Alias {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make([]Alias, 0, len(m.config.Aliases))
+	for _, v := range m.config.Aliases {
+		result = append(result, v)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+// ListAliasesMap returns all aliases as a map.
+func (m *Manager) ListAliasesMap() map[string]Alias {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[string]Alias, len(m.config.Aliases))
+	for k, v := range m.config.Aliases {
+		result[k] = v
+	}
+	return result
+}
+
+// IsAlias checks if a command name is an alias.
+func (m *Manager) IsAlias(name string) bool {
+	_, ok := m.GetAlias(name)
+	return ok
+}
+
+// ImportAliases imports aliases from a YAML file.
+// Returns the number of imported aliases, skipped aliases, and any error.
+// If merge is true, existing aliases are not overwritten.
+func (m *Manager) ImportAliases(filename string, merge bool) (imported, skipped int, err error) {
+	//nolint:gosec // G304: filename is user-provided intentionally (import command)
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var af aliasFile
+	if err := yaml.Unmarshal(data, &af); err != nil {
+		return 0, 0, fmt.Errorf("failed to parse file: %w", err)
+	}
+
+	// Validate all alias names before acquiring lock
+	for name := range af.Aliases {
+		if err := ValidateAliasName(name); err != nil {
+			return 0, 0, fmt.Errorf("invalid alias %q: %w", name, err)
+		}
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.config.Aliases == nil {
+		m.config.Aliases = make(map[string]Alias)
+	}
+
+	for name, command := range af.Aliases {
+		if merge {
+			if _, exists := m.config.Aliases[name]; exists {
+				skipped++
+				continue
+			}
+		}
+
+		// Detect shell aliases (prefixed with !)
+		shell := false
+		if command != "" && command[0] == '!' {
+			shell = true
+			command = command[1:]
+		}
+
+		m.config.Aliases[name] = Alias{
+			Name:    name,
+			Command: command,
+			Shell:   shell,
+		}
+		imported++
+	}
+
+	if err := m.saveWithoutLock(); err != nil {
+		return 0, 0, err
+	}
+	return imported, skipped, nil
+}
+
+// ExportAliases exports all aliases to a YAML file.
+// If filename is empty, returns the YAML data as a string.
+func (m *Manager) ExportAliases(filename string) (string, error) {
+	aliases := m.ListAliases()
+
+	af := aliasFile{
+		Aliases: make(map[string]string, len(aliases)),
+	}
+
+	for _, a := range aliases {
+		cmd := a.Command
+		if a.Shell {
+			cmd = "!" + cmd
+		}
+		af.Aliases[a.Name] = cmd
+	}
+
+	data, err := yaml.Marshal(&af)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal aliases: %w", err)
+	}
+
+	if filename == "" {
+		return string(data), nil
+	}
+
+	if err := os.WriteFile(filename, data, 0o600); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return "", nil
 }

@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Alert represents a monitoring alert configuration.
 type Alert struct {
@@ -53,4 +56,83 @@ func ListAlerts() map[string]Alert {
 // UpdateAlert updates an alert.
 func UpdateAlert(name string, enabled *bool, snoozedUntil string) error {
 	return getDefaultManager().UpdateAlert(name, enabled, snoozedUntil)
+}
+
+// =============================================================================
+// Manager Alert Methods
+// =============================================================================
+
+// CreateAlert creates a new alert.
+func (m *Manager) CreateAlert(name, description, device, condition, action string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.config.Alerts[name]; exists {
+		return fmt.Errorf("alert %q already exists", name)
+	}
+
+	m.config.Alerts[name] = Alert{
+		Name:        name,
+		Description: description,
+		Device:      device,
+		Condition:   condition,
+		Action:      action,
+		Enabled:     enabled,
+		CreatedAt:   time.Now().Format(time.RFC3339),
+	}
+	return m.saveWithoutLock()
+}
+
+// DeleteAlert removes an alert.
+func (m *Manager) DeleteAlert(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.config.Alerts[name]; !exists {
+		return fmt.Errorf("alert %q not found", name)
+	}
+
+	delete(m.config.Alerts, name)
+	return m.saveWithoutLock()
+}
+
+// GetAlert returns an alert by name.
+func (m *Manager) GetAlert(name string) (Alert, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	alert, ok := m.config.Alerts[name]
+	return alert, ok
+}
+
+// ListAlerts returns all alerts.
+func (m *Manager) ListAlerts() map[string]Alert {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[string]Alert, len(m.config.Alerts))
+	for k, v := range m.config.Alerts {
+		result[k] = v
+	}
+	return result
+}
+
+// UpdateAlert updates an alert.
+func (m *Manager) UpdateAlert(name string, enabled *bool, snoozedUntil string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	alert, exists := m.config.Alerts[name]
+	if !exists {
+		return fmt.Errorf("alert %q not found", name)
+	}
+
+	if enabled != nil {
+		alert.Enabled = *enabled
+	}
+	if snoozedUntil != "" {
+		alert.SnoozedUntil = snoozedUntil
+	}
+
+	m.config.Alerts[name] = alert
+	return m.saveWithoutLock()
 }

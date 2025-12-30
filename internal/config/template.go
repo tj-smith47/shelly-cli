@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -156,4 +157,148 @@ func GetScriptTemplate(name string) (ScriptTemplate, bool) {
 // ListScriptTemplates returns all user-defined script templates.
 func ListScriptTemplates() map[string]ScriptTemplate {
 	return getDefaultManager().ListScriptTemplates()
+}
+
+// =============================================================================
+// Manager Device Template Methods
+// =============================================================================
+
+// CreateDeviceTemplate creates a new device template.
+func (m *Manager) CreateDeviceTemplate(name, description, deviceModel, app string, generation int, cfg map[string]any, sourceDevice string) error {
+	if err := ValidateTemplateName(name); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.config.Templates.Device[name]; exists {
+		return fmt.Errorf("device template %q already exists", name)
+	}
+
+	m.config.Templates.Device[name] = DeviceTemplate{
+		Name:         name,
+		Description:  description,
+		Model:        deviceModel,
+		App:          app,
+		Generation:   generation,
+		Config:       cfg,
+		CreatedAt:    time.Now().Format(time.RFC3339),
+		SourceDevice: sourceDevice,
+	}
+	return m.saveWithoutLock()
+}
+
+// DeleteDeviceTemplate removes a device template.
+func (m *Manager) DeleteDeviceTemplate(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.config.Templates.Device[name]; !exists {
+		return fmt.Errorf("device template %q not found", name)
+	}
+
+	delete(m.config.Templates.Device, name)
+	return m.saveWithoutLock()
+}
+
+// GetDeviceTemplate returns a device template by name.
+func (m *Manager) GetDeviceTemplate(name string) (DeviceTemplate, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	template, ok := m.config.Templates.Device[name]
+	return template, ok
+}
+
+// ListDeviceTemplates returns all device templates.
+func (m *Manager) ListDeviceTemplates() map[string]DeviceTemplate {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[string]DeviceTemplate, len(m.config.Templates.Device))
+	for k, v := range m.config.Templates.Device {
+		result[k] = v
+	}
+	return result
+}
+
+// UpdateDeviceTemplate updates a device template's metadata.
+func (m *Manager) UpdateDeviceTemplate(name, description string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	template, exists := m.config.Templates.Device[name]
+	if !exists {
+		return fmt.Errorf("device template %q not found", name)
+	}
+
+	if description != "" {
+		template.Description = description
+	}
+
+	m.config.Templates.Device[name] = template
+	return m.saveWithoutLock()
+}
+
+// SaveDeviceTemplate saves or updates a device template.
+func (m *Manager) SaveDeviceTemplate(template DeviceTemplate) error {
+	if err := ValidateTemplateName(template.Name); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.config.Templates.Device[template.Name] = template
+	return m.saveWithoutLock()
+}
+
+// =============================================================================
+// Manager Script Template Methods
+// =============================================================================
+
+// SaveScriptTemplate saves or updates a script template.
+func (m *Manager) SaveScriptTemplate(template ScriptTemplate) error {
+	if err := ValidateTemplateName(template.Name); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.config.Templates.Script[template.Name] = template
+	return m.saveWithoutLock()
+}
+
+// DeleteScriptTemplate removes a script template.
+func (m *Manager) DeleteScriptTemplate(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.config.Templates.Script[name]; !exists {
+		return fmt.Errorf("script template %q not found", name)
+	}
+
+	delete(m.config.Templates.Script, name)
+	return m.saveWithoutLock()
+}
+
+// GetScriptTemplate returns a script template by name.
+func (m *Manager) GetScriptTemplate(name string) (ScriptTemplate, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	template, ok := m.config.Templates.Script[name]
+	return template, ok
+}
+
+// ListScriptTemplates returns all user-defined script templates.
+func (m *Manager) ListScriptTemplates() map[string]ScriptTemplate {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[string]ScriptTemplate, len(m.config.Templates.Script))
+	for k, v := range m.config.Templates.Script {
+		result[k] = v
+	}
+	return result
 }
