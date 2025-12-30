@@ -212,7 +212,7 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	}
 }
 
-// TestRun_Options verifies that run function receives correct options
+// TestRun_Options verifies that run function receives correct options.
 func TestRun_Options(t *testing.T) {
 	t.Parallel()
 
@@ -235,7 +235,7 @@ func TestRun_Options(t *testing.T) {
 	}
 }
 
-// TestExecute_NoArgs verifies that the command requires a device argument
+// TestExecute_NoArgs verifies that the command requires a device argument.
 func TestExecute_NoArgs(t *testing.T) {
 	t.Parallel()
 
@@ -253,7 +253,7 @@ func TestExecute_NoArgs(t *testing.T) {
 	}
 }
 
-// TestNewCommand_Metadata verifies all required command metadata
+// TestNewCommand_Metadata verifies all required command metadata.
 func TestNewCommand_Metadata(t *testing.T) {
 	t.Parallel()
 
@@ -288,7 +288,7 @@ func TestNewCommand_Metadata(t *testing.T) {
 	}
 }
 
-// TestNewCommand_ExampleContent verifies example contains expected patterns
+// TestNewCommand_ExampleContent verifies example contains expected patterns.
 func TestNewCommand_ExampleContent(t *testing.T) {
 	t.Parallel()
 
@@ -310,7 +310,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-// TestNewCommand_LongDescription verifies long description contains expected patterns
+// TestNewCommand_LongDescription verifies long description contains expected patterns.
 func TestNewCommand_LongDescription(t *testing.T) {
 	t.Parallel()
 
@@ -331,7 +331,7 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	}
 }
 
-// TestRun_Gen2Device tests that run works with a Gen2 device fixture
+// TestRun_Gen2Device tests that run works with a Gen2 device fixture.
 func TestRun_Gen2Device(t *testing.T) {
 	t.Parallel()
 
@@ -352,8 +352,8 @@ func TestRun_Gen2Device(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"gen2-device": {
 				"switch:0": map[string]interface{}{
-					"id":  0,
-					"on":  true,
+					"id":     0,
+					"on":     true,
 					"apower": 0.0,
 				},
 			},
@@ -401,7 +401,7 @@ func TestRun_Gen2Device(t *testing.T) {
 	}
 }
 
-// TestRun_Gen1DeviceRejection tests that run rejects Gen1 devices
+// TestRun_Gen1DeviceRejection tests that run rejects Gen1 devices.
 func TestRun_Gen1DeviceRejection(t *testing.T) {
 	t.Parallel()
 
@@ -453,7 +453,7 @@ func TestRun_Gen1DeviceRejection(t *testing.T) {
 	}
 }
 
-// TestRun_WithInvalidDevice tests error handling for non-existent devices
+// TestRun_WithInvalidDevice tests error handling for non-existent devices.
 func TestRun_WithInvalidDevice(t *testing.T) {
 	t.Parallel()
 
@@ -488,7 +488,7 @@ func TestRun_WithInvalidDevice(t *testing.T) {
 	}
 }
 
-// TestRun_ContextCancellation tests that context cancellation works
+// TestRun_ContextCancellation tests that context cancellation works.
 func TestRun_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
@@ -537,7 +537,7 @@ func TestRun_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestNewCommand_AllAliasesCorrect verifies all aliases are present
+// TestNewCommand_AllAliasesCorrect verifies all aliases are present.
 func TestNewCommand_AllAliasesCorrect(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -554,7 +554,7 @@ func TestNewCommand_AllAliasesCorrect(t *testing.T) {
 	}
 }
 
-// TestNewCommand_ValidArgsRejectsMultiple verifies Args validation
+// TestNewCommand_ValidArgsRejectsMultiple verifies Args validation.
 func TestNewCommand_ValidArgsRejectsMultiple(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -573,7 +573,7 @@ func TestNewCommand_ValidArgsRejectsMultiple(t *testing.T) {
 	}
 }
 
-// TestNewCommand_LongContainsMethodExamples verifies long description has RPC examples
+// TestNewCommand_LongContainsMethodExamples verifies long description has RPC examples.
 func TestNewCommand_LongContainsMethodExamples(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -593,7 +593,7 @@ func TestNewCommand_LongContainsMethodExamples(t *testing.T) {
 	}
 }
 
-// TestOptions_EmptyDevice validates Options with empty device
+// TestOptions_EmptyDevice validates Options with empty device.
 func TestOptions_EmptyDevice(t *testing.T) {
 	t.Parallel()
 
@@ -607,7 +607,7 @@ func TestOptions_EmptyDevice(t *testing.T) {
 	}
 }
 
-// TestNewCommand_ExampleHasMultipleSections verifies example structure
+// TestNewCommand_ExampleHasMultipleSections verifies example structure.
 func TestNewCommand_ExampleHasMultipleSections(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -624,7 +624,7 @@ func TestNewCommand_ExampleHasMultipleSections(t *testing.T) {
 	}
 }
 
-// TestNewCommand_LongDescriptionLength verifies thorough documentation
+// TestNewCommand_LongDescriptionLength verifies thorough documentation.
 func TestNewCommand_LongDescriptionLength(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -635,7 +635,7 @@ func TestNewCommand_LongDescriptionLength(t *testing.T) {
 	}
 }
 
-// TestNewCommand_ShortDescriptionLength verifies conciseness
+// TestNewCommand_ShortDescriptionLength verifies conciseness.
 func TestNewCommand_ShortDescriptionLength(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())

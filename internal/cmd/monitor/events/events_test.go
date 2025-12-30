@@ -214,13 +214,13 @@ func TestNewCommand_Help(t *testing.T) {
 	cmd.SetErr(&buf)
 	cmd.SetArgs([]string{"--help"})
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Errorf("--help should not error: %v", err)
+	helpErr := cmd.Execute()
+	if helpErr != nil {
+		t.Errorf("--help should not error: %v", helpErr)
 	}
 
-	output := buf.String()
-	if !strings.Contains(output, "Monitor device events") {
+	helpOutput := buf.String()
+	if !strings.Contains(helpOutput, "Monitor device events") {
 		t.Error("Help output should contain command description")
 	}
 }
@@ -518,7 +518,7 @@ func TestRun_WithFilter(t *testing.T) {
 	demo.InjectIntoFactory(f)
 
 	// Set filter flag
-	filterFlag = "switch"
+	filterFlag = switchComponent
 	defer func() { filterFlag = "" }()
 
 	// Create a short-lived context
@@ -819,9 +819,9 @@ func TestEventHandler_FilterMatching(t *testing.T) {
 	}
 
 	// Test that matching filter passes through.
-	result := !(filterFlag != "" && event.Component != filterFlag)
+	passes := filterFlag == "" || event.Component == filterFlag
 
-	if !result {
+	if !passes {
 		t.Error("Event with matching filter should pass through")
 	}
 }
@@ -843,9 +843,9 @@ func TestEventHandler_FilterNonMatching(t *testing.T) {
 	}
 
 	// Test that non-matching filter blocks event.
-	result := !(filterFlag != "" && event.Component != filterFlag)
+	passes := filterFlag == "" || event.Component == filterFlag
 
-	if result {
+	if passes {
 		t.Error("Event with non-matching filter should be blocked")
 	}
 }
@@ -866,9 +866,9 @@ func TestEventHandler_NoFilter(t *testing.T) {
 	}
 
 	// Test that empty filter allows all events.
-	result := !(filterFlag != "" && event.Component != filterFlag)
+	passes := filterFlag == "" || event.Component == filterFlag
 
-	if !result {
+	if !passes {
 		t.Error("Event with empty filter should pass through")
 	}
 }
@@ -903,7 +903,7 @@ func TestDisplayEventFunction(t *testing.T) {
 	if !strings.Contains(displayOut, "state_changed") {
 		t.Error("Output should contain event type")
 	}
-	if !strings.Contains(displayOut, "switch") {
+	if !strings.Contains(displayOut, switchComponent) {
 		t.Error("Output should contain component name")
 	}
 }
@@ -968,7 +968,7 @@ func TestDisplayEvent_DifferentEventTypes(t *testing.T) {
 				Device:      "test-device",
 				Timestamp:   time.Now(),
 				Event:       tt.eventType,
-				Component:   "switch",
+				Component:   switchComponent,
 				ComponentID: 0,
 				Data:        map[string]any{},
 			}
@@ -978,8 +978,8 @@ func TestDisplayEvent_DifferentEventTypes(t *testing.T) {
 				t.Errorf("DisplayEvent should not error: %v", err)
 			}
 
-			output := stdout.String()
-			if !strings.Contains(output, tt.eventType) {
+			eventOut := stdout.String()
+			if !strings.Contains(eventOut, tt.eventType) {
 				t.Errorf("Output should contain event type %q", tt.eventType)
 			}
 		})
@@ -1019,10 +1019,7 @@ func TestEventFilter_DifferentComponents(t *testing.T) {
 				Data:        map[string]any{},
 			}
 
-			passes := true
-			if filterFlag != "" && event.Component != filterFlag {
-				passes = false
-			}
+			passes := filterFlag == "" || event.Component == filterFlag
 
 			if passes != tt.shouldPass {
 				t.Errorf("Event filter: expected %v, got %v", tt.shouldPass, passes)
@@ -1031,7 +1028,7 @@ func TestEventFilter_DifferentComponents(t *testing.T) {
 	}
 }
 
-// Test with multiple component IDs
+// TestEventHandler_MultipleComponentIDs tests handling of multiple component IDs.
 func TestEventHandler_MultipleComponentIDs(t *testing.T) {
 	t.Parallel()
 
@@ -1055,7 +1052,7 @@ func TestEventHandler_MultipleComponentIDs(t *testing.T) {
 				Device:      "test-device",
 				Timestamp:   time.Now(),
 				Event:       "state_changed",
-				Component:   "switch",
+				Component:   switchComponent,
 				ComponentID: tt.componentID,
 				Data: map[string]any{
 					"output": true,
@@ -1070,7 +1067,7 @@ func TestEventHandler_MultipleComponentIDs(t *testing.T) {
 	}
 }
 
-// Test JSON output with different event data
+// TestOutputEventJSON_VariousData tests JSON output with different event data.
 func TestOutputEventJSON_VariousData(t *testing.T) {
 	t.Parallel()
 
@@ -1113,7 +1110,7 @@ func TestOutputEventJSON_VariousData(t *testing.T) {
 	}
 }
 
-// Test NewCommand RunE callback structure
+// TestNewCommand_RunE_Closure tests the RunE callback structure.
 func TestNewCommand_RunE_Closure(t *testing.T) {
 	t.Parallel()
 
@@ -1133,11 +1130,13 @@ func TestNewCommand_RunE_Closure(t *testing.T) {
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
-	// Should error because device doesn't exist, but tests the closure
-	_ = cmd.Execute()
+	// Should error because device doesn't exist, but tests the closure.
+	if err := cmd.Execute(); err != nil {
+		t.Logf("execute returned error (expected): %v", err)
+	}
 }
 
-// Test that the command correctly parses the device argument
+// TestNewCommand_DeviceArgumentParsing tests that the command correctly parses device arguments.
 func TestNewCommand_DeviceArgumentParsing(t *testing.T) {
 	t.Parallel()
 
@@ -1170,7 +1169,7 @@ func TestNewCommand_DeviceArgumentParsing(t *testing.T) {
 	}
 }
 
-// Test filter flag persistence across calls
+// TestFilterFlag_Persistence tests filter flag persistence across calls.
 func TestFilterFlag_Persistence(t *testing.T) {
 	t.Parallel()
 
@@ -1182,8 +1181,8 @@ func TestFilterFlag_Persistence(t *testing.T) {
 	}
 
 	// Set filter
-	filterFlag = "switch"
-	if filterFlag != "switch" {
+	filterFlag = switchComponent
+	if filterFlag != switchComponent {
 		t.Error("Filter flag should persist after being set")
 	}
 
@@ -1197,25 +1196,27 @@ func TestFilterFlag_Persistence(t *testing.T) {
 	filterFlag = ""
 }
 
-// Test multiple simultaneous flag operations
+// TestNewCommand_MultipleFlags tests multiple simultaneous flag operations.
 func TestNewCommand_MultipleFlags(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
-	cmd.SetArgs([]string{"test-device", "-f", "switch"})
+	cmd.SetArgs([]string{"test-device", "-f", switchComponent})
 	cmd.SetContext(context.Background())
 
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
-	// Execute will fail but we're testing arg parsing
-	_ = cmd.Execute()
+	// Execute will fail but we're testing arg parsing.
+	if err := cmd.Execute(); err != nil {
+		t.Logf("execute returned error (expected): %v", err)
+	}
 }
 
-// Test event model construction with various timestamps
+// TestDeviceEvent_TimestampHandling tests event model construction with various timestamps.
 func TestDeviceEvent_TimestampHandling(t *testing.T) {
 	t.Parallel()
 
@@ -1248,7 +1249,7 @@ func TestDeviceEvent_TimestampHandling(t *testing.T) {
 	}
 }
 
-// Test component type variations
+// TestDeviceEvent_ComponentVariations tests component type variations.
 func TestDeviceEvent_ComponentVariations(t *testing.T) {
 	t.Parallel()
 
@@ -1273,7 +1274,7 @@ func TestDeviceEvent_ComponentVariations(t *testing.T) {
 	}
 }
 
-// Test with different event types
+// TestDeviceEvent_EventTypes tests with different event types.
 func TestDeviceEvent_EventTypes(t *testing.T) {
 	t.Parallel()
 
@@ -1298,7 +1299,7 @@ func TestDeviceEvent_EventTypes(t *testing.T) {
 	}
 }
 
-// Test WantsJSON detection
+// TestOutputFormat_JSONDetection tests WantsJSON detection.
 func TestOutputFormat_JSONDetection(t *testing.T) {
 	t.Parallel()
 
@@ -1319,7 +1320,7 @@ func TestOutputFormat_JSONDetection(t *testing.T) {
 	}
 }
 
-// Test help output contains expected information
+// TestNewCommand_HelpContent tests that help output contains expected information.
 func TestNewCommand_HelpContent(t *testing.T) {
 	t.Parallel()
 
@@ -1331,7 +1332,9 @@ func TestNewCommand_HelpContent(t *testing.T) {
 	cmd.SetErr(&buf)
 	cmd.SetArgs([]string{"--help"})
 
-	_ = cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		t.Logf("help execute returned error: %v", err)
+	}
 
 	helpText := buf.String()
 	expectedStrings := []string{

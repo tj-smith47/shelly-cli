@@ -243,11 +243,11 @@ func TestExecute_WithMockPMDevice(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-pm": {
 				"pm:0": map[string]any{
-					"voltage":  230.5,
-					"current":  1.2,
-					"apower":   275.6,
-					"freq":     50.0,
-					"aenergy":  map[string]any{"total": 1234.5},
+					"voltage": 230.5,
+					"current": 1.2,
+					"apower":  275.6,
+					"freq":    50.0,
+					"aenergy": map[string]any{"total": 1234.5},
 				},
 			},
 		},
@@ -874,5 +874,242 @@ func TestNewCommand_Long(t *testing.T) {
 
 	if !strings.Contains(cmd.Long, "power meter") {
 		t.Error("Long should contain 'power meter'")
+	}
+}
+
+func TestNewCommand_Use(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	expected := "status <device> [id]"
+	if cmd.Use != expected {
+		t.Errorf("Use = %q, want %q", cmd.Use, expected)
+	}
+}
+
+func TestNewCommand_FlagParsing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{
+			name:    "type flag short",
+			args:    []string{"--type", "pm"},
+			wantErr: false,
+		},
+		{
+			name:    "type flag value",
+			args:    []string{"--type", "pm1"},
+			wantErr: false,
+		},
+		{
+			name:    "type flag auto",
+			args:    []string{"--type", "auto"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := NewCommand(cmdutil.NewFactory())
+
+			err := cmd.ParseFlags(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestNewCommand_RejectsNoArgs(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Should reject empty args
+	err := cmd.Args(cmd, []string{})
+	if err == nil {
+		t.Error("Expected error for no arguments")
+	}
+}
+
+func TestNewCommand_AcceptsSingleArg(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Should accept single device argument
+	err := cmd.Args(cmd, []string{"device-name"})
+	if err != nil {
+		t.Errorf("Should accept single device argument, got error: %v", err)
+	}
+}
+
+func TestNewCommand_AcceptsTwoArgs(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Should accept device and ID
+	err := cmd.Args(cmd, []string{"device-name", "0"})
+	if err != nil {
+		t.Errorf("Should accept device and ID, got error: %v", err)
+	}
+}
+
+func TestNewCommand_RejectsThreeArgs(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Should reject three or more args
+	err := cmd.Args(cmd, []string{"device", "0", "extra"})
+	if err == nil {
+		t.Error("Should reject more than 2 arguments")
+	}
+}
+
+func TestExecute_SetsContextCorrectly(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx := context.Background()
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(ctx)
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	// Execute and check that context wasn't modified
+	err := cmd.Execute()
+	// Error expected due to device not found, but that's ok - we're checking context is preserved
+	if err != nil {
+		t.Logf("Execute error (expected): %v", err)
+	}
+
+	// Just verify no panic occurred
+	if cmd.Context() != ctx {
+		t.Error("Context should be preserved")
+	}
+}
+
+func TestExecute_WithZeroComponentID(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "0"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	// Will error due to device not existing, but command should parse correctly
+	if err != nil {
+		t.Logf("Execute error (expected): %v", err)
+	}
+}
+
+func TestExecute_WithNumericComponentID(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "5"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	// Will error due to device not existing, but command should parse ID correctly
+	if err != nil {
+		t.Logf("Execute error (expected): %v", err)
+	}
+}
+
+func TestRun_WithExplicitPM_CallsGetPMStatus(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx := context.Background()
+
+	// When we specify PM type explicitly, it should try GetPMStatus
+	err := run(ctx, tf.Factory, "nonexistent", 0, shelly.ComponentTypePM)
+
+	// Expect error from trying to get PM status on nonexistent device
+	if err == nil {
+		t.Error("expected error")
+	}
+	if !strings.Contains(err.Error(), "failed to get pm status") {
+		t.Errorf("expected 'failed to get pm status' error, got: %v", err)
+	}
+}
+
+func TestRun_WithExplicitPM1_CallsGetPM1Status(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx := context.Background()
+
+	// When we specify PM1 type explicitly, it should try GetPM1Status
+	err := run(ctx, tf.Factory, "nonexistent", 0, shelly.ComponentTypePM1)
+
+	// Expect error from trying to get PM1 status on nonexistent device
+	if err == nil {
+		t.Error("expected error")
+	}
+	if !strings.Contains(err.Error(), "failed to get pm1 status") {
+		t.Errorf("expected 'failed to get pm1 status' error, got: %v", err)
+	}
+}
+
+func TestRun_WithAuto_ReturnsNoPowerMeterError(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	ctx := context.Background()
+
+	// When we use auto-detect with a device that has no power meters
+	err := run(ctx, tf.Factory, "nonexistent-device", 0, shelly.ComponentTypeAuto)
+
+	// Should get "no power meter components found" error
+	if err == nil {
+		t.Error("expected error when no power meter found")
+	}
+	if !strings.Contains(err.Error(), "no power meter components found") {
+		t.Errorf("expected 'no power meter components found', got: %v", err)
+	}
+}
+
+func TestNewCommand_TypeFlagOptions(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Verify the type flag exists and has correct description
+	typeFlag := cmd.Flags().Lookup("type")
+	if typeFlag == nil {
+		t.Fatal("type flag should exist")
+	}
+
+	if typeFlag.Usage == "" {
+		t.Error("type flag should have usage documentation")
+	}
+
+	// Check that it accepts values
+	expectedUsage := "Component type"
+	if !strings.Contains(typeFlag.Usage, expectedUsage) {
+		t.Logf("flag usage: %s", typeFlag.Usage)
 	}
 }

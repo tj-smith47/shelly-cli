@@ -72,11 +72,11 @@ func TestNewCommand_Flags(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	tests := []struct {
-		name             string
-		flagName         string
-		shorthand        string
-		defValue         string
-		shouldExist      bool
+		name        string
+		flagName    string
+		shorthand   string
+		defValue    string
+		shouldExist bool
 	}{
 		{"devices flag", "devices", "", "", true},
 		{"continuous flag", "continuous", "c", "false", true},
@@ -88,6 +88,7 @@ func TestNewCommand_Flags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			flag := cmd.Flags().Lookup(tt.flagName)
 			if (flag == nil) != !tt.shouldExist {
 				t.Errorf("flag %q should exist: %v", tt.flagName, tt.shouldExist)
@@ -185,12 +186,13 @@ func TestParseTagsEmpty(t *testing.T) {
 func TestParseTagsSingleTag(t *testing.T) {
 	t.Parallel()
 
-	tags := parseTags([]string{"location=home"})
+	const expectedLocation = "home"
+	tags := parseTags([]string{"location=" + expectedLocation})
 	if len(tags) != 1 {
 		t.Errorf("len(tags) = %d, want 1", len(tags))
 	}
-	if tags["location"] != "home" {
-		t.Errorf("tags[location] = %q, want 'home'", tags["location"])
+	if tags["location"] != expectedLocation {
+		t.Errorf("tags[location] = %q, want %q", tags["location"], expectedLocation)
 	}
 }
 
@@ -291,7 +293,7 @@ func TestSetupOutputInvalidPath(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	// Use an invalid path that can't be created
-	invalidPath := filepath.Join("/dev/null/subdir/file.txt")
+	invalidPath := "/dev/null/subdir/file.txt"
 
 	_, _, err := setupOutput(tf.TestIO.IOStreams, invalidPath)
 	if err == nil {
@@ -313,9 +315,10 @@ func TestRun_NoDevices(t *testing.T) {
 		t.Errorf("run with no devices should not error, got: %v", err)
 	}
 
-	output := tf.OutString()
+	// Warning goes to stderr, not stdout
+	output := tf.ErrString()
 	if !strings.Contains(output, "No devices found") {
-		t.Errorf("Expected warning about no devices, got: %q", output)
+		t.Errorf("Expected warning about no devices in stderr, got: %q", output)
 	}
 }
 
@@ -369,7 +372,7 @@ func TestRunContinuous_CancelledContext(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
-	svc := tf.Factory.ShellyService()
+	svc := tf.ShellyService()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -393,7 +396,7 @@ func TestRunContinuous_ShortDuration(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
-	svc := tf.Factory.ShellyService()
+	svc := tf.ShellyService()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -447,9 +450,10 @@ func TestExecute_NoDevices(t *testing.T) {
 		t.Errorf("Execute with no devices should not error, got: %v", err)
 	}
 
-	output := tf.OutString()
+	// Warning goes to stderr
+	output := tf.ErrString()
 	if !strings.Contains(output, "No devices found") {
-		t.Logf("Expected warning about no devices in output: %q", output)
+		t.Logf("Expected warning about no devices in stderr: %q", output)
 	}
 }
 

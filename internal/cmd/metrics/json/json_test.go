@@ -394,8 +394,14 @@ func TestExecute_WithOutputFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			t.Logf("warning: failed to remove temp file: %v", err)
+		}
+	}()
+	if err := tmpFile.Close(); err != nil {
+		t.Logf("warning: failed to close temp file: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
@@ -834,8 +840,14 @@ func TestRun_OutputToFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			t.Logf("warning: failed to remove temp file: %v", err)
+		}
+	}()
+	if err := tmpFile.Close(); err != nil {
+		t.Logf("warning: failed to close temp file: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
@@ -979,8 +991,8 @@ func TestExecute_DevicesAreSorted(t *testing.T) {
 			},
 		},
 		DeviceStates: map[string]mock.DeviceState{
-			"zulu":   {},
-			"alpha":  {},
+			"zulu":    {},
+			"alpha":   {},
 			"charlie": {},
 		},
 	}

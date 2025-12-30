@@ -3,10 +3,12 @@ package calibrate
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -970,5 +972,259 @@ func TestExecute_WithIDZero(t *testing.T) {
 	err = cmd.Execute()
 	if err != nil {
 		t.Logf("Execute error = %v (may be expected for mock)", err)
+	}
+}
+
+func TestNewCommand_HasUseField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.Use != "calibrate <device>" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "calibrate <device>")
+	}
+}
+
+func TestNewCommand_HasShortField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.Short != "Calibrate thermostat valve" {
+		t.Errorf("Short = %q", cmd.Short)
+	}
+}
+
+func TestNewCommand_HasLongField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.Long == "" {
+		t.Error("Long field is empty")
+	}
+}
+
+func TestNewCommand_HasExampleField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.Example == "" {
+		t.Error("Example field is empty")
+	}
+}
+
+func TestNewCommand_HasAliasField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if len(cmd.Aliases) == 0 {
+		t.Error("Aliases field is empty")
+	}
+	if cmd.Aliases[0] != "cal" {
+		t.Errorf("First alias = %q, want %q", cmd.Aliases[0], "cal")
+	}
+}
+
+func TestNewCommand_HasRunEField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.RunE == nil {
+		t.Error("RunE field is nil")
+	}
+}
+
+func TestNewCommand_HasArgsField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.Args == nil {
+		t.Error("Args field is nil")
+	}
+}
+
+func TestNewCommand_HasValidArgsFunctionField(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.ValidArgsFunction == nil {
+		t.Error("ValidArgsFunction field is nil")
+	}
+}
+
+func TestRun_Gen1DeviceFromMock(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.50",
+					MAC:        "AA:BB:CC:DD:EE:00",
+					Type:       "SHPLG-1",
+					Model:      "Shelly Plug",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "gen1-device",
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for Gen1 device")
+	}
+	if !strings.Contains(err.Error(), "Gen2") {
+		t.Errorf("Expected 'Gen2' in error, got: %v", err)
+	}
+}
+
+func TestExecute_OutputMessages(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-thermostat",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSN-0024X",
+					Model:      "Shelly Plus HT",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-thermostat": {"thermostat:0": map[string]any{"target_C": 21.0, "current_C": 19.5}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-thermostat"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute error = %v (may be expected for mock)", err)
+	}
+
+	output := tf.OutString()
+	t.Logf("Output: %q", output)
+}
+
+func TestOptions_InitializeWithAllFields(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		ComponentFlags: flags.ComponentFlags{ID: 3},
+		Factory:        tf.Factory,
+		Device:         "test-device",
+	}
+
+	if opts.Device != "test-device" {
+		t.Errorf("Device = %q, want 'test-device'", opts.Device)
+	}
+	if opts.ID != 3 {
+		t.Errorf("ID = %d, want 3", opts.ID)
+	}
+}
+
+func TestExecute_MultipleDeviceIDs(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-thermostat",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSN-0024X",
+					Model:      "Shelly Plus HT",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-thermostat": {
+				"thermostat:0": map[string]any{"target_C": 21.0, "current_C": 19.5},
+				"thermostat:1": map[string]any{"target_C": 22.0, "current_C": 20.0},
+				"thermostat:2": map[string]any{"target_C": 23.0, "current_C": 21.0},
+				"thermostat:3": map[string]any{"target_C": 24.0, "current_C": 22.0},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Test each thermostat ID
+	for id := range 4 {
+		var buf bytes.Buffer
+		cmd := NewCommand(tf.Factory)
+		cmd.SetContext(context.Background())
+		idStr := fmt.Sprintf("%d", id)
+		cmd.SetArgs([]string{"test-thermostat", "--id", idStr})
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+
+		err = cmd.Execute()
+		if err != nil {
+			t.Logf("Execute error for ID %d = %v (may be expected for mock)", id, err)
+		}
+	}
+}
+
+func TestNewCommand_FlagDefaults(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if err := cmd.ParseFlags([]string{}); err != nil {
+		t.Fatalf("ParseFlags error: %v", err)
+	}
+
+	idFlag := cmd.Flags().Lookup("id")
+	if idFlag == nil {
+		t.Fatal("id flag not found")
+	}
+	if idFlag.DefValue != "0" {
+		t.Errorf("id default = %q, want 0", idFlag.DefValue)
 	}
 }

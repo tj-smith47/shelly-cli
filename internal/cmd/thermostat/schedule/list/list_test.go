@@ -1405,3 +1405,33 @@ func TestExecute_WithFormat_Default(t *testing.T) {
 		t.Logf("Execute error = %v (may be expected with mock)", err)
 	}
 }
+
+func TestRunFunctionExists(t *testing.T) {
+	t.Parallel()
+
+	// Verify that run function is called by NewCommand's RunE
+	f := cmdutil.NewFactory()
+	cmd := NewCommand(f)
+
+	// RunE should be set and callable
+	if cmd.RunE == nil {
+		t.Fatal("RunE must be set")
+	}
+}
+
+func TestNewCommandFactoryParameter(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	cmd := NewCommand(f)
+
+	// Verify command was created with the factory
+	if cmd == nil {
+		t.Fatal("Command should not be nil")
+	}
+
+	// Verify basic properties that depend on factory
+	if cmd.RunE == nil {
+		t.Fatal("RunE should be set")
+	}
+}

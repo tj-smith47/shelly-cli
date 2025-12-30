@@ -13,6 +13,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+const testCommandUse = "current"
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -34,8 +36,8 @@ func TestNewCommand_Use(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "current" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "current")
+	if cmd.Use != testCommandUse {
+		t.Errorf("Use = %q, want %q", cmd.Use, testCommandUse)
 	}
 }
 
@@ -111,8 +113,8 @@ func TestNewCommand_Args(t *testing.T) {
 	// This command doesn't take arguments
 	// Cobra commands without Args validation accept any arguments by default
 	// Just verify the command structure is correct
-	if cmd.Use != "current" {
-		t.Errorf("Use = %q, want current", cmd.Use)
+	if cmd.Use != testCommandUse {
+		t.Errorf("Use = %q, want %s", cmd.Use, testCommandUse)
 	}
 }
 
@@ -182,7 +184,8 @@ func TestExecute_WithOutputFlagYAML(t *testing.T) {
 	}
 }
 
-func TestRun_DefaultTheme(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_DefaultTheme(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format
 	viper.Set("output", "table")
@@ -205,7 +208,8 @@ func TestRun_DefaultTheme(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_OutputContainsThemeName(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_OutputContainsThemeName(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format
 	viper.Set("output", "table")
@@ -231,7 +235,8 @@ func TestRun_OutputContainsThemeName(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_WithDisplayName(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_WithDisplayName(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format
 	viper.Set("output", "table")
@@ -261,6 +266,7 @@ func TestRun_WithDisplayName(t *testing.T) { //nolint:paralleltest
 	}
 }
 
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
 func TestRun_TextOutput(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format (text output)
@@ -285,7 +291,8 @@ func TestRun_TextOutput(t *testing.T) {
 	}
 }
 
-func TestRun_JSONFormatWithIOStreams(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_JSONFormatWithIOStreams(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format
 	viper.Set("output", "table")
@@ -355,7 +362,8 @@ func TestExecute_CalledMultipleTimes(t *testing.T) {
 	}
 }
 
-func TestRun_VerifyDataStructure(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_VerifyDataStructure(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format
 	viper.Set("output", "table")
@@ -385,7 +393,8 @@ func TestRun_VerifyDataStructure(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_TextFormatOutput(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_TextFormatOutput(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format
 	viper.Set("output", "table")
@@ -411,7 +420,8 @@ func TestRun_TextFormatOutput(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_StructuredOutput(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_StructuredOutput(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure JSON format for structured output
 	viper.Set("output", "json")
@@ -432,7 +442,8 @@ func TestRun_StructuredOutput(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_DisplayNameShownWhenDifferent(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_DisplayNameShownWhenDifferent(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format so we get text output
 	viper.Set("output", "table")
@@ -471,8 +482,8 @@ func TestNewCommand_HasValidStructure(t *testing.T) {
 		t.Error("RunE should be set")
 	}
 
-	if cmd.Use != "current" {
-		t.Errorf("Use = %q, want current", cmd.Use)
+	if cmd.Use != testCommandUse {
+		t.Errorf("Use = %q, want %s", cmd.Use, testCommandUse)
 	}
 
 	if len(cmd.Aliases) == 0 {
@@ -480,7 +491,8 @@ func TestNewCommand_HasValidStructure(t *testing.T) {
 	}
 }
 
-func TestRun_ConsistentOutput(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_ConsistentOutput(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Ensure table format
 	viper.Set("output", "table")
@@ -518,7 +530,8 @@ func TestRun_ConsistentOutput(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_JSONStructuredOutput(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_JSONStructuredOutput(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Set JSON output format
 	viper.Set("output", "json")
@@ -546,7 +559,8 @@ func TestRun_JSONStructuredOutput(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_YAMLStructuredOutput(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_YAMLStructuredOutput(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Set YAML output format
 	viper.Set("output", "yaml")
@@ -573,7 +587,8 @@ func TestRun_YAMLStructuredOutput(t *testing.T) { //nolint:paralleltest
 	}
 }
 
-func TestRun_TableFormatOutput(t *testing.T) { //nolint:paralleltest
+//nolint:paralleltest // cannot be parallel because it uses viper.Set
+func TestRun_TableFormatOutput(t *testing.T) {
 	// Cannot be parallel because it uses viper.Set
 	// Set table output format explicitly
 	viper.Set("output", "table")

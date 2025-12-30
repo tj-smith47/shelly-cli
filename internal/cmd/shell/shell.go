@@ -1,4 +1,4 @@
-// Package shellcmd provides the device shell command.
+// Package shell provides the device shell command.
 package shell
 
 import (
