@@ -1,0 +1,183 @@
+version: "1"
+
+config:
+  devices:
+    - name: "Living Room Light"
+      address: "192.168.100.101"
+      mac: "AA:BB:CC:DD:EE:01"
+      type: "SNSW-001P16EU"
+      model: "Shelly Plus 1PM"
+      generation: 2
+
+    - name: "Kitchen Switch"
+      address: "192.168.100.102"
+      mac: "AA:BB:CC:DD:EE:02"
+      type: "SHSW-1"
+      model: "Shelly 1"
+      generation: 1
+
+    - name: "Garage Cover"
+      address: "192.168.100.103"
+      mac: "AA:BB:CC:DD:EE:03"
+      type: "SNSW-102P16EU"
+      model: "Shelly Plus 2PM"
+      generation: 2
+
+    - name: "Bedroom Dimmer"
+      address: "192.168.100.104"
+      mac: "AA:BB:CC:DD:EE:04"
+      type: "SNDM-0013US"
+      model: "Shelly Plus Dimmer"
+      generation: 2
+
+    - name: "Office RGBW"
+      address: "192.168.100.105"
+      mac: "AA:BB:CC:DD:EE:05"
+      type: "SHRGBW2"
+      model: "Shelly RGBW2"
+      generation: 1
+
+    - name: "Patio Plug"
+      address: "192.168.100.106"
+      mac: "AA:BB:CC:DD:EE:06"
+      type: "SNSN-0024X"
+      model: "Shelly Plus Plug S"
+      generation: 2
+
+    - name: "Bathroom Fan"
+      address: "192.168.100.107"
+      mac: "AA:BB:CC:DD:EE:07"
+      type: "SNSW-001X16EU"
+      model: "Shelly Plus 1"
+      generation: 2
+
+    - name: "Protected Device"
+      address: "192.168.100.108"
+      mac: "AA:BB:CC:DD:EE:08"
+      type: "SPSW-001PE16EU"
+      model: "Shelly Pro 1PM"
+      generation: 2
+      auth_user: "admin"
+      auth_pass: "secret123"
+
+  groups:
+    - name: "downstairs"
+      devices:
+        - "Living Room Light"
+        - "Kitchen Switch"
+
+    - name: "upstairs"
+      devices:
+        - "Bedroom Dimmer"
+        - "Bathroom Fan"
+
+    - name: "all-lights"
+      devices:
+        - "Living Room Light"
+        - "Kitchen Switch"
+        - "Bedroom Dimmer"
+
+  scenes:
+    - name: "movie-night"
+      description: "Dim lights for movie watching"
+      actions:
+        - device: "Living Room Light"
+          method: "Switch.Set"
+          params:
+            on: false
+        - device: "Bedroom Dimmer"
+          method: "Light.Set"
+          params:
+            brightness: 20
+
+    - name: "morning"
+      description: "Turn on lights for morning routine"
+      actions:
+        - device: "Kitchen Switch"
+          method: "Switch.Set"
+          params:
+            on: true
+        - device: "Bathroom Fan"
+          method: "Switch.Set"
+          params:
+            on: true
+
+  aliases:
+    - name: "lr"
+      command: "switch toggle living-room-light"
+    - name: "all-off"
+      command: "batch off --group all-lights"
+
+device_states:
+  "Living Room Light":
+    "switch:0":
+      output: true
+      apower: 45.2
+      voltage: 121.3
+    sys:
+      available_updates:
+        stable:
+          version: "1.5.0"
+
+  "Kitchen Switch":
+    relay:
+      ison: false
+    meters:
+      - power: 0
+
+  "Garage Cover":
+    "cover:0":
+      state: "stopped"
+      current_pos: 100
+
+  "Bedroom Dimmer":
+    "light:0":
+      output: true
+      brightness: 75
+
+  "Office RGBW":
+    lights:
+      - ison: true
+        mode: "color"
+        red: 255
+        green: 100
+        blue: 50
+        white: 0
+        brightness: 80
+
+  "Patio Plug":
+    "switch:0":
+      output: false
+      apower: 0
+      voltage: 120.5
+
+fleet:
+  organization: "Demo Corp"
+  devices:
+    - id: "fleet-001"
+      name: "Office Building A - Lobby"
+      model: "SNSW-001P16EU"
+      online: true
+      firmware: "1.4.4"
+    - id: "fleet-002"
+      name: "Office Building A - Conference"
+      model: "SNSW-102P16EU"
+      online: true
+      firmware: "1.4.4"
+    - id: "fleet-003"
+      name: "Office Building B - Entrance"
+      model: "SNSW-001P16EU"
+      online: false
+      firmware: "1.3.0"
+
+discovery:
+  - name: "Unregistered Plug"
+    address: "192.168.100.200"
+    mac: "AA:BB:CC:DD:EE:99"
+    model: "SHPLG-S"
+    generation: 1
+  - name: "New Device"
+    address: "192.168.100.201"
+    mac: "AA:BB:CC:DD:EE:98"
+    model: "SNSW-001P16EU"
+    generation: 2

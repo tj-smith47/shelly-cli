@@ -22,6 +22,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
+	github.com/stretchr/testify v1.11.1
 	github.com/tj-smith47/shelly-go v0.2.2
 	golang.org/x/sync v0.19.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -36,6 +37,7 @@ require (
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/fatih/color v1.7.0 // indirect
@@ -50,6 +52,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect

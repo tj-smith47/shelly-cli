@@ -8,7 +8,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -84,7 +83,12 @@ Columns: Name, Address, Platform, Type, Model, Generation, Auth`,
 
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
-	devices := config.ListDevices()
+
+	mgr, err := opts.Factory.ConfigManager()
+	if err != nil {
+		return err
+	}
+	devices := mgr.ListDevices()
 
 	if len(devices) == 0 {
 		ios.Info("No devices registered")

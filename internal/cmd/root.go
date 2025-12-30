@@ -94,20 +94,26 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	mockpkg "github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/telemetry"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "shelly",
-	Short: "CLI for controlling Shelly smart home devices",
-	Long: `Shelly CLI - Control your Shelly smart home devices from the command line.
+var (
+	// factory is the shared factory for dependency injection.
+	// It must be package-level so demo mode can inject mock config.
+	factory *cmdutil.Factory
+
+	rootCmd = &cobra.Command{
+		Use:   "shelly",
+		Short: "CLI for controlling Shelly smart home devices",
+		Long: `Shelly CLI - Control your Shelly smart home devices from the command line.
 
 This tool provides a comprehensive interface for discovering, monitoring,
 and controlling Shelly devices on your local network.`,
-	Example: `  # Initialize configuration
+		Example: `  # Initialize configuration
   shelly init
 
   # Discover and control devices
@@ -122,11 +128,12 @@ and controlling Shelly devices on your local network.`,
 
   # Launch interactive dashboard
   shelly dash`,
-	// Disable Cobra's auto-generated completion to use our own with install subcommand
-	CompletionOptions: cobra.CompletionOptions{
-		DisableDefaultCmd: true,
-	},
-}
+		// Disable Cobra's auto-generated completion to use our own with install subcommand
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
+	}
+)
 
 // GetRootCmd returns the root command for documentation generation.
 // The command tree is fully initialized with all subcommands.
@@ -237,109 +244,117 @@ func init() {
 	)
 
 	// Create factory for dependency injection
-	f := cmdutil.NewFactory()
+	factory = cmdutil.NewFactory()
+
+	// Inject mock config if demo mode is enabled
+	if mockpkg.IsDemoMode() {
+		demo, err := mockpkg.Start()
+		if err == nil {
+			demo.InjectIntoFactory(factory)
+		}
+	}
 
 	// Quick commands - shortcuts for common operations
 	cmdutil.AddCommandsToGroup(rootCmd, groupShortcuts,
-		on.NewCommand(f),
-		off.NewCommand(f),
-		togglecmd.NewCommand(f),
-		statuscmd.NewCommand(f),
-		qr.NewCommand(f),
-		sleep.NewCommand(f),
-		wake.NewCommand(f),
-		wait.NewCommand(f),
+		on.NewCommand(factory),
+		off.NewCommand(factory),
+		togglecmd.NewCommand(factory),
+		statuscmd.NewCommand(factory),
+		qr.NewCommand(factory),
+		sleep.NewCommand(factory),
+		wake.NewCommand(factory),
+		wait.NewCommand(factory),
 	)
 
 	// Control commands - direct device control
 	cmdutil.AddCommandsToGroup(rootCmd, groupControl,
-		switchcmd.NewCommand(f),
-		cover.NewCommand(f),
-		light.NewCommand(f),
-		rgb.NewCommand(f),
-		rgbw.NewCommand(f),
-		party.NewCommand(f),
-		input.NewCommand(f),
-		thermostat.NewCommand(f),
-		batch.NewCommand(f),
-		scene.NewCommand(f),
+		switchcmd.NewCommand(factory),
+		cover.NewCommand(factory),
+		light.NewCommand(factory),
+		rgb.NewCommand(factory),
+		rgbw.NewCommand(factory),
+		party.NewCommand(factory),
+		input.NewCommand(factory),
+		thermostat.NewCommand(factory),
+		batch.NewCommand(factory),
+		scene.NewCommand(factory),
 	)
 
 	// Management commands - device and group management
 	cmdutil.AddCommandsToGroup(rootCmd, groupManagement,
-		device.NewCommand(f),
-		group.NewCommand(f),
-		discover.NewCommand(f),
-		script.NewCommand(f),
-		schedule.NewCommand(f),
-		backup.NewCommand(f),
-		migrate.NewCommand(f),
-		sync.NewCommand(f),
-		fleet.NewCommand(f),
+		device.NewCommand(factory),
+		group.NewCommand(factory),
+		discover.NewCommand(factory),
+		script.NewCommand(factory),
+		schedule.NewCommand(factory),
+		backup.NewCommand(factory),
+		migrate.NewCommand(factory),
+		sync.NewCommand(factory),
+		fleet.NewCommand(factory),
 	)
 
 	// Configuration commands - device and service configuration
 	cmdutil.AddCommandsToGroup(rootCmd, groupConfig,
-		action.NewCommand(f),
-		auth.NewCommand(f),
-		bthome.NewCommand(f),
-		cert.NewCommand(f),
-		cloud.NewCommand(f),
-		configcmd.NewCommand(f),
-		ethernet.NewCommand(f),
-		kvs.NewCommand(f),
-		lora.NewCommand(f),
-		matter.NewCommand(f),
-		modbus.NewCommand(f),
-		mqtt.NewCommand(f),
-		provision.NewCommand(f),
-		sensoraddon.NewCommand(f),
-		template.NewCommand(f),
-		virtual.NewCommand(f),
-		webhook.NewCommand(f),
-		wifi.NewCommand(f),
-		zigbee.NewCommand(f),
-		zwave.NewCommand(f),
+		action.NewCommand(factory),
+		auth.NewCommand(factory),
+		bthome.NewCommand(factory),
+		cert.NewCommand(factory),
+		cloud.NewCommand(factory),
+		configcmd.NewCommand(factory),
+		ethernet.NewCommand(factory),
+		kvs.NewCommand(factory),
+		lora.NewCommand(factory),
+		matter.NewCommand(factory),
+		modbus.NewCommand(factory),
+		mqtt.NewCommand(factory),
+		provision.NewCommand(factory),
+		sensoraddon.NewCommand(factory),
+		template.NewCommand(factory),
+		virtual.NewCommand(factory),
+		webhook.NewCommand(factory),
+		wifi.NewCommand(factory),
+		zigbee.NewCommand(factory),
+		zwave.NewCommand(factory),
 	)
 
 	// Monitoring commands - status and metrics
 	cmdutil.AddCommandsToGroup(rootCmd, groupMonitoring,
-		monitor.NewCommand(f),
-		alert.NewCommand(f),
-		energy.NewCommand(f),
-		power.NewCommand(f),
-		sensor.NewCommand(f),
-		metrics.NewCommand(f),
-		dash.NewCommand(f),
-		report.NewCommand(f),
+		monitor.NewCommand(factory),
+		alert.NewCommand(factory),
+		energy.NewCommand(factory),
+		power.NewCommand(factory),
+		sensor.NewCommand(factory),
+		metrics.NewCommand(factory),
+		dash.NewCommand(factory),
+		report.NewCommand(factory),
 	)
 
 	// Troubleshooting commands - diagnostics and debugging
 	cmdutil.AddCommandsToGroup(rootCmd, groupTroubleshooting,
-		audit.NewCommand(f),
-		benchmark.NewCommand(f),
-		debug.NewCommand(f),
-		doctor.NewCommand(f),
-		repl.NewCommand(f),
-		mock.NewCommand(f),
-		shellcmd.NewCommand(f),
+		audit.NewCommand(factory),
+		benchmark.NewCommand(factory),
+		debug.NewCommand(factory),
+		doctor.NewCommand(factory),
+		repl.NewCommand(factory),
+		mock.NewCommand(factory),
+		shellcmd.NewCommand(factory),
 	)
 
 	// Utility commands - CLI utilities
 	cmdutil.AddCommandsToGroup(rootCmd, groupUtility,
-		alias.NewCommand(f),
-		cache.NewCommand(f),
-		completioncmd.NewCommand(f),
-		exportcmd.NewCommand(f),
-		feedback.NewCommand(f),
-		firmware.NewCommand(f),
-		initcmd.NewCommand(f),
-		logcmd.NewCommand(f),
-		plugin.NewCommand(f),
-		profile.NewCommand(f),
-		themecmd.NewCommand(f),
-		updatecmd.NewCommand(f),
-		versioncmd.NewCommand(f),
+		alias.NewCommand(factory),
+		cache.NewCommand(factory),
+		completioncmd.NewCommand(factory),
+		exportcmd.NewCommand(factory),
+		feedback.NewCommand(factory),
+		firmware.NewCommand(factory),
+		initcmd.NewCommand(factory),
+		logcmd.NewCommand(factory),
+		plugin.NewCommand(factory),
+		profile.NewCommand(factory),
+		themecmd.NewCommand(factory),
+		updatecmd.NewCommand(factory),
+		versioncmd.NewCommand(factory),
 	)
 }
 
