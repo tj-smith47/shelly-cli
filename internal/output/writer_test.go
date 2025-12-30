@@ -147,7 +147,6 @@ func TestGetWriter(t *testing.T) {
 			t.Fatalf("Write() error: %v", err)
 		}
 	})
-
 }
 
 func TestExportToFile(t *testing.T) {

@@ -2,24 +2,20 @@
 package output
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
-	"github.com/alecthomas/chroma/v2"
-	"github.com/alecthomas/chroma/v2/formatters"
-	"github.com/alecthomas/chroma/v2/lexers"
-	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 
+	"github.com/tj-smith47/shelly-cli/internal/output/jsonf"
+	"github.com/tj-smith47/shelly-cli/internal/output/template"
+	yamlf "github.com/tj-smith47/shelly-cli/internal/output/yaml"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -77,22 +73,22 @@ func PrintTo(w io.Writer, data any) error {
 
 // PrintJSON outputs data as JSON.
 func PrintJSON(data any) error {
-	return NewJSONFormatter().Format(os.Stdout, data)
+	return jsonf.New().Format(os.Stdout, data)
 }
 
 // PrintYAML outputs data as YAML.
 func PrintYAML(data any) error {
-	return NewYAMLFormatter().Format(os.Stdout, data)
+	return yamlf.New().Format(os.Stdout, data)
 }
 
 // JSON outputs data as JSON to the specified writer.
 func JSON(w io.Writer, data any) error {
-	return NewJSONFormatter().Format(w, data)
+	return jsonf.New().Format(w, data)
 }
 
 // YAML outputs data as YAML to the specified writer.
 func YAML(w io.Writer, data any) error {
-	return NewYAMLFormatter().Format(w, data)
+	return yamlf.New().Format(w, data)
 }
 
 // NewFormatter creates a formatter for the given format.
@@ -113,69 +109,28 @@ func NewFormatter(format Format) Formatter {
 	}
 }
 
-// JSONFormatter formats output as JSON with optional syntax highlighting.
-type JSONFormatter struct {
-	Indent    bool
-	Highlight bool // Enable syntax highlighting (disabled in --no-color/--plain)
-}
+// JSONFormatter wraps jsonf.Formatter for backward compatibility.
+type JSONFormatter = jsonf.Formatter
 
 // NewJSONFormatter creates a new JSON formatter with syntax highlighting.
-func NewJSONFormatter() *JSONFormatter {
-	return &JSONFormatter{
-		Indent:    true,
-		Highlight: shouldHighlight(),
-	}
+func NewJSONFormatter() *jsonf.Formatter {
+	return jsonf.New()
 }
 
-// Format outputs data as JSON with optional syntax highlighting.
-func (f *JSONFormatter) Format(w io.Writer, data any) error {
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	if f.Indent {
-		encoder.SetIndent("", "  ")
-	}
-	if err := encoder.Encode(data); err != nil {
-		return err
-	}
-
-	output := buf.String()
-	if f.Highlight {
-		output = highlightCode(output, "json")
-	}
-	_, err := io.WriteString(w, output)
-	return err
-}
-
-// YAMLFormatter formats output as YAML with optional syntax highlighting.
-type YAMLFormatter struct {
-	Highlight bool // Enable syntax highlighting (disabled in --no-color/--plain)
-}
+// YAMLFormatter wraps yamlf.Formatter for backward compatibility.
+type YAMLFormatter = yamlf.Formatter
 
 // NewYAMLFormatter creates a new YAML formatter with syntax highlighting.
-func NewYAMLFormatter() *YAMLFormatter {
-	return &YAMLFormatter{
-		Highlight: shouldHighlight(),
-	}
+func NewYAMLFormatter() *yamlf.Formatter {
+	return yamlf.New()
 }
 
-// Format outputs data as YAML with optional syntax highlighting.
-func (f *YAMLFormatter) Format(w io.Writer, data any) error {
-	var buf bytes.Buffer
-	encoder := yaml.NewEncoder(&buf)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(data); err != nil {
-		return err
-	}
-	if err := encoder.Close(); err != nil {
-		return err
-	}
+// TemplateFormatter wraps template.Formatter for backward compatibility.
+type TemplateFormatter = template.Formatter
 
-	output := buf.String()
-	if f.Highlight {
-		output = highlightCode(output, "yaml")
-	}
-	_, err := io.WriteString(w, output)
-	return err
+// NewTemplateFormatter creates a new template formatter with the given template string.
+func NewTemplateFormatter(tmpl string) *template.Formatter {
+	return template.New(tmpl)
 }
 
 // TextFormatter formats output as plain text.
@@ -257,44 +212,9 @@ func ValidFormats() []string {
 	return []string{"json", "yaml", "table", "text", "template"}
 }
 
-// TemplateFormatter formats output using Go text/template.
-type TemplateFormatter struct {
-	Template string
-}
-
-// NewTemplateFormatter creates a new template formatter with the given template string.
-func NewTemplateFormatter(tmpl string) *TemplateFormatter {
-	return &TemplateFormatter{Template: tmpl}
-}
-
-// Format outputs data using the Go template.
-func (f *TemplateFormatter) Format(w io.Writer, data any) error {
-	if f.Template == "" {
-		return fmt.Errorf("template string is required when using template output format (use --template flag)")
-	}
-
-	tmpl, err := template.New("output").Parse(f.Template)
-	if err != nil {
-		return fmt.Errorf("invalid template: %w", err)
-	}
-
-	if err := tmpl.Execute(w, data); err != nil {
-		return fmt.Errorf("template execution failed: %w", err)
-	}
-
-	// Add newline if template doesn't end with one
-	if !strings.HasSuffix(f.Template, "\n") {
-		if _, err := fmt.Fprintln(w); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // Template outputs data using the specified template to the given writer.
 func Template(w io.Writer, tmpl string, data any) error {
-	return NewTemplateFormatter(tmpl).Format(w, data)
+	return template.New(tmpl).Format(w, data)
 }
 
 // PrintTemplate outputs data using the specified template to stdout.
@@ -1030,95 +950,6 @@ func FormatReleaseNotes(body string) string {
 // FormatDeviceGeneration returns a formatted generation string.
 func FormatDeviceGeneration(gen int) string {
 	return fmt.Sprintf("Gen%d", gen)
-}
-
-// shouldHighlight returns true if syntax highlighting should be enabled.
-// Returns false for --no-color, --plain, non-TTY output, or test environments.
-func shouldHighlight() bool {
-	// Require stdout to be a TTY (disables in tests and pipes)
-	if !isTTY() {
-		return false
-	}
-	// Disabled for --plain or --no-color
-	if viper.GetBool("plain") || viper.GetBool("no-color") {
-		return false
-	}
-	// Check NO_COLOR environment variable
-	if _, ok := os.LookupEnv("NO_COLOR"); ok {
-		return false
-	}
-	// Check SHELLY_NO_COLOR environment variable
-	if _, ok := os.LookupEnv("SHELLY_NO_COLOR"); ok {
-		return false
-	}
-	// Check TERM=dumb
-	if os.Getenv("TERM") == "dumb" {
-		return false
-	}
-	return true
-}
-
-// highlightCode applies syntax highlighting to code using chroma.
-// Falls back to plain text if highlighting fails.
-func highlightCode(code, language string) string {
-	lexer := lexers.Get(language)
-	if lexer == nil {
-		return code
-	}
-	lexer = chroma.Coalesce(lexer)
-
-	// Use a theme that works well with the current terminal theme
-	style := getChromaStyle()
-
-	// Use terminal256 formatter for broad compatibility
-	formatter := formatters.Get("terminal256")
-	if formatter == nil {
-		formatter = formatters.Fallback
-	}
-
-	iterator, err := lexer.Tokenise(nil, code)
-	if err != nil {
-		return code
-	}
-
-	var buf bytes.Buffer
-	if err := formatter.Format(&buf, style, iterator); err != nil {
-		return code
-	}
-
-	return buf.String()
-}
-
-// getChromaStyle returns a chroma style that matches the current theme.
-func getChromaStyle() *chroma.Style {
-	// Try to match the current theme name to a chroma style
-	currentTheme := viper.GetString("theme.name")
-	if currentTheme == "" {
-		currentTheme = "dracula"
-	}
-
-	// Map theme names to chroma styles
-	styleMap := map[string]string{
-		"dracula":      "dracula",
-		"nord":         "nord",
-		"gruvbox":      "gruvbox",
-		"gruvbox-dark": "gruvbox",
-		"tokyo-night":  "tokyonight-night",
-		"catppuccin":   "catppuccin-mocha",
-	}
-
-	if chromaStyle, ok := styleMap[strings.ToLower(currentTheme)]; ok {
-		if style := styles.Get(chromaStyle); style != nil {
-			return style
-		}
-	}
-
-	// Default to dracula which works well on dark terminals
-	if style := styles.Get("dracula"); style != nil {
-		return style
-	}
-
-	return styles.Fallback
 }
 
 // ExtractMapSection extracts a map section from an RPC result.

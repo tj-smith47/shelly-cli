@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
+
+	"github.com/tj-smith47/shelly-cli/internal/output/syntax"
 )
 
 // viperSetOutput sets the "output" viper value for the duration of the test and restores it after.
@@ -606,7 +608,7 @@ func TestHighlightCode(t *testing.T) {
 	t.Run("json syntax", func(t *testing.T) {
 		t.Parallel()
 		code := `{"key": "value"}`
-		result := highlightCode(code, "json")
+		result := syntax.HighlightCode(code, "json")
 		// Should return non-empty result
 		if result == "" {
 			t.Error("expected non-empty result")
@@ -615,8 +617,8 @@ func TestHighlightCode(t *testing.T) {
 
 	t.Run("yaml syntax", func(t *testing.T) {
 		t.Parallel()
-		code := "key: value"
-		result := highlightCode(code, "yaml")
+		code := "name: test"
+		result := syntax.HighlightCode(code, "yaml")
 		if result == "" {
 			t.Error("expected non-empty result")
 		}
@@ -625,7 +627,7 @@ func TestHighlightCode(t *testing.T) {
 	t.Run("unknown lexer returns code unchanged", func(t *testing.T) {
 		t.Parallel()
 		code := "some text"
-		result := highlightCode(code, "nonexistent-language-xyz123")
+		result := syntax.HighlightCode(code, "nonexistent-language-xyz123")
 		// Should return original code when lexer not found
 		if result != code {
 			t.Errorf("expected code unchanged, got %q", result)
@@ -636,10 +638,10 @@ func TestHighlightCode(t *testing.T) {
 func TestGetChromaStyle(t *testing.T) {
 	t.Parallel()
 
-	// Test that getChromaStyle returns a non-nil style
-	style := getChromaStyle()
+	// Test that GetChromaStyle returns a non-nil style
+	style := syntax.GetChromaStyle()
 	if style == nil {
-		t.Error("getChromaStyle() returned nil")
+		t.Error("GetChromaStyle() returned nil")
 	}
 }
 
@@ -722,7 +724,7 @@ func TestShouldHighlight(t *testing.T) {
 	t.Parallel()
 
 	// In test environment, terminal is not a TTY so shouldHighlight should return false
-	if shouldHighlight() {
+	if syntax.ShouldHighlight() {
 		// Not expected in test environment, but if it's true, that's also valid
 		t.Log("shouldHighlight returned true (unexpected in test, but acceptable)")
 	}
@@ -859,13 +861,11 @@ func TestExtractMapSection_InvalidUnmarshal(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Tests modify shared viper state
 func TestGetChromaStyle_Themes(t *testing.T) {
-	t.Parallel()
-
 	themes := []string{"dracula", "nord", "gruvbox", "tokyo-night", "catppuccin", "unknown-theme"}
 	for _, themeName := range themes {
 		t.Run(themeName, func(t *testing.T) {
-			t.Parallel()
 			// Set theme in viper (note: may affect other tests so we use t.Cleanup)
 			original := viper.GetString("theme.name")
 			viper.Set("theme.name", themeName)
@@ -873,9 +873,9 @@ func TestGetChromaStyle_Themes(t *testing.T) {
 				viper.Set("theme.name", original)
 			})
 
-			style := getChromaStyle()
+			style := syntax.GetChromaStyle()
 			if style == nil {
-				t.Errorf("getChromaStyle() returned nil for theme %q", themeName)
+				t.Errorf("syntax.GetChromaStyle() returned nil for theme %q", themeName)
 			}
 		})
 	}
@@ -884,6 +884,7 @@ func TestGetChromaStyle_Themes(t *testing.T) {
 // TestPrint_Stdout tests Print functions that write to os.Stdout.
 // We can't easily capture stdout in parallel tests, but we can verify they don't error.
 func TestPrint_Stdout(t *testing.T) {
+	t.Parallel()
 	// Print, PrintJSON, PrintYAML write to os.Stdout
 	// These are thin wrappers around PrintTo/JSON/YAML which are tested
 	// Verify they exist and compile correctly by calling PrintTo instead
@@ -971,7 +972,7 @@ func TestShouldHighlight_Flags(t *testing.T) {
 		t.Cleanup(func() {
 			viper.Set("plain", original)
 		})
-		result := shouldHighlight()
+		result := syntax.ShouldHighlight()
 		if result {
 			t.Error("shouldHighlight should return false when plain=true")
 		}
@@ -984,7 +985,7 @@ func TestShouldHighlight_Flags(t *testing.T) {
 			viper.Set("highlight", original)
 		})
 		// Still returns false because not a TTY, but exercises the code path
-		_ = shouldHighlight()
+		_ = syntax.ShouldHighlight()
 	})
 }
 
@@ -1047,71 +1048,72 @@ func TestJSONFormatter_MarshalError(t *testing.T) {
 //nolint:paralleltest // Tests modify shared isTTY and viper state
 func TestShouldHighlight_TTY(t *testing.T) {
 	// Save and restore isTTY
-	oldIsTTY := isTTY
-	defer func() { isTTY = oldIsTTY }()
+	oldIsTTY := syntax.IsTTY
+	defer func() { syntax.IsTTY = oldIsTTY }()
 
 	t.Run("non-TTY returns false", func(t *testing.T) {
-		isTTY = func() bool { return false }
-		if shouldHighlight() {
-			t.Error("expected shouldHighlight() = false for non-TTY")
+		syntax.IsTTY = func() bool { return false }
+		if syntax.ShouldHighlight() {
+			t.Error("expected syntax.ShouldHighlight() = false for non-TTY")
 		}
 	})
 
 	t.Run("TTY with plain flag returns false", func(t *testing.T) {
-		isTTY = func() bool { return true }
+		syntax.IsTTY = func() bool { return true }
 		viper.Set("plain", true)
 		defer viper.Set("plain", false)
-		if shouldHighlight() {
-			t.Error("expected shouldHighlight() = false when plain=true")
+		if syntax.ShouldHighlight() {
+			t.Error("expected syntax.ShouldHighlight() = false when plain=true")
 		}
 	})
 
 	t.Run("TTY with no-color flag returns false", func(t *testing.T) {
-		isTTY = func() bool { return true }
+		syntax.IsTTY = func() bool { return true }
 		viper.Set("no-color", true)
 		defer viper.Set("no-color", false)
-		if shouldHighlight() {
-			t.Error("expected shouldHighlight() = false when no-color=true")
+		if syntax.ShouldHighlight() {
+			t.Error("expected syntax.ShouldHighlight() = false when no-color=true")
 		}
 	})
 
 	t.Run("TTY with NO_COLOR env returns false", func(t *testing.T) {
-		isTTY = func() bool { return true }
+		syntax.IsTTY = func() bool { return true }
 		t.Setenv("NO_COLOR", "1")
-		if shouldHighlight() {
-			t.Error("expected shouldHighlight() = false when NO_COLOR is set")
+		if syntax.ShouldHighlight() {
+			t.Error("expected syntax.ShouldHighlight() = false when NO_COLOR is set")
 		}
 	})
 
 	t.Run("TTY with SHELLY_NO_COLOR env returns false", func(t *testing.T) {
-		isTTY = func() bool { return true }
+		syntax.IsTTY = func() bool { return true }
 		t.Setenv("SHELLY_NO_COLOR", "1")
-		if shouldHighlight() {
-			t.Error("expected shouldHighlight() = false when SHELLY_NO_COLOR is set")
+		if syntax.ShouldHighlight() {
+			t.Error("expected syntax.ShouldHighlight() = false when SHELLY_NO_COLOR is set")
 		}
 	})
 
 	t.Run("TTY with TERM=dumb returns false", func(t *testing.T) {
-		isTTY = func() bool { return true }
+		syntax.IsTTY = func() bool { return true }
 		t.Setenv("TERM", "dumb")
-		if shouldHighlight() {
-			t.Error("expected shouldHighlight() = false when TERM=dumb")
+		if syntax.ShouldHighlight() {
+			t.Error("expected syntax.ShouldHighlight() = false when TERM=dumb")
 		}
 	})
 
 	t.Run("TTY with no restrictions returns true", func(t *testing.T) {
-		isTTY = func() bool { return true }
+		syntax.IsTTY = func() bool { return true }
 		// Clear all flags
 		viper.Set("plain", false)
 		viper.Set("no-color", false)
 		// Set a normal terminal type
 		t.Setenv("TERM", "xterm-256color")
-		if !shouldHighlight() {
-			t.Error("expected shouldHighlight() = true when TTY with no restrictions")
+		if !syntax.ShouldHighlight() {
+			t.Error("expected syntax.ShouldHighlight() = true when TTY with no restrictions")
 		}
 	})
 }
 
+//nolint:paralleltest // Writes to shared stdout
 func TestPrint_ToStdout(t *testing.T) {
 	// Test that Print doesn't panic and writes to stdout
 	data := map[string]string{"key": "value"}
@@ -1121,6 +1123,7 @@ func TestPrint_ToStdout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Writes to shared stdout
 func TestPrintJSON_ToStdout(t *testing.T) {
 	// Test that PrintJSON doesn't panic and writes to stdout
 	data := map[string]string{"key": "value"}
@@ -1130,6 +1133,7 @@ func TestPrintJSON_ToStdout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Writes to shared stdout
 func TestPrintYAML_ToStdout(t *testing.T) {
 	// Test that PrintYAML doesn't panic and writes to stdout
 	data := map[string]string{"key": "value"}
@@ -1139,6 +1143,7 @@ func TestPrintYAML_ToStdout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Writes to shared stdout
 func TestPrintTemplate_ToStdout(t *testing.T) {
 	// Test that PrintTemplate doesn't panic and writes to stdout
 	data := map[string]string{"key": "value"}
@@ -1148,14 +1153,13 @@ func TestPrintTemplate_ToStdout(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify shared isTTY and viper state
 func TestNewJSONFormatter_WithTTY(t *testing.T) {
 	// Save and restore isTTY
-	oldIsTTY := isTTY
-	defer func() { isTTY = oldIsTTY }()
+	oldIsTTY := syntax.IsTTY
+	defer func() { syntax.IsTTY = oldIsTTY }()
 
 	// Enable TTY mode to test highlighting path
-	isTTY = func() bool { return true }
+	syntax.IsTTY = func() bool { return true }
 	// Make sure no color restrictions
 	viper.Set("plain", false)
 	viper.Set("no-color", false)
@@ -1178,14 +1182,13 @@ func TestNewJSONFormatter_WithTTY(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify shared isTTY and viper state
 func TestNewYAMLFormatter_WithTTY(t *testing.T) {
 	// Save and restore isTTY
-	oldIsTTY := isTTY
-	defer func() { isTTY = oldIsTTY }()
+	oldIsTTY := syntax.IsTTY
+	defer func() { syntax.IsTTY = oldIsTTY }()
 
 	// Enable TTY mode to test highlighting path
-	isTTY = func() bool { return true }
+	syntax.IsTTY = func() bool { return true }
 	// Make sure no color restrictions
 	viper.Set("plain", false)
 	viper.Set("no-color", false)
@@ -1213,7 +1216,7 @@ func TestHighlightCode_Languages(t *testing.T) {
 	t.Run("unknown language returns plain code", func(t *testing.T) {
 		t.Parallel()
 		code := "some code"
-		result := highlightCode(code, "nonexistent-language-xyz")
+		result := syntax.HighlightCode(code, "nonexistent-language-xyz")
 		if result != code {
 			t.Errorf("expected plain code for unknown language, got %q", result)
 		}
@@ -1222,7 +1225,7 @@ func TestHighlightCode_Languages(t *testing.T) {
 	t.Run("json language highlights", func(t *testing.T) {
 		t.Parallel()
 		code := `{"key": "value"}`
-		result := highlightCode(code, "json")
+		result := syntax.HighlightCode(code, "json")
 		// Result should be non-empty (may or may not have ANSI depending on formatter)
 		if result == "" {
 			t.Error("expected non-empty result for json highlighting")
@@ -1232,7 +1235,7 @@ func TestHighlightCode_Languages(t *testing.T) {
 	t.Run("yaml language highlights", func(t *testing.T) {
 		t.Parallel()
 		code := "key: value"
-		result := highlightCode(code, "yaml")
+		result := syntax.HighlightCode(code, "yaml")
 		if result == "" {
 			t.Error("expected non-empty result for yaml highlighting")
 		}
@@ -1246,7 +1249,7 @@ func TestGetChromaStyle_AllThemes(t *testing.T) {
 		t.Run("theme_"+themeName, func(t *testing.T) {
 			viper.Set("theme.name", themeName)
 			defer viper.Set("theme.name", "")
-			style := getChromaStyle()
+			style := syntax.GetChromaStyle()
 			if style == nil {
 				t.Errorf("expected non-nil style for theme %q", themeName)
 			}

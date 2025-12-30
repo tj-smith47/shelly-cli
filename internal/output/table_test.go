@@ -641,6 +641,7 @@ func TestBuildTableFromData_EdgeCases(t *testing.T) {
 	})
 }
 
+//nolint:gocyclo // Many edge case test scenarios
 func TestFormatFieldValue_EdgeCases(t *testing.T) {
 	t.Parallel()
 
