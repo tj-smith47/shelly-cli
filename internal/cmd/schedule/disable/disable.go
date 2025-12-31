@@ -12,8 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+}
+
 // NewCommand creates the schedule disable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "disable <device> <id>",
 		Aliases: []string{"off", "deactivate"},
@@ -28,25 +37,27 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid schedule ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id)
+			opts.Device = args[0]
+			opts.ID = id
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Disabling schedule...", func(ctx context.Context) error {
-		if err := svc.DisableSchedule(ctx, device, id); err != nil {
+		if err := svc.DisableSchedule(ctx, opts.Device, opts.ID); err != nil {
 			return fmt.Errorf("failed to disable schedule: %w", err)
 		}
-		ios.Success("Schedule %d disabled", id)
+		ios.Success("Schedule %d disabled", opts.ID)
 		return nil
 	})
 }

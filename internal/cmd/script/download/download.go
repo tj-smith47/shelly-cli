@@ -14,8 +14,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+	File    string
+}
+
 // NewCommand creates the script download command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "download <device> <id> <file>",
 		Aliases: []string{"save"},
@@ -33,33 +43,36 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id, args[2])
+			opts.Device = args[0]
+			opts.ID = id
+			opts.File = args[2]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, file string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Downloading script...", func(ctx context.Context) error {
-		code, err := svc.GetScriptCode(ctx, device, id)
+		code, err := svc.GetScriptCode(ctx, opts.Device, opts.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get script code: %w", err)
 		}
 
 		if code == "" {
-			ios.Warning("Script %d has no code", id)
+			ios.Warning("Script %d has no code", opts.ID)
 			return nil
 		}
 
 		// Ensure directory exists
-		dir := filepath.Dir(file)
+		dir := filepath.Dir(opts.File)
 		if dir != "." && dir != "" {
 			if mkErr := os.MkdirAll(dir, 0o750); mkErr != nil {
 				return fmt.Errorf("failed to create directory: %w", mkErr)
@@ -68,11 +81,11 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, file st
 
 		// Write file
 		//nolint:gosec // G306: 0o644 is appropriate for script files
-		if writeErr := os.WriteFile(file, []byte(code), 0o644); writeErr != nil {
+		if writeErr := os.WriteFile(opts.File, []byte(code), 0o644); writeErr != nil {
 			return fmt.Errorf("failed to write file: %w", writeErr)
 		}
 
-		ios.Success("Downloaded script %d to %s (%d bytes)", id, file, len(code))
+		ios.Success("Downloaded script %d to %s (%d bytes)", opts.ID, opts.File, len(code))
 		return nil
 	})
 }

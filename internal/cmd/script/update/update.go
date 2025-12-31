@@ -13,16 +13,22 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
-var (
-	nameFlag   string
-	codeFlag   string
-	fileFlag   string
-	appendFlag bool
-	enableFlag bool
-)
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+	Name    string
+	Code    string
+	File    string
+	Append  bool
+	Enable  bool
+}
 
 // NewCommand creates the script update command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "update <device> <id>",
 		Aliases: []string{"up"},
@@ -49,31 +55,33 @@ Use --append to add code to the existing script instead of replacing it.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id)
+			opts.Device = args[0]
+			opts.ID = id
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&nameFlag, "name", "", "Script name")
-	cmd.Flags().StringVar(&codeFlag, "code", "", "Script code (inline)")
-	cmd.Flags().StringVarP(&fileFlag, "file", "f", "", "Script code file")
-	cmd.Flags().BoolVar(&appendFlag, "append", false, "Append code instead of replacing")
-	cmd.Flags().BoolVar(&enableFlag, "enable", false, "Enable the script")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Script name")
+	cmd.Flags().StringVar(&opts.Code, "code", "", "Script code (inline)")
+	cmd.Flags().StringVarP(&opts.File, "file", "f", "", "Script code file")
+	cmd.Flags().BoolVar(&opts.Append, "append", false, "Append code instead of replacing")
+	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable the script")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	// Get code from file if specified
-	code := codeFlag
-	if fileFlag != "" {
+	code := opts.Code
+	if opts.File != "" {
 		//nolint:gosec // G304: User-provided file path is intentional for this command
-		data, err := os.ReadFile(fileFlag)
+		data, err := os.ReadFile(opts.File)
 		if err != nil {
 			return fmt.Errorf("failed to read file: %w", err)
 		}
@@ -85,10 +93,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 
 		// Update code if provided
 		if code != "" {
-			if uploadErr := svc.UpdateScriptCode(ctx, device, id, code, appendFlag); uploadErr != nil {
+			if uploadErr := svc.UpdateScriptCode(ctx, opts.Device, opts.ID, code, opts.Append); uploadErr != nil {
 				return fmt.Errorf("failed to update code: %w", uploadErr)
 			}
-			if appendFlag {
+			if opts.Append {
 				ios.Info("Code appended (%d bytes)", len(code))
 			} else {
 				ios.Info("Code updated (%d bytes)", len(code))
@@ -99,16 +107,16 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 		// Update config if name or enable specified
 		var namePtr *string
 		var enablePtr *bool
-		if nameFlag != "" {
-			namePtr = &nameFlag
+		if opts.Name != "" {
+			namePtr = &opts.Name
 		}
-		if enableFlag {
+		if opts.Enable {
 			enable := true
 			enablePtr = &enable
 		}
 
 		if namePtr != nil || enablePtr != nil {
-			if configErr := svc.UpdateScriptConfig(ctx, device, id, namePtr, enablePtr); configErr != nil {
+			if configErr := svc.UpdateScriptConfig(ctx, opts.Device, opts.ID, namePtr, enablePtr); configErr != nil {
 				return fmt.Errorf("failed to update config: %w", configErr)
 			}
 			if namePtr != nil {
@@ -125,7 +133,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 			return nil
 		}
 
-		ios.Success("Script %d updated", id)
+		ios.Success("Script %d updated", opts.ID)
 		return nil
 	})
 }

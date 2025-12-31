@@ -13,10 +13,19 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
-var appendFlag bool
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+	File    string
+	Append  bool
+}
 
 // NewCommand creates the script upload command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "upload <device> <id> <file>",
 		Aliases: []string{"put"},
@@ -36,39 +45,42 @@ By default, replaces the existing code. Use --append to add to existing code.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id, args[2])
+			opts.Device = args[0]
+			opts.ID = id
+			opts.File = args[2]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&appendFlag, "append", false, "Append to existing code")
+	cmd.Flags().BoolVar(&opts.Append, "append", false, "Append to existing code")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, file string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	// Read file
 	//nolint:gosec // G304: User-provided file path is intentional for this command
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(opts.File)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 	code := string(data)
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Uploading script...", func(ctx context.Context) error {
-		if uploadErr := svc.UpdateScriptCode(ctx, device, id, code, appendFlag); uploadErr != nil {
+		if uploadErr := svc.UpdateScriptCode(ctx, opts.Device, opts.ID, code, opts.Append); uploadErr != nil {
 			return fmt.Errorf("failed to upload script: %w", uploadErr)
 		}
 
-		if appendFlag {
-			ios.Success("Appended %d bytes to script %d", len(code), id)
+		if opts.Append {
+			ios.Success("Appended %d bytes to script %d", len(code), opts.ID)
 		} else {
-			ios.Success("Uploaded %d bytes to script %d", len(code), id)
+			ios.Success("Uploaded %d bytes to script %d", len(code), opts.ID)
 		}
 		return nil
 	})

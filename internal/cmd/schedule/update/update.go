@@ -13,15 +13,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 )
 
-var (
-	timespecFlag string
-	callsFlag    string
-	enableFlag   bool
-	disableFlag  bool
-)
+// Options holds command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Device   string
+	ID       int
+	Timespec string
+	Calls    string
+	Enable   bool
+	Disable  bool
+}
 
 // NewCommand creates the schedule update command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "update <device> <id>",
 		Aliases: []string{"up"},
@@ -46,32 +52,34 @@ You can update the timespec, calls, or enabled status.`,
 			if err != nil {
 				return fmt.Errorf("invalid schedule ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id)
+			opts.Device = args[0]
+			opts.ID = id
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&timespecFlag, "timespec", "", "Cron-like time specification")
-	cmd.Flags().StringVar(&callsFlag, "calls", "", "JSON array of RPC calls to execute")
-	cmd.Flags().BoolVar(&enableFlag, "enable", false, "Enable the schedule")
-	cmd.Flags().BoolVar(&disableFlag, "disable", false, "Disable the schedule")
+	cmd.Flags().StringVar(&opts.Timespec, "timespec", "", "Cron-like time specification")
+	cmd.Flags().StringVar(&opts.Calls, "calls", "", "JSON array of RPC calls to execute")
+	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable the schedule")
+	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable the schedule")
 
 	cmd.MarkFlagsMutuallyExclusive("enable", "disable")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	// Parse calls if provided
 	var calls []automation.ScheduleCall
-	if callsFlag != "" {
+	if opts.Calls != "" {
 		var err error
-		calls, err = automation.ParseScheduleCalls(callsFlag)
+		calls, err = automation.ParseScheduleCalls(opts.Calls)
 		if err != nil {
 			return err
 		}
@@ -79,17 +87,17 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 
 	// Build update params
 	var enablePtr *bool
-	if enableFlag {
+	if opts.Enable {
 		enable := true
 		enablePtr = &enable
-	} else if disableFlag {
+	} else if opts.Disable {
 		enable := false
 		enablePtr = &enable
 	}
 
 	var timespecPtr *string
-	if timespecFlag != "" {
-		timespecPtr = &timespecFlag
+	if opts.Timespec != "" {
+		timespecPtr = &opts.Timespec
 	}
 
 	// Check if anything was specified
@@ -99,11 +107,11 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Updating schedule...", func(ctx context.Context) error {
-		if updateErr := svc.UpdateSchedule(ctx, device, id, enablePtr, timespecPtr, calls); updateErr != nil {
+		if updateErr := svc.UpdateSchedule(ctx, opts.Device, opts.ID, enablePtr, timespecPtr, calls); updateErr != nil {
 			return fmt.Errorf("failed to update schedule: %w", updateErr)
 		}
 
-		ios.Success("Schedule %d updated", id)
+		ios.Success("Schedule %d updated", opts.ID)
 		if timespecPtr != nil {
 			ios.Info("Timespec: %s", *timespecPtr)
 		}

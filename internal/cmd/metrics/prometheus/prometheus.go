@@ -14,13 +14,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Port     int
+	Devices  []string
+	Interval time.Duration
+}
+
 // NewCommand creates the prometheus metrics command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		port     int
-		devices  []string
-		interval time.Duration
-	)
+	opts := &Options{
+		Factory:  f,
+		Port:     9090,
+		Interval: 15 * time.Second,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "prometheus",
@@ -59,26 +67,27 @@ Labels include: device, component, component_id, phase`,
   shelly metrics prometheus --interval 30s`,
 		Aliases: []string{"prom"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, port, devices, interval)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().IntVar(&port, "port", 9090, "HTTP port for the exporter")
-	cmd.Flags().StringSliceVar(&devices, "devices", nil, "Devices to include (default: all registered)")
-	cmd.Flags().DurationVar(&interval, "interval", 15*time.Second, "Metrics collection interval")
+	cmd.Flags().IntVar(&opts.Port, "port", opts.Port, "HTTP port for the exporter")
+	cmd.Flags().StringSliceVar(&opts.Devices, "devices", nil, "Devices to include (default: all registered)")
+	cmd.Flags().DurationVar(&opts.Interval, "interval", opts.Interval, "Metrics collection interval")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, interval time.Duration) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-	cfg, err := f.Config()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Get device list
+	devices := opts.Devices
 	if len(devices) == 0 {
 		for name := range cfg.Devices {
 			devices = append(devices, name)
@@ -99,7 +108,7 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 
 	// Start background collection
 	go func() {
-		ticker := time.NewTicker(interval)
+		ticker := time.NewTicker(opts.Interval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -131,13 +140,13 @@ func run(ctx context.Context, f *cmdutil.Factory, port int, devices []string, in
 	})
 
 	server := &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
+		Addr:              fmt.Sprintf(":%d", opts.Port),
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	ios.Printf("Starting Prometheus exporter on http://localhost:%d/metrics\n", port)
-	ios.Printf("Monitoring %d devices with %s collection interval\n", len(devices), interval)
+	ios.Printf("Starting Prometheus exporter on http://localhost:%d/metrics\n", opts.Port)
+	ios.Printf("Monitoring %d devices with %s collection interval\n", len(devices), opts.Interval)
 	ios.Printf("Press Ctrl+C to stop\n")
 
 	// Handle shutdown

@@ -12,15 +12,20 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
-var (
-	nameFlag   string
-	codeFlag   string
-	fileFlag   string
-	enableFlag bool
-)
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	Name    string
+	Code    string
+	File    string
+	Enable  bool
+}
 
 // NewCommand creates the script create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "create <device>",
 		Aliases: []string{"new"},
@@ -40,30 +45,31 @@ Use --enable to automatically enable the script after creation.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&nameFlag, "name", "", "Script name")
-	cmd.Flags().StringVar(&codeFlag, "code", "", "Script code (inline)")
-	cmd.Flags().StringVarP(&fileFlag, "file", "f", "", "Script code file")
-	cmd.Flags().BoolVar(&enableFlag, "enable", false, "Enable script after creation")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Script name")
+	cmd.Flags().StringVar(&opts.Code, "code", "", "Script code (inline)")
+	cmd.Flags().StringVarP(&opts.File, "file", "f", "", "Script code file")
+	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable script after creation")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	// Get code from file if specified
-	code := codeFlag
-	if fileFlag != "" {
+	code := opts.Code
+	if opts.File != "" {
 		//nolint:gosec // G304: User-provided file path is intentional for this command
-		data, err := os.ReadFile(fileFlag)
+		data, err := os.ReadFile(opts.File)
 		if err != nil {
 			return fmt.Errorf("failed to read file: %w", err)
 		}
@@ -72,34 +78,34 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Creating script...", func(ctx context.Context) error {
 		// Create the script
-		id, err := svc.CreateScript(ctx, device, nameFlag)
+		id, err := svc.CreateScript(ctx, opts.Device, opts.Name)
 		if err != nil {
 			return fmt.Errorf("failed to create script: %w", err)
 		}
 
 		// Upload code if provided
 		if code != "" {
-			if uploadErr := svc.UpdateScriptCode(ctx, device, id, code, false); uploadErr != nil {
+			if uploadErr := svc.UpdateScriptCode(ctx, opts.Device, id, code, false); uploadErr != nil {
 				return fmt.Errorf("failed to upload code: %w", uploadErr)
 			}
 		}
 
 		// Enable if requested
-		if enableFlag {
+		if opts.Enable {
 			enable := true
-			if configErr := svc.UpdateScriptConfig(ctx, device, id, nil, &enable); configErr != nil {
+			if configErr := svc.UpdateScriptConfig(ctx, opts.Device, id, nil, &enable); configErr != nil {
 				return fmt.Errorf("failed to enable script: %w", configErr)
 			}
 		}
 
 		ios.Success("Created script %d", id)
-		if nameFlag != "" {
-			ios.Info("Name: %s", nameFlag)
+		if opts.Name != "" {
+			ios.Info("Name: %s", opts.Name)
 		}
 		if code != "" {
 			ios.Info("Code uploaded (%d bytes)", len(code))
 		}
-		if enableFlag {
+		if opts.Enable {
 			ios.Info("Script enabled")
 		}
 		return nil

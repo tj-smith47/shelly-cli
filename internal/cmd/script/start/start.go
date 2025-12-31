@@ -12,8 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+}
+
 // NewCommand creates the script start command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "start <device> <id>",
 		Aliases: []string{"run"},
@@ -30,25 +39,27 @@ The script must be enabled before it can be started.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id)
+			opts.Device = args[0]
+			opts.ID = id
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Starting script...", func(ctx context.Context) error {
-		if err := svc.StartScript(ctx, device, id); err != nil {
+		if err := svc.StartScript(ctx, opts.Device, opts.ID); err != nil {
 			return fmt.Errorf("failed to start script: %w", err)
 		}
-		ios.Success("Script %d started", id)
+		ios.Success("Script %d started", opts.ID)
 		return nil
 	})
 }

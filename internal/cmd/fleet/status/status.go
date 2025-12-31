@@ -16,13 +16,14 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory *cmdutil.Factory
 	Online  bool
 	Offline bool
 }
 
 // NewCommand creates the fleet status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "status",
@@ -47,7 +48,7 @@ Requires an active fleet connection. Run 'shelly fleet connect' first.`,
   shelly fleet status -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -58,16 +59,16 @@ Requires an active fleet connection. Run 'shelly fleet connect' first.`,
 }
 
 //nolint:gocyclo // Complexity from handling demo mode and filtering options
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Check for demo mode
 	if mock.IsDemoMode() && mock.HasFleetFixtures() {
-		return runDemoMode(f, opts)
+		return runDemoMode(opts)
 	}
 
 	// Get credentials
-	cfg, cfgErr := f.Config()
+	cfg, cfgErr := opts.Factory.Config()
 	if cfgErr != nil {
 		ios.DebugErr("load config", cfgErr)
 	}
@@ -121,8 +122,8 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	return nil
 }
 
-func runDemoMode(f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func runDemoMode(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Get mock fleet devices
 	mockDevices := mock.GetFleetDevices()

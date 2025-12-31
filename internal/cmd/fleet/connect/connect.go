@@ -14,8 +14,9 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Host   string
-	Region string
+	Factory *cmdutil.Factory
+	Host    string
+	Region  string
 }
 
 // Cloud hosts by region.
@@ -26,7 +27,7 @@ var cloudHosts = map[string][]string{
 
 // NewCommand creates the fleet connect command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "connect",
@@ -50,7 +51,7 @@ to a specific cloud host.`,
   shelly fleet connect --region eu`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -60,11 +61,11 @@ to a specific cloud host.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Get credentials
-	cfg, cfgErr := f.Config()
+	cfg, cfgErr := opts.Factory.Config()
 	if cfgErr != nil {
 		ios.DebugErr("load config", cfgErr)
 	}

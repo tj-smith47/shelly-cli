@@ -204,7 +204,7 @@ func TestExecute_NoDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Expected no error with no devices, got: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestExecute_WithAllDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Execute failed: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestExecute_WithSpecificDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{"kitchen", "bedroom"}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"kitchen", "bedroom"}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Execute failed: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestExecute_SingleShot(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Execute failed: %v", err)
 	}
@@ -513,7 +513,7 @@ func TestExecute_ContinuousMode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	err = run(ctx, tf.Factory, []string{}, true, 50*time.Millisecond, "")
+	err = run(ctx, &Options{Factory: tf.Factory, Devices: []string{}, Continuous: true, Interval: 50 * time.Millisecond, Output: ""})
 	// Context timeout is normal for continuous mode
 	if err != nil && !strings.Contains(err.Error(), "context") {
 		t.Logf("Execute returned: %v (expected for continuous mode)", err)
@@ -572,7 +572,7 @@ func TestExecute_CustomInterval(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	err = run(ctx, tf.Factory, []string{}, true, 100*time.Millisecond, "")
+	err = run(ctx, &Options{Factory: tf.Factory, Devices: []string{}, Continuous: true, Interval: 100 * time.Millisecond, Output: ""})
 	// Context timeout is normal
 	if err != nil && !strings.Contains(err.Error(), "context") {
 		t.Logf("Execute returned: %v (expected for continuous mode)", err)
@@ -659,7 +659,7 @@ func TestRun_NoDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Expected no error with no devices, got: %v", err)
 	}
@@ -696,7 +696,7 @@ func TestRun_WithDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{"device1"}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"device1"}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -742,7 +742,7 @@ func TestRun_WithMultipleDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{"device1", "device2"}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"device1", "device2"}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -788,7 +788,7 @@ func TestRun_DevicesSorted(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -852,7 +852,7 @@ func TestRun_OutputToFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{"test-device"}, false, 10*time.Second, tmpFile.Name())
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"test-device"}, Continuous: false, Interval: 10 * time.Second, Output: tmpFile.Name()})
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -908,7 +908,7 @@ func TestRun_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err = run(ctx, tf.Factory, []string{"test-device"}, true, 10*time.Second, "")
+	err = run(ctx, &Options{Factory: tf.Factory, Devices: []string{"test-device"}, Continuous: true, Interval: 10 * time.Second, Output: ""})
 	// Context cancellation is expected
 	if err != nil && !strings.Contains(err.Error(), "context") {
 		t.Logf("Expected context cancellation, got: %v", err)
@@ -946,7 +946,7 @@ func TestRun_OutputStdout(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{"test-device"}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"test-device"}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -1006,7 +1006,7 @@ func TestExecute_DevicesAreSorted(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, []string{}, false, 10*time.Second, "")
+	err = run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{}, Continuous: false, Interval: 10 * time.Second, Output: ""})
 	if err != nil {
 		t.Errorf("Execute failed: %v", err)
 	}

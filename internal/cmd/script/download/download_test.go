@@ -284,7 +284,8 @@ func TestRun_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses global
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "script.js")
 
-	err = run(context.Background(), tf.Factory, "test-device", 1, outputFile)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -327,7 +328,8 @@ func TestRun_DeviceNotFound(t *testing.T) { //nolint:paralleltest // Uses global
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "script.js")
 
-	err = run(context.Background(), tf.Factory, "nonexistent-device", 1, outputFile)
+	opts := &Options{Factory: tf.Factory, Device: "nonexistent-device", ID: 1, File: outputFile}
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
 	}
@@ -374,7 +376,8 @@ func TestRun_EmptyScriptCode(t *testing.T) { //nolint:paralleltest // Uses globa
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "script.js")
 
-	err = run(context.Background(), tf.Factory, "test-device", 1, outputFile)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -426,7 +429,8 @@ func TestRun_CreateDirectory(t *testing.T) { //nolint:paralleltest // Uses globa
 	nestedDir := filepath.Join(tmpDir, "scripts", "nested")
 	outputFile := filepath.Join(nestedDir, "script.js")
 
-	err = run(context.Background(), tf.Factory, "test-device", 1, outputFile)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -603,7 +607,8 @@ func TestRun_CurrentDirectory(t *testing.T) { //nolint:paralleltest // Uses glob
 	// Use just filename (current directory)
 	outputFile := "local-script.js"
 
-	err = run(context.Background(), tf.Factory, "test-device", 1, outputFile)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}

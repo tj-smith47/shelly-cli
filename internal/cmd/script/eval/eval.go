@@ -14,8 +14,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+	Code    string
+}
+
 // NewCommand creates the script eval command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "eval <device> <id> <code>",
 		Aliases: []string{"exec"},
@@ -39,23 +49,25 @@ multiple words that will be joined together.`,
 			if err != nil {
 				return fmt.Errorf("invalid script ID: %s", args[1])
 			}
-			code := strings.Join(args[2:], " ")
-			return run(cmd.Context(), f, args[0], id, code)
+			opts.Device = args[0]
+			opts.ID = id
+			opts.Code = strings.Join(args[2:], " ")
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, code string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Evaluating code...", func(ctx context.Context) error {
-		result, err := svc.EvalScript(ctx, device, id, code)
+		result, err := svc.EvalScript(ctx, opts.Device, opts.ID, opts.Code)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate code: %w", err)
 		}

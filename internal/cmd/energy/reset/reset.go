@@ -10,12 +10,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory      *cmdutil.Factory
+	Device       string
+	ComponentID  int
+	CounterTypes []string
+}
+
 // NewCommand creates the energy reset command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		componentID  int
-		counterTypes []string
-	)
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:   "reset <device> [id]",
@@ -35,30 +40,30 @@ do not have a reset capability.`,
 		Aliases: []string{"clear"},
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
+			opts.Device = args[0]
 			if len(args) == 2 {
-				if _, err := fmt.Sscanf(args[1], "%d", &componentID); err != nil {
+				if _, err := fmt.Sscanf(args[1], "%d", &opts.ComponentID); err != nil {
 					return fmt.Errorf("invalid component ID: %w", err)
 				}
 			}
-			return run(cmd.Context(), f, device, componentID, counterTypes)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringSliceVar(&counterTypes, "types", nil, "Counter types to reset (leave empty for all)")
+	cmd.Flags().StringSliceVar(&opts.CounterTypes, "types", nil, "Counter types to reset (leave empty for all)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, counterTypes []string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Resetting energy counters...", func(ctx context.Context) error {
-		if err := svc.ResetEMCounters(ctx, device, id, counterTypes); err != nil {
+		if err := svc.ResetEMCounters(ctx, opts.Device, opts.ComponentID, opts.CounterTypes); err != nil {
 			return fmt.Errorf("failed to reset EM counters: %w", err)
 		}
-		ios.Success("Energy counters reset for EM #%d", id)
+		ios.Success("Energy counters reset for EM #%d", opts.ComponentID)
 		return nil
 	})
 }

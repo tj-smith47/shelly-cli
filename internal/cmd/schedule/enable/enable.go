@@ -12,8 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	ID      int
+}
+
 // NewCommand creates the schedule enable command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "enable <device> <id>",
 		Aliases: []string{"on", "activate"},
@@ -28,25 +37,27 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid schedule ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], id)
+			opts.Device = args[0]
+			opts.ID = id
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Enabling schedule...", func(ctx context.Context) error {
-		if err := svc.EnableSchedule(ctx, device, id); err != nil {
+		if err := svc.EnableSchedule(ctx, opts.Device, opts.ID); err != nil {
 			return fmt.Errorf("failed to enable schedule: %w", err)
 		}
-		ios.Success("Schedule %d enabled", id)
+		ios.Success("Schedule %d enabled", opts.ID)
 		return nil
 	})
 }

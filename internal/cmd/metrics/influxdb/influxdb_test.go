@@ -310,7 +310,7 @@ func TestRun_NoDevices(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(context.Background(), tf.Factory, []string{}, false, 10*time.Second, "", "shelly", []string{})
+	err := run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{}, Continuous: false, Interval: 10 * time.Second, Output: "", Measurement: "shelly", Tags: []string{}})
 	if err != nil {
 		t.Errorf("run with no devices should not error, got: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestRun_WithDevice(t *testing.T) {
 		},
 	})
 
-	err := run(context.Background(), tf.Factory, []string{"kitchen"}, false, 10*time.Second, "", "shelly", []string{})
+	err := run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"kitchen"}, Continuous: false, Interval: 10 * time.Second, Output: "", Measurement: "shelly", Tags: []string{}})
 	// Error may occur due to mock service, but we're testing the flow
 	if err != nil {
 		t.Logf("run with device returned error (may be expected): %v", err)
@@ -347,7 +347,7 @@ func TestRun_WithCustomMeasurement(t *testing.T) {
 		},
 	})
 
-	err := run(context.Background(), tf.Factory, []string{"living_room"}, false, 10*time.Second, "", "home_metrics", []string{})
+	err := run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"living_room"}, Continuous: false, Interval: 10 * time.Second, Output: "", Measurement: "home_metrics", Tags: []string{}})
 	if err != nil {
 		t.Logf("run with custom measurement returned error (may be expected): %v", err)
 	}
@@ -362,7 +362,7 @@ func TestRun_WithCustomTags(t *testing.T) {
 		},
 	})
 
-	err := run(context.Background(), tf.Factory, []string{"bedroom"}, false, 10*time.Second, "", "shelly", []string{"location=home", "floor=2"})
+	err := run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"bedroom"}, Continuous: false, Interval: 10 * time.Second, Output: "", Measurement: "shelly", Tags: []string{"location=home", "floor=2"}})
 	if err != nil {
 		t.Logf("run with custom tags returned error (may be expected): %v", err)
 	}
@@ -621,7 +621,7 @@ func TestRun_SortDevices(t *testing.T) {
 	})
 
 	// Run with no explicit devices to test sorting
-	err := run(context.Background(), tf.Factory, []string{"zebra", "alpha", "beta"}, false, 10*time.Second, "", "shelly", []string{})
+	err := run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"zebra", "alpha", "beta"}, Continuous: false, Interval: 10 * time.Second, Output: "", Measurement: "shelly", Tags: []string{}})
 	if err != nil {
 		t.Logf("run with explicit devices returned error (may be expected): %v", err)
 	}
@@ -634,7 +634,7 @@ func TestRun_InvalidConfigManager(t *testing.T) {
 
 	// The factory has a valid config, but we test the error path by expecting failures
 	// when the service tries to contact non-existent devices
-	err := run(context.Background(), tf.Factory, []string{"nonexistent-device"}, false, 10*time.Second, "", "shelly", []string{})
+	err := run(context.Background(), &Options{Factory: tf.Factory, Devices: []string{"nonexistent-device"}, Continuous: false, Interval: 10 * time.Second, Output: "", Measurement: "shelly", Tags: []string{}})
 	if err != nil {
 		t.Logf("run with nonexistent device returned error (may be expected): %v", err)
 	}

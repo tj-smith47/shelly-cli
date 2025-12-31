@@ -13,14 +13,22 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
-var (
-	timespecFlag string
-	callsFlag    string
-	enableFlag   bool
-)
+// Options holds command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Device   string
+	Timespec string
+	Calls    string
+	Enable   bool
+}
 
 // NewCommand creates the schedule create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Factory: f,
+		Enable:  true,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "create <device>",
 		Aliases: []string{"new"},
@@ -51,13 +59,14 @@ The calls parameter is a JSON array of RPC calls to execute.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&timespecFlag, "timespec", "", "Cron-like time specification (required)")
-	cmd.Flags().StringVar(&callsFlag, "calls", "", "JSON array of RPC calls to execute (required)")
-	cmd.Flags().BoolVar(&enableFlag, "enable", true, "Enable schedule after creation")
+	cmd.Flags().StringVar(&opts.Timespec, "timespec", "", "Cron-like time specification (required)")
+	cmd.Flags().StringVar(&opts.Calls, "calls", "", "JSON array of RPC calls to execute (required)")
+	cmd.Flags().BoolVar(&opts.Enable, "enable", true, "Enable schedule after creation")
 
 	utils.Must(cmd.MarkFlagRequired("timespec"))
 	utils.Must(cmd.MarkFlagRequired("calls"))
@@ -65,28 +74,28 @@ The calls parameter is a JSON array of RPC calls to execute.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	// Parse calls JSON
-	calls, err := automation.ParseScheduleCalls(callsFlag)
+	calls, err := automation.ParseScheduleCalls(opts.Calls)
 	if err != nil {
 		return err
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Creating schedule...", func(ctx context.Context) error {
-		id, createErr := svc.CreateSchedule(ctx, device, enableFlag, timespecFlag, calls)
+		id, createErr := svc.CreateSchedule(ctx, opts.Device, opts.Enable, opts.Timespec, calls)
 		if createErr != nil {
 			return fmt.Errorf("failed to create schedule: %w", createErr)
 		}
 
 		ios.Success("Created schedule %d", id)
-		ios.Info("Timespec: %s", timespecFlag)
-		if enableFlag {
+		ios.Info("Timespec: %s", opts.Timespec)
+		if opts.Enable {
 			ios.Info("Schedule is enabled")
 		} else {
 			ios.Info("Schedule is disabled")

@@ -830,8 +830,14 @@ func TestRun_DirectCall(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	opts := &Options{
+		Factory: tf.Factory,
+		Devices: []string{"test-dev-1", "test-dev-2"},
+		Period:  "day",
+	}
+
 	// Call run directly
-	err = run(context.Background(), tf.Factory, []string{"test-dev-1", "test-dev-2"}, "day", "", "")
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected for mock)", err)
 	}
@@ -842,8 +848,14 @@ func TestRun_EmptyDevicesList(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
+	opts := &Options{
+		Factory: tf.Factory,
+		Devices: []string{},
+		Period:  "day",
+	}
+
 	// Call run with empty devices list (tests the warning path)
-	err := run(context.Background(), tf.Factory, []string{}, "day", "", "")
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error for empty device list: %v", err)
 	}
@@ -859,8 +871,14 @@ func TestRun_SingleDeviceOnly(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
+	opts := &Options{
+		Factory: tf.Factory,
+		Devices: []string{"single-device"},
+		Period:  "day",
+	}
+
 	// Call run with just one device (tests the warning path)
-	err := run(context.Background(), tf.Factory, []string{"single-device"}, "day", "", "")
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error for single device: %v", err)
 	}

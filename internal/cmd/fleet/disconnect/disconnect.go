@@ -10,8 +10,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the fleet disconnect command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "disconnect",
 		Aliases: []string{"logout", "close"},
@@ -29,18 +36,18 @@ Requires integrator credentials configured via environment variables or config:
   shelly fleet disconnect`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f)
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Get credentials
-	cfg, cfgErr := f.Config()
+	cfg, cfgErr := opts.Factory.Config()
 	if cfgErr != nil {
 		ios.DebugErr("load config", cfgErr)
 	}

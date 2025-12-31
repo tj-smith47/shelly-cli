@@ -12,8 +12,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+}
+
 // NewCommand creates the script list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "list <device>",
 		Aliases: []string{"ls"},
@@ -45,22 +53,23 @@ Columns: ID, Name, Enabled (yes/no), Running (running/stopped)`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.AutomationService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.AutomationService()
 
 	items, err := cmdutil.RunWithSpinnerResult(ctx, ios, "Getting scripts...", func(ctx context.Context) ([]automation.ScriptInfo, error) {
-		return svc.ListScripts(ctx, device)
+		return svc.ListScripts(ctx, opts.Device)
 	})
 	if err != nil {
 		return err

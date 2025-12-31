@@ -12,17 +12,26 @@ import (
 	shellyexport "github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory       *cmdutil.Factory
+	Device        string
+	ComponentID   int
+	ComponentType string
+	Format        string
+	OutputFile    string
+	Period        string
+	From          string
+	To            string
+}
+
 // NewCommand creates the energy export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		componentID   int
-		componentType string
-		format        string
-		outputFile    string
-		period        string
-		from          string
-		to            string
-	)
+	opts := &Options{
+		Factory:       f,
+		ComponentType: shelly.ComponentTypeAuto,
+		Format:        shellyexport.FormatCSV,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "export <device> [id]",
@@ -47,44 +56,45 @@ measurements for the specified time range.`,
 		Aliases: []string{"exp", "dump"},
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
+			opts.Device = args[0]
 			if len(args) == 2 {
-				if _, err := fmt.Sscanf(args[1], "%d", &componentID); err != nil {
+				if _, err := fmt.Sscanf(args[1], "%d", &opts.ComponentID); err != nil {
 					return fmt.Errorf("invalid component ID: %w", err)
 				}
 			}
-			return run(cmd.Context(), f, device, componentID, componentType, format, outputFile, period, from, to)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
-	cmd.Flags().StringVarP(&format, "format", "f", shellyexport.FormatCSV, "Output format (csv, json, yaml)")
-	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file (default: stdout)")
-	cmd.Flags().StringVarP(&period, "period", "p", "", "Time period (hour, day, week, month)")
-	cmd.Flags().StringVar(&from, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
-	cmd.Flags().StringVar(&to, "to", "", "End time (RFC3339 or YYYY-MM-DD)")
+	cmd.Flags().StringVar(&opts.ComponentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
+	cmd.Flags().StringVarP(&opts.Format, "format", "f", shellyexport.FormatCSV, "Output format (csv, json, yaml)")
+	cmd.Flags().StringVarP(&opts.OutputFile, "output", "o", "", "Output file (default: stdout)")
+	cmd.Flags().StringVarP(&opts.Period, "period", "p", "", "Time period (hour, day, week, month)")
+	cmd.Flags().StringVar(&opts.From, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
+	cmd.Flags().StringVar(&opts.To, "to", "", "End time (RFC3339 or YYYY-MM-DD)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, componentType, format, outputFile, period, from, to string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Validate format
-	if format != shellyexport.FormatCSV && format != shellyexport.FormatJSON && format != shellyexport.FormatYAML {
-		return fmt.Errorf("invalid format: %s (use: csv, json, yaml)", format)
+	if opts.Format != shellyexport.FormatCSV && opts.Format != shellyexport.FormatJSON && opts.Format != shellyexport.FormatYAML {
+		return fmt.Errorf("invalid format: %s (use: csv, json, yaml)", opts.Format)
 	}
 
 	// Calculate time range
-	startTS, endTS, err := shelly.CalculateTimeRange(period, from, to)
+	startTS, endTS, err := shelly.CalculateTimeRange(opts.Period, opts.From, opts.To)
 	if err != nil {
 		return fmt.Errorf("invalid time range: %w", err)
 	}
 
 	// Auto-detect type if not specified
+	componentType := opts.ComponentType
 	if componentType == shelly.ComponentTypeAuto {
-		componentType, err = svc.DetectEnergyComponentType(ctx, ios, device, id)
+		componentType, err = svc.DetectEnergyComponentType(ctx, ios, opts.Device, opts.ComponentID)
 		if err != nil {
 			return err
 		}
@@ -93,9 +103,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 	// Export based on type and format
 	switch componentType {
 	case shelly.ComponentTypeEM:
-		return shellyexport.EMData(ctx, ios, svc.GetEMDataHistory, device, id, startTS, endTS, format, outputFile)
+		return shellyexport.EMData(ctx, ios, svc.GetEMDataHistory, opts.Device, opts.ComponentID, startTS, endTS, opts.Format, opts.OutputFile)
 	case shelly.ComponentTypeEM1:
-		return shellyexport.EM1Data(ctx, ios, svc.GetEM1DataHistory, device, id, startTS, endTS, format, outputFile)
+		return shellyexport.EM1Data(ctx, ios, svc.GetEM1DataHistory, opts.Device, opts.ComponentID, startTS, endTS, opts.Format, opts.OutputFile)
 	default:
 		return fmt.Errorf("no energy data components found")
 	}

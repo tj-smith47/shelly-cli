@@ -208,7 +208,13 @@ func TestRun_NoDevicesWarning(t *testing.T) {
 	ctx := context.Background()
 
 	// Call run with no devices specified
-	err := run(ctx, f, 9999, nil, 15*time.Second)
+	opts := &Options{
+		Factory:  f,
+		Port:     9999,
+		Devices:  nil,
+		Interval: 15 * time.Second,
+	}
+	err := run(ctx, opts)
 	if err != nil {
 		t.Errorf("Expected no error when no devices, got: %v", err)
 	}
@@ -245,7 +251,13 @@ func TestRun_WithDevices(t *testing.T) {
 	// Run in a goroutine since it blocks until context is done
 	done := make(chan error, 1)
 	go func() {
-		done <- run(ctx, f, 19999, nil, 1*time.Second) // Use high port to avoid conflicts
+		opts := &Options{
+			Factory:  f,
+			Port:     19999, // Use high port to avoid conflicts
+			Devices:  nil,
+			Interval: 1 * time.Second,
+		}
+		done <- run(ctx, opts)
 	}()
 
 	// Wait for completion
@@ -296,7 +308,13 @@ func TestRun_WithSpecificDevices(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		// Only include kitchen and bedroom
-		done <- run(ctx, f, 29999, []string{"kitchen", "bedroom"}, 1*time.Second)
+		opts := &Options{
+			Factory:  f,
+			Port:     29999,
+			Devices:  []string{"kitchen", "bedroom"},
+			Interval: 1 * time.Second,
+		}
+		done <- run(ctx, opts)
 	}()
 
 	// Wait for completion
@@ -344,7 +362,13 @@ func TestRun_DevicesAreSorted(t *testing.T) {
 	// Run - should sort the devices alphabetically
 	done := make(chan error, 1)
 	go func() {
-		done <- run(ctx, f, 39999, nil, 1*time.Second)
+		opts := &Options{
+			Factory:  f,
+			Port:     39999,
+			Devices:  nil,
+			Interval: 1 * time.Second,
+		}
+		done <- run(ctx, opts)
 	}()
 
 	// Wait for completion

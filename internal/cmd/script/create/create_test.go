@@ -195,13 +195,8 @@ func TestRun_WithMock(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = "test-script"
-	codeFlag = ""
-	fileFlag = ""
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device", Name: "test-script"}
+	err = run(context.Background(), opts)
 	// May fail due to mock limitations
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
@@ -220,28 +215,20 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = "test-script"
-	codeFlag = ""
-	fileFlag = ""
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "nonexistent-device")
+	opts := &Options{Factory: tf.Factory, Device: "nonexistent-device", Name: "test-script"}
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
 	}
 }
 
 func TestRun_FileNotFound(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
-	// Reset global flags
-	nameFlag = "test-script"
-	codeFlag = ""
-	fileFlag = "/nonexistent/path/to/script.js"
-	enableFlag = false
-
-	err := run(context.Background(), tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device", Name: "test-script", File: "/nonexistent/path/to/script.js"}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
 	}

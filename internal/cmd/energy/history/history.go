@@ -12,16 +12,24 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory       *cmdutil.Factory
+	Device        string
+	ComponentID   int
+	ComponentType string
+	Period        string
+	From          string
+	To            string
+	Limit         int
+}
+
 // NewCommand creates the energy history command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		componentID   int
-		componentType string
-		period        string
-		from          string
-		to            string
-		limit         int
-	)
+	opts := &Options{
+		Factory:       f,
+		ComponentType: shelly.ComponentTypeAuto,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "history <device> [id]",
@@ -51,38 +59,39 @@ measurements. Not all Shelly devices support historical data storage.`,
 		Aliases: []string{"hist", "events"},
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
+			opts.Device = args[0]
 			if len(args) == 2 {
-				if _, err := fmt.Sscanf(args[1], "%d", &componentID); err != nil {
+				if _, err := fmt.Sscanf(args[1], "%d", &opts.ComponentID); err != nil {
 					return fmt.Errorf("invalid component ID: %w", err)
 				}
 			}
-			return run(cmd.Context(), f, device, componentID, componentType, period, from, to, limit)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
-	cmd.Flags().StringVarP(&period, "period", "p", "", "Time period (hour, day, week, month)")
-	cmd.Flags().StringVar(&from, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
-	cmd.Flags().StringVar(&to, "to", "", "End time (RFC3339 or YYYY-MM-DD)")
-	cmd.Flags().IntVar(&limit, "limit", 0, "Limit number of data points (0 = no limit)")
+	cmd.Flags().StringVar(&opts.ComponentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
+	cmd.Flags().StringVarP(&opts.Period, "period", "p", "", "Time period (hour, day, week, month)")
+	cmd.Flags().StringVar(&opts.From, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
+	cmd.Flags().StringVar(&opts.To, "to", "", "End time (RFC3339 or YYYY-MM-DD)")
+	cmd.Flags().IntVar(&opts.Limit, "limit", 0, "Limit number of data points (0 = no limit)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, componentType, period, from, to string, limit int) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Calculate time range
-	startTS, endTS, err := shelly.CalculateTimeRange(period, from, to)
+	startTS, endTS, err := shelly.CalculateTimeRange(opts.Period, opts.From, opts.To)
 	if err != nil {
 		return fmt.Errorf("invalid time range: %w", err)
 	}
 
 	// Auto-detect type if not specified
+	componentType := opts.ComponentType
 	if componentType == shelly.ComponentTypeAuto {
-		componentType, err = svc.DetectEnergyComponentType(ctx, ios, device, id)
+		componentType, err = svc.DetectEnergyComponentType(ctx, ios, opts.Device, opts.ComponentID)
 		if err != nil {
 			return err
 		}
@@ -90,18 +99,18 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 
 	switch componentType {
 	case shelly.ComponentTypeEM:
-		data, err := svc.GetEMDataHistory(ctx, device, id, startTS, endTS)
+		data, err := svc.GetEMDataHistory(ctx, opts.Device, opts.ComponentID, startTS, endTS)
 		if err != nil {
 			return fmt.Errorf("failed to get EMData history: %w", err)
 		}
-		term.DisplayEMDataHistory(ios, data, id, startTS, endTS, limit)
+		term.DisplayEMDataHistory(ios, data, opts.ComponentID, startTS, endTS, opts.Limit)
 		return nil
 	case shelly.ComponentTypeEM1:
-		data, err := svc.GetEM1DataHistory(ctx, device, id, startTS, endTS)
+		data, err := svc.GetEM1DataHistory(ctx, opts.Device, opts.ComponentID, startTS, endTS)
 		if err != nil {
 			return fmt.Errorf("failed to get EM1Data history: %w", err)
 		}
-		term.DisplayEM1DataHistory(ios, data, id, startTS, endTS, limit)
+		term.DisplayEM1DataHistory(ios, data, opts.ComponentID, startTS, endTS, opts.Limit)
 		return nil
 	default:
 		return fmt.Errorf("no energy data components found (device may not support historical data storage)")

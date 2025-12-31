@@ -15,14 +15,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory    *cmdutil.Factory
+	Devices    []string
+	Continuous bool
+	Interval   time.Duration
+	Output     string
+}
+
 // NewCommand creates the JSON metrics command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		devices    []string
-		continuous bool
-		interval   time.Duration
-		output     string
-	)
+	opts := &Options{
+		Factory:  f,
+		Interval: 10 * time.Second,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "json",
@@ -47,27 +54,28 @@ for a single snapshot.`,
   # Save to file
   shelly metrics json --output metrics.json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, devices, continuous, interval, output)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringSliceVar(&devices, "devices", nil, "Devices to include (default: all registered)")
-	cmd.Flags().BoolVarP(&continuous, "continuous", "c", false, "Stream metrics continuously")
-	cmd.Flags().DurationVarP(&interval, "interval", "i", 10*time.Second, "Collection interval for continuous mode")
-	cmd.Flags().StringVarP(&output, "output", "o", "", "Output file (default: stdout)")
+	cmd.Flags().StringSliceVar(&opts.Devices, "devices", nil, "Devices to include (default: all registered)")
+	cmd.Flags().BoolVarP(&opts.Continuous, "continuous", "c", false, "Stream metrics continuously")
+	cmd.Flags().DurationVarP(&opts.Interval, "interval", "i", opts.Interval, "Collection interval for continuous mode")
+	cmd.Flags().StringVarP(&opts.Output, "output", "o", "", "Output file (default: stdout)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous bool, interval time.Duration, outputFile string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-	cfg, err := f.Config()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Get device list
+	devices := opts.Devices
 	if len(devices) == 0 {
 		for name := range cfg.Devices {
 			devices = append(devices, name)
@@ -83,8 +91,8 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 
 	// Determine output writer
 	out := ios.Out
-	if outputFile != "" {
-		cleanPath := filepath.Clean(outputFile)
+	if opts.Output != "" {
+		cleanPath := filepath.Clean(opts.Output)
 		file, err := os.Create(cleanPath)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
@@ -100,9 +108,9 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 	encoder := json.NewEncoder(out)
 	encoder.SetIndent("", "  ")
 
-	if continuous {
+	if opts.Continuous {
 		// Stream mode
-		ticker := time.NewTicker(interval)
+		ticker := time.NewTicker(opts.Interval)
 		defer ticker.Stop()
 
 		for {

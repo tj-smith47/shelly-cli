@@ -726,7 +726,15 @@ func TestRun_EMDataHistory(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "em-device", 0, "em", "day", "", "", 0)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "em-device",
+		ComponentID:   0,
+		ComponentType: "em",
+		Period:        "day",
+	}
+
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected with mock)", err)
 	}
@@ -766,7 +774,15 @@ func TestRun_EM1DataHistory(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "em1-device", 0, "em1", "day", "", "", 0)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "em1-device",
+		ComponentID:   0,
+		ComponentType: "em1",
+		Period:        "day",
+	}
+
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected with mock)", err)
 	}
@@ -776,8 +792,16 @@ func TestRun_EM1DataHistory(t *testing.T) {
 func TestRun_InvalidTimeRange(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "any-device",
+		ComponentID:   0,
+		ComponentType: "em",
+		Period:        "invalid",
+	}
+
 	// Test with invalid period
-	err := run(context.Background(), tf.Factory, "any-device", 0, "em", "invalid", "", "", 0)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for invalid time range")
 	}
@@ -816,7 +840,15 @@ func TestRun_UnknownComponentType(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "test-device", 0, "unknown", "day", "", "", 0)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: "unknown",
+		Period:        "day",
+	}
+
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for unknown component type")
 	}
@@ -857,7 +889,16 @@ func TestRun_WithFromToTimes(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "test-device", 0, "em", "", "2025-01-01", "2025-01-07", 0)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: "em",
+		From:          "2025-01-01",
+		To:            "2025-01-07",
+	}
+
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected with mock)", err)
 	}
@@ -895,8 +936,16 @@ func TestRun_AutoDetectFails(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "no-energy-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeAuto,
+		Period:        "day",
+	}
+
 	// Use "auto" type to trigger auto-detection
-	err = run(context.Background(), tf.Factory, "no-energy-device", 0, shelly.ComponentTypeAuto, "day", "", "", 0)
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error when auto-detection fails")
 	}

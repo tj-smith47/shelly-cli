@@ -223,13 +223,6 @@ func TestExecute_WithMock(t *testing.T) { //nolint:paralleltest // Uses global m
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = "new-name"
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -273,13 +266,6 @@ func TestExecute_WithCodeFlag(t *testing.T) { //nolint:paralleltest // Uses glob
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = "print('hello');"
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -321,13 +307,6 @@ func TestExecute_WithAppendFlag(t *testing.T) { //nolint:paralleltest // Uses gl
 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
-
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = "// appended code"
-	fileFlag = ""
-	appendFlag = true
-	enableFlag = false
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -371,13 +350,6 @@ func TestExecute_WithEnableFlag(t *testing.T) { //nolint:paralleltest // Uses gl
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = true
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -403,13 +375,6 @@ func TestExecute_DeviceNotFound(t *testing.T) { //nolint:paralleltest // Uses gl
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = "test"
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -427,13 +392,6 @@ func TestExecute_FileNotFound(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
-
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = "/nonexistent/path/to/script.js"
-	appendFlag = false
-	enableFlag = false
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -488,13 +446,6 @@ func TestExecute_WithFileFlag(t *testing.T) { //nolint:paralleltest // Uses glob
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = scriptPath
-	appendFlag = false
-	enableFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -536,13 +487,6 @@ func TestExecute_NoChangesSpecified(t *testing.T) { //nolint:paralleltest // Use
 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
-
-	// Reset global flags - no changes specified
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -587,14 +531,8 @@ func TestRun_WithMock(t *testing.T) { //nolint:paralleltest // Uses global mock 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = "updated-script"
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, Name: "updated-script"}
+	err = run(context.Background(), opts)
 	// May fail due to mock limitations
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
@@ -613,30 +551,20 @@ func TestRun_DeviceNotFound(t *testing.T) { //nolint:paralleltest // Uses global
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = "test-script"
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "nonexistent-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "nonexistent-device", ID: 1, Name: "test-script"}
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
 	}
 }
 
-func TestRun_FileNotFound(t *testing.T) { //nolint:paralleltest // Uses global flags
+func TestRun_FileNotFound(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = "/nonexistent/path/to/script.js"
-	appendFlag = false
-	enableFlag = false
-
-	err := run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: "/nonexistent/path/to/script.js"}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent file")
 	}
@@ -674,14 +602,8 @@ func TestRun_WithCodeFlag(t *testing.T) { //nolint:paralleltest // Uses global m
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = "print('hello world');"
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, Code: "print('hello world');"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
 	}
@@ -716,14 +638,8 @@ func TestRun_WithAppendFlag(t *testing.T) { //nolint:paralleltest // Uses global
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = "// additional code"
-	fileFlag = ""
-	appendFlag = true
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, Code: "// additional code", Append: true}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
 	}
@@ -758,14 +674,8 @@ func TestRun_WithEnableFlag(t *testing.T) { //nolint:paralleltest // Uses global
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = true
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, Enable: true}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
 	}
@@ -800,14 +710,8 @@ func TestRun_CombinedFlags(t *testing.T) { //nolint:paralleltest // Uses global 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags - combine multiple updates
-	nameFlag = "new-name"
-	codeFlag = "print('new code');"
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = true
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, Name: "new-name", Code: "print('new code');", Enable: true}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
 	}
@@ -842,14 +746,8 @@ func TestRun_NoChanges(t *testing.T) { //nolint:paralleltest // Uses global mock
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags - no changes
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = ""
-	appendFlag = false
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1}
+	err = run(context.Background(), opts)
 	// Should succeed but issue a warning
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
@@ -893,14 +791,8 @@ func TestRun_WithFileFlag(t *testing.T) { //nolint:paralleltest // Uses global m
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = scriptPath
-	appendFlag = false
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: scriptPath}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
 	}
@@ -943,14 +835,8 @@ func TestRun_WithFileAndAppend(t *testing.T) { //nolint:paralleltest // Uses glo
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset global flags
-	nameFlag = ""
-	codeFlag = ""
-	fileFlag = scriptPath
-	appendFlag = true
-	enableFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", 1)
+	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: scriptPath, Append: true}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
 	}

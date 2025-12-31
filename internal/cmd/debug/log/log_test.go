@@ -231,7 +231,7 @@ func TestRun_DeviceNotFound(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(context.Background(), tf.Factory, "nonexistent-device")
+	err := run(context.Background(), &Options{Factory: tf.Factory, Device: "nonexistent-device"})
 
 	// Should fail because device doesn't exist
 	if err == nil {
@@ -245,7 +245,7 @@ func TestRun_WithTestFactory(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	// This will fail on device connection, but exercises the early run() code
-	err := run(context.Background(), tf.Factory, "test-device")
+	err := run(context.Background(), &Options{Factory: tf.Factory, Device: "test-device"})
 
 	// Expect error due to no device
 	if err == nil {
@@ -261,7 +261,7 @@ func TestRun_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	err := run(ctx, tf.Factory, "test-device")
+	err := run(ctx, &Options{Factory: tf.Factory, Device: "test-device"})
 
 	// Should return some error (context cancelled or connection error)
 	if err == nil {
@@ -343,7 +343,7 @@ func TestRun_EmptyDeviceName(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(context.Background(), tf.Factory, "")
+	err := run(context.Background(), &Options{Factory: tf.Factory, Device: ""})
 
 	// Should get an error for empty device name
 	if err == nil {

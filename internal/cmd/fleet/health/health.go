@@ -17,12 +17,14 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory   *cmdutil.Factory
 	Threshold time.Duration
 }
 
 // NewCommand creates the fleet health command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
+		Factory:   f,
 		Threshold: 10 * time.Minute,
 	}
 
@@ -46,7 +48,7 @@ Requires an active fleet connection. Run 'shelly fleet connect' first.`,
   shelly fleet health -o json`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -55,14 +57,14 @@ Requires an active fleet connection. Run 'shelly fleet connect' first.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Get credentials
 	integratorTag := os.Getenv("SHELLY_INTEGRATOR_TAG")
 	integratorToken := os.Getenv("SHELLY_INTEGRATOR_TOKEN")
 
-	cfg, cfgErr := f.Config()
+	cfg, cfgErr := opts.Factory.Config()
 	if cfgErr != nil {
 		ios.DebugErr("load config", cfgErr)
 	}

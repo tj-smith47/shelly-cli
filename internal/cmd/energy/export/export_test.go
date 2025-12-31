@@ -836,8 +836,15 @@ func TestRun_InvalidFormat(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        "xml",
+	}
 
-	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, "xml", "", "", "", "")
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for invalid format")
 	}
@@ -850,8 +857,16 @@ func TestRun_InvalidPeriod(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        shellyexport.FormatCSV,
+		Period:        "invalid-period",
+	}
 
-	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "invalid-period", "", "")
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for invalid period")
 	}
@@ -864,8 +879,16 @@ func TestRun_InvalidFromTime(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        shellyexport.FormatCSV,
+		From:          "not-a-date",
+	}
 
-	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "not-a-date", "")
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for invalid from time")
 	}
@@ -878,8 +901,16 @@ func TestRun_InvalidToTime(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        shellyexport.FormatCSV,
+		To:            "not-a-date",
+	}
 
-	err := run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "", "not-a-date")
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for invalid to time")
 	}
@@ -917,7 +948,15 @@ func TestRun_UnknownComponentType(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "test-device", 0, "unknown-type", shellyexport.FormatCSV, "", "", "", "")
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: "unknown-type",
+		Format:        shellyexport.FormatCSV,
+	}
+
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for unknown component type")
 	}
@@ -955,8 +994,16 @@ func TestRun_WithExplicitTypeEM(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        shellyexport.FormatCSV,
+	}
+
 	// Explicit type should skip auto-detection
-	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "", "")
+	err = run(context.Background(), opts)
 	// Expected to fail since mock server doesn't support EMData.GetData
 	if err != nil {
 		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
@@ -992,8 +1039,16 @@ func TestRun_WithExplicitTypeEM1(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM1,
+		Format:        shellyexport.FormatCSV,
+	}
+
 	// Explicit type should skip auto-detection
-	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM1, shellyexport.FormatCSV, "", "", "", "")
+	err = run(context.Background(), opts)
 	// Expected to fail since mock server doesn't support EM1Data.GetData
 	if err != nil {
 		t.Logf("run() error = %v (expected - mock doesn't support EM1Data)", err)
@@ -1029,8 +1084,17 @@ func TestRun_WithOutputFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        shellyexport.FormatCSV,
+		OutputFile:    "/tmp/test-export.csv",
+	}
+
 	// Try exporting to an output file (will fail early due to no data)
-	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "/tmp/test-export.csv", "", "", "")
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
 	}
@@ -1065,8 +1129,18 @@ func TestRun_WithValidTimeRange(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        shellyexport.FormatCSV,
+		From:          "2025-01-01",
+		To:            "2025-01-07",
+	}
+
 	// Valid time range should pass validation
-	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatCSV, "", "", "2025-01-01", "2025-01-07")
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
 	}
@@ -1101,8 +1175,16 @@ func TestRun_WithAutoDetection(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeAuto,
+		Format:        shellyexport.FormatCSV,
+	}
+
 	// Auto detection mode
-	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeAuto, shellyexport.FormatCSV, "", "", "", "")
+	err = run(context.Background(), opts)
 	// Expected to fail since mock server doesn't support energy data detection
 	if err != nil {
 		t.Logf("run() error = %v (expected - mock doesn't support energy data)", err)
@@ -1138,7 +1220,15 @@ func TestRun_JSONFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM, shellyexport.FormatJSON, "", "", "", "")
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM,
+		Format:        shellyexport.FormatJSON,
+	}
+
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected - mock doesn't support EMData)", err)
 	}
@@ -1173,7 +1263,15 @@ func TestRun_YAMLFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "test-device", 0, shelly.ComponentTypeEM1, shellyexport.FormatYAML, "", "", "", "")
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeEM1,
+		Format:        shellyexport.FormatYAML,
+	}
+
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (expected - mock doesn't support EM1Data)", err)
 	}

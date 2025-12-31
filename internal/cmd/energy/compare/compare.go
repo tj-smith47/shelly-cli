@@ -13,14 +13,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Devices []string
+	Period  string
+	From    string
+	To      string
+}
+
 // NewCommand creates the energy compare command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		devices []string
-		period  string
-		from    string
-		to      string
-	)
+	opts := &Options{
+		Factory: f,
+		Period:  "day",
+	}
 
 	cmd := &cobra.Command{
 		Use:   "compare",
@@ -44,26 +51,27 @@ By default, compares all registered devices. Use --devices to specify a subset.`
   shelly energy compare -o json`,
 		Aliases: []string{"cmp", "diff"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, devices, period, from, to)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringSliceVar(&devices, "devices", nil, "Devices to compare (default: all registered)")
-	cmd.Flags().StringVarP(&period, "period", "p", "day", "Time period (hour, day, week, month)")
-	cmd.Flags().StringVar(&from, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
-	cmd.Flags().StringVar(&to, "to", "", "End time (RFC3339 or YYYY-MM-DD)")
+	cmd.Flags().StringSliceVar(&opts.Devices, "devices", nil, "Devices to compare (default: all registered)")
+	cmd.Flags().StringVarP(&opts.Period, "period", "p", "day", "Time period (hour, day, week, month)")
+	cmd.Flags().StringVar(&opts.From, "from", "", "Start time (RFC3339 or YYYY-MM-DD)")
+	cmd.Flags().StringVar(&opts.To, "to", "", "End time (RFC3339 or YYYY-MM-DD)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, devices []string, period, from, to string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-	cfg, err := f.Config()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	devices := opts.Devices
 	if len(devices) == 0 {
 		for name := range cfg.Devices {
 			devices = append(devices, name)
@@ -82,13 +90,13 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, period, from
 
 	sort.Strings(devices)
 
-	startTS, endTS, err := shelly.CalculateTimeRange(period, from, to)
+	startTS, endTS, err := shelly.CalculateTimeRange(opts.Period, opts.From, opts.To)
 	if err != nil {
 		return fmt.Errorf("invalid time range: %w", err)
 	}
 
 	// Collect comparison data using service layer
-	comparison := svc.CollectComparisonData(ctx, ios, devices, period, startTS, endTS)
+	comparison := svc.CollectComparisonData(ctx, ios, devices, opts.Period, startTS, endTS)
 
 	// Calculate percentages
 	if comparison.TotalEnergy > 0 {

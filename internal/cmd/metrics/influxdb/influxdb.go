@@ -19,6 +19,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
+// Options holds command options.
+type Options struct {
+	Factory     *cmdutil.Factory
+	Devices     []string
+	Continuous  bool
+	Interval    time.Duration
+	Output      string
+	Measurement string
+	Tags        []string
+}
+
 // LineProtocolWriter writes metrics in InfluxDB line protocol format.
 type LineProtocolWriter struct {
 	out         io.Writer
@@ -60,14 +71,11 @@ func setupOutput(ios *iostreams.IOStreams, outputFile string) (io.Writer, func()
 
 // NewCommand creates the InfluxDB metrics command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		devices     []string
-		continuous  bool
-		interval    time.Duration
-		output      string
-		measurement string
-		tags        []string
-	)
+	opts := &Options{
+		Factory:     f,
+		Interval:    10 * time.Second,
+		Measurement: "shelly",
+	}
 
 	cmd := &cobra.Command{
 		Use:   "influxdb",
@@ -97,29 +105,30 @@ Use --continuous to stream metrics at regular intervals.`,
   shelly metrics influxdb | influx write -b mybucket`,
 		Aliases: []string{"influx", "line"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, devices, continuous, interval, output, measurement, tags)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringSliceVar(&devices, "devices", nil, "Devices to include (default: all registered)")
-	cmd.Flags().BoolVarP(&continuous, "continuous", "c", false, "Stream metrics continuously")
-	cmd.Flags().DurationVarP(&interval, "interval", "i", 10*time.Second, "Collection interval for continuous mode")
-	cmd.Flags().StringVarP(&output, "output", "o", "", "Output file (default: stdout)")
-	cmd.Flags().StringVarP(&measurement, "measurement", "m", "shelly", "Measurement name")
-	cmd.Flags().StringSliceVarP(&tags, "tags", "t", nil, "Additional tags (key=value)")
+	cmd.Flags().StringSliceVar(&opts.Devices, "devices", nil, "Devices to include (default: all registered)")
+	cmd.Flags().BoolVarP(&opts.Continuous, "continuous", "c", false, "Stream metrics continuously")
+	cmd.Flags().DurationVarP(&opts.Interval, "interval", "i", opts.Interval, "Collection interval for continuous mode")
+	cmd.Flags().StringVarP(&opts.Output, "output", "o", "", "Output file (default: stdout)")
+	cmd.Flags().StringVarP(&opts.Measurement, "measurement", "m", opts.Measurement, "Measurement name")
+	cmd.Flags().StringSliceVarP(&opts.Tags, "tags", "t", nil, "Additional tags (key=value)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous bool, interval time.Duration, outputFile, measurement string, tagPairs []string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-	cfg, err := f.Config()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Get device list
+	devices := opts.Devices
 	if len(devices) == 0 {
 		for name := range cfg.Devices {
 			devices = append(devices, name)
@@ -132,9 +141,9 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 	}
 
 	sort.Strings(devices)
-	tags := parseTags(tagPairs)
+	tags := parseTags(opts.Tags)
 
-	out, cleanup, err := setupOutput(ios, outputFile)
+	out, cleanup, err := setupOutput(ios, opts.Output)
 	if err != nil {
 		return err
 	}
@@ -142,7 +151,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 
 	writer := &LineProtocolWriter{
 		out:         out,
-		measurement: measurement,
+		measurement: opts.Measurement,
 		tags:        tags,
 		ios:         ios,
 	}
@@ -157,12 +166,12 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, continuous b
 		}
 	}
 
-	if continuous {
-		return runContinuous(ctx, svc, devices, measurement, tags, interval, writePoints)
+	if opts.Continuous {
+		return runContinuous(ctx, svc, devices, opts.Measurement, tags, opts.Interval, writePoints)
 	}
 
 	// Single shot
-	points := svc.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
+	points := svc.CollectInfluxDBPointsMulti(ctx, devices, opts.Measurement, tags)
 	writePoints(points)
 	return nil
 }
