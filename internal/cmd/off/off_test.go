@@ -143,25 +143,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
-	t.Parallel()
-
-	f := cmdutil.NewFactory()
-	opts := &Options{
-		Device:  "test-device",
-		Factory: f,
-	}
-
-	if opts.Device != "test-device" {
-		t.Errorf("Device = %q, want %q", opts.Device, "test-device")
-	}
-
-	if opts.Factory == nil {
-		t.Error("Factory is nil")
-	}
-}
-
 func TestRun_Gen2Switch(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

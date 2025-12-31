@@ -24,6 +24,7 @@ type EventStream struct {
 	mu          sync.RWMutex
 	ctx         context.Context
 	cancel      context.CancelFunc
+	pollerWg    sync.WaitGroup
 }
 
 type deviceConnection struct {
@@ -93,7 +94,7 @@ func (es *EventStream) connectDevice(name, address string) {
 	// Gen1 devices don't support WebSocket - use polling fallback
 	if resolvedDevice.Generation == 1 {
 		iostreams.DebugCat(iostreams.CategoryNetwork, "Device %s is Gen1, using polling", name)
-		go es.pollGen1Device(ctx, name, address)
+		es.pollerWg.Go(func() { es.pollGen1Device(ctx, name, address) })
 
 		es.mu.Lock()
 		es.connections[name] = &deviceConnection{
@@ -193,6 +194,7 @@ func (es *EventStream) fetchGen1Status(ctx context.Context, name, address string
 // Stop closes all WebSocket connections and stops event streaming.
 func (es *EventStream) Stop() {
 	es.cancel()
+	es.pollerWg.Wait()
 
 	es.mu.Lock()
 	defer es.mu.Unlock()

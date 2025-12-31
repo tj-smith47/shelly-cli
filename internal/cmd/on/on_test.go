@@ -143,25 +143,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-func TestOptions(t *testing.T) {
-	t.Parallel()
-
-	f := cmdutil.NewFactory()
-	opts := &Options{
-		Device:  "test-device",
-		Factory: f,
-	}
-
-	if opts.Device != "test-device" {
-		t.Errorf("Device = %q, want %q", opts.Device, "test-device")
-	}
-
-	if opts.Factory == nil {
-		t.Error("Factory is nil")
-	}
-}
-
 func TestRun_Gen2Switch(t *testing.T) {
+	t.Parallel()
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -217,8 +200,8 @@ func TestRun_Gen2Switch(t *testing.T) {
 	}
 }
 
-
 func TestRun_WithComponentID(t *testing.T) {
+	t.Parallel()
 	// Create fixtures with a multi-switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -268,6 +251,7 @@ func TestRun_WithComponentID(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{},
@@ -294,6 +278,7 @@ func TestRun_DeviceNotFound(t *testing.T) {
 }
 
 func TestRun_LightDevice(t *testing.T) {
+	t.Parallel()
 	// Create fixtures with a light/dimmer device
 	fixtures := &mock.Fixtures{
 		Version: "1",
