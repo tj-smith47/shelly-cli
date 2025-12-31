@@ -1,11 +1,14 @@
 package mock
 
 import (
+	"context"
 	"os"
 	"sync"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // Demo coordinates all mock components for demo mode.
@@ -76,11 +79,34 @@ func StartWithFixtures(fixtures *Fixtures) (*Demo, error) {
 	return d, nil
 }
 
+// mockResolver resolves devices using the mock's config manager directly.
+// This avoids reliance on global state for test isolation.
+type mockResolver struct {
+	mgr *config.Manager
+}
+
+func (r *mockResolver) Resolve(identifier string) (model.Device, error) {
+	return r.mgr.ResolveDevice(identifier)
+}
+
+func (r *mockResolver) ResolveWithGeneration(_ context.Context, identifier string) (model.Device, error) {
+	return r.mgr.ResolveDevice(identifier)
+}
+
 // InjectIntoFactory configures a cmdutil.Factory to use mock components.
-// It also sets the global default config manager for the shelly service resolver.
+// It injects both the config manager AND a shelly service with a resolver
+// bound to the mock's config manager. This ensures test isolation when
+// tests run in parallel across packages.
 func (d *Demo) InjectIntoFactory(f *cmdutil.Factory) {
 	f.SetConfigManager(d.ConfigMgr)
 	config.SetDefaultManager(d.ConfigMgr)
+
+	// Create a shelly service with a resolver bound to this mock's config manager.
+	// This is critical for test isolation - without it, parallel tests would
+	// stomp on each other's global config manager.
+	resolver := &mockResolver{mgr: d.ConfigMgr}
+	svc := shelly.New(resolver)
+	f.SetShellyService(svc)
 }
 
 // Cleanup shuts down all mock servers and resources.

@@ -192,6 +192,7 @@ func TestRun_Gen2Switch(t *testing.T) {
 }
 
 func TestRun_WithComponentID(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -235,6 +236,7 @@ func TestRun_WithComponentID(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)

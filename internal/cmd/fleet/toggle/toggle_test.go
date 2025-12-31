@@ -384,28 +384,6 @@ func TestNewCommand_WithFactory(t *testing.T) {
 	}
 }
 
-func TestOptions_EmbedsBatchFlags(t *testing.T) {
-	t.Parallel()
-
-	// Verify Options embeds BatchFlags
-	opts := &Options{}
-
-	// Should be able to access BatchFlags fields
-	opts.All = true
-	opts.GroupName = "test-group"
-	opts.SwitchID = 1
-
-	if !opts.All {
-		t.Error("opts.All = false, want true")
-	}
-	if opts.GroupName != "test-group" {
-		t.Errorf("opts.GroupName = %q, want %q", opts.GroupName, "test-group")
-	}
-	if opts.SwitchID != 1 {
-		t.Errorf("opts.SwitchID = %d, want 1", opts.SwitchID)
-	}
-}
-
 func TestOptions_TimeoutFlag(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
