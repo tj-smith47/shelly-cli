@@ -8,27 +8,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
+	"github.com/tj-smith47/shelly-cli/internal/cmdutil/factories"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
-// Options holds command options.
-type Options struct {
-	flags.ConfirmFlags
-	File    string
-	Name    string
-	Factory *cmdutil.Factory
-}
-
 // NewCommand creates the template import command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{Factory: f}
-
-	cmd := &cobra.Command{
-		Use:     "import <file> [name]",
-		Aliases: []string{"load"},
-		Short:   "Import a template from a file",
+	return factories.NewConfigImportCommand(f, factories.ConfigImportOpts{
+		Component: "template",
+		Aliases:   []string{"load"},
+		Short:     "Import a template from a file",
 		Long: `Import a configuration template from a JSON or YAML file.
 
 If no name is specified, the template name from the file is used.
@@ -41,57 +31,46 @@ Use --force to overwrite an existing template with the same name.`,
 
   # Overwrite existing template
   shelly template import template.yaml --force`,
-		Args:              cobra.RangeArgs(1, 2),
-		ValidArgsFunction: completion.FileThenNoComplete(),
-		RunE: func(_ *cobra.Command, args []string) error {
-			opts.File = args[0]
-			if len(args) > 1 {
-				opts.Name = args[1]
-			}
-			return run(opts)
-		},
-	}
-
-	cmd.Flags().BoolVarP(&opts.Yes, "force", "f", false, "Overwrite existing template")
-
-	return cmd
+		SupportsNameArg: true,
+		NameFlagEnabled: false,
+		ForceFlagName:   "force",
+		ValidArgsFunc:   completion.FileThenNoComplete(),
+		Importer:        importTemplate,
+	})
 }
 
-func run(opts *Options) error {
-	ios := opts.Factory.IOStreams()
-
-	// Read file
-	data, err := os.ReadFile(opts.File)
+func importTemplate(file, nameOverride string, overwrite bool) (string, error) {
+	// #nosec G304 -- file path comes from user CLI argument
+	data, err := os.ReadFile(file)
 	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
+		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
 	// Parse template
-	tpl, err := config.ParseDeviceTemplateFile(opts.File, data)
+	tpl, err := config.ParseDeviceTemplateFile(file, data)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Override name if specified
-	if opts.Name != "" {
-		tpl.Name = opts.Name
+	if nameOverride != "" {
+		tpl.Name = nameOverride
 	}
 
 	// Validate name
 	if err := config.ValidateTemplateName(tpl.Name); err != nil {
-		return err
+		return "", err
 	}
 
 	// Check if exists
-	if _, exists := config.GetDeviceTemplate(tpl.Name); exists && !opts.Yes {
-		return fmt.Errorf("template %q already exists (use --force to overwrite)", tpl.Name)
+	if _, exists := config.GetDeviceTemplate(tpl.Name); exists && !overwrite {
+		return "", fmt.Errorf("template %q already exists (use --force to overwrite)", tpl.Name)
 	}
 
 	// Save template
 	if err := config.SaveDeviceTemplate(tpl); err != nil {
-		return fmt.Errorf("failed to save template: %w", err)
+		return "", fmt.Errorf("failed to save template: %w", err)
 	}
 
-	ios.Success("Template %q imported from %s", tpl.Name, opts.File)
-	return nil
+	return fmt.Sprintf("Template %q imported from %s", tpl.Name, file), nil
 }

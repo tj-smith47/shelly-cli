@@ -31,8 +31,8 @@ func TestNewCommand_Structure(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "export <template> [file]" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "export <template> [file]")
+	if cmd.Use != "export <name> [file]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "export <name> [file]")
 	}
 
 	wantAliases := []string{"save", "dump"}
@@ -107,57 +107,5 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 		if !strings.Contains(cmd.Example, pattern) {
 			t.Errorf("expected Example to contain %q", pattern)
 		}
-	}
-}
-
-func TestOptions(t *testing.T) {
-	t.Parallel()
-
-	f := cmdutil.NewFactory()
-	opts := &Options{
-		Template: "my-template",
-		File:     "output.yaml",
-		Factory:  f,
-	}
-
-	if opts.Template != "my-template" {
-		t.Errorf("Template = %q, want %q", opts.Template, "my-template")
-	}
-
-	if opts.File != "output.yaml" {
-		t.Errorf("File = %q, want %q", opts.File, "output.yaml")
-	}
-}
-
-func TestRun_TemplateNotFound(t *testing.T) {
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory:  tf.Factory,
-		Template: "nonexistent-template-12345",
-	}
-
-	err := run(opts)
-	if err == nil {
-		t.Error("Expected error for nonexistent template")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("Error should mention 'not found': %v", err)
-	}
-}
-
-func TestRun_UnsupportedFormat(t *testing.T) {
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory:  tf.Factory,
-		Template: "nonexistent",
-	}
-	opts.Format = "xml"
-
-	err := run(opts)
-	// Will fail at template lookup first, but format check comes after
-	if err == nil {
-		t.Logf("Expected error")
 	}
 }
