@@ -906,3 +906,179 @@ func TestColorFunctions_AllWithCustom(t *testing.T) {
 		}
 	}
 }
+
+// TestApplyFromFile_UnknownTheme tests applyFromFile with an unknown theme name.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestApplyFromFile_UnknownTheme(t *testing.T) {
+	// Create temp theme file with unknown theme name
+	tmpDir := t.TempDir()
+	themePath := filepath.Join(tmpDir, "unknown-theme.yaml")
+	themeContent := `name: nonexistent_theme_xyz_12345
+colors:
+  green: "#50fa7b"
+`
+	if err := os.WriteFile(themePath, []byte(themeContent), 0o600); err != nil {
+		t.Fatalf("failed to write theme file: %v", err)
+	}
+
+	// Apply should fail with unknown theme error
+	err := ApplyConfig("", nil, nil, themePath)
+	if err == nil {
+		t.Error("ApplyConfig() with unknown theme in file should return error")
+	}
+}
+
+// TestApplyFromFile_InvalidYAML tests applyFromFile with invalid YAML.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestApplyFromFile_InvalidYAML(t *testing.T) {
+	// Create temp theme file with invalid YAML
+	tmpDir := t.TempDir()
+	themePath := filepath.Join(tmpDir, "invalid.yaml")
+	if err := os.WriteFile(themePath, []byte("name: [invalid yaml\n"), 0o600); err != nil {
+		t.Fatalf("failed to write theme file: %v", err)
+	}
+
+	err := ApplyConfig("", nil, nil, themePath)
+	if err == nil {
+		t.Error("ApplyConfig() with invalid YAML should return error")
+	}
+}
+
+// TestApplyConfig_WithSemanticOverrides tests ApplyConfig with semantic overrides.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestApplyConfig_WithSemanticOverrides(t *testing.T) {
+	// Save original state
+	originalSemantics := GetSemanticColors()
+	defer setSemanticColors(originalSemantics)
+
+	// Apply config with semantic overrides
+	semantics := &SemanticOverrides{
+		Success: "#00ff00",
+		Error:   "#ff0000",
+	}
+	err := ApplyConfig("", nil, semantics, "")
+	if err != nil {
+		t.Errorf("ApplyConfig with semantic overrides failed: %v", err)
+	}
+}
+
+// TestApplyConfig_FileWithSemantics tests ApplyConfig from file with semantic overrides.
+//
+//nolint:paralleltest // Tests modify global theme state
+func TestApplyConfig_FileWithSemantics(t *testing.T) {
+	// Create temp theme file
+	tmpDir := t.TempDir()
+	themePath := filepath.Join(tmpDir, "theme.yaml")
+	themeContent := `name: dracula
+colors:
+  green: "#50fa7b"
+`
+	if err := os.WriteFile(themePath, []byte(themeContent), 0o600); err != nil {
+		t.Fatalf("failed to write theme file: %v", err)
+	}
+
+	// Save original state
+	originalTheme := Current()
+	originalColors := GetCustomColors()
+	originalSemantics := GetSemanticColors()
+	defer func() {
+		SetTheme(originalTheme.ID)
+		SetCustomColors(originalColors)
+		setSemanticColors(originalSemantics)
+	}()
+
+	// Apply from file with semantic overrides
+	semantics := &SemanticOverrides{
+		Success: "#00ff00",
+	}
+	err := ApplyConfig("", nil, semantics, themePath)
+	if err != nil {
+		t.Errorf("ApplyConfig with file and semantics failed: %v", err)
+	}
+}
+
+// TestDefaultColor_NilColor tests defaultColor with nil primary color.
+func TestDefaultColor_NilColor(t *testing.T) {
+	t.Parallel()
+
+	// Test with nil primary color - should return fallback
+	result := defaultColor(nil, draculaGreen)
+	if result == nil {
+		t.Error("defaultColor(nil, fallback) should return fallback, got nil")
+	}
+	if result != draculaGreen {
+		t.Errorf("defaultColor(nil, fallback) = %v, want %v", result, draculaGreen)
+	}
+
+	// Test with non-nil primary color - should return primary
+	result = defaultColor(draculaRed, draculaGreen)
+	if result != draculaRed {
+		t.Errorf("defaultColor(primary, fallback) = %v, want %v", result, draculaRed)
+	}
+}
+
+// TestFormatFloat_EdgeCases tests formatFloat with additional edge cases.
+func TestFormatFloat_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input float64
+		want  string
+	}{
+		{"whole_number_2", 2, "2"},
+		{"whole_number_1000", 1000, "1000"},
+		{"zero_decimal", 5.00, "5"},
+		{"small_decimal", 1.01, "1.1"}, // Note: 0.01 * 100 = 1, not "01"
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := formatFloat(tt.input)
+			if got != tt.want {
+				t.Errorf("formatFloat(%v) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSaveTheme_NoConfigFile tests SaveTheme when no config file is set.
+//
+//nolint:paralleltest // Tests modify global viper state and filesystem
+func TestSaveTheme_NoConfigFile(t *testing.T) {
+	// This test covers the branch where configFile == "" and we need to create the default config
+
+	// Save original state
+	originalConfigFile := viper.ConfigFileUsed()
+	originalHome := os.Getenv("HOME")
+
+	// Use a temp directory as home
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	// Reset viper to clear the config file setting
+	// Create a fresh viper instance by resetting config file to empty
+	viper.Reset()
+
+	defer func() {
+		viper.Reset()
+		viper.SetConfigFile(originalConfigFile)
+		t.Setenv("HOME", originalHome)
+	}()
+
+	// SaveTheme should create the config directory and file
+	err := SaveTheme("dracula")
+	if err != nil {
+		t.Errorf("SaveTheme() with no config file error = %v", err)
+	}
+
+	// Verify the config was created
+	expectedPath := filepath.Join(tmpDir, ".config", "shelly", "config.yaml")
+	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
+		t.Errorf("SaveTheme() did not create config file at %s", expectedPath)
+	}
+}

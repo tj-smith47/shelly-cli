@@ -1009,3 +1009,275 @@ func TestDeviceRateLimiter_EnforceInterval_ContextCancelled(t *testing.T) {
 		t.Errorf("expected quick return on context cancel, but waited %v", elapsed)
 	}
 }
+
+func TestDeviceRateLimiter_TryAcquire_GenerationNormalization(t *testing.T) {
+	t.Parallel()
+	config := DefaultConfig()
+	config.Gen2.MaxConcurrent = 10
+	config.Gen2.MinInterval = 1 * time.Millisecond
+	config.Global.MaxConcurrent = 10
+
+	rl := NewWithConfig(config)
+
+	// Test generation 0 normalization in TryAcquire (treated as Gen1)
+	release, ok := rl.TryAcquire("192.168.1.100", 0)
+	if !ok {
+		t.Error("expected TryAcquire to succeed with generation 0")
+	}
+	if release != nil {
+		release()
+	}
+
+	stats, _ := rl.Stats("192.168.1.100")
+	if stats.Generation != 1 {
+		t.Errorf("expected generation 0 to be normalized to 1, got %d", stats.Generation)
+	}
+
+	// Wait for interval
+	time.Sleep(config.Gen1.MinInterval + 10*time.Millisecond)
+
+	// Test generation > 2 normalization in TryAcquire (treated as Gen2)
+	release, ok = rl.TryAcquire("192.168.1.101", 99)
+	if !ok {
+		t.Error("expected TryAcquire to succeed with generation 99")
+	}
+	if release != nil {
+		release()
+	}
+
+	stats, _ = rl.Stats("192.168.1.101")
+	if stats.Generation != 2 {
+		t.Errorf("expected generation 99 to be normalized to 2, got %d", stats.Generation)
+	}
+}
+
+func TestDeviceRateLimiter_Acquire_DeviceSemaphoreCancelledAfterGlobal(t *testing.T) {
+	t.Parallel()
+	config := DefaultConfig()
+	config.Gen2.MaxConcurrent = 1 // Only 1 per device
+	config.Gen2.MinInterval = 1 * time.Millisecond
+	config.Global.MaxConcurrent = 10
+
+	rl := NewWithConfig(config)
+	ctx := context.Background()
+
+	// First acquire takes the device slot
+	release1, err := rl.Acquire(ctx, "192.168.1.100", 2)
+	if err != nil {
+		t.Fatalf("first acquire failed: %v", err)
+	}
+
+	// Second acquire with very short timeout
+	// Should acquire global semaphore but fail on device semaphore
+	shortCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	_, err = rl.Acquire(shortCtx, "192.168.1.100", 2)
+	if err == nil {
+		t.Error("expected error when device semaphore times out")
+	}
+	// Should be context deadline or canceled
+	if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context error, got: %v", err)
+	}
+
+	release1()
+}
+
+func TestDeviceRateLimiter_SetGeneration_SameGeneration(t *testing.T) {
+	t.Parallel()
+	config := DefaultConfig()
+	rl := NewWithConfig(config)
+	ctx := context.Background()
+
+	// Create device with Gen2
+	release, err := rl.Acquire(ctx, "192.168.1.100", 2)
+	if err != nil {
+		t.Fatalf("acquire failed: %v", err)
+	}
+	release()
+
+	// Set to same generation - should not recreate semaphore
+	rl.SetGeneration("192.168.1.100", 2)
+
+	stats, _ := rl.Stats("192.168.1.100")
+	if stats.Generation != 2 {
+		t.Errorf("expected generation 2, got %d", stats.Generation)
+	}
+}
+
+func TestCircuitBreaker_HalfOpen_AllowsRequests(t *testing.T) {
+	t.Parallel()
+	cb := NewCircuitBreaker(1, 2, 10*time.Millisecond)
+
+	// Open the circuit
+	cb.RecordFailure()
+	if cb.State() != StateOpen {
+		t.Fatalf("expected state Open, got %v", cb.State())
+	}
+
+	// Wait for transition
+	time.Sleep(15 * time.Millisecond)
+
+	// First Allow() transitions to half-open and returns true
+	if !cb.Allow() {
+		t.Error("expected Allow() to return true transitioning to half-open")
+	}
+	if cb.State() != StateHalfOpen {
+		t.Errorf("expected state HalfOpen, got %v", cb.State())
+	}
+
+	// Subsequent Allow() calls in half-open should still return true
+	if !cb.Allow() {
+		t.Error("expected Allow() to return true in half-open state")
+	}
+}
+
+func TestDeviceRateLimiter_Reset_ExistingDevice(t *testing.T) {
+	t.Parallel()
+	config := DefaultConfig()
+	config.Gen2.CircuitThreshold = 1
+	config.Global.CircuitOpenDuration = 60 * time.Second
+
+	rl := NewWithConfig(config)
+	ctx := context.Background()
+
+	// Create device and open its circuit
+	release, err := rl.Acquire(ctx, "192.168.1.100", 2)
+	if err != nil {
+		t.Fatalf("acquire failed: %v", err)
+	}
+	rl.RecordFailure("192.168.1.100")
+	release()
+
+	// Verify circuit is open
+	if !rl.IsCircuitOpen("192.168.1.100") {
+		t.Fatal("expected circuit to be open")
+	}
+
+	// Reset the existing device - this covers the exists=true branch
+	rl.Reset("192.168.1.100")
+
+	// Circuit should now be closed
+	if rl.IsCircuitOpen("192.168.1.100") {
+		t.Error("expected circuit to be closed after Reset")
+	}
+}
+
+func TestDeviceRateLimiter_GetOrCreateState_RaceCondition(t *testing.T) {
+	t.Parallel()
+	config := DefaultConfig()
+	config.Gen2.MinInterval = 1 * time.Millisecond
+	config.Global.MaxConcurrent = 200
+
+	rl := NewWithConfig(config)
+
+	// Use a barrier to maximize chance of hitting the race condition
+	// where another goroutine creates the state between RUnlock and Lock
+	var ready sync.WaitGroup
+	ready.Add(100)
+	var go_ sync.WaitGroup
+	go_.Add(1)
+
+	var wg sync.WaitGroup
+	for i := range 100 {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			ready.Done()
+			go_.Wait() // All goroutines start at the same time
+
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+
+			release, err := rl.Acquire(ctx, "race-device", 2)
+			if err != nil {
+				return // timeout is fine
+			}
+			release()
+		}(i)
+	}
+
+	ready.Wait() // Wait for all goroutines to be ready
+	go_.Done()   // Release them all at once
+	wg.Wait()
+
+	// Verify only one state exists
+	stats := rl.AllStats()
+	count := 0
+	for _, s := range stats {
+		if s.Address == "race-device" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected exactly 1 device state, got %d", count)
+	}
+}
+
+func TestCircuitBreaker_Allow_InvalidState(t *testing.T) {
+	t.Parallel()
+	// Test the default case in Allow() by setting an invalid state
+	// This is defensive code that handles corrupted state
+	cb := NewCircuitBreaker(3, 2, 60*time.Second)
+
+	// Directly set an invalid state value (same package has access)
+	cb.mu.Lock()
+	cb.state = State(99) // Invalid state
+	cb.mu.Unlock()
+
+	// Allow should return false for invalid state (default case)
+	if cb.Allow() {
+		t.Error("expected Allow() to return false for invalid state")
+	}
+}
+
+func TestDeviceRateLimiter_GetOrCreateState_DoubleCheck(t *testing.T) {
+	t.Parallel()
+	// Test the double-check locking pattern in getOrCreateState
+	// by calling it concurrently on a fresh address
+
+	config := DefaultConfig()
+	config.Gen2.MinInterval = 0 // No interval delay
+	config.Global.MaxConcurrent = 1000
+
+	// Run multiple iterations to increase chance of hitting the race
+	for iteration := range 10 {
+		rl := NewWithConfig(config)
+		address := "double-check-device-" + string(rune('0'+iteration))
+
+		// Launch many goroutines that all call getOrCreateState simultaneously
+		const numGoroutines = 50
+		var start sync.WaitGroup
+		start.Add(numGoroutines)
+		var barrier sync.WaitGroup
+		barrier.Add(1)
+		var done sync.WaitGroup
+		done.Add(numGoroutines)
+
+		for range numGoroutines {
+			go func() {
+				start.Done()
+				barrier.Wait()
+				// Directly call getOrCreateState (same package)
+				_ = rl.getOrCreateState(address, 2)
+				done.Done()
+			}()
+		}
+
+		start.Wait()   // Wait for all goroutines to be ready
+		barrier.Done() // Release all goroutines at once
+		done.Wait()    // Wait for all to complete
+
+		// Verify exactly one state was created
+		count := 0
+		for _, s := range rl.AllStats() {
+			if s.Address == address {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Errorf("iteration %d: expected 1 device state for %s, got %d", iteration, address, count)
+		}
+	}
+}
