@@ -127,7 +127,8 @@ func TestRun_NoDevices(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -170,7 +171,8 @@ func TestRun_WithDevices(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err = run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -224,7 +226,8 @@ func TestRun_SkipsNonJSONFiles(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err = run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -260,7 +263,8 @@ func TestRun_SkipsDirectories(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err = run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -310,7 +314,8 @@ func TestRun_SkipsInvalidJSON(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err = run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

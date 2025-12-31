@@ -14,8 +14,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Scenario string
+}
+
 // NewCommand creates the mock scenario command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "scenario <name>",
 		Aliases: []string{"load", "setup"},
@@ -33,14 +41,15 @@ Built-in scenarios:
   shelly mock scenario office`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Scenario = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, scenario string) error {
-	ios := f.IOStreams()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	scenarios := map[string][]mock.Device{
 		"minimal": {
@@ -60,9 +69,9 @@ func run(_ context.Context, f *cmdutil.Factory, scenario string) error {
 		},
 	}
 
-	devices, ok := scenarios[scenario]
+	devices, ok := scenarios[opts.Scenario]
 	if !ok {
-		return fmt.Errorf("unknown scenario: %s (available: minimal, home, office)", scenario)
+		return fmt.Errorf("unknown scenario: %s (available: minimal, home, office)", opts.Scenario)
 	}
 
 	mockDir, err := mock.Dir()
@@ -70,7 +79,7 @@ func run(_ context.Context, f *cmdutil.Factory, scenario string) error {
 		return err
 	}
 
-	ios.Info("Loading scenario: %s", scenario)
+	ios.Info("Loading scenario: %s", opts.Scenario)
 
 	for _, device := range devices {
 		device.MAC = mock.GenerateMAC(device.Name)

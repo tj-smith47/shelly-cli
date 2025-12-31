@@ -4,18 +4,14 @@ package influxdb
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
@@ -28,45 +24,6 @@ type Options struct {
 	Output      string
 	Measurement string
 	Tags        []string
-}
-
-// LineProtocolWriter writes metrics in InfluxDB line protocol format.
-type LineProtocolWriter struct {
-	out         io.Writer
-	measurement string
-	tags        map[string]string
-	ios         *iostreams.IOStreams
-}
-
-// parseTags converts key=value pairs to a map.
-func parseTags(tagPairs []string) map[string]string {
-	tags := make(map[string]string)
-	for _, pair := range tagPairs {
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) == 2 {
-			tags[parts[0]] = parts[1]
-		}
-	}
-	return tags
-}
-
-// setupOutput opens an output file or returns stdout.
-func setupOutput(ios *iostreams.IOStreams, outputFile string) (io.Writer, func(), error) {
-	if outputFile == "" {
-		return ios.Out, func() {}, nil
-	}
-
-	cleanPath := filepath.Clean(outputFile)
-	file, err := os.Create(cleanPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create output file: %w", err)
-	}
-	cleanup := func() {
-		if cerr := file.Close(); cerr != nil {
-			ios.DebugErr("closing output file", cerr)
-		}
-	}
-	return file, cleanup, nil
 }
 
 // NewCommand creates the InfluxDB metrics command.
@@ -141,52 +98,40 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	sort.Strings(devices)
-	tags := parseTags(opts.Tags)
+	tags := export.ParseTags(opts.Tags)
 
-	out, cleanup, err := setupOutput(ios, opts.Output)
-	if err != nil {
-		return err
-	}
-	defer cleanup()
-
-	writer := &LineProtocolWriter{
-		out:         out,
-		measurement: opts.Measurement,
-		tags:        tags,
-		ios:         ios,
+	// Setup output destination
+	out := ios.Out
+	if opts.Output != "" {
+		cleanPath := filepath.Clean(opts.Output)
+		file, err := os.Create(cleanPath)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		defer func() {
+			if cerr := file.Close(); cerr != nil {
+				ios.DebugErr("closing output file", cerr)
+			}
+		}()
+		out = file
 	}
 
 	// Write points to output
 	writePoints := func(points []export.InfluxDBPoint) {
 		for _, p := range points {
 			line := export.FormatInfluxDBPoint(p)
-			if _, err := fmt.Fprintln(writer.out, line); err != nil {
-				writer.ios.DebugErr("writing line", err)
+			if _, err := fmt.Fprintln(out, line); err != nil {
+				ios.DebugErr("writing line", err)
 			}
 		}
 	}
 
 	if opts.Continuous {
-		return runContinuous(ctx, svc, devices, opts.Measurement, tags, opts.Interval, writePoints)
+		return svc.StreamInfluxDBPoints(ctx, devices, opts.Measurement, tags, opts.Interval, writePoints)
 	}
 
 	// Single shot
 	points := svc.CollectInfluxDBPointsMulti(ctx, devices, opts.Measurement, tags)
 	writePoints(points)
 	return nil
-}
-
-func runContinuous(ctx context.Context, svc *shelly.Service, devices []string, measurement string, tags map[string]string, interval time.Duration, writePoints func([]export.InfluxDBPoint)) error {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-			points := svc.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
-			writePoints(points)
-		}
-	}
 }

@@ -175,11 +175,13 @@ func TestRun_AllWithNoCredentials(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
-		Output: "/tmp/test-export.json",
+		Factory: tf.Factory,
+		Devices: []string{},
+		Output:  "/tmp/test-export.json",
 	}
 	opts.All = true
 
-	err := run(context.Background(), tf.Factory, []string{}, opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
@@ -205,11 +207,13 @@ func TestRun_NoDevicesNoAll_ReturnsError(t *testing.T) {
 	}
 
 	opts := &Options{
-		Output: filepath.Join(t.TempDir(), "test-export.json"),
+		Factory: tf.Factory,
+		Devices: []string{},
+		Output:  filepath.Join(t.TempDir(), "test-export.json"),
 	}
 	// All is false (default), no devices provided
 
-	err := run(t.Context(), tf.Factory, []string{}, opts)
+	err := run(t.Context(), opts)
 	if err == nil {
 		t.Fatal("expected error when no devices specified and --all not set")
 	}
@@ -242,11 +246,13 @@ func TestRun_AllWithCredentials_Success(t *testing.T) {
 
 	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
 	opts := &Options{
-		Output: outputPath,
+		Factory: tf.Factory,
+		Devices: []string{},
+		Output:  outputPath,
 	}
 	opts.All = true
 
-	err := run(t.Context(), tf.Factory, []string{}, opts)
+	err := run(t.Context(), opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -315,12 +321,14 @@ func TestRun_FilterSpecificDevices_Success(t *testing.T) {
 
 	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
 	opts := &Options{
-		Output: outputPath,
+		Factory: tf.Factory,
+		Devices: []string{"kitchen", "bedroom"},
+		Output:  outputPath,
 	}
 	opts.All = false // Not --all, filter by device names
 
 	// Export only kitchen and bedroom
-	err := run(t.Context(), tf.Factory, []string{"kitchen", "bedroom"}, opts)
+	err := run(t.Context(), opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -375,12 +383,14 @@ func TestRun_FilterNoMatchingDevices_Warning(t *testing.T) {
 
 	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
 	opts := &Options{
-		Output: outputPath,
+		Factory: tf.Factory,
+		Devices: []string{"nonexistent"},
+		Output:  outputPath,
 	}
 	opts.All = false
 
 	// Try to export a device that doesn't exist
-	err := run(t.Context(), tf.Factory, []string{"nonexistent"}, opts)
+	err := run(t.Context(), opts)
 	if err != nil {
 		t.Fatalf("run() should not error for non-matching filter: %v", err)
 	}
@@ -408,11 +418,13 @@ func TestRun_CreateNestedDirectory_Success(t *testing.T) {
 	// Use a nested path that needs to be created
 	outputPath := filepath.Join(t.TempDir(), "nested", "dir", "creds.json")
 	opts := &Options{
-		Output: outputPath,
+		Factory: tf.Factory,
+		Devices: []string{},
+		Output:  outputPath,
 	}
 	opts.All = true
 
-	err := run(t.Context(), tf.Factory, []string{}, opts)
+	err := run(t.Context(), opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -444,11 +456,13 @@ func TestRun_WriteFileError(t *testing.T) {
 
 	outputPath := filepath.Join(tmpFile, "creds.json")
 	opts := &Options{
-		Output: outputPath,
+		Factory: tf.Factory,
+		Devices: []string{},
+		Output:  outputPath,
 	}
 	opts.All = true
 
-	err := run(t.Context(), tf.Factory, []string{}, opts)
+	err := run(t.Context(), opts)
 	if err == nil {
 		t.Fatal("expected error when writing to invalid path")
 	}

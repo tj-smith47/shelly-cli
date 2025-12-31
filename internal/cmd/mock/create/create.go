@@ -13,9 +13,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Name     string
+	Model    string
+	Firmware string
+}
+
 // NewCommand creates the mock create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var model, firmware string
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "create <name>",
@@ -29,18 +37,19 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly mock create bedroom --model "Plus 2PM" --firmware "1.0.8"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], model, firmware)
+			opts.Name = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&model, "model", "Plus 1PM", "Device model")
-	cmd.Flags().StringVar(&firmware, "firmware", "1.0.0", "Firmware version")
+	cmd.Flags().StringVar(&opts.Model, "model", "Plus 1PM", "Device model")
+	cmd.Flags().StringVar(&opts.Firmware, "firmware", "1.0.0", "Firmware version")
 
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, name, model, firmware string) error {
-	ios := f.IOStreams()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	mockDir, err := mock.Dir()
 	if err != nil {
@@ -48,10 +57,10 @@ func run(_ context.Context, f *cmdutil.Factory, name, model, firmware string) er
 	}
 
 	dev := mock.Device{
-		Name:     name,
-		Model:    model,
-		Firmware: firmware,
-		MAC:      mock.GenerateMAC(name),
+		Name:     opts.Name,
+		Model:    opts.Model,
+		Firmware: opts.Firmware,
+		MAC:      mock.GenerateMAC(opts.Name),
 		State: map[string]interface{}{
 			"switch:0": map[string]interface{}{
 				"output": false,
@@ -65,17 +74,17 @@ func run(_ context.Context, f *cmdutil.Factory, name, model, firmware string) er
 		return err
 	}
 
-	filename := filepath.Join(mockDir, name+".json")
+	filename := filepath.Join(mockDir, opts.Name+".json")
 	if err := os.WriteFile(filename, data, 0o600); err != nil {
 		return err
 	}
 
-	ios.Success("Created mock device: %s", name)
-	ios.Printf("  Model: %s\n", model)
-	ios.Printf("  Firmware: %s\n", firmware)
+	ios.Success("Created mock device: %s", opts.Name)
+	ios.Printf("  Model: %s\n", opts.Model)
+	ios.Printf("  Firmware: %s\n", opts.Firmware)
 	ios.Printf("  MAC: %s\n", dev.MAC)
 	ios.Println("")
-	ios.Info("Add to config with: shelly config device add %s --address mock://%s", name, name)
+	ios.Info("Add to config with: shelly config device add %s --address mock://%s", opts.Name, opts.Name)
 
 	return nil
 }

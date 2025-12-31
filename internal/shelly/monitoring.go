@@ -865,6 +865,24 @@ func (c *PrometheusCollector) FormatMetrics() string {
 	return export.FormatPrometheusMetrics(combined)
 }
 
+// StreamInfluxDBPoints continuously collects and outputs InfluxDB points at the given interval.
+// It calls the writePoints function with collected points on each tick.
+// Returns when context is cancelled.
+func (s *Service) StreamInfluxDBPoints(ctx context.Context, devices []string, measurement string, tags map[string]string, interval time.Duration, writePoints func([]export.InfluxDBPoint)) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			points := s.CollectInfluxDBPointsMulti(ctx, devices, measurement, tags)
+			writePoints(points)
+		}
+	}
+}
+
 // CollectInfluxDBPointsMulti collects InfluxDB points from multiple devices concurrently.
 func (s *Service) CollectInfluxDBPointsMulti(ctx context.Context, devices []string, measurement string, tags map[string]string) []export.InfluxDBPoint {
 	now := time.Now()

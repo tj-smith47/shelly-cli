@@ -532,13 +532,15 @@ func TestRun_Success(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:     tf.Factory,
+		Name:        "kitchen-offline",
 		Device:      "kitchen",
 		Condition:   conditionOffline,
 		Action:      actionNotify,
 		Description: "Kitchen offline alert",
 	}
 
-	err := run(context.Background(), tf.Factory, "kitchen-offline", opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -583,12 +585,14 @@ func TestRun_AlertExists(t *testing.T) {
 	}
 
 	opts := &Options{
+		Factory:   tf.Factory,
+		Name:      "dup-alert",
 		Device:    "new-device",
 		Condition: conditionOnline,
 		Action:    actionNotify,
 	}
 
-	err := run(context.Background(), tf.Factory, "dup-alert", opts)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for duplicate alert name")
 	}
@@ -606,12 +610,14 @@ func TestRun_OutputFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:   tf.Factory,
+		Name:      "output-test",
 		Device:    "light",
 		Condition: conditionOffline,
 		Action:    "webhook:http://test.com",
 	}
 
-	err := run(context.Background(), tf.Factory, "output-test", opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -639,13 +645,15 @@ func TestRun_EmptyDescription(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:     tf.Factory,
+		Name:        "no-desc-alert",
 		Device:      "switch",
 		Condition:   "power>1000",
 		Action:      actionNotify,
 		Description: "", // Empty description is allowed
 	}
 
-	err := run(context.Background(), tf.Factory, "no-desc-alert", opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

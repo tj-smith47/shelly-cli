@@ -48,3 +48,24 @@ func HasFleetFixtures() bool {
 	demo := GetCurrentDemo()
 	return demo != nil && demo.Fixtures != nil && len(demo.Fixtures.Fleet.Devices) > 0
 }
+
+// ToLibraryDiscoveredDevices converts mock discovery results to the shelly-go discovery type.
+// This allows the mock results to be displayed using the standard term.DisplayDiscoveredDevices.
+func ToLibraryDiscoveredDevices(results []DiscoveryResult) []LibraryDiscoveredDevice {
+	devices := make([]LibraryDiscoveredDevice, len(results))
+	for i, d := range results {
+		devices[i] = LibraryDiscoveredDevice(d)
+	}
+	return devices
+}
+
+// LibraryDiscoveredDevice is a copy of discovery.DiscoveredDevice fields needed for display.
+// This avoids importing the discovery package in mock.
+type LibraryDiscoveredDevice struct {
+	ID         string
+	Name       string
+	Model      string
+	Address    net.IP
+	MACAddress string
+	Generation int
+}

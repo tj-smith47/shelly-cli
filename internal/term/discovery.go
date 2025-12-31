@@ -194,3 +194,38 @@ type PluginComponentInfo struct {
 	ID   int
 	Name string
 }
+
+// ConvertPluginDevice converts a shelly.PluginDiscoveredDevice to a display-oriented type.
+func ConvertPluginDevice(d PluginDeviceAdapter) PluginDiscoveredDevice {
+	components := make([]PluginComponentInfo, len(d.Components))
+	for i, c := range d.Components {
+		components[i] = PluginComponentInfo(c)
+	}
+	return PluginDiscoveredDevice{
+		ID:         d.ID,
+		Name:       d.Name,
+		Model:      d.Model,
+		Address:    d.Address,
+		Platform:   d.Platform,
+		Firmware:   d.Firmware,
+		Components: components,
+	}
+}
+
+// PluginDeviceAdapter is the interface for converting plugin devices to display format.
+type PluginDeviceAdapter struct {
+	ID         string
+	Name       string
+	Model      string
+	Address    string
+	Platform   string
+	Firmware   string
+	Components []ComponentAdapter
+}
+
+// ComponentAdapter holds component info for conversion.
+type ComponentAdapter struct {
+	Type string
+	ID   int
+	Name string
+}

@@ -119,7 +119,8 @@ func TestRun_NotFound(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(context.Background(), tf.Factory, "nonexistent-device-12345")
+	opts := &Options{Factory: tf.Factory, Name: "nonexistent-device-12345"}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent mock device")
 	}
@@ -155,7 +156,8 @@ func TestRun_DeleteExisting(t *testing.T) {
 	}
 
 	// Delete it
-	err = run(context.Background(), tf.Factory, testName)
+	opts := &Options{Factory: tf.Factory, Name: testName}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

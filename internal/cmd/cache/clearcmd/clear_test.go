@@ -404,7 +404,8 @@ func TestRun(t *testing.T) {
 				cancel()
 			}
 
-			err := run(ctx, f)
+			opts := &Options{Factory: f}
+			err := run(ctx, opts)
 
 			if err != nil {
 				t.Errorf("run returned error: %v", err)
@@ -467,7 +468,8 @@ func TestRun_RemoveAllError(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Run should still succeed (error is logged via DebugErr, not returned)
-	err := run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run should not return error for RemoveAll failures: %v", err)
 	}

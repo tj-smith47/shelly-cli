@@ -2,6 +2,7 @@
 package dash
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -13,12 +14,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Refresh int
+	Filter  string
+}
+
 // NewCommand creates the dash command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var opts struct {
-		refresh int
-		filter  string
-	}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "dash",
@@ -48,12 +53,12 @@ Navigation:
   # Start with a device filter
   shelly dash --filter kitchen`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd, f, opts.refresh, opts.filter)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.refresh, "refresh", 5, "Data refresh interval in seconds")
-	cmd.Flags().StringVar(&opts.filter, "filter", "", "Filter devices by name pattern")
+	cmd.Flags().IntVar(&opts.Refresh, "refresh", 5, "Data refresh interval in seconds")
+	cmd.Flags().StringVar(&opts.Filter, "filter", "", "Filter devices by name pattern")
 
 	// Add subcommands
 	cmd.AddCommand(devices.NewCommand(f))
@@ -62,18 +67,18 @@ Navigation:
 	return cmd
 }
 
-func run(cmd *cobra.Command, f *cmdutil.Factory, refresh int, filter string) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Check if we're in a TTY
 	if !ios.IsStdoutTTY() {
 		return fmt.Errorf("dashboard requires an interactive terminal (TTY)")
 	}
 
-	opts := tui.Options{
-		RefreshInterval: time.Duration(refresh) * time.Second,
-		Filter:          filter,
+	tuiOpts := tui.Options{
+		RefreshInterval: time.Duration(opts.Refresh) * time.Second,
+		Filter:          opts.Filter,
 	}
 
-	return tui.Run(cmd.Context(), f, opts)
+	return tui.Run(ctx, opts.Factory, tuiOpts)
 }

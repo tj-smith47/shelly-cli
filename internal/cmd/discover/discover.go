@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/discover/mdns"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -120,7 +121,7 @@ func run(ctx context.Context, opts *Options) error {
 	// If platform is specified (and not "shelly"), skip native Shelly discovery
 	// and only run plugin detection for that platform
 	if opts.Platform != "" && opts.Platform != model.PlatformShelly {
-		return runPluginOnlyDiscovery(ctx, ios, opts)
+		return runPluginOnlyDiscovery(ctx, opts)
 	}
 
 	var shellyDevices []discovery.DiscoveredDevice
@@ -146,7 +147,6 @@ func run(ctx context.Context, opts *Options) error {
 	// Run plugin detection if not skipped
 	var pluginDevices []term.PluginDiscoveredDevice
 	if !opts.SkipPlugins && opts.Method == "http" {
-		// Plugin detection only works with HTTP scan since we need to probe addresses
 		pluginDevices = runPluginDetection(ctx, ios, opts.Subnet)
 	}
 
@@ -197,14 +197,17 @@ func run(ctx context.Context, opts *Options) error {
 }
 
 // runPluginOnlyDiscovery runs discovery for a specific platform only.
-func runPluginOnlyDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options) error {
+// Uses shelly.RunPluginPlatformDiscoveryWithProgress for the core logic.
+func runPluginOnlyDiscovery(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+
 	// Get plugin registry
 	registry, err := plugins.NewRegistry()
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugin registry: %w", err)
 	}
 
-	// Find plugin for the specified platform
+	// Verify plugin exists for platform
 	plugin, err := registry.FindByPlatform(opts.Platform)
 	if err != nil {
 		return fmt.Errorf("failed to find plugin: %w", err)
@@ -213,7 +216,7 @@ func runPluginOnlyDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts 
 		return fmt.Errorf("no plugin found for platform %q (is shelly-%s installed?)", opts.Platform, opts.Platform)
 	}
 
-	// Get addresses to scan
+	// Get or detect subnet
 	subnet := opts.Subnet
 	if subnet == "" {
 		var detectErr error
@@ -243,31 +246,21 @@ func runPluginOnlyDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts 
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	// Create plugin discoverer and scan
-	pluginDiscoverer := shelly.NewPluginDiscoverer(registry)
-	var pluginDevices []term.PluginDiscoveredDevice
-	var foundCount int
-
-	for i, addr := range addresses {
-		if ctx.Err() != nil {
-			break
-		}
-
-		result, detectErr := pluginDiscoverer.DetectWithPlatform(ctx, addr, nil, opts.Platform)
-		if detectErr == nil && result != nil {
-			pluginDevices = append(pluginDevices, toTermPluginDevice(result))
-			foundCount++
+	// Use shelly service layer for plugin discovery with progress callback
+	pluginDevices := shelly.RunPluginPlatformDiscoveryWithProgress(ctx, registry, opts.Platform, subnet, isDeviceRegistered, func(p shelly.DiscoveryProgress) bool {
+		if p.Found && p.Device != nil {
 			mw.UpdateLine("scan", iostreams.StatusRunning,
-				fmt.Sprintf("%d/%d - found %s (%s)", i+1, len(addresses), result.Detection.DeviceName, result.Detection.Model))
+				fmt.Sprintf("%d/%d - found %s (%s)", p.Done, p.Total, p.Device.Name, p.Device.Model))
 		} else {
 			mw.UpdateLine("scan", iostreams.StatusRunning,
-				fmt.Sprintf("%d/%d addresses probed", i+1, len(addresses)))
+				fmt.Sprintf("%d/%d addresses probed", p.Done, p.Total))
 		}
-	}
+		return ctx.Err() == nil
+	})
 
 	mw.UpdateLine("scan", iostreams.StatusSuccess,
 		fmt.Sprintf("%d/%d addresses probed, %d %s devices found",
-			len(addresses), len(addresses), foundCount, opts.Platform))
+			len(addresses), len(addresses), len(pluginDevices), opts.Platform))
 	mw.Finalize()
 
 	if len(pluginDevices) == 0 {
@@ -276,10 +269,12 @@ func runPluginOnlyDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts 
 		return nil
 	}
 
-	term.DisplayPluginDiscoveredDevices(ios, pluginDevices)
+	// Convert to term display type
+	termDevices := convertPluginDevices(pluginDevices)
+	term.DisplayPluginDiscoveredDevices(ios, termDevices)
 
 	if opts.Register {
-		added := registerPluginDevices(pluginDevices, opts.SkipExisting)
+		added := registerPluginDevices(termDevices, opts.SkipExisting)
 		ios.Added("device", added)
 	}
 
@@ -287,6 +282,7 @@ func runPluginOnlyDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts 
 }
 
 // runPluginDetection runs plugin detection on addresses that Shelly detection may have missed.
+// Uses shelly.RunPluginDetection for the core logic.
 func runPluginDetection(ctx context.Context, ios *iostreams.IOStreams, subnet string) []term.PluginDiscoveredDevice {
 	// Get plugin registry
 	registry, err := plugins.NewRegistry()
@@ -315,53 +311,54 @@ func runPluginDetection(ctx context.Context, ios *iostreams.IOStreams, subnet st
 		}
 	}
 
-	addresses := discovery.GenerateSubnetAddresses(subnet)
-	if len(addresses) == 0 {
-		return nil
-	}
-
 	ios.Info("Checking for plugin-managed devices...")
 
-	pluginDiscoverer := shelly.NewPluginDiscoverer(registry)
-	var pluginDevices []term.PluginDiscoveredDevice
-
-	// Create a short timeout context for plugin detection
+	// Use shelly service layer for plugin detection with short timeout
 	pluginCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	for _, addr := range addresses {
-		if pluginCtx.Err() != nil {
-			break
-		}
+	pluginDevices := shelly.RunPluginDetection(pluginCtx, registry, subnet, isDeviceRegistered)
 
-		result, detectErr := pluginDiscoverer.DetectWithPlugins(pluginCtx, addr, nil)
-		if detectErr == nil && result != nil {
-			pluginDevices = append(pluginDevices, toTermPluginDevice(result))
-		}
-	}
-
-	return pluginDevices
+	return convertPluginDevices(pluginDevices)
 }
 
-// toTermPluginDevice converts a shelly plugin detection result to term display type.
-func toTermPluginDevice(result *shelly.PluginDetectionResult) term.PluginDiscoveredDevice {
-	components := make([]term.PluginComponentInfo, len(result.Detection.Components))
-	for i, c := range result.Detection.Components {
-		components[i] = term.PluginComponentInfo{
-			Type: c.Type,
-			ID:   c.ID,
-			Name: c.Name,
+// convertPluginDevices converts shelly plugin devices to term display types.
+func convertPluginDevices(devices []shelly.PluginDiscoveredDevice) []term.PluginDiscoveredDevice {
+	result := make([]term.PluginDiscoveredDevice, len(devices))
+	for i, d := range devices {
+		components := make([]term.PluginComponentInfo, len(d.Components))
+		for j, c := range d.Components {
+			components[j] = term.PluginComponentInfo{
+				Type: c.Type,
+				ID:   c.ID,
+				Name: c.Name,
+			}
+		}
+		result[i] = term.PluginDiscoveredDevice{
+			ID:         d.ID,
+			Name:       d.Name,
+			Model:      d.Model,
+			Address:    d.Address.String(),
+			Platform:   d.Platform,
+			Firmware:   d.Firmware,
+			Components: components,
 		}
 	}
-	return term.PluginDiscoveredDevice{
-		ID:         result.Detection.DeviceID,
-		Name:       result.Detection.DeviceName,
-		Model:      result.Detection.Model,
-		Address:    result.Address,
-		Platform:   result.Detection.Platform,
-		Firmware:   result.Detection.Firmware,
-		Components: components,
+	return result
+}
+
+// isDeviceRegistered checks if an address is already in the device registry.
+func isDeviceRegistered(address string) bool {
+	cfg := config.Get()
+	if cfg == nil {
+		return false
 	}
+	for _, dev := range cfg.Devices {
+		if dev.Address == address {
+			return true
+		}
+	}
+	return false
 }
 
 // registerPluginDevices registers plugin-detected devices.

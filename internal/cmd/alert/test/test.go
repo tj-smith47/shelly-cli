@@ -10,8 +10,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Name    string
+}
+
 // NewCommand creates the alert test command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "test <name>",
 		Aliases: []string{"trigger", "fire"},
@@ -23,26 +31,27 @@ This simulates the alert condition being met and executes the configured action.
   shelly alert test kitchen-offline`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Name = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, name string) error {
-	ios := f.IOStreams()
-	cfg, err := f.Config()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	alert, exists := cfg.Alerts[name]
+	alert, exists := cfg.Alerts[opts.Name]
 	if !exists {
-		return fmt.Errorf("alert %q not found", name)
+		return fmt.Errorf("alert %q not found", opts.Name)
 	}
 
-	ios.Info("Testing alert %q...", name)
+	ios.Info("Testing alert %q...", opts.Name)
 	ios.Printf("  Device: %s\n", alert.Device)
 	ios.Printf("  Condition: %s\n", alert.Condition)
 	ios.Printf("  Action: %s\n", alert.Action)

@@ -12,8 +12,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the cache clear command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "clear",
 		Short:   "Clear the discovery cache",
@@ -22,14 +29,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Example: `  # Clear the discovery cache
   shelly cache clear`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f)
+			return run(cmd.Context(), opts)
 		},
 	}
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	cacheDir, err := config.CacheDir()
 	if err != nil {

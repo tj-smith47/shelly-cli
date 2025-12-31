@@ -2,8 +2,6 @@ package influxdb
 
 import (
 	"context"
-	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -174,12 +172,14 @@ func TestNewCommand_Structure(t *testing.T) {
 	}
 }
 
+// Tests for export.ParseTags (the function was moved to export package)
+
 func TestParseTagsEmpty(t *testing.T) {
 	t.Parallel()
 
-	tags := parseTags([]string{})
+	tags := export.ParseTags([]string{})
 	if len(tags) != 0 {
-		t.Errorf("parseTags([]) = %v, want empty map", tags)
+		t.Errorf("ParseTags([]) = %v, want empty map", tags)
 	}
 }
 
@@ -187,7 +187,7 @@ func TestParseTagsSingleTag(t *testing.T) {
 	t.Parallel()
 
 	const expectedLocation = "home"
-	tags := parseTags([]string{"location=" + expectedLocation})
+	tags := export.ParseTags([]string{"location=" + expectedLocation})
 	if len(tags) != 1 {
 		t.Errorf("len(tags) = %d, want 1", len(tags))
 	}
@@ -199,7 +199,7 @@ func TestParseTagsSingleTag(t *testing.T) {
 func TestParseTagsMultipleTags(t *testing.T) {
 	t.Parallel()
 
-	tags := parseTags([]string{"location=home", "floor=1", "room=kitchen"})
+	tags := export.ParseTags([]string{"location=home", "floor=1", "room=kitchen"})
 	if len(tags) != 3 {
 		t.Errorf("len(tags) = %d, want 3", len(tags))
 	}
@@ -218,7 +218,7 @@ func TestParseTagsInvalidFormat(t *testing.T) {
 	t.Parallel()
 
 	// Tag without = should be skipped
-	tags := parseTags([]string{"invalid_tag", "location=home"})
+	tags := export.ParseTags([]string{"invalid_tag", "location=home"})
 	if len(tags) != 1 {
 		t.Errorf("len(tags) = %d, want 1", len(tags))
 	}
@@ -231,77 +231,12 @@ func TestParseTagsWithValues(t *testing.T) {
 	t.Parallel()
 
 	// Test value with multiple equals signs
-	tags := parseTags([]string{"query=key=value"})
+	tags := export.ParseTags([]string{"query=key=value"})
 	if len(tags) != 1 {
 		t.Errorf("len(tags) = %d, want 1", len(tags))
 	}
 	if tags["query"] != "key=value" {
 		t.Errorf("tags[query] = %q, want 'key=value'", tags["query"])
-	}
-}
-
-func TestSetupOutputStdout(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	out, cleanup, err := setupOutput(tf.TestIO.IOStreams, "")
-	if err != nil {
-		t.Errorf("setupOutput with empty file should not error, got: %v", err)
-	}
-
-	if out != tf.TestIO.Out {
-		t.Error("setupOutput should return stdout when file is empty string")
-	}
-
-	cleanup()
-}
-
-func TestSetupOutputFile(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "metrics.txt")
-
-	out, cleanup, err := setupOutput(tf.TestIO.IOStreams, outputFile)
-	if err != nil {
-		t.Errorf("setupOutput with valid file should not error, got: %v", err)
-	}
-
-	if out == nil {
-		t.Error("setupOutput should return a valid file writer")
-	}
-
-	// Verify we can write to it
-	if _, err := io.WriteString(out, "test"); err != nil {
-		t.Errorf("failed to write to output file: %v", err)
-	}
-
-	cleanup()
-
-	// Verify file was created
-	if _, err := os.Stat(outputFile); err != nil {
-		t.Errorf("output file not created: %v", err)
-	}
-}
-
-func TestSetupOutputInvalidPath(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	// Use an invalid path that can't be created
-	invalidPath := "/dev/null/subdir/file.txt"
-
-	_, _, err := setupOutput(tf.TestIO.IOStreams, invalidPath)
-	if err == nil {
-		t.Error("setupOutput with invalid path should error")
-	}
-
-	if strings.Contains(err.Error(), "failed to create output file") {
-		t.Logf("expected error: %v", err)
 	}
 }
 
@@ -368,7 +303,7 @@ func TestRun_WithCustomTags(t *testing.T) {
 	}
 }
 
-func TestRunContinuous_CancelledContext(t *testing.T) {
+func TestStreamInfluxDBPoints_CancelledContext(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -382,9 +317,9 @@ func TestRunContinuous_CancelledContext(t *testing.T) {
 		writePointsCalled = true
 	}
 
-	err := runContinuous(ctx, svc, []string{"test-device"}, "shelly", map[string]string{}, 1*time.Second, writePoints)
+	err := svc.StreamInfluxDBPoints(ctx, []string{"test-device"}, "shelly", map[string]string{}, 1*time.Second, writePoints)
 	if err != nil {
-		t.Errorf("runContinuous with cancelled context should not error, got: %v", err)
+		t.Errorf("StreamInfluxDBPoints with cancelled context should not error, got: %v", err)
 	}
 
 	if writePointsCalled {
@@ -392,7 +327,7 @@ func TestRunContinuous_CancelledContext(t *testing.T) {
 	}
 }
 
-func TestRunContinuous_ShortDuration(t *testing.T) {
+func TestStreamInfluxDBPoints_ShortDuration(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -406,35 +341,13 @@ func TestRunContinuous_ShortDuration(t *testing.T) {
 		callCount++
 	}
 
-	err := runContinuous(ctx, svc, []string{"test-device"}, "shelly", map[string]string{}, 20*time.Millisecond, writePoints)
+	err := svc.StreamInfluxDBPoints(ctx, []string{"test-device"}, "shelly", map[string]string{}, 20*time.Millisecond, writePoints)
 	if err != nil {
-		t.Errorf("runContinuous should not error on timeout, got: %v", err)
+		t.Errorf("StreamInfluxDBPoints should not error on timeout, got: %v", err)
 	}
 
 	// Due to timing variability, we just verify it was called at least once or zero times gracefully
 	t.Logf("writePoints called %d times", callCount)
-}
-
-func TestLineProtocolWriter_Creation(t *testing.T) {
-	t.Parallel()
-
-	tf := factory.NewTestFactory(t)
-
-	writer := &LineProtocolWriter{
-		out:         tf.TestIO.Out,
-		measurement: "test_measurement",
-		tags: map[string]string{
-			"location": "kitchen",
-		},
-		ios: tf.TestIO.IOStreams,
-	}
-
-	if writer.measurement != "test_measurement" {
-		t.Errorf("measurement = %q, want 'test_measurement'", writer.measurement)
-	}
-	if writer.tags["location"] != "kitchen" {
-		t.Errorf("tags[location] = %q, want 'kitchen'", writer.tags["location"])
-	}
 }
 
 func TestExecute_NoDevices(t *testing.T) {

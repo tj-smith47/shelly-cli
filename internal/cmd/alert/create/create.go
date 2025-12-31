@@ -15,6 +15,8 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory     *cmdutil.Factory
+	Name        string
 	Device      string
 	Condition   string
 	Action      string
@@ -23,7 +25,7 @@ type Options struct {
 
 // NewCommand creates the alert create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "create <name>",
@@ -52,7 +54,8 @@ Actions can be:
     --action "webhook:http://example.com/alert"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Name = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -67,21 +70,21 @@ Actions can be:
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, name string, opts *Options) error {
-	ios := f.IOStreams()
-	cfg, err := f.Config()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
 	// Check if alert already exists
-	if _, exists := cfg.Alerts[name]; exists {
-		return fmt.Errorf("alert %q already exists", name)
+	if _, exists := cfg.Alerts[opts.Name]; exists {
+		return fmt.Errorf("alert %q already exists", opts.Name)
 	}
 
 	// Create alert
 	alert := config.Alert{
-		Name:        name,
+		Name:        opts.Name,
 		Description: opts.Description,
 		Device:      opts.Device,
 		Condition:   opts.Condition,
@@ -90,13 +93,13 @@ func run(_ context.Context, f *cmdutil.Factory, name string, opts *Options) erro
 		CreatedAt:   time.Now().Format(time.RFC3339),
 	}
 
-	cfg.Alerts[name] = alert
+	cfg.Alerts[opts.Name] = alert
 
 	if err := cfg.Save(); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	ios.Success("Created alert %q", name)
+	ios.Success("Created alert %q", opts.Name)
 	ios.Printf("  Device: %s\n", opts.Device)
 	ios.Printf("  Condition: %s\n", opts.Condition)
 	ios.Printf("  Action: %s\n", opts.Action)

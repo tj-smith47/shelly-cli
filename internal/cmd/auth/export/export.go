@@ -17,14 +17,16 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory *cmdutil.Factory
 	flags.DeviceTargetFlags
+	Devices  []string
 	Output   string
 	Password string
 }
 
 // NewCommand creates the auth export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "export [device...]",
@@ -40,7 +42,8 @@ Use with auth import to restore credentials on another system.`,
   # Export specific devices
   shelly auth export kitchen bedroom -o creds.json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args, opts)
+			opts.Devices = args
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -50,9 +53,9 @@ Use with auth import to restore credentials on another system.`,
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, devices []string, opts *Options) error {
-	ios := f.IOStreams()
-	mgr, err := f.ConfigManager()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	mgr, err := opts.Factory.ConfigManager()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
@@ -65,9 +68,9 @@ func run(_ context.Context, f *cmdutil.Factory, devices []string, opts *Options)
 	}
 
 	// Filter if not --all
-	if !opts.All && len(devices) > 0 {
+	if !opts.All && len(opts.Devices) > 0 {
 		filtered := make(map[string]struct{ Username, Password string })
-		for _, d := range devices {
+		for _, d := range opts.Devices {
 			if c, ok := creds[d]; ok {
 				filtered[d] = c
 			}

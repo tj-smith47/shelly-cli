@@ -3,15 +3,13 @@ package alias
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds the command options.
@@ -79,12 +77,21 @@ func run(opts *Options) error {
 
 	// Handle --list flag
 	if opts.List {
-		return listAliases(ios, opts.Device)
+		aliases, err := config.GetDeviceAliases(opts.Device)
+		if err != nil {
+			return err
+		}
+		term.DisplayDeviceAliases(ios, opts.Device, aliases)
+		return nil
 	}
 
 	// Handle --remove flag
 	if opts.Remove != "" {
-		return removeAlias(ios, opts.Device, opts.Remove)
+		if err := config.RemoveDeviceAlias(opts.Device, opts.Remove); err != nil {
+			return err
+		}
+		term.DisplayAliasRemoved(ios, opts.Device, opts.Remove)
+		return nil
 	}
 
 	// Add alias - requires the alias argument
@@ -92,61 +99,21 @@ func run(opts *Options) error {
 		return fmt.Errorf("alias argument required (or use --list to view aliases)")
 	}
 
-	return addAlias(ios, opts.Device, opts.Alias)
-}
-
-func listAliases(ios *iostreams.IOStreams, deviceName string) error {
-	aliases, err := config.GetDeviceAliases(deviceName)
-	if err != nil {
-		return err
-	}
-
-	if len(aliases) == 0 {
-		ios.Info("No aliases defined for %s", deviceName)
-		return nil
-	}
-
-	if output.WantsJSON() {
-		return output.PrintJSON(map[string]any{
-			"device":  deviceName,
-			"aliases": aliases,
-		})
-	}
-	if output.WantsYAML() {
-		return output.PrintYAML(map[string]any{
-			"device":  deviceName,
-			"aliases": aliases,
-		})
-	}
-
-	ios.Printf("Aliases for %s: %s\n", deviceName, strings.Join(aliases, ", "))
-	return nil
-}
-
-func removeAlias(ios *iostreams.IOStreams, deviceName, alias string) error {
-	if err := config.RemoveDeviceAlias(deviceName, alias); err != nil {
-		return err
-	}
-	ios.Success("Removed alias %q from %s", alias, deviceName)
-	return nil
-}
-
-func addAlias(ios *iostreams.IOStreams, deviceName, alias string) error {
 	// Validate alias format
-	if err := config.ValidateDeviceAlias(alias); err != nil {
+	if err := config.ValidateDeviceAlias(opts.Alias); err != nil {
 		return fmt.Errorf("invalid alias: %w", err)
 	}
 
 	// Check for conflicts
-	if err := config.CheckAliasConflict(alias, deviceName); err != nil {
+	if err := config.CheckAliasConflict(opts.Alias, opts.Device); err != nil {
 		return err
 	}
 
 	// Add the alias
-	if err := config.AddDeviceAlias(deviceName, alias); err != nil {
+	if err := config.AddDeviceAlias(opts.Device, opts.Alias); err != nil {
 		return err
 	}
 
-	ios.Success("Added alias %q to %s", alias, deviceName)
+	term.DisplayAliasAdded(ios, opts.Device, opts.Alias)
 	return nil
 }

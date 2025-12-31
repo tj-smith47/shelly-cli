@@ -152,7 +152,13 @@ func TestRun_CreateDevice(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "my-device", "Plus 1PM", "1.0.0")
+	opts := &Options{
+		Factory:  f,
+		Name:     "my-device",
+		Model:    "Plus 1PM",
+		Firmware: "1.0.0",
+	}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -183,7 +189,8 @@ func TestRun_CustomModel(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "custom-device", "Plus 2PM", "1.0.0")
+	opts := &Options{Factory: f, Name: "custom-device", Model: "Plus 2PM", Firmware: "1.0.0"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -218,7 +225,8 @@ func TestRun_CustomFirmware(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "fw-device", "Plus 1PM", "2.0.5")
+	opts := &Options{Factory: f, Name: "fw-device", Model: "Plus 1PM", Firmware: "2.0.5"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -253,7 +261,8 @@ func TestRun_DeviceHasMAC(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "mac-device", "Plus 1PM", "1.0.0")
+	opts := &Options{Factory: f, Name: "mac-device", Model: "Plus 1PM", Firmware: "1.0.0"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -294,7 +303,8 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "state-device", "Plus 1PM", "1.0.0")
+	opts := &Options{Factory: f, Name: "state-device", Model: "Plus 1PM", Firmware: "1.0.0"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -351,7 +361,8 @@ func TestRun_OutputContainsModelAndFirmware(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "output-device", "Plug S", "3.0.0")
+	opts := &Options{Factory: f, Name: "output-device", Model: "Plug S", Firmware: "3.0.0"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -377,7 +388,8 @@ func TestRun_FilePermissions(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "perms-device", "Plus 1PM", "1.0.0")
+	opts := &Options{Factory: f, Name: "perms-device", Model: "Plus 1PM", Firmware: "1.0.0"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -410,7 +422,8 @@ func TestRun_DeterministicMAC(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create same device twice
-	err := run(context.Background(), f, "deterministic", "Plus 1PM", "1.0.0")
+	opts := &Options{Factory: f, Name: "deterministic", Model: "Plus 1PM", Firmware: "1.0.0"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("first run failed: %v", err)
 	}
@@ -435,7 +448,8 @@ func TestRun_DeterministicMAC(t *testing.T) {
 	// Create again (overwrites)
 	stdout.Reset()
 	stderr.Reset()
-	err = run(context.Background(), f, "deterministic", "Plus 1PM", "1.0.0")
+	opts = &Options{Factory: f, Name: "deterministic", Model: "Plus 1PM", Firmware: "1.0.0"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("second run failed: %v", err)
 	}

@@ -2,7 +2,7 @@
 package init
 
 import (
-	"fmt"
+	"context"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -11,9 +11,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/wizard"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory     *cmdutil.Factory
+	WizardOpts  *wizard.Options
+	Check       bool
+	RootCommand *cobra.Command // Needed for wizard.Run
+}
+
 // NewCommand creates the init command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &wizard.Options{}
+	wizardOpts := &wizard.Options{}
+	opts := &Options{Factory: f, WizardOpts: wizardOpts}
 
 	cmd := &cobra.Command{
 		Use:     "init",
@@ -70,51 +79,48 @@ Use --check to verify your current setup without making changes.`,
   # Non-interactive: enable anonymous telemetry
   shelly init --telemetry`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd, f, opts)
+			opts.RootCommand = cmd.Root()
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	// Device flags
-	cmd.Flags().StringArrayVar(&opts.Devices, "device", nil, "Device spec: name=ip[:user:pass] (repeatable)")
-	cmd.Flags().StringArrayVar(&opts.DevicesJSON, "devices-json", nil, "JSON device(s): file path, array, or single object (repeatable)")
+	cmd.Flags().StringArrayVar(&wizardOpts.Devices, "device", nil, "Device spec: name=ip[:user:pass] (repeatable)")
+	cmd.Flags().StringArrayVar(&wizardOpts.DevicesJSON, "devices-json", nil, "JSON device(s): file path, array, or single object (repeatable)")
 
 	// Discovery flags
-	cmd.Flags().BoolVar(&opts.Discover, "discover", false, "Enable device discovery (opt-in in non-interactive mode)")
-	cmd.Flags().DurationVar(&opts.DiscoverTimeout, "discover-timeout", 15*time.Second, "Discovery timeout")
-	cmd.Flags().StringVar(&opts.DiscoverModes, "discover-modes", "http", "Discovery modes: http,mdns,coiot,ble,all (comma-separated)")
-	cmd.Flags().StringVar(&opts.Network, "network", "", "Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)")
+	cmd.Flags().BoolVar(&wizardOpts.Discover, "discover", false, "Enable device discovery (opt-in in non-interactive mode)")
+	cmd.Flags().DurationVar(&wizardOpts.DiscoverTimeout, "discover-timeout", 15*time.Second, "Discovery timeout")
+	cmd.Flags().StringVar(&wizardOpts.DiscoverModes, "discover-modes", "http", "Discovery modes: http,mdns,coiot,ble,all (comma-separated)")
+	cmd.Flags().StringVar(&wizardOpts.Network, "network", "", "Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)")
 
 	// Completion flags
-	cmd.Flags().StringVar(&opts.Completions, "completions", "", "Install completions for shells: bash,zsh,fish,powershell (comma-separated)")
-	cmd.Flags().BoolVar(&opts.Aliases, "aliases", false, "Install default command aliases (opt-in)")
+	cmd.Flags().StringVar(&wizardOpts.Completions, "completions", "", "Install completions for shells: bash,zsh,fish,powershell (comma-separated)")
+	cmd.Flags().BoolVar(&wizardOpts.Aliases, "aliases", false, "Install default command aliases (opt-in)")
 
 	// Config flags
-	cmd.Flags().StringVar(&opts.Theme, "theme", "", "Set theme (default: dracula)")
-	cmd.Flags().StringVar(&opts.OutputFormat, "output-format", "", "Set output format: table,json,yaml (default: table)")
-	cmd.Flags().BoolVar(&opts.NoColor, "no-color", false, "Disable colors in output")
-	cmd.Flags().StringVar(&opts.APIMode, "api-mode", "", "API mode: local,cloud,auto (default: local)")
+	cmd.Flags().StringVar(&wizardOpts.Theme, "theme", "", "Set theme (default: dracula)")
+	cmd.Flags().StringVar(&wizardOpts.OutputFormat, "output-format", "", "Set output format: table,json,yaml (default: table)")
+	cmd.Flags().BoolVar(&wizardOpts.NoColor, "no-color", false, "Disable colors in output")
+	cmd.Flags().StringVar(&wizardOpts.APIMode, "api-mode", "", "API mode: local,cloud,auto (default: local)")
 
 	// Cloud flags
-	cmd.Flags().StringVar(&opts.CloudEmail, "cloud-email", "", "Shelly Cloud email (enables cloud setup)")
-	cmd.Flags().StringVar(&opts.CloudPassword, "cloud-password", "", "Shelly Cloud password (enables cloud setup)")
+	cmd.Flags().StringVar(&wizardOpts.CloudEmail, "cloud-email", "", "Shelly Cloud email (enables cloud setup)")
+	cmd.Flags().StringVar(&wizardOpts.CloudPassword, "cloud-password", "", "Shelly Cloud password (enables cloud setup)")
 
 	// Telemetry flags
-	cmd.Flags().BoolVar(&opts.Telemetry, "telemetry", false, "Enable anonymous usage telemetry (opt-in)")
+	cmd.Flags().BoolVar(&wizardOpts.Telemetry, "telemetry", false, "Enable anonymous usage telemetry (opt-in)")
 
 	// Control flags
-	cmd.Flags().BoolVar(&opts.Force, "force", false, "Overwrite existing configuration")
-	cmd.Flags().BoolP("check", "", false, "Verify current setup without making changes")
+	cmd.Flags().BoolVar(&wizardOpts.Force, "force", false, "Overwrite existing configuration")
+	cmd.Flags().BoolVar(&opts.Check, "check", false, "Verify current setup without making changes")
 
 	return cmd
 }
 
-func run(cmd *cobra.Command, f *cmdutil.Factory, opts *wizard.Options) error {
-	check, err := cmd.Flags().GetBool("check")
-	if err != nil {
-		return fmt.Errorf("failed to read --check flag: %w", err)
+func run(ctx context.Context, opts *Options) error {
+	if opts.Check {
+		return wizard.RunCheck(opts.Factory)
 	}
-	if check {
-		return wizard.RunCheck(f)
-	}
-	return wizard.Run(cmd.Context(), f, cmd.Root(), opts)
+	return wizard.Run(ctx, opts.Factory, opts.RootCommand, opts.WizardOpts)
 }

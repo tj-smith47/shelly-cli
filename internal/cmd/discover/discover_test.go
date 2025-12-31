@@ -4,6 +4,7 @@ package discover
 import (
 	"bytes"
 	"context"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -497,27 +498,33 @@ func TestNewCommand_SubcommandAliases(t *testing.T) {
 	}
 }
 
-// TestToTermPluginDevice tests the conversion function.
-func TestToTermPluginDevice(t *testing.T) {
+// TestConvertPluginDevices tests the conversion function.
+func TestConvertPluginDevices(t *testing.T) {
 	t.Parallel()
 
-	// Test with a mock result
-	result := &shelly.PluginDetectionResult{
-		Detection: &plugins.DeviceDetectionResult{
-			DeviceID:   "tasmota-abc",
-			DeviceName: "Living Room",
-			Model:      "Sonoff Basic",
-			Platform:   "tasmota",
-			Firmware:   "12.5.0",
+	// Test with a mock shelly.PluginDiscoveredDevice
+	input := []shelly.PluginDiscoveredDevice{
+		{
+			ID:       "tasmota-abc",
+			Name:     "Living Room",
+			Model:    "Sonoff Basic",
+			Address:  net.ParseIP("192.168.1.50"),
+			Platform: "tasmota",
+			Firmware: "12.5.0",
 			Components: []plugins.ComponentInfo{
 				{Type: "switch", ID: 0, Name: "Relay"},
 				{Type: "light", ID: 1, Name: "LED"},
 			},
 		},
-		Address: "192.168.1.50",
 	}
 
-	device := toTermPluginDevice(result)
+	devices := convertPluginDevices(input)
+
+	if len(devices) != 1 {
+		t.Fatalf("devices count = %d, want 1", len(devices))
+	}
+
+	device := devices[0]
 
 	if device.ID != "tasmota-abc" {
 		t.Errorf("ID = %q, want %q", device.ID, "tasmota-abc")
@@ -556,25 +563,29 @@ func TestToTermPluginDevice(t *testing.T) {
 	}
 }
 
-// TestToTermPluginDevice_EmptyComponents tests conversion with no components.
-func TestToTermPluginDevice_EmptyComponents(t *testing.T) {
+// TestConvertPluginDevices_EmptyComponents tests conversion with no components.
+func TestConvertPluginDevices_EmptyComponents(t *testing.T) {
 	t.Parallel()
 
-	result := &shelly.PluginDetectionResult{
-		Detection: &plugins.DeviceDetectionResult{
-			DeviceID:   "esp-123",
-			DeviceName: "Sensor",
+	input := []shelly.PluginDiscoveredDevice{
+		{
+			ID:         "esp-123",
+			Name:       "Sensor",
 			Model:      "ESP32",
+			Address:    net.ParseIP("192.168.1.100"),
 			Platform:   "esphome",
 			Components: nil,
 		},
-		Address: "192.168.1.100",
 	}
 
-	device := toTermPluginDevice(result)
+	devices := convertPluginDevices(input)
 
-	if len(device.Components) != 0 {
-		t.Errorf("Components count = %d, want 0", len(device.Components))
+	if len(devices) != 1 {
+		t.Fatalf("devices count = %d, want 1", len(devices))
+	}
+
+	if len(devices[0].Components) != 0 {
+		t.Errorf("Components count = %d, want 0", len(devices[0].Components))
 	}
 }
 

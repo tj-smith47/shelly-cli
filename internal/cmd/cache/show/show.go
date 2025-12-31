@@ -14,8 +14,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the cache show command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "show",
 		Short:   "Show cache statistics",
@@ -24,14 +31,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Example: `  # Show cache statistics
   shelly cache show`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f)
+			return run(cmd.Context(), opts)
 		},
 	}
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	cacheDir, err := config.CacheDir()
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 const testFalseValue = "false"
@@ -396,15 +397,15 @@ func TestRun_PushSpecificDevices(t *testing.T) {
 	_ = err
 }
 
-// TestPrintSyncSummary tests the summary printing function.
-func TestPrintSyncSummary(t *testing.T) {
+// TestDisplaySyncSummary tests the summary printing function.
+func TestDisplaySyncSummary(t *testing.T) {
 	t.Parallel()
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 
 	// Test successful sync summary
-	printSyncSummary(ios, 3, 0, false, "/tmp/sync")
+	term.DisplaySyncSummary(ios, 3, 0, false, "/tmp/sync")
 
 	output := stdout.String()
 	if !strings.Contains(output, "3 device(s)") {
@@ -412,15 +413,15 @@ func TestPrintSyncSummary(t *testing.T) {
 	}
 }
 
-// TestPrintSyncSummary_WithFailures tests summary with failures.
-func TestPrintSyncSummary_WithFailures(t *testing.T) {
+// TestDisplaySyncSummary_WithFailures tests summary with failures.
+func TestDisplaySyncSummary_WithFailures(t *testing.T) {
 	t.Parallel()
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 
 	// Test sync summary with failures
-	printSyncSummary(ios, 2, 1, false, "/tmp/sync")
+	term.DisplaySyncSummary(ios, 2, 1, false, "/tmp/sync")
 
 	output := stdout.String() + stderr.String()
 	if !strings.Contains(output, "2 succeeded") {
@@ -428,15 +429,15 @@ func TestPrintSyncSummary_WithFailures(t *testing.T) {
 	}
 }
 
-// TestPrintSyncSummary_DryRun tests summary in dry run mode.
-func TestPrintSyncSummary_DryRun(t *testing.T) {
+// TestDisplaySyncSummary_DryRun tests summary in dry run mode.
+func TestDisplaySyncSummary_DryRun(t *testing.T) {
 	t.Parallel()
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 
 	// Test dry run summary - should not print the sync dir path
-	printSyncSummary(ios, 3, 0, true, "/tmp/sync")
+	term.DisplaySyncSummary(ios, 3, 0, true, "/tmp/sync")
 
 	output := stdout.String()
 	if strings.Contains(output, "/tmp/sync") {

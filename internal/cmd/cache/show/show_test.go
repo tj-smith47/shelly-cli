@@ -122,7 +122,8 @@ func TestRun_NoCacheDir(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err := run(context.Background(), opts)
 
 	// Should complete without error, displaying "Cache directory does not exist"
 	if err != nil {
@@ -158,7 +159,8 @@ func TestRun_WithCacheDir(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f)
+	opts := &Options{Factory: f}
+	err := run(context.Background(), opts)
 
 	// Should complete (may or may not have cache files)
 	if err != nil {
@@ -266,7 +268,8 @@ func TestRun_ContextCancelled(t *testing.T) {
 	cancel() // Cancel immediately
 
 	// Run should still work since it doesn't make network calls
-	err := run(ctx, f)
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
 
 	// Should complete (context cancellation doesn't affect file system operations)
 	_ = err

@@ -11,8 +11,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Name    string
+	Args    []string
+}
+
 // NewCommand creates the extension exec command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "exec <name> [args...]",
 		Aliases: []string{"run"},
@@ -30,13 +39,15 @@ or when you want to explicitly invoke an extension.`,
 		ValidArgsFunction:  completion.ExtensionNames(),
 		DisableFlagParsing: true, // Pass all args to the extension
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1:])
+			opts.Name = args[0]
+			opts.Args = args[1:]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, _ *cmdutil.Factory, name string, args []string) error {
-	return plugins.RunPlugin(ctx, name, args)
+func run(ctx context.Context, opts *Options) error {
+	return plugins.RunPlugin(ctx, opts.Name, opts.Args)
 }

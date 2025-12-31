@@ -125,6 +125,7 @@ func TestNewCommand_Help(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestExecute_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -156,6 +157,7 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestExecute_ListAliases(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -195,6 +197,7 @@ func TestExecute_ListAliases(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestExecute_AddAlias(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -234,6 +237,7 @@ func TestExecute_AddAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestExecute_RemoveAlias(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -273,6 +277,7 @@ func TestExecute_RemoveAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestExecute_MissingAliasArg(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",

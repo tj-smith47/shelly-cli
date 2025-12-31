@@ -15,13 +15,14 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Input  string
-	DryRun bool
+	Factory *cmdutil.Factory
+	Input   string
+	DryRun  bool
 }
 
 // NewCommand creates the auth import command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "import <file>",
@@ -38,7 +39,7 @@ Imports credentials that were previously exported with auth export.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Input = args[0]
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -47,8 +48,8 @@ Imports credentials that were previously exported with auth export.`,
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	data, err := os.ReadFile(opts.Input)
 	if err != nil {
@@ -81,7 +82,7 @@ func run(_ context.Context, f *cmdutil.Factory, opts *Options) error {
 		return nil
 	}
 
-	cfg, err := f.Config()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

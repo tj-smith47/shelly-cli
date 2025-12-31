@@ -131,7 +131,8 @@ func TestRun_UnknownScenario(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "unknown-scenario")
+	opts := &Options{Factory: f, Scenario: "unknown-scenario"}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for unknown scenario")
 	}
@@ -150,7 +151,8 @@ func TestRun_MinimalScenario(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "minimal")
+	opts := &Options{Factory: f, Scenario: "minimal"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -182,7 +184,8 @@ func TestRun_HomeScenario(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "home")
+	opts := &Options{Factory: f, Scenario: "home"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -218,7 +221,8 @@ func TestRun_OfficeScenario(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "office")
+	opts := &Options{Factory: f, Scenario: "office"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -258,7 +262,8 @@ func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "minimal")
+	opts := &Options{Factory: f, Scenario: "minimal"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -311,7 +316,8 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(context.Background(), f, "minimal")
+	opts := &Options{Factory: f, Scenario: "minimal"}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

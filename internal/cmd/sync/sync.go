@@ -4,16 +4,14 @@ package sync
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"slices"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
 // Options holds the command options.
@@ -70,161 +68,49 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("cannot use --push and --pull together")
 	}
 
-	if opts.Pull {
-		return runPull(ctx, opts)
-	}
-
-	return runPush(ctx, opts)
-}
-
-func runPull(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
-	cfg, err := opts.Factory.Config()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
 
 	syncDir, err := config.GetSyncDir()
 	if err != nil {
 		return err
 	}
 
-	devices := opts.Devices
-	if len(devices) == 0 {
-		for name := range cfg.Devices {
-			devices = append(devices, name)
-		}
+	// Progress callback displays each device result
+	progress := func(result shelly.SyncDeviceResult) {
+		term.DisplaySyncProgress(ios, result.Device, result.Status)
 	}
 
-	if len(devices) == 0 {
-		ios.Warning("No devices configured. Add devices with 'shelly config device add'")
+	if opts.Pull {
+		cfg, err := opts.Factory.Config()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		devices := opts.Devices
+		if len(devices) == 0 {
+			for name := range cfg.Devices {
+				devices = append(devices, name)
+			}
+		}
+
+		if len(devices) == 0 {
+			ios.Warning("No devices configured. Add devices with 'shelly config device add'")
+			return nil
+		}
+
+		term.DisplaySyncHeader(ios, "Pulling", len(devices), opts.DryRun)
+		success, failed := svc.PullDeviceConfigs(ctx, devices, syncDir, opts.DryRun, progress)
+		term.DisplaySyncSummary(ios, success, failed, opts.DryRun, syncDir)
 		return nil
 	}
 
-	ios.Info("Pulling configurations from %d device(s)...", len(devices))
-	if opts.DryRun {
-		ios.Warning("[DRY RUN] No changes will be made")
-	}
-	ios.Println()
-
-	var success, failed int
-
-	for _, device := range devices {
-		ios.Printf("  %s: ", device)
-
-		result := svc.FetchDeviceConfig(ctx, device)
-		if result.Err != nil {
-			ios.Printf("failed (%v)\n", result.Err)
-			failed++
-			continue
-		}
-
-		if opts.DryRun {
-			ios.Printf("would save config\n")
-			success++
-			continue
-		}
-
-		if err := config.SaveSyncConfig(syncDir, device, result.Config); err != nil {
-			ios.Printf("failed (%v)\n", err)
-			failed++
-			continue
-		}
-
-		ios.Printf("saved\n")
-		success++
-	}
-
-	printSyncSummary(ios, success, failed, opts.DryRun, syncDir)
-	return nil
-}
-
-func runPush(ctx context.Context, opts *Options) error {
-	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
-
-	syncDir, err := config.GetSyncDir()
+	// Push operation
+	term.DisplaySyncHeader(ios, "Pushing", 0, opts.DryRun)
+	success, failed, skipped, err := svc.PushDeviceConfigs(ctx, syncDir, opts.Devices, opts.DryRun, progress)
 	if err != nil {
 		return err
 	}
-
-	files, err := os.ReadDir(syncDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("no sync directory found; run 'shelly sync --pull' first")
-		}
-		return fmt.Errorf("failed to read sync directory: %w", err)
-	}
-
-	if len(files) == 0 {
-		return fmt.Errorf("no config files found; run 'shelly sync --pull' first")
-	}
-
-	ios.Info("Pushing configurations to devices...")
-	if opts.DryRun {
-		ios.Warning("[DRY RUN] No changes will be made")
-	}
-	ios.Println()
-
-	var success, failed, skipped int
-
-	for _, file := range files {
-		if file.IsDir() || filepath.Ext(file.Name()) != ".json" {
-			continue
-		}
-
-		deviceName := file.Name()[:len(file.Name())-5] // Remove .json
-
-		if len(opts.Devices) > 0 && !slices.Contains(opts.Devices, deviceName) {
-			skipped++
-			continue
-		}
-
-		ios.Printf("  %s: ", deviceName)
-
-		if opts.DryRun {
-			ios.Printf("would push config\n")
-			success++
-			continue
-		}
-
-		configData, err := config.LoadSyncConfig(syncDir, file.Name())
-		if err != nil {
-			ios.Printf("failed (%v)\n", err)
-			failed++
-			continue
-		}
-
-		if err := svc.PushDeviceConfig(ctx, deviceName, configData); err != nil {
-			ios.Printf("failed (%v)\n", err)
-			failed++
-			continue
-		}
-
-		ios.Printf("pushed\n")
-		success++
-	}
-
-	ios.Println()
-	if failed > 0 {
-		ios.Warning("Completed: %d succeeded, %d failed, %d skipped", success, failed, skipped)
-	} else {
-		ios.Success("Completed: %d device(s) updated", success)
-	}
-
+	term.DisplayPushSummary(ios, success, failed, skipped)
 	return nil
-}
-
-func printSyncSummary(ios *iostreams.IOStreams, success, failed int, dryRun bool, syncDir string) {
-	ios.Println()
-	if failed > 0 {
-		ios.Warning("Completed: %d succeeded, %d failed", success, failed)
-	} else {
-		ios.Success("Completed: %d device(s) synced", success)
-	}
-
-	if !dryRun {
-		ios.Info("Configs saved to: %s", syncDir)
-	}
 }

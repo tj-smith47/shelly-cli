@@ -13,13 +13,15 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory  *cmdutil.Factory
+	Name     string
 	Duration string
 	Clear    bool
 }
 
 // NewCommand creates the alert snooze command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "snooze <name>",
@@ -38,7 +40,8 @@ While snoozed, the alert will not trigger even if the condition is met.`,
   shelly alert snooze kitchen-offline --clear`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Name = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -48,25 +51,25 @@ While snoozed, the alert will not trigger even if the condition is met.`,
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory, name string, opts *Options) error {
-	ios := f.IOStreams()
-	cfg, err := f.Config()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	alert, exists := cfg.Alerts[name]
+	alert, exists := cfg.Alerts[opts.Name]
 	if !exists {
-		return fmt.Errorf("alert %q not found", name)
+		return fmt.Errorf("alert %q not found", opts.Name)
 	}
 
 	if opts.Clear {
 		alert.SnoozedUntil = ""
-		cfg.Alerts[name] = alert
+		cfg.Alerts[opts.Name] = alert
 		if err := cfg.Save(); err != nil {
 			return fmt.Errorf("save config: %w", err)
 		}
-		ios.Success("Cleared snooze for alert %q", name)
+		ios.Success("Cleared snooze for alert %q", opts.Name)
 		return nil
 	}
 
@@ -77,13 +80,13 @@ func run(_ context.Context, f *cmdutil.Factory, name string, opts *Options) erro
 
 	snoozedUntil := time.Now().Add(duration)
 	alert.SnoozedUntil = snoozedUntil.Format(time.RFC3339)
-	cfg.Alerts[name] = alert
+	cfg.Alerts[opts.Name] = alert
 
 	if err := cfg.Save(); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	ios.Success("Snoozed alert %q until %s", name, snoozedUntil.Format("15:04"))
+	ios.Success("Snoozed alert %q until %s", opts.Name, snoozedUntil.Format("15:04"))
 
 	return nil
 }

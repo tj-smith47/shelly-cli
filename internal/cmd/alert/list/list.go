@@ -11,8 +11,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the alert list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls", "show"},
@@ -22,16 +29,16 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly alert list`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f)
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(_ context.Context, f *cmdutil.Factory) error {
-	ios := f.IOStreams()
-	cfg, err := f.Config()
+func run(_ context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

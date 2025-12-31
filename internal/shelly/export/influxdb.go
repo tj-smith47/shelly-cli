@@ -82,6 +82,18 @@ func EscapeInfluxTag(s string) string {
 	return s
 }
 
+// ParseTags converts key=value pairs to a tag map.
+func ParseTags(tagPairs []string) map[string]string {
+	tags := make(map[string]string)
+	for _, pair := range tagPairs {
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			tags[parts[0]] = parts[1]
+		}
+	}
+	return tags
+}
+
 // EMReadingsToInfluxDBPoints converts EM readings to InfluxDB points with phase labels.
 func EMReadingsToInfluxDBPoints(emStatuses []*model.EMStatus, device string, timestamp time.Time) []InfluxDBPoint {
 	points := make([]InfluxDBPoint, 0, len(emStatuses)*4)

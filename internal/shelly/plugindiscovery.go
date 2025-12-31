@@ -219,3 +219,98 @@ func isNetworkOrBroadcast(ip net.IP, ipNet *net.IPNet) bool {
 	}
 	return ip.Equal(broadcast)
 }
+
+// DiscoveryProgress represents progress during plugin discovery.
+type DiscoveryProgress struct {
+	Done    int                     // Number of addresses probed
+	Total   int                     // Total addresses to probe
+	Found   bool                    // Whether a device was found this iteration
+	Device  *PluginDiscoveredDevice // The device found, if any
+	Address string                  // Current address being probed
+}
+
+// ProgressCallback is called during discovery to report progress.
+// Return false to stop discovery early.
+type ProgressCallback func(DiscoveryProgress) bool
+
+// RunPluginDetectionWithProgress scans a subnet for plugin-managed devices with progress reporting.
+func RunPluginDetectionWithProgress(ctx context.Context, registry *plugins.Registry, subnet string, isRegistered func(string) bool, onProgress ProgressCallback) []PluginDiscoveredDevice {
+	// Get detection-capable plugins
+	capablePlugins, err := registry.ListDetectionCapable()
+	if err != nil || len(capablePlugins) == 0 {
+		return nil
+	}
+
+	addresses := generateSubnetAddresses(subnet)
+	if len(addresses) == 0 {
+		return nil
+	}
+
+	pluginDiscoverer := NewPluginDiscoverer(registry)
+	var pluginDevices []PluginDiscoveredDevice
+
+	for i, addr := range addresses {
+		if ctx.Err() != nil {
+			break
+		}
+
+		progress := DiscoveryProgress{
+			Done:    i + 1,
+			Total:   len(addresses),
+			Address: addr,
+		}
+
+		result, detectErr := pluginDiscoverer.DetectWithPlugins(ctx, addr, nil)
+		if detectErr == nil && result != nil {
+			added := isRegistered(result.Address)
+			device := ToPluginDiscoveredDevice(result, added)
+			pluginDevices = append(pluginDevices, device)
+			progress.Found = true
+			progress.Device = &device
+		}
+
+		if onProgress != nil && !onProgress(progress) {
+			break
+		}
+	}
+
+	return pluginDevices
+}
+
+// RunPluginPlatformDiscoveryWithProgress scans a subnet for devices of a specific platform with progress.
+func RunPluginPlatformDiscoveryWithProgress(ctx context.Context, registry *plugins.Registry, platform, subnet string, isRegistered func(string) bool, onProgress ProgressCallback) []PluginDiscoveredDevice {
+	addresses := generateSubnetAddresses(subnet)
+	if len(addresses) == 0 {
+		return nil
+	}
+
+	pluginDiscoverer := NewPluginDiscoverer(registry)
+	var pluginDevices []PluginDiscoveredDevice
+
+	for i, addr := range addresses {
+		if ctx.Err() != nil {
+			break
+		}
+
+		progress := DiscoveryProgress{
+			Done:    i + 1,
+			Total:   len(addresses),
+			Address: addr,
+		}
+
+		result, detectErr := pluginDiscoverer.DetectWithPlatform(ctx, addr, nil, platform)
+		if detectErr == nil && result != nil {
+			added := isRegistered(result.Address)
+			device := ToPluginDiscoveredDevice(result, added)
+			pluginDevices = append(pluginDevices, device)
+			progress.Found = true
+			progress.Device = &device
+		}
+
+		if onProgress != nil && !onProgress(progress) {
+			break
+		}
+	}
+
+	return pluginDevices
+}
