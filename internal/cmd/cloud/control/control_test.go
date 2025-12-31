@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -180,10 +181,10 @@ func TestNewCommand_LongDescriptionDocumentsActions(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses global config.Get() which may have side effects
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_NotLoggedIn(t *testing.T) {
-	// This test uses the global config.Get() which should return empty access token
-	// when no config file is present
+	// Use in-memory filesystem to avoid touching real config
+	factory.SetupTestFs(t)
 
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -195,16 +196,15 @@ func TestRun_NotLoggedIn(t *testing.T) {
 	ctx := context.Background()
 	err := run(ctx, f, "device123", "on", 0)
 
-	// Should fail because no token is configured
+	// Should fail because no token is configured in isolated config
 	if err == nil {
-		// Test may pass if there's a global config file - that's okay
-		t.Log("run succeeded - likely has global config")
+		t.Error("expected error for not logged in, got nil")
 		return
 	}
 
-	// If it failed, check for "not logged in" error
+	// Should get "not logged in" error
 	if !strings.Contains(err.Error(), "not logged in") {
-		t.Logf("got error: %v (expected 'not logged in')", err)
+		t.Errorf("expected 'not logged in' error, got: %v", err)
 	}
 }
 

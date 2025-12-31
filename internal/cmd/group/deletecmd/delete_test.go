@@ -2,7 +2,6 @@ package deletecmd
 
 import (
 	"bytes"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,20 +11,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-// setupTestManagerWithGroups creates a test manager with a temp path and populates it with groups.
+// setupTestManagerWithGroups creates a test manager and populates it with groups.
 func setupTestManagerWithGroups(t *testing.T, groups map[string]config.Group) *config.Manager {
 	t.Helper()
-	tmpDir := t.TempDir()
-	mgr := config.NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := mgr.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
+	cfg := &config.Config{
+		Groups: groups,
 	}
-	// Populate groups directly in config
-	cfg := mgr.Get()
-	for k, v := range groups {
-		cfg.Groups[k] = v
-	}
-	return mgr
+	return config.NewTestManager(cfg)
 }
 
 func TestNewCommand(t *testing.T) {

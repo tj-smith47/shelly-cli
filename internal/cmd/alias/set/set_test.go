@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -112,8 +113,10 @@ func TestNewCommand_Help(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_CreateAlias(t *testing.T) {
-	t.Parallel()
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
 
 	tf := factory.NewTestFactory(t)
 
@@ -136,8 +139,10 @@ func TestRun_CreateAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_CreateShellAlias(t *testing.T) {
-	t.Parallel()
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
 
 	tf := factory.NewTestFactory(t)
 
@@ -157,8 +162,10 @@ func TestRun_CreateShellAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_ShellAliasWithBangPrefix(t *testing.T) {
-	t.Parallel()
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
 
 	tf := factory.NewTestFactory(t)
 

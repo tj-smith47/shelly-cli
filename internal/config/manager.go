@@ -46,6 +46,15 @@ func Fs() afero.Fs {
 	return getFs()
 }
 
+// IsTestFs returns true if the package-level filesystem is a test filesystem
+// (i.e., not the real OS filesystem). This is used to skip certain operations
+// during tests, such as creating plugin directories.
+func IsTestFs() bool {
+	fs := getFs()
+	_, isOsFs := fs.(*afero.OsFs)
+	return !isOsFs
+}
+
 // Manager handles config loading, saving, and access with proper locking.
 // It replaces the package-level global singleton to eliminate deadlocks
 // and enable parallel testing.
@@ -188,6 +197,11 @@ func (m *Manager) saveWithoutLock() error {
 
 	// Skip disk write for test managers (no path set)
 	if m.path == "" {
+		return nil
+	}
+
+	// Skip disk write when using test filesystem
+	if IsTestFs() {
 		return nil
 	}
 

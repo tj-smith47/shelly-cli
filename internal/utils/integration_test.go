@@ -20,11 +20,8 @@ import (
 // Integration tests that require config state.
 // Run with: go test -tags=integration ./internal/utils/...
 
-func setupTestConfig(t *testing.T) func() {
+func setupTestConfig(t *testing.T) {
 	t.Helper()
-
-	// Save original HOME
-	originalHome := os.Getenv("HOME")
 
 	// Reset the config singleton BEFORE changing HOME
 	// This ensures the next call to getDefaultManager will use the new HOME
@@ -32,9 +29,7 @@ func setupTestConfig(t *testing.T) func() {
 
 	// Create temp directory for test config
 	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", tmpDir)
 
 	// Create config directory
 	configDir := filepath.Join(tmpDir, ".config", "shelly")
@@ -52,19 +47,14 @@ groups: {}
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Return cleanup function
-	return func() {
-		// Reset singleton again before restoring HOME
+	// Reset singleton on cleanup
+	t.Cleanup(func() {
 		config.ResetDefaultManagerForTesting()
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}
+	})
 }
 
 func TestRegisterDiscoveredDevices_Integration(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Create test devices
 	devices := []discovery.DiscoveredDevice{
@@ -93,8 +83,7 @@ func TestRegisterDiscoveredDevices_Integration(t *testing.T) {
 }
 
 func TestRegisterDiscoveredDevices_SkipExisting(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Register first device
 	devices := []discovery.DiscoveredDevice{
@@ -125,8 +114,7 @@ func TestRegisterDiscoveredDevices_SkipExisting(t *testing.T) {
 }
 
 func TestRegisterDevicesFromFlags_Integration(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Test with device specs
 	deviceSpecs := []string{
@@ -145,8 +133,7 @@ func TestRegisterDevicesFromFlags_Integration(t *testing.T) {
 }
 
 func TestRegisterDevicesFromFlags_JSON(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Test with JSON input
 	devicesJSON := []string{
@@ -164,8 +151,7 @@ func TestRegisterDevicesFromFlags_JSON(t *testing.T) {
 }
 
 func TestRegisterDevicesFromFlags_InvalidSpec(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Test with invalid device spec
 	deviceSpecs := []string{"invalid-no-equals"}
@@ -177,8 +163,7 @@ func TestRegisterDevicesFromFlags_InvalidSpec(t *testing.T) {
 }
 
 func TestRegisterDevicesFromFlags_InvalidJSON(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Test with invalid JSON
 	devicesJSON := []string{`{invalid-json`}
@@ -190,8 +175,7 @@ func TestRegisterDevicesFromFlags_InvalidJSON(t *testing.T) {
 }
 
 func TestRegisterDevicesFromFlags_MissingFields(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Test with missing required fields
 	devicesJSON := []string{
@@ -214,8 +198,7 @@ func TestRegisterDevicesFromFlags_MissingFields(t *testing.T) {
 }
 
 func TestRegisterPluginDiscoveredDevice_Integration(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	result := &plugins.DeviceDetectionResult{
 		Detected:   true,
@@ -235,8 +218,7 @@ func TestRegisterPluginDiscoveredDevice_Integration(t *testing.T) {
 }
 
 func TestRegisterPluginDiscoveredDevice_SkipExisting(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	result := &plugins.DeviceDetectionResult{
 		Detected:   true,
@@ -266,8 +248,7 @@ func TestRegisterPluginDiscoveredDevice_SkipExisting(t *testing.T) {
 }
 
 func TestRegisterPluginDiscoveredDevices_Batch(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	devices := []PluginDevice{
 		{
@@ -298,8 +279,7 @@ func TestRegisterPluginDiscoveredDevices_Batch(t *testing.T) {
 }
 
 func TestIsPluginDeviceRegistered_Integration(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Register a device
 	_ = config.RegisterDevice("registered-device", "192.168.1.95", 2, "", "", nil)
@@ -316,8 +296,7 @@ func TestIsPluginDeviceRegistered_Integration(t *testing.T) {
 }
 
 func TestResolveBatchTargets_All(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Register some devices
 	_ = config.RegisterDevice("all-test-1", "192.168.1.110", 2, "", "", nil)
@@ -334,8 +313,7 @@ func TestResolveBatchTargets_All(t *testing.T) {
 }
 
 func TestResolveBatchTargets_Group(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Register devices
 	_ = config.RegisterDevice("group-dev-1", "192.168.1.120", 2, "", "", nil)
@@ -357,8 +335,7 @@ func TestResolveBatchTargets_Group(t *testing.T) {
 }
 
 func TestResolveBatchTargets_EmptyGroup(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	// Create an empty group
 	_ = config.CreateGroup("empty-group")
@@ -370,8 +347,7 @@ func TestResolveBatchTargets_EmptyGroup(t *testing.T) {
 }
 
 func TestResolveBatchTargets_NonexistentGroup(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	_, err := ResolveBatchTargets("nonexistent-group", false, nil)
 	if err == nil {

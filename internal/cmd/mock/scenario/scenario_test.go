@@ -13,6 +13,13 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
+// setupTestEnv sets up an isolated XDG_CONFIG_HOME for tests.
+func setupTestEnv(t *testing.T) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+}
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -118,21 +125,7 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 
 //nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_UnknownScenario(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
-	// Create temp directory for mock config
-	tmpDir := t.TempDir()
-
-	// Set XDG_CONFIG_HOME to control config directory
-	origXDG := os.Getenv("XDG_CONFIG_HOME")
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Setenv("XDG_CONFIG_HOME", origXDG); err != nil {
-			t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-		}
-	})
+	setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -151,21 +144,7 @@ func TestRun_UnknownScenario(t *testing.T) {
 
 //nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_MinimalScenario(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
-	// Create temp directory for mock config
-	tmpDir := t.TempDir()
-
-	// Set XDG_CONFIG_HOME to control config directory
-	origXDG := os.Getenv("XDG_CONFIG_HOME")
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Setenv("XDG_CONFIG_HOME", origXDG); err != nil {
-			t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-		}
-	})
+	setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -197,21 +176,7 @@ func TestRun_MinimalScenario(t *testing.T) {
 
 //nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_HomeScenario(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
-	// Create temp directory for mock config
-	tmpDir := t.TempDir()
-
-	// Set XDG_CONFIG_HOME to control config directory
-	origXDG := os.Getenv("XDG_CONFIG_HOME")
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Setenv("XDG_CONFIG_HOME", origXDG); err != nil {
-			t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-		}
-	})
+	setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -247,21 +212,7 @@ func TestRun_HomeScenario(t *testing.T) {
 
 //nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_OfficeScenario(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
-	// Create temp directory for mock config
-	tmpDir := t.TempDir()
-
-	// Set XDG_CONFIG_HOME to control config directory
-	origXDG := os.Getenv("XDG_CONFIG_HOME")
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Setenv("XDG_CONFIG_HOME", origXDG); err != nil {
-			t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-		}
-	})
+	setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -301,21 +252,7 @@ func TestRun_OfficeScenario(t *testing.T) {
 
 //nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
-	// Create temp directory for mock config
-	tmpDir := t.TempDir()
-
-	// Set XDG_CONFIG_HOME to control config directory
-	origXDG := os.Getenv("XDG_CONFIG_HOME")
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Setenv("XDG_CONFIG_HOME", origXDG); err != nil {
-			t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-		}
-	})
+	setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -368,21 +305,7 @@ func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
 
 //nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
 func TestRun_DeviceHasInitialState(t *testing.T) {
-	// This test is NOT parallel due to XDG_CONFIG_HOME environment variable manipulation
-
-	// Create temp directory for mock config
-	tmpDir := t.TempDir()
-
-	// Set XDG_CONFIG_HOME to control config directory
-	origXDG := os.Getenv("XDG_CONFIG_HOME")
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.Setenv("XDG_CONFIG_HOME", origXDG); err != nil {
-			t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-		}
-	})
+	setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)

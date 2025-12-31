@@ -2,7 +2,6 @@ package deletecmd
 
 import (
 	"bytes"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -16,22 +15,20 @@ import (
 // testMu ensures tests that modify the global config manager don't run in parallel.
 var testMu sync.Mutex
 
-// setupTestManager creates a manager with temp dir and pre-populated templates.
+// setupTestManager creates a test manager with pre-populated templates.
 func setupTestManager(t *testing.T, templates map[string]config.DeviceTemplate) *config.Manager {
 	t.Helper()
-	tmpDir := t.TempDir()
-	mgr := config.NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := mgr.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	// Pre-populate templates
+	tpls := make(map[string]config.DeviceTemplate)
 	for name, tpl := range templates {
 		tpl.Name = name
-		if err := mgr.SaveDeviceTemplate(tpl); err != nil {
-			t.Fatalf("SaveDeviceTemplate() error: %v", err)
-		}
+		tpls[name] = tpl
 	}
-	return mgr
+	cfg := &config.Config{
+		Templates: config.TemplatesConfig{
+			Device: tpls,
+		},
+	}
+	return config.NewTestManager(cfg)
 }
 
 func TestNewCommand(t *testing.T) {

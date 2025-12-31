@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -893,8 +894,11 @@ func TestRun_WithMultipleDevices(t *testing.T) {
 
 // TestRun_RegisterSkipExistingFalse tests register with skip-existing=false.
 //
-//nolint:paralleltest // Modifies global newDiscoverer
+//nolint:paralleltest // Modifies global newDiscoverer and config.SetFs
 func TestRun_RegisterSkipExistingFalse(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	devices := []discovery.DiscoveredDevice{
 		{
 			ID:         "shellyswitch-ABC123",

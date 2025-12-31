@@ -11,6 +11,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
+// setupTest initializes the test environment with isolated filesystem.
+// Returns a cleanup function that should be deferred.
+//
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
+func setupTest(t *testing.T) {
+	t.Helper()
+	factory.SetupTestFs(t)
+}
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -163,7 +172,9 @@ func TestExecute_AlertNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_InvalidDuration(t *testing.T) {
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	// Set up config with an alert (in-memory)
@@ -191,7 +202,9 @@ func TestExecute_InvalidDuration(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_SnoozeSuccess(t *testing.T) {
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	// Set up config with an alert (in-memory)
@@ -211,13 +224,14 @@ func TestExecute_SnoozeSuccess(t *testing.T) {
 	cmd.SetErr(&buf)
 
 	err := cmd.Execute()
-	// The command will fail on cfg.Save() but the core logic works
 	if err != nil {
-		t.Logf("Execute() error = %v (expected due to config save in test)", err)
+		t.Errorf("Execute() error = %v", err)
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_ClearSnooze(t *testing.T) {
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	// Set up config with a snoozed alert (in-memory)
@@ -238,9 +252,8 @@ func TestExecute_ClearSnooze(t *testing.T) {
 	cmd.SetErr(&buf)
 
 	err := cmd.Execute()
-	// The command will fail on cfg.Save() but the core logic works
 	if err != nil {
-		t.Logf("Execute() error = %v (expected due to config save in test)", err)
+		t.Errorf("Execute() error = %v", err)
 	}
 }
 

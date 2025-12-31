@@ -1,5 +1,9 @@
 package deletecmd
 
+// Note: Tests that use demo.InjectIntoFactory cannot run in parallel
+// because InjectIntoFactory sets the global config manager, causing
+// race conditions between parallel tests.
+
 import (
 	"bytes"
 	"context"
@@ -365,9 +369,8 @@ func TestExecute_Help(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_MissingRequiredFlags(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -411,9 +414,8 @@ func TestExecute_MissingRequiredFlags(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_DeleteByID(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -455,9 +457,8 @@ func TestExecute_DeleteByID(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_DeleteByIDWithShortFlag(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -498,9 +499,8 @@ func TestExecute_DeleteByIDWithShortFlag(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_DeleteAll(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -545,9 +545,8 @@ func TestExecute_DeleteAll(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_DeleteAllFromGateway(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -595,9 +594,8 @@ func TestExecute_DeleteAllFromGateway(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_Gen1Device(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -641,9 +639,8 @@ func TestExecute_Gen1Device(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_NonexistentDevice(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -683,9 +680,8 @@ func TestExecute_NonexistentDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_IDFlagWithNumericValue(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name string
 		id   string
@@ -696,8 +692,6 @@ func TestExecute_IDFlagWithNumericValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			fixtures := &mock.Fixtures{
 				Version: "1",
 				Config: mock.ConfigFixture{
@@ -820,9 +814,8 @@ func TestNewCommand_DeviceArgIsRequired(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config manager via InjectIntoFactory
 func TestExecute_SuccessMessageFormat(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

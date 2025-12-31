@@ -73,6 +73,9 @@ type TestFactory struct {
 // The factory is pre-configured with test IOStreams, an empty config,
 // and a shelly service without plugin support (to avoid creating directories
 // in the real config directory).
+//
+// For full filesystem isolation, call SetupTestFs(t) before NewTestFactory(t).
+// Note: SetupTestFs uses t.Setenv which is incompatible with t.Parallel().
 func NewTestFactory(t *testing.T) *TestFactory {
 	t.Helper()
 

@@ -112,6 +112,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Cannot use t.Parallel() with SetupTestFs (uses t.Setenv)
 func TestRun_NotFound(t *testing.T) {
 	// Set up in-memory filesystem
 	factory.SetupTestFs(t)
@@ -127,6 +128,7 @@ func TestRun_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Cannot use t.Parallel() with SetupTestFs (uses t.Setenv)
 func TestRun_DeleteExisting(t *testing.T) {
 	// Set up in-memory filesystem
 	fs := factory.SetupTestFs(t)

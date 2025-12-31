@@ -24,27 +24,13 @@ func TestGenerateAndInstall_UnsupportedShell(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestGenerateAndInstall_Bash(t *testing.T) {
-	// Skip if we can't create temp directories
 	tmpDir := t.TempDir()
-
-	// Create a mock home directory
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	// Save original home and restore after test
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -58,23 +44,13 @@ func TestGenerateAndInstall_Bash(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestGenerateAndInstall_Zsh(t *testing.T) {
 	tmpDir := t.TempDir()
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -87,23 +63,13 @@ func TestGenerateAndInstall_Zsh(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestGenerateAndInstall_Fish(t *testing.T) {
 	tmpDir := t.TempDir()
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -116,23 +82,13 @@ func TestGenerateAndInstall_Fish(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestGenerateAndInstall_PowerShell(t *testing.T) {
 	tmpDir := t.TempDir()
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -145,23 +101,13 @@ func TestGenerateAndInstall_PowerShell(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestInstallBash(t *testing.T) {
 	tmpDir := t.TempDir()
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -174,23 +120,13 @@ func TestInstallBash(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestInstallZsh(t *testing.T) {
 	tmpDir := t.TempDir()
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -209,23 +145,13 @@ func TestInstallZsh(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestInstallFish(t *testing.T) {
 	tmpDir := t.TempDir()
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -244,23 +170,13 @@ func TestInstallFish(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies HOME environment variable
 func TestInstallPowerShell(t *testing.T) {
 	tmpDir := t.TempDir()
 	fakeHome := filepath.Join(tmpDir, "home")
 	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-
-	origHome := os.Getenv("HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
-	if err := os.Setenv("HOME", fakeHome); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
+	t.Setenv("HOME", fakeHome)
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}

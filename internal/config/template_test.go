@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/spf13/afero"
+)
 
 const testTemplateName = "my-template"
 
@@ -326,11 +330,11 @@ func TestParseScriptTemplateFile_InvalidYAML(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestPackageLevelDeviceTemplateFunctions(t *testing.T) {
-	// Note: This test modifies global state, cannot be parallel
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	// Use in-memory filesystem for test isolation
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 	ResetDefaultManagerForTesting()
 
 	// Test CreateDeviceTemplate
@@ -397,10 +401,11 @@ func TestPackageLevelDeviceTemplateFunctions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestPackageLevelScriptTemplateFunctions(t *testing.T) {
-	// Note: This test modifies global state, cannot be parallel
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	// Use in-memory filesystem for test isolation
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 	ResetDefaultManagerForTesting()
 
 	// Test SaveScriptTemplate

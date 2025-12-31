@@ -137,21 +137,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 // This test helper is NOT parallel safe.
 func setConfigHome(t *testing.T, tempDir string) {
 	t.Helper()
-	original := os.Getenv("XDG_CONFIG_HOME")
-	if err := os.Setenv("XDG_CONFIG_HOME", tempDir); err != nil {
-		t.Fatalf("Failed to set XDG_CONFIG_HOME: %v", err)
-	}
-	t.Cleanup(func() {
-		if original == "" {
-			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
-				t.Logf("warning: failed to unset XDG_CONFIG_HOME: %v", err)
-			}
-		} else {
-			if err := os.Setenv("XDG_CONFIG_HOME", original); err != nil {
-				t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-			}
-		}
-	})
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 }
 
 // TestExecute_NoLogFile tests when the log file does not exist.

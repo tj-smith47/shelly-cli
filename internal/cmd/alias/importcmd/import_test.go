@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -165,12 +167,14 @@ func TestNewCommand_LongDescription(t *testing.T) {
 func setupTestConfigEnv(t *testing.T) string {
 	t.Helper()
 
+	// Use in-memory filesystem for config operations
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Reset the singleton before changing HOME
 	config.ResetDefaultManagerForTesting()
 
 	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	// Register cleanup to reset singleton after test
 	t.Cleanup(config.ResetDefaultManagerForTesting)

@@ -139,10 +139,13 @@ func NewServiceWithPluginSupport() *Service {
 		opts = append(opts, WithRateLimiterFromAppConfig(rateLimitCfg))
 	}
 
-	// Try to initialize plugin registry - ignore errors (plugins are optional)
-	registry, err := plugins.NewRegistry()
-	if err == nil {
-		opts = append(opts, WithPluginRegistry(registry))
+	// Skip plugin registry when running tests (avoids creating real directories)
+	if !config.IsTestFs() {
+		// Try to initialize plugin registry - ignore errors (plugins are optional)
+		registry, err := plugins.NewRegistry()
+		if err == nil {
+			opts = append(opts, WithPluginRegistry(registry))
+		}
 	}
 
 	return New(NewConfigResolver(), opts...)

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +17,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+// setupTestEnv sets up an isolated environment for tests that modify config.
+func setupTestEnv(t *testing.T) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.ResetDefaultManagerForTesting()
+	})
+}
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -224,21 +234,7 @@ func TestNewCommand_CommandStructure(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_NotLoggedIn(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create test config without cloud token
 	cfg := &config.Config{
@@ -277,21 +273,7 @@ func TestRun_NotLoggedIn(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_NotLoggedIn_ShowsLoginHint(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create test config without cloud token
 	cfg := &config.Config{
@@ -325,21 +307,7 @@ func TestRun_NotLoggedIn_ShowsLoginHint(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_WithCancelledContext(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create a mock cloud server that delays response
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -380,21 +348,7 @@ func TestRun_WithCancelledContext(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_WithTimeout(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create test config with fake token (no server needed - will timeout)
 	cfg := &config.Config{
@@ -446,21 +400,7 @@ func TestNewCommand_Execute_NoArgs(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestNewCommand_Execute_WithDeviceID(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create test config without cloud token
 	cfg := &config.Config{
@@ -599,21 +539,7 @@ func base64URLEncode(data []byte) string {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_WithMockCloudServer(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create a mock cloud server that responds to device status requests
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -679,21 +605,7 @@ func TestRun_WithMockCloudServer(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_WithMockCloudServer_StatusFlag(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create a mock cloud server that responds to device status requests
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -800,21 +712,7 @@ func TestNewCommand_LongMentionsStatus(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestNewCommand_Execute_WithStatusFlag(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create test config without cloud token
 	cfg := &config.Config{
@@ -853,21 +751,7 @@ func TestNewCommand_Execute_WithStatusFlag(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestNewCommand_RunEIsCallable(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create test config without cloud token
 	cfg := &config.Config{
@@ -918,21 +802,7 @@ func TestNewCommand_VerifyReturnType(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_OutputGoesToStreams(t *testing.T) {
-	// Save original HOME to restore later
-	origHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", origHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		config.ResetDefaultManagerForTesting()
-	}()
-
-	// Create temp dir for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	config.ResetDefaultManagerForTesting()
+	setupTestEnv(t)
 
 	// Create test config without cloud token
 	cfg := &config.Config{

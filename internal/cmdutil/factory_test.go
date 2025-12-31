@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const testDeviceAddress = "testDeviceAddress"
@@ -53,8 +54,10 @@ func TestFactory_IOStreams_LazyInit(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestFactory_ShellyService_LazyInit(t *testing.T) {
-	t.Parallel()
+	// Use in-memory filesystem (ShellyService triggers plugin registry creation which touches filesystem)
+	factory.SetupTestFs(t)
 
 	f := cmdutil.NewFactory()
 
@@ -794,8 +797,10 @@ func TestFactory_SetConfigManager_NilThenGet(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestFactory_SetShellyService_NilThenGet(t *testing.T) {
-	t.Parallel()
+	// Use in-memory filesystem (ShellyService triggers plugin registry creation which touches filesystem)
+	factory.SetupTestFs(t)
 
 	f := cmdutil.NewFactory()
 

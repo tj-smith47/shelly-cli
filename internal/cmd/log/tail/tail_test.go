@@ -14,35 +14,13 @@ import (
 )
 
 // setupTestEnv sets up an isolated config environment for tests.
-// Returns the temp directory path and a cleanup function.
-func setupTestEnv(t *testing.T) (string, func()) {
+// Returns the temp directory path.
+func setupTestEnv(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-
-	cleanup := func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		if originalXDG != "" {
-			if err := os.Setenv("XDG_CONFIG_HOME", originalXDG); err != nil {
-				t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-			}
-		} else {
-			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
-				t.Logf("warning: failed to unset XDG_CONFIG_HOME: %v", err)
-			}
-		}
-	}
-	return tmpDir, cleanup
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	return tmpDir
 }
 
 func TestNewCommand(t *testing.T) {
@@ -202,8 +180,7 @@ func TestOptions_Struct(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_NoLogFile(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory but no log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -233,8 +210,7 @@ func TestRun_NoLogFile(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_WithLogFile(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -278,8 +254,7 @@ func TestRun_WithLogFile(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_ShowsLast20Lines(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -347,8 +322,7 @@ func TestNewCommand_CommandChain(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_EmptyLogFile(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and empty log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -383,8 +357,7 @@ func TestRun_EmptyLogFile(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_FewerThan20Lines(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -426,8 +399,7 @@ func TestRun_FewerThan20Lines(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_Exactly20Lines(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -469,8 +441,7 @@ func TestRun_Exactly20Lines(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestCommand_Execute(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -508,8 +479,7 @@ func TestCommand_Execute(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_SingleLine(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
 	shellyDir := filepath.Join(tmpDir, "shelly")
@@ -544,8 +514,7 @@ func TestRun_SingleLine(t *testing.T) {
 
 //nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
 func TestRun_NoTrailingNewline(t *testing.T) {
-	tmpDir, cleanup := setupTestEnv(t)
-	t.Cleanup(cleanup)
+	tmpDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
 	shellyDir := filepath.Join(tmpDir, "shelly")

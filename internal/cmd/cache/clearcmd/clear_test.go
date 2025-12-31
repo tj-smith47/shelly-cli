@@ -218,26 +218,10 @@ func setCacheHome(t *testing.T, tempDir string) {
 	switch runtime.GOOS {
 	case "darwin":
 		// On macOS, os.UserCacheDir() returns $HOME/Library/Caches
-		original := os.Getenv("HOME")
-		if err := os.Setenv("HOME", tempDir); err != nil {
-			t.Fatalf("Failed to set HOME: %v", err)
-		}
-		t.Cleanup(func() {
-			if err := os.Setenv("HOME", original); err != nil {
-				t.Logf("warning: failed to restore HOME: %v", err)
-			}
-		})
+		t.Setenv("HOME", tempDir)
 	default:
 		// On Linux/other, os.UserCacheDir() uses XDG_CACHE_HOME
-		original := os.Getenv("XDG_CACHE_HOME")
-		if err := os.Setenv("XDG_CACHE_HOME", tempDir); err != nil {
-			t.Fatalf("Failed to set XDG_CACHE_HOME: %v", err)
-		}
-		t.Cleanup(func() {
-			if err := os.Setenv("XDG_CACHE_HOME", original); err != nil {
-				t.Logf("warning: failed to restore XDG_CACHE_HOME: %v", err)
-			}
-		})
+		t.Setenv("XDG_CACHE_HOME", tempDir)
 	}
 }
 

@@ -51,13 +51,7 @@ func containsHelper(s, substr string) bool {
 func TestWriteCache_ReadCachedVersion(t *testing.T) {
 	// Create a temp directory for the test cache
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Write a version to cache
 	testVersion := "1.2.3"
@@ -76,13 +70,7 @@ func TestWriteCache_ReadCachedVersion(t *testing.T) {
 func TestReadCachedVersion_NoCache(t *testing.T) {
 	// Create a temp directory with no cache file
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Should return empty string when no cache exists
 	cached := ReadCachedVersion()
@@ -94,13 +82,7 @@ func TestReadCachedVersion_NoCache(t *testing.T) {
 func TestReadCachedVersion_StaleCache(t *testing.T) {
 	// Create a temp directory for the test cache
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Manually create a cache file
 	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
@@ -165,13 +147,7 @@ func TestCheckForUpdates_EmptyVersion(t *testing.T) {
 func TestCheckForUpdates_UpdateAvailable(t *testing.T) {
 	// Use temp dir to avoid affecting real cache
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	fetcher := func(_ context.Context) (string, error) {
 		return testVersion2, nil
@@ -203,13 +179,7 @@ func TestCheckForUpdates_UpdateAvailable(t *testing.T) {
 func TestCheckForUpdates_NoUpdate(t *testing.T) {
 	// Use temp dir to avoid affecting real cache
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	fetcher := func(_ context.Context) (string, error) {
 		return testVersion1, nil
@@ -276,13 +246,7 @@ func TestUpdateResult_Struct(t *testing.T) {
 
 func TestWriteCache_EmptyCachePath(t *testing.T) {
 	// Set HOME to invalid path to make CachePath return empty
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// WriteCache should return nil when CachePath is empty (no-op)
 	err := WriteCache("1.0.0")
@@ -293,13 +257,7 @@ func TestWriteCache_EmptyCachePath(t *testing.T) {
 
 func TestReadCachedVersion_EmptyCachePath(t *testing.T) {
 	// Set HOME to invalid path to make CachePath return empty
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// ReadCachedVersion should return empty when CachePath is empty
 	cached := ReadCachedVersion()
@@ -310,13 +268,7 @@ func TestReadCachedVersion_EmptyCachePath(t *testing.T) {
 
 func TestCachePath_NoHomeDir(t *testing.T) {
 	// Set HOME to empty to trigger the error path
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	path := CachePath()
 	if path != "" {

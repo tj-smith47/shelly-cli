@@ -361,10 +361,10 @@ func TestExecute_NotLoggedIn(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestExecute_LoggedInWithEmail(t *testing.T) {
+	factory.SetupTestFs(t)
 	// Setup manager with cloud credentials including email
 	mgr := setupTestManagerWithCloud(t, "user@example.com", "test-token", "refresh-token", "https://api.shelly.cloud", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -403,10 +403,10 @@ func TestExecute_LoggedInWithEmail(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestExecute_LoggedInWithoutEmail(t *testing.T) {
+	factory.SetupTestFs(t)
 	// Setup manager with cloud credentials but no email
 	mgr := setupTestManagerWithCloud(t, "", "test-token", "refresh-token", "https://api.shelly.cloud", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -433,10 +433,10 @@ func TestExecute_LoggedInWithoutEmail(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestExecute_ClearsAllCloudFields(t *testing.T) {
+	factory.SetupTestFs(t)
 	// Setup manager with all cloud fields populated
 	mgr := setupTestManagerWithCloud(t, "test@example.com", "access-token-123", "refresh-token-456", "https://custom.shelly.cloud", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -508,9 +508,9 @@ func TestRun_NotLoggedIn(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_LoggedInWithEmail(t *testing.T) {
+	factory.SetupTestFs(t)
 	mgr := setupTestManagerWithCloud(t, "admin@shelly.cloud", "my-token", "", "", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -527,9 +527,9 @@ func TestRun_LoggedInWithEmail(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_LoggedInWithoutEmail(t *testing.T) {
+	factory.SetupTestFs(t)
 	mgr := setupTestManagerWithCloud(t, "", "token-only", "", "", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -546,10 +546,10 @@ func TestRun_LoggedInWithoutEmail(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestExecute_MultipleLogouts(t *testing.T) {
+	factory.SetupTestFs(t)
 	// First logout with credentials
 	mgr := setupTestManagerWithCloud(t, "user@test.com", "token", "", "", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -589,9 +589,9 @@ func TestExecute_MultipleLogouts(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestExecute_WithContext(t *testing.T) {
+	factory.SetupTestFs(t)
 	mgr := setupTestManagerWithCloud(t, "ctx@test.com", "ctx-token", "", "", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -608,9 +608,9 @@ func TestExecute_WithContext(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestExecute_OutputFormat(t *testing.T) {
+	factory.SetupTestFs(t)
 	mgr := setupTestManagerWithCloud(t, "format@test.com", "format-token", "", "", true)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -637,6 +637,7 @@ func TestExecute_OutputFormat(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestRun_PreservesOtherConfig(t *testing.T) {
+	factory.SetupTestFs(t)
 	// Setup manager with cloud credentials and other config
 	cfg := &config.Config{
 		Output: "json",
@@ -649,7 +650,6 @@ func TestRun_PreservesOtherConfig(t *testing.T) {
 	}
 	mgr := config.NewTestManager(cfg)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -673,10 +673,10 @@ func TestRun_PreservesOtherConfig(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global state via config.SetDefaultManager
 func TestExecute_PartialCloudConfig(t *testing.T) {
+	factory.SetupTestFs(t)
 	// Setup manager with only access token (no email, refresh token, etc.)
 	mgr := setupTestManagerWithCloud(t, "", "partial-token", "", "", false)
 	config.SetDefaultManager(mgr)
-	t.Cleanup(config.ResetDefaultManagerForTesting)
 
 	tf := factory.NewTestFactory(t)
 
@@ -695,11 +695,10 @@ func TestExecute_PartialCloudConfig(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_WithIOStreams(t *testing.T) {
-	t.Parallel()
-
-	// This test exercises the run function with custom IOStreams
-	// The output depends on global config.Get() state
+	// Use in-memory filesystem to avoid touching real config
+	factory.SetupTestFs(t)
 
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -708,22 +707,23 @@ func TestRun_WithIOStreams(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Run will use global config state
 	err := run(f)
 
-	// Should not error (either logs out or says not logged in)
+	// Should not error (says not logged in with isolated config)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
 
-	// Should produce some output
+	// Should produce some output about not being logged in
 	if out.Len() == 0 && errOut.Len() == 0 {
-		t.Log("no output produced - may depend on global config state")
+		t.Log("no output produced")
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_ProducesOutput(t *testing.T) {
-	t.Parallel()
+	// Use in-memory filesystem to avoid touching real config
+	factory.SetupTestFs(t)
 
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -737,10 +737,10 @@ func TestRun_ProducesOutput(t *testing.T) {
 		t.Logf("run error: %v", err)
 	}
 
-	// Run should produce either stdout or stderr output
+	// Run should produce output (at least "not logged in" message)
 	totalOutput := out.Len() + errOut.Len()
 	if totalOutput == 0 {
-		t.Log("Run produced no output - expected with empty global config")
+		t.Log("Run produced no output")
 	}
 }
 

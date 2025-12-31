@@ -13,6 +13,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
+// setupTest initializes the test environment with isolated filesystem.
+//
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
+func setupTest(t *testing.T) {
+	t.Helper()
+	factory.SetupTestFs(t)
+}
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -441,9 +449,9 @@ func TestRun_DryRunShowsDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_ImportWithTestFactory(t *testing.T) {
-	t.Parallel()
-
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	tmpDir := t.TempDir()

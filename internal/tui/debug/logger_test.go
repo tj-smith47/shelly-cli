@@ -9,7 +9,6 @@ import (
 
 // Note: Tests that modify environment variables cannot run in parallel.
 
-//nolint:paralleltest // Tests modify environment variables
 func TestNew_DisabledByDefault(t *testing.T) {
 	// Ensure env is not set
 	if err := os.Unsetenv(EnvKey); err != nil {
@@ -26,16 +25,12 @@ func TestNew_DisabledByDefault(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify environment variables
 func TestNew_EnabledWithEnv(t *testing.T) {
-	if err := os.Setenv(EnvKey, "1"); err != nil {
-		t.Fatalf("setenv: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv(EnvKey); err != nil {
-			t.Logf("warning: unsetenv: %v", err)
-		}
-	}()
+	// Use temp dir to avoid creating debug directory in real config
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	t.Setenv(EnvKey, "1")
 
 	l := New()
 	if l == nil {
@@ -57,28 +52,11 @@ func TestNew_EnabledWithEnv(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify environment variables
 func TestLogger_Log(t *testing.T) {
-	// Create temp dir for test log
+	// Use temp dir to avoid creating debug directory in real config
 	tmpDir := t.TempDir()
-	homeDir := os.Getenv("HOME")
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("setenv HOME: %v", err)
-	}
-	defer func() {
-		if err := os.Setenv("HOME", homeDir); err != nil {
-			t.Logf("warning: restore HOME: %v", err)
-		}
-	}()
-
-	if err := os.Setenv(EnvKey, "1"); err != nil {
-		t.Fatalf("setenv: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv(EnvKey); err != nil {
-			t.Logf("warning: unsetenv: %v", err)
-		}
-	}()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv(EnvKey, "1")
 
 	l := New()
 	if l == nil {
@@ -125,27 +103,10 @@ func TestLogger_Log(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify environment variables
 func TestLogger_SkipDuplicateViews(t *testing.T) {
 	tmpDir := t.TempDir()
-	homeDir := os.Getenv("HOME")
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("setenv HOME: %v", err)
-	}
-	defer func() {
-		if err := os.Setenv("HOME", homeDir); err != nil {
-			t.Logf("warning: restore HOME: %v", err)
-		}
-	}()
-
-	if err := os.Setenv(EnvKey, "1"); err != nil {
-		t.Fatalf("setenv: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv(EnvKey); err != nil {
-			t.Logf("warning: unsetenv: %v", err)
-		}
-	}()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv(EnvKey, "1")
 
 	l := New()
 	if l == nil {
@@ -184,27 +145,10 @@ func TestLogger_SkipDuplicateViews(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify environment variables
 func TestLogger_SessionDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	homeDir := os.Getenv("HOME")
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("setenv HOME: %v", err)
-	}
-	defer func() {
-		if err := os.Setenv("HOME", homeDir); err != nil {
-			t.Logf("warning: restore HOME: %v", err)
-		}
-	}()
-
-	if err := os.Setenv(EnvKey, "1"); err != nil {
-		t.Fatalf("setenv: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv(EnvKey); err != nil {
-			t.Logf("warning: unsetenv: %v", err)
-		}
-	}()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv(EnvKey, "1")
 
 	l := New()
 	if l == nil {
@@ -326,24 +270,10 @@ func TestCleanupOldSessions(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify environment variables
 func TestLogger_Toggle(t *testing.T) {
-	// Use temp dir for HOME
+	// Use temp dir for config
 	tmpDir := t.TempDir()
-	homeDir := os.Getenv("HOME")
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("setenv HOME: %v", err)
-	}
-	defer func() {
-		if err := os.Setenv("HOME", homeDir); err != nil {
-			t.Logf("warning: restore HOME: %v", err)
-		}
-	}()
-
-	// Ensure env is not set - start disabled
-	if err := os.Unsetenv(EnvKey); err != nil {
-		t.Logf("warning: unsetenv: %v", err)
-	}
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	l := New()
 	if l == nil {

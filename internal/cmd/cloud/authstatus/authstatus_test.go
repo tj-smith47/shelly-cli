@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const cmdName = "auth-status"
@@ -220,11 +221,10 @@ func TestNewCommand_LongMentionsToken(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_WithIOStreams(t *testing.T) {
-	t.Parallel()
-
-	// This test exercises the run function with custom IOStreams
-	// The output depends on global config.Get() state
+	// Use in-memory filesystem to avoid touching real config
+	factory.SetupTestFs(t)
 
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
@@ -233,17 +233,16 @@ func TestRun_WithIOStreams(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Run will use global config state
 	err := run(f)
 
-	// Error is OK if not logged in (global config has no token)
+	// Error is expected when not logged in (isolated config has no token)
 	if err != nil {
-		t.Logf("run error (expected if not logged in): %v", err)
+		t.Logf("run error (expected with isolated config): %v", err)
 	}
 
-	// Should produce some output regardless of login state
+	// Should produce some output about auth status
 	if out.Len() == 0 && errOut.Len() == 0 {
-		t.Log("no output produced - command may need global config")
+		t.Log("no output produced")
 	}
 }
 

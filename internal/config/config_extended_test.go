@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 const (
@@ -235,59 +237,21 @@ func TestCacheDir(t *testing.T) {
 // =============================================================================
 
 // setupPackageTest sets up an isolated environment for package-level function tests.
-// Returns a cleanup function that MUST be deferred.
-func setupPackageTest(t *testing.T) func() {
+// Note: Tests using this helper must NOT use t.Parallel() as they modify global state.
+func setupPackageTest(t *testing.T) {
 	t.Helper()
 
-	// Save original values
-	originalHome := os.Getenv("HOME")
-	originalXDGConfig := os.Getenv("XDG_CONFIG_HOME")
+	// Use in-memory filesystem for test isolation
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
 	// Reset the default manager
 	ResetDefaultManagerForTesting()
-
-	// Create temp directory and set as HOME
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	// Also set XDG_CONFIG_HOME to temp directory to ensure config isolation
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-
-	// Create config directory and minimal config (XDG_CONFIG_HOME takes precedence)
-	configDir := tmpDir + "/shelly"
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
-	}
-	configPath := configDir + "/config.yaml"
-	configContent := "devices: {}\ngroups: {}\naliases: {}\nscenes: {}\n"
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
-		t.Fatalf("failed to write config: %v", err)
-	}
-
-	return func() {
-		ResetDefaultManagerForTesting()
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		if originalXDGConfig != "" {
-			if err := os.Setenv("XDG_CONFIG_HOME", originalXDGConfig); err != nil {
-				t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-			}
-		} else {
-			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
-				t.Logf("warning: failed to unset XDG_CONFIG_HOME: %v", err)
-			}
-		}
-	}
 }
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_RegisterDevice(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Test RegisterDevice
 	err := RegisterDevice("test-device", testIP100, 2, "shelly-plus-1pm", "SHPLUG1-S", nil)
@@ -307,8 +271,7 @@ func TestPackageLevel_RegisterDevice(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_ListDevices(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Register a device
 	if err := RegisterDevice("dev1", testIP1, 2, "", "", nil); err != nil {
@@ -324,8 +287,7 @@ func TestPackageLevel_ListDevices(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_GroupOperations(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Create group
 	err := CreateGroup("lights")
@@ -378,8 +340,7 @@ func TestPackageLevel_GroupOperations(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_ResolveDevice(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Register device
 	if err := RegisterDevice("kitchen", testIP1, 2, "", "", nil); err != nil {
@@ -398,8 +359,7 @@ func TestPackageLevel_ResolveDevice(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_DeviceAlias(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Register device
 	if err := RegisterDevice("kitchen-light", testIP1, 2, "", "", nil); err != nil {
@@ -433,8 +393,7 @@ func TestPackageLevel_DeviceAlias(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_RenameDevice(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Register device
 	if err := RegisterDevice("old-name", testIP1, 2, "", "", nil); err != nil {
@@ -459,8 +418,7 @@ func TestPackageLevel_RenameDevice(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_UpdateDeviceAddress(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Register device
 	if err := RegisterDevice("kitchen", testIP1, 2, "", "", nil); err != nil {
@@ -481,8 +439,7 @@ func TestPackageLevel_UpdateDeviceAddress(t *testing.T) {
 
 //nolint:paralleltest // Tests modify global HOME and default manager
 func TestPackageLevel_UnregisterDevice(t *testing.T) {
-	cleanup := setupPackageTest(t)
-	defer cleanup()
+	setupPackageTest(t)
 
 	// Register device
 	if err := RegisterDevice("kitchen", testIP1, 2, "", "", nil); err != nil {

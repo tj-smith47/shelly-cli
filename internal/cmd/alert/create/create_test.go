@@ -18,6 +18,14 @@ const (
 	actionNotify     = "notify"
 )
 
+// setupTest initializes the test environment with isolated filesystem.
+//
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
+func setupTest(t *testing.T) {
+	t.Helper()
+	factory.SetupTestFs(t)
+}
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -233,8 +241,9 @@ func TestOptions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_Success(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -286,8 +295,9 @@ func TestExecute_Success(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_WithAllOptions(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -338,8 +348,9 @@ func TestExecute_WithAllOptions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_AlertAlreadyExists(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	// Pre-populate an existing alert
@@ -370,8 +381,9 @@ func TestExecute_AlertAlreadyExists(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_MissingDeviceFlag(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -392,8 +404,9 @@ func TestExecute_MissingDeviceFlag(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_MissingConditionFlag(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -414,8 +427,9 @@ func TestExecute_MissingConditionFlag(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_MissingName(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -433,8 +447,9 @@ func TestExecute_MissingName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_TemperatureCondition(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -458,8 +473,9 @@ func TestExecute_TemperatureCondition(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_OnlineCondition(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -483,8 +499,9 @@ func TestExecute_OnlineCondition(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_CommandAction(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -509,8 +526,9 @@ func TestExecute_CommandAction(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_Success(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -550,8 +568,9 @@ func TestRun_Success(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_AlertExists(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	// Pre-create alert
@@ -581,8 +600,9 @@ func TestRun_AlertExists(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_OutputFormat(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -613,8 +633,9 @@ func TestRun_OutputFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_EmptyDescription(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -635,8 +656,9 @@ func TestRun_EmptyDescription(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestRun_DefaultAction(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	// Verify default action is "notify"
@@ -647,8 +669,9 @@ func TestRun_DefaultAction(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func TestExecute_MultipleAlerts(t *testing.T) {
-	t.Parallel()
+	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
 	// Create first alert

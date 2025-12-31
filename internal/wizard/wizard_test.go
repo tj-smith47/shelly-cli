@@ -28,57 +28,11 @@ func testIOStreams() (*iostreams.IOStreams, *bytes.Buffer, *bytes.Buffer) {
 }
 
 // setupTestConfig creates an isolated test config environment.
-// Returns a cleanup function that MUST be deferred.
-func setupTestConfig(t *testing.T) func() {
+// Note: Tests using this helper must NOT use t.Parallel() as they modify global state.
+func setupTestConfig(t *testing.T) {
 	t.Helper()
-
-	// Save original environment
-	originalHome := os.Getenv("HOME")
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-
-	// Reset the config singleton BEFORE changing HOME
+	factory.SetupTestFs(t)
 	config.ResetDefaultManagerForTesting()
-
-	// Create temp directory for test config
-	tmpDir := t.TempDir()
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set HOME: %v", err)
-	}
-	if err := os.Setenv("XDG_CONFIG_HOME", tmpDir); err != nil {
-		t.Fatalf("failed to set XDG_CONFIG_HOME: %v", err)
-	}
-
-	// Create config directory (XDG_CONFIG_HOME/shelly since XDG takes precedence)
-	configDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
-	}
-
-	// Write minimal config
-	configPath := filepath.Join(configDir, "config.yaml")
-	configContent := `devices: {}
-groups: {}
-`
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
-		t.Fatalf("failed to write config: %v", err)
-	}
-
-	// Return cleanup function
-	return func() {
-		config.ResetDefaultManagerForTesting()
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-		if originalXDG != "" {
-			if err := os.Setenv("XDG_CONFIG_HOME", originalXDG); err != nil {
-				t.Logf("warning: failed to restore XDG_CONFIG_HOME: %v", err)
-			}
-		} else {
-			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
-				t.Logf("warning: failed to unset XDG_CONFIG_HOME: %v", err)
-			}
-		}
-	}
 }
 
 func TestOptions_IsNonInteractive(t *testing.T) {
@@ -1998,16 +1952,11 @@ func TestSelectDiscoveryMethods_InteractiveFallback(t *testing.T) {
 }
 
 // TestCheckExistingConfig_HomeError tests CheckExistingConfig behavior.
+//
 func TestCheckExistingConfig_HomeError(t *testing.T) {
-	t.Parallel()
-
-	// Save current HOME
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if err := os.Setenv("HOME", oldHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
+	// Use temp dir for HOME
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
 
 	// Even with invalid HOME, should not panic
 	// Note: this may still work on some systems due to /etc/passwd fallback
@@ -2361,20 +2310,11 @@ func TestValidateConfig_Themes(t *testing.T) {
 }
 
 // TestCheckAndConfirmConfig_InteractiveNoConfig tests interactive mode without existing config.
+//
 func TestCheckAndConfirmConfig_InteractiveNoConfig(t *testing.T) {
-	t.Parallel()
-
 	// Create temp directory for testing
 	tmpDir := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Skipf("cannot set HOME: %v", err)
-	}
-	defer func() {
-		if err := os.Setenv("HOME", oldHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
+	t.Setenv("HOME", tmpDir)
 
 	ios, _, _ := testIOStreams()
 	opts := &Options{} // Interactive mode
@@ -2642,8 +2582,7 @@ func TestSelectDiscoveryMethods_InteractiveWithParsing(t *testing.T) {
 //
 //nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestRunFlagDevicesStep(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name string
@@ -2755,8 +2694,7 @@ func TestRunDiscoveryStep(t *testing.T) {
 //
 //nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestStepFlagDevices(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name    string
@@ -2904,8 +2842,10 @@ func TestStepCompletionsNonInteractive(t *testing.T) {
 }
 
 // TestRunSetupSteps_Components tests that setup step helper functions work correctly.
+//
+//nolint:paralleltest // Uses global config.RegisterDevice which cannot be parallelized
 func TestRunSetupSteps_Components(t *testing.T) {
-	t.Parallel()
+	setupTestConfig(t)
 
 	// Test the component functions work in isolation
 	ios, _, _ := testIOStreams()
@@ -3074,8 +3014,7 @@ func TestRunDiscoveryStep_WithMethods(t *testing.T) {
 //
 //nolint:paralleltest // stepFlagDevices uses global config.RegisterDevice which cannot be parallelized
 func TestStepFlagDevices_MoreCases(t *testing.T) {
-	cleanup := setupTestConfig(t)
-	defer cleanup()
+	setupTestConfig(t)
 
 	ios, out, _ := testIOStreams()
 
@@ -3093,11 +3032,12 @@ func TestStepFlagDevices_MoreCases(t *testing.T) {
 }
 
 // TestCheckAndConfirmConfig_MorePaths tests more CheckAndConfirmConfig scenarios.
+//
 func TestCheckAndConfirmConfig_MorePaths(t *testing.T) {
-	t.Parallel()
-
 	// Create temp dir with config file
 	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
 	configDir := filepath.Join(tmpDir, ".config", "shelly")
 	if err := os.MkdirAll(configDir, 0o750); err != nil {
 		t.Fatal(err)
@@ -3106,16 +3046,6 @@ func TestCheckAndConfirmConfig_MorePaths(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte("output: table\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-
-	oldHome := os.Getenv("HOME")
-	if err := os.Setenv("HOME", tmpDir); err != nil {
-		t.Skipf("cannot set HOME: %v", err)
-	}
-	defer func() {
-		if err := os.Setenv("HOME", oldHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	ios, out, _ := testIOStreams()
 

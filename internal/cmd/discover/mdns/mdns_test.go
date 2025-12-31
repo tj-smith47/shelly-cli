@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -354,8 +355,11 @@ func TestExecute_WithRegisterSkipExisting(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global discovererFactory
+//nolint:paralleltest // modifies global discovererFactory and config.SetFs
 func TestExecute_WithRegisterNoSkipExisting(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	mock := &mockDiscoverer{
 		devices: []discovery.DiscoveredDevice{
 			{

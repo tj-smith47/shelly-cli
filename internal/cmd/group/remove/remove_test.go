@@ -2,7 +2,6 @@ package remove
 
 import (
 	"bytes"
-	"path/filepath"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -10,15 +9,10 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
-// setupTestManager creates a manager with temp dir for tests that need mutations.
+// setupTestManager creates a test manager with pre-initialized config for mutation tests.
 func setupTestManager(t *testing.T) *config.Manager {
 	t.Helper()
-	tmpDir := t.TempDir()
-	mgr := config.NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := mgr.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	return mgr
+	return config.NewTestManager(&config.Config{})
 }
 
 func TestNewCommand(t *testing.T) {

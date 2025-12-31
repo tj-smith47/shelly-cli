@@ -18,14 +18,8 @@ func TestShowUpdateNotification_EnvDisabled(t *testing.T) {
 func TestShowUpdateNotification_NoCache(t *testing.T) {
 	// Create a temp directory with no cache
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Should not panic with no cache
 	ShowUpdateNotification()
@@ -34,14 +28,8 @@ func TestShowUpdateNotification_NoCache(t *testing.T) {
 func TestShowUpdateNotification_DevBuild(t *testing.T) {
 	// Create a temp directory with a cache file
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Create cache with a version
 	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
@@ -64,14 +52,8 @@ func TestShowUpdateNotification_DevBuild(t *testing.T) {
 func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
 	// Create a temp directory with a cache file
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
-	t.Cleanup(func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	})
 
 	// Create cache with a newer version
 	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
@@ -101,14 +83,8 @@ func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
 func TestShowUpdateNotification_NoArgs(t *testing.T) {
 	// Create a temp directory with a cache file
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Save original args
 	originalArgs := os.Args
@@ -124,14 +100,8 @@ func TestShowUpdateNotification_NoArgs(t *testing.T) {
 func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
 	// Create a temp directory with a cache file
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Create cache with a newer version
 	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
@@ -162,14 +132,8 @@ func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
 func TestShowUpdateNotification_EmptyVersion(t *testing.T) {
 	// Create a temp directory with a cache file
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Create cache with a version
 	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
@@ -192,14 +156,8 @@ func TestShowUpdateNotification_EmptyVersion(t *testing.T) {
 func TestShowUpdateNotification_NoUpdate(t *testing.T) {
 	// Create a temp directory with a cache file
 	tmpDir := t.TempDir()
-	originalHome := os.Getenv("HOME")
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
-	defer func() {
-		if err := os.Setenv("HOME", originalHome); err != nil {
-			t.Logf("warning: failed to restore HOME: %v", err)
-		}
-	}()
 
 	// Create cache with same version (no update)
 	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")

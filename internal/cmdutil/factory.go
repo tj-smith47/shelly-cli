@@ -91,7 +91,14 @@ func NewFactory() *Factory {
 			// Use rate limiting and plugin support from config
 			// Rate limiting prevents device overload
 			// Plugin support enables control of non-Shelly devices (Tasmota, ESPHome, etc.)
-			f.shellyService = shelly.NewServiceWithPluginSupport()
+			// Only enable plugins if not using a test filesystem (avoids creating real directories)
+			if config.IsTestFs() {
+				// Test mode: simple service without plugin support
+				f.shellyService = shelly.NewService()
+			} else {
+				// Production mode: full service with rate limiting and plugins
+				f.shellyService = shelly.NewServiceWithPluginSupport()
+			}
 		}
 		return f.shellyService
 	}

@@ -612,7 +612,12 @@ func (c *Config) Save() error {
 }
 
 // Save writes the current configuration to file.
+// In test mode (when using an in-memory filesystem), this is a no-op to prevent
+// accidental writes to the real config file.
 func Save() error {
+	if IsTestFs() {
+		return nil // Skip save in test mode
+	}
 	return getDefaultManager().Save()
 }
 
