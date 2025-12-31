@@ -134,7 +134,7 @@ func DefaultStyles() Styles {
 
 // New creates a new device list model using the shared cache.
 func New(c *cache.Cache) Model {
-	return Model{
+	m := Model{
 		cache:    c,
 		scroller: panel.NewScroller(0, 10),
 		styles:   DefaultStyles(),
@@ -144,6 +144,8 @@ func New(c *cache.Cache) Model {
 			loading.WithCentered(true, true),
 		),
 	}
+	// Initialize cached devices immediately so DeviceCount() works without Update()
+	return m.refreshCachedDevices()
 }
 
 // Init initializes the device list component.
