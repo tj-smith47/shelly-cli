@@ -10,9 +10,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Options holds the options for the import command.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Filename string
+	Merge    bool
+}
+
 // NewCommand creates the alias import command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var merge bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "import <file>",
@@ -35,24 +42,25 @@ The file format is:
   shelly alias import aliases.yaml --merge`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(f, args[0], merge)
+			opts.Filename = args[0]
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&merge, "merge", "m", false, "Merge with existing aliases (skip conflicts)")
+	cmd.Flags().BoolVarP(&opts.Merge, "merge", "m", false, "Merge with existing aliases (skip conflicts)")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, filename string, merge bool) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	imported, skipped, err := config.ImportAliases(filename, merge)
+	imported, skipped, err := config.ImportAliases(opts.Filename, opts.Merge)
 	if err != nil {
 		return fmt.Errorf("failed to import aliases: %w", err)
 	}
 
-	ios.Success("Imported %d alias(es) from %s", imported, filename)
+	ios.Success("Imported %d alias(es) from %s", imported, opts.Filename)
 	if skipped > 0 {
 		ios.Info("Skipped %d existing alias(es)", skipped)
 	}

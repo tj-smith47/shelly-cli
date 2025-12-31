@@ -18,6 +18,8 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory    *cmdutil.Factory
+	Device     string
 	Iterations int
 	Warmup     int
 }
@@ -25,6 +27,7 @@ type Options struct {
 // NewCommand creates the benchmark command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
+		Factory:    f,
 		Iterations: 10,
 		Warmup:     2,
 	}
@@ -50,7 +53,8 @@ Results include min, max, average, and percentile statistics (P50, P95, P99).`,
   shelly benchmark kitchen-light --json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -60,17 +64,17 @@ Results include min, max, average, and percentile statistics (P50, P95, P99).`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	ios.Info("Benchmarking %s (%d iterations + %d warmup)...",
-		device, opts.Iterations, opts.Warmup)
+		opts.Device, opts.Iterations, opts.Warmup)
 	ios.Println("")
 
 	var result model.BenchmarkResult
 
-	err := svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 		if dev.IsGen1() {
 			return fmt.Errorf("benchmark is only supported on Gen2+ devices")
 		}
@@ -134,7 +138,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 
 		// Build result
 		result = model.BenchmarkResult{
-			Device:      device,
+			Device:      opts.Device,
 			Iterations:  opts.Iterations,
 			PingLatency: pingStats,
 			RPCLatency:  rpcStats,
@@ -157,7 +161,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	ios.Success("Benchmark Complete")
 	ios.Println("")
 
-	ios.Printf("Device: %s\n", device)
+	ios.Printf("Device: %s\n", opts.Device)
 	ios.Printf("Iterations: %d\n", opts.Iterations)
 	ios.Println("")
 

@@ -3,11 +3,13 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
 // CoverInfo holds cover information for list operations.
@@ -17,6 +19,25 @@ type CoverInfo struct {
 	State    string
 	Position int
 	Power    float64
+}
+
+// ListHeaders returns the column headers for the table.
+func (c CoverInfo) ListHeaders() []string {
+	return []string{"ID", "Name", "State", "Position", "Power"}
+}
+
+// ListRow returns the formatted row values for the table.
+func (c CoverInfo) ListRow() []string {
+	name := output.FormatComponentName(c.Name, "cover", c.ID)
+	state := output.RenderCoverState(c.State)
+
+	position := "-"
+	if c.Position >= 0 {
+		position = fmt.Sprintf("%d%%", c.Position)
+	}
+
+	power := output.FormatPowerTableValue(c.Power)
+	return []string{fmt.Sprintf("%d", c.ID), name, state, position, power}
 }
 
 // CoverOpen opens a cover component with optional duration in seconds.

@@ -10,8 +10,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the prev command.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the theme prev command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "prev",
 		Aliases: []string{"previous", "p"},
@@ -19,16 +26,16 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long:    `Cycle to the previous theme in the list.`,
 		Example: `  # Go to previous theme
   shelly theme prev`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(f)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	theme.PrevTheme()
 

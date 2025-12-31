@@ -12,14 +12,15 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Network bool
+	Factory *cmdutil.Factory
 	Devices bool
 	Full    bool
+	Network bool
 }
 
 // NewCommand creates the doctor command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "doctor",
@@ -52,7 +53,7 @@ Use --full for all checks including device connectivity tests.`,
 				opts.Network = true
 				opts.Devices = true
 			}
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -63,8 +64,8 @@ Use --full for all checks including device connectivity tests.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	term.DisplayDoctorHeader(ios)
 
@@ -94,7 +95,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 
 	// Optional: Device connectivity
 	if opts.Devices {
-		svc := f.ShellyService()
+		svc := opts.Factory.ShellyService()
 		issues += term.CheckDeviceConnectivity(ctx, ios, svc)
 	}
 

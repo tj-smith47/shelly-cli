@@ -15,9 +15,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Force   bool
+	Source  string
+}
+
 // NewCommand creates the extension install command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var force bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "install <source>",
@@ -44,17 +51,18 @@ The extension must be named with the shelly- prefix.`,
   shelly extension install ./shelly-myext --force`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], force)
+			opts.Source = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force reinstall even if already installed")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force reinstall even if already installed")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	registry, err := plugins.NewRegistry()
 	if err != nil {
@@ -70,8 +78,8 @@ func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) err
 
 	// Determine source type and get local path
 	switch {
-	case strings.HasPrefix(source, "gh:") || strings.HasPrefix(source, "github:"):
-		owner, repo, parseErr := github.ParseRepoString(source)
+	case strings.HasPrefix(opts.Source, "gh:") || strings.HasPrefix(opts.Source, "github:"):
+		owner, repo, parseErr := github.ParseRepoString(opts.Source)
 		if parseErr != nil {
 			return fmt.Errorf("failed to parse GitHub source: %w", parseErr)
 		}
@@ -92,11 +100,11 @@ func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) err
 		pluginSrc = plugins.ParseGitHubSource(owner+"/"+repo, result.TagName, result.AssetName)
 		version = strings.TrimPrefix(result.TagName, "v")
 
-	case strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://"):
+	case strings.HasPrefix(opts.Source, "http://") || strings.HasPrefix(opts.Source, "https://"):
 		var result *download.Result
 		downloadErr := cmdutil.RunWithSpinner(ctx, ios, "Downloading extension...", func(ctx context.Context) error {
 			var derr error
-			result, derr = download.FromURL(ctx, source)
+			result, derr = download.FromURL(ctx, opts.Source)
 			return derr
 		})
 		if downloadErr != nil {
@@ -104,11 +112,11 @@ func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) err
 		}
 		localPath = result.LocalPath
 		cleanup = result.Cleanup
-		pluginSrc = plugins.ParseURLSource(source)
+		pluginSrc = plugins.ParseURLSource(opts.Source)
 
 	default:
-		localPath = source
-		pluginSrc = plugins.ParseLocalSource(source)
+		localPath = opts.Source
+		pluginSrc = plugins.ParseLocalSource(opts.Source)
 	}
 
 	if cleanup != nil {
@@ -124,7 +132,7 @@ func run(ctx context.Context, f *cmdutil.Factory, source string, force bool) err
 	extName := strings.TrimPrefix(filename, plugins.PluginPrefix)
 
 	// Check if already installed
-	if registry.IsInstalled(extName) && !force {
+	if registry.IsInstalled(extName) && !opts.Force {
 		return fmt.Errorf("extension %q is already installed (use --force to reinstall)", extName)
 	}
 

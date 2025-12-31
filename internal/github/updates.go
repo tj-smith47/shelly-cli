@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
@@ -82,6 +84,8 @@ func (c *Client) FindPreviousRelease(ctx context.Context, currentVersion string,
 // CheckForUpdatesCached checks for updates using a cached result.
 // Returns nil if no update is available or check is disabled.
 func CheckForUpdatesCached(ctx context.Context, ios *iostreams.IOStreams, cachePath, currentVersion string) *Release {
+	fs := getFs()
+
 	// Check if updates are disabled
 	if os.Getenv("SHELLY_NO_UPDATE_CHECK") != "" {
 		return nil
@@ -89,14 +93,14 @@ func CheckForUpdatesCached(ctx context.Context, ios *iostreams.IOStreams, cacheP
 
 	// Check cache
 	cacheValid := false
-	if info, err := os.Stat(cachePath); err == nil {
+	if info, err := fs.Stat(cachePath); err == nil {
 		// Cache is valid for 24 hours
 		cacheValid = time.Since(info.ModTime()) < 24*time.Hour
 	}
 
 	if cacheValid {
 		// Read cached version
-		data, err := os.ReadFile(cachePath) //nolint:gosec // G304: cachePath is from known config directory
+		data, err := afero.ReadFile(fs, cachePath)
 		if err == nil {
 			cachedVersion := strings.TrimSpace(string(data))
 			if cachedVersion != "" && IsNewerVersion(currentVersion, cachedVersion) {
@@ -118,10 +122,10 @@ func CheckForUpdatesCached(ctx context.Context, ios *iostreams.IOStreams, cacheP
 	}
 
 	// Update cache
-	if merr := os.MkdirAll(filepath.Dir(cachePath), 0o750); merr != nil {
+	if merr := fs.MkdirAll(filepath.Dir(cachePath), 0o750); merr != nil {
 		ios.DebugErr("creating cache directory", merr)
 	}
-	if werr := os.WriteFile(cachePath, []byte(release.Version()), 0o600); werr != nil {
+	if werr := afero.WriteFile(fs, cachePath, []byte(release.Version()), 0o600); werr != nil {
 		ios.DebugErr("writing update cache", werr)
 	}
 

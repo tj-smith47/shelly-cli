@@ -93,7 +93,8 @@ func TestRun_TextOutput(t *testing.T) {
 	// Ensure a theme is set
 	theme.SetTheme("dracula")
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -146,7 +147,8 @@ func TestRun_JSONOutput(t *testing.T) {
 	// Ensure a theme is set
 	theme.SetTheme("dracula")
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -208,7 +210,8 @@ func TestRun_YAMLOutput(t *testing.T) {
 	// Ensure a theme is set
 	theme.SetTheme("dracula")
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -245,7 +248,8 @@ func TestRun_ColorBlocksRendered(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}

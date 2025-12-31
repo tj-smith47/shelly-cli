@@ -15,14 +15,16 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory    *cmdutil.Factory
 	CAFile     string
 	ClientCert string
 	ClientKey  string
+	Device     string
 }
 
 // NewCommand creates the cert install command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "install <device>",
@@ -39,7 +41,8 @@ as well as client certificates for mutual TLS authentication.`,
   shelly cert install kitchen --client-cert cert.pem --client-key key.pem`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -85,7 +88,7 @@ func (opts *Options) loadCertData() (*model.CertInstallData, error) {
 	return data, nil
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
+func run(ctx context.Context, opts *Options) error {
 	if err := opts.validate(); err != nil {
 		return err
 	}
@@ -95,14 +98,14 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		return err
 	}
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	installedCA := false
 	installedClient := false
 
 	err = cmdutil.RunWithSpinner(ctx, ios, "Installing certificate...", func(ctx context.Context) error {
-		return svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+		return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 			if dev.IsGen1() {
 				return fmt.Errorf("certificate installation is only supported on Gen2+ devices")
 			}
@@ -132,10 +135,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	}
 
 	if installedCA {
-		ios.Success("Installed CA certificate on %s", device)
+		ios.Success("Installed CA certificate on %s", opts.Device)
 	}
 	if installedClient {
-		ios.Success("Installed client certificate on %s", device)
+		ios.Success("Installed client certificate on %s", opts.Device)
 	}
 
 	return nil

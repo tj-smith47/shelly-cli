@@ -1,4 +1,4 @@
-// Package exportcmd provides the theme export command.
+// Package export provides the theme export command.
 package export
 
 import (
@@ -12,8 +12,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the export command.
+type Options struct {
+	Factory *cmdutil.Factory
+	File    string
+}
+
 // NewCommand creates the theme export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "export [file]",
 		Aliases: []string{"exp", "save"},
@@ -31,20 +39,19 @@ If no file is specified, outputs to stdout.`,
   # Export to stdout
   shelly theme export`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			file := ""
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				file = args[0]
+				opts.File = args[0]
 			}
-			return run(f, file)
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, file string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	current := theme.Current()
 	if current == nil {
@@ -77,13 +84,13 @@ func run(f *cmdutil.Factory, file string) error {
 	}
 
 	// Write to file or stdout
-	if file == "" {
+	if opts.File == "" {
 		ios.Printf("%s", string(data))
 	} else {
-		if err := os.WriteFile(file, data, 0o600); err != nil {
+		if err := os.WriteFile(opts.File, data, 0o600); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
-		ios.Success("Theme exported to %s", file)
+		ios.Success("Theme exported to %s", opts.File)
 	}
 
 	return nil

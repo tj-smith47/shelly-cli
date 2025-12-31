@@ -272,7 +272,8 @@ func TestRun_Success(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	err := run(f, "kitchen")
+	opts := &Options{Factory: f, Name: "kitchen"}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error: %v", err)
 	}
@@ -303,7 +304,8 @@ func TestRun_GroupAlreadyExists(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	err := run(f, "bedroom")
+	opts := &Options{Factory: f, Name: "bedroom"}
+	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error for existing group")
 	}
@@ -333,7 +335,8 @@ func TestRun_InvalidName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		err := run(f, tt.name)
+		opts := &Options{Factory: f, Name: tt.name}
+		err := run(opts)
 		if err == nil {
 			t.Errorf("run(%q) expected error", tt.name)
 			continue

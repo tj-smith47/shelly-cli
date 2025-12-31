@@ -8,10 +8,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -39,7 +38,7 @@ type EditModel struct {
 	err     error
 	width   int
 	height  int
-	styles  EditStyles
+	styles  editmodal.Styles
 
 	// Cloud state
 	connected bool   // Current connection status
@@ -50,69 +49,12 @@ type EditModel struct {
 	pendingEnabled bool
 }
 
-// EditStyles holds styles for the edit modal.
-type EditStyles struct {
-	Overlay        lipgloss.Style
-	Modal          lipgloss.Style
-	Title          lipgloss.Style
-	Label          lipgloss.Style
-	Value          lipgloss.Style
-	Error          lipgloss.Style
-	Help           lipgloss.Style
-	StatusOn       lipgloss.Style
-	StatusOff      lipgloss.Style
-	ToggleEnabled  lipgloss.Style
-	ToggleDisabled lipgloss.Style
-	Warning        lipgloss.Style
-}
-
-// DefaultEditStyles returns the default edit modal styles.
-func DefaultEditStyles() EditStyles {
-	colors := theme.GetSemanticColors()
-	return EditStyles{
-		Overlay: lipgloss.NewStyle().
-			Background(lipgloss.Color("#000000")),
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Width(12),
-		Value: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		StatusOn: lipgloss.NewStyle().
-			Foreground(colors.Online).
-			Bold(true),
-		StatusOff: lipgloss.NewStyle().
-			Foreground(colors.Offline).
-			Bold(true),
-		ToggleEnabled: lipgloss.NewStyle().
-			Foreground(colors.Online).
-			Bold(true),
-		ToggleDisabled: lipgloss.NewStyle().
-			Foreground(colors.Offline).
-			Bold(true),
-		Warning: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-	}
-}
-
 // NewEditModel creates a new cloud configuration edit modal.
 func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	return EditModel{
 		ctx:    ctx,
 		svc:    svc,
-		styles: DefaultEditStyles(),
+		styles: editmodal.DefaultStyles().WithLabelWidth(12),
 	}
 }
 
@@ -307,9 +249,9 @@ func (m EditModel) renderToggle() string {
 	content.WriteString(" ")
 
 	if m.pendingEnabled {
-		content.WriteString(m.styles.ToggleEnabled.Render("[●] ON "))
+		content.WriteString(m.styles.StatusOn.Render("[●] ON "))
 	} else {
-		content.WriteString(m.styles.ToggleDisabled.Render("[ ] OFF"))
+		content.WriteString(m.styles.StatusOff.Render("[ ] OFF"))
 	}
 
 	return content.String()

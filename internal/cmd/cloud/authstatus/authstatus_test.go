@@ -233,7 +233,8 @@ func TestRun_WithIOStreams(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	// Error is expected when not logged in (isolated config has no token)
 	if err != nil {

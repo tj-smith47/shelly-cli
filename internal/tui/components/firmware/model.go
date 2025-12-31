@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -117,7 +118,7 @@ func DefaultStyles() Styles {
 			Foreground(colors.Highlight).
 			Bold(true),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(colors.Text),
 		Error: lipgloss.NewStyle().
 			Foreground(colors.Error),
 		Muted: lipgloss.NewStyle().
@@ -409,19 +410,13 @@ func (m Model) handleBatchComplete() Model {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Handle navigation keys first
+	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+		return m, nil
+	}
+
+	// Handle action keys
 	switch msg.String() {
-	case "j", "down":
-		m.scroller.CursorDown()
-	case "k", "up":
-		m.scroller.CursorUp()
-	case "g":
-		m.scroller.CursorToStart()
-	case "G":
-		m.scroller.CursorToEnd()
-	case "ctrl+d", "pgdown":
-		m.scroller.PageDown()
-	case "ctrl+u", "pgup":
-		m.scroller.PageUp()
 	case "space":
 		m = m.toggleSelection()
 	case "a":

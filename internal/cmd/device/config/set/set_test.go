@@ -194,7 +194,13 @@ func TestRun_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "test-device", "switch:0", []string{"name=Light"})
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "switch:0",
+		KeyValues: []string{"name=Light"},
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {
@@ -214,7 +220,13 @@ func TestRun_Timeout(t *testing.T) {
 	// Allow the timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "test-device", "switch:0", []string{"name=Light"})
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "switch:0",
+		KeyValues: []string{"name=Light"},
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to timeout
 	if err == nil {
@@ -232,7 +244,13 @@ func TestRun_InvalidKeyValueFormat(t *testing.T) {
 	defer cancel()
 
 	// Test invalid key=value format (no equals sign)
-	err := run(ctx, tf.Factory, "test-device", "switch:0", []string{"invalid"})
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "switch:0",
+		KeyValues: []string{"invalid"},
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to invalid format
 	if err == nil {
@@ -250,7 +268,13 @@ func TestRun_ValidKeyValuePairs(t *testing.T) {
 	cancel()
 
 	// Valid key=value pairs should parse correctly, but will fail due to cancelled context
-	err := run(ctx, tf.Factory, "test-device", "switch:0", []string{"name=Light", "initial_state=on"})
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "switch:0",
+		KeyValues: []string{"name=Light", "initial_state=on"},
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context (not due to parsing)
 	if err == nil {
@@ -381,9 +405,13 @@ func TestRun_MultipleKeyValuePairs(t *testing.T) {
 	cancel()
 
 	// Multiple key=value pairs
-	keyValues := []string{"name=Light", "initial_state=on", "auto_off=true"}
-
-	err := run(ctx, tf.Factory, "test-device", "switch:0", keyValues)
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "switch:0",
+		KeyValues: []string{"name=Light", "initial_state=on", "auto_off=true"},
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {
@@ -401,9 +429,13 @@ func TestRun_ValueWithSpaces(t *testing.T) {
 	cancel()
 
 	// Value with spaces (quoted in shell, but passed as single arg)
-	keyValues := []string{"name=Main Light Switch"}
-
-	err := run(ctx, tf.Factory, "test-device", "switch:0", keyValues)
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "switch:0",
+		KeyValues: []string{"name=Main Light Switch"},
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {
@@ -421,9 +453,13 @@ func TestRun_NestedKey(t *testing.T) {
 	cancel()
 
 	// Nested key (e.g., default.brightness)
-	keyValues := []string{"default.brightness=50"}
-
-	err := run(ctx, tf.Factory, "test-device", "light:0", keyValues)
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "light:0",
+		KeyValues: []string{"default.brightness=50"},
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {

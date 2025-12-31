@@ -15,14 +15,22 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-var (
-	outputFlag string
-	latestFlag bool
-	betaFlag   bool
-)
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Beta    bool
+	Device  string
+	Latest  bool
+	Output  string
+}
 
 // NewCommand creates the firmware download command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Factory: f,
+		Latest:  true,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "download <device>",
 		Aliases: []string{"dl"},
@@ -42,24 +50,25 @@ The firmware URL is determined by querying the device.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&outputFlag, "output", "o", "", "Output file path")
-	cmd.Flags().BoolVar(&latestFlag, "latest", true, "Download latest version")
-	cmd.Flags().BoolVar(&betaFlag, "beta", false, "Download beta version")
+	cmd.Flags().StringVarP(&opts.Output, "output", "o", "", "Output file path")
+	cmd.Flags().BoolVar(&opts.Latest, "latest", true, "Download latest version")
+	cmd.Flags().BoolVar(&opts.Beta, "beta", false, "Download beta version")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Determine stage
 	stage := "stable"
-	if betaFlag {
+	if opts.Beta {
 		stage = "beta"
 	}
 
@@ -67,7 +76,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	var fwURL string
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting firmware information...", func(ctx context.Context) error {
 		var urlErr error
-		fwURL, urlErr = svc.GetFirmwareURL(ctx, device, stage)
+		fwURL, urlErr = svc.GetFirmwareURL(ctx, opts.Device, stage)
 		return urlErr
 	})
 	if err != nil {
@@ -75,10 +84,10 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 	}
 
 	// Determine output filename
-	outputPath := outputFlag
+	outputPath := opts.Output
 	if outputPath == "" {
 		// Default to firmware_<device>_<stage>.zip
-		outputPath = fmt.Sprintf("firmware_%s_%s.zip", device, stage)
+		outputPath = fmt.Sprintf("firmware_%s_%s.zip", opts.Device, stage)
 	}
 
 	// Ensure parent directory exists

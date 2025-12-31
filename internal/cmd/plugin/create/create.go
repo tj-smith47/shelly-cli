@@ -12,12 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins/scaffold"
 )
 
+// Options holds the options for the create command.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Lang      string
+	Name      string
+	OutputDir string
+}
+
 // NewCommand creates the extension create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		lang      string
-		outputDir string
-	)
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "create <name>",
@@ -42,31 +47,32 @@ specified with --output.`,
   shelly extension create myext --output ~/projects`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0], lang, outputDir)
+			opts.Name = args[0]
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&lang, "lang", "l", "bash", "Extension language (bash, go, python)")
-	cmd.Flags().StringVarP(&outputDir, "output", "o", ".", "Output directory")
+	cmd.Flags().StringVarP(&opts.Lang, "lang", "l", "bash", "Extension language (bash, go, python)")
+	cmd.Flags().StringVarP(&opts.OutputDir, "output", "o", ".", "Output directory")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, name, lang, outputDir string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Normalize name and get full extension name
-	name = scaffold.NormalizeName(name)
+	name := scaffold.NormalizeName(opts.Name)
 	extName := scaffold.FullName(name)
 
 	// Create output directory
-	extDir := filepath.Join(outputDir, extName)
+	extDir := filepath.Join(opts.OutputDir, extName)
 	if err := os.MkdirAll(extDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Generate files based on language
-	switch lang {
+	switch opts.Lang {
 	case "bash", "sh":
 		if err := scaffold.Bash(extDir, extName, name); err != nil {
 			return err
@@ -80,7 +86,7 @@ func run(f *cmdutil.Factory, name, lang, outputDir string) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("unsupported language: %s (use bash, go, or python)", lang)
+		return fmt.Errorf("unsupported language: %s (use bash, go, or python)", opts.Lang)
 	}
 
 	ios.Success("Created extension scaffold in %s", extDir)

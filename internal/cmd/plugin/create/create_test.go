@@ -524,7 +524,8 @@ func TestRun_BashLanguage(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "testbash", "bash", tmpDir)
+	opts := &Options{Factory: tf.Factory, Name: "testbash", Lang: "bash", OutputDir: tmpDir}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -546,7 +547,8 @@ func TestRun_GoLanguage(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "testgo", "go", tmpDir)
+	opts := &Options{Factory: tf.Factory, Name: "testgo", Lang: "go", OutputDir: tmpDir}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -568,7 +570,8 @@ func TestRun_PythonLanguage(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "testpy", "python", tmpDir)
+	opts := &Options{Factory: tf.Factory, Name: "testpy", Lang: "python", OutputDir: tmpDir}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -590,7 +593,8 @@ func TestRun_ShAlias(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "testsh", "sh", tmpDir)
+	opts := &Options{Factory: tf.Factory, Name: "testsh", Lang: "sh", OutputDir: tmpDir}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -608,7 +612,8 @@ func TestRun_GolangAlias(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "testgolang", "golang", tmpDir)
+	opts := &Options{Factory: tf.Factory, Name: "testgolang", Lang: "golang", OutputDir: tmpDir}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -626,7 +631,8 @@ func TestRun_PyAlias(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "testpy2", "py", tmpDir)
+	opts := &Options{Factory: tf.Factory, Name: "testpy2", Lang: "py", OutputDir: tmpDir}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -644,7 +650,8 @@ func TestRun_UnsupportedLanguage(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "testjava", "java", tmpDir)
+	opts := &Options{Factory: tf.Factory, Name: "testjava", Lang: "java", OutputDir: tmpDir}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for unsupported language")
 	}
@@ -661,7 +668,8 @@ func TestRun_DirectoryCreationError(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 	// Use a path that cannot be created
-	err := run(tf.Factory, "test", "bash", "/dev/null/invalid")
+	opts := &Options{Factory: tf.Factory, Name: "test", Lang: "bash", OutputDir: "/dev/null/invalid"}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for invalid output directory")
 	}

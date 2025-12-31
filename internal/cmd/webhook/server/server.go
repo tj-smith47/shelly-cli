@@ -15,16 +15,18 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Port       int
-	Interface  string
-	LogJSON    bool
+	Factory    *cmdutil.Factory
 	AutoConfig bool
 	Devices    []string
+	Interface  string
+	LogJSON    bool
+	Port       int
 }
 
 // NewCommand creates the webhook server command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
+		Factory:   f,
 		Port:      8080,
 		Interface: "0.0.0.0",
 	}
@@ -52,7 +54,7 @@ The server will display its URL which can be used to configure device webhooks.`
   shelly webhook server --auto-config --device kitchen --device bedroom`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -65,8 +67,8 @@ The server will display its URL which can be used to configure device webhooks.`
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Get local IP for display
 	localIP := webhook.GetLocalIP()
@@ -83,7 +85,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	// Auto-configure devices if requested
 	if opts.AutoConfig && len(opts.Devices) > 0 {
 		ios.Info("Auto-configuring devices...")
-		svc := f.ShellyService()
+		svc := opts.Factory.ShellyService()
 		webhook.ConfigureDevices(ctx, ios, svc, opts.Devices, serverURL)
 		ios.Println()
 	}

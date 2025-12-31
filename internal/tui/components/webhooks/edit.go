@@ -8,10 +8,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -54,53 +53,13 @@ type EditModel struct {
 	err       error
 	width     int
 	height    int
-	styles    EditStyles
+	styles    editmodal.Styles
 
 	// Form inputs
 	nameInput   form.TextInput
 	eventInput  form.TextInput
 	urlsInput   form.TextArea
 	enableInput form.Toggle
-}
-
-// EditStyles holds styles for the webhook edit modal.
-type EditStyles struct {
-	Modal      lipgloss.Style
-	Title      lipgloss.Style
-	Label      lipgloss.Style
-	LabelFocus lipgloss.Style
-	Error      lipgloss.Style
-	Help       lipgloss.Style
-	Selector   lipgloss.Style
-}
-
-// DefaultEditStyles returns the default edit modal styles.
-func DefaultEditStyles() EditStyles {
-	colors := theme.GetSemanticColors()
-	return EditStyles{
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Width(8),
-		LabelFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Width(8),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Selector: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-	}
 }
 
 // NewEditModel creates a new webhook edit modal.
@@ -136,7 +95,7 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	return EditModel{
 		ctx:         ctx,
 		svc:         svc,
-		styles:      DefaultEditStyles(),
+		styles:      editmodal.DefaultStyles().WithLabelWidth(8),
 		nameInput:   nameInput,
 		eventInput:  eventInput,
 		urlsInput:   urlsInput,

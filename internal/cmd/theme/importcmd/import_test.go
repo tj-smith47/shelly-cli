@@ -440,7 +440,8 @@ func TestRun_ValidThemeWithoutApply(t *testing.T) {
 	}
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, themeFile, false)
+	opts := &Options{Factory: tf.Factory, File: themeFile, Apply: false}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -466,7 +467,8 @@ colors:
 	}
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, themeFile, true)
+	opts := &Options{Factory: tf.Factory, File: themeFile, Apply: true}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -481,7 +483,8 @@ func TestRun_FileNotFound(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, "/nonexistent/file.yaml", false)
+	opts := &Options{Factory: tf.Factory, File: "/nonexistent/file.yaml", Apply: false}
+	err := run(opts)
 	if err == nil {
 		t.Error("run() expected error for non-existent file")
 	}
@@ -498,7 +501,8 @@ func TestRun_InvalidYAML(t *testing.T) {
 	}
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, themeFile, false)
+	opts := &Options{Factory: tf.Factory, File: themeFile, Apply: false}
+	err := run(opts)
 	if err == nil {
 		t.Error("run() expected error for invalid YAML")
 	}
@@ -516,7 +520,8 @@ func TestRun_InvalidThemeName(t *testing.T) {
 	}
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, themeFile, false)
+	opts := &Options{Factory: tf.Factory, File: themeFile, Apply: false}
+	err := run(opts)
 	if err == nil {
 		t.Error("run() expected error for invalid theme name")
 	}
@@ -538,7 +543,8 @@ func TestRun_MissingNameAndColors(t *testing.T) {
 	}
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, themeFile, false)
+	opts := &Options{Factory: tf.Factory, File: themeFile, Apply: false}
+	err := run(opts)
 	if err == nil {
 		t.Error("run() expected error for missing name and colors")
 	}
@@ -564,7 +570,8 @@ colors:
 	}
 
 	tf := factory.NewTestFactory(t)
-	err := run(tf.Factory, themeFile, false)
+	opts := &Options{Factory: tf.Factory, File: themeFile, Apply: false}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

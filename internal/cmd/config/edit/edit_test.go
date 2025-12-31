@@ -165,12 +165,13 @@ func TestRun_ConfigNotFound(t *testing.T) {
 	// Cannot use t.Parallel() with t.Setenv()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory}
 
 	// Set HOME to a temp directory with no config
 	tempDir := t.TempDir()
 	t.Setenv("HOME", tempDir)
 
-	err := run(context.Background(), tf.Factory)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error when config file not found")
 	}
@@ -186,6 +187,7 @@ func TestRun_NoEditorFound(t *testing.T) {
 	// Cannot use t.Parallel() with t.Setenv()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory}
 
 	// Create a temp directory with a config file
 	tempDir := t.TempDir()
@@ -207,7 +209,7 @@ func TestRun_NoEditorFound(t *testing.T) {
 	// Modify PATH to ensure no editor can be found
 	t.Setenv("PATH", tempDir)
 
-	err := run(context.Background(), tf.Factory)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error when no editor found")
 	}
@@ -223,6 +225,7 @@ func TestRun_ContextCancelled(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory}
 
 	// Create a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -230,7 +233,7 @@ func TestRun_ContextCancelled(t *testing.T) {
 
 	// Even with cancelled context, we should get an error
 	// (either from config not found, no editor, or context cancellation)
-	err := run(ctx, tf.Factory)
+	err := run(ctx, opts)
 	if err == nil {
 		// This might succeed if config exists and editor runs quickly
 		// but generally we expect an error

@@ -9,8 +9,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the log clear command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "clear",
 		Aliases: []string{"clean", "truncate"},
@@ -20,15 +27,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly log clear`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f)
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	logPath, err := cmdutil.GetLogPath()
 	if err != nil {

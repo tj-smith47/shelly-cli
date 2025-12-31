@@ -477,7 +477,11 @@ func TestRun_WithContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err = run(ctx, f, "test-device")
+	opts := &Options{
+		Factory: f,
+		Device:  "test-device",
+	}
+	err = run(ctx, opts)
 	// Context cancelled should result in error
 	if err == nil {
 		t.Log("run with cancelled context may succeed if no connection attempted")
@@ -517,15 +521,16 @@ func TestRun_WithFilter(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 	demo.InjectIntoFactory(f)
 
-	// Set filter flag
-	filterFlag = switchComponent
-	defer func() { filterFlag = "" }()
-
 	// Create a short-lived context
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err = run(ctx, f, "test-device")
+	opts := &Options{
+		Factory: f,
+		Device:  "test-device",
+		Filter:  switchComponent,
+	}
+	err = run(ctx, opts)
 	// We expect timeout or connection error
 	if err == nil {
 		t.Log("run completed or no error from filter test")
@@ -565,14 +570,15 @@ func TestRun_NoFilter(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 	demo.InjectIntoFactory(f)
 
-	// Reset filter
-	filterFlag = ""
-
 	// Create a short-lived context
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err = run(ctx, f, "test-device")
+	opts := &Options{
+		Factory: f,
+		Device:  "test-device",
+	}
+	err = run(ctx, opts)
 	// We expect timeout or connection error
 	if err == nil {
 		t.Log("run completed or no error")
@@ -612,15 +618,15 @@ func TestRun_OutputWithTitle(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 	demo.InjectIntoFactory(f)
 
-	// Reset format to default (not JSON)
-	// Store original format if needed
-	filterFlag = ""
-
 	// Create a short-lived context
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	if err := run(ctx, f, "test-device"); err != nil {
+	opts := &Options{
+		Factory: f,
+		Device:  "test-device",
+	}
+	if err := run(ctx, opts); err != nil {
 		t.Logf("run returned error (expected with timeout): %v", err)
 	}
 
@@ -668,13 +674,15 @@ func TestRun_WithJSONOutput(t *testing.T) {
 	viper.Set("output", string(output.FormatJSON))
 	defer viper.Set("output", "")
 
-	filterFlag = ""
-
 	// Create a short-lived context
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	if err := run(ctx, f, "test-device"); err != nil {
+	opts := &Options{
+		Factory: f,
+		Device:  "test-device",
+	}
+	if err := run(ctx, opts); err != nil {
 		t.Logf("run returned error (expected with timeout): %v", err)
 	}
 
@@ -804,8 +812,7 @@ func TestNewCommand_CommandStructure(t *testing.T) {
 func TestEventHandler_FilterMatching(t *testing.T) {
 	t.Parallel()
 
-	filterFlag = switchComponent
-	defer func() { filterFlag = "" }()
+	filter := switchComponent
 
 	event := model.DeviceEvent{
 		Device:      "test-device",
@@ -819,7 +826,7 @@ func TestEventHandler_FilterMatching(t *testing.T) {
 	}
 
 	// Test that matching filter passes through.
-	passes := filterFlag == "" || event.Component == filterFlag
+	passes := filter == "" || event.Component == filter
 
 	if !passes {
 		t.Error("Event with matching filter should pass through")
@@ -830,8 +837,7 @@ func TestEventHandler_FilterMatching(t *testing.T) {
 func TestEventHandler_FilterNonMatching(t *testing.T) {
 	t.Parallel()
 
-	filterFlag = switchComponent
-	defer func() { filterFlag = "" }()
+	filter := switchComponent
 
 	event := model.DeviceEvent{
 		Device:      "test-device",
@@ -843,7 +849,7 @@ func TestEventHandler_FilterNonMatching(t *testing.T) {
 	}
 
 	// Test that non-matching filter blocks event.
-	passes := filterFlag == "" || event.Component == filterFlag
+	passes := filter == "" || event.Component == filter
 
 	if passes {
 		t.Error("Event with non-matching filter should be blocked")
@@ -854,7 +860,7 @@ func TestEventHandler_FilterNonMatching(t *testing.T) {
 func TestEventHandler_NoFilter(t *testing.T) {
 	t.Parallel()
 
-	filterFlag = ""
+	filter := ""
 
 	event := model.DeviceEvent{
 		Device:      "test-device",
@@ -866,7 +872,7 @@ func TestEventHandler_NoFilter(t *testing.T) {
 	}
 
 	// Test that empty filter allows all events.
-	passes := filterFlag == "" || event.Component == filterFlag
+	passes := filter == "" || event.Component == filter
 
 	if !passes {
 		t.Error("Event with empty filter should pass through")
@@ -1007,8 +1013,7 @@ func TestEventFilter_DifferentComponents(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			filterFlag = tt.filterValue
-			defer func() { filterFlag = "" }()
+			filter := tt.filterValue
 
 			event := model.DeviceEvent{
 				Device:      "test-device",
@@ -1019,7 +1024,7 @@ func TestEventFilter_DifferentComponents(t *testing.T) {
 				Data:        map[string]any{},
 			}
 
-			passes := filterFlag == "" || event.Component == filterFlag
+			passes := filter == "" || event.Component == filter
 
 			if passes != tt.shouldPass {
 				t.Errorf("Event filter: expected %v, got %v", tt.shouldPass, passes)
@@ -1169,31 +1174,32 @@ func TestNewCommand_DeviceArgumentParsing(t *testing.T) {
 	}
 }
 
-// TestFilterFlag_Persistence tests filter flag persistence across calls.
-func TestFilterFlag_Persistence(t *testing.T) {
+// TestFilterOption_InOptions tests that filter can be set in Options struct.
+func TestFilterOption_InOptions(t *testing.T) {
 	t.Parallel()
 
-	// Test initial state
-	initialValue := filterFlag
-	if initialValue != "" {
-		// Reset if it somehow has a value from a previous test
-		filterFlag = ""
+	f := cmdutil.NewFactory()
+
+	// Test Options with filter
+	opts := &Options{
+		Factory: f,
+		Device:  "test-device",
+		Filter:  switchComponent,
 	}
 
-	// Set filter
-	filterFlag = switchComponent
-	if filterFlag != switchComponent {
-		t.Error("Filter flag should persist after being set")
+	if opts.Filter != switchComponent {
+		t.Errorf("Filter = %q, want %q", opts.Filter, switchComponent)
 	}
 
-	// Verify it can be changed
-	filterFlag = "light"
-	if filterFlag != "light" {
-		t.Error("Filter flag should be changeable")
+	// Test Options without filter
+	optsNoFilter := &Options{
+		Factory: f,
+		Device:  "test-device",
 	}
 
-	// Reset for next tests
-	filterFlag = ""
+	if optsNoFilter.Filter != "" {
+		t.Errorf("Filter should be empty, got %q", optsNoFilter.Filter)
+	}
 }
 
 // TestNewCommand_MultipleFlags tests multiple simultaneous flag operations.

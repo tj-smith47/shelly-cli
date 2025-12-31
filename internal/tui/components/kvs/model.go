@@ -15,6 +15,7 @@ import (
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -325,19 +326,13 @@ func (m Model) handleDeleteConfirmation(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Handle navigation keys first
+	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+		return m, nil
+	}
+
+	// Handle action keys
 	switch msg.String() {
-	case "j", "down":
-		m.scroller.CursorDown()
-	case "k", "up":
-		m.scroller.CursorUp()
-	case "g":
-		m.scroller.CursorToStart()
-	case "G":
-		m.scroller.CursorToEnd()
-	case "ctrl+d", "pgdown":
-		m.scroller.PageDown()
-	case "ctrl+u", "pgup":
-		m.scroller.PageUp()
 	case "enter":
 		return m, m.selectItem()
 	case "e":

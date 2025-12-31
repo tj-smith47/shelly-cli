@@ -14,8 +14,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the config edit command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "edit",
 		Aliases: []string{"e"},
@@ -36,15 +43,15 @@ devices, aliases, groups, scenes, and other settings.`,
   # Set EDITOR and open
   EDITOR=nano shelly config edit`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f)
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Get config file path
 	configDir, err := config.Dir()

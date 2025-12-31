@@ -13,9 +13,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Action   string
+	Channel  int
+	DeviceID string
+}
+
 // NewCommand creates the cloud control command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var channel int
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "control <device-id> <action>",
@@ -48,20 +56,22 @@ This command requires authentication with 'shelly cloud login'.`,
   shelly cloud control abc123 brightness=75`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1], channel)
+			opts.DeviceID = args[0]
+			opts.Action = args[1]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().IntVar(&channel, "channel", 0, "Device channel/relay number")
+	cmd.Flags().IntVar(&opts.Channel, "channel", 0, "Device channel/relay number")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, deviceID, action string, channel int) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2)
 	defer cancel()
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()
@@ -75,7 +85,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceID, action string, chann
 	client := network.NewCloudClient(cfg.Cloud.AccessToken)
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Sending command...", func(ctx context.Context) error {
-		result, err := client.ExecuteAction(ctx, deviceID, action, channel)
+		result, err := client.ExecuteAction(ctx, opts.DeviceID, opts.Action, opts.Channel)
 		if err != nil {
 			return err
 		}

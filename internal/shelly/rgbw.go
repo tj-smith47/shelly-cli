@@ -3,11 +3,14 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // RGBWInfo holds RGBW information for list operations.
@@ -21,6 +24,31 @@ type RGBWInfo struct {
 	Blue       int
 	White      int
 	Power      float64
+}
+
+// ListHeaders returns the column headers for the table.
+func (r RGBWInfo) ListHeaders() []string {
+	return []string{"ID", "Name", "State", "Color", "White", "Brightness", "Power"}
+}
+
+// ListRow returns the formatted row values for the table.
+func (r RGBWInfo) ListRow() []string {
+	name := output.FormatComponentName(r.Name, "rgbw", r.ID)
+	state := output.RenderOnOff(r.Output, output.CaseUpper, theme.FalseError)
+	color := fmt.Sprintf("R:%d G:%d B:%d", r.Red, r.Green, r.Blue)
+
+	white := "-"
+	if r.White >= 0 {
+		white = fmt.Sprintf("%d", r.White)
+	}
+
+	brightness := "-"
+	if r.Brightness >= 0 {
+		brightness = fmt.Sprintf("%d%%", r.Brightness)
+	}
+
+	power := output.FormatPowerTableValue(r.Power)
+	return []string{fmt.Sprintf("%d", r.ID), name, state, color, white, brightness, power}
 }
 
 // RGBWSetParams holds parameters for RGBWSet operation.

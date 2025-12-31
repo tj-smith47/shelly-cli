@@ -393,7 +393,8 @@ func TestRun_ContextCancelled(t *testing.T) {
 	cancel()
 
 	// The run function should respect context cancellation
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context (connection will fail)
 	if err == nil {
@@ -413,7 +414,8 @@ func TestRun_Timeout(t *testing.T) {
 	// Allow the timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
 
 	// Expect an error due to timeout
 	if err == nil {
@@ -450,7 +452,8 @@ func TestRun_AcceptsIPAddress(t *testing.T) {
 	cancel()
 
 	// The run function should accept IP addresses
-	err := run(ctx, tf.Factory, "192.168.1.100")
+	opts := &Options{Factory: tf.Factory, Device: "192.168.1.100"}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context, but the function should be invoked
 	if err == nil {
@@ -468,7 +471,8 @@ func TestRun_AcceptsDeviceName(t *testing.T) {
 	cancel()
 
 	// The run function should accept device names
-	err := run(ctx, tf.Factory, "living-room")
+	opts := &Options{Factory: tf.Factory, Device: "living-room"}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context, but the function should be invoked
 	if err == nil {
@@ -521,7 +525,8 @@ func TestRun_MultipleDeviceFormats(t *testing.T) {
 			cancel()
 
 			// The run function should accept various device formats
-			err := run(ctx, tf.Factory, tt.device)
+			opts := &Options{Factory: tf.Factory, Device: tt.device}
+			err := run(ctx, opts)
 
 			// Expect an error due to cancelled context, but no panic
 			if err == nil {
@@ -543,7 +548,8 @@ func TestRun_UsesIOStreams(t *testing.T) {
 	// Give time for context to timeout
 	time.Sleep(2 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
 
 	// We expect an error due to timeout, but the factory methods should have been called
 	if err == nil {
@@ -567,7 +573,8 @@ func TestRun_UsesShellyService(t *testing.T) {
 	cancel()
 
 	// The run function should attempt to use the shelly service
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
 
 	// The error should be non-nil since context is cancelled
 	if err == nil {
@@ -615,7 +622,8 @@ func TestRun_ContextDeadlineExceeded(t *testing.T) {
 	defer cancel()
 
 	// The run function should return an error due to deadline exceeded
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
 
 	if err == nil {
 		t.Error("Expected error with deadline exceeded context")
@@ -705,7 +713,8 @@ func TestRun_ErrorPropagation(t *testing.T) {
 			ctx, cancel := tt.ctxSetup()
 			defer cancel()
 
-			err := run(ctx, tf.Factory, tt.device)
+			opts := &Options{Factory: tf.Factory, Device: tt.device}
+			err := run(ctx, opts)
 
 			if tt.wantErr && err == nil {
 				t.Error("Expected error but got nil")
@@ -727,7 +736,8 @@ func TestRun_FactoryMethodsCalled(t *testing.T) {
 	defer cancel()
 
 	// The run function should call IOStreams and ShellyService from the factory
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
 
 	// Error is expected since no real device exists
 	if err == nil {
@@ -748,7 +758,8 @@ func TestRun_EmptyDeviceString(t *testing.T) {
 	cancel()
 
 	// Test with empty device string - should still attempt connection
-	err := run(ctx, tf.Factory, "")
+	opts := &Options{Factory: tf.Factory, Device: ""}
+	err := run(ctx, opts)
 
 	// Error expected due to cancelled context or invalid device
 	if err == nil {
@@ -778,7 +789,8 @@ func TestRun_SpecialCharactersInDevice(t *testing.T) {
 			cancel()
 
 			// Should handle special characters without panic
-			err := run(ctx, tf.Factory, device)
+			opts := &Options{Factory: tf.Factory, Device: device}
+			err := run(ctx, opts)
 
 			// Error expected due to cancelled context
 			if err == nil {
@@ -818,7 +830,8 @@ func TestRun_MultipleCalls(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		err := run(ctx, tf.Factory, "device")
+		opts := &Options{Factory: tf.Factory, Device: "device"}
+		err := run(ctx, opts)
 		if err == nil {
 			t.Errorf("Call %d: Expected error with cancelled context", i)
 		}
@@ -836,7 +849,8 @@ func TestRun_OutputBufferAccess(t *testing.T) {
 	// Reset buffers before test
 	tf.Reset()
 
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error with cancelled context")
 	}
@@ -1123,7 +1137,8 @@ func TestRun_CancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	err = run(ctx, tf.Factory, "cancel-test")
+	opts := &Options{Factory: tf.Factory, Device: "cancel-test"}
+	err = run(ctx, opts)
 	if err == nil {
 		t.Error("expected error for cancelled context")
 	}
@@ -1270,7 +1285,8 @@ func TestRun_MultipleDevices(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	// Test first device
-	err = run(context.Background(), tf.Factory, "device1")
+	opts := &Options{Factory: tf.Factory, Device: "device1"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run(device1) error = %v", err)
 	}
@@ -1279,7 +1295,8 @@ func TestRun_MultipleDevices(t *testing.T) {
 	tf.Reset()
 
 	// Test second device
-	err = run(context.Background(), tf.Factory, "device2")
+	opts = &Options{Factory: tf.Factory, Device: "device2"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run(device2) error = %v", err)
 	}
@@ -1321,7 +1338,8 @@ func TestRun_VerboseMode_ShowsRawConfig(t *testing.T) {
 	viper.Set("verbose", true)
 	defer viper.Set("verbose", false)
 
-	err = run(context.Background(), tf.Factory, "verbose-dev")
+	opts := &Options{Factory: tf.Factory, Device: "verbose-dev"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -1369,7 +1387,8 @@ func TestRun_NoCustomCA_ShowsCertInstall(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "no-cert-dev")
+	opts := &Options{Factory: tf.Factory, Device: "no-cert-dev"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -1413,7 +1432,8 @@ func TestRun_Gen2Success_OutputFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "output-fmt-dev")
+	opts := &Options{Factory: tf.Factory, Device: "output-fmt-dev"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -1463,7 +1483,8 @@ func TestRun_WithMQTTConfig(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	err = run(context.Background(), tf.Factory, "mqtt-dev")
+	opts := &Options{Factory: tf.Factory, Device: "mqtt-dev"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -1511,7 +1532,8 @@ func TestRun_VerboseWithValidConfig(t *testing.T) {
 	viper.Set("verbose", true)
 	defer viper.Set("verbose", false)
 
-	err = run(context.Background(), tf.Factory, "verbose-cfg-dev")
+	opts := &Options{Factory: tf.Factory, Device: "verbose-cfg-dev"}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -1561,7 +1583,8 @@ func TestRun_DirectCallToRun(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	ctx := context.Background()
-	err = run(ctx, tf.Factory, "direct-call-dev")
+	opts := &Options{Factory: tf.Factory, Device: "direct-call-dev"}
+	err = run(ctx, opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

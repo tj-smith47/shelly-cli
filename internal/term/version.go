@@ -79,4 +79,3 @@ func DisplayUpdateStatus(ios *iostreams.IOStreams, currentVersion, availableVers
 		ios.Printf("Already at latest version (%s)\n", currentVersion)
 	}
 }
-

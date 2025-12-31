@@ -107,7 +107,7 @@ func DefaultEditStyles() EditStyles {
 			Bold(true).
 			MarginBottom(1),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(12),
 		LabelFocus: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
@@ -718,7 +718,24 @@ func (m EditModel) renderField(field EditField, label, input string) string {
 		labelStr = m.styles.Label.Render(label)
 	}
 
-	return selector + labelStr + " " + input
+	prefix := selector + labelStr + " "
+
+	// Handle multi-line inputs by indenting subsequent lines
+	lines := strings.Split(input, "\n")
+	if len(lines) <= 1 {
+		return prefix + input
+	}
+
+	// Calculate indent for subsequent lines (selector width + label width + space)
+	indent := strings.Repeat(" ", 2+12+1) // 2 for selector, 12 for label width, 1 for space
+
+	var result strings.Builder
+	result.WriteString(prefix + lines[0])
+	for i := 1; i < len(lines); i++ {
+		result.WriteString("\n")
+		result.WriteString(indent + lines[i])
+	}
+	return result.String()
 }
 
 func (m EditModel) renderAliasSection() string {

@@ -343,9 +343,9 @@ func TestRun_NoLogFile(t *testing.T) {
 	_ = setupTestConfigDir(t)
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{}
+	opts := &Options{Factory: tf.Factory}
 
-	err := run(tf.Factory, opts)
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -364,9 +364,9 @@ func TestRun_ExportToStdout(t *testing.T) {
 	createLogFile(t, configDir, logContent)
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{} // No output file
+	opts := &Options{Factory: tf.Factory} // No output file
 
-	err := run(tf.Factory, opts)
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -388,9 +388,9 @@ func TestRun_ExportToFile(t *testing.T) {
 	outputFile := filepath.Join(tmpDir, "output.log")
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Output: outputFile}
+	opts := &Options{Factory: tf.Factory, Output: outputFile}
 
-	err := run(tf.Factory, opts)
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -423,9 +423,9 @@ func TestRun_WriteError(t *testing.T) {
 	outputFile := filepath.Join(tmpDir, "nonexistent-dir", "output.log")
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Output: outputFile}
+	opts := &Options{Factory: tf.Factory, Output: outputFile}
 
-	err := run(tf.Factory, opts)
+	err := run(opts)
 	if err == nil {
 		t.Error("run() should error when write fails")
 	}
@@ -438,9 +438,9 @@ func TestRun_EmptyLogFile(t *testing.T) {
 	createLogFile(t, configDir, "")
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{} // Export to stdout
+	opts := &Options{Factory: tf.Factory} // Export to stdout
 
-	err := run(tf.Factory, opts)
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -471,9 +471,9 @@ func TestRun_LargeLogFile(t *testing.T) {
 	outputFile := filepath.Join(tmpDir, "large-export.log")
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Output: outputFile}
+	opts := &Options{Factory: tf.Factory, Output: outputFile}
 
-	err := run(tf.Factory, opts)
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

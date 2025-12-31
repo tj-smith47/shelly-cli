@@ -14,17 +14,26 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	dryRunFlag        bool
-	skipNetworkFlag   bool
-	skipScriptsFlag   bool
-	skipSchedulesFlag bool
-	skipWebhooksFlag  bool
-	decryptFlag       string
-)
+// Options holds the command options.
+type Options struct {
+	Factory       *cmdutil.Factory
+	Decrypt       string
+	Device        string
+	DryRun        bool
+	FilePath      string
+	SkipNetwork   bool
+	SkipScripts   bool
+	SkipSchedules bool
+	SkipWebhooks  bool
+}
 
 // NewCommand creates the backup restore command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Factory:     f,
+		SkipNetwork: true,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "restore <device> <file>",
 		Aliases: []string{"apply", "load"},
@@ -52,28 +61,30 @@ Network configuration (WiFi, Ethernet) is skipped by default with
   shelly backup restore living-room backup.json --skip-scripts`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1])
+			opts.Device = args[0]
+			opts.FilePath = args[1]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would be restored without applying")
-	cmd.Flags().BoolVar(&skipNetworkFlag, "skip-network", true, "Skip network configuration (WiFi, Ethernet)")
-	cmd.Flags().BoolVar(&skipScriptsFlag, "skip-scripts", false, "Skip script restoration")
-	cmd.Flags().BoolVar(&skipSchedulesFlag, "skip-schedules", false, "Skip schedule restoration")
-	cmd.Flags().BoolVar(&skipWebhooksFlag, "skip-webhooks", false, "Skip webhook restoration")
-	cmd.Flags().StringVarP(&decryptFlag, "decrypt", "d", "", "Password to decrypt backup")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Show what would be restored without applying")
+	cmd.Flags().BoolVar(&opts.SkipNetwork, "skip-network", true, "Skip network configuration (WiFi, Ethernet)")
+	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Skip script restoration")
+	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Skip schedule restoration")
+	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Skip webhook restoration")
+	cmd.Flags().StringVarP(&opts.Decrypt, "decrypt", "d", "", "Password to decrypt backup")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*5)
 	defer cancel()
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
 	// Read backup file
-	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is user-provided CLI argument
+	data, err := os.ReadFile(opts.FilePath) //#nosec G304 -- FilePath is user-provided CLI argument
 	if err != nil {
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}
@@ -85,31 +96,31 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Check encryption
-	if bkp.Encrypted() && decryptFlag == "" {
+	if bkp.Encrypted() && opts.Decrypt == "" {
 		return fmt.Errorf("backup is encrypted, use --decrypt to provide password")
 	}
 
-	opts := backup.RestoreOptions{
-		DryRun:        dryRunFlag,
-		SkipNetwork:   skipNetworkFlag,
-		SkipScripts:   skipScriptsFlag,
-		SkipSchedules: skipSchedulesFlag,
-		SkipWebhooks:  skipWebhooksFlag,
-		Password:      decryptFlag,
+	restoreOpts := backup.RestoreOptions{
+		DryRun:        opts.DryRun,
+		SkipNetwork:   opts.SkipNetwork,
+		SkipScripts:   opts.SkipScripts,
+		SkipSchedules: opts.SkipSchedules,
+		SkipWebhooks:  opts.SkipWebhooks,
+		Password:      opts.Decrypt,
 	}
 
-	if dryRunFlag {
+	if opts.DryRun {
 		ios.Title("Dry run - Restore preview")
 		ios.Println()
-		term.DisplayRestorePreview(ios, bkp, opts)
+		term.DisplayRestorePreview(ios, bkp, restoreOpts)
 		return nil
 	}
 
-	svc := f.ShellyService()
+	svc := opts.Factory.ShellyService()
 	var result *backup.RestoreResult
 	err = cmdutil.RunWithSpinner(ctx, ios, "Restoring backup...", func(ctx context.Context) error {
 		var restoreErr error
-		result, restoreErr = svc.RestoreBackup(ctx, device, bkp, opts)
+		result, restoreErr = svc.RestoreBackup(ctx, opts.Device, bkp, restoreOpts)
 		return restoreErr
 	})
 	if err != nil {
@@ -117,7 +128,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Print results
-	ios.Success("Backup restored to %s", device)
+	ios.Success("Backup restored to %s", opts.Device)
 	term.DisplayRestoreResult(ios, result)
 
 	return nil

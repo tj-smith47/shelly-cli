@@ -12,8 +12,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Component string
+	Device    string
+	KeyValues []string
+}
+
 // NewCommand creates the config set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "set <device> <component> <key>=<value>...",
 		Aliases: []string{"write", "update"},
@@ -31,26 +41,26 @@ Specify key=value pairs to update. Only the specified keys will be modified.`,
   shelly config set living-room light:0 default.brightness=50`,
 		Args: cobra.MinimumNArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
-			component := args[1]
-			keyValues := args[2:]
-			return run(cmd.Context(), f, device, component, keyValues)
+			opts.Device = args[0]
+			opts.Component = args[1]
+			opts.KeyValues = args[2:]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyValues []string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
-	ios := f.IOStreams()
+	svc := opts.Factory.ShellyService()
+	ios := opts.Factory.IOStreams()
 
 	// Parse key=value pairs
 	cfg := make(map[string]any)
-	for _, kv := range keyValues {
+	for _, kv := range opts.KeyValues {
 		parts := strings.SplitN(kv, "=", 2)
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid key=value format: %s", kv)
@@ -61,12 +71,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string, keyV
 	}
 
 	err := cmdutil.RunWithSpinner(ctx, ios, "Setting configuration...", func(ctx context.Context) error {
-		return svc.SetComponentConfig(ctx, device, component, cfg)
+		return svc.SetComponentConfig(ctx, opts.Device, opts.Component, cfg)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set configuration: %w", err)
 	}
 
-	ios.Success("Configuration updated for %s on %s", component, device)
+	ios.Success("Configuration updated for %s on %s", opts.Component, opts.Device)
 	return nil
 }

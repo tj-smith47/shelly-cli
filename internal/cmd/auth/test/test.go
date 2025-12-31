@@ -16,14 +16,17 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	User     string
+	Factory  *cmdutil.Factory
+	Device   string
 	Password string
 	Timeout  time.Duration
+	User     string
 }
 
 // NewCommand creates the auth test command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
+		Factory: f,
 		Timeout: 10 * time.Second,
 	}
 
@@ -50,7 +53,8 @@ Exit codes:
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -61,16 +65,16 @@ Exit codes:
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	ios.Info("Testing authentication for %s...", device)
+	ios.Info("Testing authentication for %s...", opts.Device)
 
-	return svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+	return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 		if dev.IsGen1() {
 			return fmt.Errorf("auth test is only supported on Gen2+ devices")
 		}
@@ -104,7 +108,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		ios.Success("Authentication successful!")
 		ios.Println("")
 
-		ios.Printf("Device: %s\n", device)
+		ios.Printf("Device: %s\n", opts.Device)
 		ios.Printf("ID: %s\n", result.ID)
 		ios.Printf("MAC: %s\n", result.MAC)
 

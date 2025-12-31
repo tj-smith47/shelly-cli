@@ -11,9 +11,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the set command.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Save      bool
+	ThemeName string
+}
+
 // NewCommand creates the theme set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var save bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "set <theme>",
@@ -30,37 +37,38 @@ the theme is only applied for the current session.`,
   shelly theme set nord --save`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.ThemeNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(f, args[0], save)
+		RunE: func(_ *cobra.Command, args []string) error {
+			opts.ThemeName = args[0]
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&save, "save", false, "Save theme to configuration file")
+	cmd.Flags().BoolVar(&opts.Save, "save", false, "Save theme to configuration file")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, themeName string, save bool) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Check if theme exists
-	if _, ok := theme.GetTheme(themeName); !ok {
-		return fmt.Errorf("theme not found: %s\nRun 'shelly theme list' to see available themes", themeName)
+	if _, ok := theme.GetTheme(opts.ThemeName); !ok {
+		return fmt.Errorf("theme not found: %s\nRun 'shelly theme list' to see available themes", opts.ThemeName)
 	}
 
 	// Set the theme
-	if !theme.SetTheme(themeName) {
-		return fmt.Errorf("failed to set theme: %s", themeName)
+	if !theme.SetTheme(opts.ThemeName) {
+		return fmt.Errorf("failed to set theme: %s", opts.ThemeName)
 	}
 
 	// Save to config if requested
-	if save {
-		if err := theme.SaveTheme(themeName); err != nil {
+	if opts.Save {
+		if err := theme.SaveTheme(opts.ThemeName); err != nil {
 			return fmt.Errorf("failed to save theme to config: %w", err)
 		}
-		ios.Success("Theme set to '%s' and saved to config", themeName)
+		ios.Success("Theme set to '%s' and saved to config", opts.ThemeName)
 	} else {
-		ios.Success("Theme set to '%s'", themeName)
+		ios.Success("Theme set to '%s'", opts.ThemeName)
 	}
 
 	return nil

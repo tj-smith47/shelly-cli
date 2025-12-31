@@ -30,13 +30,17 @@ var discovererFactory = func() Discoverer {
 	return discovery.NewMDNSDiscoverer()
 }
 
+// Options holds the command options.
+type Options struct {
+	Factory      *cmdutil.Factory
+	Register     bool
+	SkipExisting bool
+	Timeout      time.Duration
+}
+
 // NewCommand creates the mDNS discovery command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		timeout      time.Duration
-		register     bool
-		skipExisting bool
-	)
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "mdns",
@@ -72,19 +76,20 @@ Protocol, and Auth status.`,
   shelly discover zeroconf --timeout 20s
   shelly discover bonjour --register`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, timeout, register, skipExisting)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", DefaultTimeout, "Discovery timeout")
-	cmd.Flags().BoolVar(&register, "register", false, "Auto-register discovered devices")
-	cmd.Flags().BoolVar(&skipExisting, "skip-existing", true, "Skip devices already registered")
+	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", DefaultTimeout, "Discovery timeout")
+	cmd.Flags().BoolVar(&opts.Register, "register", false, "Auto-register discovered devices")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", true, "Skip devices already registered")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, register, skipExisting bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	timeout := opts.Timeout
 
 	if timeout == 0 {
 		timeout = DefaultTimeout
@@ -123,8 +128,8 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, registe
 		ios.DebugErr("saving discovery cache", err)
 	}
 
-	if register {
-		added, err := utils.RegisterDiscoveredDevices(devices, skipExisting)
+	if opts.Register {
+		added, err := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
 		if err != nil {
 			ios.Warning("Registration error: %v", err)
 		}

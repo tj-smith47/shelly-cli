@@ -159,11 +159,13 @@ func TestRun_ShortDuration(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:  tf.Factory,
+		Devices:  []string{"test-light"},
 		Duration: 10 * time.Millisecond,
 		Interval: 5 * time.Millisecond,
 	}
 
-	err = run(context.Background(), tf.Factory, []string{"test-light"}, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -206,6 +208,8 @@ func TestRun_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	opts := &Options{
+		Factory:  tf.Factory,
+		Devices:  []string{"test-light"},
 		Duration: 1 * time.Hour,
 		Interval: 100 * time.Millisecond,
 	}
@@ -216,7 +220,7 @@ func TestRun_ContextCancellation(t *testing.T) {
 		cancel()
 	}()
 
-	err = run(ctx, tf.Factory, []string{"test-light"}, opts)
+	err = run(ctx, opts)
 	if err != nil {
 		t.Errorf("run() with cancelled context should not error: %v", err)
 	}

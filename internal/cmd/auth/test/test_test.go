@@ -211,10 +211,12 @@ func TestRun_WithMock(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
 		Timeout: 5 * time.Second,
 	}
 
-	err = run(context.Background(), tf.Factory, "test-device", opts)
+	err = run(context.Background(), opts)
 	// May fail due to mock limitations
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
@@ -234,10 +236,12 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "nonexistent-device",
 		Timeout: 5 * time.Second,
 	}
 
-	err = run(context.Background(), tf.Factory, "nonexistent-device", opts)
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
 	}

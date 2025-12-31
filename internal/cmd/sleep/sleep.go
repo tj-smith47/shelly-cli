@@ -13,13 +13,16 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Delay time.Duration
+	Factory *cmdutil.Factory
+	Device  string
+	Delay   time.Duration
 }
 
 // NewCommand creates the sleep command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
-		Delay: 5 * time.Minute,
+		Factory: f,
+		Delay:   5 * time.Minute,
 	}
 
 	cmd := &cobra.Command{
@@ -44,7 +47,8 @@ Press Ctrl+C to cancel before the delay expires.`,
   shelly sleep hallway --delay 1h`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -53,11 +57,11 @@ Press Ctrl+C to cancel before the delay expires.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
-	ios.Info("Sleep timer set for %s", device)
+	ios.Info("Sleep timer set for %s", opts.Device)
 	ios.Info("Device will turn off in %v", opts.Delay)
 	ios.Println("")
 	ios.Info("Press Ctrl+C to cancel...")
@@ -73,18 +77,18 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	}
 
 	ios.Println("")
-	ios.Info("Turning off %s...", device)
+	ios.Info("Turning off %s...", opts.Device)
 
 	// Try QuickOff first (works for most devices)
-	result, err := svc.QuickOff(ctx, device, nil)
+	result, err := svc.QuickOff(ctx, opts.Device, nil)
 	if err != nil {
 		return fmt.Errorf("failed to turn off device: %w", err)
 	}
 
 	if result != nil && result.Count > 0 {
-		ios.Success("Goodnight! %s is now off", device)
+		ios.Success("Goodnight! %s is now off", opts.Device)
 	} else {
-		ios.Info("Command sent to %s", device)
+		ios.Info("Command sent to %s", opts.Device)
 	}
 
 	return nil

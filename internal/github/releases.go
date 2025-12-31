@@ -11,19 +11,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 const (
-	// GitHubAPIBaseURL is the base URL for GitHub API.
-	GitHubAPIBaseURL = "https://api.github.com"
 	// DefaultTimeout for API requests.
 	DefaultTimeout = 30 * time.Second
 	// DefaultOwner is the repository owner for shelly-cli.
@@ -31,6 +30,9 @@ const (
 	// DefaultRepo is the repository name.
 	DefaultRepo = "shelly-cli"
 )
+
+// GitHubAPIBaseURL is the base URL for GitHub API (var for testing).
+var GitHubAPIBaseURL = "https://api.github.com"
 
 // ErrNoReleases is returned when no releases are found.
 var ErrNoReleases = errors.New("no releases found")
@@ -254,6 +256,8 @@ func (c *Client) FindBinaryAsset(release *Release, binaryName string) (*Asset, e
 
 // DownloadAsset downloads a release asset to a local file.
 func (c *Client) DownloadAsset(ctx context.Context, asset *Asset, destPath string) error {
+	fs := getFs()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -277,11 +281,11 @@ func (c *Client) DownloadAsset(ctx context.Context, asset *Asset, destPath strin
 
 	// Create destination file
 	destDir := filepath.Dir(destPath)
-	if err := os.MkdirAll(destDir, 0o750); err != nil {
+	if err := fs.MkdirAll(destDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	outFile, err := os.Create(destPath) //nolint:gosec // G304: destPath is from controlled temp directory
+	outFile, err := fs.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -302,14 +306,16 @@ func (c *Client) DownloadAsset(ctx context.Context, asset *Asset, destPath strin
 // DownloadAndExtract downloads a release binary and extracts it if needed.
 // Returns the path to the extracted binary.
 func (c *Client) DownloadAndExtract(ctx context.Context, asset *Asset, binaryName string) (binaryPath string, cleanup func(), err error) {
+	fs := getFs()
+
 	// Create temp directory for download
-	tmpDir, err := os.MkdirTemp("", "shelly-download-*")
+	tmpDir, err := afero.TempDir(fs, "", "shelly-download-*")
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
 	cleanup = func() {
-		if rerr := os.RemoveAll(tmpDir); rerr != nil {
+		if rerr := fs.RemoveAll(tmpDir); rerr != nil {
 			c.ios.DebugErr("removing temp directory", rerr)
 		}
 	}
@@ -339,7 +345,7 @@ func (c *Client) DownloadAndExtract(ctx context.Context, asset *Asset, binaryNam
 	}
 
 	// Make it executable - downloaded binaries must be executable
-	if err := os.Chmod(binaryPath, 0o755); err != nil { //nolint:gosec // G302: binaries require executable permissions
+	if err := fs.Chmod(binaryPath, 0o755); err != nil {
 		cleanup()
 		return "", nil, fmt.Errorf("failed to make executable: %w", err)
 	}
@@ -352,7 +358,9 @@ const maxExtractSize = 100 * 1024 * 1024
 
 // extractTarGz extracts a .tar.gz file and returns the path to the binary.
 func (c *Client) extractTarGz(archivePath, destDir, binaryName string) (string, error) {
-	file, err := os.Open(archivePath) //nolint:gosec // archivePath is from trusted temp directory
+	fs := getFs()
+
+	file, err := fs.Open(archivePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open archive: %w", err)
 	}
@@ -407,21 +415,45 @@ func (c *Client) findBinaryInTar(tarReader *tar.Reader, destDir, binaryName stri
 
 // extractZip extracts a .zip file and returns the path to the binary.
 func (c *Client) extractZip(archivePath, destDir, binaryName string) (string, error) {
-	reader, err := zip.OpenReader(archivePath)
+	fs := getFs()
+
+	// Read the zip file content using afero
+	zipData, err := afero.ReadFile(fs, archivePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read zip file: %w", err)
+	}
+
+	// Create a zip reader from the bytes
+	reader, err := zip.NewReader(newBytesReaderAt(zipData), int64(len(zipData)))
 	if err != nil {
 		return "", fmt.Errorf("failed to open zip: %w", err)
 	}
-	defer func() {
-		if cerr := reader.Close(); cerr != nil {
-			c.ios.DebugErr("closing zip reader", cerr)
-		}
-	}()
 
 	return c.findBinaryInZip(reader, destDir, binaryName)
 }
 
+// bytesReaderAt wraps a byte slice to implement io.ReaderAt.
+type bytesReaderAt struct {
+	data []byte
+}
+
+func newBytesReaderAt(data []byte) *bytesReaderAt {
+	return &bytesReaderAt{data: data}
+}
+
+func (b *bytesReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
+	if off >= int64(len(b.data)) {
+		return 0, io.EOF
+	}
+	n = copy(p, b.data[off:])
+	if n < len(p) {
+		return n, io.EOF
+	}
+	return n, nil
+}
+
 // findBinaryInZip searches for and extracts the binary from a zip reader.
-func (c *Client) findBinaryInZip(reader *zip.ReadCloser, destDir, binaryName string) (string, error) {
+func (c *Client) findBinaryInZip(reader *zip.Reader, destDir, binaryName string) (string, error) {
 	for _, file := range reader.File {
 		if file.FileInfo().IsDir() {
 			continue
@@ -464,7 +496,9 @@ func (c *Client) matchesBinaryName(filename, binaryName string) bool {
 
 // extractToFile extracts data from a reader to a file with size limit.
 func (c *Client) extractToFile(destPath string, r io.Reader) error {
-	outFile, err := os.Create(destPath) //nolint:gosec // destPath is in trusted temp directory
+	fs := getFs()
+
+	outFile, err := fs.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}

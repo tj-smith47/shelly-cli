@@ -174,8 +174,13 @@ func TestRun_NonExistentFile(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: "/nonexistent/backup.json",
+	}
 	// Test with non-existent file
-	err := run(context.Background(), f, "test-device", "/nonexistent/backup.json")
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for non-existent file")
 	}
@@ -198,7 +203,12 @@ func TestRun_InvalidJSON(t *testing.T) {
 	// Create invalid JSON file
 	invalidFile := createInvalidBackupFile(t, tmpDir, "invalid.json", "{ not valid json }")
 
-	err := run(context.Background(), f, "test-device", invalidFile)
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: invalidFile,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -222,7 +232,12 @@ func TestRun_MissingVersion(t *testing.T) {
 	missingVersionFile := createInvalidBackupFile(t, tmpDir, "missing-version.json",
 		`{"device_info": {"id": "test"}, "config": {}}`)
 
-	err := run(context.Background(), f, "test-device", missingVersionFile)
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: missingVersionFile,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for missing version")
 	}
@@ -246,7 +261,12 @@ func TestRun_MissingDeviceInfo(t *testing.T) {
 	missingInfoFile := createInvalidBackupFile(t, tmpDir, "missing-info.json",
 		`{"version": 1, "config": {}}`)
 
-	err := run(context.Background(), f, "test-device", missingInfoFile)
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: missingInfoFile,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for missing device info")
 	}
@@ -270,7 +290,12 @@ func TestRun_MissingConfig(t *testing.T) {
 	missingConfigFile := createInvalidBackupFile(t, tmpDir, "missing-config.json",
 		`{"version": 1, "device_info": {"id": "test"}}`)
 
-	err := run(context.Background(), f, "test-device", missingConfigFile)
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: missingConfigFile,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for missing config")
 	}
@@ -293,8 +318,13 @@ func TestRun_ValidBackupButUnreachableDevice(t *testing.T) {
 	// Create valid backup file
 	validFile := createValidBackupFile(t, tmpDir, "valid.json")
 
+	opts := &Options{
+		Factory:  f,
+		Device:   "192.0.2.1", // TEST-NET-1, unreachable
+		FilePath: validFile,
+	}
 	// Use unreachable device address - should fail to compare
-	err := run(context.Background(), f, "192.0.2.1", validFile) // TEST-NET-1, unreachable
+	err := run(context.Background(), opts)
 	if err == nil {
 		// This is expected to fail because we can't reach the device
 		t.Log("Note: run succeeded (device might be mocked), which is acceptable")
@@ -313,7 +343,12 @@ func TestRun_EmptyFile(t *testing.T) {
 	// Create empty file
 	emptyFile := createInvalidBackupFile(t, tmpDir, "empty.json", "")
 
-	err := run(context.Background(), f, "test-device", emptyFile)
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: emptyFile,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for empty file")
 	}
@@ -349,8 +384,13 @@ func TestRun_ValidBackupWithMinimalData(t *testing.T) {
 		t.Fatalf("failed to write minimal file: %v", err)
 	}
 
+	opts := &Options{
+		Factory:  f,
+		Device:   "192.0.2.1",
+		FilePath: minimalFile,
+	}
 	// This will likely fail due to unreachable device, but should get past validation
-	err = run(context.Background(), f, "192.0.2.1", minimalFile)
+	err = run(context.Background(), opts)
 	// We expect a failure since we can't reach the device
 	// The important part is that validation passed
 	if err != nil && bytes.Contains([]byte(err.Error()), []byte("invalid backup")) {
@@ -373,7 +413,12 @@ func TestRun_FileReadError(t *testing.T) {
 		t.Fatalf("failed to create directory: %v", err)
 	}
 
-	err := run(context.Background(), f, "test-device", dirPath)
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: dirPath,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error when path is a directory")
 	}
@@ -405,7 +450,12 @@ func TestRun_PermissionDenied(t *testing.T) {
 		}
 	})
 
-	err := run(context.Background(), f, "test-device", noReadFile)
+	opts := &Options{
+		Factory:  f,
+		Device:   "test-device",
+		FilePath: noReadFile,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for permission denied")
 	}

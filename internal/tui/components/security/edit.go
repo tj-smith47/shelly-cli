@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -63,7 +64,10 @@ type EditModel struct {
 	err     error
 	width   int
 	height  int
-	styles  EditStyles
+	styles  editmodal.Styles
+
+	// Password strength styles (component-specific)
+	strengthStyles StrengthStyles
 
 	// Auth state
 	authEnabled bool // Current auth state from device
@@ -76,86 +80,22 @@ type EditModel struct {
 	disableMode bool // True when disabling auth (no password required)
 }
 
-// EditStyles holds styles for the edit modal.
-type EditStyles struct {
-	Overlay        lipgloss.Style
-	Modal          lipgloss.Style
-	Title          lipgloss.Style
-	Label          lipgloss.Style
-	LabelFocus     lipgloss.Style
-	Input          lipgloss.Style
-	InputFocus     lipgloss.Style
-	Button         lipgloss.Style
-	ButtonFocus    lipgloss.Style
-	ButtonDanger   lipgloss.Style
-	Error          lipgloss.Style
-	Help           lipgloss.Style
-	Selector       lipgloss.Style
-	StrengthWeak   lipgloss.Style
-	StrengthFair   lipgloss.Style
-	StrengthGood   lipgloss.Style
-	StrengthStrong lipgloss.Style
-	StatusEnabled  lipgloss.Style
-	StatusDisabled lipgloss.Style
+// StrengthStyles holds password strength indicator styles.
+type StrengthStyles struct {
+	Weak   lipgloss.Style
+	Fair   lipgloss.Style
+	Good   lipgloss.Style
+	Strong lipgloss.Style
 }
 
-// DefaultEditStyles returns the default edit modal styles.
-func DefaultEditStyles() EditStyles {
+// DefaultStrengthStyles returns default password strength styles.
+func DefaultStrengthStyles() StrengthStyles {
 	colors := theme.GetSemanticColors()
-	return EditStyles{
-		Overlay: lipgloss.NewStyle().
-			Background(lipgloss.Color("#000000")),
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Width(14),
-		LabelFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Width(14),
-		Input: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		InputFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		Button: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Padding(0, 2),
-		ButtonFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Padding(0, 2),
-		ButtonDanger: lipgloss.NewStyle().
-			Foreground(colors.Error).
-			Bold(true).
-			Padding(0, 2),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Selector: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		StrengthWeak: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		StrengthFair: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-		StrengthGood: lipgloss.NewStyle().
-			Foreground(colors.Success),
-		StrengthStrong: lipgloss.NewStyle().
-			Foreground(colors.Online),
-		StatusEnabled: lipgloss.NewStyle().
-			Foreground(colors.Online).
-			Bold(true),
-		StatusDisabled: lipgloss.NewStyle().
-			Foreground(colors.Error).
-			Bold(true),
+	return StrengthStyles{
+		Weak:   lipgloss.NewStyle().Foreground(colors.Error),
+		Fair:   lipgloss.NewStyle().Foreground(colors.Warning),
+		Good:   lipgloss.NewStyle().Foreground(colors.Success),
+		Strong: lipgloss.NewStyle().Foreground(colors.Online),
 	}
 }
 
@@ -175,11 +115,12 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	)
 
 	return EditModel{
-		ctx:           ctx,
-		svc:           svc,
-		styles:        DefaultEditStyles(),
-		passwordInput: passwordInput,
-		confirmInput:  confirmInput,
+		ctx:            ctx,
+		svc:            svc,
+		styles:         editmodal.DefaultStyles(),
+		strengthStyles: DefaultStrengthStyles(),
+		passwordInput:  passwordInput,
+		confirmInput:   confirmInput,
 	}
 }
 
@@ -581,9 +522,9 @@ func (m EditModel) renderStatus() string {
 
 	content.WriteString(m.styles.Label.Render("Current status: "))
 	if m.authEnabled {
-		content.WriteString(m.styles.StatusEnabled.Render("● Protected"))
+		content.WriteString(m.styles.StatusOn.Render("● Protected"))
 	} else {
-		content.WriteString(m.styles.StatusDisabled.Render("○ UNPROTECTED"))
+		content.WriteString(m.styles.StatusOff.Render("○ UNPROTECTED"))
 	}
 
 	return content.String()
@@ -611,13 +552,13 @@ func (m EditModel) renderStrength(strength PasswordStrength) string {
 	case StrengthNone:
 		return indent + m.styles.Help.Render("Enter a password")
 	case StrengthWeak:
-		return indent + m.styles.StrengthWeak.Render("█░░░ Weak")
+		return indent + m.strengthStyles.Weak.Render("█░░░ Weak")
 	case StrengthFair:
-		return indent + m.styles.StrengthFair.Render("██░░ Fair")
+		return indent + m.strengthStyles.Fair.Render("██░░ Fair")
 	case StrengthGood:
-		return indent + m.styles.StrengthGood.Render("███░ Good")
+		return indent + m.strengthStyles.Good.Render("███░ Good")
 	case StrengthStrong:
-		return indent + m.styles.StrengthStrong.Render("████ Strong")
+		return indent + m.strengthStyles.Strong.Render("████ Strong")
 	default:
 		return ""
 	}

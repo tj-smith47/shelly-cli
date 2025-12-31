@@ -14,9 +14,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	All     bool
+	Devices []string
+}
+
 // NewCommand creates the audit command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var all bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "audit [device...]",
@@ -44,32 +51,32 @@ Use --all to audit all registered devices.`,
   # Audit all registered devices
   shelly audit --all`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			devices := args
-			if all {
+			opts.Devices = args
+			if opts.All {
 				registered := config.ListDevices()
 				if len(registered) == 0 {
-					f.IOStreams().Warning("No devices registered. Run 'shelly discover mdns --register' first.")
+					opts.Factory.IOStreams().Warning("No devices registered. Run 'shelly discover mdns --register' first.")
 					return nil
 				}
-				devices = make([]string, 0, len(registered))
+				opts.Devices = make([]string, 0, len(registered))
 				for name := range registered {
-					devices = append(devices, name)
+					opts.Devices = append(opts.Devices, name)
 				}
 			} else if len(args) == 0 {
 				return fmt.Errorf("specify device(s) or use --all")
 			}
-			return run(cmd.Context(), f, devices)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&all, "all", false, "Audit all registered devices")
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Audit all registered devices")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, devices []string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	ios.Println("")
 	ios.Println(theme.Title().Render("Shelly Security Audit"))
@@ -79,7 +86,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string) error {
 	totalIssues := 0
 	totalWarnings := 0
 
-	for _, device := range devices {
+	for _, device := range opts.Devices {
 		result := svc.AuditDevice(ctx, device)
 		term.DisplayAuditResult(ios, result)
 		totalIssues += len(result.Issues)

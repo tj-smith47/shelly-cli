@@ -428,12 +428,13 @@ func TestRun_WithTargets(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
 		Timeout:    5 * time.Second,
 		Concurrent: 2,
 	}
 
 	targets := []string{"device-1", "device-2"}
-	err = run(context.Background(), tf.Factory, targets, "Shelly.GetStatus", nil, opts)
+	err = run(context.Background(), targets, "Shelly.GetStatus", nil, opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
@@ -469,12 +470,13 @@ func TestRun_WithParams(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
 		Timeout:    5 * time.Second,
 		Concurrent: 1,
 	}
 
 	params := map[string]any{"id": 0, "on": true}
-	err = run(context.Background(), tf.Factory, []string{"test-device"}, "Switch.Set", params, opts)
+	err = run(context.Background(), []string{"test-device"}, "Switch.Set", params, opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
@@ -510,12 +512,13 @@ func TestRun_YAMLOutput(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
 		Timeout:    5 * time.Second,
 		Concurrent: 1,
 	}
 	opts.Format = "yaml"
 
-	err = run(context.Background(), tf.Factory, []string{"test-device"}, "Shelly.GetStatus", nil, opts)
+	err = run(context.Background(), []string{"test-device"}, "Shelly.GetStatus", nil, opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
@@ -551,12 +554,13 @@ func TestRun_FailedDevice(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
 		Timeout:    5 * time.Second,
 		Concurrent: 1,
 	}
 
 	// Call an unsupported RPC method to trigger an error
-	err = run(context.Background(), tf.Factory, []string{"test-device"}, "Unsupported.Method", nil, opts)
+	err = run(context.Background(), []string{"test-device"}, "Unsupported.Method", nil, opts)
 	// Expect error due to failed RPC - the device will return an error for unknown methods
 	if err == nil {
 		t.Logf("Expected error for unsupported method")
@@ -604,12 +608,13 @@ func TestRun_MixedResults(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
 		Timeout:    5 * time.Second,
 		Concurrent: 2,
 	}
 
 	// One device should succeed, one may fail
-	err = run(context.Background(), tf.Factory, []string{"device-1", "device-2"}, "Shelly.GetStatus", nil, opts)
+	err = run(context.Background(), []string{"device-1", "device-2"}, "Shelly.GetStatus", nil, opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected for partial failure)", err)
 	}

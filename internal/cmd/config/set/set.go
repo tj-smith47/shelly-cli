@@ -12,8 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Options holds the options for the config set command.
+type Options struct {
+	Factory *cmdutil.Factory
+
+	Args []string
+}
+
 // NewCommand creates the config set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "set <key>=<value>...",
 		Aliases: []string{"write", "update"},
@@ -32,17 +41,18 @@ Use dot notation for nested values (e.g., "defaults.timeout=30s").`,
 		Args:              cobra.MinimumNArgs(1),
 		ValidArgsFunction: completion.SettingKeysWithEquals(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(f, args)
+			opts.Args = args
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, args []string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	for _, arg := range args {
+	for _, arg := range opts.Args {
 		parts := strings.SplitN(arg, "=", 2)
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid format %q, expected key=value", arg)

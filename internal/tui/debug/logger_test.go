@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// Note: Tests that modify environment variables cannot run in parallel.
-
+//nolint:paralleltest // Tests that modify environment variables cannot run in parallel.
 func TestNew_DisabledByDefault(t *testing.T) {
 	// Ensure env is not set
 	if err := os.Unsetenv(EnvKey); err != nil {

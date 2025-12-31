@@ -14,18 +14,21 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	User       string
-	Password   string
-	Length     int
+	Factory    *cmdutil.Factory
+	Device     string
 	Generate   bool
+	Length     int
+	Password   string
 	ShowSecret bool
+	User       string
 }
 
 // NewCommand creates the auth rotate command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
-		User:   "admin",
-		Length: auth.DefaultPasswordLength,
+		Factory: f,
+		User:    "admin",
+		Length:  auth.DefaultPasswordLength,
 	}
 
 	cmd := &cobra.Command{
@@ -55,7 +58,8 @@ For security best practices:
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -68,9 +72,9 @@ For security best practices:
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Determine password
 	password := opts.Password
@@ -86,15 +90,15 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		return fmt.Errorf("--password or --generate is required")
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Rotating credentials...", func(ctx context.Context) error {
-		if err := svc.SetAuth(ctx, device, opts.User, "", password); err != nil {
+		if err := svc.SetAuth(ctx, opts.Device, opts.User, "", password); err != nil {
 			return fmt.Errorf("failed to rotate credentials: %w", err)
 		}
 
-		ios.Success("Credentials rotated on %s", device)
+		ios.Success("Credentials rotated on %s", opts.Device)
 		ios.Printf("  User: %s\n", opts.User)
 
 		if opts.Generate {

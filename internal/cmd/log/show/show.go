@@ -11,13 +11,15 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Lines int
+	Factory *cmdutil.Factory
+	Lines   int
 }
 
 // NewCommand creates the log show command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
-		Lines: 50,
+		Factory: f,
+		Lines:   50,
 	}
 
 	cmd := &cobra.Command{
@@ -32,7 +34,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly log show -n 100`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f, opts)
+			return run(opts)
 		},
 	}
 
@@ -41,8 +43,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func run(f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	logPath, err := cmdutil.GetLogPath()
 	if err != nil {

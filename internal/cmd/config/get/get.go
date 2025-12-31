@@ -13,8 +13,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the options for the config get command.
+type Options struct {
+	Factory *cmdutil.Factory
+
+	Key string
+}
+
 // NewCommand creates the config get command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "get [key]",
 		Aliases: []string{"read"},
@@ -34,17 +43,20 @@ Without a key, shows all configuration values.`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completion.SettingKeys(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(f, args)
+			if len(args) > 0 {
+				opts.Key = args[0]
+			}
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, args []string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	if len(args) == 0 {
+	if opts.Key == "" {
 		settings := config.GetAllSettings()
 		if output.WantsStructured() {
 			return output.FormatOutput(ios.Out, settings)
@@ -52,16 +64,15 @@ func run(f *cmdutil.Factory, args []string) error {
 		return term.DisplayConfigTable(ios, settings)
 	}
 
-	key := args[0]
-	value, ok := config.GetSetting(key)
+	value, ok := config.GetSetting(opts.Key)
 	if !ok {
-		return fmt.Errorf("configuration key %q not set", key)
+		return fmt.Errorf("configuration key %q not set", opts.Key)
 	}
 
 	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, map[string]any{key: value})
+		return output.FormatOutput(ios.Out, map[string]any{opts.Key: value})
 	}
 
-	ios.Printf("%s: %s\n", key, config.FormatSettingValue(value))
+	ios.Printf("%s: %s\n", opts.Key, config.FormatSettingValue(value))
 	return nil
 }

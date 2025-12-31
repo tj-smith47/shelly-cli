@@ -17,6 +17,14 @@ import (
 // DefaultTimeout is the default BLE discovery timeout.
 const DefaultTimeout = 15 * time.Second
 
+// Options holds the command options.
+type Options struct {
+	Factory       *cmdutil.Factory
+	FilterPrefix  string
+	IncludeBTHome bool
+	Timeout       time.Duration
+}
+
 // Discoverer is the interface for BLE device discovery.
 // This interface allows for dependency injection in tests.
 type Discoverer interface {
@@ -52,11 +60,7 @@ var newBLEDiscoverer = func() (Discoverer, error) {
 
 // NewCommand creates the BLE discovery command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		timeout       time.Duration
-		includeBTHome bool
-		filterPrefix  string
-	)
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "ble",
@@ -83,23 +87,24 @@ Requirements:
   # Filter by device name prefix
   shelly discover ble --filter "Shelly"`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, timeout, includeBTHome, filterPrefix)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", DefaultTimeout, "Discovery timeout")
-	cmd.Flags().BoolVar(&includeBTHome, "bthome", false, "Include BTHome sensor broadcasts")
-	cmd.Flags().StringVarP(&filterPrefix, "filter", "f", "", "Filter by device name prefix")
+	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", DefaultTimeout, "Discovery timeout")
+	cmd.Flags().BoolVar(&opts.IncludeBTHome, "bthome", false, "Include BTHome sensor broadcasts")
+	cmd.Flags().StringVarP(&opts.FilterPrefix, "filter", "f", "", "Filter by device name prefix")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, includeBTHome bool, filterPrefix string) error {
+func run(ctx context.Context, opts *Options) error {
+	timeout := opts.Timeout
 	if timeout == 0 {
 		timeout = DefaultTimeout
 	}
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
 	bleDiscoverer, err := newBLEDiscoverer()
 	if err != nil {
@@ -118,9 +123,9 @@ func run(ctx context.Context, f *cmdutil.Factory, timeout time.Duration, include
 	}()
 
 	// Configure discoverer
-	bleDiscoverer.SetIncludeBTHome(includeBTHome)
-	if filterPrefix != "" {
-		bleDiscoverer.SetFilterPrefix(filterPrefix)
+	bleDiscoverer.SetIncludeBTHome(opts.IncludeBTHome)
+	if opts.FilterPrefix != "" {
+		bleDiscoverer.SetFilterPrefix(opts.FilterPrefix)
 	}
 
 	var devices []discovery.DiscoveredDevice

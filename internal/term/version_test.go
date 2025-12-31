@@ -240,4 +240,3 @@ func TestDisplayUpdateStatus_NoUpdate(t *testing.T) {
 		t.Error("output should mention already at latest")
 	}
 }
-

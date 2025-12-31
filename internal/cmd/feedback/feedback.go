@@ -16,17 +16,18 @@ import (
 
 // Options holds the command options.
 type Options struct {
-	Type       string
-	Title      string
-	Device     string
+	Factory    *cmdutil.Factory
 	AttachLog  bool
+	Device     string
 	DryRun     bool
 	OpenIssues bool
+	Title      string
+	Type       string
 }
 
 // NewCommand creates the feedback command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "feedback",
@@ -60,7 +61,7 @@ pre-populated system information.`,
   shelly feedback --issues`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -74,9 +75,9 @@ pre-populated system information.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
-	br := f.Browser()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	br := opts.Factory.Browser()
 
 	// If --issues flag, just open issues page
 	if opts.OpenIssues {
@@ -104,7 +105,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	}
 
 	// Get config for system info (optional, so ignore error)
-	cfg, err := f.Config()
+	cfg, err := opts.Factory.Config()
 	ios.DebugErr("load config for issue info", err)
 
 	// Build issue body

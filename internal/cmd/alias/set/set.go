@@ -11,9 +11,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Options holds the options for the set command.
+type Options struct {
+	Factory *cmdutil.Factory
+	Command string
+	Name    string
+	Shell   bool
+}
+
 // NewCommand creates the alias set command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var shell bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "set <name> <command>",
@@ -41,19 +49,22 @@ Shell aliases (prefixed with ! or using --shell) are executed in your shell.`,
   shelly alias set backup --shell 'tar -czf shelly-backup.tar.gz ~/.config/shelly'`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			command := strings.Join(args[1:], " ")
-			return run(f, name, command, shell)
+			opts.Name = args[0]
+			opts.Command = strings.Join(args[1:], " ")
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&shell, "shell", "s", false, "Create a shell alias (executes in shell)")
+	cmd.Flags().BoolVarP(&opts.Shell, "shell", "s", false, "Create a shell alias (executes in shell)")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, name, command string, shell bool) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
+
+	command := opts.Command
+	shell := opts.Shell
 
 	// Detect shell alias from ! prefix
 	if strings.HasPrefix(command, "!") {
@@ -62,16 +73,16 @@ func run(f *cmdutil.Factory, name, command string, shell bool) error {
 	}
 
 	// Check if updating existing alias
-	_, isUpdate := config.GetAlias(name)
+	_, isUpdate := config.GetAlias(opts.Name)
 
-	if err := config.AddAlias(name, command, shell); err != nil {
+	if err := config.AddAlias(opts.Name, command, shell); err != nil {
 		return fmt.Errorf("failed to create alias: %w", err)
 	}
 
 	if isUpdate {
-		ios.Success("Updated alias '%s'", name)
+		ios.Success("Updated alias '%s'", opts.Name)
 	} else {
-		ios.Success("Created alias '%s'", name)
+		ios.Success("Created alias '%s'", opts.Name)
 	}
 
 	// Show the alias
@@ -79,7 +90,7 @@ func run(f *cmdutil.Factory, name, command string, shell bool) error {
 	if shell {
 		aliasType = "shell"
 	}
-	ios.Printf("  %s -> %s (%s)\n", name, command, aliasType)
+	ios.Printf("  %s -> %s (%s)\n", opts.Name, command, aliasType)
 
 	return nil
 }

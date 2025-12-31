@@ -60,7 +60,8 @@ func TestRun_CyclesToNextTheme(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	initialTheme := theme.Current().ID
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
@@ -95,7 +96,8 @@ func TestRun_MultipleCycles(t *testing.T) {
 
 	// Cycle multiple times
 	for i := range 5 {
-		err := run(tf.Factory)
+		opts := &Options{Factory: tf.Factory}
+		err := run(opts)
 		if err != nil {
 			t.Fatalf("run() cycle %d error = %v", i+1, err)
 		}

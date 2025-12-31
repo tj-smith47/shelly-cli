@@ -12,8 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Source  string
+	Target  string
+}
+
 // NewCommand creates the device config diff command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "diff <source> <target>",
 		Aliases: []string{"compare", "cmp"},
@@ -42,29 +51,31 @@ Differences are shown with:
   shelly device config diff device1 device2 -o json`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1])
+			opts.Source = args[0]
+			opts.Target = args[1]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, source, target string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	var sourceConfig, targetConfig map[string]any
 	var sourceName, targetName string
 	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching configurations...", func(ctx context.Context) error {
 		var loadErr error
-		sourceConfig, sourceName, loadErr = svc.LoadConfig(ctx, source)
+		sourceConfig, sourceName, loadErr = svc.LoadConfig(ctx, opts.Source)
 		if loadErr != nil {
 			return fmt.Errorf("failed to get source config: %w", loadErr)
 		}
-		targetConfig, targetName, loadErr = svc.LoadConfig(ctx, target)
+		targetConfig, targetName, loadErr = svc.LoadConfig(ctx, opts.Target)
 		if loadErr != nil {
 			return fmt.Errorf("failed to get target config: %w", loadErr)
 		}

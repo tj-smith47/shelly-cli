@@ -13,16 +13,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	ssidFlag     string
-	passwordFlag string
-	enableFlag   bool
-	disableFlag  bool
-	clientsFlag  bool
-)
+// Options holds the command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Clients  bool
+	Device   string
+	Disable  bool
+	Enable   bool
+	Password string
+	SSID     string
+}
 
 // NewCommand creates the wifi ap command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "ap <device>",
 		Aliases: []string{"accesspoint", "hotspot"},
@@ -42,29 +47,30 @@ can connect to. Use --clients to list connected clients.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&ssidFlag, "ssid", "", "Access point SSID")
-	cmd.Flags().StringVar(&passwordFlag, "password", "", "Access point password")
-	cmd.Flags().BoolVar(&enableFlag, "enable", false, "Enable access point")
-	cmd.Flags().BoolVar(&disableFlag, "disable", false, "Disable access point")
-	cmd.Flags().BoolVar(&clientsFlag, "clients", false, "List connected clients")
+	cmd.Flags().StringVar(&opts.SSID, "ssid", "", "Access point SSID")
+	cmd.Flags().StringVar(&opts.Password, "password", "", "Access point password")
+	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable access point")
+	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable access point")
+	cmd.Flags().BoolVar(&opts.Clients, "clients", false, "List connected clients")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// If --clients flag, list connected clients
-	if clientsFlag {
-		return cmdutil.RunList(ctx, ios, svc, device,
+	if opts.Clients {
+		return cmdutil.RunList(ctx, ios, svc, opts.Device,
 			"Getting connected clients...",
 			"No clients connected to access point",
 			func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WiFiAPClient, error) {
@@ -75,30 +81,30 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 
 	// Determine enable state
 	var enable *bool
-	if enableFlag {
+	if opts.Enable {
 		t := true
 		enable = &t
-	} else if disableFlag {
+	} else if opts.Disable {
 		f := false
 		enable = &f
 	}
 
 	// Validate flags - need either enable/disable or configuration
-	if enable == nil && ssidFlag == "" && passwordFlag == "" {
+	if enable == nil && opts.SSID == "" && opts.Password == "" {
 		return fmt.Errorf("specify --enable, --disable, or configuration options (--ssid, --password)")
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Configuring access point...", func(ctx context.Context) error {
-		if err := svc.SetWiFiAPConfig(ctx, device, ssidFlag, passwordFlag, enable); err != nil {
+		if err := svc.SetWiFiAPConfig(ctx, opts.Device, opts.SSID, opts.Password, enable); err != nil {
 			return fmt.Errorf("failed to configure access point: %w", err)
 		}
 
-		if disableFlag {
-			ios.Success("Access point disabled on %s", device)
+		if opts.Disable {
+			ios.Success("Access point disabled on %s", opts.Device)
 		} else {
-			ios.Success("Access point configured on %s", device)
-			if ssidFlag != "" {
-				ios.Printf("  SSID: %s\n", ssidFlag)
+			ios.Success("Access point configured on %s", opts.Device)
+			if opts.SSID != "" {
+				ios.Printf("  SSID: %s\n", opts.SSID)
 			}
 		}
 		return nil

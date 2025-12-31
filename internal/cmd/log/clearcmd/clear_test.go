@@ -144,8 +144,10 @@ func TestNewCommand_LongDescription(t *testing.T) {
 func TestRun_NoLogFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
+	opts := &Options{Factory: tf.Factory}
+
 	// run() should handle non-existent log file gracefully
-	err := run(tf.Factory)
+	err := run(opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
@@ -154,7 +156,9 @@ func TestRun_NoLogFile(t *testing.T) {
 func TestRun_Success(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+
+	err := run(opts)
 	// Should not error even if log file doesn't exist
 	if err != nil {
 		t.Logf("run() error = %v (may be expected if log path unavailable)", err)

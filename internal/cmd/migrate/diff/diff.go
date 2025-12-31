@@ -15,8 +15,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Device   string
+	FilePath string
+}
+
 // NewCommand creates the migrate diff command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "diff <device> <backup-file>",
 		Aliases: []string{"compare", "cmp"},
@@ -28,21 +37,23 @@ This helps you understand what would change if you restored the backup.`,
   shelly migrate diff living-room backup.json`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], args[1])
+			opts.Device = args[0]
+			opts.FilePath = args[1]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2)
 	defer cancel()
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
-	// Read backup file
-	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is user-provided CLI argument
+	// Read backup file (user-provided path from CLI argument)
+	data, err := os.ReadFile(opts.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}
@@ -53,11 +64,11 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Compare with device
-	svc := f.ShellyService()
+	svc := opts.Factory.ShellyService()
 	var d *model.BackupDiff
 	err = cmdutil.RunWithSpinner(ctx, ios, "Comparing configurations...", func(ctx context.Context) error {
 		var cmpErr error
-		d, cmpErr = svc.CompareBackup(ctx, device, bkp)
+		d, cmpErr = svc.CompareBackup(ctx, opts.Device, bkp)
 		return cmpErr
 	})
 	if err != nil {
@@ -67,8 +78,8 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	// Print header
 	ios.Title("Configuration Differences")
 	ios.Println()
-	ios.Printf("Device: %s\n", device)
-	ios.Printf("Backup: %s (%s, %s)\n", filePath, bkp.Device().ID, bkp.Device().Model)
+	ios.Printf("Device: %s\n", opts.Device)
+	ios.Printf("Backup: %s (%s, %s)\n", opts.FilePath, bkp.Device().ID, bkp.Device().Model)
 	ios.Println()
 
 	if !d.HasDifferences() {

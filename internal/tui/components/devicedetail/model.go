@@ -82,7 +82,7 @@ func DefaultStyles() Styles {
 			Bold(true).
 			MarginTop(1),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(15),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),

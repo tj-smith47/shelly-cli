@@ -13,10 +13,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var filterFlag string
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+	Filter  string
+}
 
 // NewCommand creates the monitor events command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "events <device>",
 		Aliases: []string{"ev", "subscribe"},
@@ -36,29 +43,30 @@ Press Ctrl+C to stop monitoring.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&filterFlag, "filter", "f", "", "Filter events by component type")
+	cmd.Flags().StringVarP(&opts.Filter, "filter", "f", "", "Filter events by component type")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	jsonOutput := output.WantsJSON()
 
 	if !jsonOutput {
-		ios.Title("Event Monitor: %s", device)
+		ios.Title("Event Monitor: %s", opts.Device)
 		ios.Printf("Press Ctrl+C to stop\n\n")
 	}
 
-	return svc.SubscribeEvents(ctx, device, func(event model.DeviceEvent) error {
+	return svc.SubscribeEvents(ctx, opts.Device, func(event model.DeviceEvent) error {
 		// Apply filter if set
-		if filterFlag != "" && event.Component != filterFlag {
+		if opts.Filter != "" && event.Component != opts.Filter {
 			return nil
 		}
 

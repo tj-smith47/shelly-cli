@@ -15,16 +15,25 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	formatFlag        string
-	encryptFlag       string
-	skipScriptsFlag   bool
-	skipSchedulesFlag bool
-	skipWebhooksFlag  bool
-)
+// Options holds the command options.
+type Options struct {
+	Factory       *cmdutil.Factory
+	Device        string
+	Encrypt       string
+	FilePath      string
+	Format        string
+	SkipScripts   bool
+	SkipSchedules bool
+	SkipWebhooks  bool
+}
 
 // NewCommand creates the backup create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Factory: f,
+		Format:  "json",
+	}
+
 	cmd := &cobra.Command{
 		Use:     "create <device> [file]",
 		Aliases: []string{"new", "make"},
@@ -52,42 +61,41 @@ sensitive data is not encrypted in the file).`,
   shelly backup create living-room backup.json --skip-scripts`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
-			filePath := ""
+			opts.Device = args[0]
 			if len(args) > 1 {
-				filePath = args[1]
+				opts.FilePath = args[1]
 			}
-			return run(cmd.Context(), f, device, filePath)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&formatFlag, "format", "f", "json", "Output format (json, yaml)")
-	cmd.Flags().StringVarP(&encryptFlag, "encrypt", "e", "", "Password to protect backup")
-	cmd.Flags().BoolVar(&skipScriptsFlag, "skip-scripts", false, "Exclude scripts from backup")
-	cmd.Flags().BoolVar(&skipSchedulesFlag, "skip-schedules", false, "Exclude schedules from backup")
-	cmd.Flags().BoolVar(&skipWebhooksFlag, "skip-webhooks", false, "Exclude webhooks from backup")
+	cmd.Flags().StringVarP(&opts.Format, "format", "f", "json", "Output format (json, yaml)")
+	cmd.Flags().StringVarP(&opts.Encrypt, "encrypt", "e", "", "Password to protect backup")
+	cmd.Flags().BoolVar(&opts.SkipScripts, "skip-scripts", false, "Exclude scripts from backup")
+	cmd.Flags().BoolVar(&opts.SkipSchedules, "skip-schedules", false, "Exclude schedules from backup")
+	cmd.Flags().BoolVar(&opts.SkipWebhooks, "skip-webhooks", false, "Exclude webhooks from backup")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*3)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
-	opts := backup.Options{
-		SkipScripts:   skipScriptsFlag,
-		SkipSchedules: skipSchedulesFlag,
-		SkipWebhooks:  skipWebhooksFlag,
-		Password:      encryptFlag,
+	backupOpts := backup.Options{
+		SkipScripts:   opts.SkipScripts,
+		SkipSchedules: opts.SkipSchedules,
+		SkipWebhooks:  opts.SkipWebhooks,
+		Password:      opts.Encrypt,
 	}
 
 	var bkp *backup.DeviceBackup
 	err := cmdutil.RunWithSpinner(ctx, ios, "Creating backup...", func(ctx context.Context) error {
 		var err error
-		bkp, err = svc.CreateBackup(ctx, device, opts)
+		bkp, err = svc.CreateBackup(ctx, opts.Device, backupOpts)
 		return err
 	})
 	if err != nil {
@@ -95,19 +103,19 @@ func run(ctx context.Context, f *cmdutil.Factory, device, filePath string) error
 	}
 
 	// Format the output
-	data, err := export.MarshalBackup(bkp, formatFlag)
+	data, err := export.MarshalBackup(bkp, opts.Format)
 	if err != nil {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
 
 	// Write to file or stdout
-	if filePath == "" || filePath == "-" {
+	if opts.FilePath == "" || opts.FilePath == "-" {
 		ios.Printf("%s\n", data)
 	} else {
-		if err := os.WriteFile(filePath, data, 0o600); err != nil {
+		if err := os.WriteFile(opts.FilePath, data, 0o600); err != nil {
 			return fmt.Errorf("failed to write backup file: %w", err)
 		}
-		ios.Success("Backup created: %s", filePath)
+		ios.Success("Backup created: %s", opts.FilePath)
 		term.DisplayBackupSummary(ios, bkp)
 	}
 

@@ -3,11 +3,14 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // LightInfo holds light information for list operations.
@@ -17,6 +20,25 @@ type LightInfo struct {
 	Output     bool
 	Brightness int
 	Power      float64
+}
+
+// ListHeaders returns the column headers for the table.
+func (l LightInfo) ListHeaders() []string {
+	return []string{"ID", "Name", "State", "Brightness", "Power"}
+}
+
+// ListRow returns the formatted row values for the table.
+func (l LightInfo) ListRow() []string {
+	name := output.FormatComponentName(l.Name, "light", l.ID)
+	state := output.RenderOnOff(l.Output, output.CaseUpper, theme.FalseError)
+
+	brightness := "-"
+	if l.Brightness >= 0 {
+		brightness = fmt.Sprintf("%d%%", l.Brightness)
+	}
+
+	power := output.FormatPowerTableValue(l.Power)
+	return []string{fmt.Sprintf("%d", l.ID), name, state, brightness, power}
 }
 
 // LightOn turns on a light component.

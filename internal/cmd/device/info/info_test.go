@@ -100,7 +100,11 @@ func TestRun_ContextCancelled(t *testing.T) {
 	cancel()
 
 	// The run function should respect context cancellation
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context (connection will fail)
 	if err == nil {
@@ -120,7 +124,11 @@ func TestRun_Timeout(t *testing.T) {
 	// Allow the timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "test-device")
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to timeout
 	if err == nil {

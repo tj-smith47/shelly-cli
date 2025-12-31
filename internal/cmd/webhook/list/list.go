@@ -12,8 +12,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+}
+
 // NewCommand creates the webhook list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "list <device>",
 		Aliases: []string{"ls"},
@@ -51,21 +59,22 @@ Columns: ID, Event, URLs (truncated if long), Enabled (Yes/No)`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
-	return cmdutil.RunList(ctx, ios, svc, device,
+	return cmdutil.RunList(ctx, ios, svc, opts.Device,
 		"Getting webhooks...",
 		"No webhooks configured",
 		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.WebhookInfo, error) {

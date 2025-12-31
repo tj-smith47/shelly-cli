@@ -13,9 +13,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	All     bool
+	Devices []string
+}
+
 // NewCommand creates the firmware check command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var allFlag bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "check [device]",
@@ -31,20 +38,21 @@ Use --all to check all registered devices.`,
   shelly firmware check --all`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, allFlag, args)
+			opts.Devices = args
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&allFlag, "all", false, "Check all registered devices")
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Check all registered devices")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, all bool, args []string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
-	if all {
+	if opts.All {
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
@@ -61,14 +69,14 @@ func run(ctx context.Context, f *cmdutil.Factory, all bool, args []string) error
 		return nil
 	}
 
-	if len(args) == 0 {
+	if len(opts.Devices) == 0 {
 		return fmt.Errorf("device name required (or use --all)")
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, args[0],
+	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Devices[0],
 		"Checking for updates...",
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.FirmwareInfo, error) {
 			return svc.CheckFirmware(ctx, device)

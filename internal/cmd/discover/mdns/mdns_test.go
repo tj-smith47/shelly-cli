@@ -621,8 +621,9 @@ func TestRun_DirectCall(t *testing.T) {
 	defer cleanup()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Timeout: time.Millisecond, Register: false, SkipExisting: true}
 
-	err := run(context.Background(), tf.Factory, time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -646,8 +647,9 @@ func TestRun_WithRegistration(t *testing.T) {
 	defer cleanup()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Timeout: time.Millisecond, Register: true, SkipExisting: true}
 
-	err := run(context.Background(), tf.Factory, time.Millisecond, true, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -660,9 +662,10 @@ func TestRun_ZeroTimeoutDefault(t *testing.T) {
 	defer cleanup()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Timeout: 0, Register: false, SkipExisting: true}
 
 	// Pass zero timeout - should use DefaultTimeout
-	err := run(context.Background(), tf.Factory, 0, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}

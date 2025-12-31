@@ -536,6 +536,8 @@ func TestRun_DirectCall(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "test-device",
 		Iterations: 10,
 		Warmup:     2,
 	}
@@ -545,7 +547,7 @@ func TestRun_DirectCall(t *testing.T) {
 	cancel()
 
 	// Call run directly
-	err := run(ctx, tf.Factory, "test-device", opts)
+	err := run(ctx, opts)
 
 	// Should fail due to network/context error
 	if err == nil {
@@ -569,6 +571,8 @@ func TestRun_DirectCall_CustomIterations(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "my-device",
 		Iterations: 50,
 		Warmup:     5,
 	}
@@ -576,7 +580,7 @@ func TestRun_DirectCall_CustomIterations(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "my-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error from run with cancelled context")
 	}
@@ -597,6 +601,8 @@ func TestRun_DirectCall_ZeroWarmup(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "device",
 		Iterations: 10,
 		Warmup:     0,
 	}
@@ -604,7 +610,7 @@ func TestRun_DirectCall_ZeroWarmup(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error from run with cancelled context")
 	}
@@ -622,6 +628,8 @@ func TestRun_DirectCall_Timeout(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "timeout-device",
 		Iterations: 5,
 		Warmup:     1,
 	}
@@ -630,7 +638,7 @@ func TestRun_DirectCall_Timeout(t *testing.T) {
 	defer cancel()
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "timeout-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error from run with timed out context")
 	}
@@ -643,6 +651,8 @@ func TestRun_DirectCall_IPAddress(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "192.168.1.100",
 		Iterations: 3,
 		Warmup:     1,
 	}
@@ -650,7 +660,7 @@ func TestRun_DirectCall_IPAddress(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "192.168.1.100", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error from run with cancelled context")
 	}
@@ -888,11 +898,13 @@ func TestRun_WithMock(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "run-test-device",
 		Iterations: 3,
 		Warmup:     1,
 	}
 
-	err = run(context.Background(), tf.Factory, "run-test-device", opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -934,11 +946,13 @@ func TestRun_Gen1Rejection(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "gen1-test",
 		Iterations: 2,
 		Warmup:     0,
 	}
 
-	err = run(context.Background(), tf.Factory, "gen1-test", opts)
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for Gen1 device")
 	}
@@ -978,11 +992,13 @@ func TestRun_ManyIterations(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "many-iter-device",
 		Iterations: 10, // More than 5 to trigger progress output
 		Warmup:     2,
 	}
 
-	err = run(context.Background(), tf.Factory, "many-iter-device", opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

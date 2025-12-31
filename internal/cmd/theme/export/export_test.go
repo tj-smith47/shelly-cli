@@ -109,7 +109,8 @@ func TestRun_ExportToStdout(t *testing.T) {
 	// Ensure a theme is set
 	theme.SetTheme("dracula")
 
-	err := run(f, "")
+	opts := &Options{Factory: f, File: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -156,7 +157,8 @@ func TestRun_ExportToFile(t *testing.T) {
 	// Ensure a theme is set
 	theme.SetTheme("nord")
 
-	err := run(f, tmpFile)
+	opts := &Options{Factory: f, File: tmpFile}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -193,7 +195,8 @@ func TestRun_ExportContainsAllColors(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, "")
+	opts := &Options{Factory: f, File: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -239,7 +242,8 @@ func TestRun_ExportShowsSuccessMessage(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, tmpFile)
+	opts := &Options{Factory: f, File: tmpFile}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -267,7 +271,8 @@ func TestRun_ExportInvalidPath(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, invalidPath)
+	opts := &Options{Factory: f, File: invalidPath}
+	err := run(opts)
 	if err == nil {
 		t.Error("run() should return error for invalid path")
 	}
@@ -289,7 +294,8 @@ func TestRun_ExportFilePermissions(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, tmpFile)
+	opts := &Options{Factory: f, File: tmpFile}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}

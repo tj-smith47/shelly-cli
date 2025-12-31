@@ -225,7 +225,8 @@ func TestRun_NotLoggedIn(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	ctx := context.Background()
-	err := run(f, ctx)
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
 
 	// If global config has no token, this should error
 	if err != nil {
@@ -249,7 +250,8 @@ func TestRun_WithCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(f, ctx)
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
 
 	// Should fail due to cancelled context or not logged in
 	if err == nil {
@@ -274,7 +276,8 @@ func TestRun_WithTimeout(t *testing.T) {
 	// Allow timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(f, ctx)
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
 
 	// Should fail due to timeout or not logged in
 	if err == nil {
@@ -411,7 +414,8 @@ func TestRun_ProducesOutput(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	ctx := context.Background()
-	err := run(f, ctx)
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
 	if err != nil {
 		t.Logf("run error: %v", err)
 	}

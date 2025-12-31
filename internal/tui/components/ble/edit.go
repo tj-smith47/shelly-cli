@@ -7,10 +7,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -50,7 +49,7 @@ type EditModel struct {
 	err     error
 	width   int
 	height  int
-	styles  EditStyles
+	styles  editmodal.Styles
 
 	// Original config for comparison
 	original *shelly.BLEConfig
@@ -59,53 +58,6 @@ type EditModel struct {
 	enableToggle   form.Toggle
 	rpcToggle      form.Toggle
 	observerToggle form.Toggle
-}
-
-// EditStyles holds styles for the BLE edit modal.
-type EditStyles struct {
-	Modal      lipgloss.Style
-	Title      lipgloss.Style
-	Label      lipgloss.Style
-	LabelFocus lipgloss.Style
-	Error      lipgloss.Style
-	Help       lipgloss.Style
-	Selector   lipgloss.Style
-	Warning    lipgloss.Style
-	Info       lipgloss.Style
-}
-
-// DefaultEditStyles returns the default edit modal styles.
-func DefaultEditStyles() EditStyles {
-	colors := theme.GetSemanticColors()
-	return EditStyles{
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Width(14),
-		LabelFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Width(14),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Selector: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		Warning: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-		Info: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Italic(true),
-	}
 }
 
 // NewEditModel creates a new BLE edit modal.
@@ -128,7 +80,7 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	return EditModel{
 		ctx:            ctx,
 		svc:            svc,
-		styles:         DefaultEditStyles(),
+		styles:         editmodal.DefaultStyles(),
 		enableToggle:   enableToggle,
 		rpcToggle:      rpcToggle,
 		observerToggle: observerToggle,
@@ -426,11 +378,7 @@ func (m EditModel) renderFormFields() string {
 }
 
 func (m EditModel) renderField(field EditField, label, value string) string {
-	labelStyle := m.styles.Label
-	if m.cursor == field {
-		labelStyle = m.styles.LabelFocus
-	}
-	return labelStyle.Render(label) + " " + value
+	return m.styles.RenderLabel(label, m.cursor == field) + " " + value
 }
 
 // Device returns the current device.

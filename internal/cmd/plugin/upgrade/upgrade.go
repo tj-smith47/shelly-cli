@@ -11,9 +11,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	All     bool
+	Name    string
+}
+
 // NewCommand creates the extension upgrade command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var all bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "upgrade [name]",
@@ -34,21 +41,20 @@ For extensions installed from local files or URLs, you need to reinstall manuall
   shelly extension upgrade --all`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := ""
 			if len(args) > 0 {
-				name = args[0]
+				opts.Name = args[0]
 			}
-			return run(cmd.Context(), f, name, all)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&all, "all", "a", false, "Upgrade all installed extensions")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Upgrade all installed extensions")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, name string, all bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	registry, err := plugins.NewRegistry()
 	if err != nil {
@@ -57,7 +63,7 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, all bool) error {
 
 	upgrader := plugins.New(registry, ios)
 
-	if all {
+	if opts.All {
 		extensionList, listErr := registry.List()
 		if listErr != nil {
 			return listErr
@@ -92,12 +98,12 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, all bool) error {
 		return nil
 	}
 
-	if name == "" {
+	if opts.Name == "" {
 		ios.Info("Specify an extension name or use --all to upgrade all extensions")
 		return nil
 	}
 
-	result, err := upgrader.UpgradeOne(ctx, name)
+	result, err := upgrader.UpgradeOne(ctx, opts.Name)
 	if err != nil {
 		return err
 	}

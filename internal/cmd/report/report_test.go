@@ -567,11 +567,12 @@ func TestRun_DevicesReport(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Type: "devices",
+		Factory: tf.Factory,
+		Type:    "devices",
 	}
 	opts.Format = formatJSON
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -609,11 +610,12 @@ func TestRun_EnergyReport(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Type: reportTypeEnergy,
+		Factory: tf.Factory,
+		Type:    reportTypeEnergy,
 	}
 	opts.Format = formatJSON
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -651,11 +653,12 @@ func TestRun_AuditReport(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Type: "audit",
+		Factory: tf.Factory,
+		Type:    "audit",
 	}
 	opts.Format = formatJSON
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -693,11 +696,12 @@ func TestRun_TextFormat(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Type: "devices",
+		Factory: tf.Factory,
+		Type:    "devices",
 	}
 	opts.Format = formatText
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -732,11 +736,12 @@ func TestRun_UnknownReportType(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
-		Type: "unknown",
+		Factory: tf.Factory,
+		Type:    "unknown",
 	}
 	opts.Format = formatJSON
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for unknown report type")
 	}

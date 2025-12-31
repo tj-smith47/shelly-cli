@@ -31,18 +31,19 @@ const DefaultScanTimeout = 2 * time.Minute
 
 // Options holds all discovery options.
 type Options struct {
-	timeout      time.Duration
-	register     bool
-	skipExisting bool
-	subnet       string
-	method       string
-	skipPlugins  bool
-	platform     string
+	Factory      *cmdutil.Factory
+	Method       string
+	Platform     string
+	Register     bool
+	SkipExisting bool
+	SkipPlugins  bool
+	Subnet       string
+	Timeout      time.Duration
 }
 
 // NewCommand creates the discover command group.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "discover",
@@ -83,18 +84,18 @@ plugin detection, or --platform to filter by specific platform.`,
   # Discover only Tasmota devices
   shelly discover --platform tasmota`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	// Add flags for the parent discover command
-	cmd.Flags().DurationVarP(&opts.timeout, "timeout", "t", DefaultScanTimeout, "Discovery timeout")
-	cmd.Flags().BoolVar(&opts.register, "register", false, "Auto-register discovered devices")
-	cmd.Flags().BoolVar(&opts.skipExisting, "skip-existing", true, "Skip devices already registered")
-	cmd.Flags().StringVar(&opts.subnet, "subnet", "", "Subnet to scan (auto-detected if not specified)")
-	cmd.Flags().StringVarP(&opts.method, "method", "m", "http", "Discovery method: http, mdns, ble, coiot")
-	cmd.Flags().BoolVar(&opts.skipPlugins, "skip-plugins", false, "Skip plugin detection (Shelly-only discovery)")
-	cmd.Flags().StringVarP(&opts.platform, "platform", "p", "", "Only discover devices of this platform (e.g., tasmota)")
+	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", DefaultScanTimeout, "Discovery timeout")
+	cmd.Flags().BoolVar(&opts.Register, "register", false, "Auto-register discovered devices")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", true, "Skip devices already registered")
+	cmd.Flags().StringVar(&opts.Subnet, "subnet", "", "Subnet to scan (auto-detected if not specified)")
+	cmd.Flags().StringVarP(&opts.Method, "method", "m", "http", "Discovery method: http, mdns, ble, coiot")
+	cmd.Flags().BoolVar(&opts.SkipPlugins, "skip-plugins", false, "Skip plugin detection (Shelly-only discovery)")
+	cmd.Flags().StringVarP(&opts.Platform, "platform", "p", "", "Only discover devices of this platform (e.g., tasmota)")
 
 	// Add subcommands (kept for direct access)
 	cmd.AddCommand(mdns.NewCommand(f))
@@ -108,34 +109,34 @@ plugin detection, or --platform to filter by specific platform.`,
 // run runs device discovery using the selected method.
 //
 //nolint:gocyclo // Complexity from handling multiple discovery methods and plugin integration
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Check for demo mode
 	if mock.IsDemoMode() && mock.HasDiscoveryFixtures() {
-		return runDemoMode(f, opts)
+		return runDemoMode(opts)
 	}
 
 	// If platform is specified (and not "shelly"), skip native Shelly discovery
 	// and only run plugin detection for that platform
-	if opts.platform != "" && opts.platform != model.PlatformShelly {
-		return runPluginOnlyDiscovery(ctx, f, ios, opts)
+	if opts.Platform != "" && opts.Platform != model.PlatformShelly {
+		return runPluginOnlyDiscovery(ctx, ios, opts)
 	}
 
 	var shellyDevices []discovery.DiscoveredDevice
 	var err error
 
-	switch opts.method {
+	switch opts.Method {
 	case "http", "scan", "":
-		shellyDevices, err = runHTTPDiscovery(ctx, ios, opts.timeout, opts.subnet)
+		shellyDevices, err = runHTTPDiscovery(ctx, ios, opts.Timeout, opts.Subnet)
 	case "mdns":
-		shellyDevices, err = runMDNSDiscovery(ctx, ios, opts.timeout)
+		shellyDevices, err = runMDNSDiscovery(ctx, ios, opts.Timeout)
 	case "coiot":
-		shellyDevices, err = runCoIoTDiscovery(ctx, ios, opts.timeout)
+		shellyDevices, err = runCoIoTDiscovery(ctx, ios, opts.Timeout)
 	case "ble":
-		shellyDevices, err = runBLEDiscovery(ctx, ios, opts.timeout)
+		shellyDevices, err = runBLEDiscovery(ctx, ios, opts.Timeout)
 	default:
-		return fmt.Errorf("unknown discovery method: %s (valid: http, mdns, ble, coiot)", opts.method)
+		return fmt.Errorf("unknown discovery method: %s (valid: http, mdns, ble, coiot)", opts.Method)
 	}
 
 	if err != nil {
@@ -144,9 +145,9 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 
 	// Run plugin detection if not skipped
 	var pluginDevices []term.PluginDiscoveredDevice
-	if !opts.skipPlugins && opts.method == "http" {
+	if !opts.SkipPlugins && opts.Method == "http" {
 		// Plugin detection only works with HTTP scan since we need to probe addresses
-		pluginDevices = runPluginDetection(ctx, ios, opts.subnet)
+		pluginDevices = runPluginDetection(ctx, ios, opts.Subnet)
 	}
 
 	// Display results
@@ -181,13 +182,13 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 	}
 
 	// Register devices if requested
-	if opts.register {
-		addedShelly, regErr := utils.RegisterDiscoveredDevices(shellyDevices, opts.skipExisting)
+	if opts.Register {
+		addedShelly, regErr := utils.RegisterDiscoveredDevices(shellyDevices, opts.SkipExisting)
 		if regErr != nil {
 			ios.Warning("Registration error: %v", regErr)
 		}
 
-		addedPlugin := registerPluginDevices(pluginDevices, opts.skipExisting)
+		addedPlugin := registerPluginDevices(pluginDevices, opts.SkipExisting)
 		totalAdded := addedShelly + addedPlugin
 		ios.Added("device", totalAdded)
 	}
@@ -196,7 +197,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 }
 
 // runPluginOnlyDiscovery runs discovery for a specific platform only.
-func runPluginOnlyDiscovery(ctx context.Context, _ *cmdutil.Factory, ios *iostreams.IOStreams, opts *Options) error {
+func runPluginOnlyDiscovery(ctx context.Context, ios *iostreams.IOStreams, opts *Options) error {
 	// Get plugin registry
 	registry, err := plugins.NewRegistry()
 	if err != nil {
@@ -204,16 +205,16 @@ func runPluginOnlyDiscovery(ctx context.Context, _ *cmdutil.Factory, ios *iostre
 	}
 
 	// Find plugin for the specified platform
-	plugin, err := registry.FindByPlatform(opts.platform)
+	plugin, err := registry.FindByPlatform(opts.Platform)
 	if err != nil {
 		return fmt.Errorf("failed to find plugin: %w", err)
 	}
 	if plugin == nil {
-		return fmt.Errorf("no plugin found for platform %q (is shelly-%s installed?)", opts.platform, opts.platform)
+		return fmt.Errorf("no plugin found for platform %q (is shelly-%s installed?)", opts.Platform, opts.Platform)
 	}
 
 	// Get addresses to scan
-	subnet := opts.subnet
+	subnet := opts.Subnet
 	if subnet == "" {
 		var detectErr error
 		subnet, detectErr = utils.DetectSubnet()
@@ -233,13 +234,13 @@ func runPluginOnlyDiscovery(ctx context.Context, _ *cmdutil.Factory, ios *iostre
 		return fmt.Errorf("no addresses to scan in subnet %s", subnet)
 	}
 
-	ios.Info("Scanning %d addresses for %s devices...", len(addresses), opts.platform)
+	ios.Info("Scanning %d addresses for %s devices...", len(addresses), opts.Platform)
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
 	mw.AddLine("scan", fmt.Sprintf("0/%d addresses probed", len(addresses)))
 
-	ctx, cancel := context.WithTimeout(ctx, opts.timeout)
+	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
 	// Create plugin discoverer and scan
@@ -252,7 +253,7 @@ func runPluginOnlyDiscovery(ctx context.Context, _ *cmdutil.Factory, ios *iostre
 			break
 		}
 
-		result, detectErr := pluginDiscoverer.DetectWithPlatform(ctx, addr, nil, opts.platform)
+		result, detectErr := pluginDiscoverer.DetectWithPlatform(ctx, addr, nil, opts.Platform)
 		if detectErr == nil && result != nil {
 			pluginDevices = append(pluginDevices, toTermPluginDevice(result))
 			foundCount++
@@ -266,19 +267,19 @@ func runPluginOnlyDiscovery(ctx context.Context, _ *cmdutil.Factory, ios *iostre
 
 	mw.UpdateLine("scan", iostreams.StatusSuccess,
 		fmt.Sprintf("%d/%d addresses probed, %d %s devices found",
-			len(addresses), len(addresses), foundCount, opts.platform))
+			len(addresses), len(addresses), foundCount, opts.Platform))
 	mw.Finalize()
 
 	if len(pluginDevices) == 0 {
-		ios.NoResults(opts.platform+" devices",
-			fmt.Sprintf("Ensure %s devices are powered on and accessible in %s", opts.platform, ipNet))
+		ios.NoResults(opts.Platform+" devices",
+			fmt.Sprintf("Ensure %s devices are powered on and accessible in %s", opts.Platform, ipNet))
 		return nil
 	}
 
 	term.DisplayPluginDiscoveredDevices(ios, pluginDevices)
 
-	if opts.register {
-		added := registerPluginDevices(pluginDevices, opts.skipExisting)
+	if opts.Register {
+		added := registerPluginDevices(pluginDevices, opts.SkipExisting)
 		ios.Added("device", added)
 	}
 
@@ -380,8 +381,8 @@ func registerPluginDevices(devices []term.PluginDiscoveredDevice, skipExisting b
 }
 
 // runDemoMode returns mock discovery results from fixtures.
-func runDemoMode(f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func runDemoMode(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Get mock discovered devices
 	mockDevices := mock.GetDiscoveredDevices()
@@ -419,8 +420,8 @@ func runDemoMode(f *cmdutil.Factory, opts *Options) error {
 	}
 
 	// Register devices if requested
-	if opts.register {
-		added, err := utils.RegisterDiscoveredDevices(shellyDevices, opts.skipExisting)
+	if opts.Register {
+		added, err := utils.RegisterDiscoveredDevices(shellyDevices, opts.SkipExisting)
 		if err != nil {
 			ios.Warning("Registration error: %v", err)
 		}

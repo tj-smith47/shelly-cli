@@ -15,12 +15,14 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory *cmdutil.Factory
 	CopyURL bool
+	Device  string
 }
 
 // NewCommand creates the device ui command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "ui <device>",
@@ -43,7 +45,8 @@ The device can be specified by name (from config) or by IP address/hostname.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, opts, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -52,12 +55,12 @@ The device can be specified by name (from config) or by IP address/hostname.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options, device string) error {
-	ios := f.IOStreams()
-	br := f.Browser()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	br := opts.Factory.Browser()
 
 	// Resolve device to get its address
-	addr := f.ResolveAddress(device)
+	addr := opts.Factory.ResolveAddress(opts.Device)
 	url := fmt.Sprintf("http://%s", addr)
 
 	// If --copy-url flag is set, copy to clipboard directly

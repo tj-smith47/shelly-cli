@@ -21,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -160,7 +161,7 @@ func DefaultStyles() Styles {
 		Current: lipgloss.NewStyle().
 			Foreground(colors.Primary),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(8),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),
@@ -562,20 +563,7 @@ func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
-	switch msg.String() {
-	case "j", "down":
-		m.scroller.CursorDown()
-	case "k", "up":
-		m.scroller.CursorUp()
-	case "g":
-		m.scroller.CursorToStart()
-	case "G":
-		m.scroller.CursorToEnd()
-	case "pgdown", "ctrl+d":
-		m.scroller.PageDown()
-	case "pgup", "ctrl+u":
-		m.scroller.PageUp()
-	}
+	keys.HandleScrollNavigation(msg.String(), m.scroller)
 	return m
 }
 

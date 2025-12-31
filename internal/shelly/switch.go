@@ -3,11 +3,14 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 
 	gen1comp "github.com/tj-smith47/shelly-go/gen1/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // SwitchInfo holds switch information for list operations.
@@ -16,6 +19,19 @@ type SwitchInfo struct {
 	Name   string
 	Output bool
 	Power  float64
+}
+
+// ListHeaders returns the column headers for the table.
+func (s SwitchInfo) ListHeaders() []string {
+	return []string{"ID", "Name", "State", "Power"}
+}
+
+// ListRow returns the formatted row values for the table.
+func (s SwitchInfo) ListRow() []string {
+	name := output.FormatComponentName(s.Name, "switch", s.ID)
+	state := output.RenderOnOff(s.Output, output.CaseUpper, theme.FalseError)
+	power := output.FormatPowerTableValue(s.Power)
+	return []string{fmt.Sprintf("%d", s.ID), name, state, power}
 }
 
 // SwitchOn turns on a switch component.

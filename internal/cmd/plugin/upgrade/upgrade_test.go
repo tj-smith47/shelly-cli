@@ -225,8 +225,13 @@ func TestRun_NoNameNoAll(t *testing.T) {
 	ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
+	opts := &Options{
+		Factory: f,
+		Name:    "",
+		All:     false,
+	}
 	// No name and all=false should print info message
-	err := run(context.Background(), f, "", false)
+	err := run(context.Background(), opts)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -247,8 +252,13 @@ func TestRun_AllWithEmptyList(t *testing.T) {
 	ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
+	opts := &Options{
+		Factory: f,
+		Name:    "",
+		All:     true,
+	}
 	// all=true with no extensions should output info message
-	err := run(context.Background(), f, "", true)
+	err := run(context.Background(), opts)
 
 	if err != nil {
 		// Error from registry is acceptable
@@ -266,8 +276,13 @@ func TestRun_SpecificExtension(t *testing.T) {
 	ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
+	opts := &Options{
+		Factory: f,
+		Name:    "nonexistent-extension",
+		All:     false,
+	}
 	// Try to upgrade a non-existent extension
-	err := run(context.Background(), f, "nonexistent-extension", false)
+	err := run(context.Background(), opts)
 
 	// Should fail with "not installed" error
 	if err == nil {
@@ -291,8 +306,13 @@ func TestRun_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
+	opts := &Options{
+		Factory: f,
+		Name:    "test-ext",
+		All:     false,
+	}
 	// Should handle cancelled context gracefully
-	err := run(ctx, f, "test-ext", false)
+	err := run(ctx, opts)
 
 	// Either returns quickly with context error or proceeds
 	// Just verify it doesn't panic
@@ -321,8 +341,13 @@ func TestRun_AllFlagBehavior(t *testing.T) {
 			ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 			f := cmdutil.NewFactory().SetIOStreams(ios)
 
+			opts := &Options{
+				Factory: f,
+				Name:    tt.extName,
+				All:     tt.all,
+			}
 			// Just verify it doesn't panic - error result is not important for this test
-			_ = run(context.Background(), f, tt.extName, tt.all) //nolint:errcheck // intentionally ignored for panic check
+			_ = run(context.Background(), opts) //nolint:errcheck // intentionally ignored for panic check
 		})
 	}
 }

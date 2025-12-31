@@ -83,7 +83,7 @@ func DefaultStyles() Styles {
 		Disabled: lipgloss.NewStyle().
 			Foreground(colors.Offline),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(colors.Text),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),
 		Highlight: lipgloss.NewStyle().

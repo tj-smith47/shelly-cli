@@ -230,24 +230,24 @@ func TestOptions_Defaults(t *testing.T) {
 
 	opts := &Options{}
 
-	if opts.timeout != 0 {
-		t.Errorf("default timeout = %v, want 0", opts.timeout)
+	if opts.Timeout != 0 {
+		t.Errorf("default timeout = %v, want 0", opts.Timeout)
 	}
 
-	if opts.register {
+	if opts.Register {
 		t.Error("default register = true, want false")
 	}
 
-	if opts.skipExisting {
+	if opts.SkipExisting {
 		t.Error("default skipExisting = true, want false (from zero value)")
 	}
 
-	if opts.subnet != "" {
-		t.Errorf("default subnet = %q, want empty string", opts.subnet)
+	if opts.Subnet != "" {
+		t.Errorf("default subnet = %q, want empty string", opts.Subnet)
 	}
 
-	if opts.method != "" {
-		t.Errorf("default method = %q, want empty string", opts.method)
+	if opts.Method != "" {
+		t.Errorf("default method = %q, want empty string", opts.Method)
 	}
 }
 
@@ -255,41 +255,41 @@ func TestOptions_AllFields(t *testing.T) {
 	t.Parallel()
 
 	opts := &Options{
-		timeout:      30 * time.Second,
-		register:     true,
-		skipExisting: true,
-		subnet:       "192.168.1.0/24",
-		method:       "http",
-		skipPlugins:  true,
-		platform:     "tasmota",
+		Timeout:      30 * time.Second,
+		Register:     true,
+		SkipExisting: true,
+		Subnet:       "192.168.1.0/24",
+		Method:       "http",
+		SkipPlugins:  true,
+		Platform:     "tasmota",
 	}
 
-	if opts.timeout != 30*time.Second {
-		t.Errorf("timeout = %v, want %v", opts.timeout, 30*time.Second)
+	if opts.Timeout != 30*time.Second {
+		t.Errorf("timeout = %v, want %v", opts.Timeout, 30*time.Second)
 	}
 
-	if !opts.register {
+	if !opts.Register {
 		t.Error("register = false, want true")
 	}
 
-	if !opts.skipExisting {
+	if !opts.SkipExisting {
 		t.Error("skipExisting = false, want true")
 	}
 
-	if opts.subnet != "192.168.1.0/24" {
-		t.Errorf("subnet = %q, want %q", opts.subnet, "192.168.1.0/24")
+	if opts.Subnet != "192.168.1.0/24" {
+		t.Errorf("subnet = %q, want %q", opts.Subnet, "192.168.1.0/24")
 	}
 
-	if opts.method != testMethodHTTP {
-		t.Errorf("method = %q, want %q", opts.method, testMethodHTTP)
+	if opts.Method != testMethodHTTP {
+		t.Errorf("method = %q, want %q", opts.Method, testMethodHTTP)
 	}
 
-	if !opts.skipPlugins {
+	if !opts.SkipPlugins {
 		t.Error("skipPlugins = false, want true")
 	}
 
-	if opts.platform != testPlatformTasmota {
-		t.Errorf("platform = %q, want %q", opts.platform, testPlatformTasmota)
+	if opts.Platform != testPlatformTasmota {
+		t.Errorf("platform = %q, want %q", opts.Platform, testPlatformTasmota)
 	}
 }
 
@@ -717,10 +717,11 @@ func TestRun_UnknownMethod(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		method: "invalid-method",
+		Factory: f,
+		Method:  "invalid-method",
 	}
 
-	err := run(context.Background(), f, opts)
+	err := run(context.Background(), opts)
 
 	if err == nil {
 		t.Error("Expected error for unknown method")
@@ -744,13 +745,14 @@ func TestRun_HTTPMethod(t *testing.T) {
 	cancel()
 
 	opts := &Options{
-		method:      "http",
-		timeout:     1 * time.Millisecond,
-		skipPlugins: true,
+		Factory:     f,
+		Method:      "http",
+		Timeout:     1 * time.Millisecond,
+		SkipPlugins: true,
 	}
 
 	// Should fail due to cancelled context or subnet detection
-	err := run(ctx, f, opts)
+	err := run(ctx, opts)
 	_ = err // Error is expected
 }
 
@@ -767,11 +769,12 @@ func TestRun_MDNSMethod(t *testing.T) {
 	cancel()
 
 	opts := &Options{
-		method:  "mdns",
-		timeout: 1 * time.Millisecond,
+		Factory: f,
+		Method:  "mdns",
+		Timeout: 1 * time.Millisecond,
 	}
 
-	err := run(ctx, f, opts)
+	err := run(ctx, opts)
 	_ = err // Error expected
 }
 
@@ -788,11 +791,12 @@ func TestRun_CoIoTMethod(t *testing.T) {
 	cancel()
 
 	opts := &Options{
-		method:  "coiot",
-		timeout: 1 * time.Millisecond,
+		Factory: f,
+		Method:  "coiot",
+		Timeout: 1 * time.Millisecond,
 	}
 
-	err := run(ctx, f, opts)
+	err := run(ctx, opts)
 	_ = err // Error expected
 }
 
@@ -808,11 +812,12 @@ func TestRun_BLEMethod(t *testing.T) { //nolint:paralleltest // Intentional - BL
 	cancel()
 
 	opts := &Options{
-		method:  "ble",
-		timeout: 1 * time.Millisecond,
+		Factory: f,
+		Method:  "ble",
+		Timeout: 1 * time.Millisecond,
 	}
 
-	err := run(ctx, f, opts)
+	err := run(ctx, opts)
 	_ = err // Error expected (BLE might not be available)
 }
 
@@ -829,10 +834,11 @@ func TestRun_PlatformFilter(t *testing.T) {
 	cancel()
 
 	opts := &Options{
-		platform: "tasmota",
-		timeout:  1 * time.Millisecond,
+		Factory:  f,
+		Platform: "tasmota",
+		Timeout:  1 * time.Millisecond,
 	}
 
-	err := run(ctx, f, opts)
+	err := run(ctx, opts)
 	_ = err // Error expected (no plugin for tasmota likely)
 }

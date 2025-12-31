@@ -13,8 +13,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the preview command.
+type Options struct {
+	Factory   *cmdutil.Factory
+	ThemeName string
+}
+
 // NewCommand creates the theme preview command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "preview [theme]",
 		Aliases: []string{"show", "demo"},
@@ -29,19 +37,18 @@ If no theme is specified, previews the current theme.`,
   shelly theme preview`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			themeName := ""
 			if len(args) > 0 {
-				themeName = args[0]
+				opts.ThemeName = args[0]
 			}
-			return run(f, themeName)
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, themeName string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Save current theme to restore later
 	current := theme.Current()
@@ -51,11 +58,11 @@ func run(f *cmdutil.Factory, themeName string) error {
 	}
 
 	// Set preview theme if specified
-	if themeName != "" {
-		if _, ok := theme.GetTheme(themeName); !ok {
-			return fmt.Errorf("theme not found: %s", themeName)
+	if opts.ThemeName != "" {
+		if _, ok := theme.GetTheme(opts.ThemeName); !ok {
+			return fmt.Errorf("theme not found: %s", opts.ThemeName)
 		}
-		theme.SetTheme(themeName)
+		theme.SetTheme(opts.ThemeName)
 		defer func() {
 			if currentID != "" {
 				theme.SetTheme(currentID)

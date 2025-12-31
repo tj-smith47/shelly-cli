@@ -193,7 +193,8 @@ func TestRun_InstalledExtensions(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	// Test with all=false (installed only)
-	err := run(f, false)
+	opts := &Options{Factory: f, All: false}
+	err := run(opts)
 
 	// Should succeed or produce a meaningful error
 	if err != nil {
@@ -213,7 +214,8 @@ func TestRun_AllDiscoveredExtensions(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	// Test with all=true (discover all)
-	err := run(f, true)
+	opts := &Options{Factory: f, All: true}
+	err := run(opts)
 
 	// Should succeed or produce a meaningful error
 	if err != nil {
@@ -233,7 +235,8 @@ func TestRun_OutputEmptyList(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	// Run the command
-	err := run(f, false)
+	opts := &Options{Factory: f, All: false}
+	err := run(opts)
 
 	// Check output contains info message or table header
 	output := stdout.String() + stderr.String()
@@ -271,8 +274,9 @@ func TestRun_FlagVariations(t *testing.T) {
 			ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 			f := cmdutil.NewFactory().SetIOStreams(ios)
 
-			// Just verify it doesn't panic - error result is not important for this test
-			_ = run(f, tt.all) //nolint:errcheck // intentionally ignored for panic check
+				// Just verify it doesn't panic - error result is not important for this test
+			opts := &Options{Factory: f, All: tt.all}
+			_ = run(opts) //nolint:errcheck // intentionally ignored for panic check
 		})
 	}
 }

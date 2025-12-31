@@ -12,8 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Component string
+	Device    string
+}
+
 // NewCommand creates the config get command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "get <device> [component]",
 		Aliases: []string{"show", "read"},
@@ -42,29 +51,28 @@ only that component's configuration.`,
   shelly config get living-room -o yaml`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
-			component := ""
+			opts.Device = args[0]
 			if len(args) > 1 {
-				component = args[1]
+				opts.Component = args[1]
 			}
-			return run(cmd.Context(), f, device, component)
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device, component string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
-	ios := f.IOStreams()
+	svc := opts.Factory.ShellyService()
+	ios := opts.Factory.IOStreams()
 
 	var config map[string]any
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting configuration...", func(ctx context.Context) error {
 		var err error
-		config, err = svc.GetConfig(ctx, device)
+		config, err = svc.GetConfig(ctx, opts.Device)
 		return err
 	})
 	if err != nil {
@@ -73,12 +81,12 @@ func run(ctx context.Context, f *cmdutil.Factory, device, component string) erro
 
 	// If a specific component was requested, extract just that
 	var result any = config
-	if component != "" {
-		compConfig, ok := config[component]
+	if opts.Component != "" {
+		compConfig, ok := config[opts.Component]
 		if !ok {
-			return fmt.Errorf("component %q not found in configuration", component)
+			return fmt.Errorf("component %q not found in configuration", opts.Component)
 		}
-		result = map[string]any{component: compConfig}
+		result = map[string]any{opts.Component: compConfig}
 	}
 
 	// Output based on format

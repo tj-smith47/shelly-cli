@@ -11,8 +11,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
+// Options holds the options for the validate command.
+type Options struct {
+	Factory  *cmdutil.Factory
+	FilePath string
+}
+
 // NewCommand creates the migrate validate command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "validate <backup-file>",
 		Aliases: []string{"check", "verify"},
@@ -25,18 +33,19 @@ all required fields.`,
   shelly migrate validate backup.json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0])
+			opts.FilePath = args[0]
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, filePath string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Read backup file
-	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is user-provided CLI argument
+	data, err := os.ReadFile(opts.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}

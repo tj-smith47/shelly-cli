@@ -13,8 +13,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+}
+
 // NewCommand creates the device info command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "info <device>",
 		Aliases: []string{"details", "show"},
@@ -39,25 +47,26 @@ The device can be specified by its registered name or IP address.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	svc := f.ShellyService()
-	ios := f.IOStreams()
+	svc := opts.Factory.ShellyService()
+	ios := opts.Factory.IOStreams()
 
 	var info *shelly.DeviceInfo
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting device info...", func(ctx context.Context) error {
 		var err error
 		// Use DeviceInfoAuto to support both Gen1 and Gen2 devices
-		info, err = svc.DeviceInfoAuto(ctx, device)
+		info, err = svc.DeviceInfoAuto(ctx, opts.Device)
 		return err
 	})
 	if err != nil {

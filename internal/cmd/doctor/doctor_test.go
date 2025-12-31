@@ -405,12 +405,13 @@ func TestRun_Basic(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory: tf.Factory,
 		Network: false,
 		Devices: false,
 		Full:    false,
 	}
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -447,12 +448,13 @@ func TestRun_WithNetwork(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory: tf.Factory,
 		Network: true,
 		Devices: false,
 		Full:    false,
 	}
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -489,12 +491,13 @@ func TestRun_WithDevices(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory: tf.Factory,
 		Network: false,
 		Devices: true,
 		Full:    false,
 	}
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -531,12 +534,13 @@ func TestRun_Full(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory: tf.Factory,
 		Network: true,
 		Devices: true,
 		Full:    true,
 	}
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -576,13 +580,14 @@ func TestRun_CancelledContext(t *testing.T) {
 	cancel() // Cancel immediately
 
 	opts := &Options{
+		Factory: tf.Factory,
 		Network: true,
 		Devices: true,
 		Full:    false,
 	}
 
 	// Should handle cancelled context gracefully
-	err = run(ctx, tf.Factory, opts)
+	err = run(ctx, opts)
 	if err != nil {
 		t.Logf("run() with cancelled context: %v (may be expected)", err)
 	}
@@ -637,12 +642,13 @@ func TestRun_MultipleDevices(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	opts := &Options{
+		Factory: tf.Factory,
 		Network: false,
 		Devices: true,
 		Full:    false,
 	}
 
-	err = run(context.Background(), tf.Factory, opts)
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

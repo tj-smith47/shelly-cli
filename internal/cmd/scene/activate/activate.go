@@ -17,13 +17,22 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory    *cmdutil.Factory
+	Concurrent int
+	DryRun     bool
+	Name       string
+	Timeout    time.Duration
+}
+
 // NewCommand creates the scene activate command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		timeout    time.Duration
-		concurrent int
-		dryRun     bool
-	)
+	opts := &Options{
+		Factory:    f,
+		Concurrent: 5,
+		Timeout:    10 * time.Second,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "activate <name>",
@@ -48,34 +57,35 @@ Use --dry-run to preview actions without executing them.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.SceneNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], timeout, concurrent, dryRun)
+			opts.Name = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 10*time.Second, "Timeout per device")
-	cmd.Flags().IntVarP(&concurrent, "concurrent", "c", 5, "Max concurrent operations")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview actions without executing")
+	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", 10*time.Second, "Timeout per device")
+	cmd.Flags().IntVarP(&opts.Concurrent, "concurrent", "c", 5, "Max concurrent operations")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview actions without executing")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Duration, concurrent int, dryRun bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Cap concurrency to global rate limit
-	concurrent = cmdutil.CapConcurrency(ios, concurrent)
+	concurrent := cmdutil.CapConcurrency(ios, opts.Concurrent)
 
-	scene, exists := config.GetScene(name)
+	scene, exists := config.GetScene(opts.Name)
 	if !exists {
-		return fmt.Errorf("scene %q not found", name)
+		return fmt.Errorf("scene %q not found", opts.Name)
 	}
 
 	if len(scene.Actions) == 0 {
-		ios.Warning("Scene %q has no actions", name)
+		ios.Warning("Scene %q has no actions", opts.Name)
 		return nil
 	}
 
-	if dryRun {
+	if opts.DryRun {
 		ios.Info("Dry run - would execute %d action(s):", len(scene.Actions))
 		for i, action := range scene.Actions {
 			params := output.FormatParamsInline(action.Params)
@@ -92,9 +102,9 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 		return nil
 	}
 
-	ios.Info("Activating scene %q (%d actions)...", theme.Bold().Render(name), len(scene.Actions))
+	ios.Info("Activating scene %q (%d actions)...", theme.Bold().Render(opts.Name), len(scene.Actions))
 
-	svc := f.ShellyService()
+	svc := opts.Factory.ShellyService()
 
 	// Create MultiWriter for progress tracking
 	mw := iostreams.NewMultiWriter(ios.Out, ios.IsStdoutTTY())
@@ -106,7 +116,7 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 	}
 
 	// Create parent context with overall timeout
-	ctx, cancel := context.WithTimeout(ctx, timeout*time.Duration(len(scene.Actions)))
+	ctx, cancel := context.WithTimeout(ctx, opts.Timeout*time.Duration(len(scene.Actions)))
 	defer cancel()
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -123,7 +133,7 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 			mw.UpdateLine(lineID, iostreams.StatusRunning, params)
 
 			// Per-action timeout
-			actionCtx, actionCancel := context.WithTimeout(ctx, timeout)
+			actionCtx, actionCancel := context.WithTimeout(ctx, opts.Timeout)
 			defer actionCancel()
 
 			_, err := svc.RawRPC(actionCtx, act.Device, act.Method, act.Params)
@@ -149,10 +159,10 @@ func run(ctx context.Context, f *cmdutil.Factory, name string, timeout time.Dura
 
 	// Print summary
 	if failed > 0 {
-		ios.Warning("Scene %q: %d/%d actions failed", name, failed, len(scene.Actions))
+		ios.Warning("Scene %q: %d/%d actions failed", opts.Name, failed, len(scene.Actions))
 		return fmt.Errorf("%d/%d actions failed", failed, len(scene.Actions))
 	}
 
-	ios.Success("Scene %q activated (%d actions)", name, succeeded)
+	ios.Success("Scene %q activated (%d actions)", opts.Name, succeeded)
 	return nil
 }

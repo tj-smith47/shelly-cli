@@ -235,7 +235,8 @@ func TestRun_NoArgs_ReturnsAllSettings(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, []string{})
+	opts := &Options{Factory: tf.Factory, Key: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() with no args should not error, got: %v", err)
 	}
@@ -249,7 +250,8 @@ func TestRun_WithUnknownKey(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, []string{"nonexistent.key.that.does.not.exist"})
+	opts := &Options{Factory: tf.Factory, Key: "nonexistent.key.that.does.not.exist"}
+	err := run(opts)
 	if err == nil {
 		t.Error("Expected error for unknown key")
 	}
@@ -267,7 +269,8 @@ func TestRun_WithValidKey(t *testing.T) {
 
 	// Note: This may or may not error depending on viper state
 	// The important thing is it doesn't panic
-	err := run(tf.Factory, []string{"output"})
+	opts := &Options{Factory: tf.Factory, Key: "output"}
+	err := run(opts)
 	if err != nil {
 		// Some keys may not be set in test environment
 		if !strings.Contains(err.Error(), "not set") {
@@ -337,7 +340,8 @@ func TestRun_OutputIsProduced(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	// Run with no args (shows all settings)
-	err := run(tf.Factory, []string{})
+	opts := &Options{Factory: tf.Factory, Key: ""}
+	err := run(opts)
 
 	// We mainly want to verify no panic occurs
 	// Output verification depends on viper state which varies in tests

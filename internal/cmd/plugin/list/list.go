@@ -9,9 +9,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
+// Options holds the options for the list command.
+type Options struct {
+	Factory *cmdutil.Factory
+	All     bool
+}
+
 // NewCommand creates the extension list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var all bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -48,22 +54,22 @@ Columns: Name, Version, Source (github/url/local/unknown), Path`,
   # Short form
   shelly ext ls`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f, all)
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&all, "all", "a", false, "List all discovered extensions, not just installed ones")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "List all discovered extensions, not just installed ones")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, all bool) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	var extensionList []plugins.Plugin
 	var err error
 
-	if all {
+	if opts.All {
 		// List all discovered extensions
 		loader := plugins.NewLoader()
 		extensionList, err = loader.Discover()
@@ -81,7 +87,7 @@ func run(f *cmdutil.Factory, all bool) error {
 	}
 
 	if len(extensionList) == 0 {
-		if all {
+		if opts.All {
 			ios.Info("No extensions found")
 		} else {
 			ios.Info("No extensions installed. Use 'shelly extension install' to install one.")

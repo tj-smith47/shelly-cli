@@ -17,8 +17,8 @@ const (
 	testJSONDefault = "json"
 )
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd == nil {
@@ -48,8 +48,8 @@ func TestNewCommand(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Aliases(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	aliases := cmd.Aliases
@@ -76,8 +76,8 @@ func TestNewCommand_Aliases(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_RequiresDevice(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Should require at least 1 argument (device)
@@ -105,8 +105,8 @@ func TestNewCommand_RequiresDevice(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Flags(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Check format flag
@@ -158,17 +158,14 @@ func TestNewCommand_Flags(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_FlagParsing(t *testing.T) {
+	t.Parallel()
+
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
-
-	cmd := NewCommand(f)
-	cmd.SetOut(out)
-	cmd.SetErr(errOut)
 
 	// Test parsing with flags - these won't actually run because no device
 	// but they validate flag parsing works
@@ -190,12 +187,7 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Reset flags for each test
-			formatFlag = ""
-			encryptFlag = ""
-			skipScriptsFlag = false
-			skipSchedulesFlag = false
-			skipWebhooksFlag = false
+			t.Parallel()
 
 			cmd := NewCommand(f)
 			cmd.SetOut(out)
@@ -211,8 +203,8 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Example_Content(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	example := cmd.Example
@@ -289,7 +281,6 @@ func TestExecute_TooManyArgs(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestExecute_WithMockDevice(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -319,13 +310,6 @@ func TestExecute_WithMockDevice(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -341,7 +325,6 @@ func TestExecute_WithMockDevice(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestExecute_WithOutputFile(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -371,13 +354,6 @@ func TestExecute_WithOutputFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	dir := t.TempDir()
 	filePath := dir + "/backup.json"
 
@@ -394,7 +370,6 @@ func TestExecute_WithOutputFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestExecute_YAMLFormat(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -424,13 +399,6 @@ func TestExecute_YAMLFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -444,7 +412,6 @@ func TestExecute_YAMLFormat(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestExecute_WithSkipFlags(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -474,13 +441,6 @@ func TestExecute_WithSkipFlags(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -494,7 +454,6 @@ func TestExecute_WithSkipFlags(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestExecute_WithEncrypt(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -524,13 +483,6 @@ func TestExecute_WithEncrypt(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -545,7 +497,6 @@ func TestExecute_WithEncrypt(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestExecute_UnknownDevice(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -560,13 +511,6 @@ func TestExecute_UnknownDevice(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
-
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -584,7 +528,6 @@ func TestExecute_UnknownDevice(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestExecute_StdoutOutput(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -614,13 +557,6 @@ func TestExecute_StdoutOutput(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
@@ -635,7 +571,6 @@ func TestExecute_StdoutOutput(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_Success(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -665,20 +600,17 @@ func TestRun_Success(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", "")
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Format:  "json",
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected for mock)", err)
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_WriteToFile(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -708,23 +640,21 @@ func TestRun_WriteToFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	dir := t.TempDir()
 	filePath := dir + "/backup.json"
 
-	err = run(context.Background(), tf.Factory, "test-device", filePath)
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		FilePath: filePath,
+		Format:   "json",
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected for mock)", err)
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_InvalidFilePath(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -754,22 +684,20 @@ func TestRun_InvalidFilePath(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Reset package-level flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
 	// Try to write to an invalid path
-	err = run(context.Background(), tf.Factory, "test-device", "/nonexistent/directory/backup.json")
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		FilePath: "/nonexistent/directory/backup.json",
+		Format:   "json",
+	}
+	err = run(context.Background(), opts)
 	// This should fail either at backup creation (mock limitation) or file write (invalid path)
 	if err != nil {
 		t.Logf("run() error = %v (expected)", err)
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_YAMLFormat(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -799,20 +727,17 @@ func TestRun_YAMLFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Set format to yaml
-	formatFlag = "yaml"
-	encryptFlag = ""
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", "")
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Format:  "yaml",
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected for mock)", err)
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_WithAllSkipFlags(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -842,20 +767,20 @@ func TestRun_WithAllSkipFlags(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Set all skip flags
-	formatFlag = testJSONDefault
-	encryptFlag = ""
-	skipScriptsFlag = true
-	skipSchedulesFlag = true
-	skipWebhooksFlag = true
-
-	err = run(context.Background(), tf.Factory, "test-device", "")
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		Format:        "json",
+		SkipScripts:   true,
+		SkipSchedules: true,
+		SkipWebhooks:  true,
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected for mock)", err)
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_WithPassword(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -885,22 +810,21 @@ func TestRun_WithPassword(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Set encryption password
-	formatFlag = testJSONDefault
-	encryptFlag = "mysecretpassword"
-	skipScriptsFlag = false
-	skipSchedulesFlag = false
-	skipWebhooksFlag = false
-
-	err = run(context.Background(), tf.Factory, "test-device", "")
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Format:  "json",
+		Encrypt: "mysecretpassword",
+	}
+	err = run(context.Background(), opts)
 	// Expected to fail because encrypted backups are not supported via service layer
 	if err == nil {
 		t.Log("Expected error for encrypted backup via service layer")
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Long_Description(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	long := cmd.Long

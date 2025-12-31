@@ -15,8 +15,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+}
+
 // NewCommand creates the action list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "list <device>",
 		Aliases: []string{"ls", "show"},
@@ -38,25 +46,26 @@ Gen2+ devices use webhooks instead. See 'shelly webhook list'.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	var actions *gen1.ActionSettings
-	err := svc.WithDevice(ctx, device, func(dev *shelly.DeviceClient) error {
+	err := svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 		if !dev.IsGen1() {
-			ios.Warning("Device %s is not a Gen1 device", device)
-			ios.Info("Gen2+ devices use webhooks. Try: shelly webhook list %s", device)
+			ios.Warning("Device %s is not a Gen1 device", opts.Device)
+			ios.Info("Gen2+ devices use webhooks. Try: shelly webhook list %s", opts.Device)
 			return fmt.Errorf("action URLs only available for Gen1 devices")
 		}
 

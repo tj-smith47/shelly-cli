@@ -15,8 +15,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the options for the list command.
+type Options struct {
+	Factory *cmdutil.Factory
+	Dir     string
+}
+
 // NewCommand creates the backup list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "list [directory]",
 		Aliases: []string{"ls"},
@@ -50,21 +58,21 @@ Columns: Filename, Device, Model, Created, Encrypted, Size`,
   shelly backup ls`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			dir := ""
 			if len(args) > 0 {
-				dir = args[0]
+				opts.Dir = args[0]
 			}
-			return run(f, dir)
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, dir string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Resolve directory
+	dir := opts.Dir
 	if dir == "" {
 		configDir, err := config.Dir()
 		if err != nil {

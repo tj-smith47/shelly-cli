@@ -287,11 +287,13 @@ func TestRun_ContextCancelled(t *testing.T) {
 	cancel()
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
 		Count:   1,
 		Timeout: 5 * time.Second,
 	}
 
-	err := run(ctx, tf.Factory, "test-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error with cancelled context")
 	}
@@ -308,11 +310,13 @@ func TestRun_Timeout(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
 		Count:   1,
 		Timeout: 5 * time.Second,
 	}
 
-	err := run(ctx, tf.Factory, "test-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error with timed out context")
 	}
@@ -428,12 +432,14 @@ func TestRun_SinglePing(t *testing.T) {
 	cancel()
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
 		Count:   1,
 		Timeout: 5 * time.Second,
 	}
 
 	// Will fail due to cancelled context, but tests single ping path
-	err := run(ctx, tf.Factory, "test-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error with cancelled context")
 	}
@@ -448,12 +454,14 @@ func TestRun_MultiplePings(t *testing.T) {
 	cancel()
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
 		Count:   3,
 		Timeout: 5 * time.Second,
 	}
 
 	// Will fail due to cancelled context, but tests multiple ping path
-	err := run(ctx, tf.Factory, "test-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Error("Expected error with cancelled context")
 	}
@@ -520,6 +528,8 @@ func TestRun_OutputFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
 		Count:   1,
 		Timeout: 5 * time.Second,
 	}
@@ -529,7 +539,7 @@ func TestRun_OutputFormat(t *testing.T) {
 	cancel()
 
 	// Run with cancelled context - error is expected and checked via output
-	err := run(ctx, tf.Factory, "test-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Log("Note: run() returned nil error with cancelled context")
 	}
@@ -547,6 +557,8 @@ func TestRun_PrintsDeviceName(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
 		Count:   1,
 		Timeout: 5 * time.Second,
 	}
@@ -555,7 +567,7 @@ func TestRun_PrintsDeviceName(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "test-device", opts)
+	err := run(ctx, opts)
 	if err == nil {
 		t.Log("Note: run() returned nil error with cancelled context")
 	}

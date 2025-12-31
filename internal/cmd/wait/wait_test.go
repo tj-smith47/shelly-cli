@@ -114,7 +114,11 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 func TestRun_ShortDuration(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	err := run(context.Background(), tf.Factory, "1ms")
+	opts := &Options{
+		Factory:     tf.Factory,
+		DurationStr: "1ms",
+	}
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -131,7 +135,11 @@ func TestRun_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "1h")
+	opts := &Options{
+		Factory:     tf.Factory,
+		DurationStr: "1h",
+	}
+	err := run(ctx, opts)
 	// With cancelled context, the function should return quickly
 	if err != nil {
 		t.Logf("run() with cancelled context error = %v (may be expected)", err)
@@ -141,7 +149,11 @@ func TestRun_ContextCancellation(t *testing.T) {
 func TestRun_InvalidDuration(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	err := run(context.Background(), tf.Factory, "invalid")
+	opts := &Options{
+		Factory:     tf.Factory,
+		DurationStr: "invalid",
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for invalid duration")
 	}
@@ -175,7 +187,11 @@ func TestRun_VariousDurations(t *testing.T) {
 			}
 			defer cancel()
 
-			err := run(ctx, tf.Factory, tt.duration)
+			opts := &Options{
+				Factory:     tf.Factory,
+				DurationStr: tt.duration,
+			}
+			err := run(ctx, opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("run(%q) error = %v, wantErr %v", tt.duration, err, tt.wantErr)
 			}

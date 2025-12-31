@@ -338,7 +338,8 @@ func TestRun_WithContext(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	ctx := context.Background()
-	err = run(ctx, tf.Factory, "context-device")
+	opts := &Options{Factory: tf.Factory, Device: "context-device"}
+	err = run(ctx, opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -374,7 +375,8 @@ func TestRun_CanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	err = run(ctx, tf.Factory, "cancel-device")
+	opts := &Options{Factory: tf.Factory, Device: "cancel-device"}
+	err = run(ctx, opts)
 	if err == nil {
 		t.Error("expected error for canceled context")
 	}

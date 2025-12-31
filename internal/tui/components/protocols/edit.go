@@ -111,7 +111,7 @@ func DefaultMQTTEditStyles() MQTTEditStyles {
 			Bold(true).
 			MarginBottom(1),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(14),
 		LabelFocus: lipgloss.NewStyle().
 			Foreground(colors.Highlight).

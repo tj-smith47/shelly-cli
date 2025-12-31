@@ -10,8 +10,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the next command.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the theme next command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "next",
 		Aliases: []string{"n"},
@@ -19,16 +26,16 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Long:    `Cycle to the next theme in the list.`,
 		Example: `  # Go to next theme
   shelly theme next`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(f)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	theme.NextTheme()
 

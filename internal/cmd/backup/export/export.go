@@ -15,14 +15,24 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	allFlag      bool
-	formatFlag   string
-	parallelFlag int
-)
+// Options holds the command options.
+type Options struct {
+	Factory   *cmdutil.Factory
+	All       bool
+	Directory string
+	Format    string
+	Parallel  int
+}
 
 // NewCommand creates the backup export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Factory:  f,
+		All:      true,
+		Format:   "json",
+		Parallel: 3,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "export <directory>",
 		Aliases: []string{"save", "dump"},
@@ -41,22 +51,23 @@ Use --format to choose JSON or YAML output.`,
   shelly backup export ./backups --parallel 5`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Directory = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&allFlag, "all", "a", true, "Export all registered devices")
-	cmd.Flags().StringVarP(&formatFlag, "format", "f", "json", "Output format (json, yaml)")
-	cmd.Flags().IntVar(&parallelFlag, "parallel", 3, "Number of parallel backups")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", true, "Export all registered devices")
+	cmd.Flags().StringVarP(&opts.Format, "format", "f", "json", "Output format (json, yaml)")
+	cmd.Flags().IntVar(&opts.Parallel, "parallel", 3, "Number of parallel backups")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, dir string) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*10)
 	defer cancel()
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
 	// Get registered devices
 	cfg := config.Get()
@@ -67,29 +78,29 @@ func run(ctx context.Context, f *cmdutil.Factory, dir string) error {
 	}
 
 	// Create directory if it doesn't exist
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	if err := os.MkdirAll(opts.Directory, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	ios.Info("Exporting backups for %d devices...", len(cfg.Devices))
 	ios.Println()
 
-	exporter := shelly.NewBackupExporter(f.ShellyService())
-	opts := shelly.BackupExportOptions{
-		Directory:  dir,
-		Format:     formatFlag,
-		Parallel:   parallelFlag,
+	exporter := shelly.NewBackupExporter(opts.Factory.ShellyService())
+	exportOpts := shelly.BackupExportOptions{
+		Directory:  opts.Directory,
+		Format:     opts.Format,
+		Parallel:   opts.Parallel,
 		BackupOpts: backup.Options{},
 	}
 
-	results := exporter.ExportAll(ctx, cfg.Devices, opts)
+	results := exporter.ExportAll(ctx, cfg.Devices, exportOpts)
 	term.DisplayBackupExportResults(ios, results)
 
 	ios.Println()
 
 	success, failed := shelly.CountBackupResults(results)
 	if success > 0 {
-		ios.Success("Successfully exported %d backup(s) to %s", success, dir)
+		ios.Success("Successfully exported %d backup(s) to %s", success, opts.Directory)
 	}
 	if failed > 0 {
 		ios.Warning("Failed to export %d device(s):", failed)

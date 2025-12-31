@@ -45,7 +45,7 @@ func DefaultEditorStyles() EditorStyles {
 			Foreground(colors.Highlight).
 			Bold(true),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(12),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),

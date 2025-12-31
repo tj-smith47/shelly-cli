@@ -11,9 +11,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the list command.
+type Options struct {
+	Factory *cmdutil.Factory
+	Filter  string
+}
+
 // NewCommand creates the theme list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var filter string
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -56,17 +62,17 @@ Columns: Theme (name), Current (checkmark if active)`,
   # Short form
   shelly theme ls`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f, filter)
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&filter, "filter", "", "Filter themes by name pattern")
+	cmd.Flags().StringVar(&opts.Filter, "filter", "", "Filter themes by name pattern")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, filter string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	themes := theme.ListThemes()
 	current := theme.Current()
@@ -76,11 +82,11 @@ func run(f *cmdutil.Factory, filter string) error {
 	}
 
 	// Filter if specified
-	if filter != "" {
-		filter = strings.ToLower(filter)
+	if opts.Filter != "" {
+		filterLower := strings.ToLower(opts.Filter)
 		var filtered []string
 		for _, t := range themes {
-			if strings.Contains(strings.ToLower(t), filter) {
+			if strings.Contains(strings.ToLower(t), filterLower) {
 				filtered = append(filtered, t)
 			}
 		}
@@ -101,7 +107,7 @@ func run(f *cmdutil.Factory, filter string) error {
 
 	// Text output
 	if len(themes) == 0 {
-		ios.Info("No themes found matching filter: %s", filter)
+		ios.Info("No themes found matching filter: %s", opts.Filter)
 		return nil
 	}
 

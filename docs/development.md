@@ -35,6 +35,62 @@ These standards apply to all code in the shelly-cli repository.
 
 ## Command Development Standards
 
+### Options Struct Pattern
+
+**Standard**: All commands with options MUST embed `Factory *cmdutil.Factory` in the Options struct.
+
+```go
+// ✅ Correct - Factory embedded in Options
+type Options struct {
+    // 1. Embedded flag groups (alphabetical)
+    flags.ConfirmFlags
+    flags.OutputFlags
+
+    // 2. Factory (always present)
+    Factory *cmdutil.Factory
+
+    // 3. Command-specific fields (alphabetical)
+    Device string
+    ID     int
+}
+
+func NewCommand(f *cmdutil.Factory) *cobra.Command {
+    opts := &Options{Factory: f}
+
+    cmd := &cobra.Command{
+        Use: "example <device>",
+        RunE: func(cmd *cobra.Command, args []string) error {
+            opts.Device = args[0]
+            return run(cmd.Context(), opts)  // Only pass opts
+        },
+    }
+    return cmd
+}
+
+func run(ctx context.Context, opts *Options) error {
+    ios := opts.Factory.IOStreams()   // Access from opts
+    svc := opts.Factory.ShellyService()
+    // ...
+}
+
+// ❌ Incorrect - Factory passed separately
+type Options struct {
+    Device string
+    ID     int
+}
+
+func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {  // DON'T DO THIS
+    ios := f.IOStreams()
+    // ...
+}
+```
+
+**Rationale**:
+- Consistent pattern across all commands (71 files already follow this)
+- Simplifies `run()` function signatures
+- Options struct becomes self-contained with all dependencies
+- Easier to test - mock factory can be injected into Options
+
 ### Constructor Naming
 
 **Standard**: All command constructors must be named `NewCommand`.

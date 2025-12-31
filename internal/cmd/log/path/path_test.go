@@ -113,7 +113,9 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 func TestRun(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -128,7 +130,9 @@ func TestRun(t *testing.T) {
 func TestRun_OutputContainsPath(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

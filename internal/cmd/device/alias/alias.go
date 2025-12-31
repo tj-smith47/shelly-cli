@@ -14,10 +14,18 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Alias   string
+	Device  string
+	List    bool
+	Remove  string
+}
+
 // NewCommand creates the device alias command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var remove string
-	var list bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "alias <device> [alias]",
@@ -47,41 +55,44 @@ and contain only letters, numbers, hyphens, and underscores.`,
 		Args:              cobra.RangeArgs(1, 2),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(f, args, remove, list)
+			opts.Device = args[0]
+			if len(args) > 1 {
+				opts.Alias = args[1]
+			}
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&remove, "remove", "r", "", "Remove the specified alias")
-	cmd.Flags().BoolVarP(&list, "list", "l", false, "List all aliases for the device")
+	cmd.Flags().StringVarP(&opts.Remove, "remove", "r", "", "Remove the specified alias")
+	cmd.Flags().BoolVarP(&opts.List, "list", "l", false, "List all aliases for the device")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, args []string, remove string, list bool) error {
-	ios := f.IOStreams()
-	deviceName := args[0]
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Verify device exists
-	if _, exists := config.GetDevice(deviceName); !exists {
-		return fmt.Errorf("device %q not found", deviceName)
+	if _, exists := config.GetDevice(opts.Device); !exists {
+		return fmt.Errorf("device %q not found", opts.Device)
 	}
 
 	// Handle --list flag
-	if list {
-		return listAliases(ios, deviceName)
+	if opts.List {
+		return listAliases(ios, opts.Device)
 	}
 
 	// Handle --remove flag
-	if remove != "" {
-		return removeAlias(ios, deviceName, remove)
+	if opts.Remove != "" {
+		return removeAlias(ios, opts.Device, opts.Remove)
 	}
 
 	// Add alias - requires the alias argument
-	if len(args) < 2 {
+	if opts.Alias == "" {
 		return fmt.Errorf("alias argument required (or use --list to view aliases)")
 	}
 
-	return addAlias(ios, deviceName, args[1])
+	return addAlias(ios, opts.Device, opts.Alias)
 }
 
 func listAliases(ios *iostreams.IOStreams, deviceName string) error {

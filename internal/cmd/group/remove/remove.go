@@ -9,8 +9,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the options for the remove command.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Devices   []string
+	GroupName string
+}
+
 // NewCommand creates the group remove command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "remove <group> <device>...",
 		Aliases: []string{"rm"},
@@ -32,30 +41,32 @@ Removing a device from a group does not delete the device.`,
   shelly grp rm office 192.168.1.100`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0], args[1:])
+			opts.GroupName = args[0]
+			opts.Devices = args[1:]
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, groupName string, devices []string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Check if group exists
-	if f.GetGroup(groupName) == nil {
-		return fmt.Errorf("group %q not found", groupName)
+	if opts.Factory.GetGroup(opts.GroupName) == nil {
+		return fmt.Errorf("group %q not found", opts.GroupName)
 	}
 
 	// Get config manager for mutations
-	mgr, err := f.ConfigManager()
+	mgr, err := opts.Factory.ConfigManager()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	removed := 0
-	for _, device := range devices {
-		err := mgr.RemoveDeviceFromGroup(groupName, device)
+	for _, device := range opts.Devices {
+		err := mgr.RemoveDeviceFromGroup(opts.GroupName, device)
 		if err != nil {
 			ios.Warning("Failed to remove %q: %v", device, err)
 			continue
@@ -68,9 +79,9 @@ func run(f *cmdutil.Factory, groupName string, devices []string) error {
 	}
 
 	if removed == 1 {
-		ios.Success("Removed 1 device from group %q", groupName)
+		ios.Success("Removed 1 device from group %q", opts.GroupName)
 	} else {
-		ios.Success("Removed %d devices from group %q", removed, groupName)
+		ios.Success("Removed %d devices from group %q", removed, opts.GroupName)
 	}
 
 	return nil

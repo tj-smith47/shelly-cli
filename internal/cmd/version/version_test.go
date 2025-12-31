@@ -213,7 +213,9 @@ func TestRun_Check(t *testing.T) {
 	cmd.SetErr(errOut)
 
 	// Execute (may fail due to network, but exercises the code path)
-	_ = cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		t.Logf("cmd.Execute() error (may be expected): %v", err)
+	}
 
 	// Just verify the code path was exercised
 	output := out.String()

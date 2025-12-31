@@ -90,7 +90,7 @@ func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(colors.Text),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),
 		ValueEnabled: lipgloss.NewStyle().

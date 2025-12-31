@@ -188,7 +188,12 @@ func TestRun_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "device1", "device2")
+	opts := &Options{
+		Factory: tf.Factory,
+		Source:  "device1",
+		Target:  "device2",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {
@@ -208,7 +213,12 @@ func TestRun_Timeout(t *testing.T) {
 	// Allow the timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "device1", "device2")
+	opts := &Options{
+		Factory: tf.Factory,
+		Source:  "device1",
+		Target:  "device2",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to timeout
 	if err == nil {

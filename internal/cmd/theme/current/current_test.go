@@ -193,7 +193,8 @@ func TestRun_DefaultTheme(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -217,7 +218,8 @@ func TestRun_OutputContainsThemeName(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -247,7 +249,8 @@ func TestRun_WithDisplayName(t *testing.T) {
 	// Set a theme with a display name different from ID
 	theme.SetTheme("monokai")
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -275,7 +278,8 @@ func TestRun_TextOutput(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -302,7 +306,8 @@ func TestRun_JSONFormatWithIOStreams(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -373,7 +378,8 @@ func TestRun_VerifyDataStructure(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -404,7 +410,8 @@ func TestRun_TextFormatOutput(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -431,7 +438,8 @@ func TestRun_StructuredOutput(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -456,7 +464,8 @@ func TestRun_DisplayNameShownWhenDifferent(t *testing.T) {
 	// Use a different theme to test display name
 	currentTheme := theme.Current()
 	if currentTheme != nil && currentTheme.DisplayName != "" && currentTheme.DisplayName != currentTheme.ID {
-		err := run(f)
+		opts := &Options{Factory: f}
+		err := run(opts)
 		if err != nil {
 			t.Errorf("run() error = %v, want nil", err)
 		}
@@ -501,7 +510,8 @@ func TestRun_ConsistentOutput(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	// Run twice and verify output is consistent
-	err1 := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err1 := run(opts)
 	if err1 != nil {
 		t.Errorf("First run() error = %v, want nil", err1)
 	}
@@ -514,7 +524,8 @@ func TestRun_ConsistentOutput(t *testing.T) {
 	// Reset and run again
 	tf.Reset()
 
-	err2 := run(tf.Factory)
+	opts2 := &Options{Factory: tf.Factory}
+	err2 := run(opts2)
 	if err2 != nil {
 		t.Errorf("Second run() error = %v, want nil", err2)
 	}
@@ -541,7 +552,8 @@ func TestRun_JSONStructuredOutput(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() with JSON format error = %v, want nil", err)
 	}
@@ -570,7 +582,8 @@ func TestRun_YAMLStructuredOutput(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() with YAML format error = %v, want nil", err)
 	}
@@ -598,7 +611,8 @@ func TestRun_TableFormatOutput(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() with table format error = %v, want nil", err)
 	}

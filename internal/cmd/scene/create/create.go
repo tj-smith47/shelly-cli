@@ -8,9 +8,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Options holds the options for the create command.
+type Options struct {
+	Factory     *cmdutil.Factory
+	Description string
+	Name        string
+}
+
 // NewCommand creates the scene create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var description string
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "create <name>",
@@ -33,24 +40,25 @@ or import an existing scene definition from a file.`,
   shelly sc create morning-routine`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0], description)
+			opts.Name = args[0]
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&description, "description", "d", "", "Scene description")
+	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Scene description")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, name, description string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	if err := config.CreateScene(name, description); err != nil {
+	if err := config.CreateScene(opts.Name, opts.Description); err != nil {
 		return err
 	}
 
-	ios.Success("Scene %q created", name)
-	ios.Info("Add actions with: shelly scene add-action %s <device> <method> [params]", name)
+	ios.Success("Scene %q created", opts.Name)
+	ios.Info("Add actions with: shelly scene add-action %s <device> <method> [params]", opts.Name)
 
 	return nil
 }

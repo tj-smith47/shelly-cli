@@ -21,15 +21,17 @@ import (
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
-	GroupName  string
+	Factory    *cmdutil.Factory
 	All        bool
-	Timeout    time.Duration
 	Concurrent int
+	GroupName  string
+	Timeout    time.Duration
 }
 
 // NewCommand creates the batch command command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
+		Factory:    f,
 		Timeout:    10 * time.Second,
 		Concurrent: 5,
 	}
@@ -98,7 +100,7 @@ the device name and either the response or error message.`,
 			if err != nil {
 				return err
 			}
-			return run(cmd.Context(), f, targets, method, params, opts)
+			return run(cmd.Context(), targets, method, params, opts)
 		},
 	}
 
@@ -111,9 +113,9 @@ the device name and either the response or error message.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, targets []string, method string, params map[string]any, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, targets []string, method string, params map[string]any, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Cap concurrency to global rate limit
 	concurrent := cmdutil.CapConcurrency(ios, opts.Concurrent)

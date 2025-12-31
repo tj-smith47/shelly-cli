@@ -17,8 +17,8 @@ import (
 
 const testFalseValue = "false"
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	if cmd == nil {
@@ -48,8 +48,8 @@ func TestNewCommand(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Aliases(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	aliases := cmd.Aliases
@@ -76,8 +76,8 @@ func TestNewCommand_Aliases(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_RequiresTwoArgs(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Should require exactly 2 arguments
@@ -102,8 +102,8 @@ func TestNewCommand_RequiresTwoArgs(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Flags(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Check dry-run flag
@@ -192,8 +192,8 @@ func createTestBackupFile(t *testing.T, dir, filename string) string {
 	return filePath
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_FileNotFound(t *testing.T) {
+	t.Parallel()
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -215,8 +215,8 @@ func TestRun_FileNotFound(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_InvalidBackupFile(t *testing.T) {
+	t.Parallel()
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -244,8 +244,8 @@ func TestRun_InvalidBackupFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_BackupMissingVersion(t *testing.T) {
+	t.Parallel()
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -284,8 +284,8 @@ func TestRun_BackupMissingVersion(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_BackupMissingDeviceInfo(t *testing.T) {
+	t.Parallel()
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -321,8 +321,8 @@ func TestRun_BackupMissingDeviceInfo(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_BackupMissingConfig(t *testing.T) {
+	t.Parallel()
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -361,8 +361,8 @@ func TestRun_BackupMissingConfig(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Modifies package-level flag variables
 func TestRun_DryRun_ValidBackup(t *testing.T) {
+	t.Parallel()
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -390,8 +390,9 @@ func TestRun_DryRun_ValidBackup(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_FlagParsing(t *testing.T) {
+	t.Parallel()
+
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)
@@ -415,13 +416,7 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Reset flags
-			dryRunFlag = false
-			skipNetworkFlag = true
-			skipScriptsFlag = false
-			skipSchedulesFlag = false
-			skipWebhooksFlag = false
-			decryptFlag = ""
+			t.Parallel()
 
 			cmd := NewCommand(f)
 			cmd.SetOut(out)
@@ -436,8 +431,8 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Example_Content(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	example := cmd.Example
@@ -458,8 +453,8 @@ func TestNewCommand_Example_Content(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestNewCommand_Long_Description(t *testing.T) {
+	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	long := cmd.Long
@@ -479,8 +474,8 @@ func TestNewCommand_Long_Description(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Uses package-level flag variables
 func TestRun_DirectoryAsFile(t *testing.T) {
+	t.Parallel()
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	ios := iostreams.Test(nil, out, errOut)

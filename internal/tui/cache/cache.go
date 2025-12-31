@@ -135,6 +135,7 @@ type Cache struct {
 	mu      sync.RWMutex
 	devices map[string]*DeviceData
 	order   []string // Sorted device names for consistent display
+	version uint64   // Incremented on every device data change for cache invalidation
 
 	ctx             context.Context
 	svc             *shelly.Service
@@ -239,6 +240,7 @@ func (c *Cache) handleDeviceEvent(evt events.Event) {
 		data.Online = false
 		data.UpdatedAt = evt.Timestamp()
 	}
+	c.version++ // Increment version for cache invalidation
 
 	c.ios.DebugCat(iostreams.CategoryDevice, "cache: event update for %s, type=%s", deviceID, evt.Type())
 }
@@ -645,6 +647,7 @@ func (c *Cache) loadDevicesWave() tea.Cmd {
 		// Sort for consistent display
 		sortStrings(c.order)
 		c.pendingCount = len(deviceMap)
+		c.version++ // Increment version for cache invalidation
 		c.mu.Unlock()
 
 		// Create waves (Gen2 first for resilience)
@@ -898,6 +901,7 @@ func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
 	// Apply update with preservation logic - returns deferred event to publish after unlock
 	deferredEvent := c.applyDeviceUpdate(msg, existing)
 	c.deviceRefreshTimes[msg.Name] = time.Now()
+	c.version++ // Increment version for cache invalidation
 	c.pendingCount--
 	allDone := c.pendingCount <= 0 && c.initialLoad
 	if allDone {
@@ -1133,6 +1137,14 @@ func (c *Cache) DeviceCount() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.devices)
+}
+
+// Version returns the current cache version for change detection.
+// The version increments on every device data change.
+func (c *Cache) Version() uint64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.version
 }
 
 // OnlineCount returns count of online devices.

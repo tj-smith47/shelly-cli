@@ -6,17 +6,20 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // VerifyChecksum verifies the checksum of a downloaded binary against a checksum asset.
 func (c *Client) VerifyChecksum(ctx context.Context, ios *iostreams.IOStreams, binaryPath, assetName string, checksumAsset *Asset) error {
+	fs := getFs()
+
 	// Calculate checksum of downloaded file
-	f, err := os.Open(binaryPath) //nolint:gosec // G304: binaryPath is from controlled temp directory
+	f, err := fs.Open(binaryPath)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -33,12 +36,12 @@ func (c *Client) VerifyChecksum(ctx context.Context, ios *iostreams.IOStreams, b
 	actualHash := hex.EncodeToString(hasher.Sum(nil))
 
 	// Download and parse checksum file
-	tmpDir, err := os.MkdirTemp("", "shelly-checksum-*")
+	tmpDir, err := afero.TempDir(fs, "", "shelly-checksum-*")
 	if err != nil {
 		return fmt.Errorf("create temp dir: %w", err)
 	}
 	defer func() {
-		if rerr := os.RemoveAll(tmpDir); rerr != nil {
+		if rerr := fs.RemoveAll(tmpDir); rerr != nil {
 			ios.DebugErr("removing temp dir", rerr)
 		}
 	}()
@@ -48,7 +51,7 @@ func (c *Client) VerifyChecksum(ctx context.Context, ios *iostreams.IOStreams, b
 		return fmt.Errorf("download checksum: %w", err)
 	}
 
-	content, err := os.ReadFile(checksumPath) //nolint:gosec // G304: checksumPath is from controlled temp directory
+	content, err := afero.ReadFile(fs, checksumPath)
 	if err != nil {
 		return fmt.Errorf("read checksum: %w", err)
 	}

@@ -1,4 +1,4 @@
-// Package exportcmd provides the alias export command.
+// Package export provides the alias export command.
 package export
 
 import (
@@ -9,8 +9,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the options for the export command.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Filename string
+}
+
 // NewCommand creates the alias export command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "export [file]",
 		Aliases: []string{"save", "dump"},
@@ -34,21 +42,20 @@ The output format is:
   shelly alias export | cat`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			filename := ""
 			if len(args) > 0 {
-				filename = args[0]
+				opts.Filename = args[0]
 			}
-			return run(f, filename)
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, filename string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	cfg, err := f.Config()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
 	}
@@ -59,21 +66,21 @@ func run(f *cmdutil.Factory, filename string) error {
 		return nil
 	}
 
-	mgr, err := f.ConfigManager()
+	mgr, err := opts.Factory.ConfigManager()
 	if err != nil {
 		return fmt.Errorf("failed to get config manager: %w", err)
 	}
 
-	output, err := mgr.ExportAliases(filename)
+	output, err := mgr.ExportAliases(opts.Filename)
 	if err != nil {
 		return fmt.Errorf("failed to export aliases: %w", err)
 	}
 
-	if filename == "" {
+	if opts.Filename == "" {
 		// Print YAML to stdout
 		ios.Printf("%s", output)
 	} else {
-		ios.Success("Exported %d alias(es) to %s", len(aliases), filename)
+		ios.Success("Exported %d alias(es) to %s", len(aliases), opts.Filename)
 	}
 
 	return nil

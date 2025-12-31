@@ -10,8 +10,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+// Options holds the options for the create command.
+type Options struct {
+	Factory *cmdutil.Factory
+	Name    string
+}
+
 // NewCommand creates the group create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "create <name>",
 		Aliases: []string{"new", "add-group"},
@@ -29,22 +37,23 @@ Group names must be unique and cannot contain spaces or special characters.`,
   shelly grp create office`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0])
+			opts.Name = args[0]
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, name string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	if err := config.CreateGroup(name); err != nil {
+	if err := config.CreateGroup(opts.Name); err != nil {
 		return fmt.Errorf("failed to create group: %w", err)
 	}
 
-	ios.Success("Group %q created", name)
-	ios.Info("Add devices with: shelly group add %s <device>...", name)
+	ios.Success("Group %q created", opts.Name)
+	ios.Info("Add devices with: shelly group add %s <device>...", opts.Name)
 
 	return nil
 }

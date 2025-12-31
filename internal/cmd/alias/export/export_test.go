@@ -195,7 +195,8 @@ func TestRun_NoAliases(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, "")
+	opts := &Options{Factory: tf.Factory, Filename: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -226,7 +227,8 @@ func TestRun_WithAliasesToStdout(t *testing.T) {
 		},
 	}
 
-	err := run(tf.Factory, "")
+	opts := &Options{Factory: tf.Factory, Filename: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -256,7 +258,8 @@ func TestRun_WithAliasesToFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	filename := filepath.Join(tmpDir, "aliases.yaml")
 
-	err := run(tf.Factory, filename)
+	opts := &Options{Factory: tf.Factory, Filename: filename}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -287,7 +290,8 @@ func TestRun_ShellAlias(t *testing.T) {
 		},
 	}
 
-	err := run(tf.Factory, "")
+	opts := &Options{Factory: tf.Factory, Filename: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -316,7 +320,8 @@ func TestRun_InvalidFilePath(t *testing.T) {
 	// Use an invalid path (directory that doesn't exist)
 	filename := "/nonexistent/directory/aliases.yaml"
 
-	err := run(tf.Factory, filename)
+	opts := &Options{Factory: tf.Factory, Filename: filename}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for invalid file path, got nil")
 	}
@@ -346,7 +351,8 @@ func TestRun_MultipleAliases(t *testing.T) {
 		},
 	}
 
-	err := run(tf.Factory, "")
+	opts := &Options{Factory: tf.Factory, Filename: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}

@@ -14,13 +14,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var (
-	intervalFlag time.Duration
-	countFlag    int
-)
+// Options holds the command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	Count    int
+	Device   string
+	Interval time.Duration
+}
 
 // NewCommand creates the monitor power command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{
+		Factory:  f,
+		Interval: 2 * time.Second,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "power <device>",
 		Aliases: []string{"pwr", "watt"},
@@ -41,30 +49,31 @@ Press Ctrl+C to stop monitoring.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().DurationVarP(&intervalFlag, "interval", "i", 2*time.Second, "Refresh interval")
-	cmd.Flags().IntVarP(&countFlag, "count", "n", 0, "Number of updates (0 = unlimited)")
+	cmd.Flags().DurationVarP(&opts.Interval, "interval", "i", 2*time.Second, "Refresh interval")
+	cmd.Flags().IntVarP(&opts.Count, "count", "n", 0, "Number of updates (0 = unlimited)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
-	opts := shelly.MonitoringOptions{
-		Interval: intervalFlag,
-		Count:    countFlag,
+	monitorOpts := shelly.MonitoringOptions{
+		Interval: opts.Interval,
+		Count:    opts.Count,
 	}
 
-	ios.Title("Power Monitoring: %s", device)
+	ios.Title("Power Monitoring: %s", opts.Device)
 	ios.Printf("Press Ctrl+C to stop\n\n")
 
 	var lastSnapshot *model.MonitoringSnapshot
-	return svc.MonitorDevice(ctx, device, opts, func(snapshot model.MonitoringSnapshot) error {
+	return svc.MonitorDevice(ctx, opts.Device, monitorOpts, func(snapshot model.MonitoringSnapshot) error {
 		term.DisplayPowerSnapshot(ios, &snapshot, lastSnapshot)
 		lastSnapshot = &snapshot
 		return nil

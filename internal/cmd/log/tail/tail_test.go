@@ -193,8 +193,8 @@ func TestRun_NoLogFile(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -230,8 +230,8 @@ func TestRun_WithLogFile(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -277,8 +277,8 @@ func TestRun_ShowsLast20Lines(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -341,8 +341,8 @@ func TestRun_EmptyLogFile(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -380,8 +380,8 @@ func TestRun_FewerThan20Lines(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -422,8 +422,8 @@ func TestRun_Exactly20Lines(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -498,8 +498,8 @@ func TestRun_SingleLine(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
@@ -533,8 +533,8 @@ func TestRun_NoTrailingNewline(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	opts := &Options{Follow: false}
-	err := run(f, opts)
+	opts := &Options{Factory: f, Follow: false}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)

@@ -105,7 +105,8 @@ func TestRun_CurrentTheme(t *testing.T) {
 	// Ensure a theme is set
 	theme.SetTheme("dracula")
 
-	err := run(f, "")
+	opts := &Options{Factory: f, ThemeName: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -158,7 +159,8 @@ func TestRun_SpecificTheme(t *testing.T) {
 	// Set a different current theme first
 	theme.SetTheme("dracula")
 
-	err := run(f, "nord")
+	opts := &Options{Factory: f, ThemeName: "nord"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -178,7 +180,8 @@ func TestRun_InvalidTheme(t *testing.T) {
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f, "nonexistent-theme-xyz")
+	opts := &Options{Factory: f, ThemeName: "nonexistent-theme-xyz"}
+	err := run(opts)
 	if err == nil {
 		t.Error("run() should return error for nonexistent theme")
 	}
@@ -197,7 +200,8 @@ func TestRun_ColorSections(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, "")
+	opts := &Options{Factory: f, ThemeName: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -234,7 +238,8 @@ func TestRun_PreservesCurrentTheme(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Preview a different theme
-	err := run(f, "nord")
+	opts := &Options{Factory: f, ThemeName: "nord"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}

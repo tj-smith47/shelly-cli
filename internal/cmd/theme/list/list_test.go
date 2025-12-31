@@ -87,7 +87,8 @@ func TestRun_ListAllThemes(t *testing.T) {
 	// Set current theme
 	theme.SetTheme("dracula")
 
-	err := run(f, "")
+	opts := &Options{Factory: f, Filter: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -122,7 +123,8 @@ func TestRun_FilterThemes(t *testing.T) {
 	theme.SetTheme("dracula")
 
 	// Filter for "nord" themes
-	err := run(f, "nord")
+	opts := &Options{Factory: f, Filter: "nord"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -152,7 +154,8 @@ func TestRun_FilterCaseInsensitive(t *testing.T) {
 	theme.SetTheme("dracula")
 
 	// Filter with uppercase (should still match)
-	err := run(f, "NORD")
+	opts := &Options{Factory: f, Filter: "NORD"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -177,7 +180,8 @@ func TestRun_FilterNoMatches(t *testing.T) {
 	theme.SetTheme("dracula")
 
 	// Filter for non-existent pattern
-	err := run(f, "nonexistent-xyz-pattern")
+	opts := &Options{Factory: f, Filter: "nonexistent-xyz-pattern"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -201,7 +205,8 @@ func TestRun_JSONOutput(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, "")
+	opts := &Options{Factory: f, Filter: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -241,7 +246,8 @@ func TestRun_JSONOutputWithFilter(t *testing.T) {
 	theme.SetTheme("dracula")
 
 	// Filter for "dracula"
-	err := run(f, "dracula")
+	opts := &Options{Factory: f, Filter: "dracula"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -280,7 +286,8 @@ func TestRun_CurrentThemeMarked(t *testing.T) {
 	// Set specific theme
 	theme.SetTheme("nord")
 
-	err := run(f, "nord")
+	opts := &Options{Factory: f, Filter: "nord"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -318,7 +325,8 @@ func TestRun_YAMLOutput(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, "dracula")
+	opts := &Options{Factory: f, Filter: "dracula"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}
@@ -345,7 +353,8 @@ func TestRun_TableOutputShowsCount(t *testing.T) {
 
 	theme.SetTheme("dracula")
 
-	err := run(f, "")
+	opts := &Options{Factory: f, Filter: ""}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() unexpected error: %v", err)
 	}

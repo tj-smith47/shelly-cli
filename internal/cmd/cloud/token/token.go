@@ -13,8 +13,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the cloud token command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "token",
 		Aliases: []string{"tok", "key"},
@@ -29,15 +36,15 @@ Be careful not to share or expose your token.`,
   # Copy token to clipboard (Linux)
   shelly cloud token | xclip -selection clipboard`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f)
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	cfg := config.Get()
 

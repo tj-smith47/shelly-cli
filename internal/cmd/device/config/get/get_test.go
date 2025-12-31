@@ -188,7 +188,12 @@ func TestRun_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "test-device", "")
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {
@@ -208,7 +213,12 @@ func TestRun_Timeout(t *testing.T) {
 	// Allow the timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, tf.Factory, "test-device", "")
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to timeout
 	if err == nil {
@@ -225,7 +235,12 @@ func TestRun_WithComponent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "test-device", "switch:0")
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "switch:0",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {
@@ -242,7 +257,12 @@ func TestRun_WithoutComponent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "test-device", "")
+	opts := &Options{
+		Factory:   tf.Factory,
+		Device:    "test-device",
+		Component: "",
+	}
+	err := run(ctx, opts)
 
 	// Expect an error due to cancelled context
 	if err == nil {

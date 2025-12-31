@@ -319,8 +319,9 @@ func TestRun_InvalidSubnet(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "not-a-subnet", Timeout: 1 * time.Second, Register: false, SkipExisting: true}
 
-	err := run(context.Background(), tf.Factory, "not-a-subnet", 1*time.Second, false, true)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for invalid subnet")
 	}
@@ -333,9 +334,10 @@ func TestRun_MissingCIDRMask(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "10.0.0.1", Timeout: 1 * time.Second, Register: false, SkipExisting: true}
 
 	// IP without CIDR notation
-	err := run(context.Background(), tf.Factory, "10.0.0.1", 1*time.Second, false, true)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for IP without CIDR mask")
 	}
@@ -348,9 +350,10 @@ func TestRun_SmallSubnet(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Use TEST-NET-1 (192.0.2.0/24) - reserved for documentation, won't have real devices
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	// Should complete without error even if no devices found
 	if err != nil {
 		t.Logf("run() with small subnet: %v", err)
@@ -367,8 +370,9 @@ func TestRun_WithRegister(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: true, SkipExisting: true}
 
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, true, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with register=true: %v", err)
 	}
@@ -378,8 +382,9 @@ func TestRun_WithRegisterSkipExistingFalse(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: true, SkipExisting: false}
 
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, true, false)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with register=true, skipExisting=false: %v", err)
 	}
@@ -389,12 +394,13 @@ func TestRun_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 5 * time.Second, Register: false, SkipExisting: true}
 
 	// Cancel context immediately
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, tf.Factory, "192.0.2.0/30", 5*time.Second, false, true)
+	err := run(ctx, opts)
 	// With cancelled context, the scan should abort quickly
 	if err != nil {
 		t.Logf("run() with cancelled context: %v", err)
@@ -405,12 +411,13 @@ func TestRun_ContextTimeout(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/28", Timeout: 10 * time.Second, Register: false, SkipExisting: true}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
 	// Long scan timeout but short context timeout
-	err := run(ctx, tf.Factory, "192.0.2.0/28", 10*time.Second, false, true)
+	err := run(ctx, opts)
 	// Should respect context timeout
 	if err != nil {
 		t.Logf("run() with short context timeout: %v", err)
@@ -421,9 +428,10 @@ func TestRun_MultipleAddresses(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/28", Timeout: 200 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// /28 gives 14 usable addresses (16 - network - broadcast)
-	err := run(context.Background(), tf.Factory, "192.0.2.0/28", 200*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with /28 subnet: %v", err)
 	}
@@ -574,8 +582,9 @@ func TestRun_OutputMessages(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error: %v", err)
 	}
@@ -599,9 +608,10 @@ func TestRun_NoDevicesFound(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Use documentation subnet - guaranteed no real devices
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error: %v", err)
 	}
@@ -639,9 +649,10 @@ func TestRun_ValidIPv6SubnetReturnsError(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "::1/128", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// IPv6 subnet - should handle gracefully
-	err := run(context.Background(), tf.Factory, "::1/128", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	// IPv6 may or may not be supported, but should not panic
 	if err != nil {
 		t.Logf("run() with IPv6: %v", err)
@@ -652,9 +663,10 @@ func TestRun_AutoDetectSubnet(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Pass empty subnet to trigger auto-detection
-	err := run(context.Background(), tf.Factory, "", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		// On some systems (like containers), auto-detection may fail
 		// That's acceptable - we just want to test the code path
@@ -690,12 +702,13 @@ func TestRun_EmptySubnetAutoDetect(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Empty string triggers auto-detection
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err := run(ctx, tf.Factory, "", 100*time.Millisecond, false, true)
+	err := run(ctx, opts)
 	if err != nil {
 		// Could fail if no network interface available
 		t.Logf("run() with empty subnet: %v", err)
@@ -733,8 +746,9 @@ func TestRun_SubnetDetectionFails(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "", Timeout: 50 * time.Millisecond, Register: false, SkipExisting: true}
 
-	err := run(context.Background(), tf.Factory, "", 50*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	// Either works or returns "failed to detect subnet"
 	if err != nil && strings.Contains(err.Error(), "failed to detect subnet") {
 		t.Logf("Expected error path: %v", err)
@@ -747,9 +761,10 @@ func TestRun_SingleHostSubnet(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.1/32", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// /32 subnet is a single host - should generate 0 addresses
-	err := run(context.Background(), tf.Factory, "192.0.2.1/32", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for /32 subnet")
 	} else if !strings.Contains(err.Error(), "no addresses") {
@@ -761,9 +776,10 @@ func TestRun_NoAddressesError(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.255/32", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Additional test for the "no addresses" error path
-	err := run(context.Background(), tf.Factory, "192.0.2.255/32", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for /32 subnet")
 	}
@@ -776,9 +792,10 @@ func TestRun_AllFlagsEnabled(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: true, SkipExisting: true}
 
 	// Test with all flags enabled
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, true, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error: %v", err)
 	}
@@ -788,9 +805,10 @@ func TestRun_RegisterWithSkipExistingFalse(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: true, SkipExisting: false}
 
 	// Test register with skipExisting = false
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, true, false)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error: %v", err)
 	}
@@ -824,13 +842,14 @@ func TestRun_ProgressCallbackBranches(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/29", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Very short timeout to trigger callback but exit quickly
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 	defer cancel()
 
 	// Use larger subnet to increase likelihood of progress callback being triggered
-	err := run(ctx, tf.Factory, "192.0.2.0/29", 100*time.Millisecond, false, true)
+	err := run(ctx, opts)
 	if err != nil {
 		t.Logf("run() error: %v", err)
 	}
@@ -885,8 +904,9 @@ func TestRun_OutputFormat(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error: %v", err)
 	}
@@ -906,9 +926,10 @@ func TestRun_SlashThirtyOne(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/31", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// /31 is point-to-point link, 2 addresses
-	err := run(context.Background(), tf.Factory, "192.0.2.0/31", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with /31: %v", err)
 	}
@@ -979,12 +1000,13 @@ func TestRun_WithMockDevice(t *testing.T) {
 	}
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "127.0.0.0/30", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Scan loopback subnet where our server is running
 	// Note: This may not find our mock server because:
 	// 1. The probe uses port 80 by default, not our random port
 	// 2. The probe may not scan 127.0.0.1
-	err := run(context.Background(), tf.Factory, "127.0.0.0/30", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with mock device: %v", err)
 	}
@@ -997,9 +1019,10 @@ func TestRun_ScanLocalhost(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "127.0.0.0/30", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// Scan localhost subnet - may find local services
-	err := run(context.Background(), tf.Factory, "127.0.0.0/30", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() localhost: %v", err)
 	}
@@ -1009,9 +1032,10 @@ func TestRun_ZeroAddressSubnet(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "0.0.0.0/32", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// 0.0.0.0/32 - special case
-	err := run(context.Background(), tf.Factory, "0.0.0.0/32", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with 0.0.0.0/32: %v", err)
 	}
@@ -1021,9 +1045,10 @@ func TestRun_BroadcastAddress(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "255.255.255.255/32", Timeout: 100 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// 255.255.255.255/32 - broadcast
-	err := run(context.Background(), tf.Factory, "255.255.255.255/32", 100*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with broadcast: %v", err)
 	}
@@ -1055,9 +1080,10 @@ func TestRun_VeryShortTimeout(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: 1 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// 1ms timeout - should abort quickly
-	err := run(context.Background(), tf.Factory, "192.0.2.0/30", 1*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with 1ms timeout: %v", err)
 	}
@@ -1080,8 +1106,9 @@ func TestRun_PrivateNetworkSubnets(t *testing.T) {
 			t.Parallel()
 
 			tf := factory.NewTestFactory(t)
+			opts := &Options{Factory: tf.Factory, Subnet: tt.subnet, Timeout: 50 * time.Millisecond, Register: false, SkipExisting: true}
 
-			err := run(context.Background(), tf.Factory, tt.subnet, 50*time.Millisecond, false, true)
+			err := run(context.Background(), opts)
 			if err != nil {
 				t.Logf("run() with %s: %v", tt.name, err)
 			}
@@ -1093,9 +1120,10 @@ func TestRun_LinkLocalSubnet(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory, Subnet: "169.254.0.0/30", Timeout: 50 * time.Millisecond, Register: false, SkipExisting: true}
 
 	// 169.254.x.x is link-local
-	err := run(context.Background(), tf.Factory, "169.254.0.0/30", 50*time.Millisecond, false, true)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() with link-local: %v", err)
 	}
@@ -1141,8 +1169,9 @@ func TestRun_MultipleTimeouts(t *testing.T) {
 			t.Parallel()
 
 			tf := factory.NewTestFactory(t)
+			opts := &Options{Factory: tf.Factory, Subnet: "192.0.2.0/30", Timeout: timeout, Register: false, SkipExisting: true}
 
-			err := run(context.Background(), tf.Factory, "192.0.2.0/30", timeout, false, true)
+			err := run(context.Background(), opts)
 			if err != nil {
 				t.Logf("run() with %v timeout: %v", timeout, err)
 			}

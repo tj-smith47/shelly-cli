@@ -299,7 +299,14 @@ func TestRun_NoDevices(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	dir := t.TempDir()
-	err = run(context.Background(), tf.Factory, dir)
+	opts := &Options{
+		Factory:   tf.Factory,
+		Directory: dir,
+		All:       true,
+		Format:    "json",
+		Parallel:  3,
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}
@@ -332,7 +339,14 @@ func TestRun_WithDevices(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	dir := t.TempDir()
-	err = run(context.Background(), tf.Factory, dir)
+	opts := &Options{
+		Factory:   tf.Factory,
+		Directory: dir,
+		All:       true,
+		Format:    "json",
+		Parallel:  3,
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}
@@ -365,7 +379,14 @@ func TestRun_InvalidDirectory(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	// Try to use an invalid path (file instead of directory)
-	err = run(context.Background(), tf.Factory, "/dev/null/invalid")
+	opts := &Options{
+		Factory:   tf.Factory,
+		Directory: "/dev/null/invalid",
+		All:       true,
+		Format:    "json",
+		Parallel:  3,
+	}
+	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for invalid directory")
 	}
@@ -406,7 +427,14 @@ func TestRun_MultipleDevices(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	dir := t.TempDir()
-	err = run(context.Background(), tf.Factory, dir)
+	opts := &Options{
+		Factory:   tf.Factory,
+		Directory: dir,
+		All:       true,
+		Format:    "json",
+		Parallel:  3,
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Logf("run() error = %v (may be expected)", err)
 	}

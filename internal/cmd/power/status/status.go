@@ -14,12 +14,20 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory       *cmdutil.Factory
+	ComponentID   int
+	ComponentType string
+	Device        string
+}
+
 // NewCommand creates the power status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		componentID   int
-		componentType string
-	)
+	opts := &Options{
+		Factory:       f,
+		ComponentType: shelly.ComponentTypeAuto,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "status <device> [id]",
@@ -42,29 +50,30 @@ frequency, and accumulated energy.`,
 		Aliases: []string{"st"},
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
+			opts.Device = args[0]
 			if len(args) == 2 {
-				_, err := fmt.Sscanf(args[1], "%d", &componentID)
+				_, err := fmt.Sscanf(args[1], "%d", &opts.ComponentID)
 				if err != nil {
 					return fmt.Errorf("invalid component ID: %w", err)
 				}
 			}
-			return run(cmd.Context(), f, device, componentID, componentType)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, pm, pm1)")
+	cmd.Flags().StringVar(&opts.ComponentType, "type", shelly.ComponentTypeAuto, "Component type (auto, pm, pm1)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, componentType string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Auto-detect type if not specified
+	componentType := opts.ComponentType
 	if componentType == shelly.ComponentTypeAuto {
-		componentType = svc.DetectPowerComponentType(ctx, ios, device, id)
+		componentType = svc.DetectPowerComponentType(ctx, ios, opts.Device, opts.ComponentID)
 	}
 
 	switch componentType {
@@ -73,9 +82,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, id int, compone
 		var err error
 
 		if componentType == shelly.ComponentTypePM {
-			status, err = svc.GetPMStatus(ctx, device, id)
+			status, err = svc.GetPMStatus(ctx, opts.Device, opts.ComponentID)
 		} else {
-			status, err = svc.GetPM1Status(ctx, device, id)
+			status, err = svc.GetPM1Status(ctx, opts.Device, opts.ComponentID)
 		}
 
 		if err != nil {

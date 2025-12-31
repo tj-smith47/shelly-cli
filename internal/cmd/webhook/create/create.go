@@ -12,16 +12,21 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-var (
-	eventFlag   string
-	urlFlag     []string
-	nameFlag    string
-	disableFlag bool
-	cidFlag     int
-)
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Cid     int
+	Device  string
+	Disable bool
+	Event   string
+	Name    string
+	URLs    []string
+}
 
 // NewCommand creates the webhook create command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "create <device>",
 		Aliases: []string{"add", "new"},
@@ -41,51 +46,52 @@ Common events include "switch.on", "switch.off", "input.toggle", etc.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&eventFlag, "event", "", "Event type (e.g., switch.on, input.toggle)")
-	cmd.Flags().StringArrayVar(&urlFlag, "url", nil, "Webhook URL (can be specified multiple times)")
-	cmd.Flags().StringVar(&nameFlag, "name", "", "Webhook name (optional)")
-	cmd.Flags().BoolVar(&disableFlag, "disable", false, "Create webhook in disabled state")
-	cmd.Flags().IntVar(&cidFlag, "cid", 0, "Component ID (default: 0)")
+	cmd.Flags().StringVar(&opts.Event, "event", "", "Event type (e.g., switch.on, input.toggle)")
+	cmd.Flags().StringArrayVar(&opts.URLs, "url", nil, "Webhook URL (can be specified multiple times)")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Webhook name (optional)")
+	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Create webhook in disabled state")
+	cmd.Flags().IntVar(&opts.Cid, "cid", 0, "Component ID (default: 0)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+func run(ctx context.Context, opts *Options) error {
 	// Validate required flags
-	if eventFlag == "" {
+	if opts.Event == "" {
 		return fmt.Errorf("--event is required")
 	}
-	if len(urlFlag) == 0 {
+	if len(opts.URLs) == 0 {
 		return fmt.Errorf("--url is required (at least one URL)")
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Creating webhook...", func(ctx context.Context) error {
 		params := shelly.CreateWebhookParams{
-			Event:  eventFlag,
-			URLs:   urlFlag,
-			Name:   nameFlag,
-			Enable: !disableFlag,
-			Cid:    cidFlag,
+			Event:  opts.Event,
+			URLs:   opts.URLs,
+			Name:   opts.Name,
+			Enable: !opts.Disable,
+			Cid:    opts.Cid,
 		}
 
-		id, err := svc.CreateWebhook(ctx, device, params)
+		id, err := svc.CreateWebhook(ctx, opts.Device, params)
 		if err != nil {
 			return fmt.Errorf("failed to create webhook: %w", err)
 		}
 
-		ios.Success("Webhook created on %s", device)
+		ios.Success("Webhook created on %s", opts.Device)
 		ios.Printf("  ID:    %d\n", id)
-		ios.Printf("  Event: %s\n", eventFlag)
+		ios.Printf("  Event: %s\n", opts.Event)
 		return nil
 	})
 }

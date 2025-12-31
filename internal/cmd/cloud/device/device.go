@@ -14,10 +14,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
-var statusFlag bool
+// Options holds the command options.
+type Options struct {
+	Factory  *cmdutil.Factory
+	DeviceID string
+	Status   bool
+}
 
 // NewCommand creates the cloud device command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "device <id>",
 		Aliases: []string{"get"},
@@ -32,20 +39,21 @@ Displays device information including status, settings, and online state.`,
   shelly cloud device abc123 --status`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.DeviceID = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&statusFlag, "status", false, "Show full device status")
+	cmd.Flags().BoolVar(&opts.Status, "status", false, "Show full device status")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, deviceID string) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2)
 	defer cancel()
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()
@@ -59,12 +67,12 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceID string) error {
 	client := network.NewCloudClient(cfg.Cloud.AccessToken)
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Fetching device from cloud...", func(ctx context.Context) error {
-		device, err := client.GetDevice(ctx, deviceID)
+		device, err := client.GetDevice(ctx, opts.DeviceID)
 		if err != nil {
 			return fmt.Errorf("failed to get device: %w", err)
 		}
 
-		term.DisplayCloudDevice(ios, device, statusFlag)
+		term.DisplayCloudDevice(ios, device, opts.Status)
 		return nil
 	})
 }

@@ -8,9 +8,38 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
+
+// defaultFs is the package-level filesystem used for install operations.
+// This can be replaced in tests with an in-memory filesystem.
+var (
+	defaultFs   afero.Fs = afero.NewOsFs()
+	defaultFsMu sync.RWMutex
+)
+
+// SetFs sets the package-level filesystem for testing.
+// Pass nil to reset to the real OS filesystem.
+func SetFs(fs afero.Fs) {
+	defaultFsMu.Lock()
+	defer defaultFsMu.Unlock()
+	if fs == nil {
+		defaultFs = afero.NewOsFs()
+	} else {
+		defaultFs = fs
+	}
+}
+
+// getFs returns the current package-level filesystem.
+func getFs() afero.Fs {
+	defaultFsMu.RLock()
+	defer defaultFsMu.RUnlock()
+	return defaultFs
+}
 
 // InstallRelease downloads and installs a release binary.
 func (c *Client) InstallRelease(ctx context.Context, ios *iostreams.IOStreams, release *Release) error {
@@ -72,14 +101,16 @@ func (c *Client) InstallRelease(ctx context.Context, ios *iostreams.IOStreams, r
 
 // ReplaceBinary replaces the binary at targetPath with the one at newPath.
 func ReplaceBinary(ios *iostreams.IOStreams, newPath, targetPath string) error {
+	fs := getFs()
+
 	// Read the new binary
-	newBinary, err := os.ReadFile(newPath) //nolint:gosec // G304: newPath is from controlled temp directory
+	newBinary, err := afero.ReadFile(fs, newPath)
 	if err != nil {
 		return fmt.Errorf("read new binary: %w", err)
 	}
 
 	// Get permissions of the old binary
-	info, err := os.Stat(targetPath)
+	info, err := fs.Stat(targetPath)
 	if err != nil {
 		return fmt.Errorf("stat target: %w", err)
 	}
@@ -92,12 +123,12 @@ func ReplaceBinary(ios *iostreams.IOStreams, newPath, targetPath string) error {
 	}
 
 	// Write new binary
-	if err := os.WriteFile(targetPath, newBinary, mode); err != nil {
+	if err := afero.WriteFile(fs, targetPath, newBinary, mode); err != nil {
 		return restoreFromBackup(backupPath, targetPath, err)
 	}
 
 	// Remove backup
-	if rerr := os.Remove(backupPath); rerr != nil {
+	if rerr := fs.Remove(backupPath); rerr != nil {
 		ios.DebugErr("removing backup", rerr)
 	}
 
@@ -106,7 +137,9 @@ func ReplaceBinary(ios *iostreams.IOStreams, newPath, targetPath string) error {
 
 // createBackup backs up the file at targetPath to backupPath.
 func createBackup(ios *iostreams.IOStreams, targetPath, backupPath string) error {
-	if err := os.Rename(targetPath, backupPath); err != nil {
+	fs := getFs()
+
+	if err := fs.Rename(targetPath, backupPath); err != nil {
 		// On Windows, we might need to copy instead
 		if runtime.GOOS != "windows" {
 			return fmt.Errorf("backup failed: %w", err)
@@ -116,7 +149,7 @@ func createBackup(ios *iostreams.IOStreams, targetPath, backupPath string) error
 			return fmt.Errorf("backup failed: %w", copyErr)
 		}
 		// Try to remove original (might fail if in use)
-		if rerr := os.Remove(targetPath); rerr != nil {
+		if rerr := fs.Remove(targetPath); rerr != nil {
 			ios.DebugErr("removing original binary", rerr)
 		}
 	}
@@ -125,7 +158,9 @@ func createBackup(ios *iostreams.IOStreams, targetPath, backupPath string) error
 
 // restoreFromBackup restores a backup after a failed write.
 func restoreFromBackup(backupPath, targetPath string, writeErr error) error {
-	if restoreErr := os.Rename(backupPath, targetPath); restoreErr != nil {
+	fs := getFs()
+
+	if restoreErr := fs.Rename(backupPath, targetPath); restoreErr != nil {
 		return fmt.Errorf("write failed (%w) and restore failed: %w", writeErr, restoreErr)
 	}
 	return fmt.Errorf("write failed: %w", writeErr)
@@ -133,7 +168,9 @@ func restoreFromBackup(backupPath, targetPath string, writeErr error) error {
 
 // copyFile copies a file from src to dst.
 func copyFile(ios *iostreams.IOStreams, src, dst string) error {
-	source, err := os.Open(src) //nolint:gosec // G304: src is the current executable path
+	fs := getFs()
+
+	source, err := fs.Open(src)
 	if err != nil {
 		return err
 	}
@@ -143,7 +180,7 @@ func copyFile(ios *iostreams.IOStreams, src, dst string) error {
 		}
 	}()
 
-	destination, err := os.Create(dst) //nolint:gosec // G304: dst is backup path derived from executable
+	destination, err := fs.Create(dst)
 	if err != nil {
 		return err
 	}

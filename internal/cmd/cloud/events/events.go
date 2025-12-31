@@ -25,6 +25,7 @@ import (
 // Options holds command options.
 type Options struct {
 	flags.OutputFlags
+	Factory      *cmdutil.Factory
 	DeviceFilter string
 	EventFilter  string
 	Raw          bool
@@ -58,7 +59,7 @@ func makeEventHandler(ios *iostreams.IOStreams, opts *Options) func(event *model
 
 // NewCommand creates the cloud events command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "events",
@@ -88,7 +89,7 @@ Event types:
   # Output in JSON format
   shelly cloud events --format json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -100,8 +101,8 @@ Event types:
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()

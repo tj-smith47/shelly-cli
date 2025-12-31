@@ -332,7 +332,8 @@ func TestRun_NotLoggedIn(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err == nil {
 		t.Fatal("expected error for not logged in")
@@ -365,7 +366,8 @@ func TestRun_InvalidToken(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err == nil {
 		t.Fatal("expected error for invalid token")
@@ -396,7 +398,8 @@ func TestRun_ValidToken_TTY(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -448,7 +451,8 @@ func TestRun_ValidToken_NonTTY(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -486,7 +490,8 @@ func TestRun_ExpiredToken_TTY(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -527,7 +532,8 @@ func TestRun_TokenWithoutExpiry(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -563,7 +569,8 @@ func TestRun_TokenWithoutServerURL(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -727,7 +734,8 @@ func TestRun_ShortToken_TTY(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -763,7 +771,8 @@ func TestRun_TokenWithClipboardHint(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -792,7 +801,8 @@ func TestRun_WithIOStreams(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	// This will fail because no config, but it exercises the run function
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	// We expect an error (not logged in)
 	if err == nil {
@@ -862,7 +872,8 @@ func TestRun_TokenMinimalClaims(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)
@@ -933,7 +944,8 @@ func TestRun_LongToken_Truncation(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	if err != nil {
 		t.Errorf("run() error = %v", err)

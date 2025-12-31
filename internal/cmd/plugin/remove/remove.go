@@ -9,8 +9,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
+// Options holds the options for the remove command.
+type Options struct {
+	Factory *cmdutil.Factory
+	Name    string
+}
+
 // NewCommand creates the extension remove command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "remove <name>",
 		Aliases: []string{"rm", "uninstall", "delete"},
@@ -24,25 +32,26 @@ Extensions found in PATH cannot be removed with this command.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.ExtensionNames(),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0])
+			opts.Name = args[0]
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, name string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	registry, err := plugins.NewRegistry()
 	if err != nil {
 		return err
 	}
 
-	if err := registry.Remove(name); err != nil {
+	if err := registry.Remove(opts.Name); err != nil {
 		return err
 	}
 
-	ios.Success("Removed extension '%s'", name)
+	ios.Success("Removed extension '%s'", opts.Name)
 	return nil
 }

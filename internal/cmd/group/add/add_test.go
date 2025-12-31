@@ -179,7 +179,8 @@ func TestRun_GroupNotFound(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	err := run(f, "nonexistent-group", []string{"device1"})
+	opts := &Options{Factory: f, GroupName: "nonexistent-group", Devices: []string{"device1"}}
+	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error for nonexistent group")
 	}
@@ -232,7 +233,8 @@ func TestRun_GroupNotFoundTable(t *testing.T) {
 
 			f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-			err := run(f, tt.groupName, tt.devices)
+			opts := &Options{Factory: f, GroupName: tt.groupName, Devices: tt.devices}
+			err := run(opts)
 			if err == nil {
 				t.Fatal("expected error for nonexistent group")
 			}
@@ -257,7 +259,8 @@ func TestRun_AddSingleDevice(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	err := run(f, "living-room", []string{"light-1"})
+	opts := &Options{Factory: f, GroupName: "living-room", Devices: []string{"light-1"}}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -288,7 +291,8 @@ func TestRun_AddMultipleDevices(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	err := run(f, "office", []string{"lamp-1", "lamp-2", "switch-1"})
+	opts := &Options{Factory: f, GroupName: "office", Devices: []string{"lamp-1", "lamp-2", "switch-1"}}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -319,7 +323,8 @@ func TestRun_AddDeviceAlreadyInGroup(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	err := run(f, "bedroom", []string{"lamp-1"})
+	opts := &Options{Factory: f, GroupName: "bedroom", Devices: []string{"lamp-1"}}
+	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error when no devices were added")
 	}
@@ -346,7 +351,8 @@ func TestRun_PartialAddWithWarnings(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
 	// Add one existing device and one new device
-	err := run(f, "kitchen", []string{"light-1", "light-2"})
+	opts := &Options{Factory: f, GroupName: "kitchen", Devices: []string{"light-1", "light-2"}}
+	err := run(opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -374,7 +380,8 @@ func TestRun_EmptyDeviceList(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
 
-	err := run(f, "test-group", []string{})
+	opts := &Options{Factory: f, GroupName: "test-group", Devices: []string{}}
+	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error with empty device list")
 	}

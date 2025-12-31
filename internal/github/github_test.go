@@ -1,20 +1,36 @@
 package github_test
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/github"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+)
+
+// Test version constants to avoid magic strings.
+const (
+	testVersionV1   = "v1.0.0"
+	testVersionV2   = "v2.0.0"
+	testExtractDir  = "/tmp/extracted"
+	testChecksumTxt = "checksums.txt"
 )
 
 func TestRelease_Version(t *testing.T) {
@@ -161,8 +177,8 @@ func TestSortReleasesByVersion(t *testing.T) {
 	if releases[1].TagName != "v1.5.0" {
 		t.Errorf("releases[1].TagName = %q, want v1.5.0", releases[1].TagName)
 	}
-	if releases[2].TagName != "v1.0.0" {
-		t.Errorf("releases[2].TagName = %q, want v1.0.0", releases[2].TagName)
+	if releases[2].TagName != testVersionV1 {
+		t.Errorf("releases[2].TagName = %q, want %s", releases[2].TagName, testVersionV1)
 	}
 }
 
@@ -641,13 +657,19 @@ func TestCheckForUpdatesCached_UpdatesDisabled(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test writes to filesystem cache
+//nolint:paralleltest // modifies global filesystem
 func TestCheckForUpdatesCached_ValidCache(t *testing.T) {
-	tmpDir := t.TempDir()
-	cachePath := filepath.Join(tmpDir, "version-cache")
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	cachePath := "/tmp/cache/version-cache"
 
 	// Write a "newer" version to cache
-	if err := os.WriteFile(cachePath, []byte("2.0.0"), 0o600); err != nil {
+	if err := memFs.MkdirAll("/tmp/cache", 0o750); err != nil {
+		t.Fatalf("failed to create cache dir: %v", err)
+	}
+	if err := afero.WriteFile(memFs, cachePath, []byte("2.0.0"), 0o600); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
@@ -724,4 +746,1983 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestCopyFile(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	srcPath := "/tmp/source.txt"
+	dstPath := "/tmp/dest.txt"
+
+	// Create source file
+	content := []byte("test content for copy")
+	if err := afero.WriteFile(memFs, srcPath, content, 0o600); err != nil {
+		t.Fatalf("failed to write source file: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err := github.CopyFile(ios, srcPath, dstPath); err != nil {
+		t.Fatalf("CopyFile() error = %v", err)
+	}
+
+	// Verify content was copied
+	copied, err := afero.ReadFile(memFs, dstPath)
+	if err != nil {
+		t.Fatalf("failed to read dest file: %v", err)
+	}
+	if !bytes.Equal(copied, content) {
+		t.Errorf("copied content = %q, want %q", string(copied), string(content))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestCopyFile_SourceNotExists(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+
+	err := github.CopyFile(ios, "/tmp/nonexistent", "/tmp/dest")
+	if err == nil {
+		t.Error("CopyFile() should error when source doesn't exist")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestReplaceBinary(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	targetPath := "/tmp/target-binary"
+	newPath := "/tmp/new-binary"
+
+	// Create target (old) binary
+	oldContent := []byte("old binary content")
+	if err := afero.WriteFile(memFs, targetPath, oldContent, 0o600); err != nil {
+		t.Fatalf("failed to write target: %v", err)
+	}
+
+	// Create new binary
+	newContent := []byte("new binary content")
+	if err := afero.WriteFile(memFs, newPath, newContent, 0o600); err != nil {
+		t.Fatalf("failed to write new: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err := github.ReplaceBinary(ios, newPath, targetPath); err != nil {
+		t.Fatalf("ReplaceBinary() error = %v", err)
+	}
+
+	// Verify target was replaced
+	result, err := afero.ReadFile(memFs, targetPath)
+	if err != nil {
+		t.Fatalf("failed to read target: %v", err)
+	}
+	if !bytes.Equal(result, newContent) {
+		t.Errorf("target content = %q, want %q", string(result), string(newContent))
+	}
+
+	// Verify backup was removed
+	exists, err := afero.Exists(memFs, targetPath+".bak")
+	if err != nil {
+		t.Fatalf("failed to check backup: %v", err)
+	}
+	if exists {
+		t.Error("backup file should have been removed")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestReplaceBinary_NewPathNotExists(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	targetPath := "/tmp/target"
+
+	// Create target
+	if err := afero.WriteFile(memFs, targetPath, []byte("old"), 0o600); err != nil {
+		t.Fatalf("failed to write target: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	err := github.ReplaceBinary(ios, "/tmp/nonexistent", targetPath)
+	if err == nil {
+		t.Error("ReplaceBinary() should error when new path doesn't exist")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestReplaceBinary_TargetNotExists(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	newPath := "/tmp/new-binary"
+
+	// Create new binary
+	if err := afero.WriteFile(memFs, newPath, []byte("new"), 0o600); err != nil {
+		t.Fatalf("failed to write new: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	err := github.ReplaceBinary(ios, newPath, "/tmp/nonexistent")
+	if err == nil {
+		t.Error("ReplaceBinary() should error when target doesn't exist")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestExtractTarGz(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	archivePath := "/tmp/test.tar.gz"
+	destDir := testExtractDir
+	if err := memFs.MkdirAll(destDir, 0o750); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
+
+	// Create a test tar.gz archive with a binary
+	binaryContent := []byte("#!/bin/sh\necho hello")
+	if err := createTestTarGzWithFs(memFs, archivePath, "shelly", binaryContent); err != nil {
+		t.Fatalf("failed to create test archive: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	binaryPath, err := client.ExtractTarGz(archivePath, destDir, "shelly")
+	if err != nil {
+		t.Fatalf("ExtractTarGz() error = %v", err)
+	}
+
+	if binaryPath == "" {
+		t.Error("ExtractTarGz() returned empty path")
+	}
+
+	// Verify content
+	extracted, err := afero.ReadFile(memFs, binaryPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted: %v", err)
+	}
+	if !bytes.Equal(extracted, binaryContent) {
+		t.Errorf("extracted content = %q, want %q", string(extracted), string(binaryContent))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestExtractTarGz_BinaryNotFound(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	archivePath := "/tmp/test.tar.gz"
+	destDir := testExtractDir
+	if err := memFs.MkdirAll(destDir, 0o750); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
+
+	// Create archive with different binary name
+	if err := createTestTarGzWithFs(memFs, archivePath, "other-binary", []byte("content")); err != nil {
+		t.Fatalf("failed to create test archive: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.ExtractTarGz(archivePath, destDir, "shelly")
+	if err == nil {
+		t.Error("ExtractTarGz() should error when binary not found")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestExtractTarGz_InvalidArchive(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	archivePath := "/tmp/invalid.tar.gz"
+	destDir := testExtractDir
+	if err := memFs.MkdirAll(destDir, 0o750); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
+
+	// Create invalid archive
+	if err := afero.WriteFile(memFs, archivePath, []byte("not a valid gzip"), 0o600); err != nil {
+		t.Fatalf("failed to write invalid archive: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.ExtractTarGz(archivePath, destDir, "shelly")
+	if err == nil {
+		t.Error("ExtractTarGz() should error for invalid archive")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestExtractZip(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	archivePath := "/tmp/test.zip"
+	destDir := testExtractDir
+	if err := memFs.MkdirAll(destDir, 0o750); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
+
+	// Create a test zip archive with a binary
+	binaryContent := []byte("@echo off\necho hello")
+	if err := createTestZipWithFs(memFs, archivePath, "shelly.exe", binaryContent); err != nil {
+		t.Fatalf("failed to create test archive: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	binaryPath, err := client.ExtractZip(archivePath, destDir, "shelly")
+	if err != nil {
+		t.Fatalf("ExtractZip() error = %v", err)
+	}
+
+	if binaryPath == "" {
+		t.Error("ExtractZip() returned empty path")
+	}
+
+	// Verify content
+	extracted, err := afero.ReadFile(memFs, binaryPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted: %v", err)
+	}
+	if !bytes.Equal(extracted, binaryContent) {
+		t.Errorf("extracted content = %q, want %q", string(extracted), string(binaryContent))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestExtractZip_BinaryNotFound(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	archivePath := "/tmp/test.zip"
+	destDir := testExtractDir
+	if err := memFs.MkdirAll(destDir, 0o750); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
+
+	// Create archive with different binary name
+	if err := createTestZipWithFs(memFs, archivePath, "other-binary.exe", []byte("content")); err != nil {
+		t.Fatalf("failed to create test archive: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.ExtractZip(archivePath, destDir, "shelly")
+	if err == nil {
+		t.Error("ExtractZip() should error when binary not found")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestExtractZip_InvalidArchive(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	archivePath := "/tmp/invalid.zip"
+	destDir := testExtractDir
+	if err := memFs.MkdirAll(destDir, 0o750); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
+
+	// Create invalid archive
+	if err := afero.WriteFile(memFs, archivePath, []byte("not a valid zip"), 0o600); err != nil {
+		t.Fatalf("failed to write invalid archive: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.ExtractZip(archivePath, destDir, "shelly")
+	if err == nil {
+		t.Error("ExtractZip() should error for invalid archive")
+	}
+}
+
+func TestMatchesBinaryName(t *testing.T) {
+	t.Parallel()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	tests := []struct {
+		filename   string
+		binaryName string
+		want       bool
+	}{
+		{"shelly", "shelly", true},
+		{"shelly-linux-amd64", "shelly", true},
+		{"shelly.exe", "shelly", true},
+		{"other-binary", "shelly", false},
+		{"preshelly", "shelly", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			t.Parallel()
+			got := client.MatchesBinaryName(tt.filename, tt.binaryName)
+			if got != tt.want {
+				t.Errorf("MatchesBinaryName(%q, %q) = %v, want %v", tt.filename, tt.binaryName, got, tt.want)
+			}
+		})
+	}
+}
+
+// Helper functions to create test archives using afero
+
+func createTestTarGzWithFs(fs afero.Fs, path, filename string, content []byte) error {
+	file, err := fs.Create(path)
+	if err != nil {
+		return err
+	}
+
+	gzWriter := gzip.NewWriter(file)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	header := &tar.Header{
+		Name: filename,
+		Mode: 0o755,
+		Size: int64(len(content)),
+	}
+
+	if err := tarWriter.WriteHeader(header); err != nil {
+		return err
+	}
+
+	if _, err = tarWriter.Write(content); err != nil {
+		return err
+	}
+
+	if err := tarWriter.Close(); err != nil {
+		return err
+	}
+	if err := gzWriter.Close(); err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+func createTestZipWithFs(fs afero.Fs, path, filename string, content []byte) error {
+	file, err := fs.Create(path)
+	if err != nil {
+		return err
+	}
+
+	zipWriter := zip.NewWriter(file)
+
+	writer, err := zipWriter.Create(filename)
+	if err != nil {
+		return err
+	}
+
+	if _, err = writer.Write(content); err != nil {
+		return err
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+func TestFindBinaryAsset(t *testing.T) {
+	t.Parallel()
+
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+
+	// Create assets that match the current platform
+	assetName := "shelly-" + goos + "-" + goarch + ".tar.gz"
+	release := &github.Release{
+		Assets: []github.Asset{
+			{Name: assetName},
+			{Name: "shelly-other-os.tar.gz"},
+			{Name: "checksums.txt"},
+		},
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	asset, err := client.FindBinaryAsset(release, "shelly")
+	if err != nil {
+		t.Fatalf("FindBinaryAsset() error = %v", err)
+	}
+	if asset == nil {
+		t.Fatal("FindBinaryAsset() returned nil")
+	}
+	if asset.Name != assetName {
+		t.Errorf("FindBinaryAsset() = %q, want %q", asset.Name, assetName)
+	}
+}
+
+func TestFindBinaryAsset_NotFound(t *testing.T) {
+	t.Parallel()
+
+	// Use assets that don't match any platform
+	release := &github.Release{
+		Assets: []github.Asset{
+			{Name: "shelly-freebsd-sparc64.tar.gz"},
+			{Name: "checksums.txt"},
+		},
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	asset, err := client.FindBinaryAsset(release, "shelly")
+	if err == nil {
+		t.Error("FindBinaryAsset() should return error for unsupported platform")
+	}
+	if asset != nil {
+		t.Error("FindBinaryAsset() should return nil asset for unsupported platform")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestListReleases(t *testing.T) {
+	releases := []github.Release{
+		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+		{TagName: "v1.1.0", Name: "Release 1.1.0"},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/testowner/testrepo/releases" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(releases); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	result, err := client.ListReleases(context.Background(), "testowner", "testrepo", false)
+	if err != nil {
+		t.Fatalf("ListReleases() error = %v", err)
+	}
+
+	if len(result) != 2 {
+		t.Errorf("ListReleases() returned %d releases, want 2", len(result))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestDownloadAsset(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	assetContent := []byte("binary content here")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		if _, err := w.Write(assetContent); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	destPath := "/tmp/downloaded"
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	asset := &github.Asset{
+		Name:               "shelly-linux-amd64.tar.gz",
+		BrowserDownloadURL: server.URL + "/download",
+	}
+
+	err := client.DownloadAsset(context.Background(), asset, destPath)
+	if err != nil {
+		t.Fatalf("DownloadAsset() error = %v", err)
+	}
+
+	// Verify content
+	downloaded, err := afero.ReadFile(memFs, destPath)
+	if err != nil {
+		t.Fatalf("failed to read downloaded file: %v", err)
+	}
+	if !bytes.Equal(downloaded, assetContent) {
+		t.Errorf("downloaded content = %q, want %q", string(downloaded), string(assetContent))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestDownloadAndExtract_TarGz(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	// Create a tar.gz archive in memory
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	content := []byte("#!/bin/sh\necho hello")
+	header := &tar.Header{
+		Name: "shelly",
+		Mode: 0o755,
+		Size: int64(len(content)),
+	}
+	if err := tarWriter.WriteHeader(header); err != nil {
+		t.Fatalf("failed to write tar header: %v", err)
+	}
+	if _, err := tarWriter.Write(content); err != nil {
+		t.Fatalf("failed to write tar content: %v", err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatalf("failed to close tar writer: %v", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		t.Fatalf("failed to close gzip writer: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/gzip")
+		if _, err := w.Write(buf.Bytes()); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	asset := &github.Asset{
+		Name:               "shelly-linux-amd64.tar.gz",
+		BrowserDownloadURL: server.URL + "/download",
+	}
+
+	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, "shelly")
+	if err != nil {
+		t.Fatalf("DownloadAndExtract() error = %v", err)
+	}
+	defer cleanup()
+
+	if binaryPath == "" {
+		t.Error("DownloadAndExtract() returned empty path")
+	}
+
+	// Verify content
+	extracted, err := afero.ReadFile(memFs, binaryPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted file: %v", err)
+	}
+	if !bytes.Equal(extracted, content) {
+		t.Errorf("extracted content = %q, want %q", string(extracted), string(content))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestDownloadAndExtract_Zip(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	// Create a zip archive in memory
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+
+	content := []byte("@echo off\necho hello")
+	writer, err := zipWriter.Create("shelly.exe")
+	if err != nil {
+		t.Fatalf("failed to create zip entry: %v", err)
+	}
+	if _, err := writer.Write(content); err != nil {
+		t.Fatalf("failed to write zip content: %v", err)
+	}
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("failed to close zip writer: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/zip")
+		if _, err := w.Write(buf.Bytes()); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	asset := &github.Asset{
+		Name:               "shelly-windows-amd64.zip",
+		BrowserDownloadURL: server.URL + "/download",
+	}
+
+	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, "shelly")
+	if err != nil {
+		t.Fatalf("DownloadAndExtract() error = %v", err)
+	}
+	defer cleanup()
+
+	if binaryPath == "" {
+		t.Error("DownloadAndExtract() returned empty path")
+	}
+
+	// Verify content
+	extracted, err := afero.ReadFile(memFs, binaryPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted file: %v", err)
+	}
+	if !bytes.Equal(extracted, content) {
+		t.Errorf("extracted content = %q, want %q", string(extracted), string(content))
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestGetLatestRelease_WithMockServer(t *testing.T) {
+	release := github.Release{
+		TagName: "v1.0.0",
+		Name:    "Release 1.0.0",
+		Body:    "Release notes",
+		Assets:  []github.Asset{},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/testowner/testrepo/releases/latest" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(release); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	result, err := client.GetLatestRelease(context.Background(), "testowner", "testrepo")
+	if err != nil {
+		t.Fatalf("GetLatestRelease() error = %v", err)
+	}
+
+	if result.TagName != "v1.0.0" {
+		t.Errorf("GetLatestRelease().TagName = %q, want %q", result.TagName, "v1.0.0")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestGetReleaseByTag_WithMockServer(t *testing.T) {
+	release := github.Release{
+		TagName: "v1.2.3",
+		Name:    "Release 1.2.3",
+		Body:    "Release notes",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/testowner/testrepo/releases/tags/v1.2.3" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(release); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	result, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", "v1.2.3")
+	if err != nil {
+		t.Fatalf("GetReleaseByTag() error = %v", err)
+	}
+
+	if result.TagName != "v1.2.3" {
+		t.Errorf("GetReleaseByTag().TagName = %q, want %q", result.TagName, "v1.2.3")
+	}
+}
+
+func TestCompareVersions_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		v1   string
+		v2   string
+		want int
+	}{
+		{"", "", 0},
+		{"1", "1", 0},
+		{"1.2", "1.2.0", 0},
+		{"10.0.0", "9.99.99", 1},
+		{"0.0.1", "0.0.2", -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.v1+"_vs_"+tt.v2, func(t *testing.T) {
+			t.Parallel()
+			got := github.CompareVersions(tt.v1, tt.v2)
+			if got != tt.want {
+				t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.v1, tt.v2, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildIssueURL_WithTitle(t *testing.T) {
+	t.Parallel()
+
+	url := github.BuildIssueURL(github.IssueTypeBug, "My Bug Title", "body content")
+	if url == "" {
+		t.Error("BuildIssueURL() returned empty string")
+	}
+	if !containsString(url, "title=My") {
+		t.Error("BuildIssueURL() should contain title param")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestVerifyChecksum(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	// Create a test binary
+	binaryPath := "/tmp/test-binary"
+	binaryContent := []byte("test binary content")
+	if err := afero.WriteFile(memFs, binaryPath, binaryContent, 0o600); err != nil {
+		t.Fatalf("failed to create test binary: %v", err)
+	}
+
+	// Calculate expected checksum (SHA256)
+	hasher := sha256.New()
+	hasher.Write(binaryContent)
+	expectedHash := hex.EncodeToString(hasher.Sum(nil))
+
+	checksumContent := fmt.Sprintf("%s  test-asset.tar.gz\n", expectedHash)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		if _, err := w.Write([]byte(checksumContent)); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	checksumAsset := &github.Asset{
+		Name:               "checksums.txt",
+		BrowserDownloadURL: server.URL + "/checksums.txt",
+	}
+
+	err := client.VerifyChecksum(context.Background(), ios, binaryPath, "test-asset.tar.gz", checksumAsset)
+	if err != nil {
+		t.Errorf("VerifyChecksum() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestVerifyChecksum_Mismatch(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	binaryPath := "/tmp/test-binary"
+	binaryContent := []byte("test binary content")
+	if err := afero.WriteFile(memFs, binaryPath, binaryContent, 0o600); err != nil {
+		t.Fatalf("failed to create test binary: %v", err)
+	}
+
+	// Provide wrong checksum
+	checksumContent := "0000000000000000000000000000000000000000000000000000000000000000  test-asset.tar.gz\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		if _, err := w.Write([]byte(checksumContent)); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	checksumAsset := &github.Asset{
+		Name:               "checksums.txt",
+		BrowserDownloadURL: server.URL + "/checksums.txt",
+	}
+
+	err := client.VerifyChecksum(context.Background(), ios, binaryPath, "test-asset.tar.gz", checksumAsset)
+	if err == nil {
+		t.Error("VerifyChecksum() should return error for checksum mismatch")
+	}
+	if !containsString(err.Error(), "checksum mismatch") {
+		t.Errorf("error should mention checksum mismatch, got: %v", err)
+	}
+}
+
+func TestVerifyChecksum_FileNotFound(t *testing.T) {
+	t.Parallel()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	checksumAsset := &github.Asset{
+		Name:               "checksums.txt",
+		BrowserDownloadURL: "http://localhost:1/checksums.txt",
+	}
+
+	err := client.VerifyChecksum(context.Background(), ios, "/nonexistent/path", "test-asset.tar.gz", checksumAsset)
+	if err == nil {
+		t.Error("VerifyChecksum() should return error for nonexistent file")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestCreateBackup_Failure(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+
+	// Try to backup a file that doesn't exist
+	err := github.CreateBackup(ios, "/tmp/nonexistent", "/tmp/backup")
+	if err == nil {
+		t.Error("CreateBackup() should return error for nonexistent source")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestRestoreFromBackup(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	// Create backup file
+	backupPath := "/tmp/backup"
+	backupContent := []byte("original content")
+	if err := afero.WriteFile(memFs, backupPath, backupContent, 0o600); err != nil {
+		t.Fatalf("failed to create backup file: %v", err)
+	}
+
+	targetPath := "/tmp/target"
+	originalErr := fmt.Errorf("write failed")
+
+	err := github.RestoreFromBackup(backupPath, targetPath, originalErr)
+	if err == nil {
+		t.Error("RestoreFromBackup() should return error")
+	}
+	if !containsString(err.Error(), "write failed") {
+		t.Errorf("error should contain original error, got: %v", err)
+	}
+
+	// Verify backup was moved to target
+	content, err := afero.ReadFile(memFs, targetPath)
+	if err != nil {
+		t.Fatalf("failed to read restored file: %v", err)
+	}
+	if !bytes.Equal(content, backupContent) {
+		t.Errorf("restored content = %q, want %q", string(content), string(backupContent))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestRestoreFromBackup_RestoreFails(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	originalErr := fmt.Errorf("write failed")
+
+	err := github.RestoreFromBackup("/nonexistent/backup", "/nonexistent/target", originalErr)
+	if err == nil {
+		t.Error("RestoreFromBackup() should return error when restore fails")
+	}
+	if !containsString(err.Error(), "restore failed") {
+		t.Errorf("error should mention restore failure, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestPerformUpdate_Cancelled(t *testing.T) {
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	release := &github.Release{
+		TagName: "v2.0.0",
+		Name:    "Release 2.0.0",
+	}
+
+	// Confirmation returns false
+	confirmFunc := func(prompt string, skipConfirm bool) (bool, error) {
+		return false, nil
+	}
+
+	err := client.PerformUpdate(context.Background(), ios, release, "v1.0.0", "release notes", confirmFunc, false)
+	if err == nil {
+		t.Error("PerformUpdate() should return error when cancelled")
+	}
+	if !containsString(err.Error(), "cancelled") {
+		t.Errorf("error should mention cancellation, got: %v", err)
+	}
+}
+
+func TestPerformUpdate_ConfirmError(t *testing.T) {
+	t.Parallel()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	release := &github.Release{
+		TagName: "v2.0.0",
+		Name:    "Release 2.0.0",
+	}
+
+	// Confirmation returns error
+	confirmFunc := func(prompt string, skipConfirm bool) (bool, error) {
+		return false, fmt.Errorf("input error")
+	}
+
+	err := client.PerformUpdate(context.Background(), ios, release, "v1.0.0", "release notes", confirmFunc, false)
+	if err == nil {
+		t.Error("PerformUpdate() should return error when confirmation fails")
+	}
+	if !containsString(err.Error(), "confirmation") {
+		t.Errorf("error should mention confirmation failure, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestPerformRollback_NoRelease(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return empty releases list
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte("[]")); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	confirmFunc := func(prompt string, skipConfirm bool) (bool, error) {
+		return true, nil
+	}
+
+	err := client.PerformRollback(context.Background(), ios, "v1.0.0", false, confirmFunc, false)
+	if err == nil {
+		t.Error("PerformRollback() should return error when no previous release available")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestListReleases_Prereleases(t *testing.T) {
+	releases := []github.Release{
+		{TagName: "v1.0.0", Name: "Release 1.0.0", Prerelease: false},
+		{TagName: "v1.1.0-beta", Name: "Beta Release", Prerelease: true},
+		{TagName: "v1.2.0", Name: "Release 1.2.0", Prerelease: false},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(releases); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	// Test without prereleases
+	result, err := client.ListReleases(context.Background(), "testowner", "testrepo", false)
+	if err != nil {
+		t.Fatalf("ListReleases() error = %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("ListReleases(includePre=false) returned %d releases, want 2", len(result))
+	}
+
+	// Test with prereleases
+	result, err = client.ListReleases(context.Background(), "testowner", "testrepo", true)
+	if err != nil {
+		t.Fatalf("ListReleases(includePre=true) error = %v", err)
+	}
+	if len(result) != 3 {
+		t.Errorf("ListReleases(includePre=true) returned %d releases, want 3", len(result))
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestGetLatestRelease_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.GetLatestRelease(context.Background(), "testowner", "testrepo")
+	if err == nil {
+		t.Error("GetLatestRelease() should return error when not found")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestGetReleaseByTag_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", "v1.0.0")
+	if err == nil {
+		t.Error("GetReleaseByTag() should return error when not found")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestDownloadAsset_Failure(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	destPath := "/tmp/downloaded"
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	asset := &github.Asset{
+		Name:               "test.tar.gz",
+		BrowserDownloadURL: "http://localhost:1/nonexistent",
+	}
+
+	err := client.DownloadAsset(context.Background(), asset, destPath)
+	if err == nil {
+		t.Error("DownloadAsset() should return error for unreachable URL")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestPerformRollback_Cancelled(t *testing.T) {
+	releases := []github.Release{
+		{TagName: "v2.0.0", Name: "Release 2.0.0"},
+		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(releases); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	confirmFunc := func(prompt string, skipConfirm bool) (bool, error) {
+		return false, nil // User cancels
+	}
+
+	err := client.PerformRollback(context.Background(), ios, "v2.0.0", false, confirmFunc, false)
+	// Rollback should complete without error when cancelled gracefully
+	if err != nil {
+		t.Errorf("PerformRollback() unexpected error = %v", err)
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestPerformRollback_ConfirmError(t *testing.T) {
+	releases := []github.Release{
+		{TagName: "v2.0.0", Name: "Release 2.0.0"},
+		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(releases); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	confirmFunc := func(prompt string, skipConfirm bool) (bool, error) {
+		return false, fmt.Errorf("input error")
+	}
+
+	err := client.PerformRollback(context.Background(), ios, "v2.0.0", false, confirmFunc, false)
+	if err == nil {
+		t.Error("PerformRollback() should return error when confirmation fails")
+	}
+	if !containsString(err.Error(), "confirmation") {
+		t.Errorf("error should mention confirmation failure, got: %v", err)
+	}
+}
+
+func TestInstallRelease_NoPlatformAsset(t *testing.T) {
+	t.Parallel()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	// Release with no assets for any platform
+	release := &github.Release{
+		TagName: "v1.0.0",
+		Name:    "Release 1.0.0",
+		Assets: []github.Asset{
+			{Name: "shelly-freebsd-sparc64.tar.gz"},
+		},
+	}
+
+	err := client.InstallRelease(context.Background(), ios, release)
+	if err == nil {
+		t.Error("InstallRelease() should return error when no platform asset available")
+	}
+	if !containsString(err.Error(), "no binary available") {
+		t.Errorf("error should mention no binary available, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestDownloadAndExtract_RawBinary(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	binaryContent := []byte("#!/bin/sh\necho hello")
+
+	// Create a server that returns a raw binary
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		if _, err := w.Write(binaryContent); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	// For unknown formats, it treats the file as a raw binary
+	asset := &github.Asset{
+		Name:               "shelly-linux-amd64",
+		BrowserDownloadURL: server.URL + "/download",
+	}
+
+	binaryPath, cleanup, err := client.DownloadAndExtract(context.Background(), asset, "shelly")
+	if err != nil {
+		t.Fatalf("DownloadAndExtract() error = %v", err)
+	}
+	defer cleanup()
+
+	// Verify the binary was downloaded
+	content, err := afero.ReadFile(memFs, binaryPath)
+	if err != nil {
+		t.Fatalf("failed to read binary: %v", err)
+	}
+	if !bytes.Equal(content, binaryContent) {
+		t.Errorf("binary content = %q, want %q", string(content), string(binaryContent))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestCreateBackup_Success(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+
+	// Create source file
+	srcPath := "/tmp/source"
+	if err := afero.WriteFile(memFs, srcPath, []byte("content"), 0o600); err != nil {
+		t.Fatalf("failed to create source file: %v", err)
+	}
+
+	backupPath := "/tmp/backup"
+	err := github.CreateBackup(ios, srcPath, backupPath)
+	if err != nil {
+		t.Errorf("CreateBackup() error = %v", err)
+	}
+
+	// Verify backup exists
+	content, err := afero.ReadFile(memFs, backupPath)
+	if err != nil {
+		t.Fatalf("failed to read backup: %v", err)
+	}
+	if string(content) != "content" {
+		t.Errorf("backup content = %q, want %q", string(content), "content")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestListReleases_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.ListReleases(context.Background(), "testowner", "testrepo", false)
+	if err == nil {
+		t.Error("ListReleases() should return error for server error")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestGetLatestRelease_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.GetLatestRelease(context.Background(), "testowner", "testrepo")
+	if err == nil {
+		t.Error("GetLatestRelease() should return error for server error")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestGetReleaseByTag_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.GetReleaseByTag(context.Background(), "testowner", "testrepo", "v1.0.0")
+	if err == nil {
+		t.Error("GetReleaseByTag() should return error for server error")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestFindPreviousRelease(t *testing.T) {
+	releases := []github.Release{
+		{TagName: "v2.0.0", Name: "Release 2.0.0"},
+		{TagName: "v1.5.0", Name: "Release 1.5.0"},
+		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(releases); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	result, err := client.FindPreviousRelease(context.Background(), "v2.0.0", false)
+	if err != nil {
+		t.Fatalf("FindPreviousRelease() error = %v", err)
+	}
+
+	if result.TagName != "v1.5.0" {
+		t.Errorf("FindPreviousRelease() = %q, want v1.5.0", result.TagName)
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestFindPreviousRelease_NoPrevious(t *testing.T) {
+	releases := []github.Release{
+		{TagName: "v1.0.0", Name: "Release 1.0.0"},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(releases); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	restore := github.SetAPIBaseURL(server.URL)
+	defer restore()
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	_, err := client.FindPreviousRelease(context.Background(), "v1.0.0", false)
+	if err == nil {
+		t.Error("FindPreviousRelease() should return error when no previous release exists")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestSetFs(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+
+	// Reset to nil (should restore OS filesystem)
+	github.SetFs(nil)
+
+	// No error means it worked
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestReplaceBinary_WithAfero(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+
+	// Create the new binary
+	newContent := []byte("new binary content")
+	if err := afero.WriteFile(memFs, "/tmp/new", newContent, 0o755); err != nil {
+		t.Fatalf("failed to create new binary: %v", err)
+	}
+
+	// Create the target binary
+	oldContent := []byte("old binary content")
+	if err := afero.WriteFile(memFs, "/tmp/target", oldContent, 0o755); err != nil {
+		t.Fatalf("failed to create target binary: %v", err)
+	}
+
+	err := github.ReplaceBinary(ios, "/tmp/new", "/tmp/target")
+	if err != nil {
+		t.Fatalf("ReplaceBinary() error = %v", err)
+	}
+
+	// Verify the target was replaced
+	content, err := afero.ReadFile(memFs, "/tmp/target")
+	if err != nil {
+		t.Fatalf("failed to read target: %v", err)
+	}
+	if !bytes.Equal(content, newContent) {
+		t.Errorf("target content = %q, want %q", string(content), string(newContent))
+	}
+
+	// Verify backup was removed
+	exists, err := afero.Exists(memFs, "/tmp/target.bak")
+	if err != nil {
+		t.Fatalf("failed to check backup: %v", err)
+	}
+	if exists {
+		t.Error("backup file should have been removed")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestCopyFile_WithAfero(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+
+	// Create source file
+	content := []byte("source content")
+	if err := afero.WriteFile(memFs, "/tmp/src", content, 0o644); err != nil {
+		t.Fatalf("failed to create source: %v", err)
+	}
+
+	err := github.CopyFile(ios, "/tmp/src", "/tmp/dst")
+	if err != nil {
+		t.Fatalf("CopyFile() error = %v", err)
+	}
+
+	// Verify copy
+	copied, err := afero.ReadFile(memFs, "/tmp/dst")
+	if err != nil {
+		t.Fatalf("failed to read copy: %v", err)
+	}
+	if !bytes.Equal(copied, content) {
+		t.Errorf("copied content = %q, want %q", string(copied), string(content))
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestCreateBackup_WithAfero(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+
+	// Create source file
+	content := []byte("source content")
+	if err := afero.WriteFile(memFs, "/tmp/src", content, 0o644); err != nil {
+		t.Fatalf("failed to create source: %v", err)
+	}
+
+	err := github.CreateBackup(ios, "/tmp/src", "/tmp/backup")
+	if err != nil {
+		t.Fatalf("CreateBackup() error = %v", err)
+	}
+
+	// Verify backup exists
+	backed, err := afero.ReadFile(memFs, "/tmp/backup")
+	if err != nil {
+		t.Fatalf("failed to read backup: %v", err)
+	}
+	if !bytes.Equal(backed, content) {
+		t.Errorf("backup content = %q, want %q", string(backed), string(content))
+	}
+
+	// Verify source was moved (no longer exists)
+	exists, err := afero.Exists(memFs, "/tmp/src")
+	if err != nil {
+		t.Fatalf("failed to check source: %v", err)
+	}
+	if exists {
+		t.Error("source should have been moved to backup")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem
+func TestRestoreFromBackup_WithAfero(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	// Create backup file
+	backupContent := []byte("backup content")
+	if err := afero.WriteFile(memFs, "/tmp/backup", backupContent, 0o644); err != nil {
+		t.Fatalf("failed to create backup: %v", err)
+	}
+
+	originalErr := fmt.Errorf("write failed")
+	err := github.RestoreFromBackup("/tmp/backup", "/tmp/target", originalErr)
+	if err == nil {
+		t.Error("RestoreFromBackup() should return error")
+	}
+
+	// Verify backup was moved to target
+	content, err := afero.ReadFile(memFs, "/tmp/target")
+	if err != nil {
+		t.Fatalf("failed to read target: %v", err)
+	}
+	if !bytes.Equal(content, backupContent) {
+		t.Errorf("target content = %q, want %q", string(content), string(backupContent))
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestFetchSpecificVersion(t *testing.T) {
+	testCases := []struct {
+		name     string
+		inputVer string
+		wantTag  string
+	}{
+		{"with_prefix", "v2.0.0", "v2.0.0"},
+		{"without_prefix", "2.0.0", "v2.0.0"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "/releases/tags/") {
+					w.Header().Set("Content-Type", "application/json")
+					if _, err := w.Write([]byte(`{"tag_name": "` + tc.wantTag + `"}`)); err != nil {
+						t.Errorf("failed to write response: %v", err)
+					}
+				}
+			}))
+			defer ts.Close()
+
+			github.SetAPIBaseURL(ts.URL)
+			defer github.SetAPIBaseURL("")
+
+			ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+			client := github.NewClient(ios)
+
+			release, err := client.FetchSpecificVersion(context.Background(), tc.inputVer)
+			if err != nil {
+				t.Fatalf("FetchSpecificVersion() error = %v", err)
+			}
+			if release.TagName != tc.wantTag {
+				t.Errorf("TagName = %q, want %q", release.TagName, tc.wantTag)
+			}
+		})
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestFetchLatestVersion(t *testing.T) {
+	t.Run("stable_release", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/releases/latest") {
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(`{"tag_name": "v2.0.0"}`)); err != nil {
+					t.Errorf("failed to write response: %v", err)
+				}
+			}
+		}))
+		defer ts.Close()
+
+		github.SetAPIBaseURL(ts.URL)
+		defer github.SetAPIBaseURL("")
+
+		ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+		client := github.NewClient(ios)
+
+		release, err := client.FetchLatestVersion(context.Background(), false)
+		if err != nil {
+			t.Fatalf("FetchLatestVersion() error = %v", err)
+		}
+		if release.TagName != testVersionV2 {
+			t.Errorf("TagName = %q, want %q", release.TagName, testVersionV2)
+		}
+	})
+
+	t.Run("include_prerelease", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/releases") {
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(`[{"tag_name": "v3.0.0-beta"}, {"tag_name": "v2.0.0"}]`)); err != nil {
+					t.Errorf("failed to write response: %v", err)
+				}
+			}
+		}))
+		defer ts.Close()
+
+		github.SetAPIBaseURL(ts.URL)
+		defer github.SetAPIBaseURL("")
+
+		ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+		client := github.NewClient(ios)
+
+		release, err := client.FetchLatestVersion(context.Background(), true)
+		if err != nil {
+			t.Fatalf("FetchLatestVersion() error = %v", err)
+		}
+		if release.TagName != "v3.0.0-beta" {
+			t.Errorf("TagName = %q, want %q", release.TagName, "v3.0.0-beta")
+		}
+	})
+
+	t.Run("no_releases", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/releases") {
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(`[]`)); err != nil {
+					t.Errorf("failed to write response: %v", err)
+				}
+			}
+		}))
+		defer ts.Close()
+
+		github.SetAPIBaseURL(ts.URL)
+		defer github.SetAPIBaseURL("")
+
+		ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+		client := github.NewClient(ios)
+
+		_, err := client.FetchLatestVersion(context.Background(), true)
+		if err != github.ErrNoReleases {
+			t.Errorf("expected ErrNoReleases, got %v", err)
+		}
+	})
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestGetTargetRelease(t *testing.T) {
+	t.Run("specific_version", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.Contains(r.URL.Path, "/releases/tags/") {
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(`{"tag_name": "v1.5.0"}`)); err != nil {
+					t.Errorf("failed to write response: %v", err)
+				}
+			}
+		}))
+		defer ts.Close()
+
+		github.SetAPIBaseURL(ts.URL)
+		defer github.SetAPIBaseURL("")
+
+		ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+		client := github.NewClient(ios)
+
+		release, err := client.GetTargetRelease(context.Background(), "1.5.0", false)
+		if err != nil {
+			t.Fatalf("GetTargetRelease() error = %v", err)
+		}
+		if release.TagName != "v1.5.0" {
+			t.Errorf("TagName = %q, want %q", release.TagName, "v1.5.0")
+		}
+	})
+
+	t.Run("latest_stable", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/releases/latest") {
+				w.Header().Set("Content-Type", "application/json")
+				if _, err := w.Write([]byte(`{"tag_name": "v2.0.0"}`)); err != nil {
+					t.Errorf("failed to write response: %v", err)
+				}
+			}
+		}))
+		defer ts.Close()
+
+		github.SetAPIBaseURL(ts.URL)
+		defer github.SetAPIBaseURL("")
+
+		ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+		client := github.NewClient(ios)
+
+		release, err := client.GetTargetRelease(context.Background(), "", false)
+		if err != nil {
+			t.Fatalf("GetTargetRelease() error = %v", err)
+		}
+		if release.TagName != testVersionV2 {
+			t.Errorf("TagName = %q, want %q", release.TagName, testVersionV2)
+		}
+	})
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestReleaseFetcher(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write([]byte(`{"tag_name": "v2.5.0"}`)); err != nil {
+				t.Errorf("failed to write response: %v", err)
+			}
+		}
+	}))
+	defer ts.Close()
+
+	github.SetAPIBaseURL(ts.URL)
+	defer github.SetAPIBaseURL("")
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	fetcher := github.ReleaseFetcher(ios)
+
+	version, err := fetcher(context.Background())
+	if err != nil {
+		t.Fatalf("ReleaseFetcher() error = %v", err)
+	}
+	if version != "2.5.0" {
+		t.Errorf("version = %q, want %q", version, "2.5.0")
+	}
+}
+
+//nolint:paralleltest // modifies global base URL
+func TestReleaseFetcher_Error(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server error", http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	github.SetAPIBaseURL(ts.URL)
+	defer github.SetAPIBaseURL("")
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	fetcher := github.ReleaseFetcher(ios)
+
+	_, err := fetcher(context.Background())
+	if err == nil {
+		t.Error("ReleaseFetcher() should return error")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem and base URL
+func TestDownloadExtensionRelease(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	binaryContent := []byte("extension binary")
+	var tarBuf bytes.Buffer
+	tw := tar.NewWriter(&tarBuf)
+	hdr := &tar.Header{
+		Name: "shelly-extension",
+		Mode: 0o755,
+		Size: int64(len(binaryContent)),
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatalf("failed to write tar header: %v", err)
+	}
+	if _, err := tw.Write(binaryContent); err != nil {
+		t.Fatalf("failed to write tar content: %v", err)
+	}
+	tw.Close()
+
+	var gzBuf bytes.Buffer
+	gzw := gzip.NewWriter(&gzBuf)
+	if _, err := gzw.Write(tarBuf.Bytes()); err != nil {
+		t.Fatalf("failed to write gzip content: %v", err)
+	}
+	gzw.Close()
+
+	// Store URL for the handler closure
+	var serverURL string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/releases/latest"):
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(map[string]any{
+				"tag_name": "v1.0.0",
+				"assets": []map[string]any{
+					{
+						"name":                 "shelly-extension_linux_amd64.tar.gz",
+						"browser_download_url": serverURL + "/download/shelly-extension_linux_amd64.tar.gz",
+					},
+				},
+			}); err != nil {
+				t.Errorf("failed to encode response: %v", err)
+			}
+		case strings.Contains(r.URL.Path, "/download/"):
+			w.Header().Set("Content-Type", "application/octet-stream")
+			if _, err := w.Write(gzBuf.Bytes()); err != nil {
+				t.Errorf("failed to write binary: %v", err)
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+	serverURL = ts.URL
+
+	github.SetAPIBaseURL(ts.URL)
+	defer github.SetAPIBaseURL("")
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	client := github.NewClient(ios)
+
+	result, err := client.DownloadExtensionRelease(context.Background(), "owner", "extension", "shelly-")
+	if err != nil {
+		t.Fatalf("DownloadExtensionRelease() error = %v", err)
+	}
+	if result == nil {
+		t.Fatal("DownloadExtensionRelease() returned nil result")
+	}
+	if result.TagName != testVersionV1 {
+		t.Errorf("TagName = %q, want %q", result.TagName, testVersionV1)
+	}
+	if result.Cleanup != nil {
+		result.Cleanup()
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem and base URL
+func TestCheckForUpdatesCached_DisabledByEnv(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	t.Setenv("SHELLY_NO_UPDATE_CHECK", "1")
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	if result != nil {
+		t.Error("CheckForUpdatesCached() should return nil when disabled")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem and base URL
+func TestCheckForUpdatesCached_ValidCacheWithUpdate(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	// Create cache directory and file
+	if err := memFs.MkdirAll("/cache", 0o755); err != nil {
+		t.Fatalf("failed to create cache dir: %v", err)
+	}
+	if err := afero.WriteFile(memFs, "/cache/version", []byte("2.0.0"), 0o644); err != nil {
+		t.Fatalf("failed to write cache: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	if result == nil {
+		t.Fatal("CheckForUpdatesCached() should return update")
+	}
+	if result.Version() != "2.0.0" {
+		t.Errorf("Version = %q, want %q", result.Version(), "2.0.0")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem and base URL
+func TestCheckForUpdatesCached_ValidCacheNoUpdate(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	// Create cache with same version
+	if err := memFs.MkdirAll("/cache", 0o755); err != nil {
+		t.Fatalf("failed to create cache dir: %v", err)
+	}
+	if err := afero.WriteFile(memFs, "/cache/version", []byte("1.0.0"), 0o644); err != nil {
+		t.Fatalf("failed to write cache: %v", err)
+	}
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	if result != nil {
+		t.Error("CheckForUpdatesCached() should return nil when no update available")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem and base URL
+func TestCheckForUpdatesCached_FetchFromAPI(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write([]byte(`{"tag_name": "v3.0.0"}`)); err != nil {
+				t.Errorf("failed to write response: %v", err)
+			}
+		}
+	}))
+	defer ts.Close()
+
+	github.SetAPIBaseURL(ts.URL)
+	defer github.SetAPIBaseURL("")
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	if result == nil {
+		t.Fatal("CheckForUpdatesCached() should return update")
+	}
+	if result.Version() != "3.0.0" {
+		t.Errorf("Version = %q, want %q", result.Version(), "3.0.0")
+	}
+
+	// Verify cache was written
+	data, err := afero.ReadFile(memFs, "/cache/version")
+	if err != nil {
+		t.Fatalf("cache not written: %v", err)
+	}
+	if string(data) != "3.0.0" {
+		t.Errorf("cached version = %q, want %q", string(data), "3.0.0")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem and base URL
+func TestCheckForUpdatesCached_FetchNoUpdate(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write([]byte(`{"tag_name": "v1.0.0"}`)); err != nil {
+				t.Errorf("failed to write response: %v", err)
+			}
+		}
+	}))
+	defer ts.Close()
+
+	github.SetAPIBaseURL(ts.URL)
+	defer github.SetAPIBaseURL("")
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	if result != nil {
+		t.Error("CheckForUpdatesCached() should return nil when no update")
+	}
+}
+
+//nolint:paralleltest // modifies global filesystem and base URL
+func TestCheckForUpdatesCached_FetchError(t *testing.T) {
+	memFs := afero.NewMemMapFs()
+	github.SetFs(memFs)
+	defer github.SetFs(nil)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server error", http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	github.SetAPIBaseURL(ts.URL)
+	defer github.SetAPIBaseURL("")
+
+	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+	result := github.CheckForUpdatesCached(context.Background(), ios, "/cache/version", "1.0.0")
+	if result != nil {
+		t.Error("CheckForUpdatesCached() should return nil on error")
+	}
 }

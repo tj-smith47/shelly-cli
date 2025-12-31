@@ -16,6 +16,8 @@ import (
 // Options holds the command options.
 type Options struct {
 	flags.DeviceTargetFlags
+	Factory  *cmdutil.Factory
+	Devices  []string
 	Duration time.Duration
 	Interval time.Duration
 }
@@ -23,6 +25,7 @@ type Options struct {
 // NewCommand creates the party command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
+		Factory:  f,
 		Duration: 30 * time.Second,
 		Interval: 500 * time.Millisecond,
 	}
@@ -46,21 +49,21 @@ Use Ctrl+C to stop early.`,
   # Fast strobe effect (200ms interval)
   shelly party --all -i 200ms`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			devices := args
+			opts.Devices = args
 			if opts.All {
 				registered := config.ListDevices()
 				if len(registered) == 0 {
-					f.IOStreams().Warning("No devices registered. Run 'shelly discover mdns --register' first.")
+					opts.Factory.IOStreams().Warning("No devices registered. Run 'shelly discover mdns --register' first.")
 					return nil
 				}
-				devices = make([]string, 0, len(registered))
+				opts.Devices = make([]string, 0, len(registered))
 				for name := range registered {
-					devices = append(devices, name)
+					opts.Devices = append(opts.Devices, name)
 				}
 			} else if len(args) == 0 {
 				return fmt.Errorf("specify device(s) or use --all")
 			}
-			return run(cmd.Context(), f, devices, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -71,13 +74,13 @@ Use Ctrl+C to stop early.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	ios.Success("Party mode starting!")
 	ios.Info("Duration: %v, Interval: %v", opts.Duration, opts.Interval)
-	ios.Info("Devices: %d", len(devices))
+	ios.Info("Devices: %d", len(opts.Devices))
 	ios.Println("")
 	ios.Info("Press Ctrl+C to stop...")
 	ios.Println("")
@@ -98,7 +101,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 			ios.Success("Party's over!")
 
 			// Turn lights back on
-			for _, device := range devices {
+			for _, device := range opts.Devices {
 				if err := svc.LightOn(ctx, device, 0); err != nil {
 					// Silently ignore - might not be a light, try switch
 					if switchErr := svc.SwitchOn(ctx, device, 0); switchErr != nil {
@@ -111,7 +114,7 @@ func run(ctx context.Context, f *cmdutil.Factory, devices []string, opts *Option
 		case <-ticker.C:
 			toggleState = !toggleState
 
-			for _, device := range devices {
+			for _, device := range opts.Devices {
 				go func(dev string) {
 					svc.PartyToggleDevice(partyCtx, ios, dev, toggleState)
 				}(device)

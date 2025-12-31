@@ -194,7 +194,8 @@ func TestRun_NotLoggedIn(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	ctx := context.Background()
-	err := run(ctx, f, "device123", "on", 0)
+	opts := &Options{Factory: f, DeviceID: "device123", Action: "on", Channel: 0}
+	err := run(ctx, opts)
 
 	// Should fail because no token is configured in isolated config
 	if err == nil {

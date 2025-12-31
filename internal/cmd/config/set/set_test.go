@@ -122,7 +122,8 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 func TestRun_InvalidFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, []string{"invalid-no-equals"})
+	opts := &Options{Factory: tf.Factory, Args: []string{"invalid-no-equals"}}
+	err := run(opts)
 	if err == nil {
 		t.Error("Expected error for invalid format")
 	}
@@ -136,7 +137,8 @@ func TestRun_ValidSetting(t *testing.T) {
 
 	// This will fail because config.SetSetting needs a real config setup
 	// but we're testing the run function's parsing logic
-	err := run(tf.Factory, []string{"defaults.timeout=30s"})
+	opts := &Options{Factory: tf.Factory, Args: []string{"defaults.timeout=30s"}}
+	err := run(opts)
 	// We expect either success or a config-related error, not a parsing error
 	if err != nil && strings.Contains(err.Error(), "invalid format") {
 		t.Errorf("Should not get invalid format error for valid format: %v", err)
@@ -146,7 +148,8 @@ func TestRun_ValidSetting(t *testing.T) {
 func TestRun_MultipleSettings(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, []string{"key1=value1", "key2=value2"})
+	opts := &Options{Factory: tf.Factory, Args: []string{"key1=value1", "key2=value2"}}
+	err := run(opts)
 	// Check that parsing is correct
 	if err != nil && strings.Contains(err.Error(), "invalid format") {
 		t.Errorf("Should not get invalid format error for valid formats: %v", err)
@@ -157,7 +160,8 @@ func TestRun_EmptyValue(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	// key= should be valid (empty value)
-	err := run(tf.Factory, []string{"key="})
+	opts := &Options{Factory: tf.Factory, Args: []string{"key="}}
+	err := run(opts)
 	if err != nil && strings.Contains(err.Error(), "invalid format") {
 		t.Errorf("Should not get invalid format error for key=: %v", err)
 	}
@@ -167,7 +171,8 @@ func TestRun_ValueWithEquals(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 
 	// key=value=with=equals should be valid
-	err := run(tf.Factory, []string{"key=value=with=equals"})
+	opts := &Options{Factory: tf.Factory, Args: []string{"key=value=with=equals"}}
+	err := run(opts)
 	if err != nil && strings.Contains(err.Error(), "invalid format") {
 		t.Errorf("Should not get invalid format error for value with equals: %v", err)
 	}

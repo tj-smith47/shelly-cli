@@ -130,7 +130,7 @@ func DefaultStyles() Styles {
 			Background(colors.AltBackground).
 			Padding(0, 1),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(colors.Text),
 		Muted: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		Success: lipgloss.NewStyle().

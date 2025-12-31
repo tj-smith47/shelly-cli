@@ -219,11 +219,12 @@ func TestRun_NoPushOrPull(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Push: false,
-		Pull: false,
+		Factory: f,
+		Push:    false,
+		Pull:    false,
 	}
 
-	err := run(context.Background(), f, opts)
+	err := run(context.Background(), opts)
 
 	if err == nil {
 		t.Error("Expected error when neither --push nor --pull specified")
@@ -243,11 +244,12 @@ func TestRun_BothPushAndPull(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Push: true,
-		Pull: true,
+		Factory: f,
+		Push:    true,
+		Pull:    true,
 	}
 
-	err := run(context.Background(), f, opts)
+	err := run(context.Background(), opts)
 
 	if err == nil {
 		t.Error("Expected error when both --push and --pull specified")
@@ -267,11 +269,12 @@ func TestRun_PullNoDevices(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Pull: true,
+		Factory: f,
+		Pull:    true,
 	}
 
 	// Run should complete (possibly with warning about no devices)
-	err := run(context.Background(), f, opts)
+	err := run(context.Background(), opts)
 
 	// May fail due to config loading or succeed with "no devices" warning
 	_ = err
@@ -286,10 +289,11 @@ func TestRun_PushNoSyncDir(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Push: true,
+		Factory: f,
+		Push:    true,
 	}
 
-	err := run(context.Background(), f, opts)
+	err := run(context.Background(), opts)
 
 	// Should fail since no sync directory exists
 	if err != nil {
@@ -309,11 +313,12 @@ func TestRun_PullWithDryRun(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Pull:   true,
-		DryRun: true,
+		Factory: f,
+		DryRun:  true,
+		Pull:    true,
 	}
 
-	err := run(context.Background(), f, opts)
+	err := run(context.Background(), opts)
 
 	// May fail due to config loading or succeed with dry run output
 	_ = err
@@ -332,11 +337,12 @@ func TestRun_PushWithDryRun(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Push:   true,
-		DryRun: true,
+		Factory: f,
+		DryRun:  true,
+		Push:    true,
 	}
 
-	err := run(context.Background(), f, opts)
+	err := run(context.Background(), opts)
 
 	// Should fail since no sync directory exists, but dry-run should be handled
 	_ = err
@@ -351,15 +357,16 @@ func TestRun_PullSpecificDevices(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Pull:    true,
+		Factory: f,
 		Devices: []string{"living-room", "kitchen"},
+		Pull:    true,
 	}
 
 	// Use short timeout to prevent hanging on network operations
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	err := run(ctx, f, opts)
+	err := run(ctx, opts)
 
 	// May fail due to config loading, device not found, or context timeout
 	_ = err
@@ -374,15 +381,16 @@ func TestRun_PushSpecificDevices(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	opts := &Options{
-		Push:    true,
+		Factory: f,
 		Devices: []string{"living-room"},
+		Push:    true,
 	}
 
 	// Use short timeout to prevent hanging on network operations
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	err := run(ctx, f, opts)
+	err := run(ctx, opts)
 
 	// Should fail since no sync directory exists
 	_ = err

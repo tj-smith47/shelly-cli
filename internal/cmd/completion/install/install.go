@@ -10,9 +10,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
 
+// Options holds the options for the install command.
+type Options struct {
+	Factory *cmdutil.Factory
+	RootCmd *cobra.Command
+	Shell   string
+}
+
 // NewCommand creates the completion install command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var shell string
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "install",
@@ -32,19 +39,21 @@ Supported shells: bash, zsh, fish, powershell`,
   shelly completion install --shell bash
   shelly completion install --shell zsh`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(f, cmd.Root(), shell)
+			opts.RootCmd = cmd.Root()
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&shell, "shell", "", "Shell to install completions for (auto-detected if not specified)")
+	cmd.Flags().StringVar(&opts.Shell, "shell", "", "Shell to install completions for (auto-detected if not specified)")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, rootCmd *cobra.Command, shell string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Auto-detect shell if not specified
+	shell := opts.Shell
 	if shell == "" {
 		var err error
 		shell, err = completion.DetectShell()
@@ -63,5 +72,5 @@ func run(f *cmdutil.Factory, rootCmd *cobra.Command, shell string) error {
 
 	ios.Info("Detected shell: %s", shell)
 
-	return completion.GenerateAndInstall(ios, rootCmd, shell)
+	return completion.GenerateAndInstall(ios, opts.RootCmd, shell)
 }

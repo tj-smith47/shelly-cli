@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -132,7 +133,7 @@ func DefaultStyles() Styles {
 		Unit: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(colors.Text),
 		Positive: lipgloss.NewStyle().
 			Foreground(colors.Success),
 		Negative: lipgloss.NewStyle().
@@ -382,20 +383,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
-	switch msg.String() {
-	case "j", "down":
-		m.scroller.CursorDown()
-	case "k", "up":
-		m.scroller.CursorUp()
-	case "g":
-		m.scroller.CursorToStart()
-	case "G":
-		m.scroller.CursorToEnd()
-	case "pgdown", "ctrl+d":
-		m.scroller.PageDown()
-	case "pgup", "ctrl+u":
-		m.scroller.PageUp()
-	}
+	keys.HandleScrollNavigation(msg.String(), m.scroller)
 	return m
 }
 

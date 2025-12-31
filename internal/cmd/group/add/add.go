@@ -9,8 +9,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the options for the add command.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Devices   []string
+	GroupName string
+}
+
 // NewCommand creates the group add command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "add <group> <device>...",
 		Aliases: []string{"append", "include"},
@@ -32,30 +41,32 @@ Devices can belong to multiple groups.`,
   shelly grp add bedroom lamp`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return run(f, args[0], args[1:])
+			opts.GroupName = args[0]
+			opts.Devices = args[1:]
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, groupName string, devices []string) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Check if group exists
-	if f.GetGroup(groupName) == nil {
-		return fmt.Errorf("group %q not found", groupName)
+	if opts.Factory.GetGroup(opts.GroupName) == nil {
+		return fmt.Errorf("group %q not found", opts.GroupName)
 	}
 
 	// Get config manager for mutations
-	mgr, err := f.ConfigManager()
+	mgr, err := opts.Factory.ConfigManager()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	added := 0
-	for _, device := range devices {
-		err := mgr.AddDeviceToGroup(groupName, device)
+	for _, device := range opts.Devices {
+		err := mgr.AddDeviceToGroup(opts.GroupName, device)
 		if err != nil {
 			ios.Warning("Failed to add %q: %v", device, err)
 			continue
@@ -68,9 +79,9 @@ func run(f *cmdutil.Factory, groupName string, devices []string) error {
 	}
 
 	if added == 1 {
-		ios.Success("Added 1 device to group %q", groupName)
+		ios.Success("Added 1 device to group %q", opts.GroupName)
 	} else {
-		ios.Success("Added %d devices to group %q", added, groupName)
+		ios.Success("Added %d devices to group %q", added, opts.GroupName)
 	}
 
 	return nil

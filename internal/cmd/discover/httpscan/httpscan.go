@@ -20,11 +20,18 @@ import (
 // DefaultTimeout is the default scan timeout.
 const DefaultTimeout = 2 * time.Minute
 
+// Options holds the command options.
+type Options struct {
+	Factory      *cmdutil.Factory
+	Register     bool
+	SkipExisting bool
+	Subnet       string
+	Timeout      time.Duration
+}
+
 // NewCommand creates the discover http command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var register bool
-	var skipExisting bool
-	var timeout time.Duration
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "http [subnet]",
@@ -67,23 +74,23 @@ Protocol, and Auth status.`,
   shelly discover http 192.168.1.0/24 --register --timeout 10m`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			subnet := ""
 			if len(args) > 0 {
-				subnet = args[0]
+				opts.Subnet = args[0]
 			}
-			return run(cmd.Context(), f, subnet, timeout, register, skipExisting)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().DurationVarP(&timeout, "timeout", "t", DefaultTimeout, "Scan timeout")
-	cmd.Flags().BoolVar(&register, "register", false, "Automatically register discovered devices")
-	cmd.Flags().BoolVar(&skipExisting, "skip-existing", true, "Skip devices already registered")
+	cmd.Flags().DurationVarP(&opts.Timeout, "timeout", "t", DefaultTimeout, "Scan timeout")
+	cmd.Flags().BoolVar(&opts.Register, "register", false, "Automatically register discovered devices")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", true, "Skip devices already registered")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Duration, register, skipExisting bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	subnet := opts.Subnet
 
 	if subnet == "" {
 		var err error
@@ -113,7 +120,7 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 	// Add progress line
 	mw.AddLine("scan", fmt.Sprintf("0/%d addresses probed", len(addresses)))
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
 	// Use progress callback to update MultiWriter
@@ -148,8 +155,8 @@ func run(ctx context.Context, f *cmdutil.Factory, subnet string, timeout time.Du
 		ios.DebugErr("saving discovery cache", err)
 	}
 
-	if register {
-		added, err := utils.RegisterDiscoveredDevices(devices, skipExisting)
+	if opts.Register {
+		added, err := utils.RegisterDiscoveredDevices(devices, opts.SkipExisting)
 		if err != nil {
 			ios.Warning("Registration error: %v", err)
 		}

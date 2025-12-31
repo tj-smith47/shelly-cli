@@ -40,6 +40,11 @@ type Model struct {
 	height     int
 	styles     Styles
 	loader     loading.Model // Loading spinner for initial load
+
+	// Cached filtered devices to avoid calling GetAllDevices on every View()
+	cachedDevices []*cache.DeviceData
+	cachedVersion uint64 // Cache version when cachedDevices was built
+	cachedFilter  string // Filter string when cachedDevices was built
 }
 
 // Styles for the device list component.
@@ -111,7 +116,7 @@ func DefaultStyles() Styles {
 			Foreground(colors.Warning).
 			Bold(true),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(12),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),
@@ -152,6 +157,9 @@ func (m Model) Init() tea.Cmd {
 
 // Update handles messages for the device list.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Refresh cached devices if cache version changed
+	m = m.refreshCachedDevices()
+
 	// Update loader for spinner animation when loading (needed for header spinner)
 	if m.cache != nil && m.cache.IsLoading() {
 		var cmd tea.Cmd
@@ -237,15 +245,34 @@ func (m Model) emitSelection() tea.Cmd {
 	}
 }
 
-// getFilteredDevices returns devices from cache filtered by the current filter.
+// getFilteredDevices returns cached filtered devices.
+// The cache is refreshed in Update() via refreshCachedDevices().
 func (m Model) getFilteredDevices() []*cache.DeviceData {
+	return m.cachedDevices
+}
+
+// refreshCachedDevices updates the cached filtered devices if the cache has changed.
+// Returns the updated model.
+func (m Model) refreshCachedDevices() Model {
 	if m.cache == nil {
-		return nil
+		m.cachedDevices = nil
+		return m
 	}
 
+	// Check if cached devices are still valid
+	currentVersion := m.cache.Version()
+	if m.cachedDevices != nil && m.cachedVersion == currentVersion && m.cachedFilter == m.filter {
+		return m // Cache is still valid
+	}
+
+	// Cache is stale, rebuild filtered devices
 	all := m.cache.GetAllDevices()
+	m.cachedVersion = currentVersion
+	m.cachedFilter = m.filter
+
 	if m.filter == "" {
-		return all
+		m.cachedDevices = all
+		return m
 	}
 
 	filterLower := strings.ToLower(m.filter)
@@ -258,15 +285,17 @@ func (m Model) getFilteredDevices() []*cache.DeviceData {
 			filtered = append(filtered, d)
 		}
 	}
-	return filtered
+	m.cachedDevices = filtered
+	return m
 }
 
 // SetFilter sets the filter string.
 func (m Model) SetFilter(filter string) Model {
 	m.filter = filter
+	// Refresh cached devices with new filter
+	m = m.refreshCachedDevices()
 	// Update item count for new filter
-	devices := m.getFilteredDevices()
-	m.scroller.SetItemCount(len(devices))
+	m.scroller.SetItemCount(len(m.cachedDevices))
 	return m
 }
 

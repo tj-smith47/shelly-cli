@@ -643,6 +643,7 @@ func TestRun_NilConfig(t *testing.T) {
 	tf, _ := factory.NewTestFactoryWithMockBrowser(t)
 
 	opts := &Options{
+		Factory:    tf.Factory,
 		Type:       "bug",
 		Title:      "Test Bug",
 		DryRun:     true,
@@ -650,7 +651,7 @@ func TestRun_NilConfig(t *testing.T) {
 	}
 
 	// Even with nil config, should work (it's optional)
-	err := run(context.Background(), tf.Factory, opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -662,12 +663,13 @@ func TestRun_WithConfig(t *testing.T) {
 	tf, _ := factory.NewTestFactoryWithMockBrowser(t)
 
 	opts := &Options{
-		Type:   "bug",
-		Title:  "Test",
-		DryRun: true,
+		Factory: tf.Factory,
+		Type:    "bug",
+		Title:   "Test",
+		DryRun:  true,
 	}
 
-	err := run(context.Background(), tf.Factory, opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}

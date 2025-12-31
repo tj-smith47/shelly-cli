@@ -11,8 +11,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the current command.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the theme current command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "current",
 		Aliases: []string{"cur", "c"},
@@ -24,15 +31,15 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   # Output as JSON
   shelly theme current -o json`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return run(f)
+			return run(opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	current := theme.Current()
 	if current == nil {

@@ -199,8 +199,12 @@ func TestRun_ShortDelay(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	opts := &Options{Delay: 1 * time.Millisecond}
-	err = run(context.Background(), tf.Factory, "test-device", opts)
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Delay:   1 * time.Millisecond,
+	}
+	err = run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("run() error = %v", err)
 	}

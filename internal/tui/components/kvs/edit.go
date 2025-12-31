@@ -9,10 +9,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -53,7 +52,7 @@ type EditModel struct {
 	err     error
 	width   int
 	height  int
-	styles  EditStyles
+	styles  editmodal.Styles
 
 	// Original item for comparison (nil for new entries)
 	original *Item
@@ -61,45 +60,6 @@ type EditModel struct {
 	// Form inputs
 	keyInput   form.TextInput
 	valueInput form.TextArea
-}
-
-// EditStyles holds styles for the KVS edit modal.
-type EditStyles struct {
-	Modal      lipgloss.Style
-	Title      lipgloss.Style
-	Label      lipgloss.Style
-	LabelFocus lipgloss.Style
-	Error      lipgloss.Style
-	Help       lipgloss.Style
-	Selector   lipgloss.Style
-	Warning    lipgloss.Style
-}
-
-// DefaultEditStyles returns the default edit modal styles.
-func DefaultEditStyles() EditStyles {
-	colors := theme.GetSemanticColors()
-	return EditStyles{
-		Modal: lipgloss.NewStyle(), // No longer used - using rendering package
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Width(12),
-		LabelFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Width(12),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Selector: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		Warning: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-	}
 }
 
 // NewEditModel creates a new KVS edit modal.
@@ -121,7 +81,7 @@ func NewEditModel(ctx context.Context, svc *shellykvs.Service) EditModel {
 	return EditModel{
 		ctx:        ctx,
 		svc:        svc,
-		styles:     DefaultEditStyles(),
+		styles:     editmodal.DefaultStyles().WithLabelWidth(12),
 		keyInput:   keyInput,
 		valueInput: valueInput,
 	}
@@ -457,5 +417,22 @@ func (m EditModel) renderField(field EditField, label, input string) string {
 		labelStr = m.styles.Label.Render(label)
 	}
 
-	return selector + labelStr + " " + input
+	prefix := selector + labelStr + " "
+
+	// Handle multi-line inputs by indenting subsequent lines
+	lines := strings.Split(input, "\n")
+	if len(lines) <= 1 {
+		return prefix + input
+	}
+
+	// Calculate indent for subsequent lines (selector width + label width + space)
+	indent := strings.Repeat(" ", 2+12+1) // 2 for selector, 12 for label width, 1 for space
+
+	var result strings.Builder
+	result.WriteString(prefix + lines[0])
+	for i := 1; i < len(lines); i++ {
+		result.WriteString("\n")
+		result.WriteString(indent + lines[i])
+	}
+	return result.String()
 }

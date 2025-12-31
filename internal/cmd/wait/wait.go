@@ -10,8 +10,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory     *cmdutil.Factory
+	DurationStr string
+}
+
 // NewCommand creates the wait command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "wait <duration>",
 		Aliases: []string{"delay", "pause"},
@@ -43,17 +51,18 @@ Press Ctrl+C to cancel the wait early.`,
   shelly on kitchen && shelly wait 5s && shelly off kitchen`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.DurationStr = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, durationStr string) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
-	duration, err := time.ParseDuration(durationStr)
+	duration, err := time.ParseDuration(opts.DurationStr)
 	if err != nil {
 		return err
 	}

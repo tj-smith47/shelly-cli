@@ -15,13 +15,14 @@ import (
 
 // Options holds the command options.
 type Options struct {
+	Factory  *cmdutil.Factory
 	Interval time.Duration
 	Once     bool
 }
 
 // NewCommand creates the alert watch command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	opts := &Options{}
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "watch",
@@ -53,7 +54,7 @@ Actions supported:
   # Run once and exit (for cron)
   shelly alert watch --once`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, opts)
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -63,10 +64,10 @@ Actions supported:
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
-	cfg, err := f.Config()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
+	cfg, err := opts.Factory.Config()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
@@ -119,7 +120,7 @@ func run(ctx context.Context, f *cmdutil.Factory, opts *Options) error {
 			ios.Info("Alert monitor stopped")
 			return nil
 		case <-ticker.C:
-			cfg, err = f.Config()
+			cfg, err = opts.Factory.Config()
 			if err != nil {
 				ios.DebugErr("reload config", err)
 				continue

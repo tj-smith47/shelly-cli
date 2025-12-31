@@ -431,7 +431,8 @@ func TestRun_Success(t *testing.T) {
 	ios := iostreams.Test(nil, stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f, "testrun")
+	opts := &Options{Factory: f, Name: "testrun"}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -453,7 +454,8 @@ func TestRun_PluginNotFound(t *testing.T) {
 	ios := iostreams.Test(nil, stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f, "nonexistent")
+	opts := &Options{Factory: f, Name: "nonexistent"}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for non-existent plugin")
 	}

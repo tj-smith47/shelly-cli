@@ -110,7 +110,7 @@ func DefaultGroupEditStyles() GroupEditStyles {
 			Bold(true).
 			MarginBottom(1),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(10),
 		LabelFocus: lipgloss.NewStyle().
 			Foreground(colors.Highlight).

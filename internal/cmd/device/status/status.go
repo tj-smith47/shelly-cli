@@ -12,8 +12,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+	Device  string
+}
+
 // NewCommand creates the device status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "status <device>",
 		Aliases: []string{"st"},
@@ -27,22 +35,23 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0])
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, deviceName string) error {
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+func run(ctx context.Context, opts *Options) error {
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Resolve device to check if it's plugin-managed
-	device, err := svc.ResolveWithGeneration(ctx, deviceName)
+	device, err := svc.ResolveWithGeneration(ctx, opts.Device)
 	if err != nil {
 		return err
 	}
@@ -60,7 +69,7 @@ func run(ctx context.Context, f *cmdutil.Factory, deviceName string) error {
 	}
 
 	// Standard Shelly device status
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, deviceName,
+	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Device,
 		"Getting device status...",
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.DeviceStatus, error) {
 			return svc.DeviceStatus(ctx, device)

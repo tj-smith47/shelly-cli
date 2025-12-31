@@ -12,12 +12,20 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory       *cmdutil.Factory
+	ComponentID   int
+	ComponentType string
+	Device        string
+}
+
 // NewCommand creates the energy status command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var (
-		componentID   int
-		componentType string
-	)
+	opts := &Options{
+		Factory:       f,
+		ComponentType: shelly.ComponentTypeAuto,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "status <device> [id]",
@@ -41,41 +49,42 @@ per-phase data and totals.`,
 		Aliases: []string{"st"},
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			device := args[0]
+			opts.Device = args[0]
 			if len(args) == 2 {
-				_, err := fmt.Sscanf(args[1], "%d", &componentID)
+				_, err := fmt.Sscanf(args[1], "%d", &opts.ComponentID)
 				if err != nil {
 					return fmt.Errorf("invalid component ID: %w", err)
 				}
 			}
-			return run(cmd.Context(), f, device, componentID, componentType)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&componentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
+	cmd.Flags().StringVar(&opts.ComponentType, "type", shelly.ComponentTypeAuto, "Component type (auto, em, em1)")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, id int, componentType string) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Auto-detect type if not specified
+	componentType := opts.ComponentType
 	if componentType == shelly.ComponentTypeAuto {
-		componentType = svc.DetectEnergyComponentByID(ctx, ios, device, id)
+		componentType = svc.DetectEnergyComponentByID(ctx, ios, opts.Device, opts.ComponentID)
 	}
 
 	switch componentType {
 	case shelly.ComponentTypeEM:
-		status, err := svc.GetEMStatus(ctx, device, id)
+		status, err := svc.GetEMStatus(ctx, opts.Device, opts.ComponentID)
 		if err != nil {
 			return fmt.Errorf("failed to get EM status: %w", err)
 		}
 		term.DisplayEMStatus(ios, status)
 		return nil
 	case shelly.ComponentTypeEM1:
-		status, err := svc.GetEM1Status(ctx, device, id)
+		status, err := svc.GetEM1Status(ctx, opts.Device, opts.ComponentID)
 		if err != nil {
 			return fmt.Errorf("failed to get EM1 status: %w", err)
 		}

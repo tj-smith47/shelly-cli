@@ -3,9 +3,12 @@ package shelly
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // InputInfo holds input information for list operations.
@@ -14,6 +17,22 @@ type InputInfo struct {
 	Name  string
 	Type  string
 	State bool
+}
+
+// ListHeaders returns the column headers for the table.
+func (i InputInfo) ListHeaders() []string {
+	return []string{"ID", "Name", "Type", "State"}
+}
+
+// ListRow returns the formatted row values for the table.
+func (i InputInfo) ListRow() []string {
+	name := i.Name
+	if name == "" {
+		name = theme.Dim().Render("-")
+	}
+
+	state := output.RenderActive(i.State, output.CaseLower, theme.FalseError)
+	return []string{fmt.Sprintf("%d", i.ID), name, i.Type, state}
 }
 
 // InputStatus gets the status of an input component.

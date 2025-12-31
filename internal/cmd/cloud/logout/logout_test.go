@@ -495,7 +495,8 @@ func TestRun_NotLoggedIn(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -514,7 +515,8 @@ func TestRun_LoggedInWithEmail(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -533,7 +535,8 @@ func TestRun_LoggedInWithoutEmail(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -653,7 +656,8 @@ func TestRun_PreservesOtherConfig(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory)
+	opts := &Options{Factory: tf.Factory}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -707,7 +711,8 @@ func TestRun_WithIOStreams(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 
 	// Should not error (says not logged in with isolated config)
 	if err != nil {
@@ -732,7 +737,8 @@ func TestRun_ProducesOutput(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(f)
+	opts := &Options{Factory: f}
+	err := run(opts)
 	if err != nil {
 		t.Logf("run error: %v", err)
 	}

@@ -575,7 +575,8 @@ func TestRun_DefaultTimeoutUsedWhenZero(t *testing.T) {
 	t.Cleanup(func() { newBLEDiscoverer = oldFactory })
 
 	// Test that the run function handles zero timeout by using default
-	err := run(t.Context(), tf.Factory, 0, false, "")
+	opts := &Options{Factory: tf.Factory, Timeout: 0, IncludeBTHome: false, FilterPrefix: ""}
+	err := run(t.Context(), opts)
 	if err != nil {
 		t.Errorf("expected nil error, got: %v", err)
 	}
@@ -595,7 +596,8 @@ func TestRun_EmptyFilterPrefixNotSet(t *testing.T) {
 	}
 	t.Cleanup(func() { newBLEDiscoverer = oldFactory })
 
-	err := run(t.Context(), tf.Factory, DefaultTimeout, false, "")
+	opts := &Options{Factory: tf.Factory, Timeout: DefaultTimeout, IncludeBTHome: false, FilterPrefix: ""}
+	err := run(t.Context(), opts)
 	if err != nil {
 		t.Errorf("expected nil error, got: %v", err)
 	}

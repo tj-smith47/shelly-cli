@@ -3,7 +3,6 @@ package importcmd
 import (
 	"bytes"
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -192,13 +191,14 @@ func TestRun_Success(t *testing.T) {
   st: "status kitchen"
   rb: "device reboot"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, aliasFile, false)
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -216,7 +216,8 @@ func TestRun_FileNotFound(t *testing.T) {
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, "/nonexistent/path/to/aliases.yaml", false)
+	opts := &Options{Factory: tf.Factory, Filename: "/nonexistent/path/to/aliases.yaml", Merge: false}
+	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error for nonexistent file")
 	}
@@ -233,13 +234,14 @@ func TestRun_InvalidYAML(t *testing.T) {
 	// Create an invalid YAML file
 	aliasFile := filepath.Join(tmpDir, "invalid.yaml")
 	content := `this is not valid yaml: [unclosed bracket`
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, aliasFile, false)
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false}
+	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error for invalid YAML")
 	}
@@ -259,13 +261,14 @@ func TestRun_ShellAliases(t *testing.T) {
   ls: "!ls -la"
   myecho: "!echo hello"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, aliasFile, false)
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -292,13 +295,14 @@ func TestRun_MergeMode(t *testing.T) {
   st: "status kitchen"
   newcmd: "device info"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, aliasFile, true)
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: true}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -329,14 +333,15 @@ func TestRun_OverwriteMode(t *testing.T) {
 	content := `aliases:
   st: "status kitchen"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
 	tf := factory.NewTestFactory(t)
 
 	// merge=false means overwrite existing
-	err := run(tf.Factory, aliasFile, false)
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -357,13 +362,14 @@ func TestRun_InvalidAliasName(t *testing.T) {
 	content := `aliases:
   help: "some command"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, aliasFile, false)
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false}
+	err := run(opts)
 	if err == nil {
 		t.Fatal("expected error for reserved alias name")
 	}
@@ -380,13 +386,14 @@ func TestRun_EmptyFile(t *testing.T) {
 	// Create an empty YAML file (no aliases section)
 	aliasFile := filepath.Join(tmpDir, "empty.yaml")
 	content := `aliases:`
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
 	tf := factory.NewTestFactory(t)
 
-	err := run(tf.Factory, aliasFile, false)
+	opts := &Options{Factory: tf.Factory, Filename: aliasFile, Merge: false}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("run() error = %v, want nil", err)
 	}
@@ -407,7 +414,7 @@ func TestExecute_Success(t *testing.T) {
 	content := `aliases:
   st: "status kitchen"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -443,7 +450,7 @@ func TestExecute_WithMergeFlag(t *testing.T) {
 	content := `aliases:
   newcmd: "device info"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -479,7 +486,7 @@ func TestExecute_ShortMergeFlag(t *testing.T) {
 	content := `aliases:
   newcmd: "device info"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -567,7 +574,7 @@ func TestExecute_MergeWithExisting(t *testing.T) {
   existing: "new command for existing"
   brandnew: "brand new command"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -611,7 +618,7 @@ func TestExecute_MultipleAliases(t *testing.T) {
   ls: "device list"
   info: "device info"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -650,7 +657,7 @@ func TestExecute_MixedAliases(t *testing.T) {
   rb: "device reboot"
   myecho: "!echo hello world"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -686,7 +693,7 @@ func TestExecute_AliasWithWhitespace(t *testing.T) {
 	content := `aliases:
   "my alias": "status kitchen"
 `
-	if err := os.WriteFile(aliasFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 

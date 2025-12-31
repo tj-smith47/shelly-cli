@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
 
@@ -288,7 +289,7 @@ func (m *Manager) IsAlias(name string) bool {
 // If merge is true, existing aliases are not overwritten.
 func (m *Manager) ImportAliases(filename string, merge bool) (imported, skipped int, err error) {
 	//nolint:gosec // G304: filename is user-provided intentionally (import command)
-	data, err := os.ReadFile(filename)
+	data, err := afero.ReadFile(m.Fs(), filename)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -367,7 +368,7 @@ func (m *Manager) ExportAliases(filename string) (string, error) {
 		return string(data), nil
 	}
 
-	if err := os.WriteFile(filename, data, 0o600); err != nil {
+	if err := afero.WriteFile(m.Fs(), filename, data, 0o600); err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}
 

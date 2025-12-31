@@ -202,7 +202,12 @@ func TestRun_InvalidPrefix(t *testing.T) {
 	ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(context.Background(), f, invalidFile, false)
+	opts := &Options{
+		Factory: f,
+		Source:  invalidFile,
+		Force:   false,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for file without shelly- prefix")
 	}
@@ -220,7 +225,12 @@ func TestRun_NonExistentLocalFile(t *testing.T) {
 	ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	err := run(context.Background(), f, "/nonexistent/path/shelly-myext", false)
+	opts := &Options{
+		Factory: f,
+		Source:  "/nonexistent/path/shelly-myext",
+		Force:   false,
+	}
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for non-existent file")
 	}
@@ -244,9 +254,14 @@ func TestRun_ValidLocalFile(t *testing.T) {
 	ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
+	opts := &Options{
+		Factory: f,
+		Source:  validFile,
+		Force:   false,
+	}
 	// This will try to install to the real plugins dir
 	// It should succeed or fail with a registry-related error
-	err := run(context.Background(), f, validFile, false)
+	err := run(context.Background(), opts)
 
 	// We accept either success or an error that's not about the prefix
 	if err != nil && strings.Contains(err.Error(), "shelly-") && strings.Contains(err.Error(), "prefix") {
@@ -283,8 +298,13 @@ func TestRun_GitHubSourceParsing(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100)
 			defer cancel()
 
+			opts := &Options{
+				Factory: f,
+				Source:  tt.source,
+				Force:   false,
+			}
 			// This should fail due to network/auth, but should parse the source
-			err := run(ctx, f, tt.source, false)
+			err := run(ctx, opts)
 			if err == nil {
 				t.Error("expected error (network/timeout)")
 			}
@@ -325,8 +345,13 @@ func TestRun_URLSourceParsing(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100)
 			defer cancel()
 
+			opts := &Options{
+				Factory: f,
+				Source:  tt.source,
+				Force:   false,
+			}
 			// This should fail due to network/timeout, but should parse the source
-			err := run(ctx, f, tt.source, false)
+			err := run(ctx, opts)
 			if err == nil {
 				t.Error("expected error (network/timeout)")
 			}
@@ -389,10 +414,16 @@ func TestRun_ForceFlag(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	// First install - ignore error as we're testing force flag behavior
-	_ = run(context.Background(), f, validFile, false) //nolint:errcheck // intentionally ignored for setup
+	opts := &Options{
+		Factory: f,
+		Source:  validFile,
+		Force:   false,
+	}
+	_ = run(context.Background(), opts) //nolint:errcheck // intentionally ignored for setup
 
 	// Second install with force=true should not fail due to "already installed"
-	err := run(context.Background(), f, validFile, true)
+	opts.Force = true
+	err := run(context.Background(), opts)
 
 	// If we get an "already installed" error even with force=true, that's a bug
 	if err != nil && strings.Contains(err.Error(), "already installed") {

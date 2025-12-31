@@ -665,8 +665,14 @@ func TestRun_PMSuccess(t *testing.T) {
 	// Create a test context
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "nonexistent-pm",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypePM,
+	}
 	// Call run directly with known PM type to cover PM success path
-	err := run(ctx, tf.Factory, "nonexistent-pm", 0, shelly.ComponentTypePM)
+	err := run(ctx, opts)
 
 	// We expect an error because the device doesn't exist in mock
 	if err == nil {
@@ -685,8 +691,14 @@ func TestRun_PM1Success(t *testing.T) {
 	// Create a test context
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "nonexistent-pm1",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypePM1,
+	}
 	// Call run directly with known PM1 type to cover PM1 success path
-	err := run(ctx, tf.Factory, "nonexistent-pm1", 0, shelly.ComponentTypePM1)
+	err := run(ctx, opts)
 
 	// We expect an error because the device doesn't exist in mock
 	if err == nil {
@@ -703,8 +715,14 @@ func TestRun_AutoDetectToPM(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeAuto,
+	}
 	// Call run with auto-detect type
-	err := run(ctx, tf.Factory, "test-device", 0, shelly.ComponentTypeAuto)
+	err := run(ctx, opts)
 
 	// We expect an error because the device doesn't exist
 	if err == nil {
@@ -799,9 +817,15 @@ func TestRun_DirectCall_PM(t *testing.T) {
 
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       f,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypePM,
+	}
 	// Directly test the run function with PM type
 	// This should hit the GetPMStatus path
-	err := run(ctx, f, "test-device", 0, shelly.ComponentTypePM)
+	err := run(ctx, opts)
 
 	// We expect an error because the device doesn't exist
 	if err == nil {
@@ -819,9 +843,15 @@ func TestRun_DirectCall_PM1(t *testing.T) {
 
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       f,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypePM1,
+	}
 	// Directly test the run function with PM1 type
 	// This should hit the GetPM1Status path
-	err := run(ctx, f, "test-device", 0, shelly.ComponentTypePM1)
+	err := run(ctx, opts)
 
 	// We expect an error because the device doesn't exist
 	if err == nil {
@@ -839,9 +869,15 @@ func TestRun_DirectCall_Auto(t *testing.T) {
 
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       f,
+		Device:        "test-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeAuto,
+	}
 	// Directly test the run function with auto-detect type
 	// This should go to the default case (no power meter components found)
-	err := run(ctx, f, "test-device", 0, shelly.ComponentTypeAuto)
+	err := run(ctx, opts)
 
 	// We expect an error because no power meter components found
 	if err == nil {
@@ -1044,8 +1080,14 @@ func TestRun_WithExplicitPM_CallsGetPMStatus(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "nonexistent",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypePM,
+	}
 	// When we specify PM type explicitly, it should try GetPMStatus
-	err := run(ctx, tf.Factory, "nonexistent", 0, shelly.ComponentTypePM)
+	err := run(ctx, opts)
 
 	// Expect error from trying to get PM status on nonexistent device
 	if err == nil {
@@ -1062,8 +1104,14 @@ func TestRun_WithExplicitPM1_CallsGetPM1Status(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "nonexistent",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypePM1,
+	}
 	// When we specify PM1 type explicitly, it should try GetPM1Status
-	err := run(ctx, tf.Factory, "nonexistent", 0, shelly.ComponentTypePM1)
+	err := run(ctx, opts)
 
 	// Expect error from trying to get PM1 status on nonexistent device
 	if err == nil {
@@ -1080,8 +1128,14 @@ func TestRun_WithAuto_ReturnsNoPowerMeterError(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	ctx := context.Background()
 
+	opts := &Options{
+		Factory:       tf.Factory,
+		Device:        "nonexistent-device",
+		ComponentID:   0,
+		ComponentType: shelly.ComponentTypeAuto,
+	}
 	// When we use auto-detect with a device that has no power meters
-	err := run(ctx, tf.Factory, "nonexistent-device", 0, shelly.ComponentTypeAuto)
+	err := run(ctx, opts)
 
 	// Should get "no power meter components found" error
 	if err == nil {

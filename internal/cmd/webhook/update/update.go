@@ -12,16 +12,22 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
-var (
-	eventFlag   string
-	urlFlag     []string
-	nameFlag    string
-	enableFlag  bool
-	disableFlag bool
-)
+// Options holds the command options.
+type Options struct {
+	Factory   *cmdutil.Factory
+	Device    string
+	Disable   bool
+	Enable    bool
+	Event     string
+	Name      string
+	URLs      []string
+	WebhookID int
+}
 
 // NewCommand creates the webhook update command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "update <device> <webhook-id>",
 		Aliases: []string{"edit", "modify"},
@@ -44,50 +50,52 @@ change the webhook's active state.`,
 			if err != nil {
 				return fmt.Errorf("invalid webhook ID: %s", args[1])
 			}
-			return run(cmd.Context(), f, args[0], webhookID)
+			opts.Device = args[0]
+			opts.WebhookID = webhookID
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&eventFlag, "event", "", "Event type")
-	cmd.Flags().StringArrayVar(&urlFlag, "url", nil, "Webhook URL (replaces all URLs)")
-	cmd.Flags().StringVar(&nameFlag, "name", "", "Webhook name")
-	cmd.Flags().BoolVar(&enableFlag, "enable", false, "Enable webhook")
-	cmd.Flags().BoolVar(&disableFlag, "disable", false, "Disable webhook")
+	cmd.Flags().StringVar(&opts.Event, "event", "", "Event type")
+	cmd.Flags().StringArrayVar(&opts.URLs, "url", nil, "Webhook URL (replaces all URLs)")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Webhook name")
+	cmd.Flags().BoolVar(&opts.Enable, "enable", false, "Enable webhook")
+	cmd.Flags().BoolVar(&opts.Disable, "disable", false, "Disable webhook")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, webhookID int) error {
+func run(ctx context.Context, opts *Options) error {
 	// Validate - need at least one option
-	if eventFlag == "" && len(urlFlag) == 0 && nameFlag == "" && !enableFlag && !disableFlag {
+	if opts.Event == "" && len(opts.URLs) == 0 && opts.Name == "" && !opts.Enable && !opts.Disable {
 		return fmt.Errorf("specify at least one option to update (--event, --url, --name, --enable, --disable)")
 	}
 
-	ctx, cancel := f.WithDefaultTimeout(ctx)
+	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
 	// Build update params
 	params := shelly.UpdateWebhookParams{
-		Event: eventFlag,
-		URLs:  urlFlag,
-		Name:  nameFlag,
+		Event: opts.Event,
+		URLs:  opts.URLs,
+		Name:  opts.Name,
 	}
-	if enableFlag {
+	if opts.Enable {
 		t := true
 		params.Enable = &t
-	} else if disableFlag {
+	} else if opts.Disable {
 		f := false
 		params.Enable = &f
 	}
 
 	return cmdutil.RunWithSpinner(ctx, ios, "Updating webhook...", func(ctx context.Context) error {
-		if err := svc.UpdateWebhook(ctx, device, webhookID, params); err != nil {
+		if err := svc.UpdateWebhook(ctx, opts.Device, opts.WebhookID, params); err != nil {
 			return fmt.Errorf("failed to update webhook: %w", err)
 		}
-		ios.Success("Webhook %d updated on %s", webhookID, device)
+		ios.Success("Webhook %d updated on %s", opts.WebhookID, opts.Device)
 		return nil
 	})
 }

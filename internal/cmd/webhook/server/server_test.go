@@ -373,6 +373,7 @@ func TestRun_GracefulShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	opts := &Options{
+		Factory:   tf.Factory,
 		Port:      0, // Use port 0 to let the OS pick a free port
 		Interface: "127.0.0.1",
 		LogJSON:   false,
@@ -381,7 +382,7 @@ func TestRun_GracefulShutdown(t *testing.T) {
 	// Start the server in a goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, tf.Factory, opts)
+		errCh <- run(ctx, opts)
 	}()
 
 	// Give the server time to start, then cancel
@@ -443,6 +444,7 @@ func TestRun_WithAutoConfigDevices(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	opts := &Options{
+		Factory:    tf.Factory,
 		Port:       0, // Use port 0 to let the OS pick a free port
 		Interface:  "127.0.0.1",
 		LogJSON:    false,
@@ -453,7 +455,7 @@ func TestRun_WithAutoConfigDevices(t *testing.T) {
 	// Start the server in a goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, tf.Factory, opts)
+		errCh <- run(ctx, opts)
 	}()
 
 	// Give the server time to start and configure, then cancel
@@ -484,6 +486,7 @@ func TestRun_WithLogJSONEnabled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	opts := &Options{
+		Factory:   tf.Factory,
 		Port:      0,
 		Interface: "127.0.0.1",
 		LogJSON:   true,
@@ -492,7 +495,7 @@ func TestRun_WithLogJSONEnabled(t *testing.T) {
 	// Start the server in a goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, tf.Factory, opts)
+		errCh <- run(ctx, opts)
 	}()
 
 	// Give the server time to start, then cancel

@@ -166,11 +166,6 @@ func TestNewCommand_MissingPassword(t *testing.T) {
 	ios := iostreams.Test(nil, out, errOut)
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	// Reset package-level flags
-	userFlag = "admin"
-	passwordFlag = ""
-	realmFlag = ""
-
 	cmd := NewCommand(f)
 	cmd.SetArgs([]string{"device"}) // no password flag
 	cmd.SetOut(out)

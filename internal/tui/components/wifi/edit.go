@@ -103,7 +103,7 @@ func DefaultEditStyles() EditStyles {
 			Foreground(colors.Highlight).
 			MarginBottom(1),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted).
+			Foreground(colors.Text).
 			Width(12),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),

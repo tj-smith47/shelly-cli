@@ -74,7 +74,7 @@ func DefaultHealthStyles() HealthStyles {
 		Offline: lipgloss.NewStyle().
 			Foreground(colors.Offline),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(colors.Text),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text).
 			Bold(true),

@@ -14,13 +14,16 @@ import (
 
 // Options holds command options.
 type Options struct {
+	Factory *cmdutil.Factory
 	Count   int
+	Device  string
 	Timeout time.Duration
 }
 
 // NewCommand creates the device ping command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{
+		Factory: f,
 		Count:   1,
 		Timeout: 5 * time.Second,
 	}
@@ -49,7 +52,8 @@ Use -c to send multiple pings and show statistics.`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd.Context(), f, args[0], opts)
+			opts.Device = args[0]
+			return run(cmd.Context(), opts)
 		},
 	}
 
@@ -59,11 +63,11 @@ Use -c to send multiple pings and show statistics.`,
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) error {
-	ios := f.IOStreams()
-	svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
+	svc := opts.Factory.ShellyService()
 
-	ios.Info("PING %s", device)
+	ios.Info("PING %s", opts.Device)
 
 	var totalTime time.Duration
 	successCount := 0
@@ -72,7 +76,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 		pingCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 
 		start := time.Now()
-		info, err := svc.DevicePing(pingCtx, device)
+		info, err := svc.DevicePing(pingCtx, opts.Device)
 		elapsed := time.Since(start)
 		cancel()
 
@@ -83,14 +87,14 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 			totalTime += elapsed
 			if opts.Count == 1 {
 				// Single ping - show device info
-				ios.Success("Reply from %s: time=%v", device, elapsed.Round(time.Millisecond))
+				ios.Success("Reply from %s: time=%v", opts.Device, elapsed.Round(time.Millisecond))
 				ios.Info("  Model: %s (Gen%d)", info.Model, info.Generation)
 				ios.Info("  App: %s", info.App)
 				ios.Info("  Firmware: %s", info.Firmware)
 				ios.Info("  MAC: %s", info.MAC)
 			} else {
 				// Multiple pings - show sequence number
-				ios.Success("Reply from %s: seq=%d time=%v", device, i+1, elapsed.Round(time.Millisecond))
+				ios.Success("Reply from %s: seq=%d time=%v", opts.Device, i+1, elapsed.Round(time.Millisecond))
 			}
 		}
 
@@ -103,7 +107,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	// Show statistics for multiple pings
 	if opts.Count > 1 {
 		ios.Println("")
-		ios.Printf("--- %s ping statistics ---\n", device)
+		ios.Printf("--- %s ping statistics ---\n", opts.Device)
 		ios.Printf("%d packets transmitted, %d received, %.0f%% packet loss\n",
 			opts.Count, successCount, float64(opts.Count-successCount)/float64(opts.Count)*100)
 		if successCount > 0 {
@@ -113,7 +117,7 @@ func run(ctx context.Context, f *cmdutil.Factory, device string, opts *Options) 
 	}
 
 	if successCount == 0 {
-		return fmt.Errorf("device %s is unreachable", device)
+		return fmt.Errorf("device %s is unreachable", opts.Device)
 	}
 
 	return nil

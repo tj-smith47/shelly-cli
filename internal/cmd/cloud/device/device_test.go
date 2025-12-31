@@ -254,7 +254,8 @@ func TestRun_NotLoggedIn(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	ctx := context.Background()
-	err := run(ctx, f, "test-device")
+	opts := &Options{Factory: f, DeviceID: "test-device"}
+	err := run(ctx, opts)
 
 	if err == nil {
 		t.Error("expected error when not logged in")
@@ -293,7 +294,8 @@ func TestRun_NotLoggedIn_ShowsLoginHint(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	ctx := context.Background()
-	err := run(ctx, f, "test-device")
+	opts := &Options{Factory: f, DeviceID: "test-device"}
+	err := run(ctx, opts)
 	if err != nil {
 		t.Logf("expected error: %v", err)
 	}
@@ -338,7 +340,8 @@ func TestRun_WithCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err := run(ctx, f, "test-device")
+	opts := &Options{Factory: f, DeviceID: "test-device"}
+	err := run(ctx, opts)
 
 	// Should fail due to cancelled context or cloud API error
 	if err == nil {
@@ -374,7 +377,8 @@ func TestRun_WithTimeout(t *testing.T) {
 	// Allow timeout to trigger
 	time.Sleep(1 * time.Millisecond)
 
-	err := run(ctx, f, "test-device")
+	opts := &Options{Factory: f, DeviceID: "test-device"}
+	err := run(ctx, opts)
 
 	// Should fail due to timeout or API error
 	if err == nil {
@@ -590,7 +594,8 @@ func TestRun_WithMockCloudServer(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	ctx := context.Background()
-	err := run(ctx, f, "test-device-123")
+	opts := &Options{Factory: f, DeviceID: "test-device-123"}
+	err := run(ctx, opts)
 
 	// The cloud client validates JWT signatures, so this will likely fail.
 	// But we exercise the code path up to the API call.
@@ -822,7 +827,8 @@ func TestRun_OutputGoesToStreams(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	ctx := context.Background()
-	err := run(ctx, f, "test-device")
+	opts := &Options{Factory: f, DeviceID: "test-device"}
+	err := run(ctx, opts)
 	if err != nil {
 		t.Logf("expected error: %v", err)
 	}

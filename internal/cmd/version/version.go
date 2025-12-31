@@ -1,4 +1,4 @@
-// Package versioncmd provides the version command for displaying CLI version info.
+// Package version provides the version command for displaying CLI version info.
 package version
 
 import (
@@ -12,9 +12,17 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory     *cmdutil.Factory
+	CheckUpdate bool
+	JSON        bool
+	Short       bool
+}
+
 // NewCommand creates the version command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var short, jsonOut, checkUpdate bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "version",
@@ -38,30 +46,30 @@ Use --check to also check for available updates.`,
   # Check for updates
   shelly version --check`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), f, short, jsonOut, checkUpdate)
+			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&short, "short", "s", false, "Print only the version number")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output version info as JSON")
-	cmd.Flags().BoolVarP(&checkUpdate, "check", "c", false, "Check for available updates")
+	cmd.Flags().BoolVarP(&opts.Short, "short", "s", false, "Print only the version number")
+	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output version info as JSON")
+	cmd.Flags().BoolVarP(&opts.CheckUpdate, "check", "c", false, "Check for available updates")
 
 	return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, short, jsonOut, checkUpdate bool) error {
-	ios := f.IOStreams()
+func run(ctx context.Context, opts *Options) error {
+	ios := opts.Factory.IOStreams()
 	info := version.Get()
 	checker := func(c context.Context) (*version.UpdateResult, error) {
 		return github.CheckForUpdates(c, ios, info.Version)
 	}
 
-	if short {
+	if opts.Short {
 		ios.Printf("%s\n", info.Version)
 		return nil
 	}
-	if jsonOut {
-		if err := version.WriteJSONOutput(ctx, ios.Out, info, checkUpdate, github.ReleaseFetcher(ios), github.IsNewerVersion); err != nil {
+	if opts.JSON {
+		if err := version.WriteJSONOutput(ctx, ios.Out, info, opts.CheckUpdate, github.ReleaseFetcher(ios), github.IsNewerVersion); err != nil {
 			ios.DebugErr("encoding JSON", err)
 		}
 		return nil
@@ -69,7 +77,7 @@ func run(ctx context.Context, f *cmdutil.Factory, short, jsonOut, checkUpdate bo
 
 	term.DisplayVersionInfo(ios, info.Version, info.Commit, info.Date, info.BuiltBy, info.GoVersion, info.OS, info.Arch)
 
-	if checkUpdate {
+	if opts.CheckUpdate {
 		term.RunUpdateCheck(ctx, ios, checker)
 	} else if cached := version.ReadCachedVersion(); cached != "" && github.IsNewerVersion(info.Version, cached) {
 		term.DisplayUpdateAvailable(ios, info.Version, cached)

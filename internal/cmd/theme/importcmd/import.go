@@ -13,9 +13,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
+// Options holds the options for the import command.
+type Options struct {
+	Factory *cmdutil.Factory
+	Apply   bool
+	File    string
+}
+
 // NewCommand creates the theme import command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	var apply bool
+	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "import <file>",
@@ -30,21 +37,22 @@ Supports importing theme files that reference any of the 280+ built-in themes.`,
   # Just validate the file
   shelly theme import mytheme.yaml`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(f, args[0], apply)
+		RunE: func(_ *cobra.Command, args []string) error {
+			opts.File = args[0]
+			return run(opts)
 		},
 	}
 
-	cmd.Flags().BoolVar(&apply, "apply", false, "Apply the imported theme")
+	cmd.Flags().BoolVar(&opts.Apply, "apply", false, "Apply the imported theme")
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, file string, apply bool) error {
-	ios := f.IOStreams()
+func run(opts *Options) error {
+	ios := opts.Factory.IOStreams()
 
 	// Read the file
-	data, err := os.ReadFile(file) //nolint:gosec // G304: file path is user-provided, expected behavior
+	data, err := os.ReadFile(opts.File)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
@@ -75,7 +83,7 @@ func run(f *cmdutil.Factory, file string, apply bool) error {
 		}
 	}
 
-	if apply {
+	if opts.Apply {
 		return term.ApplyImportedTheme(ios, themeName, imported.Colors)
 	}
 

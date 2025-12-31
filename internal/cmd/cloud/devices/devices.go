@@ -14,8 +14,15 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
+// Options holds the command options.
+type Options struct {
+	Factory *cmdutil.Factory
+}
+
 // NewCommand creates the cloud devices command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+	opts := &Options{Factory: f}
+
 	cmd := &cobra.Command{
 		Use:     "devices",
 		Aliases: []string{"ls", "list"},
@@ -29,18 +36,18 @@ Shows device ID, name, model, firmware version, and online status.`,
   # Output as JSON
   shelly cloud devices -o json`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(f, cmd.Context())
+			return run(cmd.Context(), opts)
 		},
 	}
 
 	return cmd
 }
 
-func run(f *cmdutil.Factory, ctx context.Context) error {
+func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout*2) // Longer timeout for cloud
 	defer cancel()
 
-	ios := f.IOStreams()
+	ios := opts.Factory.IOStreams()
 
 	// Check if logged in
 	cfg := config.Get()

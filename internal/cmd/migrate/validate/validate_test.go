@@ -211,7 +211,8 @@ func TestRun_ValidBackup(t *testing.T) {
 	// Create valid backup file
 	validFile := createValidBackupFile(t, tmpDir, "valid.json")
 
-	err := run(f, validFile)
+	opts := &Options{Factory: f, FilePath: validFile}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -246,7 +247,8 @@ func TestRun_ValidBackupWithScripts(t *testing.T) {
 	// Create backup with scripts
 	scriptsFile := createBackupWithScripts(t, tmpDir, "scripts.json")
 
-	err := run(f, scriptsFile)
+	opts := &Options{Factory: f, FilePath: scriptsFile}
+	err := run(opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -266,7 +268,8 @@ func TestRun_NonExistentFile(t *testing.T) {
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
-	err := run(f, "/nonexistent/backup.json")
+	opts := &Options{Factory: f, FilePath: "/nonexistent/backup.json"}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for non-existent file")
 	}
@@ -289,7 +292,8 @@ func TestRun_InvalidJSON(t *testing.T) {
 	// Create invalid JSON file
 	invalidFile := createInvalidBackupFile(t, tmpDir, "invalid.json", "{ not valid json }")
 
-	err := run(f, invalidFile)
+	opts := &Options{Factory: f, FilePath: invalidFile}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -308,7 +312,8 @@ func TestRun_MissingVersion(t *testing.T) {
 	missingVersionFile := createInvalidBackupFile(t, tmpDir, "missing-version.json",
 		`{"device_info": {"id": "test"}, "config": {}}`)
 
-	err := run(f, missingVersionFile)
+	opts := &Options{Factory: f, FilePath: missingVersionFile}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for missing version")
 	}
@@ -327,7 +332,8 @@ func TestRun_MissingDeviceInfo(t *testing.T) {
 	missingInfoFile := createInvalidBackupFile(t, tmpDir, "missing-info.json",
 		`{"version": 1, "config": {}}`)
 
-	err := run(f, missingInfoFile)
+	opts := &Options{Factory: f, FilePath: missingInfoFile}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for missing device info")
 	}
@@ -346,7 +352,8 @@ func TestRun_MissingConfig(t *testing.T) {
 	missingConfigFile := createInvalidBackupFile(t, tmpDir, "missing-config.json",
 		`{"version": 1, "device_info": {"id": "test"}}`)
 
-	err := run(f, missingConfigFile)
+	opts := &Options{Factory: f, FilePath: missingConfigFile}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for missing config")
 	}
@@ -364,7 +371,8 @@ func TestRun_EmptyFile(t *testing.T) {
 	// Create empty file
 	emptyFile := createInvalidBackupFile(t, tmpDir, "empty.json", "")
 
-	err := run(f, emptyFile)
+	opts := &Options{Factory: f, FilePath: emptyFile}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for empty file")
 	}
@@ -385,7 +393,8 @@ func TestRun_FileIsDirectory(t *testing.T) {
 		t.Fatalf("failed to create directory: %v", err)
 	}
 
-	err := run(f, dirPath)
+	opts := &Options{Factory: f, FilePath: dirPath}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error when path is a directory")
 	}
@@ -421,7 +430,8 @@ func TestRun_OutputShowsConfigKeys(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	err = run(f, configFile)
+	opts := &Options{Factory: f, FilePath: configFile}
+	err = run(opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -463,7 +473,8 @@ func TestRun_OutputShowsVersion(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	err = run(f, versionFile)
+	opts := &Options{Factory: f, FilePath: versionFile}
+	err = run(opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -501,7 +512,8 @@ func TestRun_PermissionDenied(t *testing.T) {
 		}
 	})
 
-	err := run(f, noReadFile)
+	opts := &Options{Factory: f, FilePath: noReadFile}
+	err := run(opts)
 	if err == nil {
 		t.Error("expected error for permission denied")
 	}
@@ -538,7 +550,8 @@ func TestRun_OutputShowsFirmware(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	err = run(f, fwFile)
+	opts := &Options{Factory: f, FilePath: fwFile}
+	err = run(opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
