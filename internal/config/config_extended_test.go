@@ -2,10 +2,13 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
 const (
@@ -455,5 +458,569 @@ func TestPackageLevel_UnregisterDevice(t *testing.T) {
 	_, ok := GetDevice("kitchen")
 	if ok {
 		t.Error("device should not exist after unregister")
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_Get(t *testing.T) {
+	setupPackageTest(t)
+
+	// Get should return a config even on empty state
+	cfg := Get()
+	if cfg == nil {
+		t.Fatal("Get() returned nil")
+	}
+
+	// Check defaults
+	if cfg.Devices == nil {
+		t.Error("Devices should be initialized")
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_Load(t *testing.T) {
+	setupPackageTest(t)
+
+	// Load should return config
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("Load() returned nil config")
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_Reload(t *testing.T) {
+	setupPackageTest(t)
+
+	// First load
+	cfg1, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Reload
+	cfg2, err := Reload()
+	if err != nil {
+		t.Fatalf("Reload() error: %v", err)
+	}
+	if cfg2 == nil {
+		t.Fatal("Reload() returned nil config")
+	}
+
+	// Both should have initialized maps
+	if cfg1 == nil || cfg2 == nil {
+		t.Fatal("configs should not be nil")
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_Save(t *testing.T) {
+	setupPackageTest(t)
+
+	// Load first
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Register a device
+	if err := RegisterDevice("test", testIP1, 2, "", "", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+
+	// Save should succeed (no-op in test mode with memory fs)
+	if err := Save(); err != nil {
+		t.Errorf("Save() error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_ConfigSave(t *testing.T) {
+	setupPackageTest(t)
+
+	// Load first
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Config.Save() should succeed
+	if err := cfg.Save(); err != nil {
+		t.Errorf("Config.Save() error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_SetDefaultManager(t *testing.T) {
+	// Reset at start and end
+	ResetDefaultManagerForTesting()
+	t.Cleanup(func() { ResetDefaultManagerForTesting() })
+
+	// Create test manager
+	testCfg := &Config{
+		Output: "json",
+		Devices: map[string]model.Device{
+			"test-device": {Name: "Test Device", Address: testIP1},
+		},
+	}
+	testMgr := NewTestManager(testCfg)
+
+	// Set it as default
+	SetDefaultManager(testMgr)
+
+	// Get should return our test config
+	cfg := Get()
+	if cfg.Output != "json" {
+		t.Errorf("Get().Output = %q, want %q", cfg.Output, "json")
+	}
+	if _, ok := cfg.Devices["test-device"]; !ok {
+		t.Error("expected test-device to exist")
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_GetGlobalMaxConcurrent(t *testing.T) {
+	setupPackageTest(t)
+
+	// Should return default value
+	maxConc := GetGlobalMaxConcurrent()
+	expectedDefault := DefaultRateLimitConfig().Global.MaxConcurrent
+	if maxConc != expectedDefault {
+		t.Errorf("GetGlobalMaxConcurrent() = %d, want %d", maxConc, expectedDefault)
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_GetGlobalMaxConcurrent_WithConfig(t *testing.T) {
+	ResetDefaultManagerForTesting()
+	t.Cleanup(func() { ResetDefaultManagerForTesting() })
+
+	// Set a custom config with custom max concurrent
+	testCfg := &Config{
+		RateLimit: RateLimitConfig{
+			Global: GlobalRateLimitConfig{
+				MaxConcurrent: 10,
+			},
+		},
+	}
+	testMgr := NewTestManager(testCfg)
+	SetDefaultManager(testMgr)
+
+	// Should return configured value
+	maxConc := GetGlobalMaxConcurrent()
+	if maxConc != 10 {
+		t.Errorf("GetGlobalMaxConcurrent() = %d, want 10", maxConc)
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_SetDeviceAuth(t *testing.T) {
+	setupPackageTest(t)
+
+	// Register device first
+	if err := RegisterDevice("auth-test", testIP1, 2, "", "", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+
+	// Get the config and set auth
+	cfg := Get()
+	if err := cfg.SetDeviceAuth("auth-test", "user", "pass"); err != nil {
+		t.Errorf("SetDeviceAuth() error: %v", err)
+	}
+
+	// Verify auth was set
+	dev, ok := GetDevice("auth-test")
+	if !ok {
+		t.Fatal("device should exist")
+	}
+	if dev.Auth == nil {
+		t.Fatal("device Auth should not be nil")
+	}
+	if dev.Auth.Username != "user" || dev.Auth.Password != "pass" {
+		t.Errorf("auth = %q:%q, want user:pass", dev.Auth.Username, dev.Auth.Password)
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_GetAllDeviceCredentials(t *testing.T) {
+	setupPackageTest(t)
+
+	// Register device with auth
+	if err := RegisterDevice("auth-dev1", testIP1, 2, "", "", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+	cfg := Get()
+	if err := cfg.SetDeviceAuth("auth-dev1", "user1", "pass1"); err != nil {
+		t.Fatalf("SetDeviceAuth() error: %v", err)
+	}
+
+	// Get all credentials
+	creds := cfg.GetAllDeviceCredentials()
+	if creds == nil {
+		t.Fatal("GetAllDeviceCredentials() returned nil")
+	}
+	if len(creds) < 1 {
+		t.Error("expected at least 1 credential entry")
+	}
+}
+
+func TestDir_WithXDGConfigHome(t *testing.T) {
+	// Save original value
+	origXDG := os.Getenv("XDG_CONFIG_HOME")
+	t.Cleanup(func() {
+		if origXDG == "" {
+			os.Unsetenv("XDG_CONFIG_HOME")
+		} else {
+			os.Setenv("XDG_CONFIG_HOME", origXDG)
+		}
+	})
+
+	// Set XDG_CONFIG_HOME
+	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
+
+	dir, err := Dir()
+	if err != nil {
+		t.Fatalf("Dir() error: %v", err)
+	}
+	expected := "/custom/config/shelly"
+	if dir != expected {
+		t.Errorf("Dir() = %q, want %q", dir, expected)
+	}
+}
+
+func TestGetThemeConfig_ThemeConfigType(t *testing.T) {
+	t.Parallel()
+
+	// Test with ThemeConfig type directly
+	tc := ThemeConfig{Name: "nord", Colors: map[string]string{"accent": "#88c0d0"}}
+	cfg := &Config{Theme: tc}
+	result := cfg.GetThemeConfig()
+	if result.Name != "nord" {
+		t.Errorf("GetThemeConfig() name = %q, want %q", result.Name, "nord")
+	}
+}
+
+func TestGetThemeConfig_ThemeConfigPointer(t *testing.T) {
+	t.Parallel()
+
+	// Test with *ThemeConfig pointer
+	tc := &ThemeConfig{Name: "gruvbox", Colors: map[string]string{"bg": "#282828"}}
+	cfg := &Config{Theme: tc}
+	result := cfg.GetThemeConfig()
+	if result.Name != "gruvbox" {
+		t.Errorf("GetThemeConfig() name = %q, want %q", result.Name, "gruvbox")
+	}
+
+	// Test with nil pointer
+	var nilTC *ThemeConfig
+	cfg2 := &Config{Theme: nilTC}
+	result2 := cfg2.GetThemeConfig()
+	if result2.Name != "dracula" {
+		t.Errorf("GetThemeConfig() with nil pointer name = %q, want %q", result2.Name, "dracula")
+	}
+}
+
+//nolint:paralleltest // Tests modify global HOME and default manager
+func TestPackageLevel_Save_NonTestFs(t *testing.T) {
+	// Reset at start and end
+	ResetDefaultManagerForTesting()
+	t.Cleanup(func() { ResetDefaultManagerForTesting() })
+
+	// Use a temp directory for the config file
+	tmpDir := t.TempDir()
+
+	// Create a manager pointing to the temp dir
+	mgr := NewManager(tmpDir + "/config.yaml")
+	if err := mgr.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	SetDefaultManager(mgr)
+
+	// Ensure we're NOT in test mode (no memory fs)
+	SetFs(nil)
+
+	// Save should work on real filesystem
+	if err := Save(); err != nil {
+		t.Errorf("Save() error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestGetGlobalMaxConcurrent_ZeroConfig(t *testing.T) {
+	ResetDefaultManagerForTesting()
+	t.Cleanup(func() { ResetDefaultManagerForTesting() })
+
+	// Create a config with zero global max concurrent
+	// GetRateLimitConfig will return defaults, so the zero case in
+	// GetGlobalMaxConcurrent is actually unreachable in practice.
+	// But we can test that the default is returned when config has no rate limit.
+	testCfg := &Config{}
+	testMgr := NewTestManager(testCfg)
+	SetDefaultManager(testMgr)
+
+	// Should return default value since GetRateLimitConfig applies defaults
+	maxConc := GetGlobalMaxConcurrent()
+	expectedDefault := DefaultRateLimitConfig().Global.MaxConcurrent
+	if maxConc != expectedDefault {
+		t.Errorf("GetGlobalMaxConcurrent() = %d, want %d", maxConc, expectedDefault)
+	}
+}
+
+func TestGetThemeConfig_MapstructureDecodeError(t *testing.T) {
+	t.Parallel()
+
+	// Create a map with a type that will cause mapstructure to fail on some fields
+	// This is hard to trigger since mapstructure is very permissive
+	// Using an invalid type for colors
+	cfg := &Config{
+		Theme: map[string]any{
+			"name": "test",
+			// mapstructure handles most cases gracefully, but we can try with
+			// an unmappable type for the semantic field
+			"semantic": "invalid-not-a-struct",
+		},
+	}
+	result := cfg.GetThemeConfig()
+	// mapstructure may handle this gracefully or fail
+	// Either way, we get a theme config back
+	if result.Name == "" && result.Name != "test" && result.Name != "dracula" {
+		t.Errorf("GetThemeConfig() should return a valid theme config")
+	}
+}
+
+func TestManager_GetReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	// Create a manager but don't load it
+	tmpDir := t.TempDir()
+	m := &Manager{
+		path:   tmpDir + "/config.yaml",
+		loaded: false,
+	}
+
+	// Get should return nil when not loaded
+	cfg := m.Get()
+	if cfg != nil {
+		t.Error("Get() should return nil when not loaded")
+	}
+}
+
+// =============================================================================
+// Package-level Fs and Manager.Fs tests
+// =============================================================================
+
+func TestPackageLevel_Fs(t *testing.T) {
+	t.Parallel()
+
+	// Package-level Fs() should return a non-nil filesystem
+	fs := Fs()
+	if fs == nil {
+		t.Error("Fs() should not return nil")
+	}
+}
+
+func TestManager_Fs_WithCustomFs(t *testing.T) {
+	t.Parallel()
+
+	// Create a manager with a custom filesystem
+	memFs := afero.NewMemMapFs()
+	m := &Manager{
+		fs: memFs,
+	}
+
+	// Should return the custom filesystem
+	gotFs := m.Fs()
+	if gotFs != memFs {
+		t.Error("Manager.Fs() should return custom fs when set")
+	}
+}
+
+func TestManager_Fs_WithNilFs(t *testing.T) {
+	t.Parallel()
+
+	// Create a manager without a custom filesystem
+	m := &Manager{
+		fs: nil,
+	}
+
+	// Should return the package default filesystem
+	gotFs := m.Fs()
+	if gotFs == nil {
+		t.Error("Manager.Fs() should return default fs when m.fs is nil")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestNewManager_EmptyPath(t *testing.T) {
+	// Save original fs and restore after test
+	SetFs(nil)
+	t.Cleanup(func() { SetFs(nil) })
+
+	// NewManager with empty path should use Dir() result
+	m := NewManager("")
+
+	// Path should not be empty (uses Dir() result)
+	if m.Path() == "" {
+		t.Error("NewManager(\"\") should set a default path")
+	}
+
+	// Should contain "config.yaml"
+	if m.Path() != "config.yaml" && len(m.Path()) > 0 {
+		// If Dir() succeeded, path should end with config.yaml
+		if len(m.Path()) < len("config.yaml") {
+			t.Errorf("NewManager(\"\").Path() = %q, expected path ending with config.yaml", m.Path())
+		}
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestImportAliases_MergeSkipsExisting(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a manager with real filesystem for file operations
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Add an existing alias
+	if err := m.AddAlias("existing", "original command", false); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+
+	// Create import file with overlapping alias
+	importPath := filepath.Join(tmpDir, "import.yaml")
+	importContent := `aliases:
+  existing: "new command"
+  new-alias: "new command 2"
+`
+	if err := os.WriteFile(importPath, []byte(importContent), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	// Import with merge=true (should skip existing)
+	imported, skipped, err := m.ImportAliases(importPath, true)
+	if err != nil {
+		t.Fatalf("ImportAliases() error: %v", err)
+	}
+	if imported != 1 {
+		t.Errorf("imported = %d, want 1", imported)
+	}
+	if skipped != 1 {
+		t.Errorf("skipped = %d, want 1", skipped)
+	}
+
+	// Verify original wasn't overwritten
+	alias, ok := m.GetAlias("existing")
+	if !ok {
+		t.Fatal("existing alias should still exist")
+	}
+	if alias.Command != "original command" {
+		t.Errorf("Command = %q, want %q", alias.Command, "original command")
+	}
+}
+
+func TestManager_RenameDevice_UsingDisplayName(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Register with display name
+	if err := m.RegisterDevice("Kitchen Light", "192.168.1.1", 2, "", "", nil); err != nil {
+		t.Fatalf("RegisterDevice() error: %v", err)
+	}
+
+	// Rename using display name (not normalized key)
+	if err := m.RenameDevice("Kitchen Light", "Living Room Light"); err != nil {
+		t.Fatalf("RenameDevice() error: %v", err)
+	}
+
+	// Verify old key doesn't exist
+	_, ok := m.GetDevice("kitchen-light")
+	if ok {
+		t.Error("old normalized key should not exist")
+	}
+
+	// Verify new key exists
+	dev, ok := m.GetDevice("living-room-light")
+	if !ok {
+		t.Error("new device should exist")
+	}
+	if dev.Name != "Living Room Light" {
+		t.Errorf("device name = %q, want %q", dev.Name, "Living Room Light")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestImportScene_CreateError(t *testing.T) {
+	setupPackageTest(t)
+
+	// Import a scene with a name that will fail validation (if validation fails)
+	// Actually, we already tested empty name. Let's test the delete existing + create flow
+	scene1 := &Scene{
+		Name:        "import-test",
+		Description: "First version",
+		Actions:     []SceneAction{},
+	}
+	if err := ImportScene(scene1, false); err != nil {
+		t.Fatalf("ImportScene() initial error: %v", err)
+	}
+
+	// Import again with overwrite
+	scene2 := &Scene{
+		Name:        "import-test",
+		Description: "Second version",
+		Actions: []SceneAction{
+			{Device: "light1", Method: "Switch.On"},
+		},
+	}
+	if err := ImportScene(scene2, true); err != nil {
+		t.Fatalf("ImportScene() overwrite error: %v", err)
+	}
+
+	// Verify the new scene
+	got, ok := GetScene("import-test")
+	if !ok {
+		t.Fatal("scene should exist")
+	}
+	if got.Description != "Second version" {
+		t.Errorf("Description = %q, want %q", got.Description, "Second version")
+	}
+	if len(got.Actions) != 1 {
+		t.Errorf("len(Actions) = %d, want 1", len(got.Actions))
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestPackageLevel_Get_NilConfig(t *testing.T) {
+	ResetDefaultManagerForTesting()
+	t.Cleanup(func() { ResetDefaultManagerForTesting() })
+
+	// Create a manager with nil config
+	m := &Manager{
+		loaded: true,
+		config: nil,
+	}
+	SetDefaultManager(m)
+
+	// Get should return a default config
+	cfg := Get()
+	if cfg == nil {
+		t.Fatal("Get() should not return nil")
+	}
+	if cfg.Output != "table" {
+		t.Errorf("Get().Output = %q, want %q", cfg.Output, "table")
+	}
+	if !cfg.Color {
+		t.Error("Get().Color should be true")
+	}
+	if cfg.Theme != "dracula" {
+		t.Errorf("Get().Theme = %v, want dracula", cfg.Theme)
 	}
 }

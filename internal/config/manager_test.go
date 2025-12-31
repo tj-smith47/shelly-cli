@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 const (
@@ -520,5 +522,267 @@ func TestManager_SetDeviceAuth_NotFound(t *testing.T) {
 
 	if err := m.SetDeviceAuth("nonexistent", "user", "pass"); err == nil {
 		t.Error("expected error setting auth on nonexistent device")
+	}
+}
+
+func TestManager_CreateScene_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Try to create scene with invalid name
+	if err := m.CreateScene("", "description"); err == nil {
+		t.Error("expected error creating scene with empty name")
+	}
+}
+
+func TestManager_SaveScene_Overwrite(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create initial scene
+	scene1 := Scene{
+		Name:        "test-scene",
+		Description: "Original",
+	}
+	if err := m.SaveScene(scene1); err != nil {
+		t.Fatalf("SaveScene() error: %v", err)
+	}
+
+	// Overwrite with new scene
+	scene2 := Scene{
+		Name:        "test-scene",
+		Description: "Updated",
+	}
+	if err := m.SaveScene(scene2); err != nil {
+		t.Fatalf("SaveScene() overwrite error: %v", err)
+	}
+
+	// Verify overwrite
+	got, ok := m.GetScene("test-scene")
+	if !ok {
+		t.Fatal("scene should exist")
+	}
+	if got.Description != "Updated" {
+		t.Errorf("Description = %q, want %q", got.Description, "Updated")
+	}
+}
+
+func TestManager_SaveScene_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Try to save scene with invalid name
+	scene := Scene{Name: ""}
+	if err := m.SaveScene(scene); err == nil {
+		t.Error("expected error saving scene with empty name")
+	}
+}
+
+func TestManager_UpdateScene_DescriptionOnly(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if err := m.CreateScene("test-scene", "Original"); err != nil {
+		t.Fatalf("CreateScene() error: %v", err)
+	}
+
+	// Update description only (empty new name)
+	if err := m.UpdateScene("test-scene", "", "New Description"); err != nil {
+		t.Fatalf("UpdateScene() error: %v", err)
+	}
+
+	got, ok := m.GetScene("test-scene")
+	if !ok {
+		t.Fatal("scene should exist")
+	}
+	if got.Description != "New Description" {
+		t.Errorf("Description = %q, want %q", got.Description, "New Description")
+	}
+}
+
+func TestManager_CreateDeviceTemplate_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Try to create template with invalid name
+	if err := m.CreateDeviceTemplate("", "desc", "model", "app", 2, nil, ""); err == nil {
+		t.Error("expected error creating template with empty name")
+	}
+}
+
+func TestManager_SaveDeviceTemplate_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Try to save template with invalid name
+	tpl := DeviceTemplate{Name: ""}
+	if err := m.SaveDeviceTemplate(tpl); err == nil {
+		t.Error("expected error saving template with empty name")
+	}
+}
+
+func TestManager_SaveScriptTemplate_ValidationError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Try to save script template with invalid name
+	tpl := ScriptTemplate{Name: ""}
+	if err := m.SaveScriptTemplate(tpl); err == nil {
+		t.Error("expected error saving script template with empty name")
+	}
+}
+
+func TestManager_Load_InvalidYAML(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Write invalid YAML
+	if err := afero.WriteFile(afero.NewOsFs(), configPath, []byte(":\ninvalid yaml content"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	m := NewManager(configPath)
+	if err := m.Load(); err == nil {
+		t.Error("expected error loading invalid YAML")
+	}
+}
+
+func TestManager_AddAlias_NilMap(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Force nil aliases map
+	m.mu.Lock()
+	m.config.Aliases = nil
+	m.mu.Unlock()
+
+	// AddAlias should initialize the map
+	if err := m.AddAlias("test", "device info $1", false); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+
+	alias, ok := m.GetAlias("test")
+	if !ok {
+		t.Error("alias should exist")
+	}
+	if alias.Command != "device info $1" {
+		t.Errorf("Command = %q, want %q", alias.Command, "device info $1")
+	}
+}
+
+func TestManager_UpdateScene_RenameValidationError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if err := m.CreateScene("original", "description"); err != nil {
+		t.Fatalf("CreateScene() error: %v", err)
+	}
+
+	// Try to rename with invalid name
+	err := m.UpdateScene("original", "", "new description")
+	if err != nil {
+		t.Errorf("UpdateScene with empty newName should succeed (description only): %v", err)
+	}
+}
+
+func TestManager_UpdateScene_RenameAlreadyExists(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if err := m.CreateScene("scene1", "description1"); err != nil {
+		t.Fatalf("CreateScene() error: %v", err)
+	}
+	if err := m.CreateScene("scene2", "description2"); err != nil {
+		t.Fatalf("CreateScene() error: %v", err)
+	}
+
+	// Try to rename scene1 to scene2 (already exists)
+	err := m.UpdateScene("scene1", "scene2", "")
+	if err == nil {
+		t.Error("UpdateScene should error when new name already exists")
+	}
+}
+
+func TestManager_UpdateScene_RenameWithValidation(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if err := m.CreateScene("original", "description"); err != nil {
+		t.Fatalf("CreateScene() error: %v", err)
+	}
+
+	// Rename to a valid new name
+	if err := m.UpdateScene("original", "new-name", "new description"); err != nil {
+		t.Fatalf("UpdateScene() error: %v", err)
+	}
+
+	// Verify rename
+	_, ok := m.GetScene("original")
+	if ok {
+		t.Error("old scene name should not exist")
+	}
+	got, ok := m.GetScene("new-name")
+	if !ok {
+		t.Error("new scene name should exist")
+	}
+	if got.Description != "new description" {
+		t.Errorf("Description = %q, want %q", got.Description, "new description")
 	}
 }

@@ -98,3 +98,35 @@ func TestSaveSyncConfig_MarshalError(t *testing.T) {
 		t.Error("expected error marshaling unmarshalable value")
 	}
 }
+
+func TestGetSyncDir(t *testing.T) {
+	// Not parallel since it creates a real directory
+	syncDir, err := GetSyncDir()
+	if err != nil {
+		t.Fatalf("GetSyncDir() error: %v", err)
+	}
+
+	if syncDir == "" {
+		t.Error("GetSyncDir() returned empty string")
+	}
+
+	// Verify directory exists
+	if stat, err := os.Stat(syncDir); err != nil {
+		t.Errorf("sync directory should exist: %v", err)
+	} else if !stat.IsDir() {
+		t.Error("sync directory should be a directory")
+	}
+}
+
+func TestSaveSyncConfig_WriteError(t *testing.T) {
+	t.Parallel()
+
+	// Use a path that doesn't exist as a directory
+	nonExistentDir := "/nonexistent/path/to/sync"
+	cfg := map[string]any{"test": "value"}
+
+	err := SaveSyncConfig(nonExistentDir, "device1", cfg)
+	if err == nil {
+		t.Error("expected error writing to non-existent directory")
+	}
+}

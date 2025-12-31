@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -513,4 +514,387 @@ func TestPackageLevelAliasFunctions(t *testing.T) {
 
 	// Note: ImportAliases and ExportAliases(file) tests use os.ReadFile/WriteFile directly,
 	// not afero. These are tested in Manager tests with temp directories instead.
+}
+
+func TestPackageLevel_ImportAliases(t *testing.T) {
+	// Use temp dir for file operations
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Reset default manager
+	ResetDefaultManagerForTesting()
+	t.Cleanup(func() { ResetDefaultManagerForTesting() })
+
+	// Set up a real manager (not in-memory fs since ImportAliases uses os.ReadFile)
+	mgr := NewManager(configPath)
+	if err := mgr.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	SetDefaultManager(mgr)
+
+	// Create an import file
+	importFile := filepath.Join(tmpDir, "import.yaml")
+	importContent := `aliases:
+  import-test: device info $1
+  shell-alias: "!echo hello"
+`
+	if err := os.WriteFile(importFile, []byte(importContent), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	// Test package-level ImportAliases
+	imported, skipped, err := ImportAliases(importFile, false)
+	if err != nil {
+		t.Errorf("ImportAliases() error = %v", err)
+	}
+	if imported != 2 {
+		t.Errorf("ImportAliases() imported = %d, want 2", imported)
+	}
+	if skipped != 0 {
+		t.Errorf("ImportAliases() skipped = %d, want 0", skipped)
+	}
+
+	// Verify shell alias was imported correctly
+	alias, ok := GetAlias("shell-alias")
+	if !ok {
+		t.Fatal("GetAlias() should find shell-alias")
+	}
+	if !alias.Shell {
+		t.Error("shell-alias should have Shell=true")
+	}
+	if alias.Command != "echo hello" {
+		t.Errorf("shell-alias command = %q, want %q", alias.Command, "echo hello")
+	}
+}
+
+func TestManager_ImportAliases_FileNotFound(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Use a path that's guaranteed not to exist
+	nonExistentPath := filepath.Join(tmpDir, "nonexistent_subdir", "aliases.yaml")
+	_, _, err := m.ImportAliases(nonExistentPath, false)
+	if err == nil {
+		t.Error("ImportAliases() should error for nonexistent file")
+	}
+}
+
+func TestManager_ImportAliases_InvalidYAML(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create invalid YAML file
+	invalidFile := filepath.Join(tmpDir, "invalid.yaml")
+	if err := os.WriteFile(invalidFile, []byte(":\ninvalid yaml here"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	_, _, err := m.ImportAliases(invalidFile, false)
+	if err == nil {
+		t.Error("ImportAliases() should error for invalid YAML")
+	}
+}
+
+func TestManager_ImportAliases_InvalidAliasName(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create file with reserved command as alias name
+	invalidFile := filepath.Join(tmpDir, "reserved.yaml")
+	content := `aliases:
+  help: this should fail validation
+`
+	if err := os.WriteFile(invalidFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	_, _, err := m.ImportAliases(invalidFile, false)
+	if err == nil {
+		t.Error("ImportAliases() should error for reserved command name")
+	}
+}
+
+func TestManager_ImportAliases_ShellAlias(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Create file with shell alias (! prefix)
+	shellFile := filepath.Join(tmpDir, "shell.yaml")
+	content := `aliases:
+  myshell: "!ls -la"
+`
+	if err := os.WriteFile(shellFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	imported, _, err := m.ImportAliases(shellFile, false)
+	if err != nil {
+		t.Fatalf("ImportAliases() error: %v", err)
+	}
+	if imported != 1 {
+		t.Errorf("imported = %d, want 1", imported)
+	}
+
+	alias, ok := m.GetAlias("myshell")
+	if !ok {
+		t.Fatal("GetAlias() should find myshell")
+	}
+	if !alias.Shell {
+		t.Error("alias.Shell should be true")
+	}
+	if alias.Command != "ls -la" {
+		t.Errorf("alias.Command = %q, want %q", alias.Command, "ls -la")
+	}
+}
+
+func TestManager_AddAlias_NilAliasesMap(t *testing.T) {
+	t.Parallel()
+
+	// Create a manager with a nil Aliases map
+	cfg := &Config{
+		Aliases: nil, // Explicitly nil
+	}
+	m := NewTestManager(cfg)
+
+	// AddAlias should initialize the map
+	if err := m.AddAlias("newtest", "echo test", false); err != nil {
+		t.Errorf("AddAlias() error = %v", err)
+	}
+
+	// Verify the alias was added
+	alias, ok := m.GetAlias("newtest")
+	if !ok {
+		t.Fatal("GetAlias() should find newtest")
+	}
+	if alias.Command != "echo test" {
+		t.Errorf("alias.Command = %q, want %q", alias.Command, "echo test")
+	}
+}
+
+func TestManager_AddAlias_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Try to add alias with empty name
+	err := m.AddAlias("", "echo test", false)
+	if err == nil {
+		t.Error("AddAlias() should error for empty name")
+	}
+
+	// Try to add alias with reserved name
+	err = m.AddAlias("help", "echo test", false)
+	if err == nil {
+		t.Error("AddAlias() should error for reserved name")
+	}
+}
+
+func TestManager_RemoveAlias_NotFound(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	err := m.RemoveAlias("nonexistent-alias")
+	if err == nil {
+		t.Error("RemoveAlias() should error for nonexistent alias")
+	}
+}
+
+func TestManager_ExportAliases_ToFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Add both regular and shell alias
+	if err := m.AddAlias("regular", "device info", false); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+	if err := m.AddAlias("shell", "ls -la", true); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+
+	// Export to file
+	exportPath := filepath.Join(tmpDir, "exported.yaml")
+	result, err := m.ExportAliases(exportPath)
+	if err != nil {
+		t.Fatalf("ExportAliases() error: %v", err)
+	}
+	if result != "" {
+		t.Error("ExportAliases(file) should return empty string")
+	}
+
+	// Verify file content
+	data, err := os.ReadFile(exportPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "regular:") {
+		t.Error("exported file should contain regular alias")
+	}
+	if !strings.Contains(content, "!ls -la") {
+		t.Error("exported file should contain shell prefix for shell alias")
+	}
+}
+
+func TestManager_ExportAliases_WriteError(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if err := m.AddAlias("test", "echo", false); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+
+	// Try to export to a non-existent directory within tmpDir
+	nonExistentPath := filepath.Join(tmpDir, "nonexistent_subdir", "aliases.yaml")
+	_, err := m.ExportAliases(nonExistentPath)
+	if err == nil {
+		t.Error("ExportAliases() should error for non-writable path")
+	}
+}
+
+func TestManager_ImportAliases_NilAliasesMap(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	// Create a config with nil Aliases map
+	cfg := &Config{
+		Aliases: nil,
+	}
+	m := NewTestManager(cfg)
+
+	// Create import file
+	importFile := filepath.Join(tmpDir, "import.yaml")
+	content := `aliases:
+  imported: echo test
+`
+	if err := os.WriteFile(importFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	// Import should initialize the map and succeed
+	imported, _, err := m.ImportAliases(importFile, false)
+	if err != nil {
+		t.Fatalf("ImportAliases() error: %v", err)
+	}
+	if imported != 1 {
+		t.Errorf("imported = %d, want 1", imported)
+	}
+}
+
+func TestManager_ExportAliases_EmptyFilename(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Add some aliases including a shell alias
+	if err := m.AddAlias("test", "device info $1", false); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+	if err := m.AddAlias("shell-test", "echo hello", true); err != nil {
+		t.Fatalf("AddAlias() shell error: %v", err)
+	}
+
+	// Export with empty filename should return YAML string
+	yamlStr, err := m.ExportAliases("")
+	if err != nil {
+		t.Fatalf("ExportAliases() error: %v", err)
+	}
+	if yamlStr == "" {
+		t.Error("ExportAliases() should return non-empty YAML string")
+	}
+	if !strings.Contains(yamlStr, "test:") {
+		t.Error("exported YAML should contain 'test:' alias")
+	}
+	// Shell alias should have ! prefix
+	if !strings.Contains(yamlStr, "!echo hello") {
+		t.Error("exported YAML should contain shell alias with ! prefix")
+	}
+}
+
+func TestManager_ImportAliases_NonMergeOverwrite(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Add an existing alias
+	if err := m.AddAlias("existing", "original command", false); err != nil {
+		t.Fatalf("AddAlias() error: %v", err)
+	}
+
+	// Create import file with same alias name
+	importFile := filepath.Join(tmpDir, "import.yaml")
+	content := `aliases:
+  existing: new command
+`
+	if err := os.WriteFile(importFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	// Import without merge (overwrite)
+	imported, skipped, err := m.ImportAliases(importFile, false)
+	if err != nil {
+		t.Fatalf("ImportAliases() error: %v", err)
+	}
+	if imported != 1 {
+		t.Errorf("imported = %d, want 1", imported)
+	}
+	if skipped != 0 {
+		t.Errorf("skipped = %d, want 0", skipped)
+	}
+
+	// Verify alias was overwritten
+	alias, ok := m.GetAlias("existing")
+	if !ok {
+		t.Fatal("alias should exist")
+	}
+	if alias.Command != "new command" {
+		t.Errorf("Command = %q, want %q", alias.Command, "new command")
+	}
 }
