@@ -159,21 +159,6 @@ func TestNewCommand_ExampleContainsUsage(t *testing.T) {
 	}
 }
 
-func TestOptions_Structure(t *testing.T) {
-	t.Parallel()
-
-	// Test that Options struct can be created and used
-	opts := &Options{}
-
-	// Options embeds OutputFlags which should have Format field
-	// We verify the Options type is usable by accessing the embedded field
-	const testFormat = "test-format"
-	opts.Format = testFormat
-	if opts.Format != testFormat {
-		t.Errorf("Format = %q, want %q", opts.Format, testFormat)
-	}
-}
-
 func TestNewCommand_RunE_SceneNotFound(t *testing.T) {
 	t.Parallel()
 
