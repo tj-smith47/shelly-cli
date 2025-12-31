@@ -47,11 +47,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Get credentials
-	cfg, cfgErr := opts.Factory.Config()
-	if cfgErr != nil {
-		ios.DebugErr("load config", cfgErr)
-	}
-
+	cfg := cmdutil.SafeConfig(opts.Factory)
 	creds, err := shelly.GetIntegratorCredentials(ios, cfg)
 	if err != nil {
 		return err

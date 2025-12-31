@@ -8,10 +8,8 @@ import (
 	"strings"
 
 	"github.com/tj-smith47/shelly-go/discovery"
-	"github.com/tj-smith47/shelly-go/types"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
@@ -22,20 +20,7 @@ import (
 // Model is set to the human-readable name (e.g., "Shelly Pro 1PM").
 // MAC is set from the discovery result if available.
 func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
-	name := d.ID
-	if d.Name != "" {
-		name = d.Name
-	}
-
-	return model.Device{
-		Name:       name,
-		Address:    d.Address.String(),
-		MAC:        model.NormalizeMAC(d.MACAddress), // Normalize MAC for storage
-		Platform:   model.PlatformShelly,
-		Generation: int(d.Generation),
-		Type:       d.Model,                         // Model code/SKU
-		Model:      types.ModelDisplayName(d.Model), // Human-readable name
-	}
+	return DiscoveredDeviceToRegistration(d).ToDevice()
 }
 
 // RegisterDiscoveredDevices adds discovered devices to the registry.
@@ -43,46 +28,12 @@ func DiscoveredDeviceToConfig(d discovery.DiscoveredDevice) model.Device {
 // Type is set to the model code, Model is set to the human-readable name.
 // MAC is populated from discovery data when available.
 func RegisterDiscoveredDevices(devices []discovery.DiscoveredDevice, skipExisting bool) (int, error) {
-	added := 0
-
-	for _, d := range devices {
-		name := d.ID
-		if d.Name != "" {
-			name = d.Name
-		}
-
-		// Skip if already registered
-		if skipExisting {
-			if _, exists := config.GetDevice(name); exists {
-				continue
-			}
-		}
-
-		err := config.RegisterDevice(
-			name,
-			d.Address.String(),
-			int(d.Generation),
-			d.Model,                         // deviceType: model code/SKU
-			types.ModelDisplayName(d.Model), // deviceModel: human-readable name
-			nil,
-		)
-		if err != nil {
-			return added, fmt.Errorf("failed to register device %q: %w", name, err)
-		}
-
-		// Update MAC if available from discovery
-		if d.MACAddress != "" {
-			if err := config.UpdateDeviceInfo(name, config.DeviceUpdates{
-				MAC: d.MACAddress,
-			}); err != nil {
-				iostreams.DebugErr("update MAC for "+name, err)
-			}
-		}
-
-		added++
+	// Convert to registrations
+	regs := make([]DeviceRegistration, len(devices))
+	for i, d := range devices {
+		regs[i] = DiscoveredDeviceToRegistration(d)
 	}
-
-	return added, nil
+	return RegisterDevicesBatch(regs, skipExisting)
 }
 
 // UnmarshalJSON converts an RPC response (interface{}) to a typed struct.
@@ -284,55 +235,13 @@ func ListRegisteredDevices() map[string]model.Device {
 // The address parameter is used since the detection result may not have the IP address.
 // For plugin devices, Model is typically already human-readable from the plugin.
 func PluginDetectionResultToConfig(result *plugins.DeviceDetectionResult, address string) model.Device {
-	name := result.DeviceName
-	if name == "" {
-		name = result.DeviceID
-	}
-	if name == "" {
-		name = address
-	}
-
-	// For plugin devices, the Model from plugin is usually already human-readable
-	// But still apply display name mapping in case it's a Shelly code
-	displayModel := types.ModelDisplayName(result.Model)
-
-	return model.Device{
-		Name:       name,
-		Address:    address,
-		Platform:   result.Platform,
-		Generation: 0,            // Plugin devices don't have Shelly generations
-		Type:       result.Model, // Model code
-		Model:      displayModel, // Human-readable name
-	}
+	return PluginResultToRegistration(result, address).ToDevice()
 }
 
 // RegisterPluginDiscoveredDevice registers a plugin-detected device.
 // Returns true if the device was added, false if it was already registered.
 func RegisterPluginDiscoveredDevice(result *plugins.DeviceDetectionResult, address string, skipExisting bool) (bool, error) {
-	device := PluginDetectionResultToConfig(result, address)
-
-	// Check if already registered
-	if skipExisting {
-		if _, exists := config.GetDevice(device.Name); exists {
-			return false, nil
-		}
-	}
-
-	// Use RegisterDeviceWithPlatform if we need platform support
-	err := config.RegisterDeviceWithPlatform(
-		device.Name,
-		device.Address,
-		device.Generation,
-		device.Type,
-		device.Model,
-		device.Platform,
-		nil,
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to register device %q: %w", device.Name, err)
-	}
-
-	return true, nil
+	return RegisterDevice(PluginResultToRegistration(result, address), skipExisting)
 }
 
 // PluginDevice represents a plugin-discovered device for batch registration.
@@ -348,31 +257,7 @@ type PluginDevice struct {
 // RegisterPluginDiscoveredDevices registers multiple plugin-discovered devices.
 // Returns the number of devices added.
 func RegisterPluginDiscoveredDevices(devices []PluginDevice, skipExisting bool) int {
-	added := 0
-	for _, d := range devices {
-		if d.Address == "" {
-			continue
-		}
-
-		// Convert to DeviceDetectionResult for registration
-		result := &plugins.DeviceDetectionResult{
-			Detected:   true,
-			Platform:   d.Platform,
-			DeviceID:   d.ID,
-			DeviceName: d.Name,
-			Model:      d.Model,
-			Firmware:   d.Firmware,
-		}
-
-		wasAdded, err := RegisterPluginDiscoveredDevice(result, d.Address, skipExisting)
-		if err != nil {
-			continue
-		}
-		if wasAdded {
-			added++
-		}
-	}
-	return added
+	return RegisterDevicesFromSlice(devices, PluginDeviceToRegistration, skipExisting)
 }
 
 // IsPluginDeviceRegistered checks if a device at the given address is registered.

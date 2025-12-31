@@ -64,11 +64,7 @@ func run(ctx context.Context, opts *Options) error {
 	integratorTag := os.Getenv("SHELLY_INTEGRATOR_TAG")
 	integratorToken := os.Getenv("SHELLY_INTEGRATOR_TOKEN")
 
-	cfg, cfgErr := opts.Factory.Config()
-	if cfgErr != nil {
-		ios.DebugErr("load config", cfgErr)
-	}
-	if cfg != nil {
+	if cfg := cmdutil.SafeConfig(opts.Factory); cfg != nil {
 		if integratorTag == "" {
 			integratorTag = cfg.Integrator.Tag
 		}

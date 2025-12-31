@@ -115,10 +115,7 @@ func FormatComponentName(name, componentType string, id int) string {
 
 // FormatPower returns a human-readable power string (W or kW).
 func FormatPower(watts float64) string {
-	if watts >= 1000 {
-		return fmt.Sprintf("%.2f kW", watts/1000)
-	}
-	return fmt.Sprintf("%.1f W", watts)
+	return FormatPowerValue(watts, PowerValueOptions{})
 }
 
 // FormatEnergy returns a human-readable energy string (Wh or kWh).
@@ -132,69 +129,70 @@ func FormatEnergy(wh float64) string {
 // FormatPowerColored returns a themed power string based on usage level.
 // Red for >=1000W, yellow for >=100W, green otherwise.
 func FormatPowerColored(watts float64) string {
-	s := FormatPower(watts)
-	if watts >= 1000 {
-		return theme.StatusError().Render(s)
-	} else if watts >= 100 {
-		return theme.StatusWarn().Render(s)
-	}
-	return theme.StatusOK().Render(s)
+	return FormatPowerValue(watts, PowerValueOptions{Colored: true})
 }
 
 // FormatPowerTableValue returns formatted power string or "-" if zero.
 // Use for table cell display where zero values should show placeholder.
 func FormatPowerTableValue(power float64) string {
-	if power > 0 {
-		return fmt.Sprintf("%.1f W", power)
-	}
-	return "-"
+	return FormatPowerValue(power, PowerValueOptions{ZeroAsPlaceholder: true})
 }
 
 // FormatPowerWithChange formats power value with directional change indicator.
 // Shows ↑ (warning) for increases, ↓ (ok) for decreases.
 func FormatPowerWithChange(power float64, prevPower *float64) string {
-	formatted := FormatPower(power)
-	if prevPower == nil {
-		return formatted
-	}
-	if power > *prevPower {
-		return theme.StatusWarn().Render(formatted + " ↑")
-	} else if power < *prevPower {
-		return theme.StatusOK().Render(formatted + " ↓")
-	}
-	return formatted
+	return FormatPowerValue(power, PowerValueOptions{
+		Colored:    true,
+		ShowChange: true,
+		PrevPower:  prevPower,
+	})
 }
 
 // FormatMeterLine formats a single meter reading with optional change indicator.
 // Optional pf (power factor) is displayed if non-nil.
 func FormatMeterLine(label string, id int, power, voltage, current float64, pf, prevPower *float64) string {
-	powerStr := FormatPowerWithChange(power, prevPower)
-	pfStr := ""
-	if pf != nil {
-		pfStr = fmt.Sprintf("  PF:%.2f", *pf)
-	}
-	return fmt.Sprintf("  %s %d: %s  %.1fV  %.2fA%s", label, id, powerStr, voltage, current, pfStr)
+	return FormatMeterReading(MeterLineOptions{
+		Label:     label,
+		ID:        &id,
+		Power:     power,
+		Voltage:   voltage,
+		Current:   current,
+		PF:        pf,
+		PrevPower: prevPower,
+	})
 }
 
 // FormatMeterLineWithEnergy formats a meter line including energy total.
 // Optional pf (power factor) is displayed if non-nil.
 func FormatMeterLineWithEnergy(label string, id int, power, voltage, current float64, pf, energy, prevPower *float64) string {
-	base := FormatMeterLine(label, id, power, voltage, current, pf, prevPower)
-	if energy != nil {
-		return fmt.Sprintf("%s  %.2f Wh", base, *energy)
-	}
-	return base
+	return FormatMeterReading(MeterLineOptions{
+		Label:     label,
+		ID:        &id,
+		Power:     power,
+		Voltage:   voltage,
+		Current:   current,
+		PF:        pf,
+		Energy:    energy,
+		PrevPower: prevPower,
+	})
 }
 
 // FormatEMPhase formats a single phase line for 3-phase EM.
 // Optional pf (power factor) is displayed if non-nil.
 func FormatEMPhase(label string, power, voltage, current float64, pf, prevPower *float64) string {
-	powerStr := FormatPowerWithChange(power, prevPower)
-	pfStr := ""
-	if pf != nil {
-		pfStr = fmt.Sprintf("  PF:%.2f", *pf)
+	// Extract phase letter from label (e.g., "Phase A" -> "A")
+	phase := label
+	if len(label) > 6 && label[:6] == "Phase " {
+		phase = label[6:]
 	}
-	return fmt.Sprintf("    %s: %s  %.1fV  %.2fA%s", label, powerStr, voltage, current, pfStr)
+	return FormatPhaseLine(PhaseLineOptions{
+		Phase:     phase,
+		Power:     power,
+		Voltage:   voltage,
+		Current:   current,
+		PF:        pf,
+		PrevPower: prevPower,
+	})
 }
 
 // FormatEMLines returns formatted lines for a 3-phase energy meter.
