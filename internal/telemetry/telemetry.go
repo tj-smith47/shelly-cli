@@ -64,6 +64,14 @@ type Client struct {
 	eventQueue chan Event
 	done       chan struct{}
 	wg         sync.WaitGroup
+
+	// tickerDuration controls how often the sender checks for queued events.
+	// Defaults to 10 seconds. Configurable for testing.
+	tickerDuration time.Duration
+
+	// marshalFunc is the JSON marshal function. Defaults to json.Marshal.
+	// Can be overridden for testing error paths.
+	marshalFunc func(v any) ([]byte, error)
 }
 
 var (
@@ -95,9 +103,35 @@ func NewClient(endpoint string) *Client {
 		httpClient: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		enabled:    false,
-		eventQueue: make(chan Event, 100),
-		done:       make(chan struct{}),
+		enabled:        false,
+		eventQueue:     make(chan Event, 100),
+		done:           make(chan struct{}),
+		tickerDuration: 10 * time.Second,
+		marshalFunc:    json.Marshal,
+	}
+
+	// Start background sender
+	c.wg.Go(c.sender)
+
+	return c
+}
+
+// NewClientWithOptions creates a new telemetry client with custom options.
+// tickerDuration controls how often queued events are sent (default 10s).
+func NewClientWithOptions(endpoint string, tickerDuration time.Duration) *Client {
+	if tickerDuration <= 0 {
+		tickerDuration = 10 * time.Second
+	}
+	c := &Client{
+		endpoint: endpoint,
+		httpClient: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+		enabled:        false,
+		eventQueue:     make(chan Event, 100),
+		done:           make(chan struct{}),
+		tickerDuration: tickerDuration,
+		marshalFunc:    json.Marshal,
 	}
 
 	// Start background sender
@@ -155,7 +189,7 @@ func (c *Client) Track(command string, success bool, duration time.Duration) {
 func (c *Client) sender() {
 	// Batch events and send periodically
 	var batch []Event
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(c.tickerDuration)
 	defer ticker.Stop()
 
 	for {
@@ -194,7 +228,7 @@ func (c *Client) sendBatch(events []Event) {
 		return
 	}
 
-	data, err := json.Marshal(events)
+	data, err := c.marshalFunc(events)
 	if err != nil {
 		iostreams.DebugErrCat(iostreams.CategoryNetwork, "marshal telemetry events", err)
 		return
