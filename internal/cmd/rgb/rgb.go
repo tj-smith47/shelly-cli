@@ -16,9 +16,10 @@ import (
 // NewCommand creates the rgb command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rgb",
-		Short: "Control RGB light components",
-		Long:  `Control RGB light components on Shelly devices.`,
+		Use:     "rgb",
+		Aliases: []string{"color"},
+		Short:   "Control RGB light components",
+		Long:    `Control RGB light components on Shelly devices.`,
 		Example: `  # Turn on RGB light
   shelly rgb on living-room
 

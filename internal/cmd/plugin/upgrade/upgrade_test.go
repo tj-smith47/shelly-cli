@@ -316,7 +316,9 @@ func TestRun_ContextCancellation(t *testing.T) {
 
 	// Either returns quickly with context error or proceeds
 	// Just verify it doesn't panic
-	_ = err
+	if err != nil {
+		t.Logf("run error (expected for cancelled context): %v", err)
+	}
 }
 
 func TestRun_AllFlagBehavior(t *testing.T) {

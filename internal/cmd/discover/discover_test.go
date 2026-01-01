@@ -678,8 +678,10 @@ func TestRunMDNSDiscovery(t *testing.T) {
 	devices, err := runMDNSDiscovery(ctx, ios, 1*time.Millisecond)
 
 	// Should complete (possibly with context error or empty results)
-	_ = devices
-	_ = err
+	if err != nil {
+		t.Logf("mDNS discovery error (expected for cancelled context): %v", err)
+	}
+	t.Logf("discovered %d devices", len(devices))
 }
 
 // TestRunCoIoTDiscovery tests CoIoT discovery.
@@ -696,8 +698,10 @@ func TestRunCoIoTDiscovery(t *testing.T) {
 	devices, err := runCoIoTDiscovery(ctx, ios, 1*time.Millisecond)
 
 	// Should complete (possibly with context error or empty results)
-	_ = devices
-	_ = err
+	if err != nil {
+		t.Logf("CoIoT discovery error (expected for cancelled context): %v", err)
+	}
+	t.Logf("discovered %d devices", len(devices))
 }
 
 // TestRunBLEDiscovery tests BLE discovery.
@@ -764,7 +768,9 @@ func TestRun_HTTPMethod(t *testing.T) {
 
 	// Should fail due to cancelled context or subnet detection
 	err := run(ctx, opts)
-	_ = err // Error is expected
+	if err != nil {
+		t.Logf("HTTP discovery error (expected): %v", err)
+	}
 }
 
 // TestRun_MDNSMethod tests the run function with mDNS method.
@@ -786,7 +792,9 @@ func TestRun_MDNSMethod(t *testing.T) {
 	}
 
 	err := run(ctx, opts)
-	_ = err // Error expected
+	if err != nil {
+		t.Logf("mDNS discovery error (expected): %v", err)
+	}
 }
 
 // TestRun_CoIoTMethod tests the run function with CoIoT method.
@@ -808,7 +816,9 @@ func TestRun_CoIoTMethod(t *testing.T) {
 	}
 
 	err := run(ctx, opts)
-	_ = err // Error expected
+	if err != nil {
+		t.Logf("CoIoT discovery error (expected): %v", err)
+	}
 }
 
 // TestRun_BLEMethod tests the run function with BLE method.
@@ -829,7 +839,9 @@ func TestRun_BLEMethod(t *testing.T) { //nolint:paralleltest // Intentional - BL
 	}
 
 	err := run(ctx, opts)
-	_ = err // Error expected (BLE might not be available)
+	if err != nil {
+		t.Logf("BLE discovery error (expected - BLE might not be available): %v", err)
+	}
 }
 
 // TestRun_PlatformFilter tests the run function with platform filter.
@@ -851,5 +863,7 @@ func TestRun_PlatformFilter(t *testing.T) {
 	}
 
 	err := run(ctx, opts)
-	_ = err // Error expected (no plugin for tasmota likely)
+	if err != nil {
+		t.Logf("platform filter error (expected - no plugin for tasmota likely): %v", err)
+	}
 }

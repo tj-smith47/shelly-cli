@@ -31,32 +31,6 @@ type Options struct {
 	Raw          bool
 }
 
-// makeEventHandler creates an event handler function for processing cloud events.
-// This is extracted for testability.
-func makeEventHandler(ios *iostreams.IOStreams, opts *Options) func(event *model.CloudEvent, raw []byte) error {
-	return func(event *model.CloudEvent, raw []byte) error {
-		// Raw output mode
-		if opts.Raw {
-			ios.Println(string(raw))
-			return nil
-		}
-
-		// Output based on format
-		switch opts.Format {
-		case "json":
-			formatted, jsonErr := json.Marshal(event)
-			if jsonErr != nil {
-				return jsonErr
-			}
-			ios.Println(string(formatted))
-		default:
-			term.DisplayCloudEvent(ios, event)
-		}
-
-		return nil
-	}
-}
-
 // NewCommand creates the cloud events command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
@@ -165,7 +139,30 @@ func run(ctx context.Context, opts *Options) error {
 		Raw:          opts.Raw,
 	}
 
-	err = network.StreamCloudEvents(ctx, conn, streamOpts, makeEventHandler(ios, opts))
+	// Event handler callback
+	eventHandler := func(event *model.CloudEvent, raw []byte) error {
+		// Raw output mode
+		if opts.Raw {
+			ios.Println(string(raw))
+			return nil
+		}
+
+		// Output based on format
+		switch opts.Format {
+		case "json":
+			formatted, jsonErr := json.Marshal(event)
+			if jsonErr != nil {
+				return jsonErr
+			}
+			ios.Println(string(formatted))
+		default:
+			term.DisplayCloudEvent(ios, event)
+		}
+
+		return nil
+	}
+
+	err = network.StreamCloudEvents(ctx, conn, streamOpts, eventHandler)
 
 	if err != nil {
 		return err

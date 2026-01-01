@@ -349,6 +349,8 @@ func TestCleanupMigrationFailure_PartialFailure(t *testing.T) {
 	// Using paths that don't exist should cause errors
 	err := cleanupMigrationFailure(fs, "/nonexistent/temp", "/nonexistent/old", "/nonexistent/dir")
 	// This may or may not error depending on whether the dir exists
-	// The function should handle missing files gracefully
-	_ = err // Just verify it doesn't panic
+	// The function should handle missing files gracefully - just verify it doesn't panic
+	if err != nil {
+		t.Logf("cleanup error (expected for nonexistent paths): %v", err)
+	}
 }

@@ -2904,8 +2904,10 @@ func TestStepDiscovery_NonInteractive(t *testing.T) {
 
 	devices, err := stepDiscovery(ctx, ios, opts)
 	// May or may not find devices, may error
-	_ = devices
-	_ = err
+	if err != nil {
+		t.Logf("discovery error (may be expected): %v", err)
+	}
+	t.Logf("discovered %d devices", len(devices))
 }
 
 // TestRunCompletionsStep_NonInteractive tests runCompletionsStep paths.
@@ -3127,8 +3129,10 @@ func TestStepDiscovery_NoMethods(t *testing.T) {
 
 	devices, err := stepDiscovery(ctx, ios, opts)
 	// Expect nil devices when methods are empty (after multiselect fails)
-	_ = devices
-	_ = err
+	if err != nil {
+		t.Logf("discovery error (expected in non-interactive): %v", err)
+	}
+	t.Logf("discovered %d devices", len(devices))
 }
 
 // TestRunDiscoveryStepIfNeeded_Interactive tests interactive path.

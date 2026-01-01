@@ -543,7 +543,9 @@ func (m EditorModel) Edit() tea.Cmd {
 
 	if _, err := tmpFile.WriteString(code); err != nil {
 		iostreams.CloseWithDebug("closing temp file on error", tmpFile)
-		os.Remove(tmpPath) //nolint:errcheck // Best-effort cleanup on error path
+		if rmErr := os.Remove(tmpPath); rmErr != nil {
+			iostreams.DebugErr("cleanup temp file on error", rmErr)
+		}
 		return func() tea.Msg {
 			return EditorFinishedMsg{Device: device, ScriptID: scriptID, Err: err}
 		}
@@ -575,7 +577,9 @@ func (m EditorModel) Edit() tea.Cmd {
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		//nolint:gosec // G304: Reading temp file we created - safe and expected
 		modifiedCode, readErr := os.ReadFile(tmpPath)
-		os.Remove(tmpPath) //nolint:errcheck // Best-effort temp file cleanup
+		if rmErr := os.Remove(tmpPath); rmErr != nil {
+			iostreams.DebugErr("cleanup temp file after editor", rmErr)
+		}
 
 		if err != nil {
 			return EditorFinishedMsg{Device: device, ScriptID: scriptID, Err: err}

@@ -2,8 +2,6 @@
 package importcmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -35,28 +33,6 @@ Use --name to override the scene name from the file.`,
 		SupportsNameArg: false,
 		NameFlagEnabled: true,
 		ForceFlagName:   "overwrite",
-		Importer:        importScene,
+		Importer:        config.ImportSceneFromFile,
 	})
-}
-
-func importScene(file, nameOverride string, overwrite bool) (string, error) {
-	scene, err := config.ParseSceneFile(file)
-	if err != nil {
-		return "", err
-	}
-
-	// Override name if specified
-	if nameOverride != "" {
-		scene.Name = nameOverride
-	}
-
-	if scene.Name == "" {
-		return "", fmt.Errorf("scene name is required (use --name to specify)")
-	}
-
-	if err := config.ImportScene(scene, overwrite); err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("Imported scene %q with %d action(s)", scene.Name, len(scene.Actions)), nil
 }

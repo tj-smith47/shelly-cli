@@ -210,7 +210,7 @@ func enrichDiscoveredDevices(ctx context.Context, rawDevices []discovery.Discove
 		}
 
 		// Check if in registry
-		device.Added = isDeviceRegistered(device.Address)
+		device.Added = IsDeviceRegistered(device.Address)
 
 		result = append(result, device)
 	}
@@ -218,8 +218,8 @@ func enrichDiscoveredDevices(ctx context.Context, rawDevices []discovery.Discove
 	return result
 }
 
-// isDeviceRegistered checks if a device is in the registry.
-func isDeviceRegistered(address string) bool {
+// IsDeviceRegistered checks if a device is in the registry.
+func IsDeviceRegistered(address string) bool {
 	cfg := config.Get()
 	if cfg == nil {
 		return false
@@ -296,7 +296,7 @@ func normalizeMAC(mac string) string {
 // RegisterDiscoveredDevice adds a discovered device to the registry.
 func RegisterDiscoveredDevice(ctx context.Context, device DiscoveredDevice, svc *Service) error {
 	// Check if already registered
-	if isDeviceRegistered(device.Address) {
+	if IsDeviceRegistered(device.Address) {
 		return nil
 	}
 

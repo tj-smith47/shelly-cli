@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -105,22 +106,15 @@ func run(opts *Options) error {
 
 		ios.Println()
 		ios.Printf("  %s:\n", theme.Dim().Render("Protocols"))
-		ios.Printf("    Z-Wave: %s\n", boolStatus(r.IsZWave))
-		ios.Printf("    Ethernet: %s\n", boolStatus(r.HasEthernet))
-		ios.Printf("    WiFi: %s\n", boolStatus(r.HasWiFi))
+		ios.Printf("    Z-Wave: %s\n", output.RenderYesNo(r.IsZWave, output.CaseTitle, theme.FalseError))
+		ios.Printf("    Ethernet: %s\n", output.RenderYesNo(r.HasEthernet, output.CaseTitle, theme.FalseError))
+		ios.Printf("    WiFi: %s\n", output.RenderYesNo(r.HasWiFi, output.CaseTitle, theme.FalseError))
 
 		ios.Println()
 		ios.Printf("  %s:\n", theme.Dim().Render("Features"))
-		ios.Printf("    Z-Wave Long Range: %s\n", boolStatus(r.SupportsLongRange))
-		ios.Printf("    Pro Series: %s\n", boolStatus(r.IsPro))
+		ios.Printf("    Z-Wave Long Range: %s\n", output.RenderYesNo(r.SupportsLongRange, output.CaseTitle, theme.FalseError))
+		ios.Printf("    Pro Series: %s\n", output.RenderYesNo(r.IsPro, output.CaseTitle, theme.FalseError))
 
 		ios.Println()
 	})
-}
-
-func boolStatus(b bool) string {
-	if b {
-		return theme.StatusOK().Render("Yes")
-	}
-	return theme.StatusError().Render("No")
 }

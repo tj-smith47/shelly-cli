@@ -278,7 +278,9 @@ func TestRun_PullNoDevices(t *testing.T) {
 	err := run(context.Background(), opts)
 
 	// May fail due to config loading or succeed with "no devices" warning
-	_ = err
+	if err != nil {
+		t.Logf("sync error (may be expected): %v", err)
+	}
 }
 
 // TestRun_PushNoSyncDir tests push when no sync directory exists.
@@ -322,11 +324,13 @@ func TestRun_PullWithDryRun(t *testing.T) {
 	err := run(context.Background(), opts)
 
 	// May fail due to config loading or succeed with dry run output
-	_ = err
+	if err != nil {
+		t.Logf("dry run error (may be expected): %v", err)
+	}
 
 	// Check for dry run indicator in output
 	output := stdout.String() + stderr.String()
-	_ = output // Output may contain [DRY RUN] or warning about no devices
+	t.Logf("output: %s", output) // Output may contain [DRY RUN] or warning about no devices
 }
 
 // TestRun_PushWithDryRun tests push with dry-run flag.
@@ -346,7 +350,9 @@ func TestRun_PushWithDryRun(t *testing.T) {
 	err := run(context.Background(), opts)
 
 	// Should fail since no sync directory exists, but dry-run should be handled
-	_ = err
+	if err != nil {
+		t.Logf("push dry run error (expected): %v", err)
+	}
 }
 
 // TestRun_PullSpecificDevices tests pull with specific devices.
@@ -370,7 +376,9 @@ func TestRun_PullSpecificDevices(t *testing.T) {
 	err := run(ctx, opts)
 
 	// May fail due to config loading, device not found, or context timeout
-	_ = err
+	if err != nil {
+		t.Logf("pull specific devices error (may be expected): %v", err)
+	}
 }
 
 // TestRun_PushSpecificDevices tests push with specific devices.
@@ -394,7 +402,9 @@ func TestRun_PushSpecificDevices(t *testing.T) {
 	err := run(ctx, opts)
 
 	// Should fail since no sync directory exists
-	_ = err
+	if err != nil {
+		t.Logf("push specific devices error (expected): %v", err)
+	}
 }
 
 // TestDisplaySyncSummary tests the summary printing function.

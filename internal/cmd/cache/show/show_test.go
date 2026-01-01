@@ -242,7 +242,9 @@ func TestFormatOutput(t *testing.T) {
 	err := output.FormatOutput(&buf, data)
 
 	// This may fail depending on viper output setting, but shouldn't panic
-	_ = err
+	if err != nil {
+		t.Logf("format error (may be expected): %v", err)
+	}
 }
 
 // TestNewCommand_NoFlags verifies no extra flags are added.
@@ -274,7 +276,9 @@ func TestRun_ContextCancelled(t *testing.T) {
 	err := run(ctx, opts)
 
 	// Should complete (context cancellation doesn't affect file system operations)
-	_ = err
+	if err != nil {
+		t.Logf("run error: %v", err)
+	}
 }
 
 // TestNewCommand_AcceptsNoArgs verifies command accepts no arguments.

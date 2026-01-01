@@ -11,7 +11,9 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/utils"
 )
 
 // DisplayDiscoveredDevices prints a table of discovered devices.
@@ -235,4 +237,46 @@ type ComponentAdapter struct {
 	Type string
 	ID   int
 	Name string
+}
+
+// ConvertPluginDevices converts shelly plugin devices to display-oriented types.
+func ConvertPluginDevices(devices []shelly.PluginDiscoveredDevice) []PluginDiscoveredDevice {
+	result := make([]PluginDiscoveredDevice, len(devices))
+	for i, d := range devices {
+		components := make([]PluginComponentInfo, len(d.Components))
+		for j, c := range d.Components {
+			components[j] = PluginComponentInfo{
+				Type: c.Type,
+				ID:   c.ID,
+				Name: c.Name,
+			}
+		}
+		result[i] = PluginDiscoveredDevice{
+			ID:         d.ID,
+			Name:       d.Name,
+			Model:      d.Model,
+			Address:    d.Address.String(),
+			Platform:   d.Platform,
+			Firmware:   d.Firmware,
+			Components: components,
+		}
+	}
+	return result
+}
+
+// RegisterPluginDevices converts display-oriented plugin devices to utils format and registers them.
+// Returns the number of devices successfully registered.
+func RegisterPluginDevices(devices []PluginDiscoveredDevice, skipExisting bool) int {
+	pluginDevices := make([]utils.PluginDevice, len(devices))
+	for i, d := range devices {
+		pluginDevices[i] = utils.PluginDevice{
+			Address:  d.Address,
+			Platform: d.Platform,
+			ID:       d.ID,
+			Name:     d.Name,
+			Model:    d.Model,
+			Firmware: d.Firmware,
+		}
+	}
+	return utils.RegisterPluginDiscoveredDevices(pluginDevices, skipExisting)
 }

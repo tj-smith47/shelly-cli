@@ -389,7 +389,9 @@ func TestRun_BothFlagsWithContextCancelled(t *testing.T) {
 	// The confirmation prompt may fail or succeed depending on implementation
 	// Either the confirmation returns an error (cancelled) or proceeds and fails at reset
 	// The key is that the function doesn't hang and handles cancellation gracefully
-	_ = err // Just ensure it doesn't panic
+	if err != nil {
+		t.Logf("run error (expected for cancelled context): %v", err)
+	}
 }
 
 func TestRun_Timeout(t *testing.T) {
@@ -413,7 +415,9 @@ func TestRun_Timeout(t *testing.T) {
 	// The confirmation prompt may fail or succeed depending on implementation
 	// Either the confirmation times out or proceeds and fails at reset
 	// The key is that the function doesn't hang and handles timeout gracefully
-	_ = err // Just ensure it doesn't panic
+	if err != nil {
+		t.Logf("run error (expected for timeout): %v", err)
+	}
 }
 
 func TestNewCommand_AcceptsIPAddress(t *testing.T) {

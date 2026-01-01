@@ -131,6 +131,31 @@ func ImportScene(scene *Scene, overwrite bool) error {
 	return nil
 }
 
+// ImportSceneFromFile imports a scene from a file with optional name override.
+// This is the full import workflow: parse, validate, import.
+// Returns a success message or error.
+func ImportSceneFromFile(file, nameOverride string, overwrite bool) (string, error) {
+	scene, err := ParseSceneFile(file)
+	if err != nil {
+		return "", err
+	}
+
+	// Override name if specified
+	if nameOverride != "" {
+		scene.Name = nameOverride
+	}
+
+	if scene.Name == "" {
+		return "", fmt.Errorf("scene name is required (use --name to specify)")
+	}
+
+	if err := ImportScene(scene, overwrite); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("Imported scene %q with %d action(s)", scene.Name, len(scene.Actions)), nil
+}
+
 // =============================================================================
 // Manager Scene Methods
 // =============================================================================

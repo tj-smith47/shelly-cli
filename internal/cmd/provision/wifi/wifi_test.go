@@ -767,7 +767,9 @@ func TestRun_WithMock_Gen1Device(t *testing.T) {
 	// Gen1 might not support WiFi config the same way
 	err = run(context.Background(), opts)
 	// Error may or may not occur depending on implementation
-	_ = err
+	if err != nil {
+		t.Logf("Gen1 WiFi config error (may be expected): %v", err)
+	}
 }
 
 //nolint:paralleltest // uses global mock config manager
@@ -851,7 +853,9 @@ func TestRun_WithMock_EmptyPassword(t *testing.T) {
 	// In test environment, password prompt will fail
 	err = run(context.Background(), opts)
 	// Error expected because password prompt fails in non-TTY
-	_ = err
+	if err != nil {
+		t.Logf("password prompt error (expected in non-TTY): %v", err)
+	}
 }
 
 //nolint:paralleltest // uses global mock config manager
@@ -893,5 +897,7 @@ func TestRun_WithMock_NoScanNoSSID(t *testing.T) {
 	// In test environment, SSID prompt returns empty which triggers an error path
 	err = run(context.Background(), opts)
 	// The prompt returns empty default, then the scan happens
-	_ = err
+	if err != nil {
+		t.Logf("SSID prompt error (may be expected in non-TTY): %v", err)
+	}
 }

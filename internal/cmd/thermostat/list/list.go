@@ -11,7 +11,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -112,12 +111,8 @@ func run(ctx context.Context, opts *Options) error {
 		return err
 	}
 
-	return displayThermostats(ios, thermostats, opts.Device, opts.Format)
-}
-
-// displayThermostats outputs the thermostat list in the specified format.
-func displayThermostats(ios *iostreams.IOStreams, thermostats []model.ThermostatInfo, device, format string) error {
-	if format == "json" {
+	// Output in requested format
+	if opts.Format == "json" {
 		jsonBytes, jsonErr := json.MarshalIndent(thermostats, "", "  ")
 		if jsonErr != nil {
 			return fmt.Errorf("failed to format JSON: %w", jsonErr)
@@ -126,6 +121,6 @@ func displayThermostats(ios *iostreams.IOStreams, thermostats []model.Thermostat
 		return nil
 	}
 
-	term.DisplayThermostats(ios, thermostats, device)
+	term.DisplayThermostats(ios, thermostats, opts.Device)
 	return nil
 }

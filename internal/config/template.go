@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
 
@@ -96,6 +97,44 @@ func UpdateDeviceTemplate(name, description string) error {
 // SaveDeviceTemplate saves or updates a device template.
 func SaveDeviceTemplate(template DeviceTemplate) error {
 	return getDefaultManager().SaveDeviceTemplate(template)
+}
+
+// ImportTemplateFromFile imports a template from a file with optional name override.
+// This is the full import workflow: read, parse, validate, import.
+// Returns a success message or error.
+func ImportTemplateFromFile(file, nameOverride string, overwrite bool) (string, error) {
+	data, err := afero.ReadFile(Fs(), file)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse template
+	tpl, err := ParseDeviceTemplateFile(file, data)
+	if err != nil {
+		return "", err
+	}
+
+	// Override name if specified
+	if nameOverride != "" {
+		tpl.Name = nameOverride
+	}
+
+	// Validate name
+	if err := ValidateTemplateName(tpl.Name); err != nil {
+		return "", err
+	}
+
+	// Check if exists
+	if _, exists := GetDeviceTemplate(tpl.Name); exists && !overwrite {
+		return "", fmt.Errorf("template %q already exists (use --force to overwrite)", tpl.Name)
+	}
+
+	// Save template
+	if err := SaveDeviceTemplate(tpl); err != nil {
+		return "", fmt.Errorf("failed to save template: %w", err)
+	}
+
+	return fmt.Sprintf("Template %q imported from %s", tpl.Name, file), nil
 }
 
 // =============================================================================

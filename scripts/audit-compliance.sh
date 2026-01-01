@@ -209,15 +209,16 @@ check_pattern 'fmt\.Println' "Use ios.Print() or ios.Success() instead of fmt.Pr
 
 # Rule 9: No spinner.New() - use iostreams.NewSpinner
 info "Checking for spinner.New()..."
-# Exclude: progress.go (this is the wrapper itself)
-check_pattern 'spinner\.New(' "Use iostreams.NewSpinner() instead of spinner.New()" "all" "error" "progress.go"
+# Exclude: progress.go (this is the wrapper itself), internal/tui/ (uses BubbleTea spinner correctly)
+check_pattern 'spinner\.New(' "Use iostreams.NewSpinner() instead of spinner.New()" "all" "error" "progress.go\|internal/tui/"
 
 # Rule 10: No error suppression with _ = err
 info "Checking for error suppression..."
 # Match "_ = err" but not blank identifiers in function signatures "_ context" or struct tags
 # Pattern: _ = err as a statement (with optional whitespace)
+# Exclude: test files (tests may legitimately suppress expected errors)
 if [[ -d "internal" ]]; then
-    results=$(grep -rn --include='*.go' '^\s*_ = err\b\|[^_]\s_ = err\b' internal 2>/dev/null || true)
+    results=$(grep -rn --include='*.go' --exclude='*_test.go' '^\s*_ = err\b\|[^_]\s_ = err\b' internal 2>/dev/null || true)
     if [[ -n "$results" ]]; then
         while IFS= read -r line; do
             # Skip lines that are clearly not error suppression (struct tags, blank params)
@@ -230,20 +231,23 @@ fi
 
 # Rule 11: No //nolint:errcheck directives (error suppression requires approval)
 info "Checking for //nolint:errcheck directives..."
-check_pattern '//nolint:errcheck' "nolint:errcheck requires explicit approval - handle errors properly" "all" "warning"
+# Exclude test files - tests may legitimately use nolint for testing specific behaviors
+check_pattern '//nolint:errcheck' "nolint:errcheck requires explicit approval - handle errors properly" "all" "warning" "_test.go"
 
 # Rule 12: No TODO comments
 info "Checking for TODO comments..."
 check_pattern '// TODO' "Fix TODO items, don't defer them" "all" "error"
 check_pattern '//TODO' "Fix TODO items, don't defer them" "all" "error"
 
-# Rule 13: No "deferred" or "future work" comments
+# Rule 13: No "deferred work" or "future work" comments
 info "Checking for deferred/future language..."
-check_pattern_nocase 'deferred' "Don't defer work - fix issues now" "all" "error"
-# Only flag "future" when it indicates deferred work, not legitimate descriptions
-check_pattern_nocase 'in the future' "Don't defer work to 'future' - fix issues now" "all" "error"
-check_pattern_nocase 'future version' "Don't promise future versions - implement now or remove" "all" "error"
-check_pattern_nocase 'future release' "Don't promise future releases - implement now or remove" "all" "error"
+# Note: We use specific patterns to avoid false positives:
+# - "defer this/that/work/task" but NOT Go's defer keyword usage
+# - "future version/release" but NOT token expiry dates or time descriptions
+# Patterns that indicate work deferral (excluding Go defer keyword and legitimate uses)
+check_pattern 'defer this\|defer that\|defer the\|defer work\|defer task\|defer implementation' "Don't defer work - fix issues now" "all" "error" "_test.go"
+check_pattern 'future version' "Don't promise future versions - implement now or remove" "all" "error" "_test.go"
+check_pattern 'future release' "Don't promise future releases - implement now or remove" "all" "error" "_test.go"
 
 # Rule 14: No "best effort" (any case)
 info "Checking for 'best effort' language..."

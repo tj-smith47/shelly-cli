@@ -2,9 +2,6 @@
 package importcmd
 
 import (
-	"fmt"
-
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -35,41 +32,6 @@ Use --force to overwrite an existing template with the same name.`,
 		NameFlagEnabled: false,
 		ForceFlagName:   "force",
 		ValidArgsFunc:   completion.FileThenNoComplete(),
-		Importer:        importTemplate,
+		Importer:        config.ImportTemplateFromFile,
 	})
-}
-
-func importTemplate(file, nameOverride string, overwrite bool) (string, error) {
-	data, err := afero.ReadFile(config.Fs(), file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
-	}
-
-	// Parse template
-	tpl, err := config.ParseDeviceTemplateFile(file, data)
-	if err != nil {
-		return "", err
-	}
-
-	// Override name if specified
-	if nameOverride != "" {
-		tpl.Name = nameOverride
-	}
-
-	// Validate name
-	if err := config.ValidateTemplateName(tpl.Name); err != nil {
-		return "", err
-	}
-
-	// Check if exists
-	if _, exists := config.GetDeviceTemplate(tpl.Name); exists && !overwrite {
-		return "", fmt.Errorf("template %q already exists (use --force to overwrite)", tpl.Name)
-	}
-
-	// Save template
-	if err := config.SaveDeviceTemplate(tpl); err != nil {
-		return "", fmt.Errorf("failed to save template: %w", err)
-	}
-
-	return fmt.Sprintf("Template %q imported from %s", tpl.Name, file), nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // Result holds the result of downloading a file.
@@ -31,8 +32,10 @@ func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
 	tmpPath := tmpFile.Name()
 
 	cleanup := func() {
-		// Best effort cleanup - ignore errors since we can't report them
-		_ = fs.Remove(tmpPath)
+		// Cleanup temp file - log errors for debugging but don't block caller
+		if err := fs.Remove(tmpPath); err != nil {
+			iostreams.DebugErr("cleanup temp file", err)
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, http.NoBody)
@@ -49,7 +52,11 @@ func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
 		cleanup()
 		return nil, fmt.Errorf("failed to download: %w", err)
 	}
-	defer resp.Body.Close() //nolint:errcheck // response body close in defer
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			iostreams.DebugErr("close response body", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		cleanup()

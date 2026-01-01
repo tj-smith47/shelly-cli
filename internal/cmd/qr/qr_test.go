@@ -529,7 +529,9 @@ func TestNewCommand_WithCancelledContext(t *testing.T) {
 	// Execute - may fail due to cancelled context
 	err := cmd.Execute()
 	// We expect an error or the command to complete quickly
-	_ = err // Error is acceptable due to cancelled context
+	if err != nil {
+		t.Logf("execute error (acceptable for cancelled context): %v", err)
+	}
 }
 
 func TestNewCommand_AcceptsIPAddress(t *testing.T) {

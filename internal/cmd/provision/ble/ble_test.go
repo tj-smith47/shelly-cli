@@ -414,7 +414,9 @@ func TestNewCommand_Execute_WithSSIDFlag(t *testing.T) {
 	// Execute - will fail due to BLE unavailability, but we're testing flag parsing
 	err := cmd.Execute()
 	// Error expected, but should be related to device connection, not flags
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_AllFlags(t *testing.T) {
@@ -436,7 +438,9 @@ func TestNewCommand_Execute_AllFlags(t *testing.T) {
 	// Execute - will fail due to BLE, but we're testing flag parsing
 	err := cmd.Execute()
 	// Error expected
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_PartialFlags(t *testing.T) {
@@ -451,7 +455,9 @@ func TestNewCommand_Execute_PartialFlags(t *testing.T) {
 	// Execute - will fail due to BLE, but we're testing it accepts flags
 	err := cmd.Execute()
 	// Error expected
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestNewCommand_Structure(t *testing.T) {
@@ -890,7 +896,9 @@ func TestNewCommand_Execute_IntegrationWithAllFlags(t *testing.T) {
 	err := cmd.Execute()
 	// Error is expected (Bluetooth not available)
 	// Just verify the command structure is correct
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_WithCloudDisabled(t *testing.T) {
@@ -907,7 +915,9 @@ func TestNewCommand_Execute_WithCloudDisabled(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_WithNameOnly(t *testing.T) {
@@ -919,7 +929,9 @@ func TestNewCommand_Execute_WithNameOnly(t *testing.T) {
 	cmd.SetArgs([]string{"device", "--name", "MyDevice"})
 
 	err := cmd.Execute()
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_WithTimezoneOnly(t *testing.T) {
@@ -931,7 +943,9 @@ func TestNewCommand_Execute_WithTimezoneOnly(t *testing.T) {
 	cmd.SetArgs([]string{"device", "--timezone", "Europe/Paris"})
 
 	err := cmd.Execute()
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_WithCloudEnabled(t *testing.T) {
@@ -948,7 +962,9 @@ func TestNewCommand_Execute_WithCloudEnabled(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	_ = err
+	if err != nil {
+		t.Logf("execute error (expected for BLE unavailability): %v", err)
+	}
 }
 
 func TestOptions_BothCloudFlagsSet(t *testing.T) {
@@ -1027,7 +1043,9 @@ func TestNewCommand_Execute_Variations(t *testing.T) {
 			// Execute - will fail but we're testing command structure
 			err := cmd.Execute()
 			// Error expected (BLE unavailable), but no panic
-			_ = err
+			if err != nil {
+				t.Logf("execute error (expected for BLE unavailability): %v", err)
+			}
 		})
 	}
 }

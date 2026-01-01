@@ -317,8 +317,10 @@ func TestRun_WithDevice(t *testing.T) {
 
 	err := run(ctx, opts)
 
-	// Error or nil are both acceptable
-	_ = err
+	// Error or nil are both acceptable for cancelled context
+	if err != nil {
+		t.Logf("run() error (acceptable for cancelled context): %v", err)
+	}
 
 	// Verify output contains REPL header
 	output := tf.OutString()
@@ -370,7 +372,9 @@ func TestNewCommand_Execute_NoArgs(t *testing.T) {
 	// Execute - should not require any args
 	err := cmd.Execute()
 	// Error is acceptable due to readline initialization in non-TTY
-	_ = err
+	if err != nil {
+		t.Logf("execute error (acceptable for non-TTY): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_WithDeviceFlag(t *testing.T) {
@@ -386,7 +390,9 @@ func TestNewCommand_Execute_WithDeviceFlag(t *testing.T) {
 	cmd.SetContext(ctx)
 
 	err := cmd.Execute()
-	_ = err
+	if err != nil {
+		t.Logf("execute error (acceptable for cancelled context): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_WithNoPromptFlag(t *testing.T) {
@@ -402,7 +408,9 @@ func TestNewCommand_Execute_WithNoPromptFlag(t *testing.T) {
 	cmd.SetContext(ctx)
 
 	err := cmd.Execute()
-	_ = err
+	if err != nil {
+		t.Logf("execute error (acceptable for cancelled context): %v", err)
+	}
 }
 
 func TestNewCommand_Execute_AllFlags(t *testing.T) {
@@ -418,7 +426,9 @@ func TestNewCommand_Execute_AllFlags(t *testing.T) {
 	cmd.SetContext(ctx)
 
 	err := cmd.Execute()
-	_ = err
+	if err != nil {
+		t.Logf("execute error (acceptable for cancelled context): %v", err)
+	}
 }
 
 func TestNewCommand_AcceptsNoArgs(t *testing.T) {
