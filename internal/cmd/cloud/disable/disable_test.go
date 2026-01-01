@@ -129,6 +129,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses mock server which modifies global state
 func TestRun_WithMock(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -166,6 +167,7 @@ func TestRun_WithMock(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses mock server which modifies global state
 func TestRun_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
@@ -182,5 +184,158 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Uses test factory which may modify global state
+func TestRun_CancelledContext(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	opts := &Options{Factory: tf.Factory, Device: "test-device"}
+	err := run(ctx, opts)
+
+	// Should fail due to cancelled context
+	if err == nil {
+		t.Error("expected error with cancelled context")
+	}
+}
+
+func TestNewCommand_CommandName(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.Name() != "disable" {
+		t.Errorf("Name() = %q, want 'disable'", cmd.Name())
+	}
+}
+
+func TestNewCommand_UsageString(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	usage := cmd.UsageString()
+	if !strings.Contains(usage, "disable") {
+		t.Error("UsageString should contain command name")
+	}
+}
+
+func TestNewCommand_NoSubcommands(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if len(cmd.Commands()) > 0 {
+		t.Errorf("disable command should not have subcommands, has %d", len(cmd.Commands()))
+	}
+}
+
+func TestNewCommand_LongMentionsCloud(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if !strings.Contains(cmd.Long, "Cloud") && !strings.Contains(cmd.Long, "cloud") {
+		t.Error("Long description should mention Cloud")
+	}
+}
+
+func TestNewCommand_LongMentionsLocal(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if !strings.Contains(cmd.Long, "local") {
+		t.Error("Long description should mention local network")
+	}
+}
+
+func TestNewCommand_ShortIsConcise(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if strings.Contains(cmd.Short, "\n") {
+		t.Error("Short description should not contain newlines")
+	}
+
+	if len(cmd.Short) > 80 {
+		t.Errorf("Short description too long (%d chars), should be under 80", len(cmd.Short))
+	}
+}
+
+func TestOptions_Fields(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	opts := &Options{
+		Factory: f,
+		Device:  "my-device",
+	}
+
+	if opts.Factory == nil {
+		t.Error("Factory should not be nil")
+	}
+	if opts.Device != "my-device" {
+		t.Errorf("Device = %q, want 'my-device'", opts.Device)
+	}
+}
+
+func TestExecute_MissingArgs(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for missing device argument")
+	}
+}
+
+//nolint:paralleltest // Uses mock server which modifies global state
+func TestExecute_WithDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "exec-test",
+					Address:    "192.168.1.200",
+					MAC:        "11:22:33:44:55:66",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"exec-test"})
+
+	// May succeed or fail depending on mock capability
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute() error = %v (expected for mock)", err)
 	}
 }

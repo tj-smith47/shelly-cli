@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -635,5 +637,615 @@ func TestNewCommand_RejectsTwoArgs(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("expected error when two args provided")
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify output contains expected content
+	output := tf.OutString()
+	if !strings.Contains(output, "QR Code for") {
+		t.Errorf("Output should contain 'QR Code for', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_NoQR(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    true,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify output contains expected content
+	output := tf.OutString()
+	if !strings.Contains(output, "Content:") {
+		t.Errorf("Output should contain 'Content:', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_WiFi(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    true,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify output contains expected content
+	output := tf.OutString()
+	if !strings.Contains(output, "QR Code for") {
+		t.Errorf("Output should contain 'QR Code for', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_Gen1Device(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "gen1-device", opts)
+	// Gen1 devices are not supported for QR generation
+	if err == nil {
+		t.Error("Expected error for Gen1 device")
+	}
+	if !strings.Contains(err.Error(), "Gen2") {
+		t.Errorf("Error should mention Gen2, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "nonexistent-device", opts)
+	// Should fail because device is not found
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_CancelledContext(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = run(ctx, "test-device", opts)
+	// Cancelled context should return error
+	if err == nil {
+		t.Error("Expected error with cancelled context")
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_WiFiAndNoQR(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    true,
+		NoQR:    true,
+		Size:    512,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify output contains expected content
+	output := tf.OutString()
+	if !strings.Contains(output, "Content:") {
+		t.Errorf("Output should contain 'Content:', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_StructuredOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Set JSON output format via viper
+	viper.Set("output", "json")
+	defer viper.Set("output", "")
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify JSON output
+	output := tf.OutString()
+	if !strings.Contains(output, `"device"`) {
+		t.Errorf("Output should contain JSON structure, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithEmptyMAC(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify MAC line is not printed for empty MAC
+	output := tf.OutString()
+	if strings.Contains(output, "MAC:") && strings.Contains(output, "MAC: \n") {
+		t.Errorf("Output should not contain empty MAC")
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithEmptyModel(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "",
+					Model:      "",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify Model line is not printed for empty Model
+	output := tf.OutString()
+	if strings.Contains(output, "Model: \n") {
+		t.Errorf("Output should not contain empty Model")
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithDifferentSize(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    128, // Different size
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_YAMLOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Set YAML output format
+	viper.Set("output", "yaml")
+	defer viper.Set("output", "")
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	// Verify YAML output
+	output := tf.OutString()
+	if !strings.Contains(output, "device:") {
+		t.Errorf("Output should contain YAML structure, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithBothEmptyMACAndModel(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "",
+					Type:       "",
+					Model:      "",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		WiFi:    false,
+		NoQR:    false,
+		Size:    256,
+	}
+
+	err = run(context.Background(), "test-device", opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Should NOT contain "MAC:" or "Model:" lines since they're empty
+	if strings.Contains(output, "MAC: ") || strings.Contains(output, "Model: ") {
+		t.Errorf("Output should not contain empty MAC/Model, got: %q", output)
 	}
 }

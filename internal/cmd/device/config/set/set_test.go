@@ -1,13 +1,16 @@
 package set
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -488,5 +491,94 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	long := cmd.Long
 	if long == "" {
 		t.Error("Long description should not be empty")
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_SetConfig(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "set-device",
+					Address:    "192.168.1.240",
+					MAC:        "AA:BB:CC:DD:EE:70",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"set-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"set-device", "sys", "device.name=TestDevice"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	out := tf.OutString()
+	if !strings.Contains(out, "updated") && !strings.Contains(out, "Configuration") {
+		t.Errorf("Output should contain success message, got: %s", out)
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_SetConfigError(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "existing-set-device",
+					Address:    "192.168.1.241",
+					MAC:        "AA:BB:CC:DD:EE:71",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"existing-set-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device", "sys", "name=Test"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
 	}
 }

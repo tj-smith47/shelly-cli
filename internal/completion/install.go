@@ -10,8 +10,10 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -83,14 +85,15 @@ func InstallBash(ios *iostreams.IOStreams, script []byte) error {
 // writeBashCompletion writes the bash completion script to the appropriate location.
 // It tries the system directory first, then falls back to user directory.
 func writeBashCompletion(home string, script []byte) (completionDir, completionFile string, err error) {
+	fs := config.Fs()
 	userDir := filepath.Join(home, ".local", "share", "bash-completion", "completions")
 
 	// Try system-wide completion directory on Linux
 	if runtime.GOOS == "linux" {
-		if _, statErr := os.Stat("/etc/bash_completion.d"); statErr == nil {
+		if _, statErr := fs.Stat("/etc/bash_completion.d"); statErr == nil {
 			completionFile = "/etc/bash_completion.d/shelly"
 			//nolint:gosec // G306: 0644 is required for shell to source completion files
-			if writeErr := os.WriteFile(completionFile, script, 0o644); writeErr == nil {
+			if writeErr := afero.WriteFile(fs, completionFile, script, 0o644); writeErr == nil {
 				return "/etc/bash_completion.d", completionFile, nil
 			}
 			// Fall through to user directory on write failure
@@ -99,13 +102,13 @@ func writeBashCompletion(home string, script []byte) (completionDir, completionF
 
 	// Use user directory
 	//nolint:gosec // G301: 0755 is required for directories to be traversable
-	if err = os.MkdirAll(userDir, 0o755); err != nil {
+	if err = fs.MkdirAll(userDir, 0o755); err != nil {
 		return "", "", fmt.Errorf("failed to create completion directory: %w", err)
 	}
 
 	completionFile = filepath.Join(userDir, "shelly")
 	//nolint:gosec // G306: 0644 is required for shell to source completion files
-	if err = os.WriteFile(completionFile, script, 0o644); err != nil {
+	if err = afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return "", "", fmt.Errorf("failed to write completion script: %w", err)
 	}
 
@@ -119,10 +122,12 @@ func InstallZsh(ios *iostreams.IOStreams, script []byte) error {
 		return err
 	}
 
+	fs := config.Fs()
+
 	// Use user's fpath-compatible directory
 	completionDir := filepath.Join(home, ".zsh", "completions")
 	//nolint:gosec // G301: 0755 is required for directories to be traversable
-	if err := os.MkdirAll(completionDir, 0o755); err != nil {
+	if err := fs.MkdirAll(completionDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create completion directory: %w", err)
 	}
 
@@ -130,7 +135,7 @@ func InstallZsh(ios *iostreams.IOStreams, script []byte) error {
 
 	// Write completion script
 	//nolint:gosec // G306: 0644 is required for shell to source completion files
-	if err := os.WriteFile(completionFile, script, 0o644); err != nil {
+	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return fmt.Errorf("failed to write completion script: %w", err)
 	}
 
@@ -163,7 +168,7 @@ func updateZshRC(ios *iostreams.IOStreams, rcFile, completionDir string) error {
 	}
 
 	//nolint:gosec // G302: 0644 is standard for shell rc files
-	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := config.Fs().OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -196,10 +201,12 @@ func InstallFish(ios *iostreams.IOStreams, script []byte) error {
 		return err
 	}
 
+	fs := config.Fs()
+
 	// Fish completions go in ~/.config/fish/completions
 	completionDir := filepath.Join(home, ".config", "fish", "completions")
 	//nolint:gosec // G301: 0755 is required for directories to be traversable
-	if err := os.MkdirAll(completionDir, 0o755); err != nil {
+	if err := fs.MkdirAll(completionDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create completion directory: %w", err)
 	}
 
@@ -207,7 +214,7 @@ func InstallFish(ios *iostreams.IOStreams, script []byte) error {
 
 	// Write completion script
 	//nolint:gosec // G306: 0644 is required for shell to source completion files
-	if err := os.WriteFile(completionFile, script, 0o644); err != nil {
+	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return fmt.Errorf("failed to write completion script: %w", err)
 	}
 
@@ -224,6 +231,8 @@ func InstallPowerShell(ios *iostreams.IOStreams, script []byte) error {
 		return err
 	}
 
+	fs := config.Fs()
+
 	// Determine PowerShell profile directory
 	var profileDir string
 	if runtime.GOOS == "windows" {
@@ -233,7 +242,7 @@ func InstallPowerShell(ios *iostreams.IOStreams, script []byte) error {
 	}
 
 	//nolint:gosec // G301: 0755 is required for directories to be traversable
-	if err := os.MkdirAll(profileDir, 0o755); err != nil {
+	if err := fs.MkdirAll(profileDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create profile directory: %w", err)
 	}
 
@@ -241,7 +250,7 @@ func InstallPowerShell(ios *iostreams.IOStreams, script []byte) error {
 
 	// Write completion script
 	//nolint:gosec // G306: 0644 is required for shell to source completion files
-	if err := os.WriteFile(completionFile, script, 0o644); err != nil {
+	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return fmt.Errorf("failed to write completion script: %w", err)
 	}
 
@@ -272,7 +281,7 @@ func updatePowerShellProfile(ios *iostreams.IOStreams, profileFile, completionFi
 	}
 
 	//nolint:gosec // G302: 0644 is standard for PowerShell profile files
-	f, err := os.OpenFile(profileFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := config.Fs().OpenFile(profileFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -290,8 +299,7 @@ func updatePowerShellProfile(ios *iostreams.IOStreams, profileFile, completionFi
 
 // needsSourceLine checks if a source line needs to be added to an rc file.
 func needsSourceLine(rcFile, searchStr string) bool {
-	//nolint:gosec // G304: rcFile is from known paths (home directory + constant)
-	f, err := os.Open(rcFile)
+	f, err := config.Fs().Open(rcFile)
 	if err != nil {
 		// File doesn't exist, need to add line
 		return true

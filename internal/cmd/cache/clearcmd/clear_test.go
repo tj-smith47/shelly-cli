@@ -453,12 +453,12 @@ func TestRun_RemoveAllError(t *testing.T) {
 	}
 
 	// Make parent directory read-only to prevent deletion
-	if err := os.Chmod(subDir, 0o500); err != nil {
+	if err := os.Chmod(subDir, 0o500); err != nil { //nolint:gosec // G302: intentionally restrictive for test
 		t.Fatalf("Failed to chmod: %v", err)
 	}
 	t.Cleanup(func() {
 		// Restore permissions for cleanup
-		if err := os.Chmod(subDir, 0o750); err != nil {
+		if err := os.Chmod(subDir, 0o750); err != nil { //nolint:gosec // G302: restore for cleanup
 			t.Logf("warning: failed to restore permissions: %v", err)
 		}
 	})

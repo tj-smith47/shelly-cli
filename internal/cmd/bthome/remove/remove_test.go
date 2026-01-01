@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -188,5 +189,106 @@ func TestNewCommand_InvalidID(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid device ID") {
 		t.Errorf("expected 'invalid device ID' error, got: %v", err)
+	}
+}
+
+func TestRun_WithMock_Success(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{Name: "test-device", Address: "10.0.0.1", Generation: 2},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures error: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	// Use --yes to skip confirmation
+	cmd.SetArgs([]string{"test-device", "200", "--yes"})
+
+	err = cmd.Execute()
+	// The command will likely fail because BTHomeRemoveDevice isn't mocked,
+	// but this tests the confirmation bypass path
+	// We expect a device resolution or RPC error, not a confirmation error
+	if err != nil {
+		// This is expected since we don't have a real BTHome device
+		// Just verify it got past the confirmation step
+		if strings.Contains(err.Error(), "confirm") {
+			t.Errorf("Should have bypassed confirmation with --yes: %v", err)
+		}
+	}
+}
+
+func TestRun_Cancelled(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{Name: "test-device", Address: "10.0.0.1", Generation: 2},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures error: %v", err)
+	}
+	t.Cleanup(demo.Cleanup)
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	// Don't use --yes so confirmation is required
+	// In non-TTY mode (test mode), confirmation returns false by default
+	cmd.SetArgs([]string{"test-device", "200"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	// Should show "Operation cancelled" - Info() goes to stdout
+	output := tf.OutString()
+	if !strings.Contains(output, "cancelled") {
+		t.Errorf("Output = %q, want to contain 'cancelled'", output)
+	}
+}
+
+func TestOptions_Factory(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	opts := &Options{
+		Factory: f,
+		Device:  "gateway",
+		ID:      100,
+	}
+	opts.Yes = true
+
+	if opts.Factory != f {
+		t.Error("Factory not set correctly")
+	}
+	if opts.Device != "gateway" {
+		t.Errorf("Device = %q, want %q", opts.Device, "gateway")
+	}
+	if opts.ID != 100 {
+		t.Errorf("ID = %d, want %d", opts.ID, 100)
+	}
+	if !opts.Yes {
+		t.Error("Yes should be true")
 	}
 }

@@ -2,6 +2,8 @@ package mock
 
 import (
 	"time"
+
+	"github.com/tj-smith47/shelly-go/integrator"
 )
 
 // FleetDeviceStatus represents a fleet device status for demo mode.
@@ -52,4 +54,29 @@ func GetFleetOrganization() string {
 		return ""
 	}
 	return demo.Fixtures.Fleet.Organization
+}
+
+// GetFleetDeviceStatuses returns fleet device statuses as integrator.DeviceStatus
+// for direct use in display functions. Returns nil if not in demo mode.
+func GetFleetDeviceStatuses() []*integrator.DeviceStatus {
+	demo := GetCurrentDemo()
+	if demo == nil || demo.Fixtures == nil {
+		return nil
+	}
+
+	statuses := make([]*integrator.DeviceStatus, len(demo.Fixtures.Fleet.Devices))
+	for i, d := range demo.Fixtures.Fleet.Devices {
+		// Use Name as DeviceID for display since the table shows DeviceID
+		deviceID := d.Name
+		if deviceID == "" {
+			deviceID = d.ID
+		}
+		statuses[i] = &integrator.DeviceStatus{
+			DeviceID: deviceID,
+			Online:   d.Online,
+			LastSeen: time.Now().Add(-time.Duration(i) * time.Minute),
+			Host:     "wss://api.shelly.cloud",
+		}
+	}
+	return statuses
 }

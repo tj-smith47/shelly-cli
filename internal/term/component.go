@@ -4,6 +4,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -77,13 +78,16 @@ func DisplayList[T model.Listable](ios *iostreams.IOStreams, items []T, emptyMsg
 	// Use a zero value to get headers (works even for empty slices)
 	var zero T
 	headers := zero.ListHeaders()
-	t := output.NewTable(headers...)
+	builder := table.NewBuilder(headers...)
 
 	for _, item := range items {
-		t.AddRow(item.ListRow()...)
+		builder.AddRow(item.ListRow()...)
 	}
 
-	printTable(ios, t)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print component list table", err)
+	}
 }
 
 // DisplaySwitchList prints a table of switches.

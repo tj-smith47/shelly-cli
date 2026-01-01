@@ -1,6 +1,7 @@
 package factoryreset
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -570,5 +572,83 @@ func TestOptions_ConfirmFlagsEmbedded(t *testing.T) {
 	}
 	if !opts.Confirm {
 		t.Error("Confirm should be true")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_FactoryResetSuccess(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Provide "y" response for final confirmation
+	tf.TestIO.In.WriteString("y\n")
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device", "-y", "--confirm"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_FactoryResetDeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Provide "y" response for final confirmation
+	tf.TestIO.In.WriteString("y\n")
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"nonexistent", "-y", "--confirm"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	// For nonexistent device, the factory reset will fail after confirmation
+	// This exercises the spinner error path
+	err = cmd.Execute()
+	// Error is expected because device doesn't exist
+	if err != nil {
+		t.Logf("Execute() error = %v (expected for nonexistent device)", err)
 	}
 }

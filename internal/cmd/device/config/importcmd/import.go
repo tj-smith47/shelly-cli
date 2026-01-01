@@ -6,12 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -65,16 +66,16 @@ func run(ctx context.Context, opts *Options) error {
 	defer cancel()
 
 	// Read and parse file
-	fileData, err := os.ReadFile(opts.FilePath)
+	fileData, err := afero.ReadFile(config.Fs(), opts.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	var config map[string]any
+	var deviceConfig map[string]any
 
 	// Try JSON first, then YAML
-	if err := json.Unmarshal(fileData, &config); err != nil {
-		if err := yaml.Unmarshal(fileData, &config); err != nil {
+	if err := json.Unmarshal(fileData, &deviceConfig); err != nil {
+		if err := yaml.Unmarshal(fileData, &deviceConfig); err != nil {
 			return fmt.Errorf("failed to parse file as JSON or YAML: %w", err)
 		}
 	}
@@ -95,12 +96,12 @@ func run(ctx context.Context, opts *Options) error {
 		}
 
 		ios.Title("Dry run - changes that would be applied")
-		term.DisplayConfigMapDiff(ios, currentConfig, config)
+		term.DisplayConfigMapDiff(ios, currentConfig, deviceConfig)
 		return nil
 	}
 
 	err = cmdutil.RunWithSpinner(ctx, ios, "Importing configuration...", func(ctx context.Context) error {
-		return svc.SetConfig(ctx, opts.Device, config)
+		return svc.SetConfig(ctx, opts.Device, deviceConfig)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to import configuration: %w", err)

@@ -149,8 +149,8 @@ func TestOptions(t *testing.T) {
 		t.Errorf("DeviceFilter = %q, want %q", opts.DeviceFilter, "abc123")
 	}
 
-	if opts.EventFilter != "Shelly:Online" {
-		t.Errorf("EventFilter = %q, want %q", opts.EventFilter, "Shelly:Online")
+	if opts.EventFilter != testEventOnline {
+		t.Errorf("EventFilter = %q, want %q", opts.EventFilter, testEventOnline)
 	}
 
 	if !opts.Raw {
@@ -159,6 +159,7 @@ func TestOptions(t *testing.T) {
 }
 
 func TestExecute_NotLoggedIn(t *testing.T) {
+	t.Parallel()
 	tf := factory.NewTestFactory(t)
 
 	var buf bytes.Buffer
@@ -323,12 +324,12 @@ func TestOptions_OutputFlags(t *testing.T) {
 		Raw:          false,
 	}
 
-	if opts.Format != "json" {
-		t.Errorf("Format = %q, want %q", opts.Format, "json")
+	if opts.Format != testFormatJSON {
+		t.Errorf("Format = %q, want %q", opts.Format, testFormatJSON)
 	}
 
-	if opts.DeviceFilter != "device1" {
-		t.Errorf("DeviceFilter = %q, want %q", opts.DeviceFilter, "device1")
+	if opts.DeviceFilter != testDevice1 {
+		t.Errorf("DeviceFilter = %q, want %q", opts.DeviceFilter, testDevice1)
 	}
 }
 
@@ -391,13 +392,17 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 }
 
 func TestNewCommand_OutputContainsLoginHint(t *testing.T) {
+	t.Parallel()
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
 	cmd.SetArgs([]string{})
 
-	_ = cmd.Execute()
+	// Error expected (not logged in), but we want to check output.
+	if err := cmd.Execute(); err == nil {
+		t.Log("expected error from Execute")
+	}
 
 	// Check IOStreams output (where the login hint is printed)
 	output := tf.OutString()
@@ -496,7 +501,10 @@ func TestExecute_DisplaysConnectingMessage(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	_ = cmd.Execute()
+	// Connection will fail (no real server), but we want to verify output.
+	if err := cmd.Execute(); err != nil {
+		t.Logf("expected error: %v", err)
+	}
 
 	output := out.String()
 	if !strings.Contains(output, "Connecting") {
@@ -541,8 +549,8 @@ func TestNewCommand_EventFlagValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetString error: %v", err)
 	}
-	if val != "Shelly:StatusOnChange" {
-		t.Errorf("event value = %q, want 'Shelly:StatusOnChange'", val)
+	if val != testEventStatusOnChange {
+		t.Errorf("event value = %q, want %q", val, testEventStatusOnChange)
 	}
 }
 
@@ -577,8 +585,8 @@ func TestNewCommand_FormatFlagValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetString error: %v", err)
 	}
-	if val != "json" {
-		t.Errorf("format value = %q, want 'json'", val)
+	if val != testFormatJSON {
+		t.Errorf("format value = %q, want %q", val, testFormatJSON)
 	}
 }
 
@@ -603,7 +611,12 @@ func (s *testWSServer) handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			// Test server cleanup error - not significant.
+			iostreams.DebugErr("closing test websocket", cerr)
+		}
+	}()
 
 	for _, event := range s.events {
 		data, err := json.Marshal(event)
@@ -617,8 +630,10 @@ func (s *testWSServer) handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Close normally after sending events.
-	_ = conn.WriteMessage(websocket.CloseMessage,
-		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err := conn.WriteMessage(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
+		iostreams.DebugErr("sending close message", err)
+	}
 }
 
 func (s *testWSServer) URL() string {
@@ -699,16 +714,12 @@ func TestStreamCloudEvents_DeviceFilter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var receivedIDs []string
-	opts := network.CloudEventStreamOptions{DeviceFilter: "device1"}
+	opts := network.CloudEventStreamOptions{DeviceFilter: testDevice1}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		receivedIDs = append(receivedIDs, event.GetDeviceID())
 		return nil
 	})
@@ -721,7 +732,7 @@ func TestStreamCloudEvents_DeviceFilter(t *testing.T) {
 	}
 
 	for _, id := range receivedIDs {
-		if id != "device1" {
+		if id != testDevice1 {
 			t.Errorf("expected only device1 events, got %q", id)
 		}
 	}
@@ -743,16 +754,12 @@ func TestStreamCloudEvents_EventFilter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var receivedTypes []string
 	opts := network.CloudEventStreamOptions{EventFilter: "Online"}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		receivedTypes = append(receivedTypes, event.Event)
 		return nil
 	})
@@ -764,7 +771,7 @@ func TestStreamCloudEvents_EventFilter(t *testing.T) {
 		t.Errorf("received %d events, want 1 (filtered to Online)", len(receivedTypes))
 	}
 
-	if len(receivedTypes) > 0 && receivedTypes[0] != "Shelly:Online" {
+	if len(receivedTypes) > 0 && receivedTypes[0] != testEventOnline {
 		t.Errorf("expected Shelly:Online event, got %q", receivedTypes[0])
 	}
 }
@@ -786,16 +793,12 @@ func TestStreamCloudEvents_MultipleEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var received []model.CloudEvent
 	opts := network.CloudEventStreamOptions{}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		received = append(received, *event)
 		return nil
 	})
@@ -820,18 +823,15 @@ func TestStreamCloudEvents_ContextCancellation(t *testing.T) {
 	defer srv.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(context.Background(), srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, context.Background(), srv.URL())
 
 	receivedCount := 0
 	opts := network.CloudEventStreamOptions{}
 
-	// Cancel context after first event
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	// Cancel context after first event.
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		receivedCount++
 		cancel()
 		return nil
@@ -887,8 +887,8 @@ func TestNewCommand_DeviceFlagType(t *testing.T) {
 		t.Fatal("device flag should exist")
 	}
 
-	if deviceFlag.Value.Type() != "string" {
-		t.Errorf("device flag type = %q, want 'string'", deviceFlag.Value.Type())
+	if deviceFlag.Value.Type() != testTypeString {
+		t.Errorf("device flag type = %q, want %q", deviceFlag.Value.Type(), testTypeString)
 	}
 }
 
@@ -902,8 +902,8 @@ func TestNewCommand_EventFlagType(t *testing.T) {
 		t.Fatal("event flag should exist")
 	}
 
-	if eventFlag.Value.Type() != "string" {
-		t.Errorf("event flag type = %q, want 'string'", eventFlag.Value.Type())
+	if eventFlag.Value.Type() != testTypeString {
+		t.Errorf("event flag type = %q, want %q", eventFlag.Value.Type(), testTypeString)
 	}
 }
 
@@ -932,8 +932,8 @@ func TestNewCommand_FormatFlagType(t *testing.T) {
 		t.Fatal("format flag should exist")
 	}
 
-	if formatFlag.Value.Type() != "string" {
-		t.Errorf("format flag type = %q, want 'string'", formatFlag.Value.Type())
+	if formatFlag.Value.Type() != testTypeString {
+		t.Errorf("format flag type = %q, want %q", formatFlag.Value.Type(), testTypeString)
 	}
 }
 
@@ -941,9 +941,9 @@ func TestCloudEvent_GetDeviceID(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		event    model.CloudEvent
-		wantID   string
+		name   string
+		event  model.CloudEvent
+		wantID string
 	}{
 		{
 			name:   "DeviceID set",
@@ -995,19 +995,15 @@ func TestStreamCloudEvents_CombinedFilters(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var received []model.CloudEvent
 	opts := network.CloudEventStreamOptions{
-		DeviceFilter: "device1",
+		DeviceFilter: testDevice1,
 		EventFilter:  "Status",
 	}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		received = append(received, *event)
 		return nil
 	})
@@ -1015,7 +1011,7 @@ func TestStreamCloudEvents_CombinedFilters(t *testing.T) {
 		t.Fatalf("StreamCloudEvents error: %v", err)
 	}
 
-	// Should only receive StatusOnChange from device1
+	// Should only receive StatusOnChange from device1.
 	if len(received) != 1 {
 		t.Errorf("received %d events, want 1", len(received))
 	}
@@ -1113,8 +1109,10 @@ func TestExecute_WithAllFlags(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
-	// Will fail to connect but should parse all flags correctly
-	_ = cmd.Execute()
+	// Will fail to connect but should parse all flags correctly.
+	if err := cmd.Execute(); err != nil {
+		t.Logf("expected connection error: %v", err)
+	}
 
 	// Verify flags were parsed (command ran, even if connection failed)
 	output := out.String()
@@ -1149,7 +1147,7 @@ func TestNewCommand_CommandPath(t *testing.T) {
 	}
 }
 
-// TestEventHandler_RawOutput tests the raw output path in the event handler
+// TestEventHandler_RawOutput tests the raw output path in the event handler.
 func TestEventHandler_RawOutput(t *testing.T) {
 	t.Parallel()
 
@@ -1164,16 +1162,12 @@ func TestEventHandler_RawOutput(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var rawOutput []string
 	opts := network.CloudEventStreamOptions{Raw: true}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, raw []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, raw []byte) error {
 		rawOutput = append(rawOutput, string(raw))
 		return nil
 	})
@@ -1185,7 +1179,7 @@ func TestEventHandler_RawOutput(t *testing.T) {
 		t.Errorf("received %d raw outputs, want 1", len(rawOutput))
 	}
 
-	// Verify raw output is valid JSON
+	// Verify raw output is valid JSON.
 	if len(rawOutput) > 0 {
 		var decoded model.CloudEvent
 		if err := json.Unmarshal([]byte(rawOutput[0]), &decoded); err != nil {
@@ -1194,7 +1188,7 @@ func TestEventHandler_RawOutput(t *testing.T) {
 	}
 }
 
-// TestEventHandler_JSONOutput tests the JSON output path in the event handler
+// TestEventHandler_JSONOutput tests the JSON output path in the event handler.
 func TestEventHandler_JSONOutput(t *testing.T) {
 	t.Parallel()
 
@@ -1210,16 +1204,12 @@ func TestEventHandler_JSONOutput(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var jsonOutputs []string
 	opts := network.CloudEventStreamOptions{}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		formatted, jsonErr := json.Marshal(event)
 		if jsonErr != nil {
 			return jsonErr
@@ -1235,7 +1225,7 @@ func TestEventHandler_JSONOutput(t *testing.T) {
 		t.Errorf("received %d JSON outputs, want 2", len(jsonOutputs))
 	}
 
-	// Verify each output is valid JSON that can decode back
+	// Verify each output is valid JSON that can decode back.
 	for i, output := range jsonOutputs {
 		var decoded model.CloudEvent
 		if err := json.Unmarshal([]byte(output), &decoded); err != nil {
@@ -1244,7 +1234,7 @@ func TestEventHandler_JSONOutput(t *testing.T) {
 	}
 }
 
-// TestEventHandler_TextOutput tests the text display path in the event handler
+// TestEventHandler_TextOutput tests the text display path in the event handler.
 func TestEventHandler_TextOutput(t *testing.T) {
 	t.Parallel()
 
@@ -1259,16 +1249,12 @@ func TestEventHandler_TextOutput(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var received []*model.CloudEvent
 	opts := network.CloudEventStreamOptions{}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		received = append(received, event)
 		return nil
 	})
@@ -1282,16 +1268,16 @@ func TestEventHandler_TextOutput(t *testing.T) {
 
 	if len(received) > 0 {
 		event := received[0]
-		if event.Event != "Shelly:Online" {
-			t.Errorf("event type = %q, want 'Shelly:Online'", event.Event)
+		if event.Event != testEventOnline {
+			t.Errorf("event type = %q, want %q", event.Event, testEventOnline)
 		}
-		if event.GetDeviceID() != "device1" {
-			t.Errorf("device ID = %q, want 'device1'", event.GetDeviceID())
+		if event.GetDeviceID() != testDevice1 {
+			t.Errorf("device ID = %q, want %q", event.GetDeviceID(), testDevice1)
 		}
 	}
 }
 
-// TestStreamCloudEvents_HandlerError tests that handler errors stop streaming
+// TestStreamCloudEvents_HandlerError tests that handler errors stop streaming.
 func TestStreamCloudEvents_HandlerError(t *testing.T) {
 	t.Parallel()
 
@@ -1308,17 +1294,13 @@ func TestStreamCloudEvents_HandlerError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	receivedCount := 0
 	handlerErr := "handler error"
 	opts := network.CloudEventStreamOptions{}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		receivedCount++
 		if receivedCount >= 1 {
 			return errors.New(handlerErr)
@@ -1338,7 +1320,7 @@ func TestStreamCloudEvents_HandlerError(t *testing.T) {
 	}
 }
 
-// TestCloudEvent_OnlineStatus tests online status parsing
+// TestCloudEvent_OnlineStatus tests online status parsing.
 func TestCloudEvent_OnlineStatus(t *testing.T) {
 	t.Parallel()
 
@@ -1391,7 +1373,7 @@ func TestCloudEvent_OnlineStatus(t *testing.T) {
 	}
 }
 
-// TestCloudEvent_StatusOnChange tests status change parsing
+// TestCloudEvent_StatusOnChange tests status change parsing.
 func TestCloudEvent_StatusOnChange(t *testing.T) {
 	t.Parallel()
 
@@ -1416,7 +1398,7 @@ func TestCloudEvent_StatusOnChange(t *testing.T) {
 	}
 }
 
-// TestCloudEvent_Settings tests settings event parsing
+// TestCloudEvent_Settings tests settings event parsing.
 func TestCloudEvent_Settings(t *testing.T) {
 	t.Parallel()
 
@@ -1441,7 +1423,7 @@ func TestCloudEvent_Settings(t *testing.T) {
 	}
 }
 
-// TestCloudEvent_Timestamp tests timestamp parsing
+// TestCloudEvent_Timestamp tests timestamp parsing.
 func TestCloudEvent_Timestamp(t *testing.T) {
 	t.Parallel()
 
@@ -1465,7 +1447,7 @@ func TestCloudEvent_Timestamp(t *testing.T) {
 	}
 }
 
-// TestNewWSServer tests the test websocket server itself
+// TestNewWSServer tests the test websocket server itself.
 func TestNewWSServer(t *testing.T) {
 	t.Parallel()
 
@@ -1479,7 +1461,7 @@ func TestNewWSServer(t *testing.T) {
 	}
 }
 
-// TestStreamCloudEvents_EmptyEvents tests handling of empty event list
+// TestStreamCloudEvents_EmptyEvents tests handling of empty event list.
 func TestStreamCloudEvents_EmptyEvents(t *testing.T) {
 	t.Parallel()
 
@@ -1491,16 +1473,12 @@ func TestStreamCloudEvents_EmptyEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	receivedCount := 0
 	opts := network.CloudEventStreamOptions{}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		receivedCount++
 		return nil
 	})
@@ -1513,15 +1491,15 @@ func TestStreamCloudEvents_EmptyEvents(t *testing.T) {
 	}
 }
 
-// TestStreamCloudEvents_NoFilters tests streaming without any filters
+// TestStreamCloudEvents_NoFilters tests streaming without any filters.
 func TestStreamCloudEvents_NoFilters(t *testing.T) {
 	t.Parallel()
 
 	online := 1
 	events := []model.CloudEvent{
-		{Event: "Shelly:Online", DeviceID: "device1", Online: &online},
-		{Event: "Shelly:StatusOnChange", DeviceID: "device2", Status: []byte(`{}`)},
-		{Event: "Shelly:Settings", DeviceID: "device3", Settings: []byte(`{}`)},
+		{Event: testEventOnline, DeviceID: testDevice1, Online: &online},
+		{Event: testEventStatusOnChange, DeviceID: "device2", Status: []byte(`{}`)},
+		{Event: testEventSettings, DeviceID: "device3", Settings: []byte(`{}`)},
 	}
 
 	srv := newTestWSServer(events)
@@ -1530,16 +1508,12 @@ func TestStreamCloudEvents_NoFilters(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, srv.URL(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+	conn := dialTestWS(t, ctx, srv.URL())
 
 	var received []model.CloudEvent
 	opts := network.CloudEventStreamOptions{}
 
-	err = network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
+	err := network.StreamCloudEvents(ctx, conn, opts, func(event *model.CloudEvent, _ []byte) error {
 		received = append(received, *event)
 		return nil
 	})
@@ -1565,7 +1539,7 @@ func TestStreamCloudEvents_NoFilters(t *testing.T) {
 	}
 }
 
-// TestOptions_AllFieldsSet tests Options with all fields populated
+// TestOptions_AllFieldsSet tests Options with all fields populated.
 func TestOptions_AllFieldsSet(t *testing.T) {
 	t.Parallel()
 
@@ -1592,7 +1566,7 @@ func TestOptions_AllFieldsSet(t *testing.T) {
 	}
 }
 
-// TestNewCommand_FullFlagSet tests parsing all flags together
+// TestNewCommand_FullFlagSet tests parsing all flags together.
 func TestNewCommand_FullFlagSet(t *testing.T) {
 	t.Parallel()
 
@@ -1609,10 +1583,22 @@ func TestNewCommand_FullFlagSet(t *testing.T) {
 		t.Fatalf("ParseFlags error: %v", err)
 	}
 
-	device, _ := cmd.Flags().GetString("device")
-	event, _ := cmd.Flags().GetString("event")
-	format, _ := cmd.Flags().GetString("format")
-	raw, _ := cmd.Flags().GetBool("raw")
+	device, err := cmd.Flags().GetString("device")
+	if err != nil {
+		t.Fatalf("GetString device: %v", err)
+	}
+	event, err := cmd.Flags().GetString("event")
+	if err != nil {
+		t.Fatalf("GetString event: %v", err)
+	}
+	format, err := cmd.Flags().GetString("format")
+	if err != nil {
+		t.Fatalf("GetString format: %v", err)
+	}
+	raw, err := cmd.Flags().GetBool("raw")
+	if err != nil {
+		t.Fatalf("GetBool raw: %v", err)
+	}
 
 	if device != "mydevice" {
 		t.Errorf("device = %q, want 'mydevice'", device)
@@ -1620,15 +1606,15 @@ func TestNewCommand_FullFlagSet(t *testing.T) {
 	if event != "Online" {
 		t.Errorf("event = %q, want 'Online'", event)
 	}
-	if format != "json" {
-		t.Errorf("format = %q, want 'json'", format)
+	if format != testFormatJSON {
+		t.Errorf("format = %q, want %q", format, testFormatJSON)
 	}
 	if !raw {
 		t.Error("raw should be true")
 	}
 }
 
-// TestMakeEventHandler_RawMode tests the event handler in raw mode
+// TestMakeEventHandler_RawMode tests the event handler in raw mode.
 func TestMakeEventHandler_RawMode(t *testing.T) {
 	t.Parallel()
 
@@ -1661,7 +1647,7 @@ func TestMakeEventHandler_RawMode(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_JSONFormat tests the event handler with JSON format
+// TestMakeEventHandler_JSONFormat tests the event handler with JSON format.
 func TestMakeEventHandler_JSONFormat(t *testing.T) {
 	t.Parallel()
 
@@ -1702,7 +1688,7 @@ func TestMakeEventHandler_JSONFormat(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_TextFormat tests the event handler with default text format
+// TestMakeEventHandler_TextFormat tests the event handler with default text format.
 func TestMakeEventHandler_TextFormat(t *testing.T) {
 	t.Parallel()
 
@@ -1741,7 +1727,7 @@ func TestMakeEventHandler_TextFormat(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_DefaultFormat tests the event handler with empty format (defaults to text)
+// TestMakeEventHandler_DefaultFormat tests the event handler with empty format (defaults to text).
 func TestMakeEventHandler_DefaultFormat(t *testing.T) {
 	t.Parallel()
 
@@ -1774,7 +1760,7 @@ func TestMakeEventHandler_DefaultFormat(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_StatusOnChangeEvent tests the handler with status change events
+// TestMakeEventHandler_StatusOnChangeEvent tests the handler with status change events.
 func TestMakeEventHandler_StatusOnChangeEvent(t *testing.T) {
 	t.Parallel()
 
@@ -1807,7 +1793,7 @@ func TestMakeEventHandler_StatusOnChangeEvent(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_SettingsEvent tests the handler with settings events
+// TestMakeEventHandler_SettingsEvent tests the handler with settings events.
 func TestMakeEventHandler_SettingsEvent(t *testing.T) {
 	t.Parallel()
 
@@ -1840,7 +1826,7 @@ func TestMakeEventHandler_SettingsEvent(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_JSONMarshalError tests error handling when JSON marshaling fails
+// TestMakeEventHandler_JSONMarshalError tests error handling when JSON marshaling fails.
 func TestMakeEventHandler_JSONMarshalError(t *testing.T) {
 	t.Parallel()
 
@@ -1868,7 +1854,7 @@ func TestMakeEventHandler_JSONMarshalError(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_OnlineEvent tests the handler with online events
+// TestMakeEventHandler_OnlineEvent tests the handler with online events.
 func TestMakeEventHandler_OnlineEvent(t *testing.T) {
 	t.Parallel()
 
@@ -1924,7 +1910,7 @@ func TestMakeEventHandler_OnlineEvent(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_UnknownEventType tests the handler with unknown event types
+// TestMakeEventHandler_UnknownEventType tests the handler with unknown event types.
 func TestMakeEventHandler_UnknownEventType(t *testing.T) {
 	t.Parallel()
 
@@ -1956,7 +1942,7 @@ func TestMakeEventHandler_UnknownEventType(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_EmptyDeviceID tests the handler with empty device ID
+// TestMakeEventHandler_EmptyDeviceID tests the handler with empty device ID.
 func TestMakeEventHandler_EmptyDeviceID(t *testing.T) {
 	t.Parallel()
 
@@ -1991,7 +1977,7 @@ func TestMakeEventHandler_EmptyDeviceID(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_RawModeIgnoresFormat tests that raw mode ignores format setting
+// TestMakeEventHandler_RawModeIgnoresFormat tests that raw mode ignores format setting.
 func TestMakeEventHandler_RawModeIgnoresFormat(t *testing.T) {
 	t.Parallel()
 
@@ -2022,7 +2008,7 @@ func TestMakeEventHandler_RawModeIgnoresFormat(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_JSONFormat_WithTimestamp tests JSON output includes timestamp
+// TestMakeEventHandler_JSONFormat_WithTimestamp tests JSON output includes timestamp.
 func TestMakeEventHandler_JSONFormat_WithTimestamp(t *testing.T) {
 	t.Parallel()
 
@@ -2056,7 +2042,7 @@ func TestMakeEventHandler_JSONFormat_WithTimestamp(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_TextFormat_StatusChange tests text output for status changes
+// TestMakeEventHandler_TextFormat_StatusChange tests text output for status changes.
 func TestMakeEventHandler_TextFormat_StatusChange(t *testing.T) {
 	t.Parallel()
 
@@ -2089,7 +2075,7 @@ func TestMakeEventHandler_TextFormat_StatusChange(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_MultipleEventsSequence tests handling multiple events in sequence
+// TestMakeEventHandler_MultipleEventsSequence tests handling multiple events in sequence.
 func TestMakeEventHandler_MultipleEventsSequence(t *testing.T) {
 	t.Parallel()
 
@@ -2131,7 +2117,7 @@ func TestMakeEventHandler_MultipleEventsSequence(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_TextFormat_SettingsWithJSON tests settings display with JSON data
+// TestMakeEventHandler_TextFormat_SettingsWithJSON tests settings display with JSON data.
 func TestMakeEventHandler_TextFormat_SettingsWithJSON(t *testing.T) {
 	t.Parallel()
 
@@ -2164,7 +2150,7 @@ func TestMakeEventHandler_TextFormat_SettingsWithJSON(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_RawMode_EmptyData tests raw mode with empty data
+// TestMakeEventHandler_RawMode_EmptyData tests raw mode with empty data.
 func TestMakeEventHandler_RawMode_EmptyData(t *testing.T) {
 	t.Parallel()
 
@@ -2185,7 +2171,7 @@ func TestMakeEventHandler_RawMode_EmptyData(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_UnknownFormat tests non-json and non-text format defaults to text
+// TestMakeEventHandler_UnknownFormat tests non-json and non-text format defaults to text.
 func TestMakeEventHandler_UnknownFormat(t *testing.T) {
 	t.Parallel()
 
@@ -2220,7 +2206,7 @@ func TestMakeEventHandler_UnknownFormat(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_DeviceField tests handler with Device field instead of DeviceID
+// TestMakeEventHandler_DeviceField tests handler with Device field instead of DeviceID.
 func TestMakeEventHandler_DeviceField(t *testing.T) {
 	t.Parallel()
 
@@ -2252,7 +2238,7 @@ func TestMakeEventHandler_DeviceField(t *testing.T) {
 	}
 }
 
-// TestNewCommand_FlagShorthand tests flag shorthand availability
+// TestNewCommand_FlagShorthand tests flag shorthand availability.
 func TestNewCommand_FlagShorthand(t *testing.T) {
 	t.Parallel()
 
@@ -2268,8 +2254,9 @@ func TestNewCommand_FlagShorthand(t *testing.T) {
 	}
 }
 
-// TestNewCommand_RunEReturnsError tests that RunE returns error correctly
+// TestNewCommand_RunEReturnsError tests that RunE returns error correctly.
 func TestNewCommand_RunEReturnsError(t *testing.T) {
+	t.Parallel()
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -2287,7 +2274,7 @@ func TestNewCommand_RunEReturnsError(t *testing.T) {
 	}
 }
 
-// TestOptions_CopyValues tests that Options fields can be read correctly
+// TestOptions_CopyValues tests that Options fields can be read correctly.
 func TestOptions_CopyValues(t *testing.T) {
 	t.Parallel()
 
@@ -2324,7 +2311,7 @@ func TestOptions_CopyValues(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_NilEvent tests handler with nil event doesn't panic
+// TestMakeEventHandler_NilEvent tests handler with nil event doesn't panic.
 func TestMakeEventHandler_NilEvent(t *testing.T) {
 	t.Parallel()
 
@@ -2345,7 +2332,7 @@ func TestMakeEventHandler_NilEvent(t *testing.T) {
 	}
 }
 
-// TestMakeEventHandler_TextFormat_LargeStatus tests text output with large status
+// TestMakeEventHandler_TextFormat_LargeStatus tests text output with large status.
 func TestMakeEventHandler_TextFormat_LargeStatus(t *testing.T) {
 	t.Parallel()
 

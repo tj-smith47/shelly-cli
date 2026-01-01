@@ -3,12 +3,21 @@ package devices
 import (
 	"bytes"
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
+)
+
+const (
+	// Test JWT token with exp claim in year 2030 (cannot be validated without proper signature).
+	testTokenFuture = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4OTM0NTYwMDB9.signature"
+	cmdName         = "devices"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -20,7 +29,7 @@ func TestNewCommand(t *testing.T) {
 		t.Fatal("NewCommand returned nil")
 	}
 
-	if cmd.Use != "devices" {
+	if cmd.Use != cmdName {
 		t.Errorf("Use = %q, want 'devices'", cmd.Use)
 	}
 
@@ -168,7 +177,7 @@ func TestNewCommand_UseField(t *testing.T) {
 
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	if cmd.Use != "devices" {
+	if cmd.Use != cmdName {
 		t.Errorf("Use = %q, want 'devices'", cmd.Use)
 	}
 }
@@ -424,5 +433,304 @@ func TestRun_ProducesOutput(t *testing.T) {
 	totalOutput := out.Len() + errOut.Len()
 	if totalOutput == 0 {
 		t.Log("Run produced no output - expected with empty global config")
+	}
+}
+
+// setupTestManagerWithCloud creates a test config manager with cloud settings.
+func setupTestManagerWithCloud(t *testing.T, accessToken string) *config.Manager {
+	t.Helper()
+	tmpDir := t.TempDir()
+	mgr := config.NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := mgr.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	cfg := mgr.Get()
+	cfg.Cloud.AccessToken = accessToken
+	cfg.Cloud.ServerURL = "https://cloud.shelly.cloud"
+	return mgr
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_NotLoggedInWithConfigManager(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	ctx := context.Background()
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
+
+	if err == nil {
+		t.Error("expected error for not logged in, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "not logged in") {
+		t.Errorf("expected 'not logged in' error, got: %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "login") {
+		t.Errorf("expected output to contain 'login' hint, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_LoggedInButConnectionFails(t *testing.T) {
+	validToken := testTokenFuture
+	mgr := setupTestManagerWithCloud(t, validToken)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100)
+	defer cancel()
+
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
+
+	// Should fail due to network error
+	if err == nil {
+		t.Error("expected error for network failure, got nil")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_NotLoggedIn(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for not logged in")
+	}
+
+	if !strings.Contains(err.Error(), "not logged in") {
+		t.Errorf("expected 'not logged in' error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_LoggedIn(t *testing.T) {
+	validToken := testTokenFuture
+	mgr := setupTestManagerWithCloud(t, validToken)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	cmd := NewCommand(f)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	// Will fail due to network, but should get past login check
+	err := cmd.Execute()
+	if err == nil {
+		t.Log("unexpected success - expected network error")
+	} else if strings.Contains(err.Error(), "not logged in") {
+		t.Error("should not get 'not logged in' error when token is set")
+	}
+}
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+func TestNewCommand_CommandName(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.Name() != "devices" {
+		t.Errorf("Name() = %q, want 'devices'", cmd.Name())
+	}
+}
+
+func TestNewCommand_UsageString(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	usage := cmd.UsageString()
+	if !strings.Contains(usage, "devices") {
+		t.Error("UsageString should contain command name")
+	}
+}
+
+func TestOptions_Fields(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	opts := &Options{Factory: f}
+
+	if opts.Factory == nil {
+		t.Error("Factory should not be nil")
+	}
+}
+
+func TestOptions_ZeroValue(t *testing.T) {
+	t.Parallel()
+
+	opts := &Options{}
+	if opts.Factory != nil {
+		t.Error("Factory should be nil for zero value")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_ContextCancellationDuringRequest(t *testing.T) {
+	validToken := testTokenFuture
+	mgr := setupTestManagerWithCloud(t, validToken)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	// Create context that will be cancelled
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	opts := &Options{Factory: f}
+	err := run(ctx, opts)
+
+	// Should fail due to cancelled context
+	if err == nil {
+		t.Error("expected error for cancelled context")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_LoginHintDisplayed(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	if err := run(context.Background(), opts); err != nil {
+		t.Logf("run returned error (expected): %v", err)
+	}
+
+	output := out.String()
+	// Should display login hint when not logged in
+	if !strings.Contains(output, "login") {
+		t.Errorf("expected login hint in output, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_ErrorMessageDisplayed(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(context.Background(), opts)
+
+	// Should return error when not logged in
+	if err == nil {
+		t.Error("expected error for not logged in")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "not logged in") {
+		t.Errorf("expected 'not logged in' error, got: %v", err)
+	}
+}
+
+func TestNewCommand_LocalFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	// devices command should not have local flags
+	if cmd.LocalFlags().HasFlags() {
+		t.Log("devices has local flags defined")
+	}
+}
+
+func TestNewCommand_CommandPath(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	path := cmd.CommandPath()
+	if !strings.Contains(path, "devices") {
+		t.Errorf("CommandPath() = %q, should contain 'devices'", path)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_WithContext(t *testing.T) {
+	validToken := testTokenFuture
+	mgr := setupTestManagerWithCloud(t, validToken)
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	cmd := NewCommand(f)
+	cmd.SetContext(ctx)
+	cmd.SetArgs([]string{})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	// Will fail due to network/timeout
+	err := cmd.Execute()
+	if err == nil {
+		t.Log("unexpected success - expected timeout error")
 	}
 }

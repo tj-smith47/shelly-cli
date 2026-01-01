@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Result holds the result of downloading a file.
@@ -18,8 +21,10 @@ type Result struct {
 // FromURL downloads a file from a URL to a temp file.
 // Returns the path to the downloaded file and a cleanup function.
 func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
+	fs := config.Fs()
+
 	// Create temp file
-	tmpFile, err := os.CreateTemp("", "shelly-download-*")
+	tmpFile, err := afero.TempFile(fs, "", "shelly-download-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -27,7 +32,7 @@ func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
 
 	cleanup := func() {
 		// Best effort cleanup - ignore errors since we can't report them
-		os.Remove(tmpPath) //nolint:errcheck // cleanup function can't return errors
+		_ = fs.Remove(tmpPath)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, http.NoBody)
@@ -62,7 +67,7 @@ func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
 	}
 
 	// Make executable - extensions must be executable binaries
-	if err := os.Chmod(tmpPath, 0o755); err != nil { //nolint:gosec // G302: extensions require executable permissions
+	if err := fs.Chmod(tmpPath, 0o755); err != nil { //nolint:gosec // G302: extensions require executable permissions
 		cleanup()
 		return nil, fmt.Errorf("failed to make executable: %w", err)
 	}

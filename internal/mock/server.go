@@ -179,6 +179,9 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 	case "Sys.GetConfig":
 		result = ds.getSysConfig(state, device)
 
+	case "Sys.GetStatus":
+		result = ds.getSysStatus(state, device)
+
 	case "Shelly.GetComponents":
 		result = ds.getComponents(state)
 
@@ -235,6 +238,56 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		ds.updateLightState(device.Name, key, on, brightness)
 		result = map[string]any{}
 
+	case "Light.Toggle":
+		id := ds.getIDFromParams(req.Params)
+		key := fmt.Sprintf("light:%d", id)
+		wasOn := ds.toggleSwitchState(device.Name, key)
+		result = map[string]any{"was_on": wasOn}
+
+	case "RGB.GetStatus":
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getComponentState(state, fmt.Sprintf("rgb:%d", id))
+
+	case "RGB.Set":
+		id := ds.getIDFromParams(req.Params)
+		key := fmt.Sprintf("rgb:%d", id)
+		ds.updateRGBState(device.Name, key, req.Params)
+		result = map[string]any{}
+
+	case "RGB.Toggle":
+		id := ds.getIDFromParams(req.Params)
+		key := fmt.Sprintf("rgb:%d", id)
+		wasOn := ds.toggleSwitchState(device.Name, key)
+		result = map[string]any{"was_on": wasOn}
+
+	case "RGBW.GetStatus":
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getComponentState(state, fmt.Sprintf("rgbw:%d", id))
+
+	case "RGBW.Set":
+		id := ds.getIDFromParams(req.Params)
+		key := fmt.Sprintf("rgbw:%d", id)
+		ds.updateRGBWState(device.Name, key, req.Params)
+		result = map[string]any{}
+
+	case "RGBW.Toggle":
+		id := ds.getIDFromParams(req.Params)
+		key := fmt.Sprintf("rgbw:%d", id)
+		wasOn := ds.toggleSwitchState(device.Name, key)
+		result = map[string]any{"was_on": wasOn}
+
+	case "Schedule.List":
+		result = ds.getScheduleList(state, device.Name)
+
+	case "Schedule.Create":
+		result = ds.createSchedule(req.Params, device.Name)
+
+	case "Schedule.Update":
+		result = ds.updateSchedule(req.Params, device.Name)
+
+	case "Schedule.Delete":
+		result = ds.deleteSchedule(req.Params, device.Name)
+
 	case "Schedule.DeleteAll":
 		result = map[string]any{}
 
@@ -259,6 +312,25 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		// Mock script config update - return success
 		result = map[string]any{"restart_required": false}
 
+	case "Script.Eval":
+		// Mock script eval - return a result
+		result = map[string]any{"result": 3}
+
+	case "Script.GetStatus":
+		// Mock script status
+		id := ds.getIDFromParams(req.Params)
+		result = map[string]any{
+			"id":        id,
+			"running":   true,
+			"mem_usage": 1024,
+			"mem_peak":  2048,
+			"mem_free":  4096,
+		}
+
+	case "Script.Delete":
+		// Mock script delete - return success
+		result = map[string]any{}
+
 	case "Shelly.SetAuth":
 		// Mock auth enable/disable - return success
 		result = map[string]any{}
@@ -280,6 +352,10 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 			"channel":       float64(15),
 		}
 
+	case "Zigbee.StartNetworkSteering":
+		// Return success for starting network steering
+		result = map[string]any{}
+
 	case "Wifi.GetStatus":
 		// Return mock WiFi status
 		result = map[string]any{
@@ -288,6 +364,87 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 			"ssid":            "HomeNetwork",
 			"rssi":            float64(-45),
 			"ap_client_count": float64(0),
+		}
+
+	case "Wifi.GetConfig":
+		// Return mock WiFi config
+		result = map[string]any{
+			"ap": map[string]any{
+				"ssid":           "ShellyAP",
+				"is_open":        true,
+				"enable":         true,
+				"range_extender": map[string]any{"enable": false},
+			},
+			"sta": map[string]any{
+				"ssid":     "HomeNetwork",
+				"is_open":  false,
+				"enable":   true,
+				"ipv4mode": "dhcp",
+			},
+			"sta1": map[string]any{
+				"ssid":     "",
+				"is_open":  false,
+				"enable":   false,
+				"ipv4mode": "dhcp",
+			},
+			"roam": map[string]any{
+				"rssi_thr": -80,
+				"interval": 60,
+			},
+		}
+
+	case "Wifi.SetConfig":
+		// Return success for WiFi config operations
+		result = map[string]any{"restart_required": false}
+
+	case "Wifi.Scan":
+		// Return mock WiFi scan results
+		result = map[string]any{
+			"results": []map[string]any{
+				{
+					"ssid":    "HomeNetwork",
+					"bssid":   "AA:BB:CC:DD:EE:FF",
+					"auth":    3,
+					"channel": 6,
+					"rssi":    -45,
+				},
+				{
+					"ssid":    "GuestNetwork",
+					"bssid":   "11:22:33:44:55:66",
+					"auth":    3,
+					"channel": 11,
+					"rssi":    -60,
+				},
+				{
+					"ssid":    "NeighborWiFi",
+					"bssid":   "AA:11:BB:22:CC:33",
+					"auth":    3,
+					"channel": 1,
+					"rssi":    -75,
+				},
+			},
+		}
+
+	case "Wifi.ListAPClients":
+		// Return mock AP clients list
+		result = map[string]any{
+			"ts": float64(1700000000),
+			"ap_clients": []map[string]any{
+				{
+					"mac":       "AA:BB:CC:DD:EE:01",
+					"ip":        "192.168.33.2",
+					"ip_static": false,
+					"mport":     0,
+					"since":     float64(3600),
+				},
+				{
+					"mac":       "AA:BB:CC:DD:EE:02",
+					"ip":        "192.168.33.3",
+					"ip_static": false,
+					"mport":     0,
+					"since":     float64(1800),
+				},
+			},
 		}
 
 	case "MQTT.GetStatus":
@@ -334,6 +491,10 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 			"ipv4mode": "dhcp",
 		}
 
+	case "Eth.SetConfig":
+		// Return success for Ethernet config operations
+		result = map[string]any{"restart_required": false}
+
 	case "Cloud.GetStatus":
 		// Return cloud status from device state or default
 		if cloudState, ok := state["cloud"].(map[string]any); ok {
@@ -374,6 +535,44 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 				"connected": false,
 			}
 		}
+
+	case "Modbus.GetStatus":
+		// Return Modbus status from device state or default
+		if modbusState, ok := state["modbus"].(map[string]any); ok {
+			result = modbusState
+		} else {
+			result = map[string]any{
+				"enabled": false,
+			}
+		}
+
+	case "Modbus.GetConfig":
+		// Return Modbus config from device state or default
+		if modbusConfig, ok := state["modbus_config"].(map[string]any); ok {
+			result = modbusConfig
+		} else {
+			result = map[string]any{
+				"enable": false,
+			}
+		}
+
+	case "Modbus.SetConfig":
+		// Return success for Modbus config operations
+		result = map[string]any{"restart_required": false}
+
+	case "EM.GetStatus":
+		// Return EM component status from device state
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getEMStatus(state, id)
+
+	case "EM.ResetCounters":
+		// Reset EM counters - return success
+		result = map[string]any{}
+
+	case "EM1.GetStatus":
+		// Return EM1 component status from device state
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getEM1Status(state, id)
 
 	case "EMData.GetRecords":
 		// Return EMData records from device state or default
@@ -457,6 +656,24 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 			},
 		}
 
+	case "LoRa.GetConfig":
+		// Return LoRa config from device state or default
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getLoRaConfig(state, id)
+
+	case "LoRa.GetStatus":
+		// Return LoRa status from device state or default
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getLoRaStatus(state, id)
+
+	case "LoRa.SetConfig":
+		// Return success for LoRa config operations
+		result = map[string]any{"restart_required": false}
+
+	case "LoRa.SendBytes":
+		// Return success for LoRa send operations
+		result = map[string]any{}
+
 	case "Shelly.PutUserCA":
 		// Return success for CA certificate installation
 		result = map[string]any{"len": 1024}
@@ -468,6 +685,126 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 	case "Shelly.SetConfig":
 		// Return success for device configuration import
 		result = map[string]any{"restart_required": false}
+
+	case "Shelly.CheckForUpdate":
+		// Return firmware update status from device state or default
+		result = map[string]any{
+			"stable": map[string]any{
+				"version":  "1.5.0",
+				"build_id": "20250101-120000/1.5.0",
+			},
+		}
+
+	case "Shelly.Update":
+		// Return success for firmware update
+		result = map[string]any{}
+
+	case "Shelly.Reboot":
+		// Return success for reboot
+		result = map[string]any{}
+
+	case "Shelly.FactoryReset":
+		// Return success for factory reset
+		result = map[string]any{}
+
+	case "Matter.GetStatus":
+		// Return Matter status from device state
+		result = ds.getMatterStatus(state)
+
+	case "Matter.GetConfig":
+		// Return Matter config from device state
+		result = ds.getMatterConfig(state)
+
+	case "Matter.SetConfig":
+		// Return success for Matter config operations
+		result = map[string]any{"restart_required": false}
+
+	case "Matter.FactoryReset":
+		// Return success for Matter factory reset
+		result = map[string]any{}
+
+	case "Matter.GetCommissioningCode":
+		// Return commissioning code from device state
+		result = ds.getMatterCommissioningCode(state)
+
+	case "Thermostat.GetStatus":
+		// Return thermostat status from device state
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getThermostatStatus(state, id)
+
+	case "Thermostat.GetConfig":
+		// Return thermostat config from device state
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getThermostatConfig(state, id)
+
+	case "Thermostat.SetConfig":
+		// Check if device state has error simulation enabled
+		if _, hasError := state["thermostat_error"]; hasError {
+			ds.writeRPCError(w, req.ID, "thermostat config failed")
+			return
+		}
+		// Return success for thermostat config operations
+		result = map[string]any{"restart_required": false}
+
+	case "Thermostat.Override":
+		// Return success for thermostat override operations
+		result = map[string]any{}
+
+	case "Thermostat.CancelOverride":
+		// Return success for thermostat cancel override operations
+		result = map[string]any{}
+
+	case "Virtual.Add":
+		// Return success for virtual component creation
+		id := 200
+		if idVal, ok := req.Params["id"].(float64); ok && idVal > 0 {
+			id = int(idVal)
+		}
+		result = map[string]any{"id": id}
+
+	case "Virtual.Delete":
+		// Return success for virtual component deletion
+		result = map[string]any{}
+
+	case "Boolean.Set", "Boolean.Toggle":
+		// Return success for virtual boolean operations
+		result = map[string]any{}
+
+	case "Boolean.GetStatus":
+		// Return virtual boolean status
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getVirtualBooleanStatus(state, id)
+
+	case "Number.Set":
+		// Return success for virtual number operations
+		result = map[string]any{}
+
+	case "Number.GetStatus":
+		// Return virtual number status
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getVirtualNumberStatus(state, id)
+
+	case "Text.Set":
+		// Return success for virtual text operations
+		result = map[string]any{}
+
+	case "Text.GetStatus":
+		// Return virtual text status
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getVirtualTextStatus(state, id)
+
+	case "Enum.Set":
+		// Return success for virtual enum operations
+		result = map[string]any{}
+
+	case "Enum.GetStatus":
+		// Return virtual enum status
+		id := ds.getIDFromParams(req.Params)
+		result = ds.getVirtualEnumStatus(state, id)
+
+	case "Button.Trigger":
+		// Return success for virtual button trigger
+		result = map[string]any{}
 
 	default:
 		ds.writeRPCError(w, req.ID, "method not found")
@@ -814,6 +1151,71 @@ func (ds *DeviceServer) updateLightState(deviceName, key string, on bool, bright
 	}
 }
 
+func (ds *DeviceServer) updateRGBState(deviceName, key string, params map[string]any) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	if ds.state[deviceName] == nil {
+		ds.state[deviceName] = make(DeviceState)
+	}
+
+	comp, ok := ds.state[deviceName][key].(map[string]any)
+	if !ok {
+		comp = map[string]any{"output": false}
+		ds.state[deviceName][key] = comp
+	}
+
+	if on, ok := params["on"].(bool); ok {
+		comp["output"] = on
+	}
+	if r, ok := params["red"].(float64); ok {
+		comp["red"] = int(r)
+	}
+	if g, ok := params["green"].(float64); ok {
+		comp["green"] = int(g)
+	}
+	if b, ok := params["blue"].(float64); ok {
+		comp["blue"] = int(b)
+	}
+	if brightness, ok := params["brightness"].(float64); ok {
+		comp["brightness"] = int(brightness)
+	}
+}
+
+func (ds *DeviceServer) updateRGBWState(deviceName, key string, params map[string]any) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	if ds.state[deviceName] == nil {
+		ds.state[deviceName] = make(DeviceState)
+	}
+
+	comp, ok := ds.state[deviceName][key].(map[string]any)
+	if !ok {
+		comp = map[string]any{"output": false}
+		ds.state[deviceName][key] = comp
+	}
+
+	if on, ok := params["on"].(bool); ok {
+		comp["output"] = on
+	}
+	if r, ok := params["red"].(float64); ok {
+		comp["red"] = int(r)
+	}
+	if g, ok := params["green"].(float64); ok {
+		comp["green"] = int(g)
+	}
+	if b, ok := params["blue"].(float64); ok {
+		comp["blue"] = int(b)
+	}
+	if w, ok := params["white"].(float64); ok {
+		comp["white"] = int(w)
+	}
+	if brightness, ok := params["brightness"].(float64); ok {
+		comp["brightness"] = int(brightness)
+	}
+}
+
 func (ds *DeviceServer) writeJSON(w http.ResponseWriter, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -925,6 +1327,84 @@ func (ds *DeviceServer) getSysConfig(state DeviceState, device *DeviceFixture) m
 	return result
 }
 
+// getSysStatus returns mock Sys.GetStatus response for firmware.
+func (ds *DeviceServer) getSysStatus(_ DeviceState, device *DeviceFixture) map[string]any {
+	return map[string]any{
+		"mac":              device.MAC,
+		"restart_required": false,
+		"time":             "12:00",
+		"unixtime":         1700000000,
+		"uptime":           3600,
+		"ram_size":         262144,
+		"ram_free":         131072,
+		"fs_size":          1048576,
+		"fs_free":          524288,
+		"cfg_rev":          10,
+		"kvs_rev":          0,
+		"schedule_rev":     0,
+		"webhook_rev":      0,
+		"available_updates": map[string]any{
+			"stable": map[string]any{
+				"version":  "1.4.4",
+				"build_id": "20241210-092317/1.4.4-g6d2a586",
+			},
+		},
+		"reset_reason": 1,
+	}
+}
+
+// getEMStatus returns mock EM component status from device state.
+func (ds *DeviceServer) getEMStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("em:%d", id)
+	if em, ok := state[key].(map[string]any); ok {
+		return em
+	}
+	// Return default EM status if not in state
+	return map[string]any{
+		"id":               id,
+		"a_current":        1.5,
+		"a_voltage":        230.0,
+		"a_act_power":      345.0,
+		"a_aprt_power":     350.0,
+		"a_pf":             0.98,
+		"a_freq":           50.0,
+		"b_current":        1.4,
+		"b_voltage":        231.0,
+		"b_act_power":      323.0,
+		"b_aprt_power":     330.0,
+		"b_pf":             0.97,
+		"b_freq":           50.0,
+		"c_current":        1.6,
+		"c_voltage":        229.0,
+		"c_act_power":      367.0,
+		"c_aprt_power":     375.0,
+		"c_pf":             0.97,
+		"c_freq":           50.0,
+		"n_current":        nil,
+		"total_current":    4.5,
+		"total_act_power":  1035.0,
+		"total_aprt_power": 1055.0,
+	}
+}
+
+// getEM1Status returns mock EM1 component status from device state.
+func (ds *DeviceServer) getEM1Status(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("em1:%d", id)
+	if em1, ok := state[key].(map[string]any); ok {
+		return em1
+	}
+	// Return default EM1 status if not in state
+	return map[string]any{
+		"id":         id,
+		"current":    2.5,
+		"voltage":    230.0,
+		"act_power":  575.0,
+		"aprt_power": 580.0,
+		"pf":         0.99,
+		"freq":       50.0,
+	}
+}
+
 // getEMDataRecords returns mock EMData records.
 func (ds *DeviceServer) getEMDataRecords(_ DeviceState, _ int) map[string]any {
 	return map[string]any{
@@ -1028,6 +1508,163 @@ func (ds *DeviceServer) getBTHomeDeviceKnownObjects(state DeviceState, id int) m
 	}
 }
 
+// getMatterStatus returns mock Matter status.
+func (ds *DeviceServer) getMatterStatus(state DeviceState) map[string]any {
+	if matter, ok := state["matter"].(map[string]any); ok {
+		return matter
+	}
+	return map[string]any{
+		"commissioning_in_progress": false,
+		"operational":               false,
+	}
+}
+
+// getMatterConfig returns mock Matter config.
+func (ds *DeviceServer) getMatterConfig(state DeviceState) map[string]any {
+	if matterCfg, ok := state["matter_config"].(map[string]any); ok {
+		return matterCfg
+	}
+	return map[string]any{
+		"enable": false,
+	}
+}
+
+// getMatterCommissioningCode returns Matter commissioning code from device state.
+func (ds *DeviceServer) getMatterCommissioningCode(state DeviceState) map[string]any {
+	if code, ok := state["matter_code"].(map[string]any); ok {
+		return code
+	}
+	// Return default commissioning code if not in state
+	return map[string]any{
+		"manual_code":    "34970112332",
+		"qr_code":        "MT:Y3.13WAF00KA0648G00",
+		"discriminator":  float64(3840),
+		"setup_pin_code": float64(20202021),
+	}
+}
+
+// getScheduleList returns mock schedule list.
+func (ds *DeviceServer) getScheduleList(state DeviceState, deviceName string) map[string]any {
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+
+	// Check device state for schedules
+	deviceState := ds.state[deviceName]
+	if deviceState == nil {
+		deviceState = state
+	}
+
+	var jobs []map[string]any
+	for key := range deviceState {
+		if len(key) > 9 && key[:9] == "schedule:" {
+			if sched, ok := deviceState[key].(map[string]any); ok {
+				jobs = append(jobs, sched)
+			}
+		}
+	}
+	if len(jobs) == 0 {
+		jobs = []map[string]any{}
+	}
+	return map[string]any{"jobs": jobs}
+}
+
+// createSchedule creates a mock schedule and returns its ID.
+func (ds *DeviceServer) createSchedule(params map[string]any, deviceName string) map[string]any {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	if ds.state[deviceName] == nil {
+		ds.state[deviceName] = make(DeviceState)
+	}
+
+	// Find next available ID
+	maxID := 0
+	for key := range ds.state[deviceName] {
+		if len(key) > 9 && key[:9] == "schedule:" {
+			var id int
+			if _, err := fmt.Sscanf(key, "schedule:%d", &id); err == nil && id > maxID {
+				maxID = id
+			}
+		}
+	}
+	newID := maxID + 1
+
+	// Create the schedule
+	enable := true
+	if e, ok := params["enable"].(bool); ok {
+		enable = e
+	}
+	timespec := ""
+	if ts, ok := params["timespec"].(string); ok {
+		timespec = ts
+	}
+	var calls []any
+	if c, ok := params["calls"].([]any); ok {
+		calls = c
+	}
+
+	ds.state[deviceName][fmt.Sprintf("schedule:%d", newID)] = map[string]any{
+		"id":       newID,
+		"enable":   enable,
+		"timespec": timespec,
+		"calls":    calls,
+	}
+
+	return map[string]any{"id": newID}
+}
+
+// updateSchedule updates a mock schedule.
+func (ds *DeviceServer) updateSchedule(params map[string]any, deviceName string) map[string]any {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	id := 0
+	if idVal, ok := params["id"].(float64); ok {
+		id = int(idVal)
+	}
+
+	key := fmt.Sprintf("schedule:%d", id)
+	if ds.state[deviceName] == nil {
+		ds.state[deviceName] = make(DeviceState)
+	}
+
+	sched, ok := ds.state[deviceName][key].(map[string]any)
+	if !ok {
+		sched = map[string]any{"id": id}
+	}
+
+	if e, ok := params["enable"].(bool); ok {
+		sched["enable"] = e
+	}
+	if ts, ok := params["timespec"].(string); ok {
+		sched["timespec"] = ts
+	}
+	if c, ok := params["calls"].([]any); ok {
+		sched["calls"] = c
+	}
+
+	ds.state[deviceName][key] = sched
+	return map[string]any{"rev": 1}
+}
+
+// deleteSchedule deletes a mock schedule.
+func (ds *DeviceServer) deleteSchedule(params map[string]any, deviceName string) map[string]any {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	id := 0
+	if idVal, ok := params["id"].(float64); ok {
+		id = int(idVal)
+	}
+
+	key := fmt.Sprintf("schedule:%d", id)
+	if ds.state[deviceName] != nil {
+		delete(ds.state[deviceName], key)
+	}
+
+	return map[string]any{}
+}
+
 // handleWebSocketRPC handles WebSocket RPC connections for Gen2 devices.
 func (ds *DeviceServer) handleWebSocketRPC(w http.ResponseWriter, r *http.Request, _ DeviceState, _ *DeviceFixture) {
 	conn, err := ds.upgrader.Upgrade(w, r, nil)
@@ -1049,5 +1686,115 @@ func (ds *DeviceServer) handleWebSocketRPC(w http.ResponseWriter, r *http.Reques
 		if err := conn.WriteMessage(messageType, message); err != nil {
 			break
 		}
+	}
+}
+
+// getLoRaConfig returns mock LoRa config from device state.
+func (ds *DeviceServer) getLoRaConfig(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("lora:%d_config", id)
+	if cfg, ok := state[key].(map[string]any); ok {
+		return cfg
+	}
+	// Return default LoRa config matching model.LoRaConfig structure
+	return map[string]any{
+		"id":   float64(id),
+		"freq": float64(868000000),
+		"bw":   float64(7),
+		"dr":   float64(7),
+		"txp":  float64(14),
+	}
+}
+
+// getLoRaStatus returns mock LoRa status from device state.
+func (ds *DeviceServer) getLoRaStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("lora:%d", id)
+	if status, ok := state[key].(map[string]any); ok {
+		return status
+	}
+	// Return default LoRa status matching model.LoRaStatus structure
+	return map[string]any{
+		"id":   float64(id),
+		"rssi": float64(-65),
+		"snr":  float64(8.5),
+	}
+}
+
+// getThermostatStatus returns mock thermostat status from device state.
+func (ds *DeviceServer) getThermostatStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("thermostat:%d", id)
+	if status, ok := state[key].(map[string]any); ok {
+		return status
+	}
+	// Return default thermostat status
+	return map[string]any{
+		"id":        float64(id),
+		"enable":    true,
+		"target_C":  float64(21.0),
+		"current_C": float64(20.5),
+		"output":    false,
+	}
+}
+
+// getThermostatConfig returns mock thermostat config from device state.
+func (ds *DeviceServer) getThermostatConfig(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("thermostat:%d_config", id)
+	if cfg, ok := state[key].(map[string]any); ok {
+		return cfg
+	}
+	// Return default thermostat config
+	return map[string]any{
+		"id":               float64(id),
+		"type":             "heating",
+		"enable":           true,
+		"target_C":         float64(21.0),
+		"thermostat_mode":  "auto",
+	}
+}
+
+// getVirtualBooleanStatus returns mock virtual boolean status from device state.
+func (ds *DeviceServer) getVirtualBooleanStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("boolean:%d", id)
+	if status, ok := state[key].(map[string]any); ok {
+		return status
+	}
+	return map[string]any{
+		"id":    float64(id),
+		"value": false,
+	}
+}
+
+// getVirtualNumberStatus returns mock virtual number status from device state.
+func (ds *DeviceServer) getVirtualNumberStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("number:%d", id)
+	if status, ok := state[key].(map[string]any); ok {
+		return status
+	}
+	return map[string]any{
+		"id":    float64(id),
+		"value": float64(0),
+	}
+}
+
+// getVirtualTextStatus returns mock virtual text status from device state.
+func (ds *DeviceServer) getVirtualTextStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("text:%d", id)
+	if status, ok := state[key].(map[string]any); ok {
+		return status
+	}
+	return map[string]any{
+		"id":    float64(id),
+		"value": "",
+	}
+}
+
+// getVirtualEnumStatus returns mock virtual enum status from device state.
+func (ds *DeviceServer) getVirtualEnumStatus(state DeviceState, id int) map[string]any {
+	key := fmt.Sprintf("enum:%d", id)
+	if status, ok := state[key].(map[string]any); ok {
+		return status
+	}
+	return map[string]any{
+		"id":    float64(id),
+		"value": "",
 	}
 }

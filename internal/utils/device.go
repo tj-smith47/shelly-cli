@@ -4,9 +4,9 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
+	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -119,8 +119,10 @@ func ParseDevicesJSON(input string) ([]JSONDevice, error) {
 	var jsonData []byte
 
 	// Check if input is a file path
-	if _, err := os.Stat(input); err == nil {
-		data, err := os.ReadFile(input) //nolint:gosec // User-provided file path is intentional
+	fs := config.Fs()
+	exists, _ := afero.Exists(fs, input)
+	if exists {
+		data, err := afero.ReadFile(fs, input)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read devices file %q: %w", input, err)
 		}

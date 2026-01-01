@@ -1,13 +1,17 @@
 package diff
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -345,5 +349,336 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	example := cmd.Example
 	if example == "" {
 		t.Error("Example should not be empty")
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_DiffConfigs(t *testing.T) {
+	// Create fixtures with two devices - configs will differ due to device names
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "device1",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "device2",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"device1": {
+				"switch:0": map[string]any{"output": false},
+			},
+			"device2": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"device1", "device2"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	out := tf.OutString()
+	// Should show comparing header and summary
+	if !strings.Contains(out, "Comparing") {
+		t.Errorf("Output should contain 'Comparing', got: %s", out)
+	}
+	if !strings.Contains(out, "Summary") {
+		t.Errorf("Output should contain 'Summary', got: %s", out)
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_DiffDifferentConfigs(t *testing.T) {
+	// Create fixtures with two devices having different configs
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "diff-source",
+					Address:    "192.168.1.110",
+					MAC:        "AA:BB:CC:DD:EE:10",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "diff-target",
+					Address:    "192.168.1.111",
+					MAC:        "AA:BB:CC:DD:EE:11",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"diff-source": {
+				"switch:0": map[string]any{"output": true},
+			},
+			"diff-target": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"diff-source", "diff-target"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	out := tf.OutString()
+	// Should show comparing header
+	if !strings.Contains(out, "Comparing") {
+		t.Errorf("Output should contain 'Comparing', got: %s", out)
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_SourceConfigError(t *testing.T) {
+	// Create fixtures with only one device
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "only-device",
+					Address:    "192.168.1.120",
+					MAC:        "AA:BB:CC:DD:EE:20",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"only-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-source", "only-device"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent source device")
+	}
+	if !strings.Contains(err.Error(), "source") {
+		t.Errorf("Error should mention 'source', got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_TargetConfigError(t *testing.T) {
+	// Create fixtures with only one device
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "source-only",
+					Address:    "192.168.1.121",
+					MAC:        "AA:BB:CC:DD:EE:21",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"source-only": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"source-only", "nonexistent-target"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent target device")
+	}
+	if !strings.Contains(err.Error(), "target") {
+		t.Errorf("Error should mention 'target', got: %v", err)
+	}
+}
+
+func TestRun_DiffWithJSONOutput(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	// Set JSON output format
+	viper.Set("output", "json")
+	defer viper.Reset()
+
+	// Create a cancelled context to test the structured output path check
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Source:  "device1",
+		Target:  "device2",
+	}
+
+	err := run(ctx, opts)
+	// Expect error due to cancelled context
+	if err == nil {
+		t.Error("Expected error with cancelled context")
+	}
+}
+
+func TestOptions_Fields(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	opts := &Options{
+		Factory: tf.Factory,
+		Source:  "source-device",
+		Target:  "target-device",
+	}
+
+	if opts.Source != "source-device" {
+		t.Errorf("Source = %q, want %q", opts.Source, "source-device")
+	}
+	if opts.Target != "target-device" {
+		t.Errorf("Target = %q, want %q", opts.Target, "target-device")
+	}
+	if opts.Factory == nil {
+		t.Error("Factory should not be nil")
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server and viper state
+func TestRun_DiffWithJSONOutputFormat(t *testing.T) {
+	// Create fixtures with two devices
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "json-device1",
+					Address:    "192.168.1.130",
+					MAC:        "AA:BB:CC:DD:EE:30",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "json-device2",
+					Address:    "192.168.1.131",
+					MAC:        "AA:BB:CC:DD:EE:31",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"json-device1": {
+				"switch:0": map[string]any{"output": false},
+			},
+			"json-device2": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	// Set JSON output format before creating factory
+	viper.Set("output", "json")
+	defer viper.Reset()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"json-device1", "json-device2"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	out := tf.OutString()
+	// JSON output should have array syntax or object syntax
+	if !strings.Contains(out, "[") && !strings.Contains(out, "{") {
+		t.Errorf("Output should be JSON formatted, got: %s", out)
 	}
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -63,7 +64,7 @@ func run(opts *Options) error {
 
 	// Save to config if requested
 	if opts.Save {
-		if err := theme.SaveTheme(opts.ThemeName); err != nil {
+		if err := config.SaveTheme(opts.ThemeName); err != nil {
 			return fmt.Errorf("failed to save theme to config: %w", err)
 		}
 		ios.Success("Theme set to '%s' and saved to config", opts.ThemeName)

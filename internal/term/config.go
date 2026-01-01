@@ -8,6 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
 // DisplayConfigTable prints a configuration map as formatted tables.
@@ -21,8 +22,8 @@ func DisplayConfigTable(ios *iostreams.IOStreams, configData any) error {
 	for component, cfg := range configMap {
 		ios.Title("%s", component)
 
-		table := output.FormatConfigTable(cfg)
-		if table == nil {
+		tbl := output.FormatConfigTable(cfg)
+		if tbl == nil {
 			// If it's not a map, print as JSON
 			data, err := json.MarshalIndent(cfg, "", "  ")
 			if err != nil {
@@ -35,9 +36,9 @@ func DisplayConfigTable(ios *iostreams.IOStreams, configData any) error {
 		}
 
 		if ios.IsPlainMode() {
-			table.SetStyle(output.PlainTableStyle())
+			tbl.SetStyle(table.PlainStyle())
 		}
-		if err := table.PrintTo(ios.Out); err != nil {
+		if err := tbl.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print config table", err)
 		}
 		ios.Printf("\n")
@@ -48,34 +49,40 @@ func DisplayConfigTable(ios *iostreams.IOStreams, configData any) error {
 
 // DisplaySceneList prints a table of scenes.
 func DisplaySceneList(ios *iostreams.IOStreams, scenes []config.Scene) {
-	table := output.NewTable("Name", "Actions", "Description")
+	builder := table.NewBuilder("Name", "Actions", "Description")
 	for _, scene := range scenes {
 		actions := output.FormatActionCount(len(scene.Actions))
 		description := scene.Description
 		if description == "" {
 			description = "-"
 		}
-		table.AddRow(scene.Name, actions, description)
+		builder.AddRow(scene.Name, actions, description)
 	}
 
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print scenes table", err)
+	}
 	ios.Println()
 	ios.Count("scene", len(scenes))
 }
 
 // DisplayAliasList prints a table of aliases.
 func DisplayAliasList(ios *iostreams.IOStreams, aliases []config.Alias) {
-	table := output.NewTable("Name", "Command", "Type")
+	builder := table.NewBuilder("Name", "Command", "Type")
 
 	for _, alias := range aliases {
 		aliasType := "command"
 		if alias.Shell {
 			aliasType = "shell"
 		}
-		table.AddRow(alias.Name, alias.Command, aliasType)
+		builder.AddRow(alias.Name, alias.Command, aliasType)
 	}
 
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print aliases table", err)
+	}
 	ios.Println()
 	ios.Count("alias", len(aliases))
 }
@@ -101,11 +108,14 @@ func DisplayTemplateDiffs(ios *iostreams.IOStreams, templateName, deviceName str
 	ios.Title("Configuration Differences")
 	ios.Printf("Template: %s  Device: %s\n\n", templateName, deviceName)
 
-	table := output.NewTable("Path", "Type", "Device Value", "Template Value")
+	builder := table.NewBuilder("Path", "Type", "Device Value", "Template Value")
 	for _, d := range diffs {
-		table.AddRow(d.Path, d.DiffType, output.FormatDisplayValue(d.OldValue), output.FormatDisplayValue(d.NewValue))
+		builder.AddRow(d.Path, d.DiffType, output.FormatDisplayValue(d.OldValue), output.FormatDisplayValue(d.NewValue))
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print template diffs table", err)
+	}
 	ios.Printf("\n%d difference(s) found\n", len(diffs))
 }
 
@@ -114,7 +124,7 @@ func DisplayDeviceTemplateList(ios *iostreams.IOStreams, templates []config.Devi
 	ios.Title("Configuration Templates")
 	ios.Println()
 
-	table := output.NewTable("Name", "Model", "Gen", "Source", "Created")
+	builder := table.NewBuilder("Name", "Model", "Gen", "Source", "Created")
 	for _, t := range templates {
 		source := t.SourceDevice
 		if source == "" {
@@ -124,9 +134,12 @@ func DisplayDeviceTemplateList(ios *iostreams.IOStreams, templates []config.Devi
 		if len(created) > 10 {
 			created = created[:10] // Just the date part
 		}
-		table.AddRow(t.Name, t.Model, fmt.Sprintf("Gen%d", t.Generation), source, created)
+		builder.AddRow(t.Name, t.Model, fmt.Sprintf("Gen%d", t.Generation), source, created)
 	}
 
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print templates table", err)
+	}
 	ios.Printf("\n%d template(s)\n", len(templates))
 }

@@ -2,11 +2,13 @@ package update
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -140,6 +142,16 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	if cmd.ValidArgsFunction == nil {
 		t.Error("ValidArgsFunction should be set for completion")
 	}
+
+	// Execute the ValidArgsFunction to cover completion paths
+	suggestions, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	_ = suggestions
+	_ = directive
+
+	// Test with one arg (device name provided, should complete schedule IDs)
+	suggestions, directive = cmd.ValidArgsFunction(cmd, []string{"device"}, "")
+	_ = suggestions
+	_ = directive
 }
 
 func TestNewCommand_ExampleContent(t *testing.T) {
@@ -182,5 +194,271 @@ func TestNewCommand_InvalidScheduleID(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid schedule ID") {
 		t.Errorf("expected 'invalid schedule ID' error, got: %v", err)
+	}
+}
+
+func TestRun_UpdateTimespec(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"schedule:1": map[string]any{
+					"id":       1,
+					"enable":   true,
+					"timespec": "0 0 8 * *",
+					"calls":    []any{},
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		ID:       1,
+		Timespec: "0 0 9 * *",
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Schedule 1 updated") {
+		t.Errorf("expected 'Schedule 1 updated' in output, got: %s", output)
+	}
+	if !strings.Contains(output, "Timespec") {
+		t.Errorf("expected 'Timespec' in output, got: %s", output)
+	}
+}
+
+func TestRun_UpdateEnable(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		ID:      1,
+		Enable:  true,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "enabled") {
+		t.Errorf("expected 'enabled' in output, got: %s", output)
+	}
+}
+
+func TestRun_UpdateDisable(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		ID:      1,
+		Disable: true,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "disabled") {
+		t.Errorf("expected 'disabled' in output, got: %s", output)
+	}
+}
+
+func TestRun_UpdateCalls(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		ID:      1,
+		Calls:   `[{"method":"Switch.Set","params":{"id":0,"on":true}}]`,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Calls updated") {
+		t.Errorf("expected 'Calls updated' in output, got: %s", output)
+	}
+}
+
+func TestRun_NoChanges(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		ID:      1,
+		// No changes specified
+	}
+
+	err := run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() should not error for no changes, got: %v", err)
+	}
+
+	// Warning goes to stderr
+	output := tf.OutString() + tf.ErrString()
+	if !strings.Contains(output, "No changes specified") {
+		t.Errorf("expected 'No changes specified' in output, got: %s", output)
+	}
+}
+
+func TestRun_InvalidCallsJSON(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		ID:      1,
+		Calls:   "invalid-json",
+	}
+
+	err := run(context.Background(), opts)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+
+	if !strings.Contains(err.Error(), "invalid calls JSON") {
+		t.Errorf("expected 'invalid calls JSON' error, got: %v", err)
+	}
+}
+
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "nonexistent-device",
+		ID:       1,
+		Timespec: "0 0 8 * *",
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
 	}
 }

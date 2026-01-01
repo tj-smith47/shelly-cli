@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -164,5 +165,104 @@ func TestExecute_Default(t *testing.T) {
 	output := tf.TestIO.Out.String()
 	if !strings.Contains(output, "No templates") && output == "" {
 		t.Logf("output = %q", output)
+	}
+}
+
+//nolint:paralleltest // Modifies global config state
+func TestExecute_WithTemplates(t *testing.T) {
+	// Reset config manager for isolated testing
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	// Create manager with properly initialized config
+	m := config.NewTestManager(&config.Config{})
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(m)
+
+	// Create some templates
+	err := config.CreateDeviceTemplate(
+		"template-one",
+		"First template",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{"name": "Switch 1"},
+		},
+		"device-1",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	err = config.CreateDeviceTemplate(
+		"template-two",
+		"Second template",
+		"Shelly Plus 2PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{"name": "Switch 2"},
+		},
+		"device-2",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := tf.TestIO.Out.String()
+	// Should list the templates or show them in some format
+	if strings.Contains(output, "No templates") {
+		t.Error("expected templates to be listed, but got 'No templates'")
+	}
+}
+
+//nolint:paralleltest // Modifies global config state
+func TestExecute_SingleTemplate(t *testing.T) {
+	// Reset config manager for isolated testing
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	// Create manager with properly initialized config
+	m := config.NewTestManager(&config.Config{})
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(m)
+
+	// Create a single template
+	err := config.CreateDeviceTemplate(
+		"single-template",
+		"Only template",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{"name": "Single Switch"},
+		},
+		"device-1",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(t.Context())
+	cmd.SetArgs([]string{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
 	}
 }

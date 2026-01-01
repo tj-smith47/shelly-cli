@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -82,16 +83,17 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Display info as a formatted table
-	table := output.NewTable("Property", "Value")
+	builder := table.NewBuilder("Property", "Value")
 
-	table.AddRow("ID", info.ID)
-	table.AddRow("MAC", info.MAC)
-	table.AddRow("Model", info.Model)
-	table.AddRow("Generation", output.RenderGeneration(info.Generation))
-	table.AddRow("Firmware", info.Firmware)
-	table.AddRow("Application", info.App)
-	table.AddRow("Auth Enabled", output.RenderAuthRequired(info.AuthEn))
+	builder.AddRow("ID", info.ID)
+	builder.AddRow("MAC", info.MAC)
+	builder.AddRow("Model", info.Model)
+	builder.AddRow("Generation", output.RenderGeneration(info.Generation))
+	builder.AddRow("Firmware", info.Firmware)
+	builder.AddRow("Application", info.App)
+	builder.AddRow("Auth Enabled", output.RenderAuthRequired(info.AuthEn))
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print device info table", err)
 	}

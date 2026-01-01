@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -40,14 +41,14 @@ type MeterReading interface {
 	GetCurrent() float64
 }
 
-// FormatDiscoveredDevices builds a table of discovered devices with themed formatting.
+// FormatDiscoveredDevices builds a table builder of discovered devices with themed formatting.
 // Returns nil if devices slice is empty.
-func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *Table {
+func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *table.Builder {
 	if len(devices) == 0 {
 		return nil
 	}
 
-	table := NewTable("Name", "ID", "Address", "Model", "Generation", "Protocol", "Auth")
+	builder := table.NewBuilder("Name", "ID", "Address", "Model", "Generation", "Protocol", "Auth")
 
 	for _, d := range devices {
 		gen := fmt.Sprintf("Gen%d", d.Generation)
@@ -64,7 +65,7 @@ func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *Table {
 			name = d.ID
 		}
 
-		table.AddRow(
+		builder.AddRow(
 			name,
 			d.ID,
 			d.Address.String(),
@@ -75,7 +76,7 @@ func FormatDiscoveredDevices(devices []discovery.DiscoveredDevice) *Table {
 		)
 	}
 
-	return table
+	return builder
 }
 
 // FormatAlarmSensor formats a single alarm sensor reading as a styled string.

@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -28,15 +29,18 @@ type SensorOpts[T model.Sensor] struct {
 
 // DisplaySensorList displays a list of sensors using generic options.
 func DisplaySensorList[T model.Sensor](ios *iostreams.IOStreams, sensors []T, opts SensorOpts[T]) {
-	t := output.NewTable("ID", "Reading")
+	builder := table.NewBuilder("ID", "Reading")
 	for _, s := range sensors {
 		if formatted := opts.Format(s, false); formatted != "" {
-			t.AddRow(fmt.Sprintf("%d", s.GetID()), formatted)
+			builder.AddRow(fmt.Sprintf("%d", s.GetID()), formatted)
 		}
 	}
 	ios.Println(theme.Bold().Render(opts.Title + ":"))
 	ios.Println()
-	printTable(ios, t)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print sensor list table", err)
+	}
 }
 
 // DisplaySensorStatus displays a single sensor status using generic options.
@@ -47,9 +51,12 @@ func DisplaySensorStatus[T model.Sensor](ios *iostreams.IOStreams, status T, id 
 		ios.Warning("%s", opts.NoValueMsg)
 		return
 	}
-	t := output.NewTable("Metric", "Value")
-	t.AddRow("Reading", opts.Format(status, true))
-	printTable(ios, t)
+	builder := table.NewBuilder("Metric", "Value")
+	builder.AddRow("Reading", opts.Format(status, true))
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print sensor status table", err)
+	}
 	displaySensorErrors(ios, status.GetErrors())
 }
 
@@ -233,25 +240,31 @@ func DisplayAlarmSensors(ios *iostreams.IOStreams, sensors []model.AlarmSensorRe
 
 // DisplayAlarmSensorList displays a list of alarm-type sensors using Go generics.
 func DisplayAlarmSensorList[T model.AlarmSensor](ios *iostreams.IOStreams, sensors []T, sensorName, alarmMsg string) {
-	t := output.NewTable("ID", "Status", "Muted")
+	builder := table.NewBuilder("ID", "Status", "Muted")
 	for _, s := range sensors {
 		status := output.RenderAlarmState(s.IsAlarm(), alarmMsg)
 		muted := output.RenderMuteState(s.IsMuted())
-		t.AddRow(fmt.Sprintf("%d", s.GetID()), status, muted)
+		builder.AddRow(fmt.Sprintf("%d", s.GetID()), status, muted)
 	}
 	ios.Println(theme.Bold().Render(sensorName + " Sensors:"))
 	ios.Println()
-	printTable(ios, t)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print alarm sensor list table", err)
+	}
 }
 
 // DisplayAlarmSensorStatus displays a single alarm-type sensor status using Go generics.
 func DisplayAlarmSensorStatus[T model.AlarmSensor](ios *iostreams.IOStreams, status T, id int, sensorName, alarmMsg string) {
 	ios.Println(theme.Bold().Render(fmt.Sprintf("%s Sensor %d:", sensorName, id)))
 	ios.Println()
-	t := output.NewTable("Metric", "Value")
-	t.AddRow("Status", output.RenderAlarmState(status.IsAlarm(), alarmMsg))
-	t.AddRow("Muted", output.RenderMuteState(status.IsMuted()))
-	printTable(ios, t)
+	builder := table.NewBuilder("Metric", "Value")
+	builder.AddRow("Status", output.RenderAlarmState(status.IsAlarm(), alarmMsg))
+	builder.AddRow("Muted", output.RenderMuteState(status.IsMuted()))
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print alarm sensor status table", err)
+	}
 	displaySensorErrors(ios, status.GetErrors())
 }
 

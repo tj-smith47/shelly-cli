@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -37,6 +38,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 func run(_ context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	fs := config.Fs()
 
 	cacheDir, err := config.CacheDir()
 	if err != nil {
@@ -44,13 +46,13 @@ func run(_ context.Context, opts *Options) error {
 	}
 
 	// Check if cache directory exists
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+	if _, err := fs.Stat(cacheDir); os.IsNotExist(err) {
 		ios.Info("Cache is already empty")
 		return nil
 	}
 
 	// Remove all files in cache directory
-	entries, err := os.ReadDir(cacheDir)
+	entries, err := afero.ReadDir(fs, cacheDir)
 	if err != nil {
 		return err
 	}
@@ -62,7 +64,7 @@ func run(_ context.Context, opts *Options) error {
 
 	for _, entry := range entries {
 		path := filepath.Join(cacheDir, entry.Name())
-		if err := os.RemoveAll(path); err != nil {
+		if err := fs.RemoveAll(path); err != nil {
 			ios.DebugErr("remove cache entry", err)
 		}
 	}

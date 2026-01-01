@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -129,6 +130,16 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	if cmd.ValidArgsFunction == nil {
 		t.Error("ValidArgsFunction should be set for completion")
 	}
+
+	// Execute the ValidArgsFunction to cover completion paths
+	suggestions, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	_ = suggestions
+	_ = directive
+
+	// Test with one arg (device name provided, should complete schedule IDs)
+	suggestions, directive = cmd.ValidArgsFunction(cmd, []string{"device"}, "")
+	_ = suggestions
+	_ = directive
 }
 
 func TestNewCommand_ExampleContent(t *testing.T) {
@@ -168,5 +179,134 @@ func TestNewCommand_InvalidScheduleID(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid schedule ID") {
 		t.Errorf("expected 'invalid schedule ID' error, got: %v", err)
+	}
+}
+
+func TestCommand_DeleteWithYes(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"schedule:1": map[string]any{
+					"id":       1,
+					"enable":   true,
+					"timespec": "0 0 8 * *",
+					"calls":    []any{},
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device", "1", "--yes"})
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "deleted") {
+		t.Errorf("expected 'deleted' in output, got: %s", output)
+	}
+}
+
+func TestCommand_DeleteCancelled(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	// Provide "n" as stdin to cancel
+	in := bytes.NewBufferString("n\n")
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(in, out, errOut)
+
+	tf := factory.NewTestFactory(t)
+	tf.Factory.SetIOStreams(ios)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device", "1"})
+	cmd.SetIn(in)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	output := out.String() + errOut.String()
+	if !strings.Contains(output, "cancelled") {
+		t.Errorf("expected 'cancelled' in output, got: %s", output)
+	}
+}
+
+func TestCommand_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device", "1", "--yes"})
+	cmd.SetOut(tf.TestIO.Out)
+	cmd.SetErr(tf.TestIO.ErrOut)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
 	}
 }

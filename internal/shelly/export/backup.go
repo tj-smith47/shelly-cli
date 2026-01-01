@@ -4,12 +4,13 @@ package export
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
@@ -46,7 +47,7 @@ func WriteBackupFile(bkp *backup.DeviceBackup, filePath, format string) error {
 		return fmt.Errorf("failed to marshal backup: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -55,7 +56,7 @@ func WriteBackupFile(bkp *backup.DeviceBackup, filePath, format string) error {
 
 // ScanBackupFiles scans a directory for backup files and returns their info.
 func ScanBackupFiles(dir string) ([]model.BackupFileInfo, error) {
-	entries, err := os.ReadDir(dir)
+	entries, err := afero.ReadDir(config.Fs(), dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
@@ -89,8 +90,9 @@ func IsBackupFile(name string) bool {
 // ParseBackupFile reads and parses a backup file, returning its metadata.
 func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 	var info model.BackupFileInfo
+	fs := config.Fs()
 
-	data, err := os.ReadFile(filePath) //nolint:gosec // G304: filePath is derived from directory listing
+	data, err := afero.ReadFile(fs, filePath)
 	if err != nil {
 		return info, err
 	}
@@ -100,7 +102,7 @@ func ParseBackupFile(filePath string) (model.BackupFileInfo, error) {
 		return info, err
 	}
 
-	stat, err := os.Stat(filePath)
+	stat, err := fs.Stat(filePath)
 	if err != nil {
 		return info, err
 	}

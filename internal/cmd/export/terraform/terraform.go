@@ -4,12 +4,12 @@ package terraform
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -84,24 +84,24 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Build Terraform config using export builder
-	config, err := export.BuildTerraformConfig(deviceData, opts.ResourceName)
+	tfConfig, err := export.BuildTerraformConfig(deviceData, opts.ResourceName)
 	if err != nil {
 		return fmt.Errorf("failed to build terraform config: %w", err)
 	}
 
 	// Output
 	if opts.File == "" {
-		ios.Printf("%s", config)
+		ios.Printf("%s", tfConfig)
 		return nil
 	}
 
-	file, err := os.Create(opts.File)
+	file, err := config.Fs().Create(opts.File)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer iostreams.CloseWithDebug("closing terraform export file", file)
 
-	if _, err := file.WriteString(config); err != nil {
+	if _, err := file.WriteString(tfConfig); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

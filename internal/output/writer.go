@@ -3,9 +3,11 @@ package output
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -17,8 +19,7 @@ func GetWriter(ios *iostreams.IOStreams, outputFile string) (io.Writer, func(), 
 		return ios.Out, func() {}, nil
 	}
 
-	//nolint:gosec // G304: User-provided file path is expected for CLI export functionality
-	file, err := os.Create(outputFile)
+	file, err := config.Fs().Create(outputFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create output file: %w", err)
 	}
@@ -77,15 +78,17 @@ func ExportCSV(ios *iostreams.IOStreams, outputFile string, formatter func() ([]
 // WriteFile writes data to a file, creating parent directories if needed.
 // Uses secure file permissions (0o600 for files, 0o750 for directories).
 func WriteFile(file string, data []byte) error {
+	fs := config.Fs()
+
 	// Ensure parent directory exists
 	dir := filepath.Dir(file)
 	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0o750); err != nil {
+		if err := fs.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
 
-	if err := os.WriteFile(file, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, file, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 	return nil

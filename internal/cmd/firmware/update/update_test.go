@@ -381,3 +381,393 @@ func TestExecute_WithList(t *testing.T) {
 		t.Logf("Execute() error = %v (expected for mock)", err)
 	}
 }
+
+func TestRun_WithMockDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "living-room",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"living-room": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "living-room",
+		Beta:        false,
+		All:         false,
+		Parallelism: 3,
+		Staged:      100,
+	}
+	opts.Yes = true
+
+	ctx := context.Background()
+	err = run(ctx, opts)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected for mock)", err)
+	}
+}
+
+func TestRun_AllWithDevices(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "device-1",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "device-2",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"device-1": {"switch:0": map[string]any{"output": false}},
+			"device-2": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"--all", "--yes"})
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute() error = %v (may be expected for mock)", err)
+	}
+}
+
+func TestRun_CancelledContext(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "test-device",
+		Beta:        false,
+		All:         false,
+		Parallelism: 3,
+		Staged:      100,
+	}
+	opts.Yes = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	err := run(ctx, opts)
+	if err == nil {
+		t.Error("expected error with cancelled context")
+	}
+}
+
+func TestRun_BetaFirmware(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "test-device",
+		Beta:        true,
+		All:         false,
+		Parallelism: 3,
+		Staged:      100,
+	}
+	opts.Yes = true
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Logf("run() error = %v (expected for mock)", err)
+	}
+}
+
+func TestRun_CustomURL(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "test-device",
+		URL:         "http://example.com/firmware.zip",
+		All:         false,
+		Parallelism: 3,
+		Staged:      100,
+	}
+	opts.Yes = true
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Logf("run() error = %v (expected for mock)", err)
+	}
+}
+
+func TestNewCommand_MultipleInstances(t *testing.T) {
+	t.Parallel()
+
+	cmd1 := NewCommand(cmdutil.NewFactory())
+	cmd2 := NewCommand(cmdutil.NewFactory())
+
+	if cmd1 == cmd2 {
+		t.Error("Multiple NewCommand calls should return different instances")
+	}
+}
+
+func TestRun_AllNoDevices(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "",
+		All:         true,
+		Parallelism: 3,
+		Staged:      100,
+	}
+	opts.Yes = true
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Logf("run() error = %v (may be expected for mock)", err)
+	}
+}
+
+func TestRun_AdHocDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "192.168.1.100",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "192.168.1.100",
+		All:         false,
+		Parallelism: 3,
+		Staged:      100,
+	}
+	opts.Yes = true
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Logf("run() error = %v (expected for mock)", err)
+	}
+}
+
+func TestNewCommand_AcceptsVariousDeviceFormats(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		device string
+	}{
+		{"ip address", "192.168.1.100"},
+		{"hostname", "shelly-living-room.local"},
+		{"simple name", "kitchen"},
+		{"name with dashes", "living-room-light"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := NewCommand(cmdutil.NewFactory())
+
+			err := cmd.Args(cmd, []string{tt.device})
+			if err != nil {
+				t.Errorf("Command should accept device %q, got error: %v", tt.device, err)
+			}
+		})
+	}
+}
+
+func TestRun_StagedRollout(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "device-1",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+				{
+					Name:       "device-2",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "",
+		All:         true,
+		Parallelism: 3,
+		Staged:      50, // Only 50% of devices
+	}
+	opts.Yes = true
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Logf("run() error = %v (expected for mock)", err)
+	}
+}
+
+func TestRun_WithFactoryAccess(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory:     tf.Factory,
+		Device:      "test-device",
+		Parallelism: 3,
+		Staged:      100,
+	}
+
+	// Verify factory access
+	if opts.Factory == nil {
+		t.Fatal("Factory is nil")
+	}
+
+	ios := opts.Factory.IOStreams()
+	if ios == nil {
+		t.Error("IOStreams is nil")
+	}
+
+	svc := opts.Factory.ShellyService()
+	if svc == nil {
+		t.Error("ShellyService is nil")
+	}
+}

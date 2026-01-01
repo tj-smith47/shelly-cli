@@ -9,7 +9,10 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -532,5 +535,162 @@ func TestNewCommand_ExecuteOneArg(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("expected error for missing device arg")
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_DiffSuccess(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create a template
+	err = config.CreateDeviceTemplate(
+		"diff-template",
+		"Template for diff",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Updated Switch",
+			},
+		},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"diff-template", "test-device"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_DiffDeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{},
+		},
+		DeviceStates: map[string]mock.DeviceState{},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create a template
+	err = config.CreateDeviceTemplate(
+		"device-not-found-template",
+		"Template",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{"name": "Test"},
+		},
+		"other-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"device-not-found-template", "nonexistent-device"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("expected error for non-existent device")
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_DiffWithEmptyConfig(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create a template with empty config
+	err = config.CreateDeviceTemplate(
+		"empty-config-template",
+		"Empty config template",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"empty-config-template", "test-device"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
 	}
 }

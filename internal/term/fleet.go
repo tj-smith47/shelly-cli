@@ -8,7 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -26,7 +26,7 @@ func DisplayFleetStatus(ios *iostreams.IOStreams, statuses []*integrator.DeviceS
 		return
 	}
 
-	table := output.NewTable("STATUS", "DEVICE", "HOST", "LAST SEEN")
+	builder := table.NewBuilder("STATUS", "DEVICE", "HOST", "LAST SEEN")
 	for _, s := range statuses {
 		status := theme.StatusError().Render("○")
 		if s.Online {
@@ -34,9 +34,10 @@ func DisplayFleetStatus(ios *iostreams.IOStreams, statuses []*integrator.DeviceS
 		}
 
 		lastSeen := formatTimeSince(s.LastSeen)
-		table.AddRow(status, s.DeviceID, s.Host, lastSeen)
+		builder.AddRow(status, s.DeviceID, s.Host, lastSeen)
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print fleet status table", err)
 	}
@@ -66,7 +67,7 @@ func DisplayFleetHealth(ios *iostreams.IOStreams, health []*integrator.DeviceHea
 	ios.Printf("Summary: %d healthy, %d warning, %d unhealthy\n\n",
 		healthy, warning, unhealthy)
 
-	table := output.NewTable("STATUS", "DEVICE", "ONLINE", "LAST SEEN", "ACTIVITY")
+	builder := table.NewBuilder("STATUS", "DEVICE", "ONLINE", "LAST SEEN", "ACTIVITY")
 	for _, h := range health {
 		status := determineHealthStatus(h, threshold)
 		var statusIcon string
@@ -84,7 +85,7 @@ func DisplayFleetHealth(ios *iostreams.IOStreams, health []*integrator.DeviceHea
 			online = "yes"
 		}
 
-		table.AddRow(
+		builder.AddRow(
 			statusIcon,
 			h.DeviceID,
 			online,
@@ -93,6 +94,7 @@ func DisplayFleetHealth(ios *iostreams.IOStreams, health []*integrator.DeviceHea
 		)
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print fleet health table", err)
 	}

@@ -119,6 +119,7 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestRun_WithMock(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -160,6 +161,7 @@ func TestRun_WithMock(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestRun_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
@@ -180,5 +182,124 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_CanceledContext(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "cancel-device",
+					Address:    "192.168.1.102",
+					MAC:        "CC:DD:EE:FF:00:11",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "cancel-device",
+	}
+
+	err = run(ctx, opts)
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+func TestOptions(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	opts := &Options{
+		Factory: f,
+		Device:  "test-device",
+	}
+
+	if opts.Device != "test-device" {
+		t.Errorf("Device = %q, want %q", opts.Device, "test-device")
+	}
+	if opts.Factory == nil {
+		t.Error("Factory should not be nil")
+	}
+}
+
+func TestExecute_NoArgs(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for missing device argument")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "exec-device",
+					Address:    "192.168.1.103",
+					MAC:        "DD:EE:FF:00:11:22",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"exec-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"exec-device"})
+
+	err = cmd.Execute()
+	// May succeed or fail depending on mock
+	if err != nil {
+		t.Logf("Execute() error = %v (expected for mock)", err)
 	}
 }

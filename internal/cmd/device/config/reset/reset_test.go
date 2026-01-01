@@ -1,13 +1,16 @@
 package reset
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -454,5 +457,143 @@ func TestNewCommand_RunE_DeviceOnly(t *testing.T) {
 	// Execute - we expect an error due to cancelled context
 	if err := cmd.Execute(); err == nil {
 		t.Error("Expected error from Execute with cancelled context")
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_ListComponents(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "reset-list-device",
+					Address:    "192.168.1.230",
+					MAC:        "AA:BB:CC:DD:EE:60",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"reset-list-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	// No component arg - should list available components
+	cmd.SetArgs([]string{"reset-list-device"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	out := tf.OutString()
+	if out == "" {
+		t.Error("Expected non-empty output listing components")
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_ResetWithYesFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "reset-yes-device",
+					Address:    "192.168.1.231",
+					MAC:        "AA:BB:CC:DD:EE:61",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"reset-yes-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"reset-yes-device", "sys", "-y"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	out := tf.OutString()
+	if !strings.Contains(out, "reset") && !strings.Contains(out, "Configuration") {
+		t.Errorf("Output should contain success message, got: %s", out)
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_GetConfigError(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "existing-reset-device",
+					Address:    "192.168.1.233",
+					MAC:        "AA:BB:CC:DD:EE:63",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"existing-reset-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
 	}
 }

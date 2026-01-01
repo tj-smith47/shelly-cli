@@ -3,11 +3,12 @@ package validate
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
 
@@ -45,7 +46,7 @@ func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Read backup file
-	data, err := os.ReadFile(opts.FilePath)
+	data, err := afero.ReadFile(config.Fs(), opts.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
 // DisplayGen1Actions displays action URLs for a Gen1 device.
@@ -17,7 +18,7 @@ func DisplayGen1Actions(ios *iostreams.IOStreams, actions *gen1.ActionSettings) 
 		return
 	}
 
-	table := output.NewTable("INDEX", "EVENT", "ENABLED", "URLS")
+	builder := table.NewBuilder("INDEX", "EVENT", "ENABLED", "URLS")
 	for _, action := range actions.Actions {
 		enabled := "no"
 		if action.Enabled {
@@ -30,7 +31,7 @@ func DisplayGen1Actions(ios *iostreams.IOStreams, actions *gen1.ActionSettings) 
 				urls += fmt.Sprintf(" (+%d more)", len(action.URLs)-1)
 			}
 		}
-		table.AddRow(
+		builder.AddRow(
 			fmt.Sprintf("%d", action.Index),
 			string(action.Event),
 			enabled,
@@ -38,8 +39,9 @@ func DisplayGen1Actions(ios *iostreams.IOStreams, actions *gen1.ActionSettings) 
 		)
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("printing actions table", err)
+		ios.DebugErr("print actions table", err)
 	}
 }
 

@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 )
 
@@ -102,7 +103,7 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Write output
 	if opts.File != "" {
-		if err := os.WriteFile(opts.File, encoded, 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), opts.File, encoded, 0o600); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
 		ios.Success("Exported %d key(s) to %s", len(data.Items), opts.File)

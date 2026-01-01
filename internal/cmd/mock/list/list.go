@@ -4,12 +4,13 @@ package list
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"path/filepath"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
@@ -45,7 +46,8 @@ func run(_ context.Context, opts *Options) error {
 		return err
 	}
 
-	entries, err := os.ReadDir(mockDir)
+	fs := config.Fs()
+	entries, err := afero.ReadDir(fs, mockDir)
 	if err != nil {
 		return err
 	}
@@ -64,7 +66,7 @@ func run(_ context.Context, opts *Options) error {
 		}
 
 		filename := filepath.Join(mockDir, entry.Name())
-		data, err := os.ReadFile(filename) //nolint:gosec // Mock dir is from config
+		data, err := afero.ReadFile(fs, filename)
 		if err != nil {
 			continue
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
@@ -37,6 +38,7 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	fs := config.Fs()
 
 	logPath, err := cmdutil.GetLogPath()
 	if err != nil {
@@ -45,14 +47,12 @@ func run(opts *Options) error {
 
 	ios.Println(logPath)
 
-	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+	info, err := fs.Stat(logPath)
+	if os.IsNotExist(err) {
 		ios.Info("(file does not exist yet)")
-	} else {
-		info, err := os.Stat(logPath)
-		if err == nil {
-			ios.Info("Size: %d bytes", info.Size())
-			ios.Info("Modified: %s", info.ModTime().Format(time.RFC3339))
-		}
+	} else if err == nil {
+		ios.Info("Size: %d bytes", info.Size())
+		ios.Info("Modified: %s", info.ModTime().Format(time.RFC3339))
 	}
 
 	return nil

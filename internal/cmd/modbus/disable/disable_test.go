@@ -133,6 +133,7 @@ func TestOptions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestRun_WithMock(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -174,6 +175,7 @@ func TestRun_WithMock(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
 func TestRun_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
@@ -194,5 +196,158 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	err = run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_CanceledContext(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "cancel-device",
+					Address:    "192.168.1.102",
+					MAC:        "CC:DD:EE:FF:00:11",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "cancel-device",
+	}
+
+	err = run(ctx, opts)
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "modbus-device",
+					Address:    "192.168.1.103",
+					MAC:        "DD:EE:FF:00:11:22",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"modbus-device": {
+				"modbus":        map[string]any{"enabled": true},
+				"modbus_config": map[string]any{"enable": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "modbus-device",
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if output == "" {
+		t.Error("expected non-empty output")
+	}
+}
+
+func TestExecute_NoArgs(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for missing device argument")
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestExecute_WithDevice(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "exec-device",
+					Address:    "192.168.1.104",
+					MAC:        "EE:FF:00:11:22:33",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"exec-device": {
+				"modbus":        map[string]any{"enabled": true},
+				"modbus_config": map[string]any{"enable": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"exec-device"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Logf("Execute() error = %v (may be expected)", err)
 	}
 }

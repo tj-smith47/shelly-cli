@@ -115,8 +115,11 @@ func DisplayRestoreResult(ios *iostreams.IOStreams, result *backup.RestoreResult
 
 // DisplayBackupsTable prints a table of backup files.
 func DisplayBackupsTable(ios *iostreams.IOStreams, backups []model.BackupFileInfo) {
-	table := output.FormatBackupsTable(backups)
-	printTable(ios, table)
+	builder := output.FormatBackupsTable(backups)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print backups table", err)
+	}
 }
 
 // DisplayBackupExportResults prints the results of a backup export operation.

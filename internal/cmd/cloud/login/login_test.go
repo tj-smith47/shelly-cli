@@ -3,11 +3,13 @@ package login
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const cmdName = "login"
@@ -620,5 +622,248 @@ func TestNewCommand_PasswordFlagType(t *testing.T) {
 
 	if passwordFlag.Value.Type() != "string" {
 		t.Errorf("password flag type = %q, want 'string'", passwordFlag.Value.Type())
+	}
+}
+
+func TestRun_EmailFromEnvVar(t *testing.T) {
+	// Set environment variable for email
+	t.Setenv("SHELLY_CLOUD_EMAIL", "envtest@example.com")
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	opts := &Options{
+		Factory:  f,
+		Email:    "", // Not set via flag
+		Password: "", // Not set - will error asking for password
+	}
+
+	ctx := context.Background()
+	err := run(ctx, opts)
+
+	// Should fail asking for password (email was obtained from env var)
+	if err == nil {
+		t.Error("expected error for missing password")
+		return
+	}
+
+	// Should mention password (not email) since email was provided via env
+	if !strings.Contains(err.Error(), "password") {
+		t.Errorf("error should mention password, got: %v", err)
+	}
+}
+
+func TestRun_PasswordFromEnvVar(t *testing.T) {
+	// Set environment variable for password
+	t.Setenv("SHELLY_CLOUD_PASSWORD", "envtestpassword")
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	opts := &Options{
+		Factory:  f,
+		Email:    "", // Not set - will error asking for email
+		Password: "", // Will be obtained from env var
+	}
+
+	ctx := context.Background()
+	err := run(ctx, opts)
+
+	// Should fail asking for email
+	if err == nil {
+		t.Error("expected error for missing email")
+		return
+	}
+
+	// Should mention email since password was provided via env
+	if !strings.Contains(err.Error(), "email") {
+		t.Errorf("error should mention email, got: %v", err)
+	}
+}
+
+func TestRun_BothFromEnvVars(t *testing.T) {
+	// Set both environment variables
+	t.Setenv("SHELLY_CLOUD_EMAIL", "envtest@example.com")
+	t.Setenv("SHELLY_CLOUD_PASSWORD", "envtestpassword")
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	opts := &Options{
+		Factory:  f,
+		Email:    "", // Will be obtained from env var
+		Password: "", // Will be obtained from env var
+	}
+
+	// Use short timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 100)
+	defer cancel()
+
+	err := run(ctx, opts)
+
+	// Should fail due to network (authentication request), not missing credentials
+	if err == nil {
+		t.Log("unexpected success - expected network error")
+	} else if strings.Contains(err.Error(), "email required") || strings.Contains(err.Error(), "password required") {
+		t.Error("should not get credential missing error when env vars are set")
+	}
+}
+
+func TestRun_FlagOverridesEnvVar(t *testing.T) {
+	// Set environment variable
+	t.Setenv("SHELLY_CLOUD_EMAIL", "env@example.com")
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	opts := &Options{
+		Factory:  f,
+		Email:    "flag@example.com", // Flag should take precedence
+		Password: "testpassword",
+	}
+
+	// Use short timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 100)
+	defer cancel()
+
+	err := run(ctx, opts)
+
+	// Should fail due to network, not missing credentials
+	if err == nil {
+		t.Log("unexpected success - expected network error")
+	}
+}
+
+func TestRun_AuthenticationAttempt(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	opts := &Options{
+		Factory:  f,
+		Email:    "test@example.com",
+		Password: "testpassword123",
+	}
+
+	// Use short timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 100)
+	defer cancel()
+
+	err := run(ctx, opts)
+
+	// Should fail due to network/authentication error, not missing credentials
+	if err == nil {
+		t.Log("unexpected success - expected authentication error")
+	} else if strings.Contains(err.Error(), "email required") || strings.Contains(err.Error(), "password required") {
+		t.Error("should not get credential missing error when credentials are provided")
+	}
+}
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+func TestExecute_MissingCredentials(t *testing.T) {
+	t.Parallel()
+
+	// Clear env vars if set
+	prevEmail := os.Getenv("SHELLY_CLOUD_EMAIL")
+	prevPass := os.Getenv("SHELLY_CLOUD_PASSWORD")
+	if prevEmail != "" {
+		if err := os.Unsetenv("SHELLY_CLOUD_EMAIL"); err != nil {
+			t.Logf("warning: failed to unset SHELLY_CLOUD_EMAIL: %v", err)
+		}
+		defer func() {
+			if err := os.Setenv("SHELLY_CLOUD_EMAIL", prevEmail); err != nil {
+				t.Logf("warning: failed to restore SHELLY_CLOUD_EMAIL: %v", err)
+			}
+		}()
+	}
+	if prevPass != "" {
+		if err := os.Unsetenv("SHELLY_CLOUD_PASSWORD"); err != nil {
+			t.Logf("warning: failed to unset SHELLY_CLOUD_PASSWORD: %v", err)
+		}
+		defer func() {
+			if err := os.Setenv("SHELLY_CLOUD_PASSWORD", prevPass); err != nil {
+				t.Logf("warning: failed to restore SHELLY_CLOUD_PASSWORD: %v", err)
+			}
+		}()
+	}
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for missing credentials")
+	}
+}
+
+func TestExecute_WithCredentials(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios)
+
+	cmd := NewCommand(f)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"--email", "test@example.com", "--password", "testpass"})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	// Will fail due to network, but should not complain about missing credentials
+	err := cmd.Execute()
+	if err == nil {
+		t.Log("unexpected success - expected network error")
+	} else if strings.Contains(err.Error(), "email required") || strings.Contains(err.Error(), "password required") {
+		t.Error("should not get credential missing error when credentials are provided")
+	}
+}
+
+func TestOptions_Fields(t *testing.T) {
+	t.Parallel()
+
+	opts := &Options{
+		Email:    "test@example.com",
+		Password: "secret123",
+	}
+
+	if opts.Email != "test@example.com" {
+		t.Errorf("Email = %q, want 'test@example.com'", opts.Email)
+	}
+	if opts.Password != "secret123" {
+		t.Errorf("Password = %q, want 'secret123'", opts.Password)
 	}
 }

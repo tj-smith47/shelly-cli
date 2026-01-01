@@ -144,7 +144,11 @@ func run(ctx context.Context, opts *Options) error {
 
 	conn, resp, dialErr := dialer.DialContext(ctx, wsURL, nil)
 	if resp != nil && resp.Body != nil {
-		iostreams.CloseWithDebug("closing websocket response body", resp.Body)
+		defer func() {
+			if cerr := resp.Body.Close(); cerr != nil {
+				ios.DebugErr("closing websocket response body", cerr)
+			}
+		}()
 	}
 	if dialErr != nil {
 		return fmt.Errorf("failed to connect: %w", dialErr)

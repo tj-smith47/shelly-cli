@@ -8,6 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -43,10 +44,11 @@ func DisplayQuickDeviceStatus(ios *iostreams.IOStreams, device string, info *Qui
 		return
 	}
 
-	table := output.NewTable("Component", "State")
+	builder := table.NewBuilder("Component", "State")
 	for _, cs := range states {
-		table.AddRow(cs.Name, cs.State)
+		builder.AddRow(cs.Name, cs.State)
 	}
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print component status table", err)
 	}
@@ -59,15 +61,16 @@ func DisplayAllDevicesQuickStatus(ios *iostreams.IOStreams, statuses []QuickDevi
 		return
 	}
 
-	table := output.NewTable("Device", "Model", "Status")
+	builder := table.NewBuilder("Device", "Model", "Status")
 	for _, ds := range statuses {
 		status := output.RenderOnline(ds.Online, output.CaseLower)
 		deviceModel := ds.Model
 		if !ds.Online {
 			deviceModel = "-"
 		}
-		table.AddRow(ds.Name, deviceModel, status)
+		builder.AddRow(ds.Name, deviceModel, status)
 	}
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print devices status table", err)
 	}

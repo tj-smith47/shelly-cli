@@ -127,20 +127,9 @@ func PrevTheme() {
 // =============================================================================
 
 // ApplyConfig applies a theme configuration with optional color and semantic overrides.
-// It supports setting a base theme by name, loading from file, or applying color overrides.
-func ApplyConfig(name string, colors map[string]string, semantics *SemanticOverrides, filePath string) error {
-	// Load external file if specified
-	if filePath != "" {
-		if err := applyFromFile(filePath); err != nil {
-			return err
-		}
-		// Apply semantic overrides on top of file config
-		if semantics != nil {
-			ApplySemanticOverrides(semantics)
-		}
-		return nil
-	}
-
+// It supports setting a base theme by name or applying color overrides.
+// For file-based theme configuration, use ApplyThemeFromData instead.
+func ApplyConfig(name string, colors map[string]string, semantics *SemanticOverrides) error {
 	// Set base theme if specified
 	if name != "" {
 		if !SetTheme(name) {
@@ -162,35 +151,10 @@ func ApplyConfig(name string, colors map[string]string, semantics *SemanticOverr
 	return nil
 }
 
-// SaveTheme saves the theme name to configuration file.
-func SaveTheme(themeName string) error {
-	viper.Set("theme", themeName)
-
-	configFile := viper.ConfigFileUsed()
-	if configFile == "" {
-		// Create default config path
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		configDir := filepath.Join(home, ".config", "shelly")
-		if err := os.MkdirAll(configDir, 0o700); err != nil {
-			return err
-		}
-		configFile = filepath.Join(configDir, "config.yaml")
-	}
-
-	return viper.WriteConfigAs(configFile)
-}
-
-// applyFromFile loads and applies theme configuration from a file.
-func applyFromFile(filePath string) error {
-	expanded := expandPath(filePath)
-	//nolint:gosec // G304: File path is user-configured, intentional
-	data, err := os.ReadFile(expanded)
-	if err != nil {
-		return fmt.Errorf("failed to read theme file: %w", err)
-	}
+// ApplyThemeFromData applies a theme configuration from parsed file data.
+// The caller is responsible for reading the file (using config.Fs() for test isolation).
+// After applying the file theme, semantic overrides can be applied on top.
+func ApplyThemeFromData(data []byte, semantics *SemanticOverrides) error {
 	var fileTheme File
 	if err := yaml.Unmarshal(data, &fileTheme); err != nil {
 		return fmt.Errorf("invalid theme file: %w", err)
@@ -203,6 +167,11 @@ func applyFromFile(filePath string) error {
 	}
 	// Apply colors from file
 	SetCustomColors(&fileTheme.Colors)
+
+	// Apply semantic overrides on top of file config
+	if semantics != nil {
+		ApplySemanticOverrides(semantics)
+	}
 	return nil
 }
 
@@ -242,8 +211,9 @@ func parseColorsMap(colors map[string]string) *CustomColors {
 	}
 }
 
-// expandPath expands ~ to home directory.
-func expandPath(path string) string {
+// ExpandPath expands ~ to home directory in file paths.
+// Callers should use this before reading theme files with config.Fs().
+func ExpandPath(path string) string {
 	if strings.HasPrefix(path, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {

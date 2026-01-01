@@ -4,12 +4,13 @@ package ansible
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
@@ -97,7 +98,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	if err := os.WriteFile(opts.File, data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), opts.File, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

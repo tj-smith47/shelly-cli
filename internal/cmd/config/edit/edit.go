@@ -61,7 +61,7 @@ func run(ctx context.Context, opts *Options) error {
 	configPath := configDir + "/config.yaml"
 
 	// Check if config exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, err := config.Fs().Stat(configPath); os.IsNotExist(err) {
 		return fmt.Errorf("config file not found: %s\nRun 'shelly init' to create it", configPath)
 	}
 

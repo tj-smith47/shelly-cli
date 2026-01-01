@@ -1,9 +1,14 @@
 package get
 
 import (
+	"bytes"
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -192,5 +197,234 @@ func TestNewCommand_StatusFlagUsage(t *testing.T) {
 
 	if len(statusFlag.Usage) < 10 {
 		t.Error("status flag usage seems too short to be meaningful")
+	}
+}
+
+func TestNewCommand_Help(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--help"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("--help should not error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses mock infrastructure with global state
+func TestRun_GetCode(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "get-code-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Model:      "SNSW-001P16EU",
+					Type:       "Plus1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"get-code-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("failed to start demo: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "get-code-device",
+		ID:         1,
+		ShowStatus: false,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses mock infrastructure with global state
+func TestRun_GetStatus(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "get-status-device",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Model:      "SNSW-001P16EU",
+					Type:       "Plus1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"get-status-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("failed to start demo: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:    tf.Factory,
+		Device:     "get-status-device",
+		ID:         1,
+		ShowStatus: true,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	// Status output should contain memory info
+	if !strings.Contains(output, "ID") && !strings.Contains(output, "Running") {
+		t.Errorf("output should contain status info, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Uses mock infrastructure with global state
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{}, // No devices
+		},
+		DeviceStates: map[string]mock.DeviceState{},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("failed to start demo: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "nonexistent-device",
+		ID:      1,
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Fatal("expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // Uses mock infrastructure with global state
+func TestNewCommand_Execute(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "exec-get-device",
+					Address:    "192.168.1.102",
+					MAC:        "AA:BB:CC:DD:EE:02",
+					Model:      "SNSW-001P16EU",
+					Type:       "Plus1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"exec-get-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("failed to start demo: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"exec-get-device", "1"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses mock infrastructure with global state
+func TestNewCommand_ExecuteWithStatus(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "exec-status-device",
+					Address:    "192.168.1.103",
+					MAC:        "AA:BB:CC:DD:EE:03",
+					Model:      "SNSW-001P16EU",
+					Type:       "Plus1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"exec-status-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("failed to start demo: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"exec-status-device", "1", "--status"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+}
+
+func TestNewCommand_ExampleContent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"shelly script get",
+		"--status",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Example, pattern) {
+			t.Errorf("expected Example to contain %q", pattern)
+		}
 	}
 }

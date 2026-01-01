@@ -6,6 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
@@ -101,7 +102,7 @@ func run(opts *Options) error {
 	}
 
 	// Table output
-	table := output.NewTable("Name", "Version", "Source", "Path")
+	builder := table.NewBuilder("Name", "Version", "Source", "Path")
 	for _, ext := range extensionList {
 		version := ext.Version
 		if version == "" {
@@ -111,9 +112,10 @@ func run(opts *Options) error {
 		if ext.Manifest != nil {
 			source = ext.Manifest.Source.Type
 		}
-		table.AddRow(ext.Name, version, source, ext.Path)
+		builder.AddRow(ext.Name, version, source, ext.Path)
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print extension list table", err)
 	}

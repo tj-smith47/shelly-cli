@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -114,14 +115,15 @@ func run(opts *Options) error {
 	ios.Printf("Available Themes (%d themes)\n\n", len(themes))
 
 	// Display in columns for better readability
-	table := output.NewTable("Theme", "Current")
+	builder := table.NewBuilder("Theme", "Current")
 	for _, t := range themes {
 		isCurrent := ""
 		if t == currentID {
 			isCurrent = "✓"
 		}
-		table.AddRow(t, isCurrent)
+		builder.AddRow(t, isCurrent)
 	}
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print theme list table", err)
 	}

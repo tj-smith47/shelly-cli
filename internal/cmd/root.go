@@ -13,6 +13,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -402,7 +403,16 @@ func initializeConfig(_ *cobra.Command, _ []string) error {
 
 	// Initialize theme from config (supports name, colors, semantic, and file)
 	tc := config.Get().GetThemeConfig()
-	if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic, tc.File); err != nil {
+	if tc.File != "" {
+		// Load theme from external file
+		expanded := theme.ExpandPath(tc.File)
+		data, err := afero.ReadFile(config.Fs(), expanded)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to read theme file: %v, using default theme\n", err)
+		} else if err := theme.ApplyThemeFromData(data, tc.Semantic); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: %v, using default theme\n", err)
+		}
+	} else if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic); err != nil {
 		// Log theme error but don't fail - use default theme
 		fmt.Fprintf(os.Stderr, "warning: %v, using default theme\n", err)
 	}

@@ -1,12 +1,15 @@
 package list
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -484,5 +487,143 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+//nolint:paralleltest // Uses global viper state for output format
+func TestRun_JSONOutput(t *testing.T) {
+	devices := map[string]model.Device{
+		"living-room": {
+			Name:       "living-room",
+			Address:    "192.168.1.100",
+			Model:      "SHSW-25",
+			Type:       "relay",
+			Generation: 2,
+		},
+	}
+
+	tf := factory.NewTestFactoryWithDevices(t, devices)
+
+	// Set viper output format to JSON
+	original := viper.GetString("output")
+	viper.Set("output", "json")
+	defer viper.Set("output", original)
+
+	opts := &Options{
+		Factory: tf.Factory,
+	}
+
+	err := run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global viper state for output format
+func TestRun_YAMLOutput(t *testing.T) {
+	devices := map[string]model.Device{
+		"living-room": {
+			Name:       "living-room",
+			Address:    "192.168.1.100",
+			Model:      "SHSW-25",
+			Type:       "relay",
+			Generation: 2,
+		},
+	}
+
+	tf := factory.NewTestFactoryWithDevices(t, devices)
+
+	// Set viper output format to YAML
+	original := viper.GetString("output")
+	viper.Set("output", "yaml")
+	defer viper.Set("output", original)
+
+	opts := &Options{
+		Factory: tf.Factory,
+	}
+
+	err := run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_WithMockDevices(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_ShowVersionFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"--version"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() with --version error = %v", err)
 	}
 }

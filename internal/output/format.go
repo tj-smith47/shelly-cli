@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/output/jsonfmt"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/output/tmplfmt"
 	"github.com/tj-smith47/shelly-cli/internal/output/yamlfmt"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -152,17 +153,17 @@ func NewTableFormatter() *TableFormatter {
 
 // Format outputs data as a table.
 func (f *TableFormatter) Format(w io.Writer, data any) error {
-	table := f.buildTable(data)
-	if table == nil {
+	tbl := f.buildTable(data)
+	if tbl == nil {
 		return NewTextFormatter().Format(w, data)
 	}
-	return table.PrintTo(w)
+	return tbl.PrintTo(w)
 }
 
 // buildTable attempts to build a table from structured data.
 // Returns nil if the data cannot be represented as a table.
-func (f *TableFormatter) buildTable(data any) *Table {
-	return buildTableFromData(data)
+func (f *TableFormatter) buildTable(data any) *table.Table {
+	return table.BuildFromData(data)
 }
 
 // ParseFormat parses a format string into a Format.
@@ -272,9 +273,9 @@ func FormatConfigValue(v interface{}) string {
 		return "<not set>"
 	case bool:
 		if val {
-			return "true"
+			return LabelTrue
 		}
-		return "false"
+		return LabelFalse
 	case float64:
 		// Check if it's an integer
 		if val == float64(int64(val)) {
@@ -300,17 +301,17 @@ func FormatConfigValue(v interface{}) string {
 // FormatConfigTable builds a table from a configuration map.
 // It expects a map[string]interface{} where keys are setting names.
 // Returns nil if config is not a map.
-func FormatConfigTable(config interface{}) *Table {
+func FormatConfigTable(config interface{}) *table.Table {
 	cfgMap, ok := config.(map[string]interface{})
 	if !ok {
 		return nil
 	}
 
-	table := NewTable("Setting", "Value")
+	tbl := table.New("Setting", "Value")
 	for key, value := range cfgMap {
-		table.AddRow(key, FormatConfigValue(value))
+		tbl.AddRow(key, FormatConfigValue(value))
 	}
-	return table
+	return tbl
 }
 
 // FormatFloat formats a float64 value for CSV/data export.
@@ -400,6 +401,9 @@ func FormatDisplayValue(v any) string {
 // FormatComponentStatus formats a component status map into a human-readable string.
 // This extracts key fields based on the component type (switch, cover, light, etc.)
 // and returns a meaningful summary instead of just "{N fields}".
+//
+// The formatting is handled by registered StatusFormatter implementations.
+// Custom formatters can be registered via RegisterStatusFormatter().
 func FormatComponentStatus(componentName string, status map[string]any) string {
 	if len(status) == 0 {
 		return "-"
@@ -408,29 +412,8 @@ func FormatComponentStatus(componentName string, status map[string]any) string {
 	// Determine component type from name (e.g., "switch:0" -> "switch")
 	compType := extractComponentType(componentName)
 
-	switch compType {
-	case "switch":
-		return formatSwitchStatus(status)
-	case "light":
-		return formatLightStatus(status)
-	case "cover":
-		return formatCoverStatus(status)
-	case "input":
-		return formatInputStatus(status)
-	case "pm1", "pm":
-		return formatPowerMeterStatus(status)
-	case "temperature", "humidity", "devicepower", "illuminance":
-		return formatSensorStatus(compType, status)
-	case "sys":
-		return formatSysStatus(status)
-	case "wifi", "cloud", "mqtt", "ble", "eth":
-		return formatNetworkStatus(compType, status)
-	case "ws", "ota", "ui", "sntp":
-		return formatSystemComponentStatus(compType, status)
-	default:
-		// For unknown components, show key-value pairs inline
-		return formatGenericStatus(status)
-	}
+	// Use the registry-based dispatch
+	return formatStatusWithRegistry(compType, status)
 }
 
 // extractComponentType extracts the type from a component name like "switch:0" -> "switch".
@@ -441,326 +424,6 @@ func extractComponentType(name string) string {
 		}
 	}
 	return name
-}
-
-// formatSwitchStatus formats switch component status.
-func formatSwitchStatus(status map[string]any) string {
-	var parts []string
-
-	// Output state
-	if output, ok := status["output"].(bool); ok {
-		if output {
-			parts = append(parts, theme.StatusOK().Render("ON"))
-		} else {
-			parts = append(parts, theme.Dim().Render("off"))
-		}
-	}
-
-	// Active power
-	if apower, ok := status["apower"].(float64); ok {
-		parts = append(parts, FormatPowerCompact(apower))
-	}
-
-	// Voltage
-	if voltage, ok := status["voltage"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("%.1fV", voltage))
-	}
-
-	// Current
-	if current, ok := status["current"].(float64); ok && current > 0 {
-		parts = append(parts, fmt.Sprintf("%.2fA", current))
-	}
-
-	// Temperature (overtemp protection)
-	if tc, ok := status["temperature"].(map[string]any); ok {
-		if temp, ok := tc["tC"].(float64); ok {
-			parts = append(parts, fmt.Sprintf("%.1f°C", temp))
-		}
-	}
-
-	if len(parts) == 0 {
-		return formatGenericStatus(status)
-	}
-	return strings.Join(parts, ", ")
-}
-
-// formatLightStatus formats light component status.
-func formatLightStatus(status map[string]any) string {
-	var parts []string
-
-	// Output state
-	if output, ok := status["output"].(bool); ok {
-		if output {
-			parts = append(parts, theme.StatusOK().Render("ON"))
-		} else {
-			parts = append(parts, theme.Dim().Render("off"))
-		}
-	}
-
-	// Brightness
-	if brightness, ok := status["brightness"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("%d%%", int(brightness)))
-	}
-
-	// RGB color
-	if rgb, ok := status["rgb"].([]any); ok && len(rgb) == 3 {
-		parts = append(parts, fmt.Sprintf("RGB(%v,%v,%v)", rgb[0], rgb[1], rgb[2]))
-	}
-
-	if len(parts) == 0 {
-		return formatGenericStatus(status)
-	}
-	return strings.Join(parts, ", ")
-}
-
-// formatCoverStatus formats cover component status.
-func formatCoverStatus(status map[string]any) string {
-	var parts []string
-
-	// State (open, closed, opening, closing, stopped)
-	if state, ok := status["state"].(string); ok {
-		switch state {
-		case "open":
-			parts = append(parts, theme.StatusOK().Render("open"))
-		case "closed":
-			parts = append(parts, theme.Dim().Render("closed"))
-		case "opening":
-			parts = append(parts, theme.StatusWarn().Render("opening"))
-		case "closing":
-			parts = append(parts, theme.StatusWarn().Render("closing"))
-		default:
-			parts = append(parts, state)
-		}
-	}
-
-	// Current position
-	if pos, ok := status["current_pos"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("%d%%", int(pos)))
-	}
-
-	// Power consumption during movement
-	if apower, ok := status["apower"].(float64); ok && apower > 0 {
-		parts = append(parts, FormatPowerCompact(apower))
-	}
-
-	if len(parts) == 0 {
-		return formatGenericStatus(status)
-	}
-	return strings.Join(parts, ", ")
-}
-
-// formatInputStatus formats input component status.
-func formatInputStatus(status map[string]any) string {
-	// State (true = triggered)
-	if state, ok := status["state"].(bool); ok {
-		if state {
-			return theme.StatusWarn().Render("triggered")
-		}
-		return theme.Dim().Render("idle")
-	}
-	return formatGenericStatus(status)
-}
-
-// formatPowerMeterStatus formats power meter (pm1) component status.
-func formatPowerMeterStatus(status map[string]any) string {
-	var parts []string
-
-	if apower, ok := status["apower"].(float64); ok {
-		parts = append(parts, FormatPowerCompact(apower))
-	}
-	if voltage, ok := status["voltage"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("%.1fV", voltage))
-	}
-	if current, ok := status["current"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("%.2fA", current))
-	}
-	if freq, ok := status["freq"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("%.1fHz", freq))
-	}
-
-	if len(parts) == 0 {
-		return formatGenericStatus(status)
-	}
-	return strings.Join(parts, ", ")
-}
-
-// formatSensorStatus formats sensor component status.
-func formatSensorStatus(compType string, status map[string]any) string {
-	switch compType {
-	case "temperature":
-		if tC, ok := status["tC"].(float64); ok {
-			return fmt.Sprintf("%.1f°C", tC)
-		}
-	case "humidity":
-		if rh, ok := status["rh"].(float64); ok {
-			return fmt.Sprintf("%.1f%%", rh)
-		}
-	case "illuminance":
-		if lux, ok := status["lux"].(float64); ok {
-			return fmt.Sprintf("%.0f lux", lux)
-		}
-	case "devicepower":
-		var parts []string
-		if battery, ok := status["battery"].(map[string]any); ok {
-			if percent, ok := battery["percent"].(float64); ok {
-				parts = append(parts, fmt.Sprintf("%.0f%%", percent))
-			}
-		}
-		if external, ok := status["external"].(map[string]any); ok {
-			if present, ok := external["present"].(bool); ok && present {
-				parts = append(parts, "external power")
-			}
-		}
-		if len(parts) > 0 {
-			return strings.Join(parts, ", ")
-		}
-	}
-	return formatGenericStatus(status)
-}
-
-// formatSysStatus formats sys component status.
-func formatSysStatus(status map[string]any) string {
-	var parts []string
-
-	// Check for available updates
-	if updates, ok := status["available_updates"].(map[string]any); ok {
-		if stable, ok := updates["stable"].(map[string]any); ok {
-			if version, ok := stable["version"].(string); ok {
-				parts = append(parts, theme.StatusOK().Render(fmt.Sprintf("update: %s", version)))
-			}
-		}
-	}
-
-	// Restart required
-	if restart, ok := status["restart_required"].(bool); ok && restart {
-		parts = append(parts, theme.StatusWarn().Render("restart required"))
-	}
-
-	// Uptime
-	if uptime, ok := status["uptime"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("up %s", FormatDuration(time.Duration(uptime)*time.Second)))
-	}
-
-	// RAM free
-	if ramFree, ok := status["ram_free"].(float64); ok {
-		parts = append(parts, fmt.Sprintf("%s free", FormatSize(int64(ramFree))))
-	}
-
-	if len(parts) == 0 {
-		return theme.Dim().Render("ok")
-	}
-	return strings.Join(parts, ", ")
-}
-
-// formatNetworkStatus formats network component status (wifi, cloud, mqtt, etc.).
-//
-//nolint:gocyclo // Component-specific formatting requires many cases
-func formatNetworkStatus(compType string, status map[string]any) string {
-	switch compType {
-	case "wifi":
-		if ssid, ok := status["ssid"].(string); ok {
-			result := ssid
-			if rssi, ok := status["rssi"].(float64); ok {
-				result += fmt.Sprintf(" (%ddBm)", int(rssi))
-			}
-			return result
-		}
-		if sta, ok := status["sta_ip"].(string); ok {
-			return sta
-		}
-	case "cloud":
-		if connected, ok := status["connected"].(bool); ok {
-			if connected {
-				return theme.StatusOK().Render("connected")
-			}
-			return theme.Dim().Render("disconnected")
-		}
-	case "mqtt":
-		if connected, ok := status["connected"].(bool); ok {
-			if connected {
-				return theme.StatusOK().Render("connected")
-			}
-			return theme.Dim().Render("disconnected")
-		}
-	case "ble":
-		if enabled, ok := status["enabled"].(bool); ok {
-			if enabled {
-				return theme.StatusOK().Render("enabled")
-			}
-			return theme.Dim().Render("disabled")
-		}
-	case "eth":
-		if ip, ok := status["ip"].(string); ok && ip != "" {
-			return ip
-		}
-	}
-	return formatGenericStatus(status)
-}
-
-// formatSystemComponentStatus formats other system components (ws, ota, ui, sntp).
-func formatSystemComponentStatus(compType string, status map[string]any) string {
-	switch compType {
-	case "ws":
-		if connected, ok := status["connected"].(bool); ok {
-			if connected {
-				return theme.StatusOK().Render("connected")
-			}
-			return theme.Dim().Render("disconnected")
-		}
-	case "ui":
-		// UI usually doesn't have meaningful status
-		return theme.Dim().Render("ok")
-	}
-	return formatGenericStatus(status)
-}
-
-// formatGenericStatus formats an unknown component status by showing key fields.
-func formatGenericStatus(status map[string]any) string {
-	if len(status) == 0 {
-		return "-"
-	}
-
-	// Show up to 3 key fields inline
-	parts := make([]string, 0, 4)
-	count := 0
-	for key, value := range status {
-		if count >= 3 {
-			remaining := len(status) - count
-			if remaining > 0 {
-				parts = append(parts, fmt.Sprintf("+%d more", remaining))
-			}
-			break
-		}
-		parts = append(parts, fmt.Sprintf("%s=%s", key, formatSimpleValue(value)))
-		count++
-	}
-	return strings.Join(parts, ", ")
-}
-
-// formatSimpleValue formats a single value for inline display.
-func formatSimpleValue(v any) string {
-	switch val := v.(type) {
-	case bool:
-		return strconv.FormatBool(val)
-	case float64:
-		if val == float64(int64(val)) {
-			return fmt.Sprintf("%.0f", val)
-		}
-		return fmt.Sprintf("%.2f", val)
-	case string:
-		if len(val) > 20 {
-			return val[:17] + "..."
-		}
-		return val
-	case map[string]any, []any:
-		return "..."
-	default:
-		s := fmt.Sprintf("%v", val)
-		if len(s) > 20 {
-			return s[:17] + "..."
-		}
-		return s
-	}
 }
 
 // FormatPowerCompact formats power in a compact form (e.g., "45.2W").
@@ -948,4 +611,413 @@ func ExtractMapSection(result any, key string) map[string]any {
 	}
 
 	return section
+}
+
+// StatusFormatter formats a component status map into a human-readable string.
+// The componentType is provided for formatters that need to distinguish between
+// subtypes (e.g., sensor types like "temperature" vs "humidity").
+type StatusFormatter interface {
+	Format(componentType string, status map[string]any) string
+}
+
+// statusFormatterRegistry maps component types to their formatters.
+var statusFormatterRegistry = map[string]StatusFormatter{
+	// Device components
+	"switch": switchStatusFormatter{},
+	"light":  lightStatusFormatter{},
+	"cover":  coverStatusFormatter{},
+	"input":  inputStatusFormatter{},
+
+	// Power meters
+	"pm1": powerMeterStatusFormatter{},
+	"pm":  powerMeterStatusFormatter{},
+
+	// Sensors (all use the same formatter with type dispatch)
+	"temperature": sensorStatusFormatter{},
+	"humidity":    sensorStatusFormatter{},
+	"illuminance": sensorStatusFormatter{},
+	"devicepower": sensorStatusFormatter{},
+
+	// System
+	"sys": sysStatusFormatter{},
+
+	// Network (all use the same formatter with type dispatch)
+	"wifi":  networkStatusFormatter{},
+	"cloud": networkStatusFormatter{},
+	"mqtt":  networkStatusFormatter{},
+	"ble":   networkStatusFormatter{},
+	"eth":   networkStatusFormatter{},
+
+	// System components (all use the same formatter with type dispatch)
+	"ws":   systemComponentStatusFormatter{},
+	"ota":  systemComponentStatusFormatter{},
+	"ui":   systemComponentStatusFormatter{},
+	"sntp": systemComponentStatusFormatter{},
+}
+
+// RegisterStatusFormatter registers a custom status formatter for a component type.
+// This allows plugins to extend the formatting system.
+func RegisterStatusFormatter(componentType string, formatter StatusFormatter) {
+	statusFormatterRegistry[componentType] = formatter
+}
+
+// GetStatusFormatter returns the formatter for a component type.
+// Returns the generic formatter if no specific formatter is registered.
+func GetStatusFormatter(componentType string) StatusFormatter {
+	if formatter, ok := statusFormatterRegistry[componentType]; ok {
+		return formatter
+	}
+	return genericStatusFormatter{}
+}
+
+// formatStatusWithRegistry uses the registry to format component status.
+// This is the internal dispatch function used by FormatComponentStatus.
+func formatStatusWithRegistry(componentType string, status map[string]any) string {
+	formatter := GetStatusFormatter(componentType)
+	return formatter.Format(componentType, status)
+}
+
+// --- Formatter Implementations ---
+
+// switchStatusFormatter formats switch component status.
+type switchStatusFormatter struct{}
+
+func (switchStatusFormatter) Format(_ string, status map[string]any) string {
+	var parts []string
+
+	// Output state
+	if output, ok := status["output"].(bool); ok {
+		if output {
+			parts = append(parts, theme.StatusOK().Render("ON"))
+		} else {
+			parts = append(parts, theme.Dim().Render("off"))
+		}
+	}
+
+	// Active power
+	if apower, ok := status["apower"].(float64); ok {
+		parts = append(parts, FormatPowerCompact(apower))
+	}
+
+	// Voltage
+	if voltage, ok := status["voltage"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("%.1fV", voltage))
+	}
+
+	// Current
+	if current, ok := status["current"].(float64); ok && current > 0 {
+		parts = append(parts, fmt.Sprintf("%.2fA", current))
+	}
+
+	// Temperature (overtemp protection)
+	if tc, ok := status["temperature"].(map[string]any); ok {
+		if temp, ok := tc["tC"].(float64); ok {
+			parts = append(parts, fmt.Sprintf("%.1f°C", temp))
+		}
+	}
+
+	if len(parts) == 0 {
+		return genericStatusFormatter{}.Format("", status)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// lightStatusFormatter formats light component status.
+type lightStatusFormatter struct{}
+
+func (lightStatusFormatter) Format(_ string, status map[string]any) string {
+	var parts []string
+
+	// Output state
+	if output, ok := status["output"].(bool); ok {
+		if output {
+			parts = append(parts, theme.StatusOK().Render("ON"))
+		} else {
+			parts = append(parts, theme.Dim().Render("off"))
+		}
+	}
+
+	// Brightness
+	if brightness, ok := status["brightness"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("%d%%", int(brightness)))
+	}
+
+	// RGB color
+	if rgb, ok := status["rgb"].([]any); ok && len(rgb) == 3 {
+		parts = append(parts, fmt.Sprintf("RGB(%v,%v,%v)", rgb[0], rgb[1], rgb[2]))
+	}
+
+	if len(parts) == 0 {
+		return genericStatusFormatter{}.Format("", status)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// coverStatusFormatter formats cover component status.
+type coverStatusFormatter struct{}
+
+func (coverStatusFormatter) Format(_ string, status map[string]any) string {
+	var parts []string
+
+	// State (open, closed, opening, closing, stopped)
+	if state, ok := status["state"].(string); ok {
+		switch state {
+		case "open":
+			parts = append(parts, theme.StatusOK().Render("open"))
+		case "closed":
+			parts = append(parts, theme.Dim().Render("closed"))
+		case "opening":
+			parts = append(parts, theme.StatusWarn().Render("opening"))
+		case "closing":
+			parts = append(parts, theme.StatusWarn().Render("closing"))
+		default:
+			parts = append(parts, state)
+		}
+	}
+
+	// Current position
+	if pos, ok := status["current_pos"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("%d%%", int(pos)))
+	}
+
+	// Power consumption during movement
+	if apower, ok := status["apower"].(float64); ok && apower > 0 {
+		parts = append(parts, FormatPowerCompact(apower))
+	}
+
+	if len(parts) == 0 {
+		return genericStatusFormatter{}.Format("", status)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// inputStatusFormatter formats input component status.
+type inputStatusFormatter struct{}
+
+func (inputStatusFormatter) Format(_ string, status map[string]any) string {
+	// State (true = triggered)
+	if state, ok := status["state"].(bool); ok {
+		if state {
+			return theme.StatusWarn().Render("triggered")
+		}
+		return theme.Dim().Render("idle")
+	}
+	return genericStatusFormatter{}.Format("", status)
+}
+
+// powerMeterStatusFormatter formats power meter (pm1) component status.
+type powerMeterStatusFormatter struct{}
+
+func (powerMeterStatusFormatter) Format(_ string, status map[string]any) string {
+	var parts []string
+
+	if apower, ok := status["apower"].(float64); ok {
+		parts = append(parts, FormatPowerCompact(apower))
+	}
+	if voltage, ok := status["voltage"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("%.1fV", voltage))
+	}
+	if current, ok := status["current"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("%.2fA", current))
+	}
+	if freq, ok := status["freq"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("%.1fHz", freq))
+	}
+
+	if len(parts) == 0 {
+		return genericStatusFormatter{}.Format("", status)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// sensorStatusFormatter formats sensor component status.
+type sensorStatusFormatter struct{}
+
+func (sensorStatusFormatter) Format(compType string, status map[string]any) string {
+	switch compType {
+	case "temperature":
+		if tC, ok := status["tC"].(float64); ok {
+			return fmt.Sprintf("%.1f°C", tC)
+		}
+	case "humidity":
+		if rh, ok := status["rh"].(float64); ok {
+			return fmt.Sprintf("%.1f%%", rh)
+		}
+	case "illuminance":
+		if lux, ok := status["lux"].(float64); ok {
+			return fmt.Sprintf("%.0f lux", lux)
+		}
+	case "devicepower":
+		var parts []string
+		if battery, ok := status["battery"].(map[string]any); ok {
+			if percent, ok := battery["percent"].(float64); ok {
+				parts = append(parts, fmt.Sprintf("%.0f%%", percent))
+			}
+		}
+		if external, ok := status["external"].(map[string]any); ok {
+			if present, ok := external["present"].(bool); ok && present {
+				parts = append(parts, "external power")
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, ", ")
+		}
+	}
+	return genericStatusFormatter{}.Format("", status)
+}
+
+// sysStatusFormatter formats sys component status.
+type sysStatusFormatter struct{}
+
+func (sysStatusFormatter) Format(_ string, status map[string]any) string {
+	var parts []string
+
+	// Check for available updates
+	if updates, ok := status["available_updates"].(map[string]any); ok {
+		if stable, ok := updates["stable"].(map[string]any); ok {
+			if version, ok := stable["version"].(string); ok {
+				parts = append(parts, theme.StatusOK().Render(fmt.Sprintf("update: %s", version)))
+			}
+		}
+	}
+
+	// Restart required
+	if restart, ok := status["restart_required"].(bool); ok && restart {
+		parts = append(parts, theme.StatusWarn().Render("restart required"))
+	}
+
+	// Uptime
+	if uptime, ok := status["uptime"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("up %s", FormatDuration(time.Duration(uptime)*time.Second)))
+	}
+
+	// RAM free
+	if ramFree, ok := status["ram_free"].(float64); ok {
+		parts = append(parts, fmt.Sprintf("%s free", FormatSize(int64(ramFree))))
+	}
+
+	if len(parts) == 0 {
+		return theme.Dim().Render("ok")
+	}
+	return strings.Join(parts, ", ")
+}
+
+// networkStatusFormatter formats network component status (wifi, cloud, mqtt, etc.).
+type networkStatusFormatter struct{}
+
+//nolint:gocyclo // Component-specific formatting requires many cases
+func (networkStatusFormatter) Format(compType string, status map[string]any) string {
+	switch compType {
+	case "wifi":
+		if ssid, ok := status["ssid"].(string); ok {
+			result := ssid
+			if rssi, ok := status["rssi"].(float64); ok {
+				result += fmt.Sprintf(" (%ddBm)", int(rssi))
+			}
+			return result
+		}
+		if sta, ok := status["sta_ip"].(string); ok {
+			return sta
+		}
+	case "cloud":
+		if connected, ok := status["connected"].(bool); ok {
+			if connected {
+				return theme.StatusOK().Render("connected")
+			}
+			return theme.Dim().Render("disconnected")
+		}
+	case "mqtt":
+		if connected, ok := status["connected"].(bool); ok {
+			if connected {
+				return theme.StatusOK().Render("connected")
+			}
+			return theme.Dim().Render("disconnected")
+		}
+	case "ble":
+		if enabled, ok := status["enabled"].(bool); ok {
+			if enabled {
+				return theme.StatusOK().Render("enabled")
+			}
+			return theme.Dim().Render("disabled")
+		}
+	case "eth":
+		if ip, ok := status["ip"].(string); ok && ip != "" {
+			return ip
+		}
+	}
+	return genericStatusFormatter{}.Format("", status)
+}
+
+// systemComponentStatusFormatter formats other system components (ws, ota, ui, sntp).
+type systemComponentStatusFormatter struct{}
+
+func (systemComponentStatusFormatter) Format(compType string, status map[string]any) string {
+	switch compType {
+	case "ws":
+		if connected, ok := status["connected"].(bool); ok {
+			if connected {
+				return theme.StatusOK().Render("connected")
+			}
+			return theme.Dim().Render("disconnected")
+		}
+	case "ui":
+		// UI usually doesn't have meaningful status
+		return theme.Dim().Render("ok")
+	}
+	return genericStatusFormatter{}.Format("", status)
+}
+
+// genericStatusFormatter formats an unknown component status by showing key fields.
+type genericStatusFormatter struct{}
+
+func (genericStatusFormatter) Format(_ string, status map[string]any) string {
+	if len(status) == 0 {
+		return "-"
+	}
+
+	// Show up to 3 key fields inline
+	parts := make([]string, 0, 4)
+	count := 0
+	for key, value := range status {
+		if count >= 3 {
+			remaining := len(status) - count
+			if remaining > 0 {
+				parts = append(parts, fmt.Sprintf("+%d more", remaining))
+			}
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%s=%s", key, formatSimpleValueInternal(value)))
+		count++
+	}
+	return strings.Join(parts, ", ")
+}
+
+// formatSimpleValueInternal formats a single value for inline display.
+// This is an internal version that avoids circular dependencies.
+func formatSimpleValueInternal(v any) string {
+	switch val := v.(type) {
+	case bool:
+		if val {
+			return LabelTrue
+		}
+		return LabelFalse
+	case float64:
+		if val == float64(int64(val)) {
+			return fmt.Sprintf("%.0f", val)
+		}
+		return fmt.Sprintf("%.2f", val)
+	case string:
+		if len(val) > 20 {
+			return val[:17] + "..."
+		}
+		return val
+	case map[string]any, []any:
+		return "..."
+	default:
+		s := fmt.Sprintf("%v", val)
+		if len(s) > 20 {
+			return s[:17] + "..."
+		}
+		return s
+	}
 }

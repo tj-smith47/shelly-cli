@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
@@ -65,9 +67,10 @@ func getSearchPaths() []string {
 func (l *Loader) Discover() ([]Plugin, error) {
 	seen := make(map[string]bool)
 	var plugins []Plugin
+	fs := config.Fs()
 
 	for _, dir := range l.paths {
-		entries, err := os.ReadDir(dir)
+		entries, err := afero.ReadDir(fs, dir)
 		if err != nil {
 			continue // Skip directories that don't exist or can't be read
 		}
@@ -193,11 +196,12 @@ func (l *Loader) findByName(name string) *Plugin {
 	pluginName := strings.TrimPrefix(name, PluginPrefix)
 	// Use background context for find; cancellation happens via timeout in getPluginVersion
 	ctx := context.Background()
+	fs := config.Fs()
 
 	for _, dir := range l.paths {
 		// First, check for new format (directory)
 		pluginDir := filepath.Join(dir, name)
-		if info, err := os.Stat(pluginDir); err == nil && info.IsDir() {
+		if info, err := fs.Stat(pluginDir); err == nil && info.IsDir() {
 			if plugin := l.loadFromDir(pluginDir, pluginName); plugin != nil {
 				return plugin
 			}
@@ -228,7 +232,7 @@ func (l *Loader) findByName(name string) *Plugin {
 
 // isExecutable checks if a file exists and is executable.
 func isExecutable(path string) bool {
-	info, err := os.Stat(path)
+	info, err := config.Fs().Stat(path)
 	if err != nil {
 		return false
 	}

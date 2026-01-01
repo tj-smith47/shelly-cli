@@ -4,12 +4,14 @@ package backup
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Validate validates a backup file structure.
@@ -34,14 +36,15 @@ func Validate(data []byte) (*DeviceBackup, error) {
 
 // SaveToFile saves backup data to a file.
 func SaveToFile(data []byte, filePath string) error {
+	fs := config.Fs()
 	// Ensure directory exists
 	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	if err := fs.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Write file
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, filePath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -50,7 +53,7 @@ func SaveToFile(data []byte, filePath string) error {
 
 // LoadFromFile loads backup data from a file.
 func LoadFromFile(filePath string) ([]byte, error) {
-	data, err := os.ReadFile(filePath) //nolint:gosec // User-provided file path
+	data, err := afero.ReadFile(config.Fs(), filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read backup file: %w", err)
 	}
@@ -75,7 +78,7 @@ func GenerateFilename(deviceName, deviceID string, encrypted bool) string {
 
 // IsFile checks if the path looks like a backup file (exists and is a file).
 func IsFile(path string) bool {
-	info, err := os.Stat(path)
+	info, err := config.Fs().Stat(path)
 	if err != nil {
 		return false
 	}
@@ -84,7 +87,7 @@ func IsFile(path string) bool {
 
 // LoadAndValidate loads a DeviceBackup from a file and validates it.
 func LoadAndValidate(source string) (*DeviceBackup, error) {
-	data, err := os.ReadFile(source) //nolint:gosec // G304: source is user-provided CLI argument
+	data, err := afero.ReadFile(config.Fs(), source)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read backup file: %w", err)
 	}

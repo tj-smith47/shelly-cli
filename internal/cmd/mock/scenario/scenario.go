@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
@@ -97,7 +98,7 @@ func run(_ context.Context, opts *Options) error {
 		}
 
 		filename := filepath.Join(mockDir, device.Name+".json")
-		if err := os.WriteFile(filename, data, 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), filename, data, 0o600); err != nil {
 			ios.Warning("Failed to write %s: %v", device.Name, err)
 			continue
 		}

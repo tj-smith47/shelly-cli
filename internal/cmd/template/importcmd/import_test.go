@@ -265,9 +265,8 @@ config:
 	}
 }
 
+//nolint:paralleltest // Modifies global config state
 func TestImportTemplate_NameOverride(t *testing.T) {
-	// No t.Parallel() - modifies global config state
-
 	// Reset config manager for isolated testing
 	config.ResetDefaultManagerForTesting()
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -306,9 +305,8 @@ config:
 	}
 }
 
+//nolint:paralleltest // Modifies global config state
 func TestImportTemplate_Success(t *testing.T) {
-	// No t.Parallel() - modifies global config state
-
 	// Reset config manager for isolated testing
 	config.ResetDefaultManagerForTesting()
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -353,9 +351,8 @@ config:
 	}
 }
 
+//nolint:paralleltest // Modifies global config state
 func TestImportTemplate_AlreadyExists(t *testing.T) {
-	// No t.Parallel() - modifies global config state
-
 	// Reset config manager for isolated testing
 	config.ResetDefaultManagerForTesting()
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -392,9 +389,8 @@ config:
 	}
 }
 
+//nolint:paralleltest // Modifies global config state
 func TestImportTemplate_OverwriteWithForce(t *testing.T) {
-	// No t.Parallel() - modifies global config state
-
 	// Reset config manager for isolated testing
 	config.ResetDefaultManagerForTesting()
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -453,9 +449,8 @@ config:
 	}
 }
 
+//nolint:paralleltest // Modifies global config state
 func TestImportTemplate_JSONFile(t *testing.T) {
-	// No t.Parallel() - modifies global config state
-
 	// Reset config manager for isolated testing
 	config.ResetDefaultManagerForTesting()
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -491,5 +486,105 @@ func TestImportTemplate_JSONFile(t *testing.T) {
 	_, exists := config.GetDeviceTemplate("json-template")
 	if !exists {
 		t.Error("template 'json-template' should exist")
+	}
+}
+
+//nolint:paralleltest // Modifies global config state
+func TestImportTemplate_InvalidNameOverride(t *testing.T) {
+	// Reset config manager for isolated testing
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	// Create manager with properly initialized config
+	m := config.NewTestManager(&config.Config{})
+	config.SetDefaultManager(m)
+
+	tmpDir := t.TempDir()
+	file := tmpDir + "/template.yaml"
+	content := `name: "valid-name"
+model: "SNSW-001P16EU"
+config:
+  switch:0:
+    name: "Test Switch"
+`
+	if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	// Override with invalid name
+	_, err := importTemplate(file, "invalid/override/name", false)
+	if err == nil {
+		t.Error("expected error for invalid name override")
+	}
+}
+
+//nolint:paralleltest // Modifies global config state
+func TestImportTemplate_UnknownFileExtension(t *testing.T) {
+	// Reset config manager for isolated testing
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	// Create manager with properly initialized config
+	m := config.NewTestManager(&config.Config{})
+	config.SetDefaultManager(m)
+
+	tmpDir := t.TempDir()
+	file := tmpDir + "/template.txt"
+	// Valid YAML content in .txt file
+	content := `name: "txt-template"
+model: "SNSW-001P16EU"
+config:
+  switch:0:
+    name: "Test Switch"
+`
+	if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	result, err := importTemplate(file, "", false)
+	if err != nil {
+		t.Fatalf("importTemplate() error = %v", err)
+	}
+	if !strings.Contains(result, "txt-template") {
+		t.Errorf("result = %q, want to contain 'txt-template'", result)
+	}
+}
+
+func TestNewCommand_ValidArgsFunction(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.ValidArgsFunction == nil {
+		t.Error("ValidArgsFunction should be set for tab completion")
+	}
+}
+
+func TestNewCommand_RunE(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.RunE == nil {
+		t.Error("RunE should be set")
+	}
+}
+
+func TestNewCommand_LongDescription(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"Import",
+		"template",
+		"JSON",
+		"YAML",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Long, pattern) {
+			t.Errorf("expected Long to contain %q", pattern)
+		}
 	}
 }

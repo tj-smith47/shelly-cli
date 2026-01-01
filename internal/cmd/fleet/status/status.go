@@ -3,7 +3,6 @@ package status
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/integrator"
@@ -11,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -58,40 +58,39 @@ Requires an active fleet connection. Run 'shelly fleet connect' first.`,
 	return cmd
 }
 
-//nolint:gocyclo // Complexity from handling demo mode and filtering options
+//nolint:gocyclo,nestif // Complexity from handling demo mode and filtering options
 func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
+	var statuses []*integrator.DeviceStatus
+	var org string
+
 	// Check for demo mode
 	if mock.IsDemoMode() && mock.HasFleetFixtures() {
-		return runDemoMode(opts)
+		statuses = mock.GetFleetDeviceStatuses()
+		org = mock.GetFleetOrganization()
+	} else {
+		// Get credentials
+		cfg, cfgErr := opts.Factory.Config()
+		if cfgErr != nil {
+			ios.DebugErr("load config", cfgErr)
+		}
+		creds, err := shelly.GetIntegratorCredentials(ios, cfg)
+		if err != nil {
+			return err
+		}
+
+		// Connect to fleet
+		fc, err := shelly.ConnectFleet(ctx, ios, creds)
+		if err != nil {
+			return err
+		}
+		defer fc.Close()
+
+		statuses = fc.Manager.ListDeviceStatuses()
 	}
 
-	// Get credentials
-	cfg, cfgErr := opts.Factory.Config()
-	if cfgErr != nil {
-		ios.DebugErr("load config", cfgErr)
-	}
-	tag, token, err := cfg.GetIntegratorCredentials()
-	if err != nil {
-		return fmt.Errorf("%w. Run 'shelly fleet connect' first", err)
-	}
-
-	// Create client and authenticate
-	client := integrator.New(tag, token)
-	if err := client.Authenticate(ctx); err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
-	}
-
-	// Create fleet manager and connect
-	fm := integrator.NewFleetManager(client)
-	ios.Info("Connecting to fleet...")
-	for host, connErr := range fm.ConnectAll(ctx, nil) {
-		ios.Warning("Failed to connect to %s: %v", host, connErr)
-	}
-
-	// Get and filter device statuses
-	statuses := fm.ListDeviceStatuses()
+	// Filter device statuses
 	if opts.Online || opts.Offline {
 		filtered := make([]*integrator.DeviceStatus, 0, len(statuses))
 		for _, s := range statuses {
@@ -115,46 +114,6 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	ios.Success("Fleet Status (%d devices)", len(statuses))
-	ios.Println()
-	term.DisplayFleetStatus(ios, statuses)
-
-	return nil
-}
-
-func runDemoMode(opts *Options) error {
-	ios := opts.Factory.IOStreams()
-
-	// Get mock fleet devices
-	mockDevices := mock.GetFleetDevices()
-
-	// Convert to integrator.DeviceStatus for display compatibility
-	statuses := make([]*integrator.DeviceStatus, 0, len(mockDevices))
-	for _, d := range mockDevices {
-		if opts.Online && !d.Online {
-			continue
-		}
-		if opts.Offline && d.Online {
-			continue
-		}
-		statuses = append(statuses, &integrator.DeviceStatus{
-			DeviceID: d.DeviceID,
-			Online:   d.Online,
-			LastSeen: d.LastSeen,
-			Host:     d.Host,
-		})
-	}
-
-	if output.WantsStructured() {
-		return output.FormatOutput(ios.Out, statuses)
-	}
-
-	if len(statuses) == 0 {
-		ios.Warning("No devices found matching criteria")
-		return nil
-	}
-
-	org := mock.GetFleetOrganization()
 	if org != "" {
 		ios.Info("Organization: %s", org)
 	}

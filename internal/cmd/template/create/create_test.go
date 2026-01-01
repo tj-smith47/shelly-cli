@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -919,5 +920,128 @@ func TestNewCommand_ExactArgs(t *testing.T) {
 		if (err != nil) != tc.wantError {
 			t.Errorf("Args with %d args: error = %v, wantError = %v", tc.argCount, err, tc.wantError)
 		}
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_DeleteTemplateForceOverwriteWithAllFlags(t *testing.T) {
+	// Test the path where deleting an existing template during force overwrite
+	// This exercises the delete + recreate path with all flag combinations
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create initial template
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"delete-test-template", "test-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("First create failed: %v", err)
+	}
+
+	// Now force overwrite - this exercises the delete + recreate path
+	buf.Reset()
+	cmd2 := NewCommand(tf.Factory)
+	cmd2.SetContext(context.Background())
+	cmd2.SetArgs([]string{"delete-test-template", "test-device", "--force", "--include-wifi", "-d", "Updated description"})
+	cmd2.SetOut(&buf)
+	cmd2.SetErr(&buf)
+
+	err = cmd2.Execute()
+	if err != nil {
+		t.Errorf("Force overwrite with all flags failed: %v", err)
+	}
+}
+
+func TestNewCommand_InvalidTemplateName(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"invalid/name/with/slashes", "test-device"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid template name")
+	}
+}
+
+//nolint:paralleltest // Modifies global config state
+func TestNewCommand_TemplateAlreadyExistsNoForce(t *testing.T) {
+	// Reset config manager for isolated testing
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	// Create manager with properly initialized config
+	m := config.NewTestManager(&config.Config{})
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+	tf.SetConfigManager(m)
+
+	// Create an existing template
+	err := config.CreateDeviceTemplate(
+		"existing-create-template",
+		"Already exists",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{"switch:0": map[string]any{"name": "Existing"}},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("Failed to create existing template: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetContext(context.Background())
+	// Try to create template with same name without --force
+	cmd.SetArgs([]string{"existing-create-template", "test-device"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("expected error when template already exists without --force")
+	}
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("expected 'already exists' error, got: %v", err)
 	}
 }

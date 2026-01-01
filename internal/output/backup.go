@@ -3,17 +3,18 @@ package output
 
 import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
-// FormatBackupsTable builds a table of backup file information.
-func FormatBackupsTable(backups []model.BackupFileInfo) *Table {
-	table := NewTable("FILENAME", "DEVICE", "MODEL", "CREATED", "ENCRYPTED", "SIZE")
+// FormatBackupsTable builds a table builder of backup file information.
+func FormatBackupsTable(backups []model.BackupFileInfo) *table.Builder {
+	builder := table.NewBuilder("FILENAME", "DEVICE", "MODEL", "CREATED", "ENCRYPTED", "SIZE")
 	for _, b := range backups {
 		encrypted := ""
 		if b.Encrypted {
 			encrypted = "yes"
 		}
-		table.AddRow(
+		builder.AddRow(
 			b.Filename,
 			b.DeviceID,
 			b.DeviceModel,
@@ -22,5 +23,5 @@ func FormatBackupsTable(backups []model.BackupFileInfo) *Table {
 			FormatSize(b.Size),
 		)
 	}
-	return table
+	return builder
 }

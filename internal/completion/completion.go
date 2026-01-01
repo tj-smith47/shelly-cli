@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -457,8 +458,7 @@ func getDiscoveryCache() []string {
 	}
 
 	cacheFile := filepath.Join(cacheDir, "shelly", "discovery_cache.txt")
-	//nolint:gosec // G304: cacheFile is constructed from UserCacheDir() + constant paths, not user input
-	data, err := os.ReadFile(cacheFile)
+	data, err := afero.ReadFile(config.Fs(), cacheFile)
 	if err != nil {
 		return nil
 	}
@@ -663,8 +663,9 @@ func SaveDiscoveryCache(addresses []string) error {
 		return err
 	}
 
+	fs := config.Fs()
 	dir := filepath.Join(cacheDir, "shelly")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := fs.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
@@ -677,7 +678,7 @@ func SaveDiscoveryCache(addresses []string) error {
 	cache.expiry["discovery"] = time.Now().Add(cacheTTL)
 	cache.Unlock()
 
-	return os.WriteFile(cacheFile, []byte(data), 0o600)
+	return afero.WriteFile(fs, cacheFile, []byte(data), 0o600)
 }
 
 // ScriptTemplateNames returns a completion function for script template names.

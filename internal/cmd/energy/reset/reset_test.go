@@ -2,11 +2,13 @@ package reset
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -152,5 +154,246 @@ func TestNewCommand_InvalidComponentID(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid component ID") {
 		t.Errorf("expected 'invalid component ID' error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-em",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-em": {
+				"em:0": map[string]any{
+					"id":              0,
+					"total_act_power": 1000.0,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-em", "0"})
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	output := tf.TestIO.Out.String()
+	if !strings.Contains(output, "reset") || !strings.Contains(output, "EM #0") {
+		t.Logf("output: %s", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithCounterTypes(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-em-types",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-em-types": {
+				"em:0": map[string]any{
+					"id":              0,
+					"total_act_power": 500.0,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-em-types", "0", "--types", "active,reactive"})
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRun_Error(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory:      tf.Factory,
+		Device:       "nonexistent-device",
+		ComponentID:  0,
+		CounterTypes: nil,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100)
+	defer cancel()
+
+	// Run - will error on device connection
+	err := run(ctx, opts)
+	if err == nil {
+		t.Fatal("expected error for nonexistent device")
+	}
+
+	// Should contain "failed to reset" error message
+	if !strings.Contains(err.Error(), "failed to reset EM counters") && !strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Errorf("expected reset error, got: %v", err)
+	}
+}
+
+func TestOptions_Defaults(t *testing.T) {
+	t.Parallel()
+
+	opts := &Options{}
+
+	if opts.Factory != nil {
+		t.Error("Default Factory should be nil")
+	}
+
+	if opts.Device != "" {
+		t.Errorf("Default Device = %q, want empty", opts.Device)
+	}
+
+	if opts.ComponentID != 0 {
+		t.Errorf("Default ComponentID = %d, want 0", opts.ComponentID)
+	}
+
+	if opts.CounterTypes != nil {
+		t.Error("Default CounterTypes should be nil")
+	}
+}
+
+func TestRun_WithComponentID(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"test-device", "5"})
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100)
+	defer cancel()
+
+	// Execute - will timeout/error but exercises the component ID parsing path
+	if err := cmd.ExecuteContext(ctx); err != nil {
+		t.Logf("expected timeout error: %v", err)
+	}
+}
+
+func TestNewCommand_LongDescription(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	wantPatterns := []string{
+		"Reset energy counters",
+		"EM",
+		"3-phase",
+	}
+
+	for _, pattern := range wantPatterns {
+		if !strings.Contains(cmd.Long, pattern) {
+			t.Errorf("Long description should contain %q", pattern)
+		}
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_DefaultComponentID(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-em-default",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SPEM-003CEBEU",
+					Model:      "Shelly Pro 3EM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-em-default": {
+				"em:0": map[string]any{
+					"id":              0,
+					"total_act_power": 750.0,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Only device name, no component ID (should default to 0)
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-em-default"})
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

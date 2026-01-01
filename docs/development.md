@@ -1,4 +1,4 @@
-# Architecture Reference
+# Development Standards
 
 This document provides development standards and architectural patterns for the shelly-cli codebase. The first half covers practical coding standards; the second half provides reference patterns derived from audits of gh, kubectl, docker, jira-cli, gh-dash, and k9s.
 
@@ -111,16 +111,18 @@ func NewCmd(f *cmdutil.Factory) *cobra.Command {
 
 ### Factory Parameter
 
-**Required**: All command constructors MUST accept `*cmdutil.Factory` as the first parameter.
+**Required**: All command constructors MUST accept `*cmdutil.Factory` as the first parameter and embed it in Options.
 
 ```go
-// ✅ Correct - Factory-based
+// ✅ Correct - Factory in Options
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
+    opts := &Options{Factory: f}
     return &cobra.Command{
         Use:   "example <device>",
         Short: "Example command",
         RunE: func(cmd *cobra.Command, args []string) error {
-            return run(cmd.Context(), f, args[0])
+            opts.Device = args[0]
+            return run(cmd.Context(), opts)  // Pass opts, NOT f
         },
     }
 }
@@ -128,6 +130,11 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 // ❌ Incorrect - No factory parameter
 func NewCommand() *cobra.Command {
     return &cobra.Command{...}
+}
+
+// ❌ Incorrect - Factory passed separately to run()
+func run(ctx context.Context, f *cmdutil.Factory, device string) error {  // DON'T DO THIS
+    // ...
 }
 ```
 
@@ -174,14 +181,14 @@ The factory provides three core dependencies:
 ### Accessing Dependencies
 
 ```go
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-    // Get dependencies from factory
-    ios := f.IOStreams()
-    svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+    // Get dependencies from factory via opts
+    ios := opts.Factory.IOStreams()
+    svc := opts.Factory.ShellyService()
 
     // Use dependencies
     ios.StartProgress("Processing...")
-    err := svc.DeviceReboot(ctx, device, 0)
+    err := svc.DeviceReboot(ctx, opts.Device, 0)
     ios.StopProgress()
 
     if err != nil {
@@ -213,9 +220,9 @@ func run(ctx context.Context, f *cmdutil.Factory, device string) error {
 **Always** use factory IOStreams methods, **never** package-level functions.
 
 ```go
-// ✅ Correct - Instance methods
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-    ios := f.IOStreams()
+// ✅ Correct - Instance methods via Options
+func run(ctx context.Context, opts *Options) error {
+    ios := opts.Factory.IOStreams()
     ios.StartProgress("Processing...")
     // ... work ...
     ios.StopProgress()
@@ -302,7 +309,7 @@ Root Command (creates signal-aware context)
     ↓
 cmd.Context() passed to RunE
     ↓
-run(ctx, f, args...)
+run(ctx, opts)
     ↓
 Service calls (svc.DeviceReboot(ctx, ...))
 ```
@@ -315,13 +322,13 @@ Service calls (svc.DeviceReboot(ctx, ...))
 4. **Always defer cancel()** to prevent context leaks
 
 ```go
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+func run(ctx context.Context, opts *Options) error {
     // Wrap context with timeout
     ctx, cancel := context.WithTimeout(ctx, shelly.DefaultTimeout)
     defer cancel()
 
-    svc := f.ShellyService()
-    return svc.DeviceReboot(ctx, device, 0) // ✅ Context propagates
+    svc := opts.Factory.ShellyService()
+    return svc.DeviceReboot(ctx, opts.Device, 0) // ✅ Context propagates
 }
 ```
 
@@ -367,10 +374,10 @@ func run(ctx context.Context, device string) error {
     // ...
 }
 
-// ✅ Always use factory
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
-    ios := f.IOStreams()
-    svc := f.ShellyService()
+// ✅ Always use factory via Options
+func run(ctx context.Context, opts *Options) error {
+    ios := opts.Factory.IOStreams()
+    svc := opts.Factory.ShellyService()
     // ...
 }
 ```
@@ -385,7 +392,7 @@ func run(device string) error {
 }
 
 // ✅ Always use passed context
-func run(ctx context.Context, f *cmdutil.Factory, device string) error {
+func run(ctx context.Context, opts *Options) error {
     // ctx comes from cmd.Context()
 }
 ```
@@ -546,8 +553,14 @@ func NewFactory() *Factory {
 ```go
 // internal/cmd/switch/on/on.go
 
+type Options struct {
+    Factory  *cmdutil.Factory
+    Device   string
+    SwitchID int
+}
+
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-    var switchID int
+    opts := &Options{Factory: f}
 
     cmd := &cobra.Command{
         Use:     "on <device>",
@@ -556,27 +569,28 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
         Example: `  shelly switch on living-room
   shelly switch on kitchen --id 1`,
         RunE: func(cmd *cobra.Command, args []string) error {
-            return run(cmd.Context(), f, args[0], switchID)
+            opts.Device = args[0]
+            return run(cmd.Context(), opts)
         },
     }
 
-    cmd.Flags().IntVarP(&switchID, "id", "i", 0, "Switch ID")
+    cmd.Flags().IntVarP(&opts.SwitchID, "id", "i", 0, "Switch ID")
     return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, switchID int) error {
-    ios := f.IOStreams()
-    svc := f.ShellyService()
+func run(ctx context.Context, opts *Options) error {
+    ios := opts.Factory.IOStreams()
+    svc := opts.Factory.ShellyService()
 
     ios.StartProgress("Turning switch on...")
-    err := svc.SwitchOn(ctx, device, switchID)
+    err := svc.SwitchOn(ctx, opts.Device, opts.SwitchID)
     ios.StopProgress()
 
     if err != nil {
         return fmt.Errorf("failed to turn switch on: %w", err)
     }
 
-    ios.Success("Switch %d turned on", switchID)
+    ios.Success("Switch %d turned on", opts.SwitchID)
     return nil
 }
 ```
@@ -912,9 +926,16 @@ import (
     "github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
 
+// Options holds the command options with Factory embedded.
+type Options struct {
+    Factory  *cmdutil.Factory
+    Device   string
+    SwitchID int
+}
+
 // NewCommand creates the switch on command
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-    var switchID int
+    opts := &Options{Factory: f}
 
     cmd := &cobra.Command{
         Use:     "on <device>",
@@ -925,25 +946,26 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly switch on kitchen --id 1`,
         Args: cobra.ExactArgs(1),
         RunE: func(cmd *cobra.Command, args []string) error {
-            return run(cmd.Context(), f, args[0], switchID)
+            opts.Device = args[0]
+            return run(cmd.Context(), opts)
         },
     }
 
-    cmd.Flags().IntVarP(&switchID, "id", "i", 0, "Switch ID")
+    cmd.Flags().IntVarP(&opts.SwitchID, "id", "i", 0, "Switch ID")
 
     return cmd
 }
 
-func run(ctx context.Context, f *cmdutil.Factory, device string, switchID int) error {
-    ios := f.IOStreams()
-    svc := f.ShellyService()  // Use factory, not shelly.NewService()
+func run(ctx context.Context, opts *Options) error {
+    ios := opts.Factory.IOStreams()
+    svc := opts.Factory.ShellyService()
 
     return cmdutil.RunWithSpinner(ctx, ios, "Turning switch on...", func(ctx context.Context) error {
-        if err := svc.SwitchOn(ctx, device, switchID); err != nil {
+        if err := svc.SwitchOn(ctx, opts.Device, opts.SwitchID); err != nil {
             return fmt.Errorf("failed to turn switch on: %w", err)
         }
 
-        ios.Success("Switch %d turned on", switchID)
+        ios.Success("Switch %d turned on", opts.SwitchID)
         return nil
     })
 }

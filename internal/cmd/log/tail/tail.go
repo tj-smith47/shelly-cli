@@ -3,12 +3,12 @@ package tail
 
 import (
 	"bufio"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -51,7 +51,8 @@ func run(opts *Options) error {
 		return err
 	}
 
-	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+	fs := config.Fs()
+	if _, err := fs.Stat(logPath); err != nil {
 		ios.Info("No log file found at: %s", logPath)
 		return nil
 	}
@@ -72,7 +73,7 @@ func run(opts *Options) error {
 
 	ios.Info("Following log... (Ctrl+C to stop)")
 
-	file, err := os.Open(logPath) //nolint:gosec // Log file path is from config dir
+	file, err := fs.Open(logPath)
 	if err != nil {
 		return err
 	}

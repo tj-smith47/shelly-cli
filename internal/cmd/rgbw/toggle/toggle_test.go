@@ -201,3 +201,82 @@ func TestExecute_WithIDFlag(t *testing.T) {
 		t.Logf("Execute error with id flag = %v (may be expected for mock)", err)
 	}
 }
+
+func TestNewCommand_RequiresArg(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Should require exactly 1 argument
+	err := cmd.Args(cmd, []string{})
+	if err == nil {
+		t.Error("Expected error when no args provided")
+	}
+
+	err = cmd.Args(cmd, []string{"device1"})
+	if err != nil {
+		t.Errorf("Expected no error with one arg, got: %v", err)
+	}
+}
+
+func TestNewCommand_HasValidArgsFunction(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.ValidArgsFunction == nil {
+		t.Error("ValidArgsFunction should be set for device completion")
+	}
+}
+
+func TestExecute_WithCancelledContext(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cmd.SetContext(ctx)
+	cmd.SetArgs([]string{"some-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("Expected error with cancelled context")
+	}
+}
+
+func TestNewCommand_FlagParsing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{
+			name:    "id flag short",
+			args:    []string{"-i", "1"},
+			wantErr: false,
+		},
+		{
+			name:    "id flag long",
+			args:    []string{"--id", "2"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := NewCommand(cmdutil.NewFactory())
+
+			err := cmd.ParseFlags(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseFlags() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

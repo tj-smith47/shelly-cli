@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds command options.
@@ -63,10 +64,10 @@ func run(ctx context.Context, opts *Options) error {
 	svc := opts.Factory.ShellyService()
 	ios := opts.Factory.IOStreams()
 
-	var config map[string]any
+	var deviceConfig map[string]any
 	err := cmdutil.RunWithSpinner(ctx, ios, "Getting configuration...", func(ctx context.Context) error {
 		var err error
-		config, err = svc.GetConfig(ctx, opts.Device)
+		deviceConfig, err = svc.GetConfig(ctx, opts.Device)
 		return err
 	})
 	if err != nil {
@@ -77,9 +78,9 @@ func run(ctx context.Context, opts *Options) error {
 	var data []byte
 	switch opts.Format {
 	case "yaml", "yml":
-		data, err = yaml.Marshal(config)
+		data, err = yaml.Marshal(deviceConfig)
 	default:
-		data, err = json.MarshalIndent(config, "", "  ")
+		data, err = json.MarshalIndent(deviceConfig, "", "  ")
 	}
 	if err != nil {
 		return fmt.Errorf("failed to marshal configuration: %w", err)
@@ -89,7 +90,7 @@ func run(ctx context.Context, opts *Options) error {
 	if opts.FilePath == "-" {
 		ios.Printf("%s\n", data)
 	} else {
-		if err := os.WriteFile(opts.FilePath, data, 0o644); err != nil { //nolint:gosec // G306: 0o644 is acceptable for config exports
+		if err := afero.WriteFile(config.Fs(), opts.FilePath, data, 0o644); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
 		ios.Success("Configuration exported to %s", opts.FilePath)

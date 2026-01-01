@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -100,9 +101,11 @@ func (s *Service) PullDeviceConfigs(ctx context.Context, devices []string, syncD
 // PushDeviceConfigs pushes configurations to multiple devices from local files.
 // It calls the progress callback for each device as it completes.
 func (s *Service) PushDeviceConfigs(ctx context.Context, syncDir string, deviceFilter []string, dryRun bool, progress SyncProgressCallback) (success, failed, skipped int, err error) {
-	files, err := os.ReadDir(syncDir)
+	fs := config.Fs()
+	files, err := afero.ReadDir(fs, syncDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		exists, existsErr := afero.Exists(fs, syncDir)
+		if existsErr == nil && !exists {
 			return 0, 0, 0, fmt.Errorf("no sync directory found; run 'shelly sync --pull' first")
 		}
 		return 0, 0, 0, fmt.Errorf("failed to read sync directory: %w", err)

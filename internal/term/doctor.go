@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -76,7 +78,7 @@ func CheckCLIVersion(ios *iostreams.IOStreams) (issues, warnings int) {
 	home, err := os.UserHomeDir()
 	if err == nil {
 		cachePath := filepath.Join(home, ".config", "shelly", "cache", "latest-version")
-		data, readErr := os.ReadFile(cachePath) //nolint:gosec // Path is constructed from known constants
+		data, readErr := afero.ReadFile(config.Fs(), cachePath)
 		if readErr == nil {
 			latestVersion := strings.TrimSpace(string(data))
 			current := strings.TrimPrefix(currentVersion, "v")
@@ -108,7 +110,8 @@ func CheckConfig(ios *iostreams.IOStreams) int {
 	}
 
 	configPath := filepath.Join(home, ".config", "shelly", "config.yaml")
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	exists, existsErr := afero.Exists(config.Fs(), configPath)
+	if existsErr != nil || !exists {
 		WarnStdout(ios, "  Config file: not found")
 		ios.Info("    Run 'shelly init' to create configuration")
 		issues++

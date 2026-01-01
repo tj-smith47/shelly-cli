@@ -4,11 +4,12 @@ package create
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
@@ -112,7 +113,7 @@ func run(ctx context.Context, opts *Options) error {
 	if opts.FilePath == "" || opts.FilePath == "-" {
 		ios.Printf("%s\n", data)
 	} else {
-		if err := os.WriteFile(opts.FilePath, data, 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), opts.FilePath, data, 0o600); err != nil {
 			return fmt.Errorf("failed to write backup file: %w", err)
 		}
 		ios.Success("Backup created: %s", opts.FilePath)

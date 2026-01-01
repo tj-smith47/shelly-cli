@@ -3,10 +3,12 @@ package scaffold
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
@@ -71,8 +73,7 @@ main "$@"
 `, extName, extName, name, name, name, extName, extName)
 
 	scriptPath := filepath.Join(dir, extName)
-	//nolint:gosec // G306: Extensions need executable permission
-	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+	if err := afero.WriteFile(config.Fs(), scriptPath, []byte(script), 0o700); err != nil {
 		return fmt.Errorf("failed to write script: %w", err)
 	}
 
@@ -108,7 +109,7 @@ The following environment variables are available to extensions:
 - `+"`SHELLY_VERBOSE`"+` - Set to "1" if verbose mode is enabled
 `, extName, extName, name)
 
-	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte(readme), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filepath.Join(dir, "README.md"), []byte(readme), 0o600); err != nil {
 		return fmt.Errorf("failed to write README: %w", err)
 	}
 
@@ -198,7 +199,8 @@ func listDevices() {
 }
 `, extName, name, extName, name, extName)
 
-	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(mainGo), 0o600); err != nil {
+	fs := config.Fs()
+	if err := afero.WriteFile(fs, filepath.Join(dir, "main.go"), []byte(mainGo), 0o600); err != nil {
 		return fmt.Errorf("failed to write main.go: %w", err)
 	}
 
@@ -208,7 +210,7 @@ func listDevices() {
 go 1.21
 `, extName)
 
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o600); err != nil {
+	if err := afero.WriteFile(fs, filepath.Join(dir, "go.mod"), []byte(goMod), 0o600); err != nil {
 		return fmt.Errorf("failed to write go.mod: %w", err)
 	}
 
@@ -228,7 +230,7 @@ clean:
 .PHONY: build install clean
 `, extName, extName, extName)
 
-	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte(makefile), 0o600); err != nil {
+	if err := afero.WriteFile(fs, filepath.Join(dir, "Makefile"), []byte(makefile), 0o600); err != nil {
 		return fmt.Errorf("failed to write Makefile: %w", err)
 	}
 
@@ -312,8 +314,7 @@ if __name__ == "__main__":
 `, extName, extName, name, extName)
 
 	scriptPath := filepath.Join(dir, extName)
-	//nolint:gosec // G306: Extensions need executable permission
-	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
+	if err := afero.WriteFile(config.Fs(), scriptPath, []byte(script), 0o700); err != nil {
 		return fmt.Errorf("failed to write script: %w", err)
 	}
 

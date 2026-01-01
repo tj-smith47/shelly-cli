@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
@@ -35,7 +37,7 @@ const (
 type Logger struct {
 	mu         sync.Mutex
 	enabled    bool
-	file       *os.File
+	file       afero.File
 	sessionDir string
 	lastView   string
 	startTime  time.Time
@@ -91,12 +93,13 @@ func New() *Logger {
 	}
 
 	// Create timestamped session directory
+	fs := config.Fs()
 	l.startTime = time.Now()
 	sessionName := l.startTime.Format("2006-01-02_15-04-05")
 	debugDir := filepath.Join(configDir, DebugDir)
 	l.sessionDir = filepath.Join(debugDir, sessionName)
 
-	if err := os.MkdirAll(l.sessionDir, 0o700); err != nil {
+	if err := fs.MkdirAll(l.sessionDir, 0o700); err != nil {
 		iostreams.DebugErr("create debug session dir", err)
 		return l
 	}
@@ -105,8 +108,7 @@ func New() *Logger {
 	cleanupOldSessions(debugDir)
 
 	logPath := filepath.Join(l.sessionDir, MainLogFile)
-	//nolint:gosec // Path constructed from config.Dir() + fixed constants, not user input
-	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	f, err := fs.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		iostreams.DebugErr("open log file", err)
 		return l
@@ -297,12 +299,13 @@ func (l *Logger) Toggle() (enabled bool, sessionDir string) {
 	}
 
 	// Create timestamped session directory
+	fs := config.Fs()
 	l.startTime = time.Now()
 	sessionName := l.startTime.Format("2006-01-02_15-04-05")
 	debugDir := filepath.Join(configDir, DebugDir)
 	l.sessionDir = filepath.Join(debugDir, sessionName)
 
-	if err := os.MkdirAll(l.sessionDir, 0o700); err != nil {
+	if err := fs.MkdirAll(l.sessionDir, 0o700); err != nil {
 		iostreams.DebugErr("create debug session dir for toggle", err)
 		return false, ""
 	}
@@ -311,8 +314,7 @@ func (l *Logger) Toggle() (enabled bool, sessionDir string) {
 	cleanupOldSessions(debugDir)
 
 	logPath := filepath.Join(l.sessionDir, MainLogFile)
-	//nolint:gosec // Path constructed from config.Dir() + fixed constants, not user input
-	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	f, err := fs.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		iostreams.DebugErr("open log file for toggle", err)
 		return false, ""
@@ -378,7 +380,8 @@ func (l *Logger) Writer() io.Writer {
 // cleanupOldSessions removes debug sessions beyond MaxSessions.
 // Sessions are sorted by name (timestamp-based) and oldest are removed.
 func cleanupOldSessions(debugDir string) {
-	entries, err := os.ReadDir(debugDir)
+	fs := config.Fs()
+	entries, err := afero.ReadDir(fs, debugDir)
 	if err != nil {
 		iostreams.DebugErr("read debug dir for cleanup", err)
 		return
@@ -403,7 +406,7 @@ func cleanupOldSessions(debugDir string) {
 	toRemove := len(sessions) - MaxSessions
 	for i := range toRemove {
 		sessionPath := filepath.Join(debugDir, sessions[i])
-		if err := os.RemoveAll(sessionPath); err != nil {
+		if err := fs.RemoveAll(sessionPath); err != nil {
 			iostreams.DebugErr("remove old debug session", err)
 		}
 	}

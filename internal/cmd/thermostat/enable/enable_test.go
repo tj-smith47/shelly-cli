@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -188,7 +189,7 @@ func TestExecute_EnableSuccess(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable": false,
+					"enable":   false,
 					"target_C": 21.0,
 				},
 			},
@@ -243,9 +244,9 @@ func TestExecute_EnableWithModeHeat(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
-					"mode":      "off",
+					"enable":   false,
+					"target_C": 21.0,
+					"mode":     "off",
 				},
 			},
 		},
@@ -294,9 +295,9 @@ func TestExecute_EnableWithModeCool(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
-					"mode":      "off",
+					"enable":   false,
+					"target_C": 21.0,
+					"mode":     "off",
 				},
 			},
 		},
@@ -345,9 +346,9 @@ func TestExecute_EnableWithModeAuto(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
-					"mode":      "off",
+					"enable":   false,
+					"target_C": 21.0,
+					"mode":     "off",
 				},
 			},
 		},
@@ -396,12 +397,12 @@ func TestExecute_EnableWithComponentID(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
+					"enable":   false,
+					"target_C": 21.0,
 				},
 				"thermostat:1": map[string]any{
-					"enable":    false,
-					"target_C":  19.0,
+					"enable":   false,
+					"target_C": 19.0,
 				},
 			},
 		},
@@ -450,8 +451,8 @@ func TestExecute_InvalidMode(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
+					"enable":   false,
+					"target_C": 21.0,
 				},
 			},
 		},
@@ -878,9 +879,9 @@ func TestExecute_WithModeHeatAlias(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
-					"mode":      "off",
+					"enable":   false,
+					"target_C": 21.0,
+					"mode":     "off",
 				},
 			},
 		},
@@ -930,8 +931,8 @@ func TestExecute_WithComponentID0(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
+					"enable":   false,
+					"target_C": 21.0,
 				},
 			},
 		},
@@ -963,86 +964,41 @@ func TestExecute_WithComponentID0(t *testing.T) {
 func TestRun_ValidModeEmpty(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Mode:    "", // Empty mode is valid
-	}
-
-	// Should not error on mode validation
-	// Will fail later on device connection, but that's expected
-	err := run(context.Background(), opts)
-	if err == nil {
-		t.Error("Expected error (from device connection), got nil")
+	// Test that empty mode passes validation
+	// (the run function validates mode before device connection)
+	err := shelly.ValidateThermostatMode("", true)
+	if err != nil {
+		t.Errorf("Empty mode should be valid when allowEmpty=true, got: %v", err)
 	}
 }
 
 func TestRun_ValidModeHeat(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Mode:    "heat",
-	}
-
-	// Should not error on mode validation (heat is valid)
-	// Will fail later on device connection, but mode validation should pass
-	err := run(context.Background(), opts)
-	if err == nil {
-		t.Error("Expected error (from device connection), got nil")
-	}
-	// Should not be a mode validation error
-	if strings.Contains(err.Error(), "invalid mode") {
-		t.Errorf("Should not be a mode validation error, got: %v", err)
+	// Test that "heat" mode passes validation
+	err := shelly.ValidateThermostatMode("heat", true)
+	if err != nil {
+		t.Errorf("Mode 'heat' should be valid, got: %v", err)
 	}
 }
 
 func TestRun_ValidModeCool(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Mode:    "cool",
-	}
-
-	// Should not error on mode validation (cool is valid)
-	err := run(context.Background(), opts)
-	if err == nil {
-		t.Error("Expected error (from device connection), got nil")
-	}
-	// Should not be a mode validation error
-	if strings.Contains(err.Error(), "invalid mode") {
-		t.Errorf("Should not be a mode validation error, got: %v", err)
+	// Test that "cool" mode passes validation
+	err := shelly.ValidateThermostatMode("cool", true)
+	if err != nil {
+		t.Errorf("Mode 'cool' should be valid, got: %v", err)
 	}
 }
 
 func TestRun_ValidModeAuto(t *testing.T) {
 	t.Parallel()
 
-	tf := factory.NewTestFactory(t)
-
-	opts := &Options{
-		Factory: tf.Factory,
-		Device:  "test-device",
-		Mode:    "auto",
-	}
-
-	// Should not error on mode validation (auto is valid)
-	err := run(context.Background(), opts)
-	if err == nil {
-		t.Error("Expected error (from device connection), got nil")
-	}
-	// Should not be a mode validation error
-	if strings.Contains(err.Error(), "invalid mode") {
-		t.Errorf("Should not be a mode validation error, got: %v", err)
+	// Test that "auto" mode passes validation
+	err := shelly.ValidateThermostatMode("auto", true)
+	if err != nil {
+		t.Errorf("Mode 'auto' should be valid, got: %v", err)
 	}
 }
 
@@ -1099,8 +1055,8 @@ func TestExecute_WithDeviceNameVariations(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"my-thermostat": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
+					"enable":   false,
+					"target_C": 21.0,
 				},
 			},
 		},
@@ -1150,12 +1106,12 @@ func TestExecute_AllFlagCombinations(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"thermostat:0": map[string]any{
-					"enable":    false,
-					"target_C":  21.0,
+					"enable":   false,
+					"target_C": 21.0,
 				},
 				"thermostat:1": map[string]any{
-					"enable":    false,
-					"target_C":  19.0,
+					"enable":   false,
+					"target_C": 19.0,
 				},
 			},
 		},

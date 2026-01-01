@@ -4,14 +4,15 @@ package download
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/tj-smith47/shelly-go/firmware"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -91,9 +92,10 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Ensure parent directory exists
+	fs := config.Fs()
 	dir := filepath.Dir(outputPath)
 	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0o750); err != nil {
+		if err := fs.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
@@ -111,8 +113,7 @@ func run(ctx context.Context, opts *Options) error {
 			return fmt.Errorf("download failed: %w", downloadErr)
 		}
 
-		//nolint:gosec // G306: 0o644 is appropriate for downloaded firmware files
-		if writeErr := os.WriteFile(outputPath, result.Data, 0o644); writeErr != nil {
+		if writeErr := afero.WriteFile(fs, outputPath, result.Data, 0o644); writeErr != nil {
 			return fmt.Errorf("failed to write file: %w", writeErr)
 		}
 

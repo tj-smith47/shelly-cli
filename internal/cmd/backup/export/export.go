@@ -4,7 +4,6 @@ package export
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -78,7 +77,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// Create directory if it doesn't exist
-	if err := os.MkdirAll(opts.Directory, 0o750); err != nil {
+	if err := config.Fs().MkdirAll(opts.Directory, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 

@@ -3,10 +3,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
 
@@ -61,8 +61,7 @@ func SaveScene(scene Scene) error {
 // Format is auto-detected from file extension (.json, .yaml, .yml).
 // If extension is unknown, it tries YAML first, then JSON.
 func ParseSceneFile(file string) (*Scene, error) {
-	// #nosec G304 -- file path comes from user CLI argument
-	data, err := os.ReadFile(file)
+	data, err := afero.ReadFile(Fs(), file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}

@@ -2,8 +2,6 @@ package theme
 
 import (
 	"image/color"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"charm.land/lipgloss/v2"
@@ -227,7 +225,7 @@ func TestApplyConfig(t *testing.T) {
 
 	t.Run("set_theme_by_name", func(t *testing.T) {
 		ClearCustomColors()
-		err := ApplyConfig(testThemeNord, nil, nil, "")
+		err := ApplyConfig(testThemeNord, nil, nil)
 		if err != nil {
 			t.Errorf("ApplyConfig with valid theme failed: %v", err)
 		}
@@ -237,7 +235,7 @@ func TestApplyConfig(t *testing.T) {
 	})
 
 	t.Run("invalid_theme", func(t *testing.T) {
-		err := ApplyConfig("nonexistent_theme_xyz", nil, nil, "")
+		err := ApplyConfig("nonexistent_theme_xyz", nil, nil)
 		if err == nil {
 			t.Error("expected error for invalid theme name")
 		}
@@ -249,7 +247,7 @@ func TestApplyConfig(t *testing.T) {
 			"green": testColorGreen,
 			"red":   "#ff0000",
 		}
-		err := ApplyConfig("", colors, nil, "")
+		err := ApplyConfig("", colors, nil)
 		if err != nil {
 			t.Errorf("ApplyConfig with colors failed: %v", err)
 		}
@@ -265,10 +263,11 @@ func TestApplyConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid_file", func(t *testing.T) {
-		err := ApplyConfig("", nil, nil, "/nonexistent/path/theme.yaml")
+	t.Run("invalid_file_data", func(t *testing.T) {
+		// Test that ApplyThemeFromData returns error for invalid YAML
+		err := ApplyThemeFromData([]byte("invalid: [yaml"), nil)
 		if err == nil {
-			t.Error("expected error for nonexistent file")
+			t.Error("expected error for invalid YAML data")
 		}
 	})
 }
@@ -278,7 +277,7 @@ func TestExpandPath(t *testing.T) {
 
 	t.Run("tilde_expansion", func(t *testing.T) {
 		t.Parallel()
-		result := expandPath("~/test/path")
+		result := ExpandPath("~/test/path")
 		if result == "~/test/path" {
 			// Only fails if home dir couldn't be determined
 			t.Skip("could not expand tilde")
@@ -290,7 +289,7 @@ func TestExpandPath(t *testing.T) {
 
 	t.Run("no_expansion_needed", func(t *testing.T) {
 		t.Parallel()
-		result := expandPath("/absolute/path")
+		result := ExpandPath("/absolute/path")
 		if result != "/absolute/path" {
 			t.Errorf("expected '/absolute/path', got %q", result)
 		}
@@ -298,7 +297,7 @@ func TestExpandPath(t *testing.T) {
 
 	t.Run("relative_path", func(t *testing.T) {
 		t.Parallel()
-		result := expandPath("relative/path")
+		result := ExpandPath("relative/path")
 		if result != "relative/path" {
 			t.Errorf("expected 'relative/path', got %q", result)
 		}
@@ -704,52 +703,14 @@ func TestSetThemeFromConfig(t *testing.T) {
 	}
 }
 
-// TestSaveTheme tests the SaveTheme function.
-//
-//nolint:paralleltest // Tests modify filesystem
-func TestSaveTheme(t *testing.T) {
-	// Create temp directory
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-
-	// Set viper to use temp config
-	originalConfigFile := viper.ConfigFileUsed()
-	viper.SetConfigFile(configPath)
-	defer viper.SetConfigFile(originalConfigFile)
-
-	// Write initial config
-	if err := os.WriteFile(configPath, []byte("output: table\n"), 0o600); err != nil {
-		t.Fatalf("failed to write initial config: %v", err)
-	}
-
-	// Save theme
-	err := SaveTheme("dracula")
-	if err != nil {
-		t.Errorf("SaveTheme() error = %v", err)
-	}
-
-	// Verify theme was saved
-	savedTheme := viper.GetString("theme")
-	if savedTheme != "dracula" {
-		t.Errorf("SaveTheme() saved theme = %q, want %q", savedTheme, "dracula")
-	}
-}
-
-// TestApplyFromFile_ValidFile tests applyFromFile with a valid theme file.
+// TestApplyThemeFromData_ValidData tests ApplyThemeFromData with valid theme data.
 //
 //nolint:paralleltest // Tests modify global theme state
-func TestApplyFromFile_ValidFile(t *testing.T) {
-	// Create temp theme file
-	tmpDir := t.TempDir()
-	themePath := filepath.Join(tmpDir, "custom-theme.yaml")
+func TestApplyThemeFromData_ValidData(t *testing.T) {
 	themeContent := `name: nord
 colors:
   green: "#50fa7b"
 `
-	if err := os.WriteFile(themePath, []byte(themeContent), 0o600); err != nil {
-		t.Fatalf("failed to write theme file: %v", err)
-	}
-
 	// Save and restore original state
 	originalTheme := Current()
 	originalColors := GetCustomColors()
@@ -758,10 +719,21 @@ colors:
 		SetCustomColors(originalColors)
 	}()
 
-	// Apply from file
-	err := ApplyConfig("", nil, nil, themePath)
+	// Apply from data
+	err := ApplyThemeFromData([]byte(themeContent), nil)
 	if err != nil {
-		t.Errorf("ApplyConfig() with valid file error = %v", err)
+		t.Errorf("ApplyThemeFromData() with valid data error = %v", err)
+	}
+
+	// Verify theme was applied
+	if Current().ID != testThemeNord {
+		t.Errorf("expected theme %q, got %q", testThemeNord, Current().ID)
+	}
+
+	// Verify color override was applied
+	colors := GetCustomColors()
+	if colors == nil || colors.Green != "#50fa7b" {
+		t.Errorf("expected green color override '#50fa7b', got %v", colors)
 	}
 }
 
@@ -785,41 +757,6 @@ func TestDefaultColor(t *testing.T) {
 			t.Error("Orange() returned nil")
 		}
 	})
-}
-
-// TestSaveTheme_WithExistingConfig tests SaveTheme with an existing config.
-//
-//nolint:paralleltest // Tests modify global viper state and filesystem
-func TestSaveTheme_WithExistingConfig(t *testing.T) {
-	// Create temp directory
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-
-	// Write initial config
-	if err := os.WriteFile(configPath, []byte("output: json\n"), 0o600); err != nil {
-		t.Fatalf("failed to write initial config: %v", err)
-	}
-
-	// Set viper to use temp config
-	originalConfigFile := viper.ConfigFileUsed()
-	viper.SetConfigFile(configPath)
-	defer viper.SetConfigFile(originalConfigFile)
-
-	// Read config so viper knows about it
-	if err := viper.ReadInConfig(); err != nil {
-		t.Fatalf("failed to read config: %v", err)
-	}
-
-	// Save a different theme
-	err := SaveTheme(testThemeNord)
-	if err != nil {
-		t.Errorf("SaveTheme() error = %v", err)
-	}
-
-	// Verify the theme was saved
-	if viper.GetString("theme") != testThemeNord {
-		t.Errorf("SaveTheme() theme = %q, want %q", viper.GetString("theme"), testThemeNord)
-	}
 }
 
 // TestPurple_WithCustomColor tests Purple with custom color override.
@@ -907,42 +844,28 @@ func TestColorFunctions_AllWithCustom(t *testing.T) {
 	}
 }
 
-// TestApplyFromFile_UnknownTheme tests applyFromFile with an unknown theme name.
+// TestApplyThemeFromData_UnknownTheme tests ApplyThemeFromData with an unknown theme name.
 //
 //nolint:paralleltest // Tests modify global theme state
-func TestApplyFromFile_UnknownTheme(t *testing.T) {
-	// Create temp theme file with unknown theme name
-	tmpDir := t.TempDir()
-	themePath := filepath.Join(tmpDir, "unknown-theme.yaml")
+func TestApplyThemeFromData_UnknownTheme(t *testing.T) {
 	themeContent := `name: nonexistent_theme_xyz_12345
 colors:
   green: "#50fa7b"
 `
-	if err := os.WriteFile(themePath, []byte(themeContent), 0o600); err != nil {
-		t.Fatalf("failed to write theme file: %v", err)
-	}
-
 	// Apply should fail with unknown theme error
-	err := ApplyConfig("", nil, nil, themePath)
+	err := ApplyThemeFromData([]byte(themeContent), nil)
 	if err == nil {
-		t.Error("ApplyConfig() with unknown theme in file should return error")
+		t.Error("ApplyThemeFromData() with unknown theme should return error")
 	}
 }
 
-// TestApplyFromFile_InvalidYAML tests applyFromFile with invalid YAML.
+// TestApplyThemeFromData_InvalidYAML tests ApplyThemeFromData with invalid YAML.
 //
 //nolint:paralleltest // Tests modify global theme state
-func TestApplyFromFile_InvalidYAML(t *testing.T) {
-	// Create temp theme file with invalid YAML
-	tmpDir := t.TempDir()
-	themePath := filepath.Join(tmpDir, "invalid.yaml")
-	if err := os.WriteFile(themePath, []byte("name: [invalid yaml\n"), 0o600); err != nil {
-		t.Fatalf("failed to write theme file: %v", err)
-	}
-
-	err := ApplyConfig("", nil, nil, themePath)
+func TestApplyThemeFromData_InvalidYAML(t *testing.T) {
+	err := ApplyThemeFromData([]byte("name: [invalid yaml\n"), nil)
 	if err == nil {
-		t.Error("ApplyConfig() with invalid YAML should return error")
+		t.Error("ApplyThemeFromData() with invalid YAML should return error")
 	}
 }
 
@@ -959,27 +882,20 @@ func TestApplyConfig_WithSemanticOverrides(t *testing.T) {
 		Success: "#00ff00",
 		Error:   "#ff0000",
 	}
-	err := ApplyConfig("", nil, semantics, "")
+	err := ApplyConfig("", nil, semantics)
 	if err != nil {
 		t.Errorf("ApplyConfig with semantic overrides failed: %v", err)
 	}
 }
 
-// TestApplyConfig_FileWithSemantics tests ApplyConfig from file with semantic overrides.
+// TestApplyThemeFromData_WithSemantics tests ApplyThemeFromData with semantic overrides.
 //
 //nolint:paralleltest // Tests modify global theme state
-func TestApplyConfig_FileWithSemantics(t *testing.T) {
-	// Create temp theme file
-	tmpDir := t.TempDir()
-	themePath := filepath.Join(tmpDir, "theme.yaml")
+func TestApplyThemeFromData_WithSemantics(t *testing.T) {
 	themeContent := `name: dracula
 colors:
   green: "#50fa7b"
 `
-	if err := os.WriteFile(themePath, []byte(themeContent), 0o600); err != nil {
-		t.Fatalf("failed to write theme file: %v", err)
-	}
-
 	// Save original state
 	originalTheme := Current()
 	originalColors := GetCustomColors()
@@ -990,13 +906,13 @@ colors:
 		setSemanticColors(originalSemantics)
 	}()
 
-	// Apply from file with semantic overrides
+	// Apply from data with semantic overrides
 	semantics := &SemanticOverrides{
 		Success: "#00ff00",
 	}
-	err := ApplyConfig("", nil, semantics, themePath)
+	err := ApplyThemeFromData([]byte(themeContent), semantics)
 	if err != nil {
-		t.Errorf("ApplyConfig with file and semantics failed: %v", err)
+		t.Errorf("ApplyThemeFromData with semantics failed: %v", err)
 	}
 }
 
@@ -1043,42 +959,5 @@ func TestFormatFloat_EdgeCases(t *testing.T) {
 				t.Errorf("formatFloat(%v) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
-	}
-}
-
-// TestSaveTheme_NoConfigFile tests SaveTheme when no config file is set.
-//
-//nolint:paralleltest // Tests modify global viper state and filesystem
-func TestSaveTheme_NoConfigFile(t *testing.T) {
-	// This test covers the branch where configFile == "" and we need to create the default config
-
-	// Save original state
-	originalConfigFile := viper.ConfigFileUsed()
-	originalHome := os.Getenv("HOME")
-
-	// Use a temp directory as home
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
-
-	// Reset viper to clear the config file setting
-	// Create a fresh viper instance by resetting config file to empty
-	viper.Reset()
-
-	defer func() {
-		viper.Reset()
-		viper.SetConfigFile(originalConfigFile)
-		t.Setenv("HOME", originalHome)
-	}()
-
-	// SaveTheme should create the config directory and file
-	err := SaveTheme("dracula")
-	if err != nil {
-		t.Errorf("SaveTheme() with no config file error = %v", err)
-	}
-
-	// Verify the config was created
-	expectedPath := filepath.Join(tmpDir, ".config", "shelly", "config.yaml")
-	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-		t.Errorf("SaveTheme() did not create config file at %s", expectedPath)
 	}
 }

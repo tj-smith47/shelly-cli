@@ -4,11 +4,12 @@ package install
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -66,20 +67,21 @@ func (opts *Options) validate() error {
 func (opts *Options) loadCertData() (*model.CertInstallData, error) {
 	data := &model.CertInstallData{}
 	var err error
+	fs := config.Fs()
 
 	if opts.CAFile != "" {
-		data.CAData, err = os.ReadFile(opts.CAFile)
+		data.CAData, err = afero.ReadFile(fs, opts.CAFile)
 		if err != nil {
 			return nil, fmt.Errorf("read CA file: %w", err)
 		}
 	}
 
 	if opts.ClientCert != "" {
-		data.CertData, err = os.ReadFile(opts.ClientCert)
+		data.CertData, err = afero.ReadFile(fs, opts.ClientCert)
 		if err != nil {
 			return nil, fmt.Errorf("read client cert: %w", err)
 		}
-		data.KeyData, err = os.ReadFile(opts.ClientKey)
+		data.KeyData, err = afero.ReadFile(fs, opts.ClientKey)
 		if err != nil {
 			return nil, fmt.Errorf("read client key: %w", err)
 		}

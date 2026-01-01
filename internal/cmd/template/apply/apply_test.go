@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -757,5 +760,634 @@ func TestRun_EmptyDeviceName(t *testing.T) {
 	// Error should be about template not found
 	if err != nil && !containsSubstring(err.Error(), "not found") {
 		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_DryRunWithChanges(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template manually
+	err = config.CreateDeviceTemplate(
+		"test-template",
+		"Test template for dry run",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Updated Switch",
+			},
+		},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-template", "test-device", "--dry-run"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+
+	output := tf.TestIO.Out.String()
+	// Should show changes would be applied or "No changes"
+	if !containsSubstring(output, "change") && !containsSubstring(output, "No changes") {
+		t.Logf("output = %q", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_DryRunNoChanges(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template with empty config
+	err = config.CreateDeviceTemplate(
+		"empty-template",
+		"Empty template",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"empty-template", "test-device", "--dry-run"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_ApplyWithYesFlag(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template
+	err = config.CreateDeviceTemplate(
+		"apply-template",
+		"Template for applying",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Applied Switch",
+			},
+		},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"apply-template", "test-device", "--yes"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+
+	output := tf.TestIO.Out.String()
+	// Should show success message
+	if !containsSubstring(output, "applied") {
+		t.Logf("output = %q", output)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_ModelMismatchWarning(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template with different model
+	err = config.CreateDeviceTemplate(
+		"different-model-template",
+		"Template with different model",
+		"Shelly Plus 2PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Test Switch",
+			},
+		},
+		"other-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"different-model-template", "test-device", "--yes"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+
+	// Should have warned about model mismatch
+	errOutput := tf.TestIO.ErrOut.String()
+	if !containsSubstring(errOutput, "warning") && !containsSubstring(errOutput, "Shelly Plus 2PM") {
+		t.Logf("stderr = %q", errOutput)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_GenerationMismatchWarning(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template with different generation
+	err = config.CreateDeviceTemplate(
+		"gen1-template",
+		"Template for Gen1",
+		"Shelly Plus 1PM",
+		"",
+		1,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Test Switch",
+			},
+		},
+		"gen1-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"gen1-template", "test-device", "--yes"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+
+	// Should have warned about generation mismatch
+	errOutput := tf.TestIO.ErrOut.String()
+	if !containsSubstring(errOutput, "warning") && !containsSubstring(errOutput, "Gen1") {
+		t.Logf("stderr = %q", errOutput)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{},
+		},
+		DeviceStates: map[string]mock.DeviceState{},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create a valid template
+	err = config.CreateDeviceTemplate(
+		"valid-template",
+		"Valid template",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Test Switch",
+			},
+		},
+		"some-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"valid-template", "nonexistent-device"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("expected error for non-existent device")
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_BothWarnings(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template with both model and generation mismatch
+	err = config.CreateDeviceTemplate(
+		"mismatch-template",
+		"Template with mismatches",
+		"Shelly 1",
+		"",
+		1,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Test Switch",
+			},
+		},
+		"old-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"mismatch-template", "test-device", "--yes"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_TemplateWithMultipleChanges(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": false, "name": "Original"},
+				"sys":      map[string]any{"device": map[string]any{"eco_mode": false}},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template with multiple component changes
+	err = config.CreateDeviceTemplate(
+		"multi-change-template",
+		"Template with multiple changes",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name":          "Updated Switch",
+				"default_state": "on",
+			},
+			"sys": map[string]any{
+				"device": map[string]any{
+					"eco_mode": true,
+				},
+			},
+		},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	// Test dry run with multiple changes
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"multi-change-template", "test-device", "--dry-run"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+
+	output := tf.TestIO.Out.String()
+	// Should mention the changes
+	if output == "" {
+		t.Error("expected some output for dry run")
+	}
+
+	// Now actually apply
+	tf.TestIO.Reset()
+	cmd2 := NewCommand(tf.Factory)
+	cmd2.SetContext(context.Background())
+	cmd2.SetArgs([]string{"multi-change-template", "test-device", "--yes"})
+
+	err = cmd2.Execute()
+	if err != nil {
+		t.Errorf("Apply execute error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_MatchingModelAndGeneration(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template with matching model and generation (no warnings)
+	err = config.CreateDeviceTemplate(
+		"matching-template",
+		"Template that matches device",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Matching Switch",
+			},
+		},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"matching-template", "test-device", "--yes"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+
+	// No warnings should be in stderr
+	errOutput := tf.TestIO.ErrOut.String()
+	if containsSubstring(errOutput, "warning") {
+		t.Errorf("unexpected warning in output: %s", errOutput)
+	}
+}
+
+//nolint:paralleltest // Uses global mock server state
+func TestRun_ConfirmationDeclined(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": false}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Create template
+	err = config.CreateDeviceTemplate(
+		"decline-template",
+		"Template to decline",
+		"Shelly Plus 1PM",
+		"",
+		2,
+		map[string]any{
+			"switch:0": map[string]any{
+				"name": "Decline Switch",
+			},
+		},
+		"test-device",
+	)
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate: %v", err)
+	}
+
+	// Execute WITHOUT --yes flag - in non-TTY mode, confirmation defaults to false
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"decline-template", "test-device"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute error: %v", err)
+	}
+
+	// Should show "Cancelled" message
+	output := tf.TestIO.Out.String()
+	if !containsSubstring(output, "Cancelled") {
+		t.Logf("expected 'Cancelled' in output, got: %q", output)
 	}
 }

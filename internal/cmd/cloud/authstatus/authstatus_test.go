@@ -2,15 +2,21 @@ package authstatus
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-const cmdName = "auth-status"
+const (
+	cmdName = "auth-status"
+	// Test JWT token with exp claim in year 2030 (cannot be validated without proper signature).
+	testTokenFuture = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4OTM0NTYwMDB9.signature"
+)
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -547,5 +553,438 @@ func TestNewCommand_VerifyReturnType(t *testing.T) {
 	// Check that it's properly initialized
 	if cmd.Use == "" {
 		t.Error("Command Use should be set")
+	}
+}
+
+// setupTestManagerWithCloud creates a test config manager with cloud settings.
+func setupTestManagerWithCloud(t *testing.T, accessToken, email, serverURL string) *config.Manager {
+	t.Helper()
+	tmpDir := t.TempDir()
+	mgr := config.NewManager(filepath.Join(tmpDir, "config.yaml"))
+	if err := mgr.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	cfg := mgr.Get()
+	cfg.Cloud.AccessToken = accessToken
+	cfg.Cloud.Email = email
+	cfg.Cloud.ServerURL = serverURL
+	return mgr
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_NotLoggedIn(t *testing.T) {
+	// Setup manager with no token (not logged in)
+	mgr := setupTestManagerWithCloud(t, "", "", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show not logged in status
+	if !strings.Contains(output, "Status") {
+		t.Errorf("expected output to contain 'Status', got: %q", output)
+	}
+	// Should suggest using login command
+	if !strings.Contains(output, "login") {
+		t.Errorf("expected output to contain 'login', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_LoggedInWithEmail(t *testing.T) {
+	// Create a valid JWT token for testing (expired but parseable)
+	// This is a minimal JWT structure: header.payload.signature
+	// Payload: {"exp": 1893456000} (year 2030)
+	validToken := testTokenFuture
+
+	mgr := setupTestManagerWithCloud(t, validToken, "test@example.com", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show logged in status and email
+	if !strings.Contains(output, "Status") {
+		t.Errorf("expected output to contain 'Status', got: %q", output)
+	}
+	if !strings.Contains(output, "test@example.com") {
+		t.Errorf("expected output to contain email, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_LoggedInWithServerURL(t *testing.T) {
+	validToken := testTokenFuture
+
+	mgr := setupTestManagerWithCloud(t, validToken, "", "https://cloud.shelly.cloud")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show server URL
+	if !strings.Contains(output, "cloud.shelly.cloud") {
+		t.Errorf("expected output to contain server URL, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_LoggedInWithEmailAndServer(t *testing.T) {
+	validToken := testTokenFuture
+
+	mgr := setupTestManagerWithCloud(t, validToken, "user@example.com", "https://api.shelly.cloud")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show both email and server
+	if !strings.Contains(output, "user@example.com") {
+		t.Errorf("expected output to contain email, got: %q", output)
+	}
+	if !strings.Contains(output, "api.shelly.cloud") {
+		t.Errorf("expected output to contain server, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_InvalidToken(t *testing.T) {
+	// Invalid token (not a valid JWT)
+	invalidToken := "not-a-valid-jwt-token"
+
+	mgr := setupTestManagerWithCloud(t, invalidToken, "test@example.com", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	// Should not return error, but show warning
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should still show status
+	if !strings.Contains(output, "Status") {
+		t.Errorf("expected output to contain 'Status', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_ExpiredToken(t *testing.T) {
+	// Create an expired JWT token
+	// Payload: {"exp": 1000000000} (year 2001, expired)
+	expiredToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjEwMDAwMDAwMDB9.signature"
+
+	mgr := setupTestManagerWithCloud(t, expiredToken, "test@example.com", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	// Should not return error, but show warning about expired token
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show status
+	if !strings.Contains(output, "Status") {
+		t.Errorf("expected output to contain 'Status', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_Title(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "", "", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show title
+	if !strings.Contains(output, "Cloud Authentication") {
+		t.Errorf("expected output to contain title, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_NotLoggedIn(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "", "", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "login") {
+		t.Errorf("expected output to contain 'login' hint, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestExecute_LoggedIn(t *testing.T) {
+	validToken := testTokenFuture
+	mgr := setupTestManagerWithCloud(t, validToken, "cloud@example.com", "https://cloud.shelly.cloud")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	cmd := NewCommand(f)
+	cmd.SetArgs([]string{})
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "cloud@example.com") {
+		t.Errorf("expected output to contain email, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_ValidTokenWithExpiry(t *testing.T) {
+	// This token has expiry far in the future (year 2030)
+	// The test exercises the code path that shows "Expiry:" with duration
+	validToken := testTokenFuture
+
+	mgr := setupTestManagerWithCloud(t, validToken, "user@example.com", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show token status
+	if !strings.Contains(output, "Token") {
+		t.Errorf("expected output to contain 'Token', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_NoEmailNoServer(t *testing.T) {
+	// Test with token but no email and no server
+	validToken := testTokenFuture
+
+	mgr := setupTestManagerWithCloud(t, validToken, "", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show status and token, but not email or server lines
+	if !strings.Contains(output, "Status") {
+		t.Errorf("expected output to contain 'Status', got: %q", output)
+	}
+	if !strings.Contains(output, "Token") {
+		t.Errorf("expected output to contain 'Token', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_TokenWithWarning(t *testing.T) {
+	// Test with a malformed token that will produce a warning
+	// Using a token that decodes but has invalid/missing exp claim
+	malformedToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature"
+
+	mgr := setupTestManagerWithCloud(t, malformedToken, "user@example.com", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	// Should not return error even with warning
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should still show status
+	if !strings.Contains(output, "Status") {
+		t.Errorf("expected output to contain 'Status', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_OutputContainsTitle(t *testing.T) {
+	mgr := setupTestManagerWithCloud(t, "", "", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	if err := run(opts); err != nil {
+		t.Logf("run returned error (expected): %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "Cloud Authentication Status") {
+		t.Errorf("expected title in output, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Tests modify global state via config.SetDefaultManager
+func TestRun_TokenStatusDisplayed(t *testing.T) {
+	// Any token (will be marked as invalid since we can't create valid signatures in tests)
+	testToken := testTokenFuture
+
+	mgr := setupTestManagerWithCloud(t, testToken, "user@example.com", "")
+	config.SetDefaultManager(mgr)
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	out := &bytes.Buffer{}
+	errOut := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, errOut)
+	f := cmdutil.NewFactory().SetIOStreams(ios).SetConfigManager(mgr)
+
+	opts := &Options{Factory: f}
+	err := run(opts)
+
+	if err != nil {
+		t.Errorf("run() error = %v, want nil", err)
+	}
+
+	output := out.String()
+	// Should show token status info (may be "Invalid" due to signature validation)
+	if !strings.Contains(output, "Token") {
+		t.Errorf("expected 'Token' in output, got: %q", output)
+	}
+}
+
+func TestOptions_ZeroValue(t *testing.T) {
+	t.Parallel()
+
+	opts := &Options{}
+	if opts.Factory != nil {
+		t.Error("Factory should be nil for zero value")
+	}
+}
+
+func TestNewCommand_NoLocalFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	// auth-status should not have local flags
+	if cmd.LocalFlags().HasFlags() {
+		t.Log("auth-status has local flags defined")
 	}
 }

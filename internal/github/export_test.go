@@ -1,6 +1,11 @@
 package github
 
-import "github.com/tj-smith47/shelly-cli/internal/iostreams"
+import (
+	"context"
+	"io"
+
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+)
 
 // CopyFile exports copyFile for testing.
 func CopyFile(ios *iostreams.IOStreams, src, dst string) error {
@@ -37,4 +42,37 @@ func CreateBackup(ios *iostreams.IOStreams, targetPath, backupPath string) error
 // RestoreFromBackup exports restoreFromBackup for testing.
 func RestoreFromBackup(backupPath, targetPath string, writeErr error) error {
 	return restoreFromBackup(backupPath, targetPath, writeErr)
+}
+
+// SetOsExecutable sets the osExecutable function for testing.
+func SetOsExecutable(fn func() (string, error)) func() {
+	old := osExecutable
+	osExecutable = fn
+	return func() { osExecutable = old }
+}
+
+// SetEvalSymlinks sets the evalSymlinks function for testing.
+func SetEvalSymlinks(fn func(string) (string, error)) func() {
+	old := evalSymlinks
+	evalSymlinks = fn
+	return func() { evalSymlinks = old }
+}
+
+// SetExecCommandStart sets the execCommandStart function for testing.
+func SetExecCommandStart(fn func(ctx context.Context, path string, args []string) error) func() {
+	old := execCommandStart
+	execCommandStart = fn
+	return func() { execCommandStart = old }
+}
+
+// SetRuntimeGOOS sets the runtimeGOOS variable for testing.
+func SetRuntimeGOOS(goos string) func() {
+	old := runtimeGOOS
+	runtimeGOOS = goos
+	return func() { runtimeGOOS = old }
+}
+
+// ExtractToFile exports extractToFile for testing.
+func (c *Client) ExtractToFile(destPath string, r io.Reader) error {
+	return c.extractToFile(destPath, r)
 }

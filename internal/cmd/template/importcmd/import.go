@@ -3,8 +3,8 @@ package importcmd
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -40,8 +40,7 @@ Use --force to overwrite an existing template with the same name.`,
 }
 
 func importTemplate(file, nameOverride string, overwrite bool) (string, error) {
-	// #nosec G304 -- file path comes from user CLI argument
-	data, err := os.ReadFile(file)
+	data, err := afero.ReadFile(config.Fs(), file)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}

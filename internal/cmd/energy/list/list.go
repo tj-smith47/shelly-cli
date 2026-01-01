@@ -11,7 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
 // Options holds command options.
@@ -103,10 +103,11 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Output results
 	return cmdutil.PrintListResult(ios, components, func(ios *iostreams.IOStreams, items []model.ComponentListItem) {
-		table := output.NewTable("ID", "Type")
+		builder := table.NewBuilder("ID", "Type")
 		for _, comp := range items {
-			table.AddRow(fmt.Sprintf("%d", comp.ID), comp.Type)
+			builder.AddRow(fmt.Sprintf("%d", comp.ID), comp.Type)
 		}
+		table := builder.WithModeStyle(ios).Build()
 		if err := table.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print table", err)
 		}

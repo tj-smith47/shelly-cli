@@ -15,7 +15,7 @@ If no file is specified, outputs to stdout.
 Format is auto-detected from file extension, or can be specified with --format.
 
 ```
-shelly template export <template> [file] [flags]
+shelly template export <name> [file] [flags]
 ```
 
 ### Examples

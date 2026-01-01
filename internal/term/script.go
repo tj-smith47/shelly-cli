@@ -7,6 +7,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -76,18 +77,19 @@ func DisplayScriptCode(ios *iostreams.IOStreams, code string) {
 
 // DisplayScriptTemplateList displays a list of script templates.
 func DisplayScriptTemplateList(ios *iostreams.IOStreams, templates []config.ScriptTemplate) {
-	table := output.NewTable("Name", "Category", "Description", "Source")
+	builder := table.NewBuilder("Name", "Category", "Description", "Source")
 
 	for _, tpl := range templates {
 		source := "user"
 		if tpl.BuiltIn {
 			source = "built-in"
 		}
-		table.AddRow(tpl.Name, tpl.Category, tpl.Description, source)
+		builder.AddRow(tpl.Name, tpl.Category, tpl.Description, source)
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
+		ios.DebugErr("print script templates table", err)
 	}
 	ios.Count("template", len(templates))
 }

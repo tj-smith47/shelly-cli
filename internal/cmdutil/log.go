@@ -2,9 +2,10 @@
 package cmdutil
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
@@ -20,7 +21,7 @@ func GetLogPath() (string, error) {
 
 // ReadLastLines reads the last N lines from a file.
 func ReadLastLines(path string, n int) ([]string, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // Log file path is from config dir
+	data, err := afero.ReadFile(config.Fs(), path)
 	if err != nil {
 		return nil, err
 	}

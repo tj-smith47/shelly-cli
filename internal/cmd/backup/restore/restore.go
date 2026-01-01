@@ -4,11 +4,12 @@ package restore
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/term"
@@ -84,7 +85,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Read backup file
-	data, err := os.ReadFile(opts.FilePath) //#nosec G304 -- FilePath is user-provided CLI argument
+	data, err := afero.ReadFile(config.Fs(), opts.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}

@@ -708,3 +708,32 @@ func TestRun_DeviceWithNilFields(t *testing.T) {
 		t.Fatalf("run() error = %v", err)
 	}
 }
+
+func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "nonexistent",
+	}
+	opts.Format = formatText
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("expected error for nonexistent device")
+	}
+}

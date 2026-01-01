@@ -93,6 +93,7 @@ func FixturesToConfigWithMockURLs(fixtures *Fixtures, server *DeviceServer) *con
 			Model:      d.Model,
 			Type:       d.Type,
 			Generation: d.Generation,
+			Platform:   d.Platform,
 		}
 		if d.AuthUser != "" || d.AuthPass != "" {
 			dev.Auth = &model.Auth{

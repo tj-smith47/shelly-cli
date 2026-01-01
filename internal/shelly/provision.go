@@ -3,10 +3,10 @@ package shelly
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -93,8 +93,7 @@ func ValidateBulkProvisionConfig(cfg *model.BulkProvisionConfig, isDeviceRegiste
 
 // ParseBulkProvisionFile reads and parses a bulk provision configuration file.
 func ParseBulkProvisionFile(file string) (*model.BulkProvisionConfig, error) {
-	//nolint:gosec // G304: file path is from user command line argument
-	data, err := os.ReadFile(file)
+	data, err := afero.ReadFile(config.Fs(), file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}

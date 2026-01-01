@@ -22,6 +22,24 @@ var (
 	defaultFsMu sync.RWMutex
 )
 
+// Function variables for testability.
+// These can be replaced in tests to inject mock behavior.
+var (
+	osExecutable     = os.Executable
+	evalSymlinks     = filepath.EvalSymlinks
+	execCommandStart = defaultExecCommandStart
+	runtimeGOOS      = runtime.GOOS
+)
+
+// defaultExecCommandStart is the default implementation that starts a command.
+func defaultExecCommandStart(ctx context.Context, path string, args []string) error {
+	cmd := exec.CommandContext(ctx, path, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Start()
+}
+
 // SetFs sets the package-level filesystem for testing.
 // Pass nil to reset to the real OS filesystem.
 func SetFs(fs afero.Fs) {
@@ -75,12 +93,12 @@ func (c *Client) InstallRelease(ctx context.Context, ios *iostreams.IOStreams, r
 	}
 
 	// Get current executable path
-	execPath, err := os.Executable()
+	execPath, err := osExecutable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	execPath, err = filepath.EvalSymlinks(execPath)
+	execPath, err = evalSymlinks(execPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve symlinks: %w", err)
 	}
@@ -141,7 +159,7 @@ func createBackup(ios *iostreams.IOStreams, targetPath, backupPath string) error
 
 	if err := fs.Rename(targetPath, backupPath); err != nil {
 		// On Windows, we might need to copy instead
-		if runtime.GOOS != "windows" {
+		if runtimeGOOS != "windows" {
 			return fmt.Errorf("backup failed: %w", err)
 		}
 
@@ -196,12 +214,12 @@ func copyFile(ios *iostreams.IOStreams, src, dst string) error {
 
 // GetExecutablePath returns the resolved path to the current executable.
 func GetExecutablePath() (string, error) {
-	execPath, err := os.Executable()
+	execPath, err := osExecutable()
 	if err != nil {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	execPath, err = filepath.EvalSymlinks(execPath)
+	execPath, err = evalSymlinks(execPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve symlinks: %w", err)
 	}
@@ -217,12 +235,7 @@ func RestartCLI(ctx context.Context, args []string) error {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, execPath, args...) //nolint:gosec // G204: execPath is the current executable
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Start()
+	return execCommandStart(ctx, execPath, args)
 }
 
 // ConfirmFunc is a function that asks the user for confirmation.

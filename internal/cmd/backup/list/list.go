@@ -82,7 +82,7 @@ func run(opts *Options) error {
 	}
 
 	// Validate directory exists
-	info, err := os.Stat(dir)
+	info, err := config.Fs().Stat(dir)
 	if os.IsNotExist(err) {
 		ios.Info("No backups directory found at %s", dir)
 		return nil

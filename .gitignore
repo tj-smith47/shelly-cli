@@ -2,6 +2,7 @@
 .claude/
 CLAUDE.md
 *.plan.md
+/*.txt
 
 # Binaries
 /shelly

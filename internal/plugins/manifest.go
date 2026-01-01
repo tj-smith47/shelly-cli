@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // ManifestSchemaVersion is the current manifest schema version.
@@ -133,7 +136,7 @@ func NewManifest(name string, source Source) *Manifest {
 // LoadManifest reads a manifest from a plugin directory.
 func LoadManifest(pluginDir string) (*Manifest, error) {
 	path := filepath.Join(pluginDir, ManifestFileName)
-	data, err := os.ReadFile(path) //nolint:gosec // G304: pluginDir is from known plugins directory
+	data, err := afero.ReadFile(config.Fs(), path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read manifest: %w", err)
 	}
@@ -154,7 +157,7 @@ func (m *Manifest) Save(pluginDir string) error {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil { //nolint:gosec // G306: manifest is not sensitive
+	if err := afero.WriteFile(config.Fs(), path, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 
@@ -169,7 +172,7 @@ func (m *Manifest) SetBinaryInfo(binaryPath string) error {
 	}
 	m.Binary.Checksum = checksum
 
-	info, err := os.Stat(binaryPath)
+	info, err := config.Fs().Stat(binaryPath)
 	if err != nil {
 		return fmt.Errorf("failed to stat binary: %w", err)
 	}
@@ -185,7 +188,7 @@ func (m *Manifest) MarkUpdated() {
 
 // ComputeChecksum calculates SHA256 checksum for a file.
 func ComputeChecksum(path string) (string, error) {
-	f, err := os.Open(path) //nolint:gosec // G304: path is from known plugins directory
+	f, err := config.Fs().Open(path)
 	if err != nil {
 		return "", err
 	}

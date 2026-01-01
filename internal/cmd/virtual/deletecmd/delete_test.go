@@ -238,6 +238,8 @@ func TestExecute_Cancelled(t *testing.T) {
 }
 
 func TestExecute_WithMock_Success(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

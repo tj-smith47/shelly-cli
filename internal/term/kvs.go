@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -48,11 +49,14 @@ func DisplayKVSKeys(ios *iostreams.IOStreams, result *kvs.ListResult) {
 	ios.Title("KVS Keys")
 	ios.Println()
 
-	table := output.NewTable("Key")
+	builder := table.NewBuilder("Key")
 	for _, key := range result.Keys {
-		table.AddRow(key)
+		builder.AddRow(key)
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print KVS keys table", err)
+	}
 
 	ios.Printf("\n%d key(s), revision %d\n", len(result.Keys), result.Rev)
 }
@@ -62,11 +66,14 @@ func DisplayKVSItems(ios *iostreams.IOStreams, items []kvs.Item) {
 	ios.Title("KVS Data")
 	ios.Println()
 
-	table := output.NewTable("Key", "Value", "Type")
+	builder := table.NewBuilder("Key", "Value", "Type")
 	for _, item := range items {
-		table.AddRow(item.Key, output.FormatDisplayValue(item.Value), output.ValueType(item.Value))
+		builder.AddRow(item.Key, output.FormatDisplayValue(item.Value), output.ValueType(item.Value))
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print KVS items table", err)
+	}
 
 	ios.Printf("\n%d key(s)\n", len(items))
 }

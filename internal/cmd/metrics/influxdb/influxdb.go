@@ -4,7 +4,6 @@ package influxdb
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 )
 
@@ -104,7 +104,7 @@ func run(ctx context.Context, opts *Options) error {
 	out := ios.Out
 	if opts.Output != "" {
 		cleanPath := filepath.Clean(opts.Output)
-		file, err := os.Create(cleanPath)
+		file, err := config.Fs().Create(cleanPath)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}

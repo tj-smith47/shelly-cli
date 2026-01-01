@@ -6,6 +6,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -22,7 +23,7 @@ func DisplayDeviceList(ios *iostreams.IOStreams, devices []model.DeviceListItem,
 	}
 	headers = append(headers, "Auth")
 
-	table := output.NewStyledTable(ios, headers...)
+	table := table.NewStyled(ios, headers...)
 
 	for i, dev := range devices {
 		gen := output.RenderGeneration(dev.Generation)

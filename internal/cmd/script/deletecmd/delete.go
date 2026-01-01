@@ -1,4 +1,4 @@
-// Package del provides the script delete subcommand.
+// Package deletecmd provides the script delete subcommand.
 package deletecmd
 
 import (

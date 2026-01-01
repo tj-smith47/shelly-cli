@@ -6,6 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // CachePath returns the path to the version cache file.
@@ -25,7 +29,8 @@ func ReadCachedVersion() string {
 		return ""
 	}
 
-	info, err := os.Stat(cachePath)
+	fs := config.Fs()
+	info, err := fs.Stat(cachePath)
 	if err != nil {
 		return ""
 	}
@@ -34,7 +39,7 @@ func ReadCachedVersion() string {
 		return ""
 	}
 
-	data, err := os.ReadFile(cachePath) //nolint:gosec // G304: cachePath is from known config directory
+	data, err := afero.ReadFile(fs, cachePath)
 	if err != nil {
 		return ""
 	}
@@ -50,11 +55,12 @@ func WriteCache(latestVersion string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(cachePath), 0o750); err != nil {
+	fs := config.Fs()
+	if err := fs.MkdirAll(filepath.Dir(cachePath), 0o750); err != nil {
 		return err
 	}
 
-	return os.WriteFile(cachePath, []byte(latestVersion), 0o600)
+	return afero.WriteFile(fs, cachePath, []byte(latestVersion), 0o600)
 }
 
 // UpdateResult holds the result of an update check.

@@ -1,0 +1,408 @@
+#!/usr/bin/env bash
+# Audit script for shelly-cli convention/rule/pattern compliance
+# Based on project rules in docs/development.md and docs/architecture.md
+#
+# Usage: ./scripts/audit-conventions.sh [path]
+#   path: Optional directory to audit (default: entire repo)
+#
+# This script should be run as the final verification step.
+# Any error means there is a compliance issue that MUST be fixed.
+# REMINDER: No issue is pre-existing - all code in this repo was written by Claude.
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default to repo root if no path specified
+AUDIT_PATH="${1:-.}"
+ERRORS=0
+WARNINGS=0
+
+# ==============================================================================
+# HELPER FUNCTIONS
+# ==============================================================================
+
+error() {
+    echo -e "${RED}ERROR:${NC} $1"
+    ((ERRORS++)) || true
+}
+
+warn() {
+    echo -e "${YELLOW}WARNING:${NC} $1"
+    ((WARNINGS++)) || true
+}
+
+success() {
+    echo -e "${GREEN}OK:${NC} $1"
+}
+
+section() {
+    echo ""
+    echo -e "${BLUE}--- $1 ---${NC}"
+}
+
+# Search Go files, excluding tests and vendor
+search_go() {
+    local pattern="$1"
+    local path="${2:-internal/}"
+    grep -rn "$pattern" "$path" 2>/dev/null | grep "\.go:" | grep -v "_test\.go" | grep -v "vendor/" || true
+}
+
+# Search only cmd/ Go files, excluding tests
+search_cmd() {
+    local pattern="$1"
+    grep -rn "$pattern" internal/cmd/ 2>/dev/null | grep "\.go:" | grep -v "_test\.go" || true
+}
+
+# Count matches
+count_matches() {
+    local result="$1"
+    if [[ -z "$result" ]]; then
+        echo "0"
+    else
+        echo "$result" | wc -l | tr -d ' '
+    fi
+}
+
+# Display results with limit
+show_results() {
+    local result="$1"
+    local limit="${2:-10}"
+    if [[ -n "$result" ]]; then
+        echo "$result" | head -"$limit"
+        local total
+        total=$(count_matches "$result")
+        if [[ "$total" -gt "$limit" ]]; then
+            echo "  ... and $((total - limit)) more"
+        fi
+    fi
+}
+
+# ==============================================================================
+# MAIN SCRIPT
+# ==============================================================================
+
+echo "=========================================="
+echo "  SHELLY-CLI CONVENTION AUDIT"
+echo "=========================================="
+echo ""
+echo "Auditing: $AUDIT_PATH"
+
+# ==============================================================================
+# SECTION 1: Stub/Incomplete Code Checks
+# ==============================================================================
+section "Stub/Incomplete Code Checks"
+
+# Check for TODO comments
+TODOS=$(search_go "TODO" "internal/")
+if [[ -n "$TODOS" ]]; then
+    error "Found TODO comments that need to be addressed:"
+    show_results "$TODOS"
+else
+    success "No TODO comments found"
+fi
+
+# Check for FIXME comments
+FIXMES=$(search_go "FIXME" "internal/")
+if [[ -n "$FIXMES" ]]; then
+    error "Found FIXME comments that need to be addressed:"
+    show_results "$FIXMES"
+else
+    success "No FIXME comments found"
+fi
+
+# Check for stub implementations
+STUBS=$(search_go "stub\|// stub\|Stub\(" "internal/")
+if [[ -n "$STUBS" ]]; then
+    error "Found stub implementations:"
+    show_results "$STUBS"
+else
+    success "No stub implementations found"
+fi
+
+# Check for placeholder comments
+PLACEHOLDERS=$(search_go "placeholder\|PLACEHOLDER" "internal/")
+if [[ -n "$PLACEHOLDERS" ]]; then
+    error "Found placeholder code:"
+    show_results "$PLACEHOLDERS"
+else
+    success "No placeholder code found"
+fi
+
+# Check for deferred work
+DEFERRED=$(search_go "future\|deferred\|later\|eventually\|nice to have\|optional.*implement" "internal/")
+if [[ -n "$DEFERRED" ]]; then
+    error "Found deferred/future work references:"
+    show_results "$DEFERRED"
+else
+    success "No deferred/future work references found"
+fi
+
+# Check for incomplete implementation mentions
+INCOMPLETE=$(search_go "full implementation\|complete implementation\|proper implementation\|real implementation" "internal/")
+if [[ -n "$INCOMPLETE" ]]; then
+    error "Found mentions of incomplete implementation:"
+    show_results "$INCOMPLETE"
+else
+    success "No incomplete implementation mentions found"
+fi
+
+# Check for panic placeholders
+PANICS=$(search_go 'panic\(".*not implemented' "internal/")
+if [[ -n "$PANICS" ]]; then
+    error "Found panic placeholders for unimplemented code:"
+    show_results "$PANICS"
+else
+    success "No panic placeholders found"
+fi
+
+# ==============================================================================
+# SECTION 2: Factory Pattern Checks
+# ==============================================================================
+section "Factory Pattern Checks"
+
+# Check for NewCmd naming (should be NewCommand)
+BAD_NAMING=$(search_cmd "func NewCmd[A-Z]")
+if [[ -n "$BAD_NAMING" ]]; then
+    error "Found 'NewCmdXxx' naming instead of 'NewCommand':"
+    show_results "$BAD_NAMING"
+else
+    success "All command constructors use 'NewCommand' naming"
+fi
+
+# Check for run() with factory as separate parameter (old pattern)
+OLD_RUN_PATTERN=$(search_cmd "func run(ctx context.Context, f \*cmdutil\.Factory")
+if [[ -n "$OLD_RUN_PATTERN" ]]; then
+    error "Found old run(ctx, f, ...) pattern instead of run(ctx, opts):"
+    show_results "$OLD_RUN_PATTERN"
+else
+    success "All run() functions use Factory-in-Options pattern"
+fi
+
+# Check for direct f.IOStreams() in run functions
+DIRECT_FACTORY=$(search_cmd "ios := f\.IOStreams()")
+if [[ -n "$DIRECT_FACTORY" ]]; then
+    error "Found direct f.IOStreams() instead of opts.Factory.IOStreams():"
+    show_results "$DIRECT_FACTORY"
+else
+    success "IOStreams accessed via opts.Factory"
+fi
+
+# ==============================================================================
+# SECTION 3: IOStreams Usage Checks
+# ==============================================================================
+section "IOStreams Usage Checks"
+
+# Check for fmt.Println anywhere in internal/
+FMT_PRINTLN=$(search_go "fmt\.Println" "internal/")
+if [[ -n "$FMT_PRINTLN" ]]; then
+    error "Found fmt.Println (should use ios methods):"
+    show_results "$FMT_PRINTLN"
+else
+    success "No fmt.Println in internal/"
+fi
+
+# Check for fmt.Printf to stdout (exclude Sprintf/Fprintf)
+FMT_PRINTF=$(search_go "fmt\.Printf" "internal/" | grep -v "fmt\.Fprintf" | grep -v "fmt\.Sprintf" || true)
+if [[ -n "$FMT_PRINTF" ]]; then
+    error "Found fmt.Printf (should use ios methods):"
+    show_results "$FMT_PRINTF"
+else
+    success "No direct fmt.Printf in internal/"
+fi
+
+# Check for iostreams.System() direct instantiation anywhere
+DIRECT_IOSTREAMS=$(search_go "iostreams\.System()" "internal/")
+if [[ -n "$DIRECT_IOSTREAMS" ]]; then
+    error "Found iostreams.System() direct instantiation:"
+    show_results "$DIRECT_IOSTREAMS"
+else
+    success "No direct iostreams.System() instantiation"
+fi
+
+# Check for shelly.NewService() direct instantiation
+DIRECT_SERVICE=$(search_go "shelly\.NewService()" "internal/")
+if [[ -n "$DIRECT_SERVICE" ]]; then
+    error "Found shelly.NewService() direct instantiation:"
+    show_results "$DIRECT_SERVICE"
+else
+    success "No direct shelly.NewService() instantiation"
+fi
+
+# ==============================================================================
+# SECTION 4: Context Usage Checks
+# ==============================================================================
+section "Context Usage Checks"
+
+# Check for context.Background() anywhere in internal/
+CTX_BACKGROUND=$(search_go "context\.Background()" "internal/")
+if [[ -n "$CTX_BACKGROUND" ]]; then
+    error "Found context.Background() (should use cmd.Context()):"
+    show_results "$CTX_BACKGROUND"
+else
+    success "No context.Background() in internal/"
+fi
+
+# ==============================================================================
+# SECTION 5: Architecture Separation of Concerns
+# ==============================================================================
+section "Architecture Separation of Concerns"
+
+# cmd/ should only have NewCommand and run functions
+OTHER_FUNCS=$(grep -rn "^func [A-Za-z]" internal/cmd/ 2>/dev/null | grep "\.go:" | grep -v "_test\.go" | grep -v "func NewCommand" | grep -v "func run(" | grep -v "func init(" || true)
+if [[ -n "$OTHER_FUNCS" ]]; then
+    error "Found functions other than NewCommand/run in cmd/ (move to appropriate package per architecture.md):"
+    show_results "$OTHER_FUNCS"
+else
+    success "cmd/ contains only NewCommand and run functions"
+fi
+
+# Check for display functions anywhere outside term/
+DISPLAY_OUTSIDE_TERM=$(search_go "func [Dd]isplay" "internal/" | grep -v "internal/term" | grep -v "internal/tui" || true)
+if [[ -n "$DISPLAY_OUTSIDE_TERM" ]]; then
+    error "Found Display functions outside term/ (should be in term/):"
+    show_results "$DISPLAY_OUTSIDE_TERM"
+else
+    success "Display functions correctly placed in term/"
+fi
+
+# Check for format functions in cmd/ (should be in output/)
+FORMAT_IN_CMD=$(search_cmd "func [Ff]ormat")
+if [[ -n "$FORMAT_IN_CMD" ]]; then
+    error "Found Format functions in cmd/ (should be in output/):"
+    show_results "$FORMAT_IN_CMD"
+else
+    success "No Format functions in cmd/"
+fi
+
+# Check for HTTP/client logic in cmd/ (should be in shelly/ or client/)
+HTTP_IN_CMD=$(search_cmd "http\.Get\|http\.Post\|http\.Client\|http\.NewRequest")
+if [[ -n "$HTTP_IN_CMD" ]]; then
+    error "Found HTTP logic in cmd/ (should be in shelly/ or client/):"
+    show_results "$HTTP_IN_CMD"
+else
+    success "No HTTP logic in cmd/"
+fi
+
+# Check for direct exec.Command outside browser/ (use browser package)
+EXEC_CMD=$(search_go 'exec\.Command\(' "internal/" | grep -v "internal/browser" | grep -v "internal/plugins" || true)
+if [[ -n "$EXEC_CMD" ]]; then
+    warn "Found exec.Command outside browser/plugins (consider browser package):"
+    show_results "$EXEC_CMD" 5
+fi
+
+# ==============================================================================
+# SECTION 6: Error Handling Checks
+# ==============================================================================
+section "Error Handling Checks"
+
+# Check for //nolint:errcheck without approval
+NOLINT_ERRCHECK=$(search_go "//nolint:errcheck" "internal/")
+if [[ -n "$NOLINT_ERRCHECK" ]]; then
+    warn "Found //nolint:errcheck (requires approval):"
+    show_results "$NOLINT_ERRCHECK" 5
+fi
+
+# Check for _ = err pattern
+SUPPRESSED_ERR=$(search_go "_ = err" "internal/")
+if [[ -n "$SUPPRESSED_ERR" ]]; then
+    error "Found '_ = err' error suppression (use ios.DebugErr()):"
+    show_results "$SUPPRESSED_ERR"
+else
+    success "No '_ = err' error suppression"
+fi
+
+# ==============================================================================
+# SECTION 7: Command Requirements Checks
+# ==============================================================================
+section "Command Requirements Checks"
+
+# Check for commands missing Aliases in leaf command files
+CMD_FILES=$(find internal/cmd -maxdepth 3 -name "*.go" ! -name "*_test.go" ! -name "root.go" -type f 2>/dev/null || true)
+MISSING_ALIASES=""
+for f in $CMD_FILES; do
+    if grep -q "cobra\.Command{" "$f" && ! grep -q "Aliases:" "$f"; then
+        MISSING_ALIASES="${MISSING_ALIASES}${f}\n"
+    fi
+done
+if [[ -n "$MISSING_ALIASES" ]]; then
+    warn "Commands potentially missing Aliases:"
+    echo -e "$MISSING_ALIASES" | head -10
+fi
+
+# Check for commands missing Example
+MISSING_EXAMPLES=""
+for f in $CMD_FILES; do
+    if grep -q "cobra\.Command{" "$f" && ! grep -q "Example:" "$f"; then
+        MISSING_EXAMPLES="${MISSING_EXAMPLES}${f}\n"
+    fi
+done
+if [[ -n "$MISSING_EXAMPLES" ]]; then
+    warn "Commands potentially missing Examples:"
+    echo -e "$MISSING_EXAMPLES" | head -10
+fi
+
+# ==============================================================================
+# SECTION 8: Build, Lint, Test
+# ==============================================================================
+echo ""
+echo "=========================================="
+echo "  BUILD, LINT, TEST"
+echo "=========================================="
+
+section "Building"
+if go build ./...; then
+    success "Build passed"
+else
+    error "Build failed"
+fi
+
+section "Linting"
+if golangci-lint run -j 3 ./... 2>&1; then
+    success "Lint passed"
+else
+    error "Lint failed"
+fi
+
+section "Testing"
+if go test ./... 2>&1; then
+    success "Tests passed"
+else
+    error "Tests failed"
+fi
+
+section "Generating Docs"
+if make docs 2>&1; then
+    success "Docs generated"
+else
+    error "Docs generation failed"
+fi
+
+# ==============================================================================
+# SUMMARY
+# ==============================================================================
+echo ""
+echo "=========================================="
+echo "  AUDIT SUMMARY"
+echo "=========================================="
+echo ""
+
+if [[ $ERRORS -gt 0 ]]; then
+    echo -e "${RED}FAILED:${NC} $ERRORS error(s), $WARNINGS warning(s)"
+    echo ""
+    echo -e "${RED}REMINDER:${NC} No issue is pre-existing. All code in this repository"
+    echo "was written by Claude. You are responsible for fixing ALL bugs."
+    echo ""
+    exit 1
+elif [[ $WARNINGS -gt 0 ]]; then
+    echo -e "${YELLOW}PASSED WITH WARNINGS:${NC} $WARNINGS warning(s)"
+    echo "Please review warnings above and fix if appropriate."
+    exit 0
+else
+    echo -e "${GREEN}PASSED:${NC} All convention checks passed!"
+    exit 0
+fi

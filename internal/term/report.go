@@ -3,8 +3,10 @@ package term
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -30,7 +32,7 @@ func OutputReport(ios *iostreams.IOStreams, report model.DeviceReport, format, o
 	}
 
 	if outputPath != "" {
-		if err := os.WriteFile(outputPath, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), outputPath, []byte(content), 0o600); err != nil {
 			return fmt.Errorf("failed to write report: %w", err)
 		}
 		ios.Success("Report saved to: %s", outputPath)

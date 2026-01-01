@@ -6,6 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -13,25 +14,31 @@ import (
 
 // DisplayScriptList prints a table of scripts.
 func DisplayScriptList(ios *iostreams.IOStreams, scripts []automation.ScriptInfo) {
-	table := output.NewTable("ID", "Name", "Enabled", "Running")
+	builder := table.NewBuilder("ID", "Name", "Enabled", "Running")
 	for _, s := range scripts {
 		name := s.Name
 		if name == "" {
 			name = output.FormatPlaceholder("(unnamed)")
 		}
-		table.AddRow(fmt.Sprintf("%d", s.ID), name, output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), output.RenderRunningState(s.Running))
+		builder.AddRow(fmt.Sprintf("%d", s.ID), name, output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), output.RenderRunningState(s.Running))
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print scripts table", err)
+	}
 }
 
 // DisplayScheduleList prints a table of schedules.
 func DisplayScheduleList(ios *iostreams.IOStreams, schedules []automation.ScheduleJob) {
-	table := output.NewTable("ID", "Enabled", "Timespec", "Calls")
+	builder := table.NewBuilder("ID", "Enabled", "Timespec", "Calls")
 	for _, s := range schedules {
 		callsSummary := formatScheduleCallsSummary(s.Calls)
-		table.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), s.Timespec, callsSummary)
+		builder.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), s.Timespec, callsSummary)
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print schedules table", err)
+	}
 }
 
 func formatScheduleCallsSummary(calls []automation.ScheduleCall) string {
@@ -59,15 +66,18 @@ func DisplayWebhookList(ios *iostreams.IOStreams, webhooks []shelly.WebhookInfo)
 	ios.Title("Webhooks")
 	ios.Println()
 
-	table := output.NewTable("ID", "Event", "URLs", "Enabled")
+	builder := table.NewBuilder("ID", "Event", "URLs", "Enabled")
 	for _, w := range webhooks {
 		urls := joinStrings(w.URLs, ", ")
 		if len(urls) > 40 {
 			urls = urls[:37] + "..."
 		}
-		table.AddRow(fmt.Sprintf("%d", w.ID), w.Event, urls, output.RenderYesNo(w.Enable, output.CaseTitle, theme.FalseError))
+		builder.AddRow(fmt.Sprintf("%d", w.ID), w.Event, urls, output.RenderYesNo(w.Enable, output.CaseTitle, theme.FalseError))
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print webhooks table", err)
+	}
 
 	ios.Printf("\n%d webhook(s) configured\n", len(webhooks))
 }

@@ -3,12 +3,12 @@ package create
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/plugins/scaffold"
 )
 
@@ -67,7 +67,7 @@ func run(opts *Options) error {
 
 	// Create output directory
 	extDir := filepath.Join(opts.OutputDir, extName)
-	if err := os.MkdirAll(extDir, 0o750); err != nil {
+	if err := config.Fs().MkdirAll(extDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 

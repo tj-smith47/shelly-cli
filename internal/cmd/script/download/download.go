@@ -4,14 +4,15 @@ package download
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
@@ -72,16 +73,16 @@ func run(ctx context.Context, opts *Options) error {
 		}
 
 		// Ensure directory exists
+		fs := config.Fs()
 		dir := filepath.Dir(opts.File)
 		if dir != "." && dir != "" {
-			if mkErr := os.MkdirAll(dir, 0o750); mkErr != nil {
+			if mkErr := fs.MkdirAll(dir, 0o750); mkErr != nil {
 				return fmt.Errorf("failed to create directory: %w", mkErr)
 			}
 		}
 
 		// Write file
-		//nolint:gosec // G306: 0o644 is appropriate for script files
-		if writeErr := os.WriteFile(opts.File, []byte(code), 0o644); writeErr != nil {
+		if writeErr := afero.WriteFile(fs, opts.File, []byte(code), 0o644); writeErr != nil {
 			return fmt.Errorf("failed to write file: %w", writeErr)
 		}
 

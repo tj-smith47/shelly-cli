@@ -8,6 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -189,7 +190,7 @@ func DisplayDashboard(ios *iostreams.IOStreams, data model.DashboardData) {
 
 	ios.Printf("\n%s\n", theme.Bold().Render("Device Breakdown"))
 
-	table := output.NewTable("Device", "Status", "Power", "Components")
+	builder := table.NewBuilder("Device", "Status", "Power", "Components")
 	for _, dev := range data.Devices {
 		statusStr := theme.StatusOK().Render("online")
 		if !dev.Online {
@@ -201,10 +202,13 @@ func DisplayDashboard(ios *iostreams.IOStreams, data model.DashboardData) {
 			powerStr = "-"
 		}
 
-		table.AddRow(dev.Device, statusStr, powerStr, formatComponentSummary(dev.Components))
+		builder.AddRow(dev.Device, statusStr, powerStr, formatComponentSummary(dev.Components))
 	}
 
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print dashboard table", err)
+	}
 }
 
 func formatComponentSummary(components []model.ComponentPower) string {
@@ -248,7 +252,7 @@ func DisplayComparison(ios *iostreams.IOStreams, data model.ComparisonData) {
 
 	ios.Printf("%s\n", theme.Bold().Render("Device Breakdown"))
 
-	table := output.NewTable("Rank", "Device", "Energy", "Avg Power", "Peak Power", "Share", "Status")
+	builder := table.NewBuilder("Rank", "Device", "Energy", "Avg Power", "Peak Power", "Share", "Status")
 	for i, dev := range sorted {
 		rank := fmt.Sprintf("#%d", i+1)
 
@@ -269,10 +273,13 @@ func DisplayComparison(ios *iostreams.IOStreams, data model.ComparisonData) {
 			}
 		}
 
-		table.AddRow(rank, dev.Device, energyStr, avgStr, peakStr, shareStr, statusStr)
+		builder.AddRow(rank, dev.Device, energyStr, avgStr, peakStr, shareStr, statusStr)
 	}
 
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print comparison table", err)
+	}
 
 	ios.Printf("\n%s\n", theme.Bold().Render("Energy Distribution"))
 	displayBarChart(ios, sorted, data.MaxEnergy)

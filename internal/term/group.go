@@ -7,17 +7,19 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
 // DisplayGroups displays a table of device groups.
 func DisplayGroups(ios *iostreams.IOStreams, groups []model.GroupInfo) {
-	table := output.NewTable("Name", "Devices")
+	builder := table.NewBuilder("Name", "Devices")
 	for _, g := range groups {
-		table.AddRow(g.Name, output.FormatDeviceCount(g.DeviceCount))
+		builder.AddRow(g.Name, output.FormatDeviceCount(g.DeviceCount))
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
+		ios.DebugErr("print groups table", err)
 	}
 	ios.Println()
 	ios.Count("group", len(groups))
@@ -28,11 +30,12 @@ func DisplayGroupMembers(ios *iostreams.IOStreams, groupName string, devices []s
 	ios.Title("Group: %s", groupName)
 	ios.Printf("\n")
 
-	t := output.NewTable("#", "Device")
+	builder := table.NewBuilder("#", "Device")
 	for i, device := range devices {
-		t.AddRow(fmt.Sprintf("%d", i+1), device)
+		builder.AddRow(fmt.Sprintf("%d", i+1), device)
 	}
-	if err := t.PrintTo(ios.Out); err != nil {
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print group members table", err)
 	}
 	ios.Println()

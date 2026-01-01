@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
@@ -98,13 +99,14 @@ func run(_ context.Context, opts *Options) error {
 	}
 
 	// Ensure output directory exists
+	fs := config.Fs()
 	if dir := filepath.Dir(opts.Output); dir != "." {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
+		if err := fs.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("create directory: %w", err)
 		}
 	}
 
-	if err := os.WriteFile(opts.Output, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, opts.Output, data, 0o600); err != nil {
 		return fmt.Errorf("write file: %w", err)
 	}
 

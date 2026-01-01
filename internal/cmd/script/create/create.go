@@ -4,12 +4,13 @@ package create
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
@@ -68,8 +69,7 @@ func run(ctx context.Context, opts *Options) error {
 	// Get code from file if specified
 	code := opts.Code
 	if opts.File != "" {
-		//nolint:gosec // G304: User-provided file path is intentional for this command
-		data, err := os.ReadFile(opts.File)
+		data, err := afero.ReadFile(config.Fs(), opts.File)
 		if err != nil {
 			return fmt.Errorf("failed to read file: %w", err)
 		}

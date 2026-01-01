@@ -11,6 +11,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
+// Function variables for testing - allow mocking integrator creation.
+var (
+	newIntegratorClient = integrator.New
+	newFleetManager     = integrator.NewFleetManager
+)
+
 // IntegratorCredentials holds integrator API credentials.
 type IntegratorCredentials struct {
 	Tag   string
@@ -48,13 +54,13 @@ type FleetConnection struct {
 // ConnectFleet creates an authenticated fleet manager and connects to all hosts.
 func ConnectFleet(ctx context.Context, ios *iostreams.IOStreams, creds *IntegratorCredentials) (*FleetConnection, error) {
 	// Create client and authenticate
-	client := integrator.New(creds.Tag, creds.Token)
+	client := newIntegratorClient(creds.Tag, creds.Token)
 	if err := client.Authenticate(ctx); err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
 	// Create fleet manager and connect
-	fm := integrator.NewFleetManager(client)
+	fm := newFleetManager(client)
 
 	ios.Info("Connecting to fleet...")
 	connErrors := fm.ConnectAll(ctx, nil)

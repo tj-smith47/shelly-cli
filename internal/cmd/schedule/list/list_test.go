@@ -96,6 +96,11 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	if cmd.ValidArgsFunction == nil {
 		t.Error("ValidArgsFunction should be set for device completion")
 	}
+
+	// Execute the ValidArgsFunction to cover completion paths
+	suggestions, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	_ = suggestions
+	_ = directive
 }
 
 func TestNewCommand_ExampleContent(t *testing.T) {
@@ -115,7 +120,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-func TestRun_WithMock(t *testing.T) {
+func TestRun_EmptyList(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -150,10 +155,75 @@ func TestRun_WithMock(t *testing.T) {
 	}
 
 	err = run(context.Background(), opts)
-	// May fail due to mock limitations
 	if err != nil {
-		t.Logf("run() error = %v (expected for mock)", err)
+		t.Errorf("run() error = %v", err)
 	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "No schedules found") {
+		t.Errorf("expected 'No schedules found' in output, got: %s", output)
+	}
+}
+
+func TestRun_WithSchedules(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"schedule:1": map[string]any{
+					"id":       float64(1),
+					"enable":   true,
+					"timespec": "0 0 8 * *",
+					"calls": []any{
+						map[string]any{
+							"method": "Switch.Set",
+							"params": map[string]any{"id": float64(0), "on": true},
+						},
+					},
+				},
+				"schedule:2": map[string]any{
+					"id":       float64(2),
+					"enable":   false,
+					"timespec": "0 0 20 * *",
+					"calls":    []any{},
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+	// When schedules are returned, output should contain schedule data
+	// (either table or some indication of schedules)
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {

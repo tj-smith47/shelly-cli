@@ -13,6 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -242,8 +243,10 @@ func (m Model) LoadDevices() Model {
 func (m Model) LoadBackupFiles() Model {
 	m.backupFiles = nil
 
+	fs := config.Fs()
+
 	// List backup files in backup directory
-	entries, err := os.ReadDir(m.backupDir)
+	entries, err := afero.ReadDir(fs, m.backupDir)
 	if err != nil {
 		// Directory may not exist yet
 		return m
@@ -260,13 +263,9 @@ func (m Model) LoadBackupFiles() Model {
 		}
 
 		path := filepath.Join(m.backupDir, name)
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
 
 		// Parse backup to get device info
-		data, err := os.ReadFile(path) //nolint:gosec // G304: path is constructed from known backup directory
+		data, err := afero.ReadFile(fs, path)
 		if err != nil {
 			continue
 		}
@@ -282,7 +281,7 @@ func (m Model) LoadBackupFiles() Model {
 			Path:       path,
 			DeviceName: deviceInfo.Name,
 			DeviceID:   deviceInfo.ID,
-			Timestamp:  info.ModTime(),
+			Timestamp:  entry.ModTime(),
 		})
 	}
 
@@ -359,7 +358,7 @@ func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
 		defer cancel()
 
 		// Ensure backup directory exists
-		if err := os.MkdirAll(m.backupDir, 0o750); err != nil {
+		if err := config.Fs().MkdirAll(m.backupDir, 0o750); err != nil {
 			return ExportCompleteMsg{Results: []ExportResult{{
 				Name:    "all",
 				Success: false,

@@ -11,7 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -87,9 +87,9 @@ func run(opts *Options) error {
 	})
 
 	return cmdutil.PrintListResult(ios, result, func(ios *iostreams.IOStreams, items []*profiles.Profile) {
-		table := output.NewTable("Model", "Name", "Generation", "Series", "Form Factor")
+		builder := table.NewBuilder("Model", "Name", "Generation", "Series", "Form Factor")
 		for _, p := range items {
-			table.AddRow(
+			builder.AddRow(
 				p.Model,
 				p.Name,
 				p.Generation.String(),
@@ -97,6 +97,7 @@ func run(opts *Options) error {
 				string(p.FormFactor),
 			)
 		}
+		table := builder.WithModeStyle(ios).Build()
 		if err := table.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print table", err)
 		}

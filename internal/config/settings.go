@@ -3,8 +3,10 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 )
 
@@ -93,4 +95,32 @@ func FormatSettingValue(v any) string {
 	default:
 		return fmt.Sprintf("%v", val)
 	}
+}
+
+// SaveTheme saves the theme name to configuration file.
+// This uses config.Fs() for proper test isolation.
+func SaveTheme(themeName string) error {
+	viper.Set("theme", themeName)
+
+	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		// Create default config path
+		configDir, err := Dir()
+		if err != nil {
+			return err
+		}
+		fs := Fs()
+		if err := fs.MkdirAll(configDir, 0o700); err != nil {
+			return err
+		}
+		configFile = filepath.Join(configDir, "config.yaml")
+	}
+
+	// In test mode, write to the test filesystem
+	if IsTestFs() {
+		data := []byte("theme: " + themeName + "\n")
+		return afero.WriteFile(Fs(), configFile, data, 0o600)
+	}
+
+	return viper.WriteConfigAs(configFile)
 }

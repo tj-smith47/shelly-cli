@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
@@ -50,6 +52,7 @@ func (r *Registry) PluginsDir() string {
 // InstallWithManifest installs a plugin with manifest metadata.
 func (r *Registry) InstallWithManifest(sourcePath string, manifest *Manifest) error {
 	filename := filepath.Base(sourcePath)
+	fs := config.Fs()
 
 	// Ensure it has the correct prefix
 	if !strings.HasPrefix(filename, PluginPrefix) {
@@ -61,25 +64,23 @@ func (r *Registry) InstallWithManifest(sourcePath string, manifest *Manifest) er
 	destPath := filepath.Join(pluginDir, filename)
 
 	// Create plugin directory
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
 	// Read source file
-	//nolint:gosec // G304: sourcePath is user-provided intentionally (install command)
-	data, err := os.ReadFile(sourcePath)
+	data, err := afero.ReadFile(fs, sourcePath)
 	if err != nil {
 		// Clean up directory on failure
-		if cleanupErr := os.RemoveAll(pluginDir); cleanupErr != nil {
+		if cleanupErr := fs.RemoveAll(pluginDir); cleanupErr != nil {
 			return fmt.Errorf("failed to read plugin (cleanup also failed: %w): %w", cleanupErr, err)
 		}
 		return fmt.Errorf("failed to read plugin: %w", err)
 	}
 
 	// Write binary
-	//nolint:gosec // G306: Plugins need executable permission
-	if err := os.WriteFile(destPath, data, 0o700); err != nil {
-		if cleanupErr := os.RemoveAll(pluginDir); cleanupErr != nil {
+	if err := afero.WriteFile(fs, destPath, data, 0o700); err != nil {
+		if cleanupErr := fs.RemoveAll(pluginDir); cleanupErr != nil {
 			return fmt.Errorf("failed to install plugin (cleanup also failed: %w): %w", cleanupErr, err)
 		}
 		return fmt.Errorf("failed to install plugin: %w", err)
@@ -126,16 +127,18 @@ func (r *Registry) Remove(name string) error {
 		return fmt.Errorf("cannot remove plugin %q: not installed in user plugins directory (found at %s)", name, plugin.Path)
 	}
 
+	fs := config.Fs()
+
 	// If plugin has a directory (new format), remove the directory
 	if plugin.Dir != "" {
-		if err := os.RemoveAll(plugin.Dir); err != nil {
+		if err := fs.RemoveAll(plugin.Dir); err != nil {
 			return fmt.Errorf("failed to remove plugin directory: %w", err)
 		}
 		return nil
 	}
 
 	// Old format: just remove the file
-	if err := os.Remove(plugin.Path); err != nil {
+	if err := fs.Remove(plugin.Path); err != nil {
 		return fmt.Errorf("failed to remove plugin: %w", err)
 	}
 
@@ -144,7 +147,8 @@ func (r *Registry) Remove(name string) error {
 
 // List returns all installed plugins (in user plugins directory).
 func (r *Registry) List() ([]Plugin, error) {
-	entries, err := os.ReadDir(r.pluginsDir)
+	fs := config.Fs()
+	entries, err := afero.ReadDir(fs, r.pluginsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil // Empty list is valid when directory doesn't exist
@@ -194,9 +198,10 @@ func (r *Registry) List() ([]Plugin, error) {
 // IsInstalled checks if a plugin is installed in the user plugins directory.
 func (r *Registry) IsInstalled(name string) bool {
 	dirPath := filepath.Join(r.pluginsDir, PluginPrefix+name)
+	fs := config.Fs()
 
 	// Check new format (directory)
-	if info, err := os.Stat(dirPath); err == nil && info.IsDir() {
+	if info, err := fs.Stat(dirPath); err == nil && info.IsDir() {
 		return true
 	}
 
@@ -216,9 +221,10 @@ func (r *Registry) IsInstalled(name string) bool {
 // GetManifest returns the manifest for an installed plugin.
 func (r *Registry) GetManifest(name string) (*Manifest, error) {
 	pluginDir := filepath.Join(r.pluginsDir, PluginPrefix+name)
+	fs := config.Fs()
 
 	// Check if directory exists
-	info, err := os.Stat(pluginDir)
+	info, err := fs.Stat(pluginDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("plugin %q not found", name)

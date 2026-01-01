@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -88,12 +89,12 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Write CSV
 	var writer *csv.Writer
-	var file *os.File
+	var file io.WriteCloser
 	if opts.File == "" {
 		writer = csv.NewWriter(ios.Out)
 	} else {
 		var createErr error
-		file, createErr = os.Create(opts.File)
+		file, createErr = config.Fs().Create(opts.File)
 		if createErr != nil {
 			return fmt.Errorf("failed to create file: %w", createErr)
 		}

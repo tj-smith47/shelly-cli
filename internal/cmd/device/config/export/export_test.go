@@ -1,13 +1,18 @@
 package export
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -450,5 +455,281 @@ func TestNewCommand_FormatValues(t *testing.T) {
 				t.Errorf("Format %q should be valid, got error: %v", tt.format, err)
 			}
 		})
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server and filesystem
+func TestRun_ExportToJSONFile(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "export-device",
+					Address:    "192.168.1.200",
+					MAC:        "AA:BB:CC:DD:EE:40",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"export-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	// Set up in-memory filesystem
+	memFs := afero.NewMemMapFs()
+	config.SetFs(memFs)
+	defer config.SetFs(afero.NewOsFs())
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"export-device", "/tmp/config.json"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	// Verify file was created
+	exists, err := afero.Exists(memFs, "/tmp/config.json")
+	if err != nil {
+		t.Fatalf("Failed to check file existence: %v", err)
+	}
+	if !exists {
+		t.Error("Expected config file to be created")
+	}
+
+	// Verify output contains success message
+	out := tf.OutString()
+	if !strings.Contains(out, "exported") && !strings.Contains(out, "Configuration") {
+		t.Errorf("Output should contain success message, got: %s", out)
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server and filesystem
+func TestRun_ExportToYAMLFile(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "yaml-export-device",
+					Address:    "192.168.1.201",
+					MAC:        "AA:BB:CC:DD:EE:41",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"yaml-export-device": {
+				"switch:0": map[string]any{"output": true},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	// Set up in-memory filesystem
+	memFs := afero.NewMemMapFs()
+	config.SetFs(memFs)
+	defer config.SetFs(afero.NewOsFs())
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"yaml-export-device", "/tmp/config.yaml", "-f", "yaml"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	// Verify file was created
+	exists, err := afero.Exists(memFs, "/tmp/config.yaml")
+	if err != nil {
+		t.Fatalf("Failed to check file existence: %v", err)
+	}
+	if !exists {
+		t.Error("Expected YAML config file to be created")
+	}
+
+	// Read file content and verify it's YAML
+	content, err := afero.ReadFile(memFs, "/tmp/config.yaml")
+	if err != nil {
+		t.Fatalf("Failed to read file: %v", err)
+	}
+	if strings.Contains(string(content), "{") {
+		t.Error("YAML output should not contain JSON braces")
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server and filesystem
+func TestRun_ExportToYMLFile(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "yml-export-device",
+					Address:    "192.168.1.202",
+					MAC:        "AA:BB:CC:DD:EE:42",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"yml-export-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	// Set up in-memory filesystem
+	memFs := afero.NewMemMapFs()
+	config.SetFs(memFs)
+	defer config.SetFs(afero.NewOsFs())
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"yml-export-device", "/tmp/config.yml", "-f", "yml"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	// Verify file was created
+	exists, err := afero.Exists(memFs, "/tmp/config.yml")
+	if err != nil {
+		t.Fatalf("Failed to check file existence: %v", err)
+	}
+	if !exists {
+		t.Error("Expected YML config file to be created")
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_ExportToStdout(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "stdout-export-device",
+					Address:    "192.168.1.203",
+					MAC:        "AA:BB:CC:DD:EE:43",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"stdout-export-device": {
+				"switch:0": map[string]any{"output": false},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"stdout-export-device", "-"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	// Verify output contains JSON
+	out := tf.OutString()
+	if !strings.Contains(out, "{") && !strings.Contains(out, "sys") {
+		t.Errorf("Output should contain JSON config, got: %s", out)
+	}
+}
+
+//nolint:paralleltest // Uses shared mock server
+func TestRun_GetConfigError(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "existing-device",
+					Address:    "192.168.1.204",
+					MAC:        "AA:BB:CC:DD:EE:44",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"existing-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device", "/tmp/config.json"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
 	}
 }

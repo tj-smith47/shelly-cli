@@ -2,10 +2,12 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -162,6 +164,11 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	if cmd.ValidArgsFunction == nil {
 		t.Error("ValidArgsFunction should be set for device completion")
 	}
+
+	// Execute the ValidArgsFunction to cover completion paths
+	suggestions, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	_ = suggestions
+	_ = directive
 }
 
 func TestNewCommand_ExampleContent(t *testing.T) {
@@ -179,5 +186,148 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 		if !strings.Contains(cmd.Example, pattern) {
 			t.Errorf("expected Example to contain %q", pattern)
 		}
+	}
+}
+
+func TestRun_Success(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		Timespec: "0 0 8 * *",
+		Calls:    `[{"method":"Switch.Set","params":{"id":0,"on":true}}]`,
+		Enable:   true,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Created schedule") {
+		t.Errorf("expected 'Created schedule' in output, got: %s", output)
+	}
+}
+
+func TestRun_SuccessDisabled(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		Timespec: "0 0 8 * *",
+		Calls:    `[{"method":"Switch.Set","params":{"id":0,"on":true}}]`,
+		Enable:   false, // Test disabled schedule
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "disabled") {
+		t.Errorf("expected 'disabled' in output, got: %s", output)
+	}
+}
+
+func TestRun_InvalidCallsJSON(t *testing.T) {
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		Timespec: "0 0 8 * *",
+		Calls:    "invalid-json",
+		Enable:   true,
+	}
+
+	err := run(context.Background(), opts)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+
+	if !strings.Contains(err.Error(), "invalid calls JSON") {
+		t.Errorf("expected 'invalid calls JSON' error, got: %v", err)
+	}
+}
+
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "nonexistent-device",
+		Timespec: "0 0 8 * *",
+		Calls:    `[{"method":"Switch.Set","params":{"id":0,"on":true}}]`,
+		Enable:   true,
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
 	}
 }

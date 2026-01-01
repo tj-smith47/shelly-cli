@@ -5,7 +5,10 @@ package mock
 import (
 	"os"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Fixtures holds all demo mode data loaded from YAML.
@@ -41,6 +44,7 @@ type DeviceFixture struct {
 	Model       string `yaml:"model"`
 	Type        string `yaml:"type"`
 	Generation  int    `yaml:"generation"`
+	Platform    string `yaml:"platform,omitempty"`
 	AuthUser    string `yaml:"auth_user,omitempty"`
 	AuthPass    string `yaml:"auth_pass,omitempty"`
 	AuthEnabled bool   `yaml:"auth_enabled,omitempty"`
@@ -103,8 +107,7 @@ type DiscoveredDevice struct {
 
 // LoadFixtures loads fixtures from a YAML file.
 func LoadFixtures(path string) (*Fixtures, error) {
-	//nolint:gosec // G304: path is user-provided intentionally (demo mode fixture path)
-	data, err := os.ReadFile(path)
+	data, err := afero.ReadFile(config.Fs(), path)
 	if err != nil {
 		return nil, err
 	}

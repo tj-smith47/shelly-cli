@@ -1,5 +1,5 @@
-// Package output provides output formatting utilities for the CLI.
-package output
+// Package table provides table rendering with styled output.
+package table
 
 import (
 	"fmt"
@@ -8,167 +8,54 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"charm.land/lipgloss/v2/table"
-	"github.com/spf13/viper"
-
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	lgtable "charm.land/lipgloss/v2/table"
 )
 
-// TableBorderStyle defines the border style for tables.
-type TableBorderStyle int
+// LabelPlaceholder is the placeholder for empty/missing values.
+const LabelPlaceholder = "-"
 
-// TableBorderStyle constants define available border styles.
+// LabelTrue and LabelFalse are boolean display labels.
 const (
-	BorderNone    TableBorderStyle = iota // No visible borders
-	BorderRounded                         // Modern rounded corners (default for TTY)
-	BorderSquare                          // Square corners
-	BorderDouble                          // Double-line borders
-	BorderHeavy                           // Heavy/bold borders
-	BorderASCII                           // ASCII-only for --plain mode
+	LabelTrue  = "true"
+	LabelFalse = "false"
 )
-
-// borderStyles maps border style constants to lipgloss border definitions.
-var borderStyles = map[TableBorderStyle]lipgloss.Border{
-	BorderNone:    lipgloss.HiddenBorder(),
-	BorderRounded: lipgloss.RoundedBorder(),
-	BorderSquare:  lipgloss.NormalBorder(),
-	BorderDouble:  lipgloss.DoubleBorder(),
-	BorderHeavy:   lipgloss.BlockBorder(),
-	BorderASCII:   lipgloss.ASCIIBorder(),
-}
 
 // Table represents a formatted table.
 type Table struct {
 	headers     []string
 	rows        [][]string
-	style       TableStyle
+	style       Style
 	hideHeaders bool // Hide header row entirely (for --no-headers)
 }
 
-// TableStyle defines the visual style for a table.
-type TableStyle struct {
-	Header           lipgloss.Style
-	Cell             lipgloss.Style
-	AltCell          lipgloss.Style   // Alternating row color
-	PrimaryCell      lipgloss.Style   // First column styling (e.g., Name column)
-	Border           lipgloss.Style   // Border character styling
-	BorderStyle      TableBorderStyle // Border style (rounded, square, etc.)
-	Padding          int
-	ShowBorder       bool
-	UppercaseHeaders bool // Make headers ALL CAPS
-	PlainMode        bool // True for --plain: no borders, tab-separated
-}
-
-// NewTable creates a new table with the given headers.
-func NewTable(headers ...string) *Table {
+// New creates a new table with the given headers.
+func New(headers ...string) *Table {
 	return &Table{
 		headers: headers,
 		rows:    [][]string{},
-		style:   DefaultTableStyle(),
+		style:   DefaultStyle(),
 	}
 }
 
-// DefaultTableStyle returns the default table style using semantic colors.
-// Uses rounded borders with themed colors for modern terminal appearance.
-// Colors are drawn from the semantic theme system for consistency.
-func DefaultTableStyle() TableStyle {
-	colors := theme.GetSemanticColors()
-	return TableStyle{
-		Header:           lipgloss.NewStyle().Bold(true).Foreground(colors.TableHeader),
-		Cell:             lipgloss.NewStyle().Foreground(colors.TableCell),
-		AltCell:          lipgloss.NewStyle().Foreground(colors.TableAltCell),
-		PrimaryCell:      lipgloss.NewStyle().Foreground(colors.Primary),
-		Border:           lipgloss.NewStyle().Foreground(colors.TableBorder),
-		BorderStyle:      BorderRounded,
-		Padding:          1,
-		ShowBorder:       true,
-		UppercaseHeaders: true, // Table headers are ALL CAPS by default
-		PlainMode:        false,
-	}
-}
-
-// NoColorTableStyle returns a table style for --no-color output.
-// Uses ASCII borders (|-+) with no ANSI codes (no colors, no bold).
-func NoColorTableStyle() TableStyle {
-	return TableStyle{
-		Header:           lipgloss.NewStyle(),
-		Cell:             lipgloss.NewStyle(),
-		AltCell:          lipgloss.NewStyle(),
-		PrimaryCell:      lipgloss.NewStyle(),
-		Border:           lipgloss.NewStyle(),
-		BorderStyle:      BorderASCII,
-		Padding:          1,
-		ShowBorder:       true,
-		UppercaseHeaders: true,
-		PlainMode:        false,
-	}
-}
-
-// PlainTableStyle returns a table style for --plain output.
-// No borders, tab-separated values for machine-readable/scriptable output.
-func PlainTableStyle() TableStyle {
-	return TableStyle{
-		Header:           lipgloss.NewStyle(),
-		Cell:             lipgloss.NewStyle(),
-		AltCell:          lipgloss.NewStyle(),
-		PrimaryCell:      lipgloss.NewStyle(),
-		Border:           lipgloss.NewStyle(),
-		BorderStyle:      BorderNone,
-		Padding:          0,
-		ShowBorder:       false,
-		UppercaseHeaders: true,
-		PlainMode:        true, // Enables tab-separated output
-	}
-}
-
-// GetTableStyle returns the appropriate table style based on output mode.
-// Priority: --plain > --no-color > default (with colors).
-func GetTableStyle(ios ModeChecker) TableStyle {
-	if ios == nil {
-		return DefaultTableStyle()
-	}
-	// --plain: aligned columns, no borders
-	if ios.IsPlainMode() {
-		return PlainTableStyle()
-	}
-	// --no-color or non-TTY: ASCII borders, no colors
-	if !ios.ColorEnabled() {
-		return NoColorTableStyle()
-	}
-	return DefaultTableStyle()
-}
-
-// ShouldHideHeaders returns true if --no-headers flag is set.
-func ShouldHideHeaders() bool {
-	return viper.GetBool("no-headers")
-}
-
-// NewStyledTable creates a table with style and headers settings from flags.
-// This is a convenience function that applies GetTableStyle and --no-headers.
-func NewStyledTable(ios ModeChecker, headers ...string) *Table {
-	t := NewTable(headers...)
-	t.SetStyle(GetTableStyle(ios))
+// NewStyled creates a table with style and headers settings from flags.
+// This is a convenience function that applies GetStyle and --no-headers.
+func NewStyled(ios ModeChecker, headers ...string) *Table {
+	t := New(headers...)
+	t.SetStyle(GetStyle(ios))
 	if ShouldHideHeaders() {
 		t.HideHeaders()
 	}
 	return t
 }
 
-// ModeChecker is an interface for checking output mode and color state.
-// This allows decoupling from the iostreams package.
-type ModeChecker interface {
-	IsPlainMode() bool
-	ColorEnabled() bool
-}
-
 // SetStyle sets a custom table style.
-func (t *Table) SetStyle(style TableStyle) *Table {
+func (t *Table) SetStyle(style Style) *Table {
 	t.style = style
 	return t
 }
 
 // SetBorderStyle sets the border style for the table.
-func (t *Table) SetBorderStyle(style TableBorderStyle) *Table {
+func (t *Table) SetBorderStyle(style BorderStyle) *Table {
 	t.style.BorderStyle = style
 	return t
 }
@@ -228,11 +115,11 @@ func (t *Table) Render() string {
 	}
 
 	// Build lipgloss table with styling
-	tbl := table.New().
+	tbl := lgtable.New().
 		Border(border).
 		BorderStyle(t.style.Border).
 		StyleFunc(func(row, col int) lipgloss.Style {
-			if row == table.HeaderRow {
+			if row == lgtable.HeaderRow {
 				return t.style.Header.Padding(0, t.style.Padding)
 			}
 			// First column (Name) gets primary styling
@@ -339,9 +226,9 @@ func (t *Table) String() string {
 	return t.Render()
 }
 
-// PrintTableTo is a convenience function to create and print a table to a writer.
-func PrintTableTo(w io.Writer, headers []string, rows [][]string) error {
-	t := NewTable(headers...)
+// PrintTo is a convenience function to create and print a table to a writer.
+func PrintTo(w io.Writer, headers []string, rows [][]string) error {
+	t := New(headers...)
 	t.AddRows(rows)
 	return t.PrintTo(w)
 }
@@ -356,9 +243,9 @@ func (t *Table) RowCount() int {
 	return len(t.rows)
 }
 
-// buildTableFromData uses reflection to build a table from structured data.
+// BuildFromData uses reflection to build a table from structured data.
 // Supports slices/arrays of structs. Returns nil for unsupported types.
-func buildTableFromData(data any) *Table {
+func BuildFromData(data any) *Table {
 	v := reflect.ValueOf(data)
 
 	// Dereference pointers
@@ -395,7 +282,7 @@ func buildTableFromData(data any) *Table {
 		return nil
 	}
 
-	tbl := NewTable(headers...)
+	tbl := New(headers...)
 
 	// Build rows from slice elements
 	for i := range v.Len() {
@@ -513,9 +400,9 @@ func formatString(s string) string {
 
 func formatBool(b bool) string {
 	if b {
-		return "true"
+		return LabelTrue
 	}
-	return "false"
+	return LabelFalse
 }
 
 func formatCollection(length int, label string) string {

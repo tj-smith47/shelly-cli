@@ -1427,3 +1427,536 @@ func TestFormatPowerCompact(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		componentType string
+		wantFormatter string // type name for verification
+	}{
+		{"switch", "switchStatusFormatter"},
+		{"light", "lightStatusFormatter"},
+		{"cover", "coverStatusFormatter"},
+		{"input", "inputStatusFormatter"},
+		{"pm1", "powerMeterStatusFormatter"},
+		{"pm", "powerMeterStatusFormatter"},
+		{"temperature", "sensorStatusFormatter"},
+		{"humidity", "sensorStatusFormatter"},
+		{"sys", "sysStatusFormatter"},
+		{"wifi", "networkStatusFormatter"},
+		{"cloud", "networkStatusFormatter"},
+		{"ws", "systemComponentStatusFormatter"},
+		{"unknown", "genericStatusFormatter"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.componentType, func(t *testing.T) {
+			t.Parallel()
+			formatter := GetStatusFormatter(tt.componentType)
+			if formatter == nil {
+				t.Errorf("GetStatusFormatter(%q) returned nil", tt.componentType)
+			}
+		})
+	}
+}
+
+func TestRegisterStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	// Create a custom formatter
+	customFormatter := &testStatusFormatter{output: "custom output"}
+
+	// Register it
+	RegisterStatusFormatter("custom", customFormatter)
+
+	// Verify it's returned
+	formatter := GetStatusFormatter("custom")
+	if formatter == nil {
+		t.Fatal("expected non-nil formatter")
+	}
+
+	result := formatter.Format("custom", map[string]any{"test": "value"})
+	if result != "custom output" {
+		t.Errorf("expected 'custom output', got %q", result)
+	}
+}
+
+// testStatusFormatter is a simple test formatter implementation.
+type testStatusFormatter struct {
+	output string
+}
+
+func (f *testStatusFormatter) Format(_ string, _ map[string]any) string {
+	return f.output
+}
+
+func TestSwitchStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		status   map[string]any
+		contains []string
+	}{
+		{
+			name:     "on with power",
+			status:   map[string]any{"output": true, "apower": 45.2, "voltage": 120.5},
+			contains: []string{"ON", "45.2W", "120.5V"},
+		},
+		{
+			name:     "off",
+			status:   map[string]any{"output": false},
+			contains: []string{"off"},
+		},
+		{
+			name:     "with current",
+			status:   map[string]any{"output": true, "current": 0.5},
+			contains: []string{"ON", "0.50A"},
+		},
+		{
+			name:     "with temperature",
+			status:   map[string]any{"output": true, "temperature": map[string]any{"tC": 42.5}},
+			contains: []string{"ON", "42.5°C"},
+		},
+	}
+
+	formatter := switchStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format("switch", tt.status)
+			for _, want := range tt.contains {
+				if !strings.Contains(result, want) {
+					t.Errorf("Format() = %q, want to contain %q", result, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLightStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		status   map[string]any
+		contains []string
+	}{
+		{
+			name:     "on with brightness",
+			status:   map[string]any{"output": true, "brightness": float64(80)},
+			contains: []string{"ON", "80%"},
+		},
+		{
+			name:     "off",
+			status:   map[string]any{"output": false},
+			contains: []string{"off"},
+		},
+		{
+			name:     "with RGB",
+			status:   map[string]any{"output": true, "rgb": []any{255, 128, 0}},
+			contains: []string{"ON", "RGB(255,128,0)"},
+		},
+	}
+
+	formatter := lightStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format("light", tt.status)
+			for _, want := range tt.contains {
+				if !strings.Contains(result, want) {
+					t.Errorf("Format() = %q, want to contain %q", result, want)
+				}
+			}
+		})
+	}
+}
+
+func TestCoverStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		status   map[string]any
+		contains []string
+	}{
+		{
+			name:     "open with position",
+			status:   map[string]any{"state": "open", "current_pos": float64(100)},
+			contains: []string{"open", "100%"},
+		},
+		{
+			name:     "closed",
+			status:   map[string]any{"state": "closed"},
+			contains: []string{"closed"},
+		},
+		{
+			name:     "opening with power",
+			status:   map[string]any{"state": "opening", "apower": 15.5},
+			contains: []string{"opening", "15.5W"},
+		},
+		{
+			name:     "closing",
+			status:   map[string]any{"state": "closing"},
+			contains: []string{"closing"},
+		},
+	}
+
+	formatter := coverStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format("cover", tt.status)
+			for _, want := range tt.contains {
+				if !strings.Contains(result, want) {
+					t.Errorf("Format() = %q, want to contain %q", result, want)
+				}
+			}
+		})
+	}
+}
+
+func TestInputStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		status   map[string]any
+		contains string
+	}{
+		{
+			name:     "triggered",
+			status:   map[string]any{"state": true},
+			contains: "triggered",
+		},
+		{
+			name:     "idle",
+			status:   map[string]any{"state": false},
+			contains: "idle",
+		},
+	}
+
+	formatter := inputStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format("input", tt.status)
+			if !strings.Contains(result, tt.contains) {
+				t.Errorf("Format() = %q, want to contain %q", result, tt.contains)
+			}
+		})
+	}
+}
+
+func TestPowerMeterStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		status   map[string]any
+		contains []string
+	}{
+		{
+			name:     "full power data",
+			status:   map[string]any{"apower": 1500.0, "voltage": 240.0, "current": 6.25, "freq": 50.0},
+			contains: []string{"1.5kW", "240.0V", "6.25A", "50.0Hz"},
+		},
+		{
+			name:     "power only",
+			status:   map[string]any{"apower": 45.2},
+			contains: []string{"45.2W"},
+		},
+	}
+
+	formatter := powerMeterStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format("pm1", tt.status)
+			for _, want := range tt.contains {
+				if !strings.Contains(result, want) {
+					t.Errorf("Format() = %q, want to contain %q", result, want)
+				}
+			}
+		})
+	}
+}
+
+func TestSensorStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		compType string
+		status   map[string]any
+		contains string
+	}{
+		{
+			name:     "temperature",
+			compType: "temperature",
+			status:   map[string]any{"tC": 25.5},
+			contains: "25.5°C",
+		},
+		{
+			name:     "humidity",
+			compType: "humidity",
+			status:   map[string]any{"rh": 65.0},
+			contains: "65.0%",
+		},
+		{
+			name:     "illuminance",
+			compType: "illuminance",
+			status:   map[string]any{"lux": 500.0},
+			contains: "500 lux",
+		},
+		{
+			name:     "devicepower with battery",
+			compType: "devicepower",
+			status:   map[string]any{"battery": map[string]any{"percent": 85.0}},
+			contains: "85%",
+		},
+		{
+			name:     "devicepower with external",
+			compType: "devicepower",
+			status:   map[string]any{"external": map[string]any{"present": true}},
+			contains: "external power",
+		},
+	}
+
+	formatter := sensorStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format(tt.compType, tt.status)
+			if !strings.Contains(result, tt.contains) {
+				t.Errorf("Format(%q) = %q, want to contain %q", tt.compType, result, tt.contains)
+			}
+		})
+	}
+}
+
+func TestSysStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		status   map[string]any
+		contains []string
+	}{
+		{
+			name:     "with update",
+			status:   map[string]any{"available_updates": map[string]any{"stable": map[string]any{"version": "1.5.0"}}},
+			contains: []string{"update:", "1.5.0"},
+		},
+		{
+			name:     "restart required",
+			status:   map[string]any{"restart_required": true},
+			contains: []string{"restart required"},
+		},
+		{
+			name:     "uptime",
+			status:   map[string]any{"uptime": 3600.0}, // 1 hour
+			contains: []string{"up 1h"},
+		},
+		{
+			name:   "empty shows ok",
+			status: map[string]any{},
+			// Empty status should fallback to generic
+		},
+	}
+
+	formatter := sysStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format("sys", tt.status)
+			for _, want := range tt.contains {
+				if !strings.Contains(result, want) {
+					t.Errorf("Format() = %q, want to contain %q", result, want)
+				}
+			}
+		})
+	}
+}
+
+func TestNetworkStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		compType string
+		status   map[string]any
+		contains string
+	}{
+		{
+			name:     "wifi with ssid and rssi",
+			compType: "wifi",
+			status:   map[string]any{"ssid": "MyNetwork", "rssi": float64(-55)},
+			contains: "MyNetwork (-55dBm)",
+		},
+		{
+			name:     "wifi with sta_ip only",
+			compType: "wifi",
+			status:   map[string]any{"sta_ip": "192.168.1.100"},
+			contains: "192.168.1.100",
+		},
+		{
+			name:     "cloud connected",
+			compType: "cloud",
+			status:   map[string]any{"connected": true},
+			contains: "connected",
+		},
+		{
+			name:     "cloud disconnected",
+			compType: "cloud",
+			status:   map[string]any{"connected": false},
+			contains: "disconnected",
+		},
+		{
+			name:     "mqtt connected",
+			compType: "mqtt",
+			status:   map[string]any{"connected": true},
+			contains: "connected",
+		},
+		{
+			name:     "ble enabled",
+			compType: "ble",
+			status:   map[string]any{"enabled": true},
+			contains: "enabled",
+		},
+		{
+			name:     "ble disabled",
+			compType: "ble",
+			status:   map[string]any{"enabled": false},
+			contains: "disabled",
+		},
+		{
+			name:     "eth with ip",
+			compType: "eth",
+			status:   map[string]any{"ip": "192.168.1.50"},
+			contains: "192.168.1.50",
+		},
+	}
+
+	formatter := networkStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format(tt.compType, tt.status)
+			if !strings.Contains(result, tt.contains) {
+				t.Errorf("Format(%q) = %q, want to contain %q", tt.compType, result, tt.contains)
+			}
+		})
+	}
+}
+
+func TestSystemComponentStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		compType string
+		status   map[string]any
+		contains string
+	}{
+		{
+			name:     "ws connected",
+			compType: "ws",
+			status:   map[string]any{"connected": true},
+			contains: "connected",
+		},
+		{
+			name:     "ws disconnected",
+			compType: "ws",
+			status:   map[string]any{"connected": false},
+			contains: "disconnected",
+		},
+		{
+			name:     "ui returns ok",
+			compType: "ui",
+			status:   map[string]any{},
+			contains: "ok",
+		},
+	}
+
+	formatter := systemComponentStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format(tt.compType, tt.status)
+			if !strings.Contains(result, tt.contains) {
+				t.Errorf("Format(%q) = %q, want to contain %q", tt.compType, result, tt.contains)
+			}
+		})
+	}
+}
+
+func TestGenericStatusFormatter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		status   map[string]any
+		contains []string
+	}{
+		{
+			name:     "empty status returns dash",
+			status:   map[string]any{},
+			contains: []string{"-"},
+		},
+		{
+			name:     "single field",
+			status:   map[string]any{"foo": "bar"},
+			contains: []string{"foo=bar"},
+		},
+		{
+			name:     "multiple fields",
+			status:   map[string]any{"a": "1", "b": float64(2)},
+			contains: []string{"="},
+		},
+	}
+
+	formatter := genericStatusFormatter{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatter.Format("unknown", tt.status)
+			for _, want := range tt.contains {
+				if !strings.Contains(result, want) {
+					t.Errorf("Format() = %q, want to contain %q", result, want)
+				}
+			}
+		})
+	}
+}
+
+func TestFormatSimpleValueInternal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{"bool true", true, "true"},
+		{"bool false", false, "false"},
+		{"integer float", float64(42), "42"},
+		{"decimal float", float64(3.14), "3.14"},
+		{"short string", "hello", "hello"},
+		{"long string gets truncated", "this is a very long string that should be truncated", "this is a very lo..."},
+		{"map returns ellipsis", map[string]any{"a": 1}, "..."},
+		{"slice returns ellipsis", []any{1, 2, 3}, "..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := formatSimpleValueInternal(tt.value)
+			if result != tt.want {
+				t.Errorf("formatSimpleValueInternal(%v) = %q, want %q", tt.value, result, tt.want)
+			}
+		})
+	}
+}

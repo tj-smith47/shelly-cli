@@ -115,6 +115,10 @@ const (
 	// Placeholder.
 	LabelPlaceholder = "-"
 
+	// Boolean values.
+	LabelTrue  = "true"
+	LabelFalse = "false"
+
 	// Cloud/Auth states.
 	LabelLoggedIn    = "Logged in"
 	LabelNotLoggedIn = "Not logged in"

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -20,10 +22,8 @@ func CheckExistingConfig() (exists bool, path string) {
 	}
 
 	path = filepath.Join(home, ".config", "shelly", "config.yaml")
-	if _, err := os.Stat(path); err == nil {
-		return true, path
-	}
-	return false, path
+	exists, _ = afero.Exists(config.Fs(), path)
+	return exists, path
 }
 
 // CheckAndConfirmConfig checks for existing config and confirms overwrite.
@@ -85,8 +85,8 @@ func CheckCompletionInstalled(shell string) bool {
 		return false
 	}
 
-	_, err = os.Stat(completionPath)
-	return err == nil
+	exists, _ := afero.Exists(config.Fs(), completionPath)
+	return exists
 }
 
 // ValidateConfig validates the configuration and returns any errors.

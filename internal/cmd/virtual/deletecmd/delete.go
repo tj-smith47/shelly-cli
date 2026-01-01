@@ -1,4 +1,4 @@
-// Package del provides the virtual delete command.
+// Package deletecmd provides the virtual delete command.
 package deletecmd
 
 import (

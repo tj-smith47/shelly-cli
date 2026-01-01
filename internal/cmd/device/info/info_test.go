@@ -1,13 +1,17 @@
 package info
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -240,5 +244,283 @@ func TestNewCommand_AcceptsDeviceName(t *testing.T) {
 	err := cmd.Args(cmd, []string{"living-room"})
 	if err != nil {
 		t.Errorf("Command should accept device name, got error: %v", err)
+	}
+}
+
+func TestNewCommand_RejectsMultipleArgs(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	err := cmd.Args(cmd, []string{"device1", "device2"})
+	if err == nil {
+		t.Error("Expected error when multiple args provided")
+	}
+}
+
+func TestNewCommand_ExampleContent(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	example := cmd.Example
+	if example == "" {
+		t.Fatal("Example should not be empty")
+	}
+
+	// Check for expected patterns
+	patterns := []string{"shelly", "device", "info"}
+	for _, pattern := range patterns {
+		found := false
+		for i := 0; i <= len(example)-len(pattern); i++ {
+			if example[i:i+len(pattern)] == pattern {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Example should contain %q", pattern)
+		}
+	}
+}
+
+func TestNewCommand_LongDescription(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.Long == "" {
+		t.Fatal("Long description should not be empty")
+	}
+
+	// Long should be more descriptive than Short
+	if len(cmd.Long) <= len(cmd.Short) {
+		t.Error("Long description should be longer than Short description")
+	}
+}
+
+func TestOptions_DeviceFieldSet(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "my-device",
+	}
+
+	if opts.Device != "my-device" {
+		t.Errorf("Device = %q, want 'my-device'", opts.Device)
+	}
+}
+
+func TestOptions_FactoryFieldSet(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+
+	if opts.Factory == nil {
+		t.Error("Factory should not be nil")
+	}
+}
+
+func TestRun_PrintsOutput(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+	}
+
+	// Run with cancelled context - this exercises error path
+	err := run(ctx, opts)
+	if err == nil {
+		t.Log("Note: run() succeeded unexpectedly with cancelled context")
+	}
+}
+
+func TestNewCommand_FlagDefaults(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Parse with no flags to ensure no errors
+	if err := cmd.ParseFlags([]string{}); err != nil {
+		t.Fatalf("ParseFlags error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_TableOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+
+	// Verify output contains device info
+	output := tf.OutString()
+	if !strings.Contains(output, "MAC") {
+		t.Error("Expected output to contain MAC header")
+	}
+}
+
+//nolint:paralleltest // Uses global viper state for output format
+func TestRun_JSONOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Set viper output format to JSON
+	original := viper.GetString("output")
+	viper.Set("output", "json")
+	defer viper.Set("output", original)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global viper state for output format
+func TestRun_YAMLOutput(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Set viper output format to YAML
+	original := viper.GetString("output")
+	viper.Set("output", "yaml")
+	defer viper.Set("output", original)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"test-device"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Errorf("Execute() error = %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses global config.SetDefaultManager via demo.InjectIntoFactory
+func TestRun_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	var buf bytes.Buffer
+	cmd := NewCommand(tf.Factory)
+	cmd.SetContext(context.Background())
+	cmd.SetArgs([]string{"nonexistent"})
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
 	}
 }

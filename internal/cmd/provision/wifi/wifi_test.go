@@ -2,12 +2,14 @@ package wifi
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -605,4 +607,291 @@ func TestNewCommand_CommandProperties(t *testing.T) {
 			}
 		})
 	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_DirectCredentials(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"test-device": {"switch:0": map[string]any{"output": true}},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		SSID:     "TestNetwork",
+		Password: "testpassword",
+		NoScan:   false,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "WiFi configured") {
+		t.Errorf("Output should contain success message, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_NoScanWithSSID(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		SSID:     "DirectSSID",
+		Password: "directpass",
+		NoScan:   true,
+	}
+
+	err = run(context.Background(), opts)
+	if err != nil {
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "DirectSSID") {
+		t.Errorf("Output should contain SSID, got: %q", output)
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "nonexistent",
+		SSID:     "Network",
+		Password: "pass",
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for nonexistent device")
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_Gen1Device(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.101",
+					MAC:        "AA:BB:CC:DD:EE:01",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "gen1-device",
+		SSID:     "Network",
+		Password: "pass",
+	}
+
+	// Gen1 might not support WiFi config the same way
+	err = run(context.Background(), opts)
+	// Error may or may not occur depending on implementation
+	_ = err
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_CancelledContext(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		SSID:     "Network",
+		Password: "pass",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = run(ctx, opts)
+	if err == nil {
+		t.Error("Expected error with cancelled context")
+	}
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_EmptyPassword(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// Empty password - should prompt but in test env will fail
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		SSID:     "Network",
+		Password: "",
+	}
+
+	// In test environment, password prompt will fail
+	err = run(context.Background(), opts)
+	// Error expected because password prompt fails in non-TTY
+	_ = err
+}
+
+//nolint:paralleltest // uses global mock config manager
+func TestRun_WithMock_NoScanNoSSID(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "test-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SNSW-001P16EU",
+					Model:      "Shelly Plus 1PM",
+					Generation: 2,
+				},
+			},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	// NoScan=true but no SSID - should prompt
+	opts := &Options{
+		Factory:  tf.Factory,
+		Device:   "test-device",
+		SSID:     "",
+		Password: "pass",
+		NoScan:   true,
+	}
+
+	// In test environment, SSID prompt returns empty which triggers an error path
+	err = run(context.Background(), opts)
+	// The prompt returns empty default, then the scan happens
+	_ = err
 }

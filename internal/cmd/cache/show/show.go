@@ -5,13 +5,14 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
 // Options holds the command options.
@@ -39,13 +40,14 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 
 func run(_ context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
+	fs := config.Fs()
 
 	cacheDir, err := config.CacheDir()
 	if err != nil {
 		return err
 	}
 
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+	if _, err := fs.Stat(cacheDir); os.IsNotExist(err) {
 		ios.Info("Cache directory does not exist")
 		return nil
 	}
@@ -53,7 +55,7 @@ func run(_ context.Context, opts *Options) error {
 	var totalSize int64
 	var fileCount int
 
-	err = filepath.Walk(cacheDir, func(_ string, info os.FileInfo, err error) error {
+	err = afero.Walk(fs, cacheDir, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -75,11 +77,12 @@ func run(_ context.Context, opts *Options) error {
 		})
 	}
 
-	table := output.NewTable("Property", "Value")
-	table.AddRow("Location", cacheDir)
-	table.AddRow("Files", fmt.Sprintf("%d", fileCount))
-	table.AddRow("Size", output.FormatSize(totalSize))
+	builder := table.NewBuilder("Property", "Value")
+	builder.AddRow("Location", cacheDir)
+	builder.AddRow("Files", fmt.Sprintf("%d", fileCount))
+	builder.AddRow("Size", output.FormatSize(totalSize))
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}

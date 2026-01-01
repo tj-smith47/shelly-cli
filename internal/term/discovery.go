@@ -10,18 +10,22 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // DisplayDiscoveredDevices prints a table of discovered devices.
 // Handles empty case with ios.NoResults and prints count at the end.
 func DisplayDiscoveredDevices(ios *iostreams.IOStreams, devices []discovery.DiscoveredDevice) {
-	table := output.FormatDiscoveredDevices(devices)
-	if table == nil {
+	builder := output.FormatDiscoveredDevices(devices)
+	if builder == nil {
 		ios.NoResults("devices")
 		return
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print discovered devices table", err)
+	}
 	ios.Println("")
 	ios.Count("device", len(devices))
 }
@@ -32,7 +36,7 @@ func DisplayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscover
 		return
 	}
 
-	table := output.NewTable("Name", "Address", "Model", "RSSI", "Connectable", "BTHome")
+	builder := table.NewBuilder("Name", "Address", "Model", "RSSI", "Connectable", "BTHome")
 
 	for _, d := range devices {
 		name := d.LocalName
@@ -60,7 +64,7 @@ func DisplayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscover
 			btHomeStr = theme.StatusInfo().Render("Yes")
 		}
 
-		table.AddRow(
+		builder.AddRow(
 			name,
 			d.Address.String(),
 			d.Model,
@@ -70,7 +74,10 @@ func DisplayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscover
 		)
 	}
 
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print BLE devices table", err)
+	}
 	ios.Println("")
 	ios.Count("BLE device", len(devices))
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -121,7 +122,7 @@ func buildFirmwareCheckRow(r shelly.FirmwareCheckResult) firmwareCheckRow {
 
 // DisplayFirmwareCheckAll displays the results of checking firmware on all devices.
 func DisplayFirmwareCheckAll(ios *iostreams.IOStreams, results []shelly.FirmwareCheckResult) {
-	table := output.NewTable("Device", "Platform", "Current", "Stable", "Beta", "Status")
+	builder := table.NewBuilder("Device", "Platform", "Current", "Stable", "Beta", "Status")
 	updatesAvailable := 0
 
 	for _, r := range results {
@@ -129,11 +130,12 @@ func DisplayFirmwareCheckAll(ios *iostreams.IOStreams, results []shelly.Firmware
 		if row.hasUpdate {
 			updatesAvailable++
 		}
-		table.AddRow(row.name, row.platform, row.current, row.stable, row.beta, row.status)
+		builder.AddRow(row.name, row.platform, row.current, row.stable, row.beta, row.status)
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
+		ios.DebugErr("print firmware check table", err)
 	}
 
 	ios.Println("")
@@ -218,12 +220,13 @@ func DisplayUpdateResults(ios *iostreams.IOStreams, results []UpdateResult) {
 func DisplayDevicesToUpdate(ios *iostreams.IOStreams, devices []shelly.DeviceUpdateStatus) {
 	ios.Println("")
 	ios.Printf("%s\n", theme.Bold().Render("Devices to update:"))
-	table := output.NewTable("Device", "Current", "Available")
+	builder := table.NewBuilder("Device", "Current", "Available")
 	for _, s := range devices {
-		table.AddRow(s.Name, s.Info.Current, s.Info.Available)
+		builder.AddRow(s.Name, s.Info.Current, s.Info.Available)
 	}
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
+		ios.DebugErr("print devices to update table", err)
 	}
 	ios.Println("")
 }
@@ -280,7 +283,7 @@ func DisplayFirmwareUpdatesTable(ios *iostreams.IOStreams, devices []FirmwareUpd
 	ios.Println("")
 	ios.Printf("%s\n\n", theme.Bold().Render("Devices with available updates:"))
 
-	table := output.NewTable("#", "Device", "Platform", "Current", "Stable", "Beta")
+	builder := table.NewBuilder("#", "Device", "Platform", "Current", "Stable", "Beta")
 	for i, d := range devices {
 		platform := d.FwInfo.Platform
 		if platform == "" {
@@ -297,7 +300,7 @@ func DisplayFirmwareUpdatesTable(ios *iostreams.IOStreams, devices []FirmwareUpd
 			beta = output.LabelPlaceholder
 		}
 
-		table.AddRow(
+		builder.AddRow(
 			fmt.Sprintf("%d", i+1),
 			d.Name,
 			platform,
@@ -307,8 +310,9 @@ func DisplayFirmwareUpdatesTable(ios *iostreams.IOStreams, devices []FirmwareUpd
 		)
 	}
 
+	table := builder.WithModeStyle(ios).Build()
 	if err := table.PrintTo(ios.Out); err != nil {
-		ios.DebugErr("print table", err)
+		ios.DebugErr("print firmware updates table", err)
 	}
 	ios.Println("")
 }

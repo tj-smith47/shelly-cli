@@ -2,9 +2,12 @@ package activate
 
 import (
 	"bytes"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -274,6 +277,345 @@ func TestNewCommand_Help(t *testing.T) {
 	}
 }
 
-// Note: TestRun_EmptyScene and TestRun_DryRun are skipped because config.GetScene
-// uses global config state and the test manager doesn't propagate to those functions.
-// The run function logic is covered by TestNewCommand_RunE_SceneNotFound.
+//nolint:paralleltest // Test modifies global config state
+func TestRun_SceneNotFound(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	m := config.NewTestManager(&config.Config{})
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Name:    "nonexistent",
+	}
+
+	err := run(t.Context(), opts)
+
+	if err == nil {
+		t.Error("expected error for nonexistent scene")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %v, want to contain 'not found'", err)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestRun_EmptyScene(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"empty-scene": {
+				Name:    "empty-scene",
+				Actions: []config.SceneAction{},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Name:    "empty-scene",
+	}
+
+	err := run(t.Context(), opts)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Should output a warning (could be in stdout or stderr)
+	allOutput := tf.OutString() + tf.ErrString()
+	if !strings.Contains(allOutput, "no actions") {
+		t.Errorf("output = %q, want to contain 'no actions'", allOutput)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestRun_DryRun(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"test-scene": {
+				Name:        "test-scene",
+				Description: "Test scene",
+				Actions: []config.SceneAction{
+					{Device: "device1", Method: "Switch.Set", Params: map[string]any{"id": 0, "on": true}},
+					{Device: "device2", Method: "Switch.Toggle", Params: nil},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Name:    "test-scene",
+		DryRun:  true,
+	}
+
+	err := run(t.Context(), opts)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check dry run output
+	out := tf.OutString()
+	if !strings.Contains(out, "Dry run") {
+		t.Errorf("output = %q, want to contain 'Dry run'", out)
+	}
+	if !strings.Contains(out, "device1") {
+		t.Errorf("output = %q, want to contain 'device1'", out)
+	}
+	if !strings.Contains(out, "device2") {
+		t.Errorf("output = %q, want to contain 'device2'", out)
+	}
+	if !strings.Contains(out, "Switch.Set") {
+		t.Errorf("output = %q, want to contain 'Switch.Set'", out)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestRun_DryRunWithParams(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"param-scene": {
+				Name: "param-scene",
+				Actions: []config.SceneAction{
+					{Device: "light", Method: "Light.Set", Params: map[string]any{"brightness": 50}},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Name:    "param-scene",
+		DryRun:  true,
+	}
+
+	err := run(t.Context(), opts)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	out := tf.OutString()
+	if !strings.Contains(out, "light") {
+		t.Errorf("output = %q, want to contain 'light'", out)
+	}
+	if !strings.Contains(out, "Light.Set") {
+		t.Errorf("output = %q, want to contain 'Light.Set'", out)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestRun_DryRunNoParams(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"no-param-scene": {
+				Name: "no-param-scene",
+				Actions: []config.SceneAction{
+					{Device: "switch", Method: "Switch.Toggle", Params: nil},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Name:    "no-param-scene",
+		DryRun:  true,
+	}
+
+	err := run(t.Context(), opts)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	out := tf.OutString()
+	if !strings.Contains(out, "switch") {
+		t.Errorf("output = %q, want to contain 'switch'", out)
+	}
+	if !strings.Contains(out, "Switch.Toggle") {
+		t.Errorf("output = %q, want to contain 'Switch.Toggle'", out)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestRun_ExecuteActionsWithErrors(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"exec-scene": {
+				Name: "exec-scene",
+				Actions: []config.SceneAction{
+					{Device: "nonexistent-device-1", Method: "Switch.Set", Params: map[string]any{"id": 0, "on": true}},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory:    tf.Factory,
+		Name:       "exec-scene",
+		DryRun:     false,
+		Timeout:    1 * time.Second,
+		Concurrent: 5,
+	}
+
+	// This will fail because no real device exists
+	err := run(t.Context(), opts)
+
+	// Expect an error since the action failed
+	if err == nil {
+		t.Error("expected error for failed action")
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestRun_ExecuteMultipleActionsWithErrors(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"multi-exec-scene": {
+				Name: "multi-exec-scene",
+				Actions: []config.SceneAction{
+					{Device: "nonexistent-1", Method: "Switch.On", Params: nil},
+					{Device: "nonexistent-2", Method: "Switch.Off", Params: nil},
+					{Device: "nonexistent-3", Method: "Switch.Toggle", Params: map[string]any{"id": 0}},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory:    tf.Factory,
+		Name:       "multi-exec-scene",
+		DryRun:     false,
+		Timeout:    1 * time.Second,
+		Concurrent: 2, // Test with lower concurrency
+	}
+
+	// This will fail because no real device exists
+	err := run(t.Context(), opts)
+
+	// Expect an error since actions failed
+	if err == nil {
+		t.Error("expected error for failed actions")
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestRun_ExecuteWithConcurrencyCap(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"cap-scene": {
+				Name: "cap-scene",
+				Actions: []config.SceneAction{
+					{Device: "dev1", Method: "Method1"},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory:    tf.Factory,
+		Name:       "cap-scene",
+		DryRun:     false,
+		Timeout:    1 * time.Second,
+		Concurrent: 100, // High concurrency that should be capped
+	}
+
+	// This will fail but exercises the concurrency capping
+	// Error is expected, we just want to verify code path runs
+	if err := run(t.Context(), opts); err == nil {
+		t.Log("Note: expected error for unreachable device")
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestNewCommand_ExecuteWithContext(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"context-scene": {
+				Name: "context-scene",
+				Actions: []config.SceneAction{
+					{Device: "dev", Method: "Switch.Toggle"},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"context-scene", "--dry-run"})
+
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}

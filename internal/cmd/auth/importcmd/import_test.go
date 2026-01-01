@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -453,10 +456,9 @@ func TestRun_ImportWithTestFactory(t *testing.T) {
 	setupTest(t)
 	tf := factory.NewTestFactory(t)
 
-	tmpDir := t.TempDir()
-	credFile := filepath.Join(tmpDir, "credentials.json")
+	credFile := "/tmp/credentials.json"
 
-	// Create a valid credentials file
+	// Create a valid credentials file in the test filesystem
 	export := map[string]any{
 		"exported_at": "2024-01-15T10:30:00Z",
 		"version":     "1.0.0",
@@ -471,7 +473,7 @@ func TestRun_ImportWithTestFactory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal JSON: %v", err)
 	}
-	if err := os.WriteFile(credFile, data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), credFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 

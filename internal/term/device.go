@@ -8,6 +8,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -20,15 +21,18 @@ func DisplayDeviceStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) 
 	ios.Info("Firmware: %s", status.Info.Firmware)
 	ios.Println()
 
-	table := output.NewTable("Component", "Status")
+	builder := table.NewBuilder("Component", "Status")
 	for key, value := range status.Status {
 		if m, ok := value.(map[string]any); ok {
-			table.AddRow(key, output.FormatComponentStatus(key, m))
+			builder.AddRow(key, output.FormatComponentStatus(key, m))
 		} else {
-			table.AddRow(key, output.FormatDisplayValue(value))
+			builder.AddRow(key, output.FormatDisplayValue(value))
 		}
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print device status table", err)
+	}
 }
 
 // DisplayAllSnapshots displays a summary of all device snapshots.
@@ -119,7 +123,7 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 	if len(status.Components) > 0 {
 		ios.Printf("%s\n", theme.Bold().Render("Components"))
 
-		table := output.NewTable("Component", "Status")
+		builder := table.NewBuilder("Component", "Status")
 
 		// Sort component keys for consistent output
 		keys := make([]string, 0, len(status.Components))
@@ -131,12 +135,15 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 		for _, key := range keys {
 			value := status.Components[key]
 			if m, ok := value.(map[string]any); ok {
-				table.AddRow(key, output.FormatComponentStatus(key, m))
+				builder.AddRow(key, output.FormatComponentStatus(key, m))
 			} else {
-				table.AddRow(key, output.FormatDisplayValue(value))
+				builder.AddRow(key, output.FormatDisplayValue(value))
 			}
 		}
-		printTable(ios, table)
+		table := builder.WithModeStyle(ios).Build()
+		if err := table.PrintTo(ios.Out); err != nil {
+			ios.DebugErr("print plugin components table", err)
+		}
 		ios.Println()
 	}
 
@@ -144,7 +151,7 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 	if len(status.Sensors) > 0 {
 		ios.Printf("%s\n", theme.Bold().Render("Sensors"))
 
-		table := output.NewTable("Sensor", "Value")
+		builder := table.NewBuilder("Sensor", "Value")
 
 		// Sort sensor keys for consistent output
 		keys := make([]string, 0, len(status.Sensors))
@@ -156,12 +163,15 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 		for _, key := range keys {
 			value := status.Sensors[key]
 			if m, ok := value.(map[string]any); ok {
-				table.AddRow(key, output.FormatComponentStatus(key, m))
+				builder.AddRow(key, output.FormatComponentStatus(key, m))
 			} else {
-				table.AddRow(key, output.FormatDisplayValue(value))
+				builder.AddRow(key, output.FormatDisplayValue(value))
 			}
 		}
-		printTable(ios, table)
+		table := builder.WithModeStyle(ios).Build()
+		if err := table.PrintTo(ios.Out); err != nil {
+			ios.DebugErr("print plugin sensors table", err)
+		}
 		ios.Println()
 	}
 

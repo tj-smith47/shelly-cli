@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
@@ -51,7 +52,7 @@ Imports credentials that were previously exported with auth export.`,
 func run(_ context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
-	data, err := os.ReadFile(opts.Input)
+	data, err := afero.ReadFile(config.Fs(), opts.Input)
 	if err != nil {
 		return fmt.Errorf("read file: %w", err)
 	}

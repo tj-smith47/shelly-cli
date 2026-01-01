@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
+	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
@@ -68,17 +69,17 @@ func (s *Service) loadConfigFromDevice(ctx context.Context, device string) (cfg 
 
 // LoadConfigFromFile reads and parses a JSON configuration file.
 func LoadConfigFromFile(filePath string) (cfg map[string]any, name string, err error) {
-	data, err := os.ReadFile(filePath) //nolint:gosec // User-provided file path is intentional
+	data, err := afero.ReadFile(config.Fs(), filePath)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	var config map[string]any
-	if err := json.Unmarshal(data, &config); err != nil {
+	var deviceConfig map[string]any
+	if err := json.Unmarshal(data, &deviceConfig); err != nil {
 		return nil, "", fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	return config, filePath, nil
+	return deviceConfig, filePath, nil
 }
 
 // IsConfigFile checks if the given path is a configuration file.
@@ -87,7 +88,7 @@ func IsConfigFile(path string) bool {
 	if strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
 		return true
 	}
-	if _, err := os.Stat(path); err == nil {
+	if _, err := config.Fs().Stat(path); err == nil {
 		return true
 	}
 	return false

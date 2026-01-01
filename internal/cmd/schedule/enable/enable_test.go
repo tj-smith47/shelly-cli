@@ -113,6 +113,17 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 	if cmd.ValidArgsFunction == nil {
 		t.Error("ValidArgsFunction should be set for completion")
 	}
+
+	// Execute the ValidArgsFunction to cover completion paths
+	suggestions, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	// We don't care about the actual values, just that it runs
+	_ = suggestions
+	_ = directive
+
+	// Test with one arg (device name provided, should complete schedule IDs)
+	suggestions, directive = cmd.ValidArgsFunction(cmd, []string{"device"}, "")
+	_ = suggestions
+	_ = directive
 }
 
 func TestNewCommand_InvalidScheduleID(t *testing.T) {
@@ -154,7 +165,7 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-func TestRun_WithMock(t *testing.T) {
+func TestRun_Success(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -170,7 +181,15 @@ func TestRun_WithMock(t *testing.T) {
 			},
 		},
 		DeviceStates: map[string]mock.DeviceState{
-			"test-device": {"switch:0": map[string]any{"output": true}},
+			"test-device": {
+				"switch:0": map[string]any{"output": true},
+				"schedule:1": map[string]any{
+					"id":       1,
+					"enable":   false,
+					"timespec": "0 0 8 * *",
+					"calls":    []any{},
+				},
+			},
 		},
 	}
 
@@ -190,9 +209,13 @@ func TestRun_WithMock(t *testing.T) {
 	}
 
 	err = run(context.Background(), opts)
-	// May fail due to mock limitations
 	if err != nil {
-		t.Logf("run() error = %v (expected for mock)", err)
+		t.Errorf("run() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "Schedule 1 enabled") {
+		t.Errorf("expected 'Schedule 1 enabled' in output, got: %s", output)
 	}
 }
 

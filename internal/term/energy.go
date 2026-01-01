@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -159,31 +160,31 @@ func DisplayEMStatus(ios *iostreams.IOStreams, status *model.EMStatus) {
 	// Human-readable format with bordered table
 	ios.Printf("Energy Monitor (EM) #%d\n\n", status.ID)
 
-	t := output.NewTable("Metric", "Phase A", "Phase B", "Phase C", "Total")
+	builder := table.NewBuilder("Metric", "Phase A", "Phase B", "Phase C", "Total")
 
 	// Voltage row
-	t.AddRow("Voltage",
+	builder.AddRow("Voltage",
 		fmt.Sprintf("%.2f V", status.AVoltage),
 		fmt.Sprintf("%.2f V", status.BVoltage),
 		fmt.Sprintf("%.2f V", status.CVoltage),
 		"-")
 
 	// Current row
-	t.AddRow("Current",
+	builder.AddRow("Current",
 		fmt.Sprintf("%.2f A", status.ACurrent),
 		fmt.Sprintf("%.2f A", status.BCurrent),
 		fmt.Sprintf("%.2f A", status.CCurrent),
 		fmt.Sprintf("%.2f A", status.TotalCurrent))
 
 	// Active Power row
-	t.AddRow("Active Power",
+	builder.AddRow("Active Power",
 		fmt.Sprintf("%.2f W", status.AActivePower),
 		fmt.Sprintf("%.2f W", status.BActivePower),
 		fmt.Sprintf("%.2f W", status.CActivePower),
 		fmt.Sprintf("%.2f W", status.TotalActivePower))
 
 	// Apparent Power row
-	t.AddRow("Apparent Power",
+	builder.AddRow("Apparent Power",
 		fmt.Sprintf("%.2f VA", status.AApparentPower),
 		fmt.Sprintf("%.2f VA", status.BApparentPower),
 		fmt.Sprintf("%.2f VA", status.CApparentPower),
@@ -200,7 +201,7 @@ func DisplayEMStatus(ios *iostreams.IOStreams, status *model.EMStatus) {
 	if status.CPowerFactor != nil {
 		cPF = fmt.Sprintf("%.3f", *status.CPowerFactor)
 	}
-	t.AddRow("Power Factor", aPF, bPF, cPF, "-")
+	builder.AddRow("Power Factor", aPF, bPF, cPF, "-")
 
 	// Frequency row (optional)
 	aFreq, bFreq, cFreq := "-", "-", "-"
@@ -213,9 +214,12 @@ func DisplayEMStatus(ios *iostreams.IOStreams, status *model.EMStatus) {
 	if status.CFreq != nil {
 		cFreq = fmt.Sprintf("%.2f Hz", *status.CFreq)
 	}
-	t.AddRow("Frequency", aFreq, bFreq, cFreq, "-")
+	builder.AddRow("Frequency", aFreq, bFreq, cFreq, "-")
 
-	printTable(ios, t)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print EM status table", err)
+	}
 
 	if status.NCurrent != nil {
 		ios.Printf("\nNeutral Current: %.2f A\n", *status.NCurrent)
@@ -238,19 +242,22 @@ func DisplayEM1Status(ios *iostreams.IOStreams, status *model.EM1Status) {
 	// Human-readable format with bordered table
 	ios.Printf("Energy Monitor (EM1) #%d\n\n", status.ID)
 
-	t := output.NewTable("Metric", "Value")
-	t.AddRow("Voltage", fmt.Sprintf("%.2f V", status.Voltage))
-	t.AddRow("Current", fmt.Sprintf("%.2f A", status.Current))
-	t.AddRow("Active Power", fmt.Sprintf("%.2f W", status.ActPower))
-	t.AddRow("Apparent Power", fmt.Sprintf("%.2f VA", status.AprtPower))
+	builder := table.NewBuilder("Metric", "Value")
+	builder.AddRow("Voltage", fmt.Sprintf("%.2f V", status.Voltage))
+	builder.AddRow("Current", fmt.Sprintf("%.2f A", status.Current))
+	builder.AddRow("Active Power", fmt.Sprintf("%.2f W", status.ActPower))
+	builder.AddRow("Apparent Power", fmt.Sprintf("%.2f VA", status.AprtPower))
 	if status.PF != nil {
-		t.AddRow("Power Factor", fmt.Sprintf("%.3f", *status.PF))
+		builder.AddRow("Power Factor", fmt.Sprintf("%.3f", *status.PF))
 	}
 	if status.Freq != nil {
-		t.AddRow("Frequency", fmt.Sprintf("%.2f Hz", *status.Freq))
+		builder.AddRow("Frequency", fmt.Sprintf("%.2f Hz", *status.Freq))
 	}
 
-	printTable(ios, t)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print EM1 status table", err)
+	}
 
 	if len(status.Errors) > 0 {
 		ios.Printf("\nErrors: %v\n", status.Errors)

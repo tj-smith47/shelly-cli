@@ -4,9 +4,11 @@ package export
 import (
 	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Options holds the command options.
@@ -48,7 +50,8 @@ func run(opts *Options) error {
 		return err
 	}
 
-	data, err := os.ReadFile(logPath) //nolint:gosec // Log file path is from config dir
+	fs := config.Fs()
+	data, err := afero.ReadFile(fs, logPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			ios.Info("No log file found")
@@ -62,7 +65,7 @@ func run(opts *Options) error {
 		return nil
 	}
 
-	if err := os.WriteFile(opts.Output, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, opts.Output, data, 0o600); err != nil {
 		return err
 	}
 

@@ -4,11 +4,12 @@ package diff
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
@@ -53,7 +54,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Read backup file (user-provided path from CLI argument)
-	data, err := os.ReadFile(opts.FilePath)
+	data, err := afero.ReadFile(config.Fs(), opts.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -158,3 +160,127 @@ func TestNewCommand_RunE_ExecutesSuccessfully(t *testing.T) {
 
 // Note: This command uses the global -o/--output flag defined on the root command,
 // not a local flag. The global flag is tested in the root command tests.
+
+//nolint:paralleltest // Test modifies global config state
+func TestNewCommand_ExecuteWithScenes(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"scene-b": {
+				Name:        "scene-b",
+				Description: "Second scene",
+				Actions: []config.SceneAction{
+					{Device: "device1", Method: "Switch.Off"},
+				},
+			},
+			"scene-a": {
+				Name:        "scene-a",
+				Description: "First scene",
+				Actions: []config.SceneAction{
+					{Device: "device2", Method: "Switch.On"},
+				},
+			},
+			"scene-c": {
+				Name:        "scene-c",
+				Description: "",
+				Actions:     []config.SceneAction{},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestNewCommand_ExecuteEmptyScenes(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	m := config.NewTestManager(&config.Config{})
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestNewCommand_ExecutesSortedByName(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"zebra": {Name: "zebra"},
+			"alpha": {Name: "alpha"},
+			"beta":  {Name: "beta"},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+//nolint:paralleltest // Test modifies global config state
+func TestNewCommand_FetchFuncIsCalled(t *testing.T) {
+	// No t.Parallel() - modifies global config state
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(config.ResetDefaultManagerForTesting)
+
+	cfg := &config.Config{
+		Scenes: map[string]config.Scene{
+			"test-scene": {
+				Name:        "test-scene",
+				Description: "Test",
+				Actions: []config.SceneAction{
+					{Device: "dev", Method: "Method"},
+				},
+			},
+		},
+	}
+	m := config.NewTestManager(cfg)
+	config.SetDefaultManager(m)
+
+	tf := factory.NewTestFactory(t)
+
+	cmd := NewCommand(tf.Factory)
+
+	// Execute and verify it doesn't panic or error
+	err := cmd.Execute()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}

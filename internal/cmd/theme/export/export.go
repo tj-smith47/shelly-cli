@@ -3,12 +3,13 @@ package export
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -87,7 +88,7 @@ func run(opts *Options) error {
 	if opts.File == "" {
 		ios.Printf("%s", string(data))
 	} else {
-		if err := os.WriteFile(opts.File, data, 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), opts.File, data, 0o600); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
 		ios.Success("Theme exported to %s", opts.File)

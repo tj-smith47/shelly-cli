@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -172,10 +173,11 @@ func TestRun_WithCacheDir(t *testing.T) {
 func TestOutputTable(t *testing.T) {
 	t.Parallel()
 
-	table := output.NewTable("Property", "Value")
-	table.AddRow("Location", "/tmp/cache")
-	table.AddRow("Files", "5")
-	table.AddRow("Size", "1.2 KB")
+	builder := table.NewBuilder("Property", "Value")
+	builder.AddRow("Location", "/tmp/cache")
+	builder.AddRow("Files", "5")
+	builder.AddRow("Size", "1.2 KB")
+	table := builder.Build()
 
 	var buf bytes.Buffer
 	err := table.PrintTo(&buf)

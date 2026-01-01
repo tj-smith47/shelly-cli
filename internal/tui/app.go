@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/branding"
 	"github.com/tj-smith47/shelly-cli/internal/browser"
@@ -175,7 +176,16 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Apply TUI-specific theme if configured
 	if cfg != nil {
 		if tc := cfg.GetTUIThemeConfig(); tc != nil {
-			if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic, tc.File); err != nil {
+			if tc.File != "" {
+				// Load theme from external file
+				expanded := theme.ExpandPath(tc.File)
+				data, err := afero.ReadFile(config.Fs(), expanded)
+				if err != nil {
+					f.IOStreams().DebugErr("read tui theme file", err)
+				} else if err := theme.ApplyThemeFromData(data, tc.Semantic); err != nil {
+					f.IOStreams().DebugErr("tui theme", err)
+				}
+			} else if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic); err != nil {
 				f.IOStreams().DebugErr("tui theme", err)
 			}
 		}

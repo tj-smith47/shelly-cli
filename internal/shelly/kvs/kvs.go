@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 // Item represents a key-value pair with optional etag.
@@ -189,8 +190,7 @@ func ParseValue(valueStr string) any {
 
 // ParseImportFile reads and parses a KVS import file (JSON or YAML).
 func ParseImportFile(file string) (*Export, error) {
-	//nolint:gosec // G304: file path is from user command line argument
-	content, err := os.ReadFile(file)
+	content, err := afero.ReadFile(config.Fs(), file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}

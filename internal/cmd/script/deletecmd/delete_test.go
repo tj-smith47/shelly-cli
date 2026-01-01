@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -168,5 +169,103 @@ func TestNewCommand_InvalidScriptID(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid script ID") {
 		t.Errorf("expected 'invalid script ID' error, got: %v", err)
+	}
+}
+
+//nolint:paralleltest // Uses mock infrastructure with global state
+func TestNewCommand_Execute(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "delete-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Model:      "SNSW-001P16EU",
+					Type:       "Plus1PM",
+					Generation: 2,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"delete-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("failed to start demo: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"delete-device", "1", "--yes"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := tf.OutString()
+	if !strings.Contains(output, "deleted") {
+		t.Errorf("output should contain 'deleted', got: %q", output)
+	}
+}
+
+//nolint:paralleltest // Uses mock infrastructure with global state
+func TestNewCommand_DeviceNotFound(t *testing.T) {
+	fixtures := &mock.Fixtures{
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{}, // No devices
+		},
+		DeviceStates: map[string]mock.DeviceState{},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("failed to start demo: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	cmd := NewCommand(tf.Factory)
+	cmd.SetArgs([]string{"nonexistent-device", "1", "--yes"})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for nonexistent device")
+	}
+}
+
+func TestNewCommand_HasRunE(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+	if cmd.RunE == nil {
+		t.Error("RunE is nil")
+	}
+}
+
+func TestNewCommand_LongDescription(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	if cmd.Long == "" {
+		t.Fatal("Long description is empty")
+	}
+
+	if len(cmd.Long) < 30 {
+		t.Error("Long description seems too short")
+	}
+
+	// Should mention permanent removal
+	if !strings.Contains(cmd.Long, "permanently") {
+		t.Error("Long description should mention permanent removal")
 	}
 }

@@ -3,12 +3,13 @@ package importcmd
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -52,7 +53,7 @@ func run(opts *Options) error {
 	ios := opts.Factory.IOStreams()
 
 	// Read the file
-	data, err := os.ReadFile(opts.File)
+	data, err := afero.ReadFile(config.Fs(), opts.File)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}

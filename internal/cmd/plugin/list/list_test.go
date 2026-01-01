@@ -274,7 +274,7 @@ func TestRun_FlagVariations(t *testing.T) {
 			ios := iostreams.Test(bytes.NewReader(nil), stdout, stderr)
 			f := cmdutil.NewFactory().SetIOStreams(ios)
 
-				// Just verify it doesn't panic - error result is not important for this test
+			// Just verify it doesn't panic - error result is not important for this test
 			opts := &Options{Factory: f, All: tt.all}
 			_ = run(opts) //nolint:errcheck // intentionally ignored for panic check
 		})

@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
+	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -31,15 +32,18 @@ func DisplayWiFiAPClients(ios *iostreams.IOStreams, clients []shelly.WiFiAPClien
 	ios.Title("Connected Clients")
 	ios.Println()
 
-	table := output.NewTable("MAC Address", "IP Address")
+	builder := table.NewBuilder("MAC Address", "IP Address")
 	for _, c := range clients {
 		ip := c.IP
 		if ip == "" {
 			ip = "<no IP>"
 		}
-		table.AddRow(c.MAC, ip)
+		builder.AddRow(c.MAC, ip)
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 
 	ios.Printf("\n%d client(s) connected\n", len(clients))
 }
@@ -49,16 +53,19 @@ func DisplayWiFiScanResults(ios *iostreams.IOStreams, results []shelly.WiFiScanR
 	ios.Title("Available WiFi Networks")
 	ios.Println()
 
-	table := output.NewTable("SSID", "Signal", "Channel", "Security")
+	builder := table.NewBuilder("SSID", "Signal", "Channel", "Security")
 	for _, r := range results {
 		ssid := r.SSID
 		if ssid == "" {
 			ssid = "<hidden>"
 		}
 		signal := formatWiFiSignal(r.RSSI)
-		table.AddRow(ssid, signal, fmt.Sprintf("%d", r.Channel), r.Auth)
+		builder.AddRow(ssid, signal, fmt.Sprintf("%d", r.Channel), r.Auth)
 	}
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print table", err)
+	}
 
 	ios.Printf("\n%d network(s) found\n", len(results))
 }
@@ -178,7 +185,7 @@ func DisplayCloudDevices(ios *iostreams.IOStreams, devices []network.CloudDevice
 		return devices[i].ID < devices[j].ID
 	})
 
-	table := output.NewTable("ID", "Model", "Gen", "Online")
+	builder := table.NewBuilder("ID", "Model", "Gen", "Online")
 
 	for _, d := range devices {
 		devModel := d.Model
@@ -191,11 +198,14 @@ func DisplayCloudDevices(ios *iostreams.IOStreams, devices []network.CloudDevice
 			gen = fmt.Sprintf("%d", d.Generation)
 		}
 
-		table.AddRow(d.ID, devModel, gen, output.RenderYesNo(d.Online, output.CaseLower, theme.FalseError))
+		builder.AddRow(d.ID, devModel, gen, output.RenderYesNo(d.Online, output.CaseLower, theme.FalseError))
 	}
 
 	ios.Printf("Found %d device(s):\n\n", len(devices))
-	printTable(ios, table)
+	table := builder.WithModeStyle(ios).Build()
+	if err := table.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print cloud devices table", err)
+	}
 }
 
 // TokenStatusInfo holds display info for cloud token status.
