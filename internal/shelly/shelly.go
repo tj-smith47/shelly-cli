@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/device"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/modbus"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/provision"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/wireless"
@@ -29,20 +30,21 @@ const DefaultTimeout = 10 * time.Second
 
 // Service provides high-level operations on Shelly devices.
 type Service struct {
-	resolver         DeviceResolver
-	connManager      *connection.Manager
-	rateLimiter      *ratelimit.DeviceRateLimiter
-	pluginRegistry   *plugins.Registry
-	firmwareService  *firmware.Service
-	wirelessService  *wireless.Service
-	networkService   *network.WiFiService
-	mqttService      *network.MQTTService
-	ethernetService  *network.EthernetService
-	deviceService    *device.Service
-	componentService *component.Service
-	authService      *auth.Service
-	modbusService    *modbus.Service
-	provisionService *provision.Service
+	resolver          DeviceResolver
+	connManager       *connection.Manager
+	rateLimiter       *ratelimit.DeviceRateLimiter
+	pluginRegistry    *plugins.Registry
+	firmwareService   *firmware.Service
+	wirelessService   *wireless.Service
+	networkService    *network.WiFiService
+	mqttService       *network.MQTTService
+	ethernetService   *network.EthernetService
+	deviceService     *device.Service
+	componentService  *component.Service
+	authService       *auth.Service
+	modbusService     *modbus.Service
+	provisionService  *provision.Service
+	monitoringService *monitoring.Service
 }
 
 // DeviceResolver resolves device identifiers to device configurations.

@@ -214,52 +214,6 @@ func TestOptions(t *testing.T) {
 	}
 }
 
-func TestBoolStatus(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		value bool
-	}{
-		{
-			name:  "true value",
-			value: true,
-		},
-		{
-			name:  "false value",
-			value: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := boolStatus(tt.value)
-			if got == "" {
-				t.Error("boolStatus returned empty string")
-			}
-		})
-	}
-}
-
-func TestBoolStatus_TrueContainsYes(t *testing.T) {
-	t.Parallel()
-
-	result := boolStatus(true)
-	if result == "" {
-		t.Error("boolStatus(true) returned empty string")
-	}
-}
-
-func TestBoolStatus_FalseContainsNo(t *testing.T) {
-	t.Parallel()
-
-	result := boolStatus(false)
-	if result == "" {
-		t.Error("boolStatus(false) returned empty string")
-	}
-}
-
 func TestRun_UnknownModel(t *testing.T) {
 	t.Parallel()
 

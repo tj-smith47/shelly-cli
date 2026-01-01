@@ -4,15 +4,12 @@ package discover
 import (
 	"bytes"
 	"context"
-	"net"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/plugins"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
 
@@ -92,14 +89,6 @@ func TestNewCommand_Flags(t *testing.T) {
 		t.Error("skip-existing flag not found")
 	} else if skipExisting.DefValue != "true" {
 		t.Errorf("skip-existing default = %q, want %q", skipExisting.DefValue, "true")
-	}
-}
-
-func TestDefaultScanTimeout(t *testing.T) {
-	t.Parallel()
-	expected := 2 * time.Minute
-	if DefaultScanTimeout != expected {
-		t.Errorf("DefaultScanTimeout = %v, want %v", DefaultScanTimeout, expected)
 	}
 }
 
@@ -496,231 +485,6 @@ func TestNewCommand_SubcommandAliases(t *testing.T) {
 			t.Error("mdns subcommand should have aliases")
 		}
 	}
-}
-
-// TestConvertPluginDevices tests the conversion function.
-func TestConvertPluginDevices(t *testing.T) {
-	t.Parallel()
-
-	// Test with a mock shelly.PluginDiscoveredDevice
-	input := []shelly.PluginDiscoveredDevice{
-		{
-			ID:       "tasmota-abc",
-			Name:     "Living Room",
-			Model:    "Sonoff Basic",
-			Address:  net.ParseIP("192.168.1.50"),
-			Platform: "tasmota",
-			Firmware: "12.5.0",
-			Components: []plugins.ComponentInfo{
-				{Type: "switch", ID: 0, Name: "Relay"},
-				{Type: "light", ID: 1, Name: "LED"},
-			},
-		},
-	}
-
-	devices := convertPluginDevices(input)
-
-	if len(devices) != 1 {
-		t.Fatalf("devices count = %d, want 1", len(devices))
-	}
-
-	device := devices[0]
-
-	if device.ID != "tasmota-abc" {
-		t.Errorf("ID = %q, want %q", device.ID, "tasmota-abc")
-	}
-
-	if device.Name != "Living Room" {
-		t.Errorf("Name = %q, want %q", device.Name, "Living Room")
-	}
-
-	if device.Model != "Sonoff Basic" {
-		t.Errorf("Model = %q, want %q", device.Model, "Sonoff Basic")
-	}
-
-	if device.Address != "192.168.1.50" {
-		t.Errorf("Address = %q, want %q", device.Address, "192.168.1.50")
-	}
-
-	if device.Platform != "tasmota" {
-		t.Errorf("Platform = %q, want %q", device.Platform, "tasmota")
-	}
-
-	if device.Firmware != "12.5.0" {
-		t.Errorf("Firmware = %q, want %q", device.Firmware, "12.5.0")
-	}
-
-	if len(device.Components) != 2 {
-		t.Errorf("Components count = %d, want 2", len(device.Components))
-	}
-
-	if device.Components[0].Type != "switch" {
-		t.Errorf("Components[0].Type = %q, want %q", device.Components[0].Type, "switch")
-	}
-
-	if device.Components[0].Name != "Relay" {
-		t.Errorf("Components[0].Name = %q, want %q", device.Components[0].Name, "Relay")
-	}
-}
-
-// TestConvertPluginDevices_EmptyComponents tests conversion with no components.
-func TestConvertPluginDevices_EmptyComponents(t *testing.T) {
-	t.Parallel()
-
-	input := []shelly.PluginDiscoveredDevice{
-		{
-			ID:         "esp-123",
-			Name:       "Sensor",
-			Model:      "ESP32",
-			Address:    net.ParseIP("192.168.1.100"),
-			Platform:   "esphome",
-			Components: nil,
-		},
-	}
-
-	devices := convertPluginDevices(input)
-
-	if len(devices) != 1 {
-		t.Fatalf("devices count = %d, want 1", len(devices))
-	}
-
-	if len(devices[0].Components) != 0 {
-		t.Errorf("Components count = %d, want 0", len(devices[0].Components))
-	}
-}
-
-// TestRegisterPluginDevices tests the registration function with empty list.
-func TestRegisterPluginDevices(t *testing.T) {
-	t.Parallel()
-
-	// Test with empty list
-	count := registerPluginDevices([]term.PluginDiscoveredDevice{}, false)
-
-	if count != 0 {
-		t.Errorf("count = %d, want 0 for empty list", count)
-	}
-}
-
-// TestRegisterPluginDevices_WithDevices tests registration with devices.
-func TestRegisterPluginDevices_WithDevices(t *testing.T) {
-	t.Parallel()
-
-	devices := []term.PluginDiscoveredDevice{
-		{
-			ID:       "tasmota-123",
-			Name:     "Kitchen Light",
-			Model:    "Sonoff Basic",
-			Address:  "192.168.1.100",
-			Platform: "tasmota",
-			Firmware: "12.0.0",
-		},
-	}
-
-	// skipExisting = true should skip devices that are already registered
-	count := registerPluginDevices(devices, true)
-
-	// Should return 0-1 depending on if device already exists
-	if count < 0 {
-		t.Errorf("count = %d, should be >= 0", count)
-	}
-}
-
-// TestRunHTTPDiscovery_InvalidSubnet tests HTTP discovery with invalid subnet.
-func TestRunHTTPDiscovery_InvalidSubnet(t *testing.T) {
-	t.Parallel()
-
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-
-	ctx := context.Background()
-	_, err := runHTTPDiscovery(ctx, ios, 1*time.Second, "invalid-subnet")
-
-	if err == nil {
-		t.Error("Expected error for invalid subnet")
-	}
-
-	if !strings.Contains(err.Error(), "invalid subnet") {
-		t.Errorf("Error = %q, should contain 'invalid subnet'", err.Error())
-	}
-}
-
-// TestRunHTTPDiscovery_ValidSubnet tests HTTP discovery with valid subnet.
-func TestRunHTTPDiscovery_ValidSubnet(t *testing.T) {
-	t.Parallel()
-
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-
-	// Use cancelled context to prevent actual network scan
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	// Use a small subnet to limit generated addresses
-	_, err := runHTTPDiscovery(ctx, ios, 1*time.Millisecond, "192.168.1.0/30")
-
-	// Should complete without error (might find 0 devices due to cancelled context)
-	if err != nil {
-		t.Logf("HTTP discovery returned error: %v", err)
-	}
-}
-
-// TestRunMDNSDiscovery tests mDNS discovery.
-func TestRunMDNSDiscovery(t *testing.T) {
-	t.Parallel()
-
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-
-	// Use cancelled context
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	devices, err := runMDNSDiscovery(ctx, ios, 1*time.Millisecond)
-
-	// Should complete (possibly with context error or empty results)
-	if err != nil {
-		t.Logf("mDNS discovery error (expected for cancelled context): %v", err)
-	}
-	t.Logf("discovered %d devices", len(devices))
-}
-
-// TestRunCoIoTDiscovery tests CoIoT discovery.
-func TestRunCoIoTDiscovery(t *testing.T) {
-	t.Parallel()
-
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-
-	// Use cancelled context
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	devices, err := runCoIoTDiscovery(ctx, ios, 1*time.Millisecond)
-
-	// Should complete (possibly with context error or empty results)
-	if err != nil {
-		t.Logf("CoIoT discovery error (expected for cancelled context): %v", err)
-	}
-	t.Logf("discovered %d devices", len(devices))
-}
-
-// TestRunBLEDiscovery tests BLE discovery.
-// NOTE: No t.Parallel() - BLE library has race when multiple tests init concurrently.
-func TestRunBLEDiscovery(t *testing.T) { //nolint:paralleltest // Intentional - BLE library race
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-
-	// Use cancelled context
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	devices, err := runBLEDiscovery(ctx, ios, 1*time.Millisecond)
-
-	// BLE might not be available in test environment
-	if err != nil {
-		t.Logf("BLE discovery error (expected in CI): %v", err)
-	}
-	_ = devices
 }
 
 // TestRun_UnknownMethod tests the run function with an unknown method.

@@ -10,7 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
-	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 )
 
 // DisplayEMDataHistory shows 3-phase energy meter history data.
@@ -75,7 +75,7 @@ func DisplayEMDataHistory(ios *iostreams.IOStreams, data *components.EMDataGetDa
 
 func displayEMMetricsSummary(ios *iostreams.IOStreams, data *components.EMDataGetDataResult, count int) {
 	if count > 0 {
-		totalEnergy, _, _, _ := shelly.CalculateEMMetrics(data)
+		totalEnergy, _, _, _ := monitoring.CalculateEMMetrics(data)
 		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
 	}
 }
@@ -143,7 +143,7 @@ func DisplayEM1DataHistory(ios *iostreams.IOStreams, data *components.EM1DataGet
 
 func displayEM1MetricsSummary(ios *iostreams.IOStreams, data *components.EM1DataGetDataResult, count int) {
 	if count > 0 {
-		totalEnergy, _, _, _ := shelly.CalculateEM1Metrics(data)
+		totalEnergy, _, _, _ := monitoring.CalculateEM1Metrics(data)
 		ios.Printf("\nEstimated total energy consumption: %.2f kWh\n", totalEnergy)
 	}
 }

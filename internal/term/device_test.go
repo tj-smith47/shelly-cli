@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 )
 
 func TestDisplayDeviceStatus(t *testing.T) {
@@ -49,7 +50,7 @@ func TestDisplayAllSnapshots(t *testing.T) {
 		ios, out, _ := testIOStreams()
 		snapshots := map[string]*shelly.DeviceSnapshot{
 			"device1": {
-				Info: &shelly.DeviceInfo{
+				Info: &monitoring.DeviceInfo{
 					ID:    "device1",
 					Model: "Shelly Pro 1PM",
 				},
