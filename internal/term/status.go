@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
@@ -124,4 +125,39 @@ func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *clie
 	default:
 		return nil
 	}
+}
+
+// GetSingleDeviceStatus fetches status for a single device.
+func GetSingleDeviceStatus(ctx context.Context, ios *iostreams.IOStreams, dev *shelly.DeviceClient) (*QuickDeviceInfo, []ComponentState, error) {
+	if dev.IsGen1() {
+		devInfo := dev.Gen1().Info()
+		return &QuickDeviceInfo{
+			Model:      devInfo.Model,
+			Generation: devInfo.Generation,
+			Firmware:   devInfo.Firmware,
+		}, nil, nil
+	}
+
+	conn := dev.Gen2()
+	devInfo := conn.Info()
+	info := &QuickDeviceInfo{
+		Model:      devInfo.Model,
+		Generation: devInfo.Generation,
+		Firmware:   devInfo.Firmware,
+	}
+
+	components, err := conn.ListComponents(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var componentStates []ComponentState
+	for _, comp := range components {
+		state := GetComponentState(ctx, ios, conn, comp)
+		if state != nil {
+			componentStates = append(componentStates, *state)
+		}
+	}
+
+	return info, componentStates, nil
 }

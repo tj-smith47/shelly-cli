@@ -10,7 +10,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
-	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 )
@@ -51,41 +50,6 @@ with their online/offline status and primary component state.`,
 	return cmd
 }
 
-// getSingleDeviceStatus fetches status for a single device.
-func getSingleDeviceStatus(ctx context.Context, ios *iostreams.IOStreams, dev *shelly.DeviceClient) (*term.QuickDeviceInfo, []term.ComponentState, error) {
-	if dev.IsGen1() {
-		devInfo := dev.Gen1().Info()
-		return &term.QuickDeviceInfo{
-			Model:      devInfo.Model,
-			Generation: devInfo.Generation,
-			Firmware:   devInfo.Firmware,
-		}, nil, nil
-	}
-
-	conn := dev.Gen2()
-	devInfo := conn.Info()
-	info := &term.QuickDeviceInfo{
-		Model:      devInfo.Model,
-		Generation: devInfo.Generation,
-		Firmware:   devInfo.Firmware,
-	}
-
-	components, err := conn.ListComponents(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var componentStates []term.ComponentState
-	for _, comp := range components {
-		state := term.GetComponentState(ctx, ios, conn, comp)
-		if state != nil {
-			componentStates = append(componentStates, *state)
-		}
-	}
-
-	return info, componentStates, nil
-}
-
 func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*shelly.DefaultTimeout)
 	defer cancel()
@@ -101,7 +65,7 @@ func run(ctx context.Context, opts *Options) error {
 		err := cmdutil.RunWithSpinner(ctx, ios, "Getting status...", func(ctx context.Context) error {
 			return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 				var fetchErr error
-				info, componentStates, fetchErr = getSingleDeviceStatus(ctx, ios, dev)
+				info, componentStates, fetchErr = term.GetSingleDeviceStatus(ctx, ios, dev)
 				return fetchErr
 			})
 		})
