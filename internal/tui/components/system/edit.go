@@ -10,11 +10,11 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -57,7 +57,7 @@ type EditModel struct {
 	err      error
 	width    int
 	height   int
-	styles   EditStyles
+	styles   editmodal.Styles
 	original *shelly.SysConfig
 
 	// Form inputs
@@ -71,71 +71,6 @@ type EditModel struct {
 	aliases       []string // Current device aliases
 	aliasCursor   int      // Selected alias index for deletion
 	newAliasInput textinput.Model
-}
-
-// EditStyles holds styles for the edit modal.
-type EditStyles struct {
-	Overlay     lipgloss.Style
-	Modal       lipgloss.Style
-	Title       lipgloss.Style
-	Label       lipgloss.Style
-	LabelFocus  lipgloss.Style
-	Input       lipgloss.Style
-	InputFocus  lipgloss.Style
-	Button      lipgloss.Style
-	ButtonFocus lipgloss.Style
-	Error       lipgloss.Style
-	Help        lipgloss.Style
-	Selector    lipgloss.Style
-	AliasItem   lipgloss.Style
-	AliasSelect lipgloss.Style
-}
-
-// DefaultEditStyles returns the default edit modal styles.
-func DefaultEditStyles() EditStyles {
-	colors := theme.GetSemanticColors()
-	return EditStyles{
-		Overlay: lipgloss.NewStyle().
-			Background(lipgloss.Color("#000000")),
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Text).
-			Width(12),
-		LabelFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Width(12),
-		Input: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		InputFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		Button: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Padding(0, 2),
-		ButtonFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Padding(0, 2),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Selector: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		AliasItem: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		AliasSelect: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true),
-	}
 }
 
 // NewEditModel creates a new system settings edit modal.
@@ -181,7 +116,7 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	return EditModel{
 		ctx:              ctx,
 		svc:              svc,
-		styles:           DefaultEditStyles(),
+		styles:           editmodal.DefaultStyles().WithLabelWidth(12),
 		nameInput:        nameInput,
 		timezoneDropdown: timezoneDropdown,
 		latitudeInput:    latitudeInput,
@@ -772,9 +707,9 @@ func (m EditModel) renderAliasesList() string {
 		}
 		content.WriteString(prefix)
 		if isSelected {
-			content.WriteString(m.styles.AliasSelect.Render(alias))
+			content.WriteString(m.styles.Selected.Render(alias))
 		} else {
-			content.WriteString(m.styles.AliasItem.Render(alias))
+			content.WriteString(m.styles.Value.Render(alias))
 		}
 		if i < len(m.aliases)-1 {
 			content.WriteString("\n")

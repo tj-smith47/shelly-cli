@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 )
 
 func TestNewMQTTEditModel(t *testing.T) {
@@ -334,7 +335,7 @@ func TestMQTTEditModel_SaveResultMsg(t *testing.T) {
 func TestMQTTEditStyles(t *testing.T) {
 	t.Parallel()
 
-	styles := DefaultMQTTEditStyles()
+	styles := editmodal.DefaultStyles()
 
 	// Verify styles can be created (they're lipgloss.Style which are structs, not pointers)
 	// Just verify they have some expected characteristics

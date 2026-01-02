@@ -8,10 +8,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -66,7 +65,7 @@ type MQTTEditModel struct {
 	err     error
 	width   int
 	height  int
-	styles  MQTTEditStyles
+	styles  editmodal.Styles
 
 	// Original config for comparison
 	originalData *MQTTData
@@ -79,66 +78,6 @@ type MQTTEditModel struct {
 	clientIDInput    form.TextInput
 	topicPrefixInput form.TextInput
 	tlsDropdown      form.Dropdown
-}
-
-// MQTTEditStyles holds styles for the MQTT edit modal.
-type MQTTEditStyles struct {
-	Modal           lipgloss.Style
-	Title           lipgloss.Style
-	Label           lipgloss.Style
-	LabelFocus      lipgloss.Style
-	Error           lipgloss.Style
-	Help            lipgloss.Style
-	Selector        lipgloss.Style
-	StatusOn        lipgloss.Style
-	StatusOff       lipgloss.Style
-	ChangeWarning   lipgloss.Style
-	TestButton      lipgloss.Style
-	TestButtonFocus lipgloss.Style
-}
-
-// DefaultMQTTEditStyles returns the default edit modal styles.
-func DefaultMQTTEditStyles() MQTTEditStyles {
-	colors := theme.GetSemanticColors()
-	return MQTTEditStyles{
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Text).
-			Width(14),
-		LabelFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Width(14),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Selector: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		StatusOn: lipgloss.NewStyle().
-			Foreground(colors.Online).
-			Bold(true),
-		StatusOff: lipgloss.NewStyle().
-			Foreground(colors.Offline).
-			Bold(true),
-		ChangeWarning: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-		TestButton: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Padding(0, 2),
-		TestButtonFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Padding(0, 2),
-	}
 }
 
 // NewMQTTEditModel creates a new MQTT configuration edit modal.
@@ -191,7 +130,7 @@ func NewMQTTEditModel(ctx context.Context, svc *shelly.Service) MQTTEditModel {
 	return MQTTEditModel{
 		ctx:              ctx,
 		svc:              svc,
-		styles:           DefaultMQTTEditStyles(),
+		styles:           editmodal.DefaultStyles(),
 		enableToggle:     enableToggle,
 		serverInput:      serverInput,
 		userInput:        userInput,
@@ -543,7 +482,7 @@ func (m MQTTEditModel) renderConnectionStatus() string {
 	case m.originalData.Connected:
 		content.WriteString(m.styles.StatusOn.Render("● Connected"))
 	case m.originalData.Enable:
-		content.WriteString(m.styles.ChangeWarning.Render("◐ Enabled (disconnected)"))
+		content.WriteString(m.styles.Warning.Render("◐ Enabled (disconnected)"))
 	default:
 		content.WriteString(m.styles.StatusOff.Render("○ Disabled"))
 	}

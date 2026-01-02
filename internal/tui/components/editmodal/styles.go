@@ -66,6 +66,15 @@ type Styles struct {
 
 	// StatusOff is the style for disabled/off status indicators.
 	StatusOff lipgloss.Style
+
+	// Selected is the style for selected/highlighted items in lists.
+	Selected lipgloss.Style
+
+	// Tab is the style for inactive tab labels.
+	Tab lipgloss.Style
+
+	// TabActive is the style for the active tab label.
+	TabActive lipgloss.Style
 }
 
 // DefaultStyles returns the default edit modal styles.
@@ -98,8 +107,7 @@ func DefaultStyles() Styles {
 		Warning: lipgloss.NewStyle().
 			Foreground(colors.Warning),
 		Info: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Italic(true),
+			Foreground(colors.Info),
 		Muted: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		Overlay: lipgloss.NewStyle().
@@ -129,9 +137,24 @@ func DefaultStyles() Styles {
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),
 		StatusOn: lipgloss.NewStyle().
-			Foreground(colors.Online),
+			Foreground(colors.Online).
+			Bold(true),
 		StatusOff: lipgloss.NewStyle().
-			Foreground(colors.Offline),
+			Foreground(colors.Offline).
+			Bold(true),
+		Selected: lipgloss.NewStyle().
+			Foreground(colors.Highlight).
+			Background(colors.AltBackground),
+		Tab: lipgloss.NewStyle().
+			Foreground(colors.Muted).
+			Padding(0, 2),
+		TabActive: lipgloss.NewStyle().
+			Foreground(colors.Highlight).
+			Bold(true).
+			Padding(0, 2).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true).
+			BorderForeground(colors.Highlight),
 	}
 }
 

@@ -6,11 +6,10 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/google/uuid"
 	"github.com/tj-smith47/shelly-go/integrator"
 
-	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
@@ -62,7 +61,7 @@ type GroupEditModel struct {
 	err     error
 	width   int
 	height  int
-	styles  GroupEditStyles
+	styles  editmodal.Styles
 
 	// Group being edited
 	groupID  string
@@ -77,72 +76,6 @@ type GroupEditModel struct {
 	deviceScroller *panel.Scroller
 }
 
-// GroupEditStyles holds styles for the group edit modal.
-type GroupEditStyles struct {
-	Modal        lipgloss.Style
-	Title        lipgloss.Style
-	Label        lipgloss.Style
-	LabelFocus   lipgloss.Style
-	Error        lipgloss.Style
-	Help         lipgloss.Style
-	Selector     lipgloss.Style
-	DeviceLine   lipgloss.Style
-	DeviceSelect lipgloss.Style
-	DeviceName   lipgloss.Style
-	Checkbox     lipgloss.Style
-	CheckboxOn   lipgloss.Style
-	CheckboxOff  lipgloss.Style
-	Warning      lipgloss.Style
-	Info         lipgloss.Style
-}
-
-// DefaultGroupEditStyles returns the default edit modal styles.
-func DefaultGroupEditStyles() GroupEditStyles {
-	colors := theme.GetSemanticColors()
-	return GroupEditStyles{
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Background(colors.Background).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Text).
-			Width(10),
-		LabelFocus: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Width(10),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Selector: lipgloss.NewStyle().
-			Foreground(colors.Highlight),
-		DeviceLine: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		DeviceSelect: lipgloss.NewStyle().
-			Background(colors.AltBackground).
-			Foreground(colors.Highlight),
-		DeviceName: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		Checkbox: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		CheckboxOn: lipgloss.NewStyle().
-			Foreground(colors.Online),
-		CheckboxOff: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		Warning: lipgloss.NewStyle().
-			Foreground(colors.Warning),
-		Info: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Italic(true),
-	}
-}
-
 // NewGroupEditModel creates a new group edit modal.
 func NewGroupEditModel() GroupEditModel {
 	nameInput := form.NewTextInput(
@@ -153,7 +86,7 @@ func NewGroupEditModel() GroupEditModel {
 	)
 
 	return GroupEditModel{
-		styles:         DefaultGroupEditStyles(),
+		styles:         editmodal.DefaultStyles().WithLabelWidth(10),
 		nameInput:      nameInput,
 		selectedIDs:    make(map[string]bool),
 		deviceScroller: panel.NewScroller(0, 8),
@@ -559,10 +492,10 @@ func (m GroupEditModel) renderDeleteContent() string {
 		content.WriteString(m.styles.Warning.Render("Are you sure you want to delete this group?"))
 		content.WriteString("\n\n")
 		content.WriteString(m.styles.Label.Render("Name: "))
-		content.WriteString(m.styles.DeviceName.Render(m.original.Name))
+		content.WriteString(m.styles.Value.Render(m.original.Name))
 		content.WriteString("\n")
 		content.WriteString(m.styles.Label.Render("Devices: "))
-		content.WriteString(m.styles.DeviceName.Render(fmt.Sprintf("%d", len(m.original.DeviceIDs))))
+		content.WriteString(m.styles.Value.Render(fmt.Sprintf("%d", len(m.original.DeviceIDs))))
 	}
 
 	if m.err != nil {
@@ -666,9 +599,9 @@ func (m GroupEditModel) renderDeviceLine(device integrator.AccountDevice, isSele
 
 	// Checkbox
 	if isSelected {
-		line.WriteString(m.styles.CheckboxOn.Render("[✓] "))
+		line.WriteString(m.styles.StatusOn.Render("[✓] "))
 	} else {
-		line.WriteString(m.styles.CheckboxOff.Render("[ ] "))
+		line.WriteString(m.styles.Muted.Render("[ ] "))
 	}
 
 	// Device name
@@ -681,9 +614,9 @@ func (m GroupEditModel) renderDeviceLine(device integrator.AccountDevice, isSele
 	}
 
 	if isCursor {
-		line.WriteString(m.styles.DeviceSelect.Render(name))
+		line.WriteString(m.styles.Selected.Render(name))
 	} else {
-		line.WriteString(m.styles.DeviceName.Render(name))
+		line.WriteString(m.styles.Value.Render(name))
 	}
 
 	return line.String()

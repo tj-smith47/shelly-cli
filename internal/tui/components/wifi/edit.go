@@ -9,11 +9,11 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -56,7 +56,7 @@ type EditModel struct {
 	err      error
 	width    int
 	height   int
-	styles   EditStyles
+	styles   editmodal.Styles
 	networks []network.WiFiNetworkFull
 
 	// Station fields
@@ -71,74 +71,6 @@ type EditModel struct {
 
 	// Original values for cancel
 	origConfig *network.WiFiConfigFull
-}
-
-// EditStyles holds styles for the edit modal.
-type EditStyles struct {
-	Container    lipgloss.Style
-	Title        lipgloss.Style
-	Label        lipgloss.Style
-	Value        lipgloss.Style
-	Focused      lipgloss.Style
-	Unfocused    lipgloss.Style
-	Toggle       lipgloss.Style
-	ToggleActive lipgloss.Style
-	Error        lipgloss.Style
-	Help         lipgloss.Style
-	Selected     lipgloss.Style
-	Tab          lipgloss.Style
-	TabActive    lipgloss.Style
-}
-
-// DefaultEditStyles returns the default styles for the edit modal.
-func DefaultEditStyles() EditStyles {
-	colors := theme.GetSemanticColors()
-	return EditStyles{
-		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Highlight).
-			Padding(1, 2),
-		Title: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(colors.Highlight).
-			MarginBottom(1),
-		Label: lipgloss.NewStyle().
-			Foreground(colors.Text).
-			Width(12),
-		Value: lipgloss.NewStyle().
-			Foreground(colors.Text),
-		Focused: lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(colors.Highlight).
-			Padding(0, 1),
-		Unfocused: lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(0, 1),
-		Toggle: lipgloss.NewStyle().
-			Foreground(colors.Muted),
-		ToggleActive: lipgloss.NewStyle().
-			Foreground(colors.Online).
-			Bold(true),
-		Error: lipgloss.NewStyle().
-			Foreground(colors.Error),
-		Help: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Italic(true),
-		Selected: lipgloss.NewStyle().
-			Background(colors.AltBackground).
-			Foreground(colors.Highlight),
-		Tab: lipgloss.NewStyle().
-			Foreground(colors.Muted).
-			Padding(0, 2),
-		TabActive: lipgloss.NewStyle().
-			Foreground(colors.Highlight).
-			Bold(true).
-			Padding(0, 2).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderForeground(colors.Highlight),
-	}
 }
 
 // NewEditModel creates a new WiFi edit modal.
@@ -185,7 +117,7 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 		svc:         svc,
 		mode:        EditModeStation,
 		field:       FieldSSID,
-		styles:      DefaultEditStyles(),
+		styles:      editmodal.DefaultStyles().WithLabelWidth(12),
 		staSSID:     staSSID,
 		staPassword: staPassword,
 		apSSID:      apSSID,
@@ -526,9 +458,9 @@ func (m EditModel) renderToggleRow(label string, enabled, focused bool) string {
 
 	var toggle string
 	if enabled {
-		toggle = m.styles.ToggleActive.Render("[●] On")
+		toggle = m.styles.StatusOn.Render("[●] On")
 	} else {
-		toggle = m.styles.Toggle.Render("[○] Off")
+		toggle = m.styles.Muted.Render("[○] Off")
 	}
 
 	if focused {
