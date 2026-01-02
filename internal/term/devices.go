@@ -23,7 +23,7 @@ func DisplayDeviceList(ios *iostreams.IOStreams, devices []model.DeviceListItem,
 	}
 	headers = append(headers, "Auth")
 
-	table := table.NewStyled(ios, headers...)
+	tbl := table.NewStyled(ios, headers...)
 
 	for i, dev := range devices {
 		gen := output.RenderGeneration(dev.Generation)
@@ -48,10 +48,10 @@ func DisplayDeviceList(ios *iostreams.IOStreams, devices []model.DeviceListItem,
 		}
 		row = append(row, auth)
 
-		table.AddRow(row...)
+		tbl.AddRow(row...)
 	}
 
-	if err := table.PrintTo(ios.Out); err != nil {
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
 	if _, err := fmt.Fprintln(ios.Out); err != nil {

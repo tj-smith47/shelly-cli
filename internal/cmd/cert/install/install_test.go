@@ -542,6 +542,8 @@ func TestOptions_LoadCertData_NoFiles(t *testing.T) {
 // Execute-based tests for the run function.
 
 func TestExecute_ValidationError_NoFlags(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -561,6 +563,8 @@ func TestExecute_ValidationError_NoFlags(t *testing.T) {
 }
 
 func TestExecute_ValidationError_ClientCertWithoutKey(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	certFile := filepath.Join(tmpDir, "cert.pem")
 	if err := os.WriteFile(certFile, []byte("test cert"), 0o600); err != nil {
@@ -586,6 +590,8 @@ func TestExecute_ValidationError_ClientCertWithoutKey(t *testing.T) {
 }
 
 func TestExecute_LoadCertDataError_NonexistentCAFile(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	cmd := NewCommand(tf.Factory)
@@ -605,6 +611,8 @@ func TestExecute_LoadCertDataError_NonexistentCAFile(t *testing.T) {
 }
 
 func TestExecute_Gen1DeviceError(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -657,6 +665,8 @@ func TestExecute_Gen1DeviceError(t *testing.T) {
 }
 
 func TestExecute_Gen2DeviceWithCA(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -711,6 +721,8 @@ func TestExecute_Gen2DeviceWithCA(t *testing.T) {
 }
 
 func TestExecute_Gen2DeviceWithClientCert(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -769,6 +781,8 @@ func TestExecute_Gen2DeviceWithClientCert(t *testing.T) {
 }
 
 func TestExecute_Gen2DeviceWithBothCerts(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -862,6 +876,8 @@ func TestExecute_Help(t *testing.T) {
 }
 
 func TestExecute_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	// Create temp CA file
@@ -884,6 +900,8 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 }
 
 func TestExecute_LoadCertDataError_NonexistentClientKey(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	certFile := filepath.Join(tmpDir, "cert.pem")
 	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {

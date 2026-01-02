@@ -28,7 +28,7 @@ func (a *monitoringAdapter) WithGen1Connection(ctx context.Context, identifier s
 
 // Resolve implements monitoring.ShellyConnector.
 func (a *monitoringAdapter) Resolve(identifier string) (model.Device, error) {
-	return a.Service.resolver.Resolve(identifier)
+	return a.resolver.Resolve(identifier)
 }
 
 // ResolveWithGeneration implements monitoring.ShellyConnector.

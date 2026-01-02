@@ -198,6 +198,8 @@ func TestOptions(t *testing.T) {
 }
 
 func TestExecute_NoDevices(t *testing.T) {
+	t.Parallel()
+
 	// No devices configured - should error "no devices specified"
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
@@ -226,6 +228,8 @@ func TestExecute_NoDevices(t *testing.T) {
 }
 
 func TestExecute_WithDevices_Stdout(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -277,6 +281,8 @@ func TestExecute_WithDevices_Stdout(t *testing.T) {
 }
 
 func TestExecute_WithDevices_ToFile(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -342,6 +348,8 @@ func TestExecute_WithDevices_ToFile(t *testing.T) {
 }
 
 func TestExecute_WithYMLExtension(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -392,6 +400,8 @@ func TestExecute_WithYMLExtension(t *testing.T) {
 }
 
 func TestExecute_WithGroupName(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -440,6 +450,8 @@ func TestExecute_WithGroupName(t *testing.T) {
 }
 
 func TestExecute_MultipleDevices(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -500,6 +512,8 @@ func TestExecute_MultipleDevices(t *testing.T) {
 }
 
 func TestExecute_InvalidFilePath(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -548,6 +562,8 @@ func TestExecute_InvalidFilePath(t *testing.T) {
 }
 
 func TestRun_NoDevicesSpecified(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -566,6 +582,8 @@ func TestRun_NoDevicesSpecified(t *testing.T) {
 }
 
 func TestRun_WithDevices_Stdout(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -613,6 +631,8 @@ func TestRun_WithDevices_Stdout(t *testing.T) {
 }
 
 func TestRun_WithDevices_ToFile(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -669,6 +689,8 @@ func TestRun_WithDevices_ToFile(t *testing.T) {
 }
 
 func TestRun_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -716,6 +738,8 @@ func TestRun_ContextCancellation(t *testing.T) {
 }
 
 func TestExecute_DifferentModels(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -792,6 +816,8 @@ func TestYamlExtensions(t *testing.T) {
 }
 
 func TestExecute_WithAtAll(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -849,6 +875,8 @@ func TestExecute_WithAtAll(t *testing.T) {
 }
 
 func TestExecute_DeviceWithFileArg(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

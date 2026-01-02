@@ -10,6 +10,7 @@ import (
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
@@ -120,7 +121,10 @@ func ParseDevicesJSON(input string) ([]JSONDevice, error) {
 
 	// Check if input is a file path
 	fs := config.Fs()
-	exists, _ := afero.Exists(fs, input)
+	exists, err := afero.Exists(fs, input)
+	if err != nil {
+		iostreams.DebugErr("check file exists", err)
+	}
 	if exists {
 		data, err := afero.ReadFile(fs, input)
 		if err != nil {

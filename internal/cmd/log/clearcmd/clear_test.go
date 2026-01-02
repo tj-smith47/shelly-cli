@@ -142,6 +142,8 @@ func TestNewCommand_LongDescription(t *testing.T) {
 }
 
 func TestRun_NoLogFile(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{Factory: tf.Factory}
@@ -154,6 +156,8 @@ func TestRun_NoLogFile(t *testing.T) {
 }
 
 func TestRun_Success(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{Factory: tf.Factory}

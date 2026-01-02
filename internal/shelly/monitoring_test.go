@@ -815,4 +815,3 @@ func TestJSONMetricsOutput_Fields(t *testing.T) {
 		t.Errorf("Devices length = %d, want 2", len(output.Devices))
 	}
 }
-

@@ -11,6 +11,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
+const strTrue = "true"
+
 // Demo coordinates all mock components for demo mode.
 type Demo struct {
 	Fixtures     *Fixtures
@@ -41,7 +43,7 @@ func setCurrentDemo(d *Demo) {
 // IsDemoMode returns true if demo mode is enabled via environment variable.
 func IsDemoMode() bool {
 	val := os.Getenv("SHELLY_DEMO")
-	return val == "1" || val == "true"
+	return val == "1" || val == strTrue
 }
 
 // Start initializes demo mode from the default fixture path.

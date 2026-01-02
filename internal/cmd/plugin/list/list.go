@@ -115,8 +115,8 @@ func run(opts *Options) error {
 		builder.AddRow(ext.Name, version, source, ext.Path)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print extension list table", err)
 	}
 	ios.Println()

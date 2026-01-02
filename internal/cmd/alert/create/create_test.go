@@ -19,8 +19,6 @@ const (
 )
 
 // setupTest initializes the test environment with isolated filesystem.
-//
-//nolint:paralleltest // Uses global config.SetFs which cannot be parallelized
 func setupTest(t *testing.T) {
 	t.Helper()
 	factory.SetupTestFs(t)

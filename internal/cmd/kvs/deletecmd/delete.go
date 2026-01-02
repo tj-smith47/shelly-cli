@@ -1,4 +1,4 @@
-// Package del provides the kvs delete subcommand.
+// Package deletecmd provides the kvs delete subcommand.
 package deletecmd
 
 import (

@@ -189,6 +189,8 @@ func TestExecute_InvalidComponentID(t *testing.T) {
 }
 
 func TestExecute_InvalidFormat(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -234,6 +236,8 @@ func TestExecute_InvalidFormat(t *testing.T) {
 }
 
 func TestExecute_InvalidPeriod(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -279,6 +283,8 @@ func TestExecute_InvalidPeriod(t *testing.T) {
 }
 
 func TestExecute_InvalidFromTime(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -324,6 +330,8 @@ func TestExecute_InvalidFromTime(t *testing.T) {
 }
 
 func TestExecute_InvalidToTime(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -369,6 +377,8 @@ func TestExecute_InvalidToTime(t *testing.T) {
 }
 
 func TestExecute_WithPeriodHour(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -413,6 +423,8 @@ func TestExecute_WithPeriodHour(t *testing.T) {
 }
 
 func TestExecute_WithPeriodDay(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -455,6 +467,8 @@ func TestExecute_WithPeriodDay(t *testing.T) {
 }
 
 func TestExecute_WithPeriodWeek(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -497,6 +511,8 @@ func TestExecute_WithPeriodWeek(t *testing.T) {
 }
 
 func TestExecute_WithPeriodMonth(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -539,6 +555,8 @@ func TestExecute_WithPeriodMonth(t *testing.T) {
 }
 
 func TestExecute_WithFromToRange(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -581,6 +599,8 @@ func TestExecute_WithFromToRange(t *testing.T) {
 }
 
 func TestExecute_WithExplicitTypeEM(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -623,6 +643,8 @@ func TestExecute_WithExplicitTypeEM(t *testing.T) {
 }
 
 func TestExecute_WithExplicitTypeEM1(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -665,6 +687,8 @@ func TestExecute_WithExplicitTypeEM1(t *testing.T) {
 }
 
 func TestExecute_WithFormatJSON(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -707,6 +731,8 @@ func TestExecute_WithFormatJSON(t *testing.T) {
 }
 
 func TestExecute_WithFormatYAML(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -749,6 +775,8 @@ func TestExecute_WithFormatYAML(t *testing.T) {
 }
 
 func TestExecute_WithFormatCSV(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -791,6 +819,8 @@ func TestExecute_WithFormatCSV(t *testing.T) {
 }
 
 func TestExecute_WithComponentID(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -920,6 +950,8 @@ func TestRun_InvalidToTime(t *testing.T) {
 }
 
 func TestRun_UnknownComponentType(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -966,6 +998,8 @@ func TestRun_UnknownComponentType(t *testing.T) {
 }
 
 func TestRun_WithExplicitTypeEM(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1011,6 +1045,8 @@ func TestRun_WithExplicitTypeEM(t *testing.T) {
 }
 
 func TestRun_WithExplicitTypeEM1(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1056,6 +1092,8 @@ func TestRun_WithExplicitTypeEM1(t *testing.T) {
 }
 
 func TestRun_WithOutputFile(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1101,6 +1139,8 @@ func TestRun_WithOutputFile(t *testing.T) {
 }
 
 func TestRun_WithValidTimeRange(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1147,6 +1187,8 @@ func TestRun_WithValidTimeRange(t *testing.T) {
 }
 
 func TestRun_WithAutoDetection(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1192,6 +1234,8 @@ func TestRun_WithAutoDetection(t *testing.T) {
 }
 
 func TestRun_JSONFormat(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1235,6 +1279,8 @@ func TestRun_JSONFormat(t *testing.T) {
 }
 
 func TestRun_YAMLFormat(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

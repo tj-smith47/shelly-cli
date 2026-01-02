@@ -111,6 +111,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{Factory: tf.Factory}
@@ -128,6 +130,8 @@ func TestRun(t *testing.T) {
 }
 
 func TestRun_OutputContainsPath(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{Factory: tf.Factory}

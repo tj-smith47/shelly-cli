@@ -1,4 +1,4 @@
-// Package del provides the webhook delete subcommand.
+// Package deletecmd provides the webhook delete subcommand.
 package deletecmd
 
 import (

@@ -203,6 +203,7 @@ func TestNewCommand_InvalidID(t *testing.T) {
 }
 
 func TestExecute_BTHomeComponentStatus(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -257,6 +258,7 @@ func TestExecute_BTHomeComponentStatus(t *testing.T) {
 }
 
 func TestExecute_BTHomeComponentStatusWithDiscovery(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -309,6 +311,7 @@ func TestExecute_BTHomeComponentStatusWithDiscovery(t *testing.T) {
 }
 
 func TestExecute_BTHomeComponentStatusJSON(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -363,6 +366,7 @@ func TestExecute_BTHomeComponentStatusJSON(t *testing.T) {
 }
 
 func TestExecute_BTHomeDeviceStatus(t *testing.T) {
+	t.Parallel()
 
 	rssi := -55
 	battery := 85
@@ -428,6 +432,7 @@ func TestExecute_BTHomeDeviceStatus(t *testing.T) {
 }
 
 func TestExecute_BTHomeDeviceStatusJSON(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -485,6 +490,7 @@ func TestExecute_BTHomeDeviceStatusJSON(t *testing.T) {
 }
 
 func TestExecute_DeviceNotFound(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -514,6 +520,7 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 }
 
 func TestExecute_ContextCancelled(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -556,6 +563,7 @@ func TestExecute_ContextCancelled(t *testing.T) {
 }
 
 func TestExecute_BTHomeDeviceStatusWithKnownObjects(t *testing.T) {
+	t.Parallel()
 
 	component := "bthomesensor:200"
 	fixtures := &mock.Fixtures{
@@ -620,6 +628,7 @@ func TestExecute_BTHomeDeviceStatusWithKnownObjects(t *testing.T) {
 }
 
 func TestExecute_BTHomeDeviceWithErrors(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -668,6 +677,7 @@ func TestExecute_BTHomeDeviceWithErrors(t *testing.T) {
 }
 
 func TestRun_HasID(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -719,6 +729,7 @@ func TestRun_HasID(t *testing.T) {
 }
 
 func TestRun_NoID(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -766,6 +777,7 @@ func TestRun_NoID(t *testing.T) {
 }
 
 func TestRun_HasIDWithJSON(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -817,6 +829,7 @@ func TestRun_HasIDWithJSON(t *testing.T) {
 }
 
 func TestRun_NoIDWithJSON(t *testing.T) {
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Version: "1",

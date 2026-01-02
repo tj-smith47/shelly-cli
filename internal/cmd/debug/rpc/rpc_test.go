@@ -224,6 +224,8 @@ func TestOptions(t *testing.T) {
 }
 
 func TestRun_InvalidParams(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -243,6 +245,8 @@ func TestRun_InvalidParams(t *testing.T) {
 }
 
 func TestRun_EmptyParams(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -287,6 +291,8 @@ func TestRun_EmptyParams(t *testing.T) {
 }
 
 func TestRun_WithParams(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -330,6 +336,8 @@ func TestRun_WithParams(t *testing.T) {
 }
 
 func TestRun_RawOutput(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

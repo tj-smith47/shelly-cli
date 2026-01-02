@@ -225,6 +225,8 @@ func TestIsJSONObject(t *testing.T) {
 }
 
 func TestExecute_WithMock(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -267,6 +269,8 @@ func TestExecute_WithMock(t *testing.T) {
 }
 
 func TestExecute_WithParams(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -330,6 +334,8 @@ func TestExecute_InvalidJSON(t *testing.T) {
 }
 
 func TestExecute_YAMLOutput(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -390,6 +396,8 @@ func TestExecute_NoTargets(t *testing.T) {
 }
 
 func TestRun_WithTargets(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -441,6 +449,8 @@ func TestRun_WithTargets(t *testing.T) {
 }
 
 func TestRun_WithParams(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -483,6 +493,8 @@ func TestRun_WithParams(t *testing.T) {
 }
 
 func TestRun_YAMLOutput(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -525,6 +537,8 @@ func TestRun_YAMLOutput(t *testing.T) {
 }
 
 func TestRun_FailedDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -570,6 +584,8 @@ func TestRun_FailedDevice(t *testing.T) {
 }
 
 func TestRun_MixedResults(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

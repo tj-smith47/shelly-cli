@@ -183,6 +183,8 @@ func TestNewCommand_InvalidScheduleID(t *testing.T) {
 }
 
 func TestCommand_DeleteWithYes(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -236,6 +238,8 @@ func TestCommand_DeleteWithYes(t *testing.T) {
 }
 
 func TestCommand_DeleteCancelled(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -268,7 +272,7 @@ func TestCommand_DeleteCancelled(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 
 	tf := factory.NewTestFactory(t)
-	tf.Factory.SetIOStreams(ios)
+	tf.SetIOStreams(ios)
 	demo.InjectIntoFactory(tf.Factory)
 
 	cmd := NewCommand(tf.Factory)
@@ -289,6 +293,8 @@ func TestCommand_DeleteCancelled(t *testing.T) {
 }
 
 func TestCommand_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)

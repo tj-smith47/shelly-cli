@@ -257,11 +257,11 @@ func TestRun_WithMockServer(t *testing.T) {
 		DeviceStates: map[string]mock.DeviceState{
 			"test-device": {
 				"em:0": map[string]any{
-					"id":               float64(0),
-					"a_current":        float64(1.5),
-					"a_voltage":        float64(230.0),
-					"a_act_power":      float64(345.0),
-					"total_act_power":  float64(1035.0),
+					"id":              float64(0),
+					"a_current":       float64(1.5),
+					"a_voltage":       float64(230.0),
+					"a_act_power":     float64(345.0),
+					"total_act_power": float64(1035.0),
 				},
 			},
 		},

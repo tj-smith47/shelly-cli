@@ -173,6 +173,7 @@ func TestNewCommand_LongDescription(t *testing.T) {
 }
 
 func TestExecute_NoDevices(t *testing.T) {
+	t.Parallel()
 	// No devices configured - should show info message
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
@@ -201,6 +202,7 @@ func TestExecute_NoDevices(t *testing.T) {
 }
 
 func TestExecute_WithDevices(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -246,6 +248,7 @@ func TestExecute_WithDevices(t *testing.T) {
 }
 
 func TestExecute_YAMLFormat(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -287,6 +290,7 @@ func TestExecute_YAMLFormat(t *testing.T) {
 }
 
 func TestRun_NoDevices(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -313,6 +317,7 @@ func TestRun_NoDevices(t *testing.T) {
 }
 
 func TestRun_WithDevices(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -353,6 +358,7 @@ func TestRun_WithDevices(t *testing.T) {
 }
 
 func TestRun_InvalidDirectory(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -393,6 +399,7 @@ func TestRun_InvalidDirectory(t *testing.T) {
 }
 
 func TestRun_MultipleDevices(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

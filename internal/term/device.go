@@ -29,8 +29,8 @@ func DisplayDeviceStatus(ios *iostreams.IOStreams, status *shelly.DeviceStatus) 
 			builder.AddRow(key, output.FormatDisplayValue(value))
 		}
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print device status table", err)
 	}
 }
@@ -140,8 +140,8 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 				builder.AddRow(key, output.FormatDisplayValue(value))
 			}
 		}
-		table := builder.WithModeStyle(ios).Build()
-		if err := table.PrintTo(ios.Out); err != nil {
+		tbl := builder.WithModeStyle(ios).Build()
+		if err := tbl.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print plugin components table", err)
 		}
 		ios.Println()
@@ -168,8 +168,8 @@ func DisplayPluginDeviceStatus(ios *iostreams.IOStreams, device model.Device, st
 				builder.AddRow(key, output.FormatDisplayValue(value))
 			}
 		}
-		table := builder.WithModeStyle(ios).Build()
-		if err := table.PrintTo(ios.Out); err != nil {
+		tbl := builder.WithModeStyle(ios).Build()
+		if err := tbl.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print plugin sensors table", err)
 		}
 		ios.Println()

@@ -53,8 +53,8 @@ func DisplayKVSKeys(ios *iostreams.IOStreams, result *kvs.ListResult) {
 	for _, key := range result.Keys {
 		builder.AddRow(key)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print KVS keys table", err)
 	}
 
@@ -70,8 +70,8 @@ func DisplayKVSItems(ios *iostreams.IOStreams, items []kvs.Item) {
 	for _, item := range items {
 		builder.AddRow(item.Key, output.FormatDisplayValue(item.Value), output.ValueType(item.Value))
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print KVS items table", err)
 	}
 

@@ -11,6 +11,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
+const testFormatJSON = "json"
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -166,13 +168,15 @@ func TestOptions(t *testing.T) {
 	}
 
 	// Test OutputFlags
-	opts.Format = "json"
-	if opts.Format != "json" {
-		t.Errorf("Format = %q, want %q", opts.Format, "json")
+	opts.Format = testFormatJSON
+	if opts.Format != testFormatJSON {
+		t.Errorf("Format = %q, want %q", opts.Format, testFormatJSON)
 	}
 }
 
 func TestRun_WithMock(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -214,6 +218,8 @@ func TestRun_WithMock(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)

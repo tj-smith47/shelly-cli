@@ -123,8 +123,8 @@ func run(opts *Options) error {
 		}
 		builder.AddRow(t, isCurrent)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print theme list table", err)
 	}
 

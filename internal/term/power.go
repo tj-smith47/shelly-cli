@@ -205,8 +205,8 @@ func DisplayDashboard(ios *iostreams.IOStreams, data model.DashboardData) {
 		builder.AddRow(dev.Device, statusStr, powerStr, formatComponentSummary(dev.Components))
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print dashboard table", err)
 	}
 }
@@ -276,8 +276,8 @@ func DisplayComparison(ios *iostreams.IOStreams, data model.ComparisonData) {
 		builder.AddRow(rank, dev.Device, energyStr, avgStr, peakStr, shareStr, statusStr)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print comparison table", err)
 	}
 

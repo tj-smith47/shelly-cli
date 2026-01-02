@@ -37,8 +37,8 @@ func DisplayFleetStatus(ios *iostreams.IOStreams, statuses []*integrator.DeviceS
 		builder.AddRow(status, s.DeviceID, s.Host, lastSeen)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print fleet status table", err)
 	}
 }
@@ -94,8 +94,8 @@ func DisplayFleetHealth(ios *iostreams.IOStreams, health []*integrator.DeviceHea
 		)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print fleet health table", err)
 	}
 }

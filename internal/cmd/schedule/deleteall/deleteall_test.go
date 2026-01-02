@@ -186,6 +186,8 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 }
 
 func TestExecute_Success(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -233,6 +235,8 @@ func TestExecute_Success(t *testing.T) {
 }
 
 func TestExecute_Cancelled(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -284,6 +288,8 @@ func TestExecute_Cancelled(t *testing.T) {
 }
 
 func TestRun_Success(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

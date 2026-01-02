@@ -176,6 +176,7 @@ func TestOptions(t *testing.T) {
 }
 
 func TestExecute_Gen2Device(t *testing.T) {
+	t.Parallel()
 	// Gen2 device - should fail with "action URLs only available for Gen1"
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -222,6 +223,7 @@ func TestExecute_Gen2Device(t *testing.T) {
 }
 
 func TestExecute_DeviceNotFound(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -247,6 +249,7 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 }
 
 func TestRun_WithIndex(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -287,6 +290,7 @@ func TestRun_WithIndex(t *testing.T) {
 }
 
 func TestExecute_Gen1Device(t *testing.T) {
+	t.Parallel()
 	// Gen1 device - should succeed in clearing action
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -331,6 +335,7 @@ func TestExecute_Gen1Device(t *testing.T) {
 }
 
 func TestRun_Gen1WithIndex(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

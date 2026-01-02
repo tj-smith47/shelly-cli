@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	testIP1   = "192.168.1.1"
-	testIP100 = "192.168.1.100"
+	testIP1          = "192.168.1.1"
+	testIP100        = "192.168.1.100"
+	testThemeDracula = "dracula"
 )
 
 func TestRateLimitConfig_Validate(t *testing.T) {
@@ -671,9 +672,13 @@ func TestDir_WithXDGConfigHome(t *testing.T) {
 	origXDG := os.Getenv("XDG_CONFIG_HOME")
 	t.Cleanup(func() {
 		if origXDG == "" {
-			os.Unsetenv("XDG_CONFIG_HOME")
+			if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+				t.Logf("warning: unsetenv error: %v", err)
+			}
 		} else {
-			os.Setenv("XDG_CONFIG_HOME", origXDG)
+			if err := os.Setenv("XDG_CONFIG_HOME", origXDG); err != nil {
+				t.Logf("warning: setenv error: %v", err)
+			}
 		}
 	})
 
@@ -717,8 +722,8 @@ func TestGetThemeConfig_ThemeConfigPointer(t *testing.T) {
 	var nilTC *ThemeConfig
 	cfg2 := &Config{Theme: nilTC}
 	result2 := cfg2.GetThemeConfig()
-	if result2.Name != "dracula" {
-		t.Errorf("GetThemeConfig() with nil pointer name = %q, want %q", result2.Name, "dracula")
+	if result2.Name != testThemeDracula {
+		t.Errorf("GetThemeConfig() with nil pointer name = %q, want %q", result2.Name, testThemeDracula)
 	}
 }
 
@@ -785,7 +790,7 @@ func TestGetThemeConfig_MapstructureDecodeError(t *testing.T) {
 	result := cfg.GetThemeConfig()
 	// mapstructure may handle this gracefully or fail
 	// Either way, we get a theme config back
-	if result.Name == "" && result.Name != "test" && result.Name != "dracula" {
+	if result.Name == "" && result.Name != "test" && result.Name != testThemeDracula {
 		t.Errorf("GetThemeConfig() should return a valid theme config")
 	}
 }
@@ -867,7 +872,7 @@ func TestNewManager_EmptyPath(t *testing.T) {
 	}
 
 	// Should contain "config.yaml"
-	if m.Path() != "config.yaml" && len(m.Path()) > 0 {
+	if m.Path() != "config.yaml" && m.Path() != "" {
 		// If Dir() succeeded, path should end with config.yaml
 		if len(m.Path()) < len("config.yaml") {
 			t.Errorf("NewManager(\"\").Path() = %q, expected path ending with config.yaml", m.Path())
@@ -1020,7 +1025,7 @@ func TestPackageLevel_Get_NilConfig(t *testing.T) {
 	if !cfg.Color {
 		t.Error("Get().Color should be true")
 	}
-	if cfg.Theme != "dracula" {
+	if cfg.Theme != testThemeDracula {
 		t.Errorf("Get().Theme = %v, want dracula", cfg.Theme)
 	}
 }

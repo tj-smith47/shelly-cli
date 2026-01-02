@@ -205,12 +205,12 @@ func TestGetEditor(t *testing.T) {
 	}
 
 	// Initially should be empty if not configured
-	editor := GetEditor()
 	// Editor might be set or not depending on config, just verify it doesn't panic
+	_ = GetEditor()
 
 	// Set via viper and test fallback
 	viper.Set("editor", "nano")
-	editor = GetEditor()
+	editor := GetEditor()
 	// Should return the editor from config or viper
 	if editor == "" {
 		// Might still be empty if config overrides

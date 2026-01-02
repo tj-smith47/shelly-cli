@@ -121,6 +121,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 }
 
 func TestRun_EmptyList(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -166,6 +168,8 @@ func TestRun_EmptyList(t *testing.T) {
 }
 
 func TestRun_WithSchedules(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -227,6 +231,8 @@ func TestRun_WithSchedules(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)

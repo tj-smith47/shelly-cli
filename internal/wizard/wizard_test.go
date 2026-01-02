@@ -1952,7 +1952,6 @@ func TestSelectDiscoveryMethods_InteractiveFallback(t *testing.T) {
 }
 
 // TestCheckExistingConfig_HomeError tests CheckExistingConfig behavior.
-//
 func TestCheckExistingConfig_HomeError(t *testing.T) {
 	// Use temp dir for HOME
 	tmpDir := t.TempDir()
@@ -2310,7 +2309,6 @@ func TestValidateConfig_Themes(t *testing.T) {
 }
 
 // TestCheckAndConfirmConfig_InteractiveNoConfig tests interactive mode without existing config.
-//
 func TestCheckAndConfirmConfig_InteractiveNoConfig(t *testing.T) {
 	// Create temp directory for testing
 	tmpDir := t.TempDir()
@@ -3034,7 +3032,6 @@ func TestStepFlagDevices_MoreCases(t *testing.T) {
 }
 
 // TestCheckAndConfirmConfig_MorePaths tests more CheckAndConfirmConfig scenarios.
-//
 func TestCheckAndConfirmConfig_MorePaths(t *testing.T) {
 	// Create temp dir with config file
 	tmpDir := t.TempDir()

@@ -171,6 +171,8 @@ func TestExecute_WithMock(t *testing.T) {
 }
 
 func TestRun_ShortDelay(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

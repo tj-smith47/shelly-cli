@@ -439,7 +439,7 @@ func TestExecuteShellAlias_NoShell(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo,paralleltest // Integration test covering all package-level alias functions.
+//nolint:paralleltest // Test modifies global state via SetFs and ResetDefaultManagerForTesting
 func TestPackageLevelAliasFunctions(t *testing.T) {
 	// Use in-memory filesystem for test isolation
 	SetFs(afero.NewMemMapFs())
@@ -516,6 +516,7 @@ func TestPackageLevelAliasFunctions(t *testing.T) {
 	// not afero. These are tested in Manager tests with temp directories instead.
 }
 
+//nolint:paralleltest // Test modifies global state via ResetDefaultManagerForTesting and SetDefaultManager
 func TestPackageLevel_ImportAliases(t *testing.T) {
 	// Use temp dir for file operations
 	tmpDir := t.TempDir()
@@ -756,7 +757,7 @@ func TestManager_ExportAliases_ToFile(t *testing.T) {
 	}
 
 	// Verify file content
-	data, err := os.ReadFile(exportPath)
+	data, err := afero.ReadFile(Fs(), exportPath)
 	if err != nil {
 		t.Fatalf("ReadFile() error: %v", err)
 	}

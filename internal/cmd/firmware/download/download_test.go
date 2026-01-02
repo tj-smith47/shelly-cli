@@ -150,6 +150,8 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 }
 
 func TestRun_WithMock(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -193,6 +195,8 @@ func TestRun_WithMock(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -217,6 +221,8 @@ func TestRun_DeviceNotFound(t *testing.T) {
 }
 
 func TestRun_BetaFirmware(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -257,6 +263,8 @@ func TestRun_BetaFirmware(t *testing.T) {
 }
 
 func TestRun_WithOutputPath(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -402,6 +410,8 @@ func TestNewCommand_AcceptsVariousDeviceFormats(t *testing.T) {
 }
 
 func TestExecute_WithDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -444,6 +454,8 @@ func TestExecute_WithDevice(t *testing.T) {
 }
 
 func TestExecute_WithBetaFlag(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -486,6 +498,8 @@ func TestExecute_WithBetaFlag(t *testing.T) {
 }
 
 func TestExecute_WithOutputFlag(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -589,6 +603,8 @@ func TestRun_WithFactoryAccess(t *testing.T) {
 }
 
 func TestRun_WithSubdirectoryOutput(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -630,6 +646,8 @@ func TestRun_WithSubdirectoryOutput(t *testing.T) {
 }
 
 func TestRun_DefaultOutputPath(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -672,6 +690,8 @@ func TestRun_DefaultOutputPath(t *testing.T) {
 }
 
 func TestRun_StableStage(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

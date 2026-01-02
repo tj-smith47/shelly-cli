@@ -113,8 +113,8 @@ func run(ctx context.Context, opts *Options) error {
 		for _, comp := range items {
 			builder.AddRow(fmt.Sprintf("%d", comp.ID), comp.Type)
 		}
-		table := builder.WithModeStyle(ios).Build()
-		if err := table.PrintTo(ios.Out); err != nil {
+		tbl := builder.WithModeStyle(ios).Build()
+		if err := tbl.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print table", err)
 		}
 	})

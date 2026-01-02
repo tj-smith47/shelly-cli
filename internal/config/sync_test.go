@@ -99,8 +99,8 @@ func TestSaveSyncConfig_MarshalError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test creates a real directory (not parallel-safe)
 func TestGetSyncDir(t *testing.T) {
-	// Not parallel since it creates a real directory
 	syncDir, err := GetSyncDir()
 	if err != nil {
 		t.Fatalf("GetSyncDir() error: %v", err)

@@ -751,6 +751,8 @@ func TestNewCommand_MultipleInstances(t *testing.T) {
 }
 
 func TestExecute_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -793,6 +795,8 @@ func TestExecute_WithMockDevice(t *testing.T) {
 }
 
 func TestRun_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -835,6 +839,8 @@ func TestRun_WithMockDevice(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -859,6 +865,8 @@ func TestRun_DeviceNotFound(t *testing.T) {
 }
 
 func TestRun_WithIPAddress(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -901,6 +909,8 @@ func TestRun_WithIPAddress(t *testing.T) {
 }
 
 func TestRun_NoConfirmation(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

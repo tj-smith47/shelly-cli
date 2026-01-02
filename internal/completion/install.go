@@ -92,7 +92,6 @@ func writeBashCompletion(home string, script []byte) (completionDir, completionF
 	if runtime.GOOS == "linux" {
 		if _, statErr := fs.Stat("/etc/bash_completion.d"); statErr == nil {
 			completionFile = "/etc/bash_completion.d/shelly"
-			//nolint:gosec // G306: 0644 is required for shell to source completion files
 			if writeErr := afero.WriteFile(fs, completionFile, script, 0o644); writeErr == nil {
 				return "/etc/bash_completion.d", completionFile, nil
 			}
@@ -101,13 +100,11 @@ func writeBashCompletion(home string, script []byte) (completionDir, completionF
 	}
 
 	// Use user directory
-	//nolint:gosec // G301: 0755 is required for directories to be traversable
 	if err = fs.MkdirAll(userDir, 0o755); err != nil {
 		return "", "", fmt.Errorf("failed to create completion directory: %w", err)
 	}
 
 	completionFile = filepath.Join(userDir, "shelly")
-	//nolint:gosec // G306: 0644 is required for shell to source completion files
 	if err = afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return "", "", fmt.Errorf("failed to write completion script: %w", err)
 	}
@@ -126,7 +123,6 @@ func InstallZsh(ios *iostreams.IOStreams, script []byte) error {
 
 	// Use user's fpath-compatible directory
 	completionDir := filepath.Join(home, ".zsh", "completions")
-	//nolint:gosec // G301: 0755 is required for directories to be traversable
 	if err := fs.MkdirAll(completionDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create completion directory: %w", err)
 	}
@@ -134,7 +130,6 @@ func InstallZsh(ios *iostreams.IOStreams, script []byte) error {
 	completionFile := filepath.Join(completionDir, "_shelly")
 
 	// Write completion script
-	//nolint:gosec // G306: 0644 is required for shell to source completion files
 	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return fmt.Errorf("failed to write completion script: %w", err)
 	}
@@ -167,7 +162,6 @@ func updateZshRC(ios *iostreams.IOStreams, rcFile, completionDir string) error {
 		"autoload -Uz compinit && compinit",
 	}
 
-	//nolint:gosec // G302: 0644 is standard for shell rc files
 	f, err := config.Fs().OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
@@ -205,7 +199,6 @@ func InstallFish(ios *iostreams.IOStreams, script []byte) error {
 
 	// Fish completions go in ~/.config/fish/completions
 	completionDir := filepath.Join(home, ".config", "fish", "completions")
-	//nolint:gosec // G301: 0755 is required for directories to be traversable
 	if err := fs.MkdirAll(completionDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create completion directory: %w", err)
 	}
@@ -213,7 +206,6 @@ func InstallFish(ios *iostreams.IOStreams, script []byte) error {
 	completionFile := filepath.Join(completionDir, "shelly.fish")
 
 	// Write completion script
-	//nolint:gosec // G306: 0644 is required for shell to source completion files
 	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return fmt.Errorf("failed to write completion script: %w", err)
 	}
@@ -241,7 +233,6 @@ func InstallPowerShell(ios *iostreams.IOStreams, script []byte) error {
 		profileDir = filepath.Join(home, ".config", "powershell")
 	}
 
-	//nolint:gosec // G301: 0755 is required for directories to be traversable
 	if err := fs.MkdirAll(profileDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create profile directory: %w", err)
 	}
@@ -249,7 +240,6 @@ func InstallPowerShell(ios *iostreams.IOStreams, script []byte) error {
 	completionFile := filepath.Join(profileDir, "shelly.ps1")
 
 	// Write completion script
-	//nolint:gosec // G306: 0644 is required for shell to source completion files
 	if err := afero.WriteFile(fs, completionFile, script, 0o644); err != nil {
 		return fmt.Errorf("failed to write completion script: %w", err)
 	}
@@ -280,7 +270,6 @@ func updatePowerShellProfile(ios *iostreams.IOStreams, profileFile, completionFi
 		sourceLine,
 	}
 
-	//nolint:gosec // G302: 0644 is standard for PowerShell profile files
 	f, err := config.Fs().OpenFile(profileFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err

@@ -22,7 +22,10 @@ func CheckExistingConfig() (exists bool, path string) {
 	}
 
 	path = filepath.Join(home, ".config", "shelly", "config.yaml")
-	exists, _ = afero.Exists(config.Fs(), path)
+	exists, existsErr := afero.Exists(config.Fs(), path)
+	if existsErr != nil {
+		return false, ""
+	}
 	return exists, path
 }
 
@@ -85,7 +88,10 @@ func CheckCompletionInstalled(shell string) bool {
 		return false
 	}
 
-	exists, _ := afero.Exists(config.Fs(), completionPath)
+	exists, err := afero.Exists(config.Fs(), completionPath)
+	if err != nil {
+		iostreams.DebugErr("check completion exists", err)
+	}
 	return exists
 }
 

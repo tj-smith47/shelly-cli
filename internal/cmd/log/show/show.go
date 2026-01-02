@@ -2,6 +2,8 @@
 package show
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -50,10 +52,13 @@ func run(opts *Options) error {
 		return err
 	}
 
-	if _, err := config.Fs().Stat(logPath); err != nil {
-		ios.Info("No log file found at: %s", logPath)
-		ios.Info("Debug logging may not be enabled.")
-		return nil
+	if _, statErr := config.Fs().Stat(logPath); statErr != nil {
+		if os.IsNotExist(statErr) {
+			ios.Info("No log file found at: %s", logPath)
+			ios.Info("Debug logging may not be enabled.")
+			return nil
+		}
+		return statErr
 	}
 
 	logLines, err := cmdutil.ReadLastLines(logPath, opts.Lines)

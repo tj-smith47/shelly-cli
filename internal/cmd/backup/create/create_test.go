@@ -282,6 +282,7 @@ func TestExecute_TooManyArgs(t *testing.T) {
 }
 
 func TestExecute_WithMockDevice(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -326,6 +327,7 @@ func TestExecute_WithMockDevice(t *testing.T) {
 }
 
 func TestExecute_WithOutputFile(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -371,6 +373,7 @@ func TestExecute_WithOutputFile(t *testing.T) {
 }
 
 func TestExecute_YAMLFormat(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -413,6 +416,7 @@ func TestExecute_YAMLFormat(t *testing.T) {
 }
 
 func TestExecute_WithSkipFlags(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -455,6 +459,7 @@ func TestExecute_WithSkipFlags(t *testing.T) {
 }
 
 func TestExecute_WithEncrypt(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -498,6 +503,7 @@ func TestExecute_WithEncrypt(t *testing.T) {
 }
 
 func TestExecute_UnknownDevice(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{},
@@ -529,6 +535,7 @@ func TestExecute_UnknownDevice(t *testing.T) {
 }
 
 func TestExecute_StdoutOutput(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -572,6 +579,7 @@ func TestExecute_StdoutOutput(t *testing.T) {
 }
 
 func TestRun_Success(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -612,6 +620,7 @@ func TestRun_Success(t *testing.T) {
 }
 
 func TestRun_WriteToFile(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -656,6 +665,7 @@ func TestRun_WriteToFile(t *testing.T) {
 }
 
 func TestRun_InvalidFilePath(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -699,6 +709,7 @@ func TestRun_InvalidFilePath(t *testing.T) {
 }
 
 func TestRun_YAMLFormat(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -739,6 +750,7 @@ func TestRun_YAMLFormat(t *testing.T) {
 }
 
 func TestRun_WithAllSkipFlags(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -782,6 +794,7 @@ func TestRun_WithAllSkipFlags(t *testing.T) {
 }
 
 func TestRun_WithPassword(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

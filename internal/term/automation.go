@@ -22,8 +22,8 @@ func DisplayScriptList(ios *iostreams.IOStreams, scripts []automation.ScriptInfo
 		}
 		builder.AddRow(fmt.Sprintf("%d", s.ID), name, output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), output.RenderRunningState(s.Running))
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print scripts table", err)
 	}
 }
@@ -35,8 +35,8 @@ func DisplayScheduleList(ios *iostreams.IOStreams, schedules []automation.Schedu
 		callsSummary := formatScheduleCallsSummary(s.Calls)
 		builder.AddRow(fmt.Sprintf("%d", s.ID), output.RenderYesNo(s.Enable, output.CaseLower, theme.FalseDim), s.Timespec, callsSummary)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print schedules table", err)
 	}
 }
@@ -74,8 +74,8 @@ func DisplayWebhookList(ios *iostreams.IOStreams, webhooks []shelly.WebhookInfo)
 		}
 		builder.AddRow(fmt.Sprintf("%d", w.ID), w.Event, urls, output.RenderYesNo(w.Enable, output.CaseTitle, theme.FalseError))
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print webhooks table", err)
 	}
 

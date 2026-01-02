@@ -133,8 +133,8 @@ func DisplayFirmwareCheckAll(ios *iostreams.IOStreams, results []shelly.Firmware
 		builder.AddRow(row.name, row.platform, row.current, row.stable, row.beta, row.status)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print firmware check table", err)
 	}
 
@@ -224,8 +224,8 @@ func DisplayDevicesToUpdate(ios *iostreams.IOStreams, devices []shelly.DeviceUpd
 	for _, s := range devices {
 		builder.AddRow(s.Name, s.Info.Current, s.Info.Available)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print devices to update table", err)
 	}
 	ios.Println("")
@@ -310,8 +310,8 @@ func DisplayFirmwareUpdatesTable(ios *iostreams.IOStreams, devices []FirmwareUpd
 		)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print firmware updates table", err)
 	}
 	ios.Println("")

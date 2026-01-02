@@ -7,7 +7,11 @@ import (
 	"time"
 )
 
-const testMAC = "AA:BB:CC:DD:EE:FF"
+const (
+	testMAC       = "AA:BB:CC:DD:EE:FF"
+	testModelPlug = "SPSW-001PE16EU"
+	testAliasName = "kitchen"
+)
 
 func TestManager_Defaults(t *testing.T) {
 	t.Parallel()
@@ -292,7 +296,7 @@ func TestManager_UpdateDeviceInfo(t *testing.T) {
 
 	// Update with partial info
 	if err := m.UpdateDeviceInfo("test-device", DeviceUpdates{
-		Type:       "SPSW-001PE16EU",
+		Type:       "testModelPlug",
 		Model:      "Shelly Pro 1PM",
 		Generation: 2,
 	}); err != nil {
@@ -304,8 +308,8 @@ func TestManager_UpdateDeviceInfo(t *testing.T) {
 	if !ok {
 		t.Fatal("expected device to exist after update")
 	}
-	if dev.Type != "SPSW-001PE16EU" {
-		t.Errorf("expected Type 'SPSW-001PE16EU', got %q", dev.Type)
+	if dev.Type != "testModelPlug" {
+		t.Errorf("expected Type 'testModelPlug', got %q", dev.Type)
 	}
 	if dev.Model != "Shelly Pro 1PM" {
 		t.Errorf("expected Model 'Shelly Pro 1PM', got %q", dev.Model)
@@ -326,8 +330,8 @@ func TestManager_UpdateDeviceInfo(t *testing.T) {
 	if !ok {
 		t.Fatal("expected device to exist after partial update")
 	}
-	if dev.Type != "SPSW-001PE16EU" {
-		t.Errorf("expected Type unchanged 'SPSW-001PE16EU', got %q", dev.Type)
+	if dev.Type != "testModelPlug" {
+		t.Errorf("expected Type unchanged 'testModelPlug', got %q", dev.Type)
 	}
 	if dev.Model != "Shelly Pro 1PM Updated" {
 		t.Errorf("expected Model 'Shelly Pro 1PM Updated', got %q", dev.Model)
@@ -365,13 +369,13 @@ func TestManager_UpdateDeviceInfo_NoChanges(t *testing.T) {
 	}
 
 	// Register a device with values already set
-	if err := m.RegisterDevice("test-device", "192.168.1.1", 2, "SPSW-001PE16EU", "Shelly Pro 1PM", nil); err != nil {
+	if err := m.RegisterDevice("test-device", "192.168.1.1", 2, "testModelPlug", "Shelly Pro 1PM", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Update with same values (should not write to disk)
 	if err := m.UpdateDeviceInfo("test-device", DeviceUpdates{
-		Type:       "SPSW-001PE16EU",
+		Type:       "testModelPlug",
 		Model:      "Shelly Pro 1PM",
 		Generation: 2,
 	}); err != nil {
@@ -633,7 +637,7 @@ func TestManager_DeviceAliases(t *testing.T) {
 	}
 
 	// Add second alias to first device
-	if err := m.AddDeviceAlias("kitchen-light", "kitchen"); err != nil {
+	if err := m.AddDeviceAlias("kitchen-light", testAliasName); err != nil {
 		t.Fatalf("AddDeviceAlias() second alias error: %v", err)
 	}
 
@@ -656,7 +660,7 @@ func TestManager_DeviceAliases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetDeviceAliases() after remove error: %v", err)
 	}
-	if len(aliases) != 1 || aliases[0] != "kitchen" {
+	if len(aliases) != 1 || aliases[0] != testAliasName {
 		t.Errorf("expected aliases [kitchen], got %v", aliases)
 	}
 

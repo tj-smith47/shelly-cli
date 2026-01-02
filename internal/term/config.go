@@ -59,8 +59,8 @@ func DisplaySceneList(ios *iostreams.IOStreams, scenes []config.Scene) {
 		builder.AddRow(scene.Name, actions, description)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print scenes table", err)
 	}
 	ios.Println()
@@ -79,8 +79,8 @@ func DisplayAliasList(ios *iostreams.IOStreams, aliases []config.Alias) {
 		builder.AddRow(alias.Name, alias.Command, aliasType)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print aliases table", err)
 	}
 	ios.Println()
@@ -112,8 +112,8 @@ func DisplayTemplateDiffs(ios *iostreams.IOStreams, templateName, deviceName str
 	for _, d := range diffs {
 		builder.AddRow(d.Path, d.DiffType, output.FormatDisplayValue(d.OldValue), output.FormatDisplayValue(d.NewValue))
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print template diffs table", err)
 	}
 	ios.Printf("\n%d difference(s) found\n", len(diffs))
@@ -137,8 +137,8 @@ func DisplayDeviceTemplateList(ios *iostreams.IOStreams, templates []config.Devi
 		builder.AddRow(t.Name, t.Model, fmt.Sprintf("Gen%d", t.Generation), source, created)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print templates table", err)
 	}
 	ios.Printf("\n%d template(s)\n", len(templates))

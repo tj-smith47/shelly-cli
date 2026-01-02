@@ -97,16 +97,16 @@ func IsConfigFile(path string) bool {
 // SetConfig updates device configuration.
 // The config parameter should be a map of component keys to configuration
 // objects. Only specified components will be updated.
-func (s *Service) SetConfig(ctx context.Context, identifier string, config map[string]any) error {
+func (s *Service) SetConfig(ctx context.Context, identifier string, cfg map[string]any) error {
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
-		return conn.SetConfig(ctx, config)
+		return conn.SetConfig(ctx, cfg)
 	})
 }
 
 // SetComponentConfig updates a specific component's configuration.
-func (s *Service) SetComponentConfig(ctx context.Context, identifier, component string, config map[string]any) error {
+func (s *Service) SetComponentConfig(ctx context.Context, identifier, component string, cfg map[string]any) error {
 	fullConfig := map[string]any{
-		component: config,
+		component: cfg,
 	}
 	return s.SetConfig(ctx, identifier, fullConfig)
 }
@@ -587,18 +587,18 @@ func (s *Service) SetBLEConfig(ctx context.Context, identifier string, enable, r
 	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		ble := components.NewBLE(conn.RPCClient())
 
-		config := &components.BLEConfig{}
+		bleCfg := &components.BLEConfig{}
 		if enable != nil {
-			config.Enable = enable
+			bleCfg.Enable = enable
 		}
 		if rpcEnabled != nil {
-			config.RPC = &components.BLERPCConfig{Enable: rpcEnabled}
+			bleCfg.RPC = &components.BLERPCConfig{Enable: rpcEnabled}
 		}
 		if observerMode != nil {
-			config.Observer = &components.BLEObserverConfig{Enable: observerMode}
+			bleCfg.Observer = &components.BLEObserverConfig{Enable: observerMode}
 		}
 
-		return ble.SetConfig(ctx, config)
+		return ble.SetConfig(ctx, bleCfg)
 	})
 }
 

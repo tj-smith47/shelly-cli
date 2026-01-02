@@ -17,13 +17,14 @@ import (
 
 // Test constants to avoid magic strings.
 const (
-	testMAC1     = "AA:BB:CC:DD:EE:FF"
-	testMAC2     = "11:22:33:44:55:66"
-	testModel1   = "SNSW-001P16EU"
-	testFirmware = "1.0.0"
-	testApp      = "Plus1PM"
-	gen2Endpoint = "/rpc/Shelly.GetDeviceInfo"
-	gen1Endpoint = "/shelly"
+	testMAC1         = "AA:BB:CC:DD:EE:FF"
+	testMAC2         = "11:22:33:44:55:66"
+	testModel1       = "SNSW-001P16EU"
+	testFirmware     = "1.0.0"
+	testApp          = "Plus1PM"
+	testKitchenLight = "Kitchen Light"
+	gen2Endpoint     = "/rpc/Shelly.GetDeviceInfo"
+	gen1Endpoint     = "/shelly"
 )
 
 func TestDeviceInfo_Fields(t *testing.T) {
@@ -654,17 +655,17 @@ func TestDetectionResult_Fields(t *testing.T) {
 	if result.Generation != Gen2 {
 		t.Errorf("Generation = %d, want %d", result.Generation, Gen2)
 	}
-	if result.DeviceType != "Plus1PM" {
-		t.Errorf("DeviceType = %q, want Plus1PM", result.DeviceType)
+	if result.DeviceType != testApp {
+		t.Errorf("DeviceType = %q, want %s", result.DeviceType, testApp)
 	}
-	if result.Model != "SNSW-001P16EU" {
-		t.Errorf("Model = %q, want SNSW-001P16EU", result.Model)
+	if result.Model != testModel1 {
+		t.Errorf("Model = %q, want %s", result.Model, testModel1)
 	}
-	if result.MAC != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("MAC = %q, want AA:BB:CC:DD:EE:FF", result.MAC)
+	if result.MAC != testMAC1 {
+		t.Errorf("MAC = %q, want %s", result.MAC, testMAC1)
 	}
-	if result.Firmware != "1.0.0" {
-		t.Errorf("Firmware = %q, want 1.0.0", result.Firmware)
+	if result.Firmware != testFirmware {
+		t.Errorf("Firmware = %q, want %s", result.Firmware, testFirmware)
 	}
 	if !result.AuthEn {
 		t.Error("AuthEn = false, want true")
@@ -1576,17 +1577,17 @@ func TestDetectGeneration_Gen2Device(t *testing.T) {
 	if result.Generation != Gen2 {
 		t.Errorf("Generation = %d, want %d", result.Generation, Gen2)
 	}
-	if result.DeviceType != "Plus1PM" {
-		t.Errorf("DeviceType = %q, want Plus1PM", result.DeviceType)
+	if result.DeviceType != testApp {
+		t.Errorf("DeviceType = %q, want %s", result.DeviceType, testApp)
 	}
-	if result.Model != "SNSW-001P16EU" {
-		t.Errorf("Model = %q, want SNSW-001P16EU", result.Model)
+	if result.Model != testModel1 {
+		t.Errorf("Model = %q, want %s", result.Model, testModel1)
 	}
-	if result.MAC != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("MAC = %q, want AA:BB:CC:DD:EE:FF", result.MAC)
+	if result.MAC != testMAC1 {
+		t.Errorf("MAC = %q, want %s", result.MAC, testMAC1)
 	}
-	if result.Firmware != "1.0.0" {
-		t.Errorf("Firmware = %q, want 1.0.0", result.Firmware)
+	if result.Firmware != testFirmware {
+		t.Errorf("Firmware = %q, want %s", result.Firmware, testFirmware)
 	}
 	if result.AuthEn {
 		t.Error("AuthEn = true, want false")
@@ -1642,8 +1643,8 @@ func TestDetectGeneration_Gen1Device(t *testing.T) {
 	if result.DeviceType != "SHSW-1" {
 		t.Errorf("DeviceType = %q, want SHSW-1", result.DeviceType)
 	}
-	if result.MAC != "11:22:33:44:55:66" {
-		t.Errorf("MAC = %q, want 11:22:33:44:55:66", result.MAC)
+	if result.MAC != testMAC2 {
+		t.Errorf("MAC = %q, want %s", result.MAC, testMAC2)
 	}
 	if result.IsGen2() {
 		t.Error("IsGen2() = true, want false")
@@ -2241,8 +2242,8 @@ func TestDetectGeneration_Gen1AllFields(t *testing.T) {
 	if result.Model != "SHSW-25" {
 		t.Errorf("Model = %q, want SHSW-25", result.Model)
 	}
-	if result.MAC != "11:22:33:44:55:66" {
-		t.Errorf("MAC = %q, want 11:22:33:44:55:66", result.MAC)
+	if result.MAC != testMAC2 {
+		t.Errorf("MAC = %q, want %s", result.MAC, testMAC2)
 	}
 	if result.Firmware != "20230913-114351/v1.14.0-gcb84623" {
 		t.Errorf("Firmware = %q, want specific version", result.Firmware)
@@ -2336,6 +2337,7 @@ type mockRPCServer struct {
 	handlers map[string]func(params map[string]any) (any, error)
 	authUser string
 	authPass string
+	t        *testing.T
 }
 
 func newMockRPCServer() *mockRPCServer {
@@ -2355,6 +2357,61 @@ func (m *mockRPCServer) handle(method string, handler func(params map[string]any
 	return m
 }
 
+// handleGETRPC handles GET /rpc/<method> format requests.
+func (m *mockRPCServer) handleGETRPC(w http.ResponseWriter, method string) bool {
+	handler, ok := m.handlers[method]
+	if !ok {
+		return false
+	}
+	result, err := handler(nil)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return true
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		m.t.Logf("warning: encode error: %v", err)
+	}
+	return true
+}
+
+// handlePOSTRPC handles POST /rpc format (JSON-RPC) requests.
+func (m *mockRPCServer) handlePOSTRPC(w http.ResponseWriter, r *http.Request) bool {
+	var req struct {
+		ID     int            `json:"id"`
+		Method string         `json:"method"`
+		Params map[string]any `json:"params"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return true
+	}
+
+	handler, ok := m.handlers[req.Method]
+	if !ok {
+		return false
+	}
+
+	result, err := handler(req.Params)
+	w.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		if encErr := json.NewEncoder(w).Encode(map[string]any{
+			"id":    req.ID,
+			"error": map[string]any{"code": -1, "message": err.Error()},
+		}); encErr != nil {
+			m.t.Logf("warning: encode error: %v", encErr)
+		}
+		return true
+	}
+	if encErr := json.NewEncoder(w).Encode(map[string]any{
+		"id":     req.ID,
+		"result": result,
+	}); encErr != nil {
+		m.t.Logf("warning: encode error: %v", encErr)
+	}
+	return true
+}
+
 func (m *mockRPCServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Check auth if configured
 	if m.authUser != "" {
@@ -2367,15 +2424,7 @@ func (m *mockRPCServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle GET /rpc/<method> format
 	if r.Method == http.MethodGet && len(r.URL.Path) > 5 && r.URL.Path[:5] == "/rpc/" {
-		method := r.URL.Path[5:]
-		if handler, ok := m.handlers[method]; ok {
-			result, err := handler(nil)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(result)
+		if m.handleGETRPC(w, r.URL.Path[5:]) {
 			return
 		}
 		http.NotFound(w, r)
@@ -2384,31 +2433,7 @@ func (m *mockRPCServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle POST /rpc format (JSON-RPC)
 	if r.Method == http.MethodPost && r.URL.Path == "/rpc" {
-		var req struct {
-			ID     int            `json:"id"`
-			Method string         `json:"method"`
-			Params map[string]any `json:"params"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		if handler, ok := m.handlers[req.Method]; ok {
-			result, err := handler(req.Params)
-			if err != nil {
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"id":    req.ID,
-					"error": map[string]any{"code": -1, "message": err.Error()},
-				})
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id":     req.ID,
-				"result": result,
-			})
+		if m.handlePOSTRPC(w, r) {
 			return
 		}
 		http.NotFound(w, r)
@@ -2420,12 +2445,13 @@ func (m *mockRPCServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (m *mockRPCServer) start(t *testing.T) *httptest.Server {
 	t.Helper()
+	m.t = t
 	server := httptest.NewServer(m)
 	t.Cleanup(server.Close)
 	return server
 }
 
-// Standard device info response for tests
+// Standard device info response for tests.
 func standardDeviceInfo() map[string]any {
 	return map[string]any{
 		"id":      "shellyplus1pm-test123",
@@ -2807,7 +2833,7 @@ func TestClient_GetConfig_Success(t *testing.T) {
 		},
 		"switch:0": map[string]any{
 			"id":            0,
-			"name":          "Kitchen Light",
+			"name":          testKitchenLight,
 			"initial_state": "restore_last",
 			"auto_on":       false,
 			"auto_off":      false,
@@ -2861,8 +2887,8 @@ func TestClient_GetConfig_Success(t *testing.T) {
 	if !ok {
 		t.Fatal("config[switch:0] not a map")
 	}
-	if sw["name"] != "Kitchen Light" {
-		t.Errorf("switch:0.name = %v, want Kitchen Light", sw["name"])
+	if sw["name"] != testKitchenLight {
+		t.Errorf("switch:0.name = %v, want %s", sw["name"], testKitchenLight)
 	}
 }
 
@@ -3207,6 +3233,7 @@ type mockGen1Server struct {
 	handlers map[string]func(query string) (any, int)
 	authUser string
 	authPass string
+	t        *testing.T
 }
 
 func newMockGen1Server() *mockGen1Server {
@@ -3226,6 +3253,23 @@ func (m *mockGen1Server) handle(path string, handler func(query string) (any, in
 	return m
 }
 
+// handleGETRequest handles GET requests for the Gen1 mock server.
+func (m *mockGen1Server) handleGETRequest(w http.ResponseWriter, r *http.Request) bool {
+	handler, ok := m.handlers[r.URL.Path]
+	if !ok {
+		return false
+	}
+	result, status := handler(r.URL.RawQuery)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if result != nil {
+		if err := json.NewEncoder(w).Encode(result); err != nil {
+			m.t.Logf("warning: encode error: %v", err)
+		}
+	}
+	return true
+}
+
 func (m *mockGen1Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Check auth if configured
 	if m.authUser != "" {
@@ -3238,14 +3282,7 @@ func (m *mockGen1Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle GET requests
 	if r.Method == http.MethodGet {
-		path := r.URL.Path
-		if handler, ok := m.handlers[path]; ok {
-			result, status := handler(r.URL.RawQuery)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(status)
-			if result != nil {
-				_ = json.NewEncoder(w).Encode(result)
-			}
+		if m.handleGETRequest(w, r) {
 			return
 		}
 		http.NotFound(w, r)
@@ -3257,12 +3294,13 @@ func (m *mockGen1Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (m *mockGen1Server) start(t *testing.T) *httptest.Server {
 	t.Helper()
+	m.t = t
 	server := httptest.NewServer(m)
 	t.Cleanup(server.Close)
 	return server
 }
 
-// Standard Gen1 device info response
+// Standard Gen1 device info response.
 func standardGen1DeviceInfo() map[string]any {
 	return map[string]any{
 		"type":        "SHSW-1",
@@ -3495,7 +3533,7 @@ func TestGen1Client_GetSettings_Success(t *testing.T) {
 		},
 		"relays": []any{
 			map[string]any{
-				"name":           "Kitchen Light",
+				"name":           testKitchenLight,
 				"default_state":  "last",
 				"btn_type":       "toggle",
 				"auto_on":        0,
@@ -4161,7 +4199,7 @@ func TestGen1Relay_GetConfig(t *testing.T) {
 		}).
 		handle("/settings/relay/0", func(_ string) (any, int) {
 			return map[string]any{
-				"name":          "Kitchen Light",
+				"name":          testKitchenLight,
 				"default_state": "last",
 				"btn_type":      "toggle",
 				"auto_on":       0,
@@ -4198,8 +4236,8 @@ func TestGen1Relay_GetConfig(t *testing.T) {
 	if config == nil {
 		t.Fatal("GetConfig() returned nil")
 	}
-	if config.Name != "Kitchen Light" {
-		t.Errorf("config.Name = %q, want Kitchen Light", config.Name)
+	if config.Name != testKitchenLight {
+		t.Errorf("config.Name = %q, want %s", config.Name, testKitchenLight)
 	}
 }
 
@@ -4365,7 +4403,7 @@ func TestGen2Switch_GetConfig(t *testing.T) {
 		handle("Switch.GetConfig", func(_ map[string]any) (any, error) {
 			return map[string]any{
 				"id":             0,
-				"name":           "Kitchen Light",
+				"name":           testKitchenLight,
 				"initial_state":  "restore_last",
 				"auto_on":        false,
 				"auto_on_delay":  0,
@@ -4399,12 +4437,12 @@ func TestGen2Switch_GetConfig(t *testing.T) {
 	if config == nil {
 		t.Fatal("GetConfig() returned nil")
 	}
-	if config.Name == nil || *config.Name != "Kitchen Light" {
+	if config.Name == nil || *config.Name != testKitchenLight {
 		var name string
 		if config.Name != nil {
 			name = *config.Name
 		}
-		t.Errorf("config.Name = %q, want Kitchen Light", name)
+		t.Errorf("config.Name = %q, want %s", name, testKitchenLight)
 	}
 }
 
@@ -7269,8 +7307,8 @@ func TestKVS_Get(t *testing.T) {
 			return standardDeviceInfo(), nil
 		}).
 		handle("KVS.Get", func(params map[string]any) (any, error) {
-			key := params["key"].(string)
-			if key != "testkey" {
+			key, ok := params["key"].(string)
+			if !ok || key != "testkey" {
 				return nil, fmt.Errorf("unexpected key: %s", key)
 			}
 			return map[string]any{
@@ -7363,8 +7401,8 @@ func TestKVS_Set(t *testing.T) {
 		}).
 		handle("KVS.Set", func(params map[string]any) (any, error) {
 			setCalled = true
-			key := params["key"].(string)
-			if key != "mykey" {
+			key, ok := params["key"].(string)
+			if !ok || key != "mykey" {
 				return nil, fmt.Errorf("unexpected key: %s", key)
 			}
 			return map[string]any{
@@ -7416,8 +7454,8 @@ func TestKVS_Delete(t *testing.T) {
 		}).
 		handle("KVS.Delete", func(params map[string]any) (any, error) {
 			deleteCalled = true
-			key := params["key"].(string)
-			if key != "deletekey" {
+			key, ok := params["key"].(string)
+			if !ok || key != "deletekey" {
 				return nil, fmt.Errorf("unexpected key: %s", key)
 			}
 			return map[string]any{
@@ -7464,8 +7502,8 @@ func TestKVS_GetAll(t *testing.T) {
 		}).
 		handle("KVS.GetMany", func(params map[string]any) (any, error) {
 			// GetAll calls GetMany with "*"
-			match := params["match"].(string)
-			if match != "*" {
+			match, ok := params["match"].(string)
+			if !ok || match != "*" {
 				return nil, fmt.Errorf("unexpected match: %s", match)
 			}
 			return map[string]any{

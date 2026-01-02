@@ -71,7 +71,7 @@ func TestNewCommand_Args(t *testing.T) {
 		args    []string
 		wantErr bool
 	}{
-		{"no args", []string{}, false},          // MaximumNArgs(1)
+		{"no args", []string{}, false},
 		{"one arg valid", []string{"device"}, false},
 		{"two args", []string{"device1", "device2"}, true},
 	}
@@ -268,7 +268,8 @@ func TestExecute_NoDeviceNoAll(t *testing.T) {
 }
 
 func TestExecute_AllNoDevices(t *testing.T) {
-	// This test modifies config, not parallel
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}}, // Empty
@@ -298,6 +299,8 @@ func TestExecute_AllNoDevices(t *testing.T) {
 }
 
 func TestExecute_SingleDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -341,6 +344,8 @@ func TestExecute_SingleDevice(t *testing.T) {
 }
 
 func TestExecute_WithList(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -383,6 +388,8 @@ func TestExecute_WithList(t *testing.T) {
 }
 
 func TestRun_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -429,6 +436,8 @@ func TestRun_WithMockDevice(t *testing.T) {
 }
 
 func TestRun_AllWithDevices(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -504,6 +513,8 @@ func TestRun_CancelledContext(t *testing.T) {
 }
 
 func TestRun_BetaFirmware(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -546,6 +557,8 @@ func TestRun_BetaFirmware(t *testing.T) {
 }
 
 func TestRun_CustomURL(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -599,6 +612,8 @@ func TestNewCommand_MultipleInstances(t *testing.T) {
 }
 
 func TestRun_AllNoDevices(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
@@ -629,6 +644,8 @@ func TestRun_AllNoDevices(t *testing.T) {
 }
 
 func TestRun_AdHocDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -696,6 +713,8 @@ func TestNewCommand_AcceptsVariousDeviceFormats(t *testing.T) {
 }
 
 func TestRun_StagedRollout(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

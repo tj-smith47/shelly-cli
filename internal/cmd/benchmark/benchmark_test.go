@@ -673,6 +673,8 @@ func TestRun_DirectCall_IPAddress(t *testing.T) {
 
 // TestExecute_WithMockDevice tests full Execute path with mock device server.
 func TestExecute_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -727,6 +729,8 @@ func TestExecute_WithMockDevice(t *testing.T) {
 
 // TestExecute_Gen1Device tests that Gen1 devices are rejected.
 func TestExecute_Gen1Device(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -770,6 +774,8 @@ func TestExecute_Gen1Device(t *testing.T) {
 
 // TestExecute_ZeroWarmup tests benchmark with no warmup iterations.
 func TestExecute_ZeroWarmup(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -816,6 +822,8 @@ func TestExecute_ZeroWarmup(t *testing.T) {
 
 // TestExecute_JSONOutput tests benchmark with JSON output format.
 func TestExecute_JSONOutput(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -869,6 +877,8 @@ func TestExecute_JSONOutput(t *testing.T) {
 
 // TestRun_WithMock tests the run function directly with mock device.
 func TestRun_WithMock(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -917,6 +927,8 @@ func TestRun_WithMock(t *testing.T) {
 
 // TestRun_Gen1Rejection tests that run function rejects Gen1 devices.
 func TestRun_Gen1Rejection(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -963,6 +975,8 @@ func TestRun_Gen1Rejection(t *testing.T) {
 
 // TestRun_ManyIterations tests run with more iterations for progress output.
 func TestRun_ManyIterations(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1012,6 +1026,8 @@ func TestRun_ManyIterations(t *testing.T) {
 
 // TestExecute_VerifyOutputFormat tests that output contains expected sections.
 func TestExecute_VerifyOutputFormat(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1075,6 +1091,8 @@ func TestExecute_VerifyOutputFormat(t *testing.T) {
 
 // TestExecute_HighIterations tests benchmark with more iterations.
 func TestExecute_HighIterations(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1143,6 +1161,8 @@ func TestExecute_UnknownDevice(t *testing.T) {
 
 // TestExecute_DefaultIterations tests benchmark with default iterations.
 func TestExecute_DefaultIterations(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

@@ -93,8 +93,8 @@ func run(ctx context.Context, opts *Options) error {
 	builder.AddRow("Application", info.App)
 	builder.AddRow("Auth Enabled", output.RenderAuthRequired(info.AuthEn))
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print device info table", err)
 	}
 

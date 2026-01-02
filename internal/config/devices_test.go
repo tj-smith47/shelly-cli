@@ -9,6 +9,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
+const (
+	testDeviceIP   = "192.168.1.1"
+	testAuthAdmin  = "admin"
+	testDeviceName = "kitchen"
+)
+
 func TestNormalizeDeviceName(t *testing.T) {
 	t.Parallel()
 
@@ -139,16 +145,16 @@ func TestManager_GroupOperations(t *testing.T) {
 	}
 
 	// Register a device and add to group
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
-	if err := m.AddDeviceToGroup("lights", "kitchen"); err != nil {
+	if err := m.AddDeviceToGroup("lights", testDeviceName); err != nil {
 		t.Fatalf("AddDeviceToGroup() error: %v", err)
 	}
 
 	// Verify device in group
 	grp, _ = m.GetGroup("lights")
-	if len(grp.Devices) != 1 || grp.Devices[0] != "kitchen" {
+	if len(grp.Devices) != 1 || grp.Devices[0] != testDeviceName {
 		t.Errorf("expected devices [kitchen], got %v", grp.Devices)
 	}
 
@@ -160,12 +166,12 @@ func TestManager_GroupOperations(t *testing.T) {
 	if len(devices) != 1 {
 		t.Errorf("expected 1 device, got %d", len(devices))
 	}
-	if devices[0].Address != "192.168.1.1" {
-		t.Errorf("expected address 192.168.1.1, got %s", devices[0].Address)
+	if devices[0].Address != testDeviceIP {
+		t.Errorf("expected address testDeviceIP, got %s", devices[0].Address)
 	}
 
 	// Remove device from group
-	if err := m.RemoveDeviceFromGroup("lights", "kitchen"); err != nil {
+	if err := m.RemoveDeviceFromGroup("lights", testDeviceName); err != nil {
 		t.Fatalf("RemoveDeviceFromGroup() error: %v", err)
 	}
 	grp, _ = m.GetGroup("lights")
@@ -222,15 +228,15 @@ func TestManager_AddDeviceToGroup_Errors(t *testing.T) {
 	if err := m.CreateGroup("lights"); err != nil {
 		t.Fatalf("CreateGroup() error: %v", err)
 	}
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
-	if err := m.AddDeviceToGroup("lights", "kitchen"); err != nil {
+	if err := m.AddDeviceToGroup("lights", testDeviceName); err != nil {
 		t.Fatalf("AddDeviceToGroup() error: %v", err)
 	}
 
 	// Try to add same device again (should fail - duplicate)
-	err = m.AddDeviceToGroup("lights", "kitchen")
+	err = m.AddDeviceToGroup("lights", testDeviceName)
 	if err == nil {
 		t.Error("expected error adding duplicate device to group")
 	}
@@ -246,7 +252,7 @@ func TestManager_RenameDevice(t *testing.T) {
 	}
 
 	// Register a device
-	if err := m.RegisterDevice("old-name", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("old-name", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -266,8 +272,8 @@ func TestManager_RenameDevice(t *testing.T) {
 	if !ok {
 		t.Fatal("new name should exist after rename")
 	}
-	if dev.Address != "192.168.1.1" {
-		t.Errorf("expected address 192.168.1.1, got %s", dev.Address)
+	if dev.Address != testDeviceIP {
+		t.Errorf("expected address testDeviceIP, got %s", dev.Address)
 	}
 }
 
@@ -287,7 +293,7 @@ func TestManager_RenameDevice_Errors(t *testing.T) {
 	}
 
 	// Register two devices
-	if err := m.RegisterDevice("device1", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice(device1) error: %v", err)
 	}
 	if err := m.RegisterDevice("device2", "192.168.1.2", 2, "", "", nil); err != nil {
@@ -311,19 +317,19 @@ func TestManager_UpdateDeviceAddress(t *testing.T) {
 	}
 
 	// Register a device
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Update address
-	if err := m.UpdateDeviceAddress("kitchen", "192.168.1.100"); err != nil {
+	if err := m.UpdateDeviceAddress(testDeviceName, "testDeviceIP00"); err != nil {
 		t.Fatalf("UpdateDeviceAddress() error: %v", err)
 	}
 
 	// Verify new address
-	dev, _ := m.GetDevice("kitchen")
-	if dev.Address != "192.168.1.100" {
-		t.Errorf("expected address 192.168.1.100, got %s", dev.Address)
+	dev, _ := m.GetDevice(testDeviceName)
+	if dev.Address != "testDeviceIP00" {
+		t.Errorf("expected address testDeviceIP00, got %s", dev.Address)
 	}
 }
 
@@ -337,17 +343,17 @@ func TestManager_UnregisterDevice(t *testing.T) {
 	}
 
 	// Register a device
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Unregister it
-	if err := m.UnregisterDevice("kitchen"); err != nil {
+	if err := m.UnregisterDevice(testDeviceName); err != nil {
 		t.Fatalf("UnregisterDevice() error: %v", err)
 	}
 
 	// Should not exist
-	_, ok := m.GetDevice("kitchen")
+	_, ok := m.GetDevice(testDeviceName)
 	if ok {
 		t.Error("device should not exist after UnregisterDevice()")
 	}
@@ -448,7 +454,7 @@ func TestManager_RegisterDeviceWithPlatform_Direct(t *testing.T) {
 	}
 
 	// Register with platform
-	auth := &model.Auth{Username: "admin", Password: "pass"}
+	auth := &model.Auth{Username: "testAuthAdmin", Password: "pass"}
 	err := m.RegisterDeviceWithPlatform("esphome-device", "192.168.1.70", 0, "light", "ESPHome Light", "esphome", auth)
 	if err != nil {
 		t.Errorf("RegisterDeviceWithPlatform() error = %v", err)
@@ -462,7 +468,7 @@ func TestManager_RegisterDeviceWithPlatform_Direct(t *testing.T) {
 	if dev.Platform != "esphome" {
 		t.Errorf("dev.Platform = %q, want %q", dev.Platform, "esphome")
 	}
-	if dev.Auth == nil || dev.Auth.Username != "admin" {
+	if dev.Auth == nil || dev.Auth.Username != "testAuthAdmin" {
 		t.Error("dev.Auth should be set")
 	}
 }
@@ -477,7 +483,7 @@ func TestManager_RegisterDeviceWithPlatform_InvalidName(t *testing.T) {
 	}
 
 	// Register with invalid name (empty after normalization)
-	err := m.RegisterDeviceWithPlatform("!!!", "192.168.1.1", 0, "", "", "", nil)
+	err := m.RegisterDeviceWithPlatform("!!!", testDeviceIP, 0, "", "", "", nil)
 	if err == nil {
 		t.Error("expected error registering device with invalid name")
 	}
@@ -493,7 +499,7 @@ func TestManager_UnregisterDevice_WithDisplayName(t *testing.T) {
 	}
 
 	// Register with display name
-	if err := m.RegisterDevice("Master Bathroom", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("Master Bathroom", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -519,26 +525,26 @@ func TestManager_UnregisterDevice_CleanupAliasesAndGroups(t *testing.T) {
 	}
 
 	// Register device with alias and add to group
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
-	if err := m.AddDeviceAlias("kitchen", "kl"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "kl"); err != nil {
 		t.Fatalf("AddDeviceAlias() error: %v", err)
 	}
 	if err := m.CreateGroup("lights"); err != nil {
 		t.Fatalf("CreateGroup() error: %v", err)
 	}
-	if err := m.AddDeviceToGroup("lights", "kitchen"); err != nil {
+	if err := m.AddDeviceToGroup("lights", testDeviceName); err != nil {
 		t.Fatalf("AddDeviceToGroup() error: %v", err)
 	}
 
 	// Unregister
-	if err := m.UnregisterDevice("kitchen"); err != nil {
+	if err := m.UnregisterDevice(testDeviceName); err != nil {
 		t.Fatalf("UnregisterDevice() error: %v", err)
 	}
 
 	// Verify device is gone
-	_, ok := m.GetDevice("kitchen")
+	_, ok := m.GetDevice(testDeviceName)
 	if ok {
 		t.Error("device should not exist after unregister")
 	}
@@ -549,7 +555,7 @@ func TestManager_UnregisterDevice_CleanupAliasesAndGroups(t *testing.T) {
 		t.Fatal("group should still exist")
 	}
 	for _, d := range grp.Devices {
-		if d == "kitchen" {
+		if d == testDeviceName {
 			t.Error("device should be removed from group")
 		}
 	}
@@ -565,12 +571,12 @@ func TestManager_UpdateDeviceAddress_SameAddress(t *testing.T) {
 	}
 
 	// Register device
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Update with same address (should be no-op)
-	if err := m.UpdateDeviceAddress("kitchen", "192.168.1.1"); err != nil {
+	if err := m.UpdateDeviceAddress(testDeviceName, testDeviceIP); err != nil {
 		t.Fatalf("UpdateDeviceAddress() same address error: %v", err)
 	}
 }
@@ -584,7 +590,7 @@ func TestManager_UpdateDeviceAddress_NotFound(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	err := m.UpdateDeviceAddress("nonexistent", "192.168.1.100")
+	err := m.UpdateDeviceAddress("nonexistent", "testDeviceIP00")
 	if err == nil {
 		t.Error("expected error for nonexistent device")
 	}
@@ -599,7 +605,7 @@ func TestManager_RenameDevice_InvalidNewName(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("device1", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -649,7 +655,7 @@ func TestManager_AddDeviceAlias_InvalidAlias(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("device1", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -669,7 +675,7 @@ func TestManager_RemoveDeviceAlias_NotFound(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("device1", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -690,7 +696,7 @@ func TestManager_ResolveDevice_ByMAC(t *testing.T) {
 	}
 
 	// Register device with MAC
-	if err := m.RegisterDevice("device1", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 	if err := m.UpdateDeviceInfo("device1", DeviceUpdates{MAC: "11:22:33:44:55:66"}); err != nil {
@@ -702,8 +708,8 @@ func TestManager_ResolveDevice_ByMAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveDevice() by MAC error: %v", err)
 	}
-	if dev.Address != "192.168.1.1" {
-		t.Errorf("dev.Address = %q, want %q", dev.Address, "192.168.1.1")
+	if dev.Address != testDeviceIP {
+		t.Errorf("dev.Address = %q, want %q", dev.Address, testDeviceIP)
 	}
 }
 
@@ -733,7 +739,7 @@ func TestManager_CheckAliasConflict_WithExclude(t *testing.T) {
 	}
 
 	// Register device with alias
-	if err := m.RegisterDevice("device1", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 	if err := m.AddDeviceAlias("device1", "alias1"); err != nil {
@@ -826,17 +832,17 @@ func TestManager_RenameDevice_SameName(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Rename to same normalized name (different display name, same key)
-	if err := m.RenameDevice("kitchen", "Kitchen"); err != nil {
+	if err := m.RenameDevice(testDeviceName, "Kitchen"); err != nil {
 		t.Errorf("RenameDevice() to same normalized key should succeed: %v", err)
 	}
 
 	// Check that device was renamed (display name updated)
-	dev, ok := m.GetDevice("kitchen")
+	dev, ok := m.GetDevice(testDeviceName)
 	if !ok {
 		t.Error("device should still exist")
 	}
@@ -854,7 +860,7 @@ func TestManager_RenameDevice_AlreadyExists(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 	if err := m.RegisterDevice("living-room", "192.168.1.2", 2, "", "", nil); err != nil {
@@ -862,7 +868,7 @@ func TestManager_RenameDevice_AlreadyExists(t *testing.T) {
 	}
 
 	// Try to rename to existing device name
-	err := m.RenameDevice("kitchen", "living-room")
+	err := m.RenameDevice(testDeviceName, "living-room")
 	if err == nil {
 		t.Error("expected error renaming to existing device name")
 	}
@@ -877,12 +883,12 @@ func TestManager_RemoveDeviceAlias_AliasNotFound(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Try to remove alias that doesn't exist
-	err := m.RemoveDeviceAlias("kitchen", "nonexistent-alias")
+	err := m.RemoveDeviceAlias(testDeviceName, "nonexistent-alias")
 	if err == nil {
 		t.Error("expected error removing nonexistent alias")
 	}
@@ -904,7 +910,7 @@ func TestManager_GetGroupDevices_FallbackToAddress(t *testing.T) {
 	// Add a device that doesn't exist (will fallback to using the identifier as address)
 	m.mu.Lock()
 	group := m.config.Groups["test-group"]
-	group.Devices = append(group.Devices, "192.168.1.100")
+	group.Devices = append(group.Devices, "testDeviceIP00")
 	m.config.Groups["test-group"] = group
 	m.mu.Unlock()
 
@@ -916,8 +922,8 @@ func TestManager_GetGroupDevices_FallbackToAddress(t *testing.T) {
 	if len(devices) != 1 {
 		t.Errorf("expected 1 device, got %d", len(devices))
 	}
-	if devices[0].Address != "192.168.1.100" {
-		t.Errorf("device address = %q, want %q", devices[0].Address, "192.168.1.100")
+	if devices[0].Address != "testDeviceIP00" {
+		t.Errorf("device address = %q, want %q", devices[0].Address, "testDeviceIP00")
 	}
 }
 
@@ -946,7 +952,7 @@ func TestManager_ResolveDevice_ByAlias(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen-light", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("kitchen-light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -959,8 +965,8 @@ func TestManager_ResolveDevice_ByAlias(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveDevice() error: %v", err)
 	}
-	if dev.Address != "192.168.1.1" {
-		t.Errorf("resolved device address = %q, want %q", dev.Address, "192.168.1.1")
+	if dev.Address != testDeviceIP {
+		t.Errorf("resolved device address = %q, want %q", dev.Address, testDeviceIP)
 	}
 }
 
@@ -973,15 +979,15 @@ func TestManager_CheckAliasConflict_WithExcludedDevice(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
-	if err := m.AddDeviceAlias("kitchen", "kl"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "kl"); err != nil {
 		t.Fatalf("AddDeviceAlias() error: %v", err)
 	}
 
 	// Check conflict with exclusion should not return error
-	err := m.CheckAliasConflict("kl", "kitchen")
+	err := m.CheckAliasConflict("kl", testDeviceName)
 	if err != nil {
 		t.Errorf("CheckAliasConflict() should not error when excluding owning device: %v", err)
 	}
@@ -997,18 +1003,18 @@ func TestManager_UnregisterDevice_CleanupFromGroup(t *testing.T) {
 	}
 
 	// Register device and add to group
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 	if err := m.CreateGroup("lights"); err != nil {
 		t.Fatalf("CreateGroup() error: %v", err)
 	}
-	if err := m.AddDeviceToGroup("lights", "kitchen"); err != nil {
+	if err := m.AddDeviceToGroup("lights", testDeviceName); err != nil {
 		t.Fatalf("AddDeviceToGroup() error: %v", err)
 	}
 
 	// Unregister device
-	if err := m.UnregisterDevice("kitchen"); err != nil {
+	if err := m.UnregisterDevice(testDeviceName); err != nil {
 		t.Fatalf("UnregisterDevice() error: %v", err)
 	}
 
@@ -1018,7 +1024,7 @@ func TestManager_UnregisterDevice_CleanupFromGroup(t *testing.T) {
 		t.Fatal("group should still exist")
 	}
 	for _, d := range group.Devices {
-		if d == "kitchen" {
+		if d == testDeviceName {
 			t.Error("device should be removed from group")
 		}
 	}
@@ -1034,18 +1040,18 @@ func TestManager_RenameDevice_UpdatesGroupReferences(t *testing.T) {
 	}
 
 	// Register device and add to group
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 	if err := m.CreateGroup("lights"); err != nil {
 		t.Fatalf("CreateGroup() error: %v", err)
 	}
-	if err := m.AddDeviceToGroup("lights", "kitchen"); err != nil {
+	if err := m.AddDeviceToGroup("lights", testDeviceName); err != nil {
 		t.Fatalf("AddDeviceToGroup() error: %v", err)
 	}
 
 	// Rename device
-	if err := m.RenameDevice("kitchen", "living-room"); err != nil {
+	if err := m.RenameDevice(testDeviceName, "living-room"); err != nil {
 		t.Fatalf("RenameDevice() error: %v", err)
 	}
 
@@ -1056,7 +1062,7 @@ func TestManager_RenameDevice_UpdatesGroupReferences(t *testing.T) {
 	}
 	foundNewName := false
 	for _, d := range group.Devices {
-		if d == "kitchen" {
+		if d == testDeviceName {
 			t.Error("old device name should not be in group")
 		}
 		if d == "living-room" {
@@ -1077,22 +1083,22 @@ func TestManager_AddDeviceAlias_ToDeviceWithExistingAliases(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Add first alias
-	if err := m.AddDeviceAlias("kitchen", "k1"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "k1"); err != nil {
 		t.Fatalf("AddDeviceAlias() error: %v", err)
 	}
 
 	// Add second alias
-	if err := m.AddDeviceAlias("kitchen", "k2"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "k2"); err != nil {
 		t.Fatalf("AddDeviceAlias() second error: %v", err)
 	}
 
 	// Verify both aliases exist
-	aliases, err := m.GetDeviceAliases("kitchen")
+	aliases, err := m.GetDeviceAliases(testDeviceName)
 	if err != nil {
 		t.Fatalf("GetDeviceAliases() error: %v", err)
 	}
@@ -1110,25 +1116,25 @@ func TestManager_RemoveDeviceAlias_SingleAlias(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Add two aliases
-	if err := m.AddDeviceAlias("kitchen", "k1"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "k1"); err != nil {
 		t.Fatalf("AddDeviceAlias() error: %v", err)
 	}
-	if err := m.AddDeviceAlias("kitchen", "k2"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "k2"); err != nil {
 		t.Fatalf("AddDeviceAlias() error: %v", err)
 	}
 
 	// Remove one alias
-	if err := m.RemoveDeviceAlias("kitchen", "k1"); err != nil {
+	if err := m.RemoveDeviceAlias(testDeviceName, "k1"); err != nil {
 		t.Fatalf("RemoveDeviceAlias() error: %v", err)
 	}
 
 	// Verify only one alias remains
-	aliases, err := m.GetDeviceAliases("kitchen")
+	aliases, err := m.GetDeviceAliases(testDeviceName)
 	if err != nil {
 		t.Fatalf("GetDeviceAliases() error: %v", err)
 	}
@@ -1150,7 +1156,7 @@ func TestManager_CheckAliasConflict_ConflictsWithName(t *testing.T) {
 	}
 
 	// Register device with display name "Kitchen Light"
-	if err := m.RegisterDevice("Kitchen Light", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -1170,10 +1176,10 @@ func TestManager_CheckAliasConflict_ConflictsWithOtherAlias(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
-	if err := m.AddDeviceAlias("kitchen", "kl"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "kl"); err != nil {
 		t.Fatalf("AddDeviceAlias() error: %v", err)
 	}
 
@@ -1198,17 +1204,17 @@ func TestManager_AddDeviceAlias_DuplicateOnSameDevice(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
 	// Add alias
-	if err := m.AddDeviceAlias("kitchen", "kl"); err != nil {
+	if err := m.AddDeviceAlias(testDeviceName, "kl"); err != nil {
 		t.Fatalf("AddDeviceAlias() error: %v", err)
 	}
 
 	// Try to add same alias again (case-insensitive)
-	err := m.AddDeviceAlias("kitchen", "KL")
+	err := m.AddDeviceAlias(testDeviceName, "KL")
 	if err == nil {
 		t.Error("expected error adding duplicate alias")
 	}
@@ -1224,7 +1230,7 @@ func TestManager_AddDeviceAlias_ByNormalizedName(t *testing.T) {
 	}
 
 	// Register with display name
-	if err := m.RegisterDevice("Kitchen Light", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -1253,7 +1259,7 @@ func TestManager_RemoveDeviceAlias_ByNormalizedName(t *testing.T) {
 	}
 
 	// Register with display name
-	if err := m.RegisterDevice("Kitchen Light", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -1287,7 +1293,7 @@ func TestManager_RemoveDeviceAlias_ByDisplayName(t *testing.T) {
 	}
 
 	// Register with display name (stored under normalized key)
-	if err := m.RegisterDevice("Kitchen Light", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -1321,7 +1327,7 @@ func TestManager_UnregisterDevice_ByDisplayName(t *testing.T) {
 	}
 
 	// Register with display name
-	if err := m.RegisterDevice("Kitchen Light", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -1347,7 +1353,7 @@ func TestManager_ResolveDevice_ByDisplayName(t *testing.T) {
 	}
 
 	// Register with specific display name
-	if err := m.RegisterDevice("Kitchen Light", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 
@@ -1357,8 +1363,8 @@ func TestManager_ResolveDevice_ByDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveDevice() error: %v", err)
 	}
-	if dev.Address != "192.168.1.1" {
-		t.Errorf("resolved device address = %q, want %q", dev.Address, "192.168.1.1")
+	if dev.Address != testDeviceIP {
+		t.Errorf("resolved device address = %q, want %q", dev.Address, testDeviceIP)
 	}
 }
 
@@ -1372,10 +1378,10 @@ func TestManager_ResolveDevice_ByExactMAC(t *testing.T) {
 	}
 
 	// Register device with MAC
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
-	if err := m.UpdateDeviceInfo("kitchen", DeviceUpdates{MAC: "AA:BB:CC:DD:EE:FF"}); err != nil {
+	if err := m.UpdateDeviceInfo(testDeviceName, DeviceUpdates{MAC: "AA:BB:CC:DD:EE:FF"}); err != nil {
 		t.Fatalf("UpdateDeviceInfo() error: %v", err)
 	}
 
@@ -1384,8 +1390,8 @@ func TestManager_ResolveDevice_ByExactMAC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveDevice() by exact MAC error: %v", err)
 	}
-	if dev.Address != "192.168.1.1" {
-		t.Errorf("resolved device address = %q, want %q", dev.Address, "192.168.1.1")
+	if dev.Address != testDeviceIP {
+		t.Errorf("resolved device address = %q, want %q", dev.Address, testDeviceIP)
 	}
 }
 
@@ -1399,7 +1405,7 @@ func TestManager_UnregisterDevice_CleanupFromMultipleGroups(t *testing.T) {
 	}
 
 	// Register device and add to multiple groups
-	if err := m.RegisterDevice("kitchen", "192.168.1.1", 2, "", "", nil); err != nil {
+	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
 	}
 	if err := m.CreateGroup("lights"); err != nil {
@@ -1408,28 +1414,28 @@ func TestManager_UnregisterDevice_CleanupFromMultipleGroups(t *testing.T) {
 	if err := m.CreateGroup("kitchen-devices"); err != nil {
 		t.Fatalf("CreateGroup() kitchen-devices error: %v", err)
 	}
-	if err := m.AddDeviceToGroup("lights", "kitchen"); err != nil {
+	if err := m.AddDeviceToGroup("lights", testDeviceName); err != nil {
 		t.Fatalf("AddDeviceToGroup() lights error: %v", err)
 	}
-	if err := m.AddDeviceToGroup("kitchen-devices", "kitchen"); err != nil {
+	if err := m.AddDeviceToGroup("kitchen-devices", testDeviceName); err != nil {
 		t.Fatalf("AddDeviceToGroup() kitchen-devices error: %v", err)
 	}
 
 	// Unregister device
-	if err := m.UnregisterDevice("kitchen"); err != nil {
+	if err := m.UnregisterDevice(testDeviceName); err != nil {
 		t.Fatalf("UnregisterDevice() error: %v", err)
 	}
 
 	// Verify device was removed from both groups
 	group1, _ := m.GetGroup("lights")
 	for _, d := range group1.Devices {
-		if d == "kitchen" {
+		if d == testDeviceName {
 			t.Error("device should be removed from lights group")
 		}
 	}
 	group2, _ := m.GetGroup("kitchen-devices")
 	for _, d := range group2.Devices {
-		if d == "kitchen" {
+		if d == testDeviceName {
 			t.Error("device should be removed from kitchen-devices group")
 		}
 	}

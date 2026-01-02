@@ -74,7 +74,7 @@ func FromURL(ctx context.Context, downloadURL string) (*Result, error) {
 	}
 
 	// Make executable - extensions must be executable binaries
-	if err := fs.Chmod(tmpPath, 0o755); err != nil { //nolint:gosec // G302: extensions require executable permissions
+	if err := fs.Chmod(tmpPath, 0o755); err != nil {
 		cleanup()
 		return nil, fmt.Errorf("failed to make executable: %w", err)
 	}

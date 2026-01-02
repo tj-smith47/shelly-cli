@@ -1054,11 +1054,14 @@ func (ds *DeviceServer) handleGen1Actions(w http.ResponseWriter, r *http.Request
 
 	// Store the action state
 	actionKey := index + "_" + name
-	actions := ds.state[device.Name]["actions"].(map[string]any)
+	actions, ok := ds.state[device.Name]["actions"].(map[string]any)
+	if !ok {
+		actions = make(map[string]any)
+	}
 	actions[actionKey] = map[string]any{
 		"index":   index,
 		"name":    name,
-		"enabled": enabled == "true",
+		"enabled": enabled == strTrue,
 	}
 	ds.mu.Unlock()
 
@@ -1068,7 +1071,7 @@ func (ds *DeviceServer) handleGen1Actions(w http.ResponseWriter, r *http.Request
 			{
 				"index":   index,
 				"name":    name,
-				"enabled": enabled == "true",
+				"enabled": enabled == strTrue,
 				"urls":    []string{},
 			},
 		},
@@ -1672,7 +1675,10 @@ func (ds *DeviceServer) handleWebSocketRPC(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer func() {
-		_ = conn.Close() // Ignore close errors in mock server
+		if closeErr := conn.Close(); closeErr != nil {
+			// Close errors expected when client disconnects
+			return
+		}
 	}()
 
 	// Simple echo-style WebSocket handler for testing
@@ -1743,11 +1749,11 @@ func (ds *DeviceServer) getThermostatConfig(state DeviceState, id int) map[strin
 	}
 	// Return default thermostat config
 	return map[string]any{
-		"id":               float64(id),
-		"type":             "heating",
-		"enable":           true,
-		"target_C":         float64(21.0),
-		"thermostat_mode":  "auto",
+		"id":              float64(id),
+		"type":            "heating",
+		"enable":          true,
+		"target_C":        float64(21.0),
+		"thermostat_mode": "auto",
 	}
 }
 

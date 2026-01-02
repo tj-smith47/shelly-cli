@@ -110,8 +110,8 @@ func TestRun_MultipleCycles(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global theme state
 func TestNewCommand_Execute(t *testing.T) {
-	// No t.Parallel() - modifies global theme state
 	originalTheme := theme.Current()
 	t.Cleanup(func() {
 		theme.SetTheme(originalTheme.ID)

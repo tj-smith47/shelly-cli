@@ -198,6 +198,8 @@ func TestNewCommand_InvalidScheduleID(t *testing.T) {
 }
 
 func TestRun_UpdateTimespec(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -256,6 +258,8 @@ func TestRun_UpdateTimespec(t *testing.T) {
 }
 
 func TestRun_UpdateEnable(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -303,6 +307,8 @@ func TestRun_UpdateEnable(t *testing.T) {
 }
 
 func TestRun_UpdateDisable(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -350,6 +356,8 @@ func TestRun_UpdateDisable(t *testing.T) {
 }
 
 func TestRun_UpdateCalls(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -397,6 +405,8 @@ func TestRun_UpdateCalls(t *testing.T) {
 }
 
 func TestRun_NoChanges(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -419,6 +429,8 @@ func TestRun_NoChanges(t *testing.T) {
 }
 
 func TestRun_InvalidCallsJSON(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -439,6 +451,8 @@ func TestRun_InvalidCallsJSON(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)

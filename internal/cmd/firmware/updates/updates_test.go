@@ -196,6 +196,7 @@ func TestOptions(t *testing.T) {
 }
 
 func TestExecute_NoDevicesRegistered(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}}, // Empty
@@ -229,6 +230,7 @@ func TestExecute_NoDevicesRegistered(t *testing.T) {
 }
 
 func TestExecute_WithAll_NoUpdatesAvailable(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -271,6 +273,7 @@ func TestExecute_WithAll_NoUpdatesAvailable(t *testing.T) {
 }
 
 func TestExecute_WithDeviceFilter(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -331,6 +334,7 @@ func TestExecute_WithDeviceFilter(t *testing.T) {
 }
 
 func TestExecute_WithPlatformFilter(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -373,6 +377,7 @@ func TestExecute_WithPlatformFilter(t *testing.T) {
 }
 
 func TestExecute_WithBetaFlag(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -415,6 +420,7 @@ func TestExecute_WithBetaFlag(t *testing.T) {
 }
 
 func TestExecute_WithStableFlag(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -457,6 +463,7 @@ func TestExecute_WithStableFlag(t *testing.T) {
 }
 
 func TestExecute_WithParallelFlag(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -508,6 +515,7 @@ func TestExecute_WithParallelFlag(t *testing.T) {
 }
 
 func TestExecute_InteractiveMode(t *testing.T) {
+	t.Parallel()
 	// Note: Interactive mode cannot be fully tested without user input
 	// This tests the setup phase before user interaction
 	fixtures := &mock.Fixtures{
@@ -553,6 +561,7 @@ func TestExecute_InteractiveMode(t *testing.T) {
 }
 
 func TestExecute_AllDevices(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -613,6 +622,7 @@ func TestExecute_AllDevices(t *testing.T) {
 }
 
 func TestExecute_MultipleDevicesWithFilter(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -644,8 +654,8 @@ func TestExecute_MultipleDevicesWithFilter(t *testing.T) {
 			},
 		},
 		DeviceStates: map[string]mock.DeviceState{
-			"kitchen-light":     {"switch:0": map[string]any{"output": false}},
-			"bedroom-light":     {"switch:0": map[string]any{"output": false}},
+			"kitchen-light":      {"switch:0": map[string]any{"output": false}},
+			"bedroom-light":      {"switch:0": map[string]any{"output": false}},
 			"living-room-switch": {"switch:0": map[string]any{"output": false}},
 		},
 	}
@@ -673,6 +683,7 @@ func TestExecute_MultipleDevicesWithFilter(t *testing.T) {
 }
 
 func TestExecute_NonInteractiveNoMatches(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -721,6 +732,7 @@ func TestExecute_NonInteractiveNoMatches(t *testing.T) {
 }
 
 func TestExecute_WithYesConfirmation(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -763,6 +775,7 @@ func TestExecute_WithYesConfirmation(t *testing.T) {
 }
 
 func TestExecute_SingleDeviceWithAll(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -805,6 +818,7 @@ func TestExecute_SingleDeviceWithAll(t *testing.T) {
 }
 
 func TestExecute_BetaAndStableFlagsSet(t *testing.T) {
+	t.Parallel()
 	// When both beta and stable are set, beta should take precedence
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -848,6 +862,7 @@ func TestExecute_BetaAndStableFlagsSet(t *testing.T) {
 }
 
 func TestExecute_LargeParallelValue(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -899,6 +914,7 @@ func TestExecute_LargeParallelValue(t *testing.T) {
 }
 
 func TestExecute_DevicesAndAllTogether(t *testing.T) {
+	t.Parallel()
 	// When both --devices and --all are specified, --devices takes precedence
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -951,6 +967,7 @@ func TestExecute_DevicesAndAllTogether(t *testing.T) {
 }
 
 func TestExecute_PlatformFilterNoMatches(t *testing.T) {
+	t.Parallel()
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -998,6 +1015,7 @@ func TestExecute_PlatformFilterNoMatches(t *testing.T) {
 }
 
 func TestExecute_ComplexScenario(t *testing.T) {
+	t.Parallel()
 	// Test a complex scenario with multiple devices and filters
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1068,6 +1086,7 @@ func TestExecute_ComplexScenario(t *testing.T) {
 }
 
 func TestExecute_DevicesWithPlatformFilter(t *testing.T) {
+	t.Parallel()
 	// Test --devices with --platform filter together
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1120,6 +1139,7 @@ func TestExecute_DevicesWithPlatformFilter(t *testing.T) {
 }
 
 func TestRun_WithFactoryAndOptions(t *testing.T) {
+	t.Parallel()
 	// Direct test of run function with mock fixtures
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1168,6 +1188,7 @@ func TestRun_WithFactoryAndOptions(t *testing.T) {
 }
 
 func TestExecute_AllDevicesNoUpdatesAvailable(t *testing.T) {
+	t.Parallel()
 	// Test the path where no updates are available (line 106-108)
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1211,6 +1232,7 @@ func TestExecute_AllDevicesNoUpdatesAvailable(t *testing.T) {
 }
 
 func TestExecute_DevicesDefaultBeta(t *testing.T) {
+	t.Parallel()
 	// Test when devices are specified with default (stable) stage
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1255,6 +1277,7 @@ func TestExecute_DevicesDefaultBeta(t *testing.T) {
 }
 
 func TestExecute_AllFlagWithoutDevices(t *testing.T) {
+	t.Parallel()
 	// Test --all flag explicitly without --devices
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1307,6 +1330,7 @@ func TestExecute_AllFlagWithoutDevices(t *testing.T) {
 }
 
 func TestExecute_MultipleConditions(t *testing.T) {
+	t.Parallel()
 	// Test various flag combinations
 	fixtures := &mock.Fixtures{
 		Version: "1",

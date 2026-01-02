@@ -288,7 +288,6 @@ func (m *Manager) IsAlias(name string) bool {
 // Returns the number of imported aliases, skipped aliases, and any error.
 // If merge is true, existing aliases are not overwritten.
 func (m *Manager) ImportAliases(filename string, merge bool) (imported, skipped int, err error) {
-	//nolint:gosec // G304: filename is user-provided intentionally (import command)
 	data, err := afero.ReadFile(m.Fs(), filename)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to read file: %w", err)

@@ -112,6 +112,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 }
 
 func TestRun_ShortDuration(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{
@@ -130,6 +132,8 @@ func TestRun_ShortDuration(t *testing.T) {
 }
 
 func TestRun_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -147,6 +151,8 @@ func TestRun_ContextCancellation(t *testing.T) {
 }
 
 func TestRun_InvalidDuration(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{

@@ -17,8 +17,8 @@ func DisplayGroups(ios *iostreams.IOStreams, groups []model.GroupInfo) {
 		builder.AddRow(g.Name, output.FormatDeviceCount(g.DeviceCount))
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print groups table", err)
 	}
 	ios.Println()
@@ -34,8 +34,8 @@ func DisplayGroupMembers(ios *iostreams.IOStreams, groupName string, devices []s
 	for i, device := range devices {
 		builder.AddRow(fmt.Sprintf("%d", i+1), device)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print group members table", err)
 	}
 	ios.Println()

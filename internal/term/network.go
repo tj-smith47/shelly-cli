@@ -40,8 +40,8 @@ func DisplayWiFiAPClients(ios *iostreams.IOStreams, clients []shelly.WiFiAPClien
 		}
 		builder.AddRow(c.MAC, ip)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
 
@@ -62,8 +62,8 @@ func DisplayWiFiScanResults(ios *iostreams.IOStreams, results []shelly.WiFiScanR
 		signal := formatWiFiSignal(r.RSSI)
 		builder.AddRow(ssid, signal, fmt.Sprintf("%d", r.Channel), r.Auth)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
 
@@ -202,8 +202,8 @@ func DisplayCloudDevices(ios *iostreams.IOStreams, devices []network.CloudDevice
 	}
 
 	ios.Printf("Found %d device(s):\n\n", len(devices))
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print cloud devices table", err)
 	}
 }

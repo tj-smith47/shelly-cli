@@ -105,8 +105,8 @@ func run(opts *Options) error {
 				string(p.FormFactor),
 			)
 		}
-		table := builder.WithModeStyle(ios).Build()
-		if err := table.PrintTo(ios.Out); err != nil {
+		tbl := builder.WithModeStyle(ios).Build()
+		if err := tbl.PrintTo(ios.Out); err != nil {
 			ios.DebugErr("print table", err)
 		}
 		ios.Printf("\nFound %d profile(s)\n", len(items))

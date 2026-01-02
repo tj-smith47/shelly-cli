@@ -87,8 +87,8 @@ func DisplayScriptTemplateList(ios *iostreams.IOStreams, templates []config.Scri
 		builder.AddRow(tpl.Name, tpl.Category, tpl.Description, source)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print script templates table", err)
 	}
 	ios.Count("template", len(templates))

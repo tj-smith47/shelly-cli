@@ -24,8 +24,8 @@ func DisplayDiscoveredDevices(ios *iostreams.IOStreams, devices []discovery.Disc
 		ios.NoResults("devices")
 		return
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print discovered devices table", err)
 	}
 	ios.Println("")
@@ -76,8 +76,8 @@ func DisplayBLEDevices(ios *iostreams.IOStreams, devices []discovery.BLEDiscover
 		)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print BLE devices table", err)
 	}
 	ios.Println("")

@@ -48,8 +48,8 @@ func DisplayQuickDeviceStatus(ios *iostreams.IOStreams, device string, info *Qui
 	for _, cs := range states {
 		builder.AddRow(cs.Name, cs.State)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print component status table", err)
 	}
 }
@@ -70,8 +70,8 @@ func DisplayAllDevicesQuickStatus(ios *iostreams.IOStreams, statuses []QuickDevi
 		}
 		builder.AddRow(ds.Name, deviceModel, status)
 	}
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print devices status table", err)
 	}
 }

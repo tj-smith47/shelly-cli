@@ -1176,16 +1176,13 @@ func TestDeviceRateLimiter_GetOrCreateState_RaceCondition(t *testing.T) {
 	// where another goroutine creates the state between RUnlock and Lock
 	var ready sync.WaitGroup
 	ready.Add(100)
-	var go_ sync.WaitGroup
-	go_.Add(1)
+	start := make(chan struct{})
 
 	var wg sync.WaitGroup
-	for i := range 100 {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			ready.Done()
-			go_.Wait() // All goroutines start at the same time
+			<-start // All goroutines start at the same time
 
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
@@ -1195,11 +1192,11 @@ func TestDeviceRateLimiter_GetOrCreateState_RaceCondition(t *testing.T) {
 				return // timeout is fine
 			}
 			release()
-		}(i)
+		})
 	}
 
 	ready.Wait() // Wait for all goroutines to be ready
-	go_.Done()   // Release them all at once
+	close(start) // Release them all at once
 	wg.Wait()
 
 	// Verify only one state exists

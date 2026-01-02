@@ -163,6 +163,8 @@ func TestOptions(t *testing.T) {
 }
 
 func TestExecute_WithDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -223,6 +225,8 @@ func TestExecute_NoDevice(t *testing.T) {
 }
 
 func TestExecute_WithIPAddress(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -265,6 +269,8 @@ func TestExecute_WithIPAddress(t *testing.T) {
 }
 
 func TestRun_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

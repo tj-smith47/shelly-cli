@@ -116,6 +116,8 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 }
 
 func TestNewCommand_NoArgsNoAllError(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
@@ -130,6 +132,8 @@ func TestNewCommand_NoArgsNoAllError(t *testing.T) {
 }
 
 func TestRun_ShortDuration(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -177,6 +181,8 @@ func TestRun_ShortDuration(t *testing.T) {
 }
 
 func TestRun_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

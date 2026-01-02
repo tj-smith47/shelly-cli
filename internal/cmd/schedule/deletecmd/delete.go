@@ -1,4 +1,4 @@
-// Package del provides the schedule delete subcommand.
+// Package deletecmd provides the schedule delete subcommand.
 package deletecmd
 
 import (

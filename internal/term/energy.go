@@ -216,8 +216,8 @@ func DisplayEMStatus(ios *iostreams.IOStreams, status *model.EMStatus) {
 	}
 	builder.AddRow("Frequency", aFreq, bFreq, cFreq, "-")
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print EM status table", err)
 	}
 
@@ -254,8 +254,8 @@ func DisplayEM1Status(ios *iostreams.IOStreams, status *model.EM1Status) {
 		builder.AddRow("Frequency", fmt.Sprintf("%.2f Hz", *status.Freq))
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print EM1 status table", err)
 	}
 

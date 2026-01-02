@@ -335,7 +335,7 @@ func TestPackageLevel_UpdateScene(t *testing.T) {
 		t.Error("old scene name should not exist")
 	}
 
-	scene, ok = GetScene("renamed-scene")
+	_, ok = GetScene("renamed-scene")
 	if !ok {
 		t.Fatal("renamed scene should exist")
 	}

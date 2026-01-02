@@ -82,8 +82,8 @@ func run(_ context.Context, opts *Options) error {
 	builder.AddRow("Files", fmt.Sprintf("%d", fileCount))
 	builder.AddRow("Size", output.FormatSize(totalSize))
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print table", err)
 	}
 

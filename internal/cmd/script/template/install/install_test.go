@@ -155,7 +155,7 @@ func TestRun_TemplateNotFound(t *testing.T) {
 }
 
 func TestRun_InstallsBuiltInTemplate(t *testing.T) {
-	// No t.Parallel() - uses mock infrastructure with global state
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Config: mock.ConfigFixture{
@@ -209,7 +209,7 @@ func TestRun_InstallsBuiltInTemplate(t *testing.T) {
 }
 
 func TestRun_InstallWithCustomName(t *testing.T) {
-	// No t.Parallel() - uses mock infrastructure with global state
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Config: mock.ConfigFixture{
@@ -257,7 +257,7 @@ func TestRun_InstallWithCustomName(t *testing.T) {
 }
 
 func TestRun_InstallWithEnable(t *testing.T) {
-	// No t.Parallel() - uses mock infrastructure with global state
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Config: mock.ConfigFixture{
@@ -308,7 +308,7 @@ func TestRun_InstallWithEnable(t *testing.T) {
 }
 
 func TestRun_DeviceNotFound(t *testing.T) {
-	// No t.Parallel() - uses mock infrastructure with global state
+	t.Parallel()
 
 	fixtures := &mock.Fixtures{
 		Config: mock.ConfigFixture{
@@ -339,7 +339,7 @@ func TestRun_DeviceNotFound(t *testing.T) {
 }
 
 func TestRun_AllBuiltInTemplates(t *testing.T) {
-	// No t.Parallel() - uses mock infrastructure with global state
+	t.Parallel()
 
 	templates := []string{
 		"motion-light",
@@ -350,7 +350,10 @@ func TestRun_AllBuiltInTemplates(t *testing.T) {
 	}
 
 	for _, tplName := range templates {
-		t.Run(tplName, func(t *testing.T) {
+		tt := tplName
+		t.Run(tt, func(t *testing.T) {
+			t.Parallel()
+
 			fixtures := &mock.Fixtures{
 				Config: mock.ConfigFixture{
 					Devices: []mock.DeviceFixture{
@@ -380,7 +383,7 @@ func TestRun_AllBuiltInTemplates(t *testing.T) {
 
 			opts := &Options{
 				Device:   "template-test-device",
-				Template: tplName,
+				Template: tt,
 				Factory:  tf.Factory,
 			}
 
@@ -393,8 +396,8 @@ func TestRun_AllBuiltInTemplates(t *testing.T) {
 			if !strings.Contains(output, "Installed template") {
 				t.Errorf("output = %q, want to contain 'Installed template'", output)
 			}
-			if !strings.Contains(output, tplName) {
-				t.Errorf("output = %q, want to contain %q", output, tplName)
+			if !strings.Contains(output, tt) {
+				t.Errorf("output = %q, want to contain %q", output, tt)
 			}
 		})
 	}

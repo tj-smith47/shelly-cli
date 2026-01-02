@@ -198,6 +198,8 @@ func TestExecute_Help(t *testing.T) {
 }
 
 func TestExecute_DeviceNotFound(t *testing.T) {
+	t.Parallel()
+
 	tf := factory.NewTestFactory(t)
 
 	var buf bytes.Buffer
@@ -214,6 +216,8 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 }
 
 func TestExecute_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -309,6 +313,8 @@ func TestRun_WithYesFlag(t *testing.T) {
 }
 
 func TestRun_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

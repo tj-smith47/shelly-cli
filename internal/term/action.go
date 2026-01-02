@@ -39,8 +39,8 @@ func DisplayGen1Actions(ios *iostreams.IOStreams, actions *gen1.ActionSettings) 
 		)
 	}
 
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print actions table", err)
 	}
 }

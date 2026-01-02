@@ -166,6 +166,34 @@ func DefaultOptions() Options {
 	}
 }
 
+// applyTUITheme loads and applies the TUI-specific theme from configuration.
+func applyTUITheme(cfg *config.Config, ios *iostreams.IOStreams) {
+	if cfg == nil {
+		return
+	}
+	tc := cfg.GetTUIThemeConfig()
+	if tc == nil {
+		return
+	}
+
+	if tc.File != "" {
+		expanded := theme.ExpandPath(tc.File)
+		data, err := afero.ReadFile(config.Fs(), expanded)
+		if err != nil {
+			ios.DebugErr("read tui theme file", err)
+			return
+		}
+		if err := theme.ApplyThemeFromData(data, tc.Semantic); err != nil {
+			ios.DebugErr("tui theme", err)
+		}
+		return
+	}
+
+	if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic); err != nil {
+		ios.DebugErr("tui theme", err)
+	}
+}
+
 // New creates a new TUI application.
 func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	cfg, err := f.Config()
@@ -173,23 +201,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		cfg = nil
 	}
 
-	// Apply TUI-specific theme if configured
-	if cfg != nil {
-		if tc := cfg.GetTUIThemeConfig(); tc != nil {
-			if tc.File != "" {
-				// Load theme from external file
-				expanded := theme.ExpandPath(tc.File)
-				data, err := afero.ReadFile(config.Fs(), expanded)
-				if err != nil {
-					f.IOStreams().DebugErr("read tui theme file", err)
-				} else if err := theme.ApplyThemeFromData(data, tc.Semantic); err != nil {
-					f.IOStreams().DebugErr("tui theme", err)
-				}
-			} else if err := theme.ApplyConfig(tc.Name, tc.Colors, tc.Semantic); err != nil {
-				f.IOStreams().DebugErr("tui theme", err)
-			}
-		}
-	}
+	applyTUITheme(cfg, f.IOStreams())
 
 	// Create shared cache
 	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams(), opts.RefreshInterval)

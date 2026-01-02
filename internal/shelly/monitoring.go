@@ -15,16 +15,26 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 )
 
-// Re-export types from monitoring package for backward compatibility.
-type (
-	MonitoringOptions        = monitoring.Options
-	MonitoringCallback       = monitoring.Callback
-	EventHandler             = monitoring.EventHandler
-	DeviceSnapshot           = monitoring.DeviceSnapshot
-	MonitoringDeviceInfo     = monitoring.DeviceInfo
-	MonitoringResolvedDevice = monitoring.ResolvedDevice
-	MonitoringDeviceStatus   = monitoring.DeviceStatusResult
-)
+// MonitoringOptions is an alias for monitoring.Options.
+type MonitoringOptions = monitoring.Options
+
+// MonitoringCallback is an alias for monitoring.Callback.
+type MonitoringCallback = monitoring.Callback
+
+// EventHandler is an alias for monitoring.EventHandler.
+type EventHandler = monitoring.EventHandler
+
+// DeviceSnapshot is an alias for monitoring.DeviceSnapshot.
+type DeviceSnapshot = monitoring.DeviceSnapshot
+
+// MonitoringDeviceInfo is an alias for monitoring.DeviceInfo.
+type MonitoringDeviceInfo = monitoring.DeviceInfo
+
+// MonitoringResolvedDevice is an alias for monitoring.ResolvedDevice.
+type MonitoringResolvedDevice = monitoring.ResolvedDevice
+
+// MonitoringDeviceStatus is an alias for monitoring.DeviceStatusResult.
+type MonitoringDeviceStatus = monitoring.DeviceStatusResult
 
 // Delegation methods - these delegate to the monitoring subpackage.
 // This maintains backward compatibility for existing callers.

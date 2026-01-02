@@ -255,6 +255,8 @@ func TestExecute_InvalidToTime(t *testing.T) {
 }
 
 func TestExecute_WithMock_Day(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -313,6 +315,8 @@ func TestExecute_WithMock_Day(t *testing.T) {
 }
 
 func TestExecute_WithMock_Week(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -364,6 +368,8 @@ func TestExecute_WithMock_Week(t *testing.T) {
 }
 
 func TestExecute_WithMock_Month(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -415,6 +421,8 @@ func TestExecute_WithMock_Month(t *testing.T) {
 }
 
 func TestExecute_WithMock_Hour(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -466,6 +474,8 @@ func TestExecute_WithMock_Hour(t *testing.T) {
 }
 
 func TestExecute_WithDevicesFlag(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -526,6 +536,8 @@ func TestExecute_WithDevicesFlag(t *testing.T) {
 }
 
 func TestExecute_WithFromToFlags(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -577,6 +589,8 @@ func TestExecute_WithFromToFlags(t *testing.T) {
 }
 
 func TestExecute_WithOnlyFromFlag(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -628,6 +642,8 @@ func TestExecute_WithOnlyFromFlag(t *testing.T) {
 }
 
 func TestExecute_WithOnlyToFlag(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -679,6 +695,8 @@ func TestExecute_WithOnlyToFlag(t *testing.T) {
 }
 
 func TestExecute_DevicesSorted(t *testing.T) {
+	t.Parallel()
+
 	// Test that devices are sorted alphabetically
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -740,6 +758,8 @@ func TestExecute_DevicesSorted(t *testing.T) {
 }
 
 func TestExecute_PercentageCalculation(t *testing.T) {
+	t.Parallel()
+
 	// This test exercises the percentage calculation branch when TotalEnergy > 0
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -792,6 +812,8 @@ func TestExecute_PercentageCalculation(t *testing.T) {
 }
 
 func TestRun_DirectCall(t *testing.T) {
+	t.Parallel()
+
 	// Test the run function directly with mock devices
 	fixtures := &mock.Fixtures{
 		Version: "1",

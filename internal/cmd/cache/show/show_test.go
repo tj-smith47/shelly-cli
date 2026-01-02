@@ -177,10 +177,10 @@ func TestOutputTable(t *testing.T) {
 	builder.AddRow("Location", "/tmp/cache")
 	builder.AddRow("Files", "5")
 	builder.AddRow("Size", "1.2 KB")
-	table := builder.Build()
+	tbl := builder.Build()
 
 	var buf bytes.Buffer
-	err := table.PrintTo(&buf)
+	err := tbl.PrintTo(&buf)
 
 	if err != nil {
 		t.Errorf("PrintTo error: %v", err)

@@ -37,8 +37,8 @@ func DisplaySensorList[T model.Sensor](ios *iostreams.IOStreams, sensors []T, op
 	}
 	ios.Println(theme.Bold().Render(opts.Title + ":"))
 	ios.Println()
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print sensor list table", err)
 	}
 }
@@ -53,8 +53,8 @@ func DisplaySensorStatus[T model.Sensor](ios *iostreams.IOStreams, status T, id 
 	}
 	builder := table.NewBuilder("Metric", "Value")
 	builder.AddRow("Reading", opts.Format(status, true))
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print sensor status table", err)
 	}
 	displaySensorErrors(ios, status.GetErrors())
@@ -248,8 +248,8 @@ func DisplayAlarmSensorList[T model.AlarmSensor](ios *iostreams.IOStreams, senso
 	}
 	ios.Println(theme.Bold().Render(sensorName + " Sensors:"))
 	ios.Println()
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print alarm sensor list table", err)
 	}
 }
@@ -261,8 +261,8 @@ func DisplayAlarmSensorStatus[T model.AlarmSensor](ios *iostreams.IOStreams, sta
 	builder := table.NewBuilder("Metric", "Value")
 	builder.AddRow("Status", output.RenderAlarmState(status.IsAlarm(), alarmMsg))
 	builder.AddRow("Muted", output.RenderMuteState(status.IsMuted()))
-	table := builder.WithModeStyle(ios).Build()
-	if err := table.PrintTo(ios.Out); err != nil {
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print alarm sensor status table", err)
 	}
 	displaySensorErrors(ios, status.GetErrors())

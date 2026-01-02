@@ -183,6 +183,8 @@ func TestOptions(t *testing.T) {
 }
 
 func TestExecute_WithDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -225,6 +227,8 @@ func TestExecute_WithDevice(t *testing.T) {
 }
 
 func TestExecute_AllNoDevices(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
@@ -258,6 +262,8 @@ func TestExecute_AllNoDevices(t *testing.T) {
 }
 
 func TestExecute_AllWithDevices(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -309,6 +315,8 @@ func TestExecute_AllWithDevices(t *testing.T) {
 }
 
 func TestRun_WithMockDevice(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -351,6 +359,8 @@ func TestRun_WithMockDevice(t *testing.T) {
 }
 
 func TestRun_AllWithConfig(t *testing.T) {
+	t.Parallel()
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

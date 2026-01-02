@@ -12,6 +12,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
+const testModeButton = "button"
+
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
@@ -98,9 +100,8 @@ func TestNewCommand_Flags(t *testing.T) {
 	if flag == nil {
 		t.Fatal("--mode flag not found")
 	}
-	wantDefault := "button" //nolint:goconst // Test data, acceptable to repeat
-	if flag.DefValue != wantDefault {
-		t.Errorf("--mode default = %q, want %q", flag.DefValue, wantDefault)
+	if flag.DefValue != testModeButton {
+		t.Errorf("--mode default = %q, want %q", flag.DefValue, testModeButton)
 	}
 }
 
@@ -143,7 +144,7 @@ func TestOptions(t *testing.T) {
 	f := cmdutil.NewFactory()
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    testModeButton,
 		Factory: f,
 	}
 
@@ -151,8 +152,8 @@ func TestOptions(t *testing.T) {
 		t.Errorf("Model = %q, want %q", opts.Model, "SNSW-001P16ZW")
 	}
 
-	if opts.Mode != "button" {
-		t.Errorf("Mode = %q, want %q", opts.Mode, "button")
+	if opts.Mode != testModeButton {
+		t.Errorf("Mode = %q, want %q", opts.Mode, testModeButton)
 	}
 
 	if opts.Factory == nil {
@@ -168,7 +169,7 @@ func TestRun_UnknownModel(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Model:   "UNKNOWN-MODEL-12345",
-		Mode:    "button",
+		Mode:    testModeButton,
 	}
 
 	err := run(opts)
@@ -208,7 +209,7 @@ func TestRun_NonZWaveDevice(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Model:   "SNSW-001P16EU", // This is not a ZWave device (but may not be in profiles)
-		Mode:    "button",
+		Mode:    testModeButton,
 	}
 
 	err := run(opts)
@@ -309,7 +310,7 @@ func TestRun_Modes_Button(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Model:   "SNSW-001P16ZW", // Valid Z-Wave model
-		Mode:    "button",
+		Mode:    testModeButton,
 	}
 
 	err := run(opts)
@@ -380,8 +381,8 @@ func TestExecute_DefaultModeIsButton(t *testing.T) {
 	if flag == nil {
 		t.Fatal("mode flag not found")
 	}
-	if flag.DefValue != "button" {
-		t.Errorf("default mode = %q, want %q", flag.DefValue, "button")
+	if flag.DefValue != testModeButton {
+		t.Errorf("default mode = %q, want %q", flag.DefValue, testModeButton)
 	}
 }
 
@@ -392,7 +393,7 @@ func TestRun_LowercaseModeSwitches(t *testing.T) {
 		name string
 		mode string
 	}{
-		{"lowercase button", "button"},
+		{"lowercase button", testModeButton},
 		{"lowercase switch", "switch"},
 		{"lowercase s", "s"},
 	}
@@ -446,7 +447,7 @@ func TestOptions_FactoryNotNil(t *testing.T) {
 	opts := &Options{
 		Factory: f,
 		Model:   "test",
-		Mode:    "button",
+		Mode:    testModeButton,
 	}
 
 	if opts.Factory == nil {
@@ -464,7 +465,7 @@ func TestRun_ModeValidationOrder(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Model:   "INVALIDMODEL123456",
-		Mode:    "button", // Valid mode
+		Mode:    testModeButton, // Valid mode
 	}
 
 	err := run(opts)
@@ -539,7 +540,7 @@ func TestExecute_ButtonMode_Success(t *testing.T) {
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", "button"})
+	cmd.SetArgs([]string{"SNSW-001P16ZW", "--mode", testModeButton})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -604,7 +605,7 @@ func TestRun_ValidZWaveModel_ButtonMode(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    testModeButton,
 		Factory: tf.Factory,
 	}
 
@@ -654,7 +655,7 @@ func TestRun_OutputContainsDeviceInfo(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    testModeButton,
 		Factory: tf.Factory,
 	}
 
@@ -680,7 +681,7 @@ func TestRun_OutputContainsMode(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    testModeButton,
 		Factory: tf.Factory,
 	}
 
@@ -703,7 +704,7 @@ func TestRun_OutputContainsInstructions(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	opts := &Options{
 		Model:   "SNSW-001P16ZW",
-		Mode:    "button",
+		Mode:    testModeButton,
 		Factory: tf.Factory,
 	}
 
