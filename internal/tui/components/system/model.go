@@ -10,17 +10,21 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Deps holds the dependencies for the System component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -31,7 +35,14 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedSystemData holds system status and config for caching.
+type CachedSystemData struct {
+	Status *shelly.SysStatus `json:"status"`
+	Config *shelly.SysConfig `json:"config"`
 }
 
 // StatusLoadedMsg signals that system status was loaded.
@@ -55,22 +66,24 @@ const (
 
 // Model displays system settings for a device.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	device     string
-	status     *shelly.SysStatus
-	config     *shelly.SysConfig
-	cursor     SettingField
-	loading    bool
-	editing    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     Styles
-	loader     loading.Model
-	editModal  EditModel
+	ctx         context.Context
+	svc         *shelly.Service
+	fileCache   *cache.FileCache
+	device      string
+	status      *shelly.SysStatus
+	config      *shelly.SysConfig
+	cursor      SettingField
+	loading     bool
+	editing     bool
+	err         error
+	width       int
+	height      int
+	focused     bool
+	panelIndex  int // 1-based panel index for Shift+N hotkey hint
+	styles      Styles
+	loader      loading.Model
+	editModal   EditModel
+	cacheStatus cachestatus.Model
 }
 
 // Styles holds styles for the System component.
@@ -119,10 +132,12 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		loading:     false,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading system settings..."),
 			loading.WithStyle(loading.StyleDot),
@@ -144,13 +159,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.config = nil
 	m.cursor = FieldName
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeSystem)
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -170,6 +186,46 @@ func (m Model) fetchStatus() tea.Cmd {
 
 		return StatusLoadedMsg{Status: status, Config: config}
 	}
+}
+
+// fetchAndCacheStatus fetches fresh data and caches it.
+func (m Model) fetchAndCacheStatus() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeSystem, cache.TTLSystem, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetSysStatus(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		config, configErr := m.svc.GetSysConfig(ctx, m.device)
+		if configErr != nil {
+			return nil, configErr
+		}
+
+		return CachedSystemData{Status: status, Config: config}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeSystem, cache.TTLSystem, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetSysStatus(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		config, configErr := m.svc.GetSysConfig(ctx, m.device)
+		if configErr != nil {
+			return nil, configErr
+		}
+
+		return CachedSystemData{Status: status, Config: config}, nil
+	})
 }
 
 // SetSize sets the component dimensions.
@@ -199,53 +255,36 @@ func (m Model) SetPanelIndex(index int) Model {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward to edit modal if editing
 	if m.editing {
-		var cmd tea.Cmd
-		m.editModal, cmd = m.editModal.Update(msg)
-
-		// Check if modal was closed
-		if !m.editModal.Visible() {
-			m.editing = false
-			// Check if it was a save - refresh data
-			if closedMsg, ok := msg.(EditClosedMsg); ok && closedMsg.Saved {
-				m.loading = true
-				return m, tea.Batch(cmd, m.loader.Tick(), m.fetchStatus())
-			}
-		}
-
-		return m, cmd
+		return m.updateEditing(msg)
 	}
 
 	// Forward tick messages to loader when loading
 	if m.loading {
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
+		}
+	}
+
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
 		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing StatusLoadedMsg even during loading
-		if _, ok := msg.(StatusLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
 	}
 
 	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
 	case StatusLoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.status = msg.Status
-		m.config = msg.Config
-		return m, nil
-
+		return m.handleStatusLoaded(msg)
 	case EditClosedMsg:
-		// Handle edit closed message for toast feedback propagation
-		if msg.Saved {
-			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
-		}
-		return m, nil
-
+		return m.handleEditClosed(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -254,6 +293,111 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) updateEditing(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.editModal.Visible() {
+		m.editing = false
+		// Check if it was a save - invalidate cache and refresh data
+		if closedMsg, ok := msg.(EditClosedMsg); ok && closedMsg.Saved {
+			m.loading = true
+			return m, tea.Batch(
+				cmd,
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeSystem),
+				m.fetchAndCacheStatus(),
+			)
+		}
+	}
+
+	return m, cmd
+}
+
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing messages even during loading
+	switch msg.(type) {
+	case StatusLoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false // Continue processing
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSystem {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedSystemData](msg.Data)
+	if err == nil {
+		m.status = data.Status
+		m.config = data.Config
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	// Background refresh if stale
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSystem {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSystem {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("system background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedSystemData); ok {
+		m.status = data.Status
+		m.config = data.Config
+	}
+	return m, nil
+}
+
+func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.status = msg.Status
+	m.config = msg.Config
+	return m, nil
+}
+
+func (m Model) handleEditClosed(msg EditClosedMsg) (Model, tea.Cmd) {
+	if !msg.Saved {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeSystem),
+		m.fetchAndCacheStatus(),
+	)
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -280,7 +424,12 @@ func (m Model) handleRefreshKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Invalidate cache and fetch fresh data
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeSystem),
+		m.fetchAndCacheStatus(),
+	)
 }
 
 func (m Model) handleEditKey() (Model, tea.Cmd) {
@@ -355,6 +504,13 @@ func (m Model) setEcoMode(enable bool) tea.Cmd {
 		if err != nil {
 			return StatusLoadedMsg{Status: status, Err: err}
 		}
+
+		// Update cache with new data
+		if m.fileCache != nil {
+			data := CachedSystemData{Status: status, Config: config}
+			iostreams.DebugErr("cache system after eco mode change", m.fileCache.Set(m.device, cache.TypeSystem, data, cache.TTLSystem))
+		}
+
 		return StatusLoadedMsg{Status: status, Config: config}
 	}
 }
@@ -378,6 +534,13 @@ func (m Model) setDiscoverable(discoverable bool) tea.Cmd {
 		if err != nil {
 			return StatusLoadedMsg{Status: status, Err: err}
 		}
+
+		// Update cache with new data
+		if m.fileCache != nil {
+			data := CachedSystemData{Status: status, Config: config}
+			iostreams.DebugErr("cache system after discoverable change", m.fileCache.Set(m.device, cache.TypeSystem, data, cache.TTLSystem))
+		}
+
 		return StatusLoadedMsg{Status: status, Config: config}
 	}
 }
@@ -417,9 +580,13 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		r.SetFooter("e:edit z:timezone t:toggle r:refresh")
+		footer := "e:edit z:timezone t:toggle r:refresh"
+		if cacheView := m.cacheStatus.View(); cacheView != "" {
+			footer += " | " + cacheView
+		}
+		r.SetFooter(footer)
 	}
 
 	// Render edit modal overlay if editing

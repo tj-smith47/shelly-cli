@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/browser"
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -54,6 +55,7 @@ type Factory struct {
 	modbusService      *modbus.Service
 	sensorAddonService *sensoraddon.Service
 	browserInst        browser.Browser
+	fileCache          *cache.FileCache
 }
 
 // NewFactory creates a Factory with production dependencies.
@@ -244,6 +246,38 @@ func (f *Factory) SensorAddonService() *sensoraddon.Service {
 		f.sensorAddonService = sensoraddon.New(f.ShellyService())
 	}
 	return f.sensorAddonService
+}
+
+// FileCache returns the file-based cache, lazily initialized.
+// Provides caching for device data shared between TUI and CLI.
+// Returns nil if cache initialization fails (non-fatal).
+// On first access, runs periodic cleanup if > 24h since last cleanup.
+func (f *Factory) FileCache() *cache.FileCache {
+	if f.fileCache == nil {
+		fc, err := cache.New()
+		if err != nil {
+			f.IOStreams().DebugErr("initialize file cache", err)
+			return nil
+		}
+		f.fileCache = fc
+
+		// Run periodic cleanup (max once per 24 hours)
+		removed, cleanupErr := fc.CleanupIfNeeded(24 * time.Hour)
+		if cleanupErr != nil {
+			f.IOStreams().DebugErr("cache cleanup", cleanupErr)
+		} else if removed > 0 {
+			f.IOStreams().Debug("cache cleanup removed %d expired entries", removed)
+		}
+	}
+	return f.fileCache
+}
+
+// SetFileCache sets a custom file cache on an existing factory.
+// This modifies the factory in-place and returns it for chaining.
+// Use this for testing with isolated cache.
+func (f *Factory) SetFileCache(fc *cache.FileCache) *Factory {
+	f.fileCache = fc
+	return f
 }
 
 // =============================================================================

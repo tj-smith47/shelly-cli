@@ -11,17 +11,21 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Deps holds the dependencies for the Security component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -32,7 +36,13 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedSecurityData holds security status for caching.
+type CachedSecurityData struct {
+	Status *shelly.TUISecurityStatus `json:"status"`
 }
 
 // StatusLoadedMsg signals that security status was loaded.
@@ -43,18 +53,20 @@ type StatusLoadedMsg struct {
 
 // Model displays security settings for a device.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	device     string
-	status     *shelly.TUISecurityStatus
-	loading    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     Styles
-	loader     loading.Model
+	ctx         context.Context
+	svc         *shelly.Service
+	fileCache   *cache.FileCache
+	device      string
+	status      *shelly.TUISecurityStatus
+	loading     bool
+	err         error
+	width       int
+	height      int
+	focused     bool
+	panelIndex  int // 1-based panel index for Shift+N hotkey hint
+	styles      Styles
+	loader      loading.Model
+	cacheStatus cachestatus.Model
 
 	// Edit modal
 	editModel EditModel
@@ -112,9 +124,11 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:    deps.Ctx,
-		svc:    deps.Svc,
-		styles: DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading security settings..."),
 			loading.WithStyle(loading.StyleDot),
@@ -134,13 +148,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.status = nil
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeSecurity)
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -154,6 +169,34 @@ func (m Model) fetchStatus() tea.Cmd {
 			Err:    err,
 		}
 	}
+}
+
+// fetchAndCacheStatus fetches fresh data and caches it.
+func (m Model) fetchAndCacheStatus() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeSecurity, cache.TTLSecurity, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetTUISecurityStatus(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+		return CachedSecurityData{Status: status}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeSecurity, cache.TTLSecurity, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetTUISecurityStatus(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+		return CachedSecurityData{Status: status}, nil
+	})
 }
 
 // SetSize sets the component dimensions.
@@ -188,26 +231,106 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		return m.handleLoadingUpdate(msg)
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
+		}
 	}
 
-	switch msg := msg.(type) {
-	case StatusLoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
-		m.status = msg.Status
-		return m, nil
+	}
 
+	return m.handleMessage(msg)
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
+	case StatusLoadedMsg:
+		return m.handleStatusLoaded(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
+	return m, nil
+}
 
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case StatusLoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSecurity {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedSecurityData](msg.Data)
+	if err == nil {
+		m.status = data.Status
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSecurity {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSecurity {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("security background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedSecurityData); ok {
+		m.status = data.Status
+	}
+	return m, nil
+}
+
+func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.status = msg.Status
 	return m, nil
 }
 
@@ -218,30 +341,16 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	if cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	// Check for EditClosedMsg to refresh data
+	// Check for EditClosedMsg to invalidate cache and refresh data
 	if closedMsg, ok := msg.(EditClosedMsg); ok && closedMsg.Saved && m.device != "" {
 		m.loading = true
-		cmds = append(cmds, m.loader.Tick(), m.fetchStatus())
+		cmds = append(cmds,
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeSecurity),
+			m.fetchAndCacheStatus(),
+		)
 	}
 	return m, tea.Batch(cmds...)
-}
-
-func (m Model) handleLoadingUpdate(msg tea.Msg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.loader, cmd = m.loader.Update(msg)
-
-	// Process StatusLoadedMsg even during loading (exit loading state first to avoid recursion)
-	if loadedMsg, ok := msg.(StatusLoadedMsg); ok {
-		m.loading = false
-		if loadedMsg.Err != nil {
-			m.err = loadedMsg.Err
-			return m, nil
-		}
-		m.status = loadedMsg.Status
-		return m, nil
-	}
-
-	return m, cmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -249,7 +358,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "r":
 		if !m.loading && m.device != "" {
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+			// Invalidate cache and fetch fresh data
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeSecurity),
+				m.fetchAndCacheStatus(),
+			)
 		}
 	case "a":
 		// Open auth configuration modal
@@ -309,9 +423,13 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		r.SetFooter("a:auth r:refresh")
+		footer := "a:auth r:refresh"
+		if cacheView := m.cacheStatus.View(); cacheView != "" {
+			footer += " | " + cacheView
+		}
+		r.SetFooter(footer)
 	}
 	return r.Render()
 }

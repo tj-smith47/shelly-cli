@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -28,11 +29,13 @@ func (e *CacheEntry) IsStale(maxAge time.Duration) bool {
 	return time.Since(e.LastChecked) > maxAge
 }
 
-// Cache provides in-memory caching of firmware info for all devices.
-// This is NOT persisted to config - it's populated at startup and refreshed on demand.
+// Cache provides caching of firmware info for all devices.
+// It uses both in-memory cache for fast access during a session
+// and file-based cache for persistence across sessions.
 type Cache struct {
-	mu      sync.RWMutex
-	entries map[string]*CacheEntry // keyed by device name
+	mu        sync.RWMutex
+	entries   map[string]*CacheEntry // keyed by device name (in-memory)
+	fileCache *cache.FileCache       // optional file-based persistence
 }
 
 // NewCache creates a new firmware cache.
@@ -42,19 +45,78 @@ func NewCache() *Cache {
 	}
 }
 
+// SetFileCache sets the file cache for persistence.
+func (c *Cache) SetFileCache(fc *cache.FileCache) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.fileCache = fc
+}
+
 // Get returns cached firmware info for a device.
+// Checks in-memory cache first, then file cache.
 func (c *Cache) Get(deviceName string) (*CacheEntry, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	entry, ok := c.entries[deviceName]
-	return entry, ok
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Check in-memory cache first.
+	if entry, ok := c.entries[deviceName]; ok {
+		return entry, true
+	}
+
+	// Try loading from file cache.
+	entry := c.loadFromFileCache(deviceName)
+	if entry != nil {
+		c.entries[deviceName] = entry
+		return entry, true
+	}
+
+	return nil, false
+}
+
+// loadFromFileCache loads a cache entry from the file cache.
+// Returns nil if file cache is not available or entry not found.
+func (c *Cache) loadFromFileCache(deviceName string) *CacheEntry {
+	if c.fileCache == nil {
+		return nil
+	}
+
+	fileEntry, err := c.fileCache.Get(deviceName, cache.TypeFirmware)
+	if err != nil {
+		iostreams.DebugErr("get firmware from file cache", err)
+		return nil
+	}
+	if fileEntry == nil {
+		return nil
+	}
+
+	var info Info
+	if err := fileEntry.Unmarshal(&info); err != nil {
+		iostreams.DebugErr("unmarshal firmware cache", err)
+		return nil
+	}
+
+	return &CacheEntry{
+		DeviceName:  deviceName,
+		Info:        &info,
+		LastChecked: fileEntry.CachedAt,
+	}
 }
 
 // Set stores firmware info for a device.
+// Stores in both in-memory and file cache.
 func (c *Cache) Set(deviceName string, entry *CacheEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Store in in-memory cache.
 	c.entries[deviceName] = entry
+
+	// Store in file cache if available and no error.
+	if c.fileCache != nil && entry.Info != nil && entry.Error == nil {
+		if err := c.fileCache.Set(deviceName, cache.TypeFirmware, entry.Info, cache.TTLFirmware); err != nil {
+			iostreams.DebugErr("set firmware to file cache", err)
+		}
+	}
 }
 
 // All returns all cached entries.

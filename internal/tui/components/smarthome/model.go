@@ -11,17 +11,21 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Deps holds the dependencies for the SmartHome component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -32,7 +36,15 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedSmartHomeData holds smart home status for caching.
+type CachedSmartHomeData struct {
+	Matter *shelly.TUIMatterStatus `json:"matter"`
+	Zigbee *shelly.TUIZigbeeStatus `json:"zigbee"`
+	LoRa   *shelly.TUILoRaStatus   `json:"lora"`
 }
 
 // Protocol identifies which protocol section is focused.
@@ -57,6 +69,7 @@ type StatusLoadedMsg struct {
 type Model struct {
 	ctx            context.Context
 	svc            *shelly.Service
+	fileCache      *cache.FileCache
 	device         string
 	matter         *shelly.TUIMatterStatus
 	zigbee         *shelly.TUIZigbeeStatus
@@ -70,6 +83,7 @@ type Model struct {
 	panelIndex     int // 1-based panel index for Shift+N hotkey hint
 	styles         Styles
 	loader         loading.Model
+	cacheStatus    cachestatus.Model
 }
 
 // Styles holds styles for the SmartHome component.
@@ -125,9 +139,11 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:    deps.Ctx,
-		svc:    deps.Svc,
-		styles: DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading smart home protocols..."),
 			loading.WithStyle(loading.StyleDot),
@@ -149,13 +165,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.lora = nil
 	m.activeProtocol = ProtocolMatter
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeMatter)
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -196,6 +213,38 @@ func (m Model) fetchLoRa(ctx context.Context) *shelly.TUILoRaStatus {
 	return status
 }
 
+// fetchAndCacheStatus fetches fresh data and caches it.
+func (m Model) fetchAndCacheStatus() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeMatter, cache.TTLSmartHome, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		data := CachedSmartHomeData{
+			Matter: m.fetchMatter(ctx),
+			Zigbee: m.fetchZigbee(ctx),
+			LoRa:   m.fetchLoRa(ctx),
+		}
+
+		return data, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeMatter, cache.TTLSmartHome, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		data := CachedSmartHomeData{
+			Matter: m.fetchMatter(ctx),
+			Zigbee: m.fetchZigbee(ctx),
+			LoRa:   m.fetchLoRa(ctx),
+		}
+
+		return data, nil
+	})
+}
+
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
@@ -221,35 +270,112 @@ func (m Model) SetPanelIndex(index int) Model {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing StatusLoadedMsg even during loading
-		if _, ok := msg.(StatusLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 
-	switch msg := msg.(type) {
-	case StatusLoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
-		m.matter = msg.Matter
-		m.zigbee = msg.Zigbee
-		m.lora = msg.LoRa
-		return m, nil
+	}
 
+	return m.handleMessage(msg)
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
+	case StatusLoadedMsg:
+		return m.handleStatusLoaded(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
+	return m, nil
+}
 
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case StatusLoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeMatter {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedSmartHomeData](msg.Data)
+	if err == nil {
+		m.matter = data.Matter
+		m.zigbee = data.Zigbee
+		m.lora = data.LoRa
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeMatter {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeMatter {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("smarthome background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedSmartHomeData); ok {
+		m.matter = data.Matter
+		m.zigbee = data.Zigbee
+		m.lora = data.LoRa
+	}
+	return m, nil
+}
+
+func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.matter = msg.Matter
+	m.zigbee = msg.Zigbee
+	m.lora = msg.LoRa
 	return m, nil
 }
 
@@ -262,7 +388,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "r":
 		if !m.loading && m.device != "" {
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+			// Invalidate cache and fetch fresh data
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeMatter),
+				m.fetchAndCacheStatus(),
+			)
 		}
 	case "1":
 		m.activeProtocol = ProtocolMatter
@@ -336,9 +467,13 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		r.SetFooter("1-3:sel j/k:nav r:refresh")
+		footer := "1-3:sel j/k:nav r:refresh"
+		if cs := m.cacheStatus.View(); cs != "" {
+			footer = cs + " " + footer
+		}
+		r.SetFooter(footer)
 	}
 	return r.Render()
 }

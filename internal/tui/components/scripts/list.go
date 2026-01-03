@@ -10,12 +10,15 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -29,8 +32,14 @@ type Script struct {
 
 // ListDeps holds the dependencies for the scripts list component.
 type ListDeps struct {
-	Ctx context.Context
-	Svc *automation.Service
+	Ctx       context.Context
+	Svc       *automation.Service
+	FileCache *cache.FileCache
+}
+
+// CachedScriptsData holds scripts data for caching.
+type CachedScriptsData struct {
+	Scripts []Script `json:"scripts"`
 }
 
 // Validate ensures all required dependencies are set.
@@ -74,19 +83,21 @@ type CreateScriptMsg struct {
 
 // ListModel displays scripts for a device.
 type ListModel struct {
-	ctx        context.Context
-	svc        *automation.Service
-	device     string
-	scripts    []Script
-	scroller   *panel.Scroller
-	loading    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     ListStyles
-	loader     loading.Model
+	ctx         context.Context
+	svc         *automation.Service
+	fileCache   *cache.FileCache
+	device      string
+	scripts     []Script
+	scroller    *panel.Scroller
+	loading     bool
+	err         error
+	width       int
+	height      int
+	focused     bool
+	panelIndex  int // 1-based panel index for Shift+N hotkey hint
+	styles      ListStyles
+	loader      loading.Model
+	cacheStatus cachestatus.Model
 }
 
 // ListStyles holds styles for the list component.
@@ -135,11 +146,13 @@ func NewList(deps ListDeps) ListModel {
 	}
 
 	return ListModel{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 1),
-		loading:  false,
-		styles:   DefaultListStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		scroller:    panel.NewScroller(0, 1),
+		loading:     false,
+		styles:      DefaultListStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading scripts..."),
 			loading.WithStyle(loading.StyleDot),
@@ -159,13 +172,14 @@ func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 	m.scripts = nil
 	m.scroller.SetItemCount(0)
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchScripts())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeScripts)
 }
 
 // fetchScripts creates a command to fetch scripts from the device.
@@ -191,6 +205,56 @@ func (m ListModel) fetchScripts() tea.Cmd {
 
 		return LoadedMsg{Scripts: result}
 	}
+}
+
+// fetchAndCacheScripts fetches fresh data and caches it.
+func (m ListModel) fetchAndCacheScripts() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeScripts, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		scripts, err := m.svc.ListScripts(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Script, len(scripts))
+		for i, s := range scripts {
+			result[i] = Script{
+				ID:      s.ID,
+				Name:    s.Name,
+				Enabled: s.Enable,
+				Running: s.Running,
+			}
+		}
+
+		return CachedScriptsData{Scripts: result}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m ListModel) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeScripts, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		scripts, err := m.svc.ListScripts(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Script, len(scripts))
+		for i, s := range scripts {
+			result[i] = Script{
+				ID:      s.ID,
+				Name:    s.Name,
+				Enabled: s.Enable,
+				Running: s.Running,
+			}
+		}
+
+		return CachedScriptsData{Scripts: result}, nil
+	})
 }
 
 // SetSize sets the component dimensions.
@@ -224,48 +288,128 @@ func (m ListModel) SetPanelIndex(index int) ListModel {
 func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing LoadedMsg/ActionMsg even during loading
-		switch msg.(type) {
-		case LoadedMsg, ActionMsg:
-			// Pass through to main switch below
-		default:
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
+
+	return m.handleMessage(msg)
+}
+
+func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
 	case LoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.scripts = msg.Scripts
-		m.scroller.SetItemCount(len(m.scripts))
-		m.scroller.CursorToStart()
-		return m, nil
-
+		return m.handleLoaded(msg)
 	case ActionMsg:
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		// Refresh scripts after action
-		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchScripts())
-
+		return m.handleAction(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
-
 	return m, nil
+}
+
+func (m ListModel) updateLoading(msg tea.Msg) (ListModel, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case LoadedMsg, ActionMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m ListModel) handleCacheHit(msg panelcache.CacheHitMsg) (ListModel, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeScripts {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedScriptsData](msg.Data)
+	if err == nil {
+		m.scripts = data.Scripts
+		m.scroller.SetItemCount(len(m.scripts))
+		m.scroller.CursorToStart()
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m ListModel) handleCacheMiss(msg panelcache.CacheMissMsg) (ListModel, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeScripts {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheScripts())
+}
+
+func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (ListModel, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeScripts {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("scripts background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedScriptsData); ok {
+		m.scripts = data.Scripts
+		m.scroller.SetItemCount(len(m.scripts))
+	}
+	return m, nil
+}
+
+func (m ListModel) handleLoaded(msg LoadedMsg) (ListModel, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.scripts = msg.Scripts
+	m.scroller.SetItemCount(len(m.scripts))
+	m.scroller.CursorToStart()
+	return m, nil
+}
+
+func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh after action
+	m.loading = true
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeScripts),
+		m.fetchAndCacheScripts(),
+	)
 }
 
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
@@ -295,9 +439,13 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// New script - will be handled by parent
 		return m, m.createScript()
 	case "R":
-		// Refresh list
+		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchScripts())
+		return m, tea.Batch(
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeScripts),
+			m.fetchAndCacheScripts(),
+		)
 	}
 
 	return m, nil
@@ -395,38 +543,50 @@ func (m ListModel) View() string {
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
 
-	// Add footer with keybindings when focused
+	// Add footer with keybindings and cache status when focused
 	if m.focused && m.device != "" && len(m.scripts) > 0 {
-		r.SetFooter("e:edit r:run s:stop d:del n:new")
+		footer := "e:edit r:run s:stop d:del n:new"
+		if cs := m.cacheStatus.View(); cs != "" {
+			footer = cs + " " + footer
+		}
+		r.SetFooter(footer)
 	}
 
+	r.SetContent(m.renderContent())
+	return r.Render()
+}
+
+func (m ListModel) renderContent() string {
 	if m.device == "" {
-		r.SetContent(m.styles.Muted.Render("No device selected"))
-		return r.Render()
+		return m.styles.Muted.Render("No device selected")
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
-		return r.Render()
+		return m.loader.View()
 	}
 
 	if m.err != nil {
-		errMsg := m.err.Error()
-		// Detect Gen1 or unsupported device errors and show a friendly message
-		if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
-			strings.Contains(errMsg, "not found") {
-			r.SetContent(m.styles.Muted.Render("Scripts not supported on this device"))
-		} else {
-			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
-		}
-		return r.Render()
+		return m.renderError()
 	}
 
 	if len(m.scripts) == 0 {
-		r.SetContent(m.styles.Muted.Render("No scripts on device"))
-		return r.Render()
+		return m.styles.Muted.Render("No scripts on device")
 	}
 
+	return m.renderScriptsList()
+}
+
+func (m ListModel) renderError() string {
+	errMsg := m.err.Error()
+	// Detect Gen1 or unsupported device errors and show a friendly message
+	if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
+		strings.Contains(errMsg, "not found") {
+		return m.styles.Muted.Render("Scripts not supported on this device")
+	}
+	return m.styles.Error.Render("Error: " + errMsg)
+}
+
+func (m ListModel) renderScriptsList() string {
 	var content strings.Builder
 	start, end := m.scroller.VisibleRange()
 
@@ -446,8 +606,7 @@ func (m ListModel) View() string {
 		content.WriteString(m.styles.Muted.Render("\n" + m.scroller.ScrollInfo()))
 	}
 
-	r.SetContent(content.String())
-	return r.Render()
+	return content.String()
 }
 
 func (m ListModel) renderScriptLine(script Script, isSelected bool) string {

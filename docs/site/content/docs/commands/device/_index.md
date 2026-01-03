@@ -47,6 +47,7 @@ Registered devices can be referenced by name in other commands.
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
+      --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
 ```

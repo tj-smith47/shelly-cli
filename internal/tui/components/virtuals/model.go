@@ -10,13 +10,16 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -37,8 +40,14 @@ type Virtual struct {
 
 // Deps holds the dependencies for the virtuals component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
+}
+
+// CachedVirtualsData holds the data for the virtuals cache.
+type CachedVirtualsData struct {
+	Virtuals []Virtual `json:"virtuals"`
 }
 
 // Validate ensures all required dependencies are set.
@@ -84,6 +93,8 @@ type Model struct {
 	styles           Styles
 	loader           loading.Model
 	editModal        EditModel
+	fileCache        *cache.FileCache
+	cacheStatus      cachestatus.Model
 }
 
 // Styles holds styles for the virtual components list.
@@ -148,11 +159,13 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 10),
-		loading:  false,
-		styles:   DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		scroller:    panel.NewScroller(0, 10),
+		loading:     false,
+		styles:      DefaultStyles(),
+		fileCache:   deps.FileCache,
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading virtual components..."),
 			loading.WithStyle(loading.StyleDot),
@@ -174,13 +187,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.scroller.SetItemCount(0)
 	m.scroller.CursorToStart()
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeVirtuals)
 }
 
 // fetchVirtuals creates a command to fetch virtual components from the device.
@@ -213,6 +227,70 @@ func (m Model) fetchVirtuals() tea.Cmd {
 
 		return LoadedMsg{Virtuals: result}
 	}
+}
+
+// fetchAndCacheVirtuals fetches fresh data and caches it.
+func (m Model) fetchAndCacheVirtuals() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeVirtuals, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		components, err := m.svc.ListVirtualComponents(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Virtual, len(components))
+		for i, c := range components {
+			result[i] = Virtual{
+				Key:       c.Key,
+				Type:      c.Type,
+				ID:        c.ID,
+				Name:      c.Name,
+				BoolValue: c.BoolValue,
+				NumValue:  c.NumValue,
+				StrValue:  c.StrValue,
+				Options:   c.Options,
+				Min:       c.Min,
+				Max:       c.Max,
+				Unit:      c.Unit,
+			}
+		}
+
+		return CachedVirtualsData{Virtuals: result}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeVirtuals, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		components, err := m.svc.ListVirtualComponents(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Virtual, len(components))
+		for i, c := range components {
+			result[i] = Virtual{
+				Key:       c.Key,
+				Type:      c.Type,
+				ID:        c.ID,
+				Name:      c.Name,
+				BoolValue: c.BoolValue,
+				NumValue:  c.NumValue,
+				StrValue:  c.StrValue,
+				Options:   c.Options,
+				Min:       c.Min,
+				Max:       c.Max,
+				Unit:      c.Unit,
+			}
+		}
+
+		return CachedVirtualsData{Virtuals: result}, nil
+	})
 }
 
 // SetSize sets the component dimensions.
@@ -255,47 +333,128 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing LoadedMsg/ActionMsg even during loading
-		switch msg.(type) {
-		case LoadedMsg, ActionMsg:
-			// Pass through to main switch below
-		default:
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
+
+	return m.handleMessage(msg)
+}
+
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case LoadedMsg, ActionMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
 	case LoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.virtuals = msg.Virtuals
-		m.scroller.SetItemCount(len(m.virtuals))
-		m.scroller.CursorToStart()
-		return m, nil
-
+		return m.handleLoaded(msg)
 	case ActionMsg:
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
-
+		return m.handleAction(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
-
 	return m, nil
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeVirtuals {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedVirtualsData](msg.Data)
+	if err == nil {
+		m.virtuals = data.Virtuals
+		m.scroller.SetItemCount(len(m.virtuals))
+		m.scroller.CursorToStart()
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeVirtuals {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheVirtuals())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeVirtuals {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("virtuals background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedVirtualsData); ok {
+		m.virtuals = data.Virtuals
+		m.scroller.SetItemCount(len(m.virtuals))
+	}
+	return m, nil
+}
+
+func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.virtuals = msg.Virtuals
+	m.scroller.SetItemCount(len(m.virtuals))
+	m.scroller.CursorToStart()
+	return m, nil
+}
+
+func (m Model) handleAction(msg ActionMsg) (Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh after action
+	m.loading = true
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
+		m.fetchAndCacheVirtuals(),
+	)
 }
 
 func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
@@ -305,9 +464,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	// Check if modal was closed
 	if !m.editModal.IsVisible() {
 		m.editing = false
-		// Refresh data after edit
+		// Invalidate cache and refresh data after edit
 		m.loading = true
-		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchVirtuals())
+		return m, tea.Batch(
+			cmd,
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
+			m.fetchAndCacheVirtuals(),
+		)
 	}
 
 	// Handle save result message
@@ -315,11 +479,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		if saveMsg.Err == nil {
 			m.editing = false
 			m.editModal = m.editModal.Hide()
-			// Refresh data after successful save
+			// Invalidate cache and refresh data after successful save
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals(), func() tea.Msg {
-				return EditClosedMsg{Saved: true}
-			})
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
+				m.fetchAndCacheVirtuals(),
+				func() tea.Msg { return EditClosedMsg{Saved: true} },
+			)
 		}
 	}
 
@@ -361,9 +528,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.adjustValue(1)
 	case "d":
 		return m.handleDeleteKey()
-	case "r":
+	case "R":
+		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
+		return m, tea.Batch(
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
+			m.fetchAndCacheVirtuals(),
+		)
 	}
 
 	return m, nil
@@ -570,9 +742,13 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		r.SetFooter("e:edit d:delete r:refresh")
+		footer := "e:edit d:delete R:refresh"
+		if cs := m.cacheStatus.View(); cs != "" {
+			footer = cs + " " + footer
+		}
+		r.SetFooter(footer)
 	}
 	return r.Render()
 }

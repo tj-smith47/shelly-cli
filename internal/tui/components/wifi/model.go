@@ -10,21 +10,25 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Deps holds the dependencies for the WiFi component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -35,7 +39,14 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedWiFiData holds WiFi status and config for caching.
+type CachedWiFiData struct {
+	Status *network.WiFiStatusFull `json:"status"`
+	Config *network.WiFiConfigFull `json:"config"`
 }
 
 // StatusLoadedMsg signals that WiFi status was loaded.
@@ -63,6 +74,7 @@ type EditClosedMsg struct {
 type Model struct {
 	ctx           context.Context
 	svc           *shelly.Service
+	fileCache     *cache.FileCache
 	device        string
 	status        *network.WiFiStatusFull
 	config        *network.WiFiConfigFull
@@ -80,6 +92,7 @@ type Model struct {
 	loader        loading.Model
 	scannerLoader loading.Model
 	editModal     EditModel
+	cacheStatus   cachestatus.Model
 }
 
 // Styles holds styles for the WiFi component.
@@ -134,11 +147,13 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 10),
-		loading:  false,
-		styles:   DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		scroller:    panel.NewScroller(0, 10),
+		loading:     false,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading WiFi status..."),
 			loading.WithStyle(loading.StyleDot),
@@ -167,13 +182,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.scroller.SetItemCount(0)
 	m.scroller.CursorToStart()
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeWiFi)
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -193,6 +209,46 @@ func (m Model) fetchStatus() tea.Cmd {
 
 		return StatusLoadedMsg{Status: status, Config: config}
 	}
+}
+
+// fetchAndCacheStatus fetches fresh data and caches it.
+func (m Model) fetchAndCacheStatus() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeWiFi, cache.TTLWiFi, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetWiFiStatusFull(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		config, configErr := m.svc.GetWiFiConfigFull(ctx, m.device)
+		if configErr != nil {
+			return nil, configErr
+		}
+
+		return CachedWiFiData{Status: status, Config: config}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeWiFi, cache.TTLWiFi, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetWiFiStatusFull(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		config, configErr := m.svc.GetWiFiConfigFull(ctx, m.device)
+		if configErr != nil {
+			return nil, configErr
+		}
+
+		return CachedWiFiData{Status: status, Config: config}, nil
+	})
 }
 
 func (m Model) scanNetworks() tea.Cmd {
@@ -242,55 +298,141 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loaders when loading or scanning
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing StatusLoadedMsg even during loading
-		if _, ok := msg.(StatusLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 	if m.scanning {
-		var cmd tea.Cmd
-		m.scannerLoader, cmd = m.scannerLoader.Update(msg)
-		// Continue processing ScanResultMsg even during scanning
-		if _, ok := msg.(ScanResultMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateScanning(msg); done {
+			return model, cmd
 		}
 	}
 
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
+
+	return m.handleMessage(msg)
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
 	case StatusLoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.status = msg.Status
-		m.config = msg.Config
-		return m, nil
-
+		return m.handleStatusLoaded(msg)
 	case ScanResultMsg:
-		m.scanning = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.networks = msg.Networks
-		m.scroller.SetItemCount(len(m.networks))
-		m.scroller.CursorToStart()
-		return m, nil
-
+		return m.handleScanResult(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
+	return m, nil
+}
 
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case StatusLoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) updateScanning(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.scannerLoader, cmd = m.scannerLoader.Update(msg)
+	// Continue processing ScanResultMsg even during scanning
+	if _, ok := msg.(ScanResultMsg); !ok {
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeWiFi {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedWiFiData](msg.Data)
+	if err == nil {
+		m.status = data.Status
+		m.config = data.Config
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	// Background refresh if stale
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeWiFi {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeWiFi {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("wifi background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedWiFiData); ok {
+		m.status = data.Status
+		m.config = data.Config
+	}
+	return m, nil
+}
+
+func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.status = msg.Status
+	m.config = msg.Config
+	return m, nil
+}
+
+func (m Model) handleScanResult(msg ScanResultMsg) (Model, tea.Cmd) {
+	m.scanning = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.networks = msg.Networks
+	m.scroller.SetItemCount(len(m.networks))
+	m.scroller.CursorToStart()
 	return m, nil
 }
 
@@ -301,9 +443,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	// Check if modal was closed
 	if !m.editModal.IsVisible() {
 		m.editing = false
-		// Refresh data after edit
+		// Invalidate cache and refresh data after edit
 		m.loading = true
-		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchStatus())
+		return m, tea.Batch(
+			cmd,
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeWiFi),
+			m.fetchAndCacheStatus(),
+		)
 	}
 
 	// Handle save result message
@@ -311,11 +458,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		if saveMsg.Success {
 			m.editing = false
 			m.editModal = m.editModal.Hide()
-			// Refresh data after successful save
+			// Invalidate cache and refresh data after successful save
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus(), func() tea.Msg {
-				return EditClosedMsg{Saved: true}
-			})
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeWiFi),
+				m.fetchAndCacheStatus(),
+				func() tea.Msg { return EditClosedMsg{Saved: true} },
+			)
 		}
 	}
 
@@ -355,7 +505,12 @@ func (m Model) handleRefreshKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Invalidate cache and fetch fresh data
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeWiFi),
+		m.fetchAndCacheStatus(),
+	)
 }
 
 func (m Model) handleEditKey() (Model, tea.Cmd) {
@@ -411,9 +566,13 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		r.SetFooter("e:edit s:scan r:refresh")
+		footer := "e:edit s:scan r:refresh"
+		if cacheView := m.cacheStatus.View(); cacheView != "" {
+			footer += " | " + cacheView
+		}
+		r.SetFooter(footer)
 	}
 	return r.Render()
 }

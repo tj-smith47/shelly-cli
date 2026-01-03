@@ -10,17 +10,21 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Deps holds the dependencies for the Cloud component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -31,7 +35,15 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedCloudData holds cloud status for caching.
+type CachedCloudData struct {
+	Connected bool   `json:"connected"`
+	Enabled   bool   `json:"enabled"`
+	Server    string `json:"server"`
 }
 
 // StatusLoadedMsg signals that cloud status was loaded.
@@ -51,21 +63,23 @@ type ToggleResultMsg struct {
 
 // Model displays cloud settings for a device.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	device     string
-	connected  bool
-	enabled    bool
-	server     string
-	loading    bool
-	toggling   bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     Styles
-	loader     loading.Model
+	ctx         context.Context
+	svc         *shelly.Service
+	fileCache   *cache.FileCache
+	device      string
+	connected   bool
+	enabled     bool
+	server      string
+	loading     bool
+	toggling    bool
+	err         error
+	width       int
+	height      int
+	focused     bool
+	panelIndex  int // 1-based panel index for Shift+N hotkey hint
+	styles      Styles
+	loader      loading.Model
+	cacheStatus cachestatus.Model
 
 	// Edit modal
 	editModel EditModel
@@ -118,10 +132,12 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		loading:     false,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading cloud status..."),
 			loading.WithStyle(loading.StyleDot),
@@ -143,13 +159,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.enabled = false
 	m.server = ""
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeCloud)
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -190,6 +207,80 @@ func (m Model) fetchStatus() tea.Cmd {
 	}
 }
 
+// fetchAndCacheStatus fetches fresh data and caches it.
+func (m Model) fetchAndCacheStatus() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeCloud, cache.TTLCloud, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetCloudStatus(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		config, configErr := m.svc.GetCloudConfig(ctx, m.device)
+		if configErr != nil {
+			return nil, configErr
+		}
+
+		// Extract enabled and server from config
+		var connected, enabled bool
+		var server string
+		if status != nil {
+			connected = status.Connected
+		}
+		if e, ok := config["enable"].(*bool); ok && e != nil {
+			enabled = *e
+		} else if e, ok := config["enable"].(bool); ok {
+			enabled = e
+		}
+		if s, ok := config["server"].(*string); ok && s != nil {
+			server = *s
+		} else if s, ok := config["server"].(string); ok {
+			server = s
+		}
+
+		return CachedCloudData{Connected: connected, Enabled: enabled, Server: server}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeCloud, cache.TTLCloud, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		status, err := m.svc.GetCloudStatus(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		config, configErr := m.svc.GetCloudConfig(ctx, m.device)
+		if configErr != nil {
+			return nil, configErr
+		}
+
+		// Extract enabled and server from config
+		var connected, enabled bool
+		var server string
+		if status != nil {
+			connected = status.Connected
+		}
+		if e, ok := config["enable"].(*bool); ok && e != nil {
+			enabled = *e
+		} else if e, ok := config["enable"].(bool); ok {
+			enabled = e
+		}
+		if s, ok := config["server"].(*string); ok && s != nil {
+			server = *s
+		} else if s, ok := config["server"].(string); ok {
+			server = s
+		}
+
+		return CachedCloudData{Connected: connected, Enabled: enabled, Server: server}, nil
+	})
+}
+
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
@@ -220,42 +311,133 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		return m.handleLoadingUpdate(msg)
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
+		}
 	}
 
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
+
+	return m.handleMessage(msg)
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
 	case StatusLoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		if msg.Status != nil {
-			m.connected = msg.Status.Connected
-		}
-		m.enabled = msg.Enabled
-		m.server = msg.Server
-		return m, nil
-
+		return m.handleStatusLoaded(msg)
 	case ToggleResultMsg:
-		m.toggling = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.enabled = msg.Enabled
-		// Refresh to get updated connection status
-		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
-
+		return m.handleToggleResult(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
-
 	return m, nil
+}
+
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case StatusLoadedMsg, ToggleResultMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeCloud {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedCloudData](msg.Data)
+	if err == nil {
+		m.connected = data.Connected
+		m.enabled = data.Enabled
+		m.server = data.Server
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeCloud {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeCloud {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("cloud background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedCloudData); ok {
+		m.connected = data.Connected
+		m.enabled = data.Enabled
+		m.server = data.Server
+	}
+	return m, nil
+}
+
+func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	if msg.Status != nil {
+		m.connected = msg.Status.Connected
+	}
+	m.enabled = msg.Enabled
+	m.server = msg.Server
+	return m, nil
+}
+
+func (m Model) handleToggleResult(msg ToggleResultMsg) (Model, tea.Cmd) {
+	m.toggling = false
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.enabled = msg.Enabled
+	// Invalidate cache and refresh to get updated connection status
+	m.loading = true
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
+		m.fetchAndCacheStatus(),
+	)
 }
 
 func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
@@ -265,34 +447,16 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	if cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	// Check for EditClosedMsg to refresh data
+	// Check for EditClosedMsg to invalidate cache and refresh data
 	if closedMsg, ok := msg.(EditClosedMsg); ok && closedMsg.Saved && m.device != "" {
 		m.loading = true
-		cmds = append(cmds, m.loader.Tick(), m.fetchStatus())
+		cmds = append(cmds,
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
+			m.fetchAndCacheStatus(),
+		)
 	}
 	return m, tea.Batch(cmds...)
-}
-
-func (m Model) handleLoadingUpdate(msg tea.Msg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	m.loader, cmd = m.loader.Update(msg)
-
-	// Process StatusLoadedMsg even during loading
-	if loadedMsg, ok := msg.(StatusLoadedMsg); ok {
-		m.loading = false
-		if loadedMsg.Err != nil {
-			m.err = loadedMsg.Err
-			return m, nil
-		}
-		if loadedMsg.Status != nil {
-			m.connected = loadedMsg.Status.Connected
-		}
-		m.enabled = loadedMsg.Enabled
-		m.server = loadedMsg.Server
-		return m, nil
-	}
-
-	return m, cmd
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -312,7 +476,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "r":
 		if !m.loading && m.device != "" {
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+			// Invalidate cache and fetch fresh data
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
+				m.fetchAndCacheStatus(),
+			)
 		}
 	}
 
@@ -396,9 +565,13 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		r.SetFooter("c:config t:toggle r:refresh")
+		footer := "c:config t:toggle r:refresh"
+		if cacheView := m.cacheStatus.View(); cacheView != "" {
+			footer += " | " + cacheView
+		}
+		r.SetFooter(footer)
 	}
 	return r.Render()
 }

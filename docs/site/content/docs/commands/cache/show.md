@@ -9,7 +9,14 @@ Show cache statistics
 
 ### Synopsis
 
-Display information about the discovery cache.
+Display detailed information about the file cache.
+
+Shows cache statistics including:
+  - Total entries and size
+  - Entries by data type
+  - Device count
+  - Expired entry count
+  - Oldest and newest entries
 
 ```
 shelly cache show [flags]
@@ -20,6 +27,9 @@ shelly cache show [flags]
 ```
   # Show cache statistics
   shelly cache show
+
+  # Show cache stats in JSON format
+  shelly cache show -o json
 ```
 
 ### Options
@@ -39,6 +49,7 @@ shelly cache show [flags]
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
+      --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
 ```

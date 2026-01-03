@@ -12,12 +12,15 @@ Manage CLI cache
 
 ### Synopsis
 
-Manage the Shelly CLI cache directory.
+Manage the Shelly CLI file cache.
 
-The cache stores:
-  - Device discovery results
-  - Firmware update information
-  - Version check data
+The cache stores device data for faster access:
+  - Device information and configuration
+  - Firmware update status
+  - Automation settings (schedules, webhooks, scripts)
+  - Protocol configurations (MQTT, Modbus)
+
+Cache data has type-specific TTLs and is shared between CLI and TUI.
 
 ### Examples
 
@@ -25,8 +28,14 @@ The cache stores:
   # Show cache statistics
   shelly cache show
 
-  # Clear the cache
+  # Clear all cache
   shelly cache clear
+
+  # Clear cache for specific device
+  shelly cache clear --device kitchen
+
+  # Clear only expired entries
+  shelly cache clear --expired
 ```
 
 ### Options
@@ -46,6 +55,7 @@ The cache stores:
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
+      --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
 ```
@@ -53,6 +63,6 @@ The cache stores:
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly cache clear](shelly_cache_clear.md)	 - Clear the discovery cache
+* [shelly cache clear](shelly_cache_clear.md)	 - Clear the cache
 * [shelly cache show](shelly_cache_show.md)	 - Show cache statistics
 

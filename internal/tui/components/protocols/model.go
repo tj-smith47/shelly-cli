@@ -11,17 +11,21 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Deps holds the dependencies for the Protocols component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -32,7 +36,15 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedProtocolsData holds protocol status for caching.
+type CachedProtocolsData struct {
+	MQTT     *MQTTData     `json:"mqtt"`
+	Modbus   *ModbusData   `json:"modbus"`
+	Ethernet *EthernetData `json:"ethernet"`
 }
 
 // Protocol identifies which protocol section is focused.
@@ -85,6 +97,7 @@ type EthernetData struct {
 type Model struct {
 	ctx            context.Context
 	svc            *shelly.Service
+	fileCache      *cache.FileCache
 	device         string
 	mqtt           *MQTTData
 	modbus         *ModbusData
@@ -100,6 +113,7 @@ type Model struct {
 	styles         Styles
 	loader         loading.Model
 	mqttEdit       MQTTEditModel
+	cacheStatus    cachestatus.Model
 }
 
 // Styles holds styles for the Protocols component.
@@ -152,10 +166,12 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:     deps.Ctx,
-		svc:     deps.Svc,
-		loading: false,
-		styles:  DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		loading:     false,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading protocols..."),
 			loading.WithStyle(loading.StyleDot),
@@ -178,13 +194,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.ethernet = nil
 	m.activeProtocol = ProtocolMQTT
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeMQTT)
 }
 
 func (m Model) fetchStatus() tea.Cmd {
@@ -290,6 +307,46 @@ func (m Model) fetchEthernet(ctx context.Context) *EthernetData {
 	return data
 }
 
+// fetchAndCacheStatus fetches fresh data and caches it.
+func (m Model) fetchAndCacheStatus() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeMQTT, cache.TTLProtocols, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		var data CachedProtocolsData
+		data.MQTT = m.fetchMQTT(ctx)
+		data.Modbus = m.fetchModbus(ctx)
+		data.Ethernet = m.fetchEthernet(ctx)
+
+		// If we got nothing at all, return an error
+		if data.MQTT == nil && data.Modbus == nil && data.Ethernet == nil {
+			return nil, fmt.Errorf("no protocol data available")
+		}
+
+		return data, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeMQTT, cache.TTLProtocols, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		var data CachedProtocolsData
+		data.MQTT = m.fetchMQTT(ctx)
+		data.Modbus = m.fetchModbus(ctx)
+		data.Ethernet = m.fetchEthernet(ctx)
+
+		// If we got nothing at all, return an error
+		if data.MQTT == nil && data.Modbus == nil && data.Ethernet == nil {
+			return nil, fmt.Errorf("no protocol data available")
+		}
+
+		return data, nil
+	})
+}
+
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
@@ -322,35 +379,112 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing StatusLoadedMsg even during loading
-		if _, ok := msg.(StatusLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 
-	switch msg := msg.(type) {
-	case StatusLoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
-		m.mqtt = msg.MQTT
-		m.modbus = msg.Modbus
-		m.ethernet = msg.Ethernet
-		return m, nil
+	}
 
+	return m.handleMessage(msg)
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
+	case StatusLoadedMsg:
+		return m.handleStatusLoaded(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
+	return m, nil
+}
 
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case StatusLoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeMQTT {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedProtocolsData](msg.Data)
+	if err == nil {
+		m.mqtt = data.MQTT
+		m.modbus = data.Modbus
+		m.ethernet = data.Ethernet
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeMQTT {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeMQTT {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("protocols background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedProtocolsData); ok {
+		m.mqtt = data.MQTT
+		m.modbus = data.Modbus
+		m.ethernet = data.Ethernet
+	}
+	return m, nil
+}
+
+func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.mqtt = msg.MQTT
+	m.modbus = msg.Modbus
+	m.ethernet = msg.Ethernet
 	return m, nil
 }
 
@@ -361,9 +495,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	// Check if modal was closed
 	if !m.mqttEdit.IsVisible() {
 		m.editing = false
-		// Refresh data after edit
+		// Invalidate cache and refresh data after edit
 		m.loading = true
-		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchStatus())
+		return m, tea.Batch(
+			cmd,
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeMQTT),
+			m.fetchAndCacheStatus(),
+		)
 	}
 
 	// Handle save result message
@@ -371,11 +510,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		if saveMsg.Err == nil {
 			m.editing = false
 			m.mqttEdit = m.mqttEdit.Hide()
-			// Refresh data after successful save
+			// Invalidate cache and refresh data after successful save
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus(), func() tea.Msg {
-				return MQTTEditClosedMsg{Saved: true}
-			})
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeMQTT),
+				m.fetchAndCacheStatus(),
+				func() tea.Msg { return MQTTEditClosedMsg{Saved: true} },
+			)
 		}
 	}
 
@@ -391,7 +533,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "r":
 		if !m.loading && m.device != "" {
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+			// Invalidate cache and fetch fresh data
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeMQTT),
+				m.fetchAndCacheStatus(),
+			)
 		}
 	case "1":
 		m.activeProtocol = ProtocolMQTT
@@ -487,13 +634,18 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
+		var footer string
 		if m.activeProtocol == ProtocolMQTT && m.mqtt != nil {
-			r.SetFooter("1-3:sel j/k:nav m:mqtt r:refresh")
+			footer = "1-3:sel j/k:nav m:mqtt r:refresh"
 		} else {
-			r.SetFooter("1-3:sel j/k:nav r:refresh")
+			footer = "1-3:sel j/k:nav r:refresh"
 		}
+		if cs := m.cacheStatus.View(); cs != "" {
+			footer = cs + " " + footer
+		}
+		r.SetFooter(footer)
 	}
 	return r.Render()
 }

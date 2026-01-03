@@ -10,13 +10,16 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -32,8 +35,9 @@ type Webhook struct {
 
 // Deps holds the dependencies for the webhooks component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -44,7 +48,13 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedWebhooksData holds webhooks for caching.
+type CachedWebhooksData struct {
+	Webhooks []Webhook `json:"webhooks"`
 }
 
 // LoadedMsg signals that webhooks were loaded.
@@ -72,21 +82,23 @@ type CreateMsg struct {
 
 // Model displays webhooks for a device.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	device     string
-	webhooks   []Webhook
-	scroller   *panel.Scroller
-	loading    bool
-	editing    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     Styles
-	loader     loading.Model
-	editModal  EditModel
+	ctx         context.Context
+	svc         *shelly.Service
+	fileCache   *cache.FileCache
+	device      string
+	webhooks    []Webhook
+	scroller    *panel.Scroller
+	loading     bool
+	editing     bool
+	err         error
+	width       int
+	height      int
+	focused     bool
+	panelIndex  int // 1-based panel index for Shift+N hotkey hint
+	styles      Styles
+	loader      loading.Model
+	editModal   EditModel
+	cacheStatus cachestatus.Model
 }
 
 // Styles holds styles for the webhook list component.
@@ -135,11 +147,13 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 1),
-		loading:  false,
-		styles:   DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		scroller:    panel.NewScroller(0, 1),
+		loading:     false,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading webhooks..."),
 			loading.WithStyle(loading.StyleDot),
@@ -160,13 +174,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.webhooks = nil
 	m.scroller.SetItemCount(0)
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeWebhooks)
 }
 
 // fetchWebhooks creates a command to fetch webhooks from the device.
@@ -194,6 +209,60 @@ func (m Model) fetchWebhooks() tea.Cmd {
 
 		return LoadedMsg{Webhooks: result}
 	}
+}
+
+// fetchAndCacheWebhooks fetches fresh data and caches it.
+func (m Model) fetchAndCacheWebhooks() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeWebhooks, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		hooks, err := m.svc.ListWebhooks(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Webhook, len(hooks))
+		for i, h := range hooks {
+			result[i] = Webhook{
+				ID:     h.ID,
+				Name:   h.Name,
+				Event:  h.Event,
+				Enable: h.Enable,
+				URLs:   h.URLs,
+				Cid:    h.Cid,
+			}
+		}
+
+		return CachedWebhooksData{Webhooks: result}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeWebhooks, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		hooks, err := m.svc.ListWebhooks(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Webhook, len(hooks))
+		for i, h := range hooks {
+			result[i] = Webhook{
+				ID:     h.ID,
+				Name:   h.Name,
+				Event:  h.Event,
+				Enable: h.Enable,
+				URLs:   h.URLs,
+				Cid:    h.Cid,
+			}
+		}
+
+		return CachedWebhooksData{Webhooks: result}, nil
+	})
 }
 
 // SetSize sets the component dimensions.
@@ -232,47 +301,128 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing LoadedMsg/ActionMsg even during loading
-		switch msg.(type) {
-		case LoadedMsg, ActionMsg:
-			// Pass through to main switch below
-		default:
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
+
+	return m.handleMessage(msg)
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
 	case LoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.webhooks = msg.Webhooks
-		m.scroller.SetItemCount(len(m.webhooks))
-		m.scroller.CursorToStart()
-		return m, nil
-
+		return m.handleLoaded(msg)
 	case ActionMsg:
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
-
+		return m.handleAction(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
-
 	return m, nil
+}
+
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case LoadedMsg, ActionMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeWebhooks {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedWebhooksData](msg.Data)
+	if err == nil {
+		m.webhooks = data.Webhooks
+		m.scroller.SetItemCount(len(m.webhooks))
+		m.scroller.CursorToStart()
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeWebhooks {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheWebhooks())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeWebhooks {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("webhooks background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedWebhooksData); ok {
+		m.webhooks = data.Webhooks
+		m.scroller.SetItemCount(len(m.webhooks))
+	}
+	return m, nil
+}
+
+func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.webhooks = msg.Webhooks
+	m.scroller.SetItemCount(len(m.webhooks))
+	m.scroller.CursorToStart()
+	return m, nil
+}
+
+func (m Model) handleAction(msg ActionMsg) (Model, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh after action
+	m.loading = true
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
+		m.fetchAndCacheWebhooks(),
+	)
 }
 
 func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
@@ -282,9 +432,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	// Check if modal was closed
 	if !m.editModal.IsVisible() {
 		m.editing = false
-		// Refresh data after edit
+		// Invalidate cache and refresh data after edit
 		m.loading = true
-		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchWebhooks())
+		return m, tea.Batch(
+			cmd,
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
+			m.fetchAndCacheWebhooks(),
+		)
 	}
 
 	// Handle save result message
@@ -292,11 +447,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		if saveMsg.Err == nil {
 			m.editing = false
 			m.editModal = m.editModal.Hide()
-			// Refresh data after successful save
+			// Invalidate cache and refresh data after successful save
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks(), func() tea.Msg {
-				return EditClosedMsg{Saved: true}
-			})
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
+				m.fetchAndCacheWebhooks(),
+				func() tea.Msg { return EditClosedMsg{Saved: true} },
+			)
 		}
 	}
 
@@ -322,8 +480,13 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "n":
 		return m, m.createWebhook()
 	case "r":
+		// Invalidate cache and fetch fresh data
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
+		return m, tea.Batch(
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
+			m.fetchAndCacheWebhooks(),
+		)
 	}
 
 	return m, nil
@@ -432,16 +595,21 @@ func (m Model) View() string {
 	return r.Render()
 }
 
-// setFooter adds the appropriate keybinding footer.
+// setFooter adds the appropriate keybinding footer with cache status.
 func (m Model) setFooter(r *rendering.Renderer) {
 	if !m.focused || m.device == "" {
 		return
 	}
+	var footer string
 	if len(m.webhooks) > 0 {
-		r.SetFooter("e:edit t:toggle d:del n:new r:refresh")
+		footer = "e:edit t:toggle d:del n:new r:refresh"
 	} else {
-		r.SetFooter("n:new r:refresh")
+		footer = "n:new r:refresh"
 	}
+	if cs := m.cacheStatus.View(); cs != "" {
+		footer = cs + " " + footer
+	}
+	r.SetFooter(footer)
 }
 
 // getStateContent returns content for non-list states and whether to use it.

@@ -5,11 +5,17 @@ description: "shelly cache clear"
 
 ## shelly cache clear
 
-Clear the discovery cache
+Clear the cache
 
 ### Synopsis
 
-Clear all cached device discovery results.
+Clear cached device data.
+
+Use flags to specify what to clear:
+  --all      Clear all cached data (requires confirmation)
+  --device   Clear cache for a specific device
+  --type     Clear cache for a specific data type (requires --device)
+  --expired  Clear only expired entries
 
 ```
 shelly cache clear [flags]
@@ -18,14 +24,28 @@ shelly cache clear [flags]
 ### Examples
 
 ```
-  # Clear the discovery cache
-  shelly cache clear
+  # Clear all cache
+  shelly cache clear --all
+
+  # Clear cache for a specific device
+  shelly cache clear --device kitchen
+
+  # Clear cache for specific device and type
+  shelly cache clear --device kitchen --type firmware
+
+  # Clear only expired entries
+  shelly cache clear --expired
 ```
 
 ### Options
 
 ```
-  -h, --help   help for clear
+  -a, --all             Clear all cached data
+  -d, --device string   Clear cache for specific device
+  -e, --expired         Clear only expired entries
+  -h, --help            help for clear
+  -t, --type string     Clear cache for specific data type (requires --device)
+  -y, --yes             Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
@@ -39,6 +59,7 @@ shelly cache clear [flags]
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
+      --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
 ```

@@ -10,19 +10,28 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
 // Deps holds the dependencies for the Inputs component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
+}
+
+// CachedInputsData holds inputs data for caching.
+type CachedInputsData struct {
+	Inputs []shelly.InputInfo `json:"inputs"`
 }
 
 // Validate ensures all required dependencies are set.
@@ -57,21 +66,23 @@ type EditRequestMsg struct {
 
 // Model displays input settings for a device.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	device     string
-	inputs     []shelly.InputInfo
-	scroller   *panel.Scroller
-	loading    bool
-	editing    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     Styles
-	loader     loading.Model
-	editModal  EditModel
+	ctx         context.Context
+	svc         *shelly.Service
+	fileCache   *cache.FileCache
+	device      string
+	inputs      []shelly.InputInfo
+	scroller    *panel.Scroller
+	loading     bool
+	editing     bool
+	err         error
+	width       int
+	height      int
+	focused     bool
+	panelIndex  int // 1-based panel index for Shift+N hotkey hint
+	styles      Styles
+	loader      loading.Model
+	editModal   EditModel
+	cacheStatus cachestatus.Model
 }
 
 // Styles holds styles for the Inputs component.
@@ -122,11 +133,13 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 10),
-		loading:  false,
-		styles:   DefaultStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		scroller:    panel.NewScroller(0, 10),
+		loading:     false,
+		styles:      DefaultStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading inputs..."),
 			loading.WithStyle(loading.StyleDot),
@@ -148,13 +161,14 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.scroller.SetItemCount(0)
 	m.scroller.CursorToStart()
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchInputs())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeInputs)
 }
 
 func (m Model) fetchInputs() tea.Cmd {
@@ -165,6 +179,36 @@ func (m Model) fetchInputs() tea.Cmd {
 		inputs, err := m.svc.InputList(ctx, m.device)
 		return LoadedMsg{Inputs: inputs, Err: err}
 	}
+}
+
+// fetchAndCacheInputs fetches fresh data and caches it.
+func (m Model) fetchAndCacheInputs() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeInputs, cache.TTLInputs, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		inputs, err := m.svc.InputList(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		return CachedInputsData{Inputs: inputs}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m Model) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeInputs, cache.TTLInputs, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		inputs, err := m.svc.InputList(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		return CachedInputsData{Inputs: inputs}, nil
+	})
 }
 
 // SetSize sets the component dimensions.
@@ -201,34 +245,111 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing LoadedMsg even during loading
-		if _, ok := msg.(LoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 
-	switch msg := msg.(type) {
-	case LoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
 		}
-		m.inputs = msg.Inputs
-		m.scroller.SetItemCount(len(m.inputs))
-		return m, nil
+	}
 
+	return m.handleMessage(msg)
+}
+
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case LoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
+	case LoadedMsg:
+		return m.handleLoaded(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
+	return m, nil
+}
 
+func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeInputs {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedInputsData](msg.Data)
+	if err == nil {
+		m.inputs = data.Inputs
+		m.scroller.SetItemCount(len(m.inputs))
+		m.scroller.CursorToStart()
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeInputs {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheInputs())
+}
+
+func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeInputs {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("inputs background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedInputsData); ok {
+		m.inputs = data.Inputs
+		m.scroller.SetItemCount(len(m.inputs))
+	}
+	return m, nil
+}
+
+func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.inputs = msg.Inputs
+	m.scroller.SetItemCount(len(m.inputs))
+	m.scroller.CursorToStart()
 	return m, nil
 }
 
@@ -239,9 +360,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	// Check if modal was closed
 	if !m.editModal.Visible() {
 		m.editing = false
-		// Refresh data after edit
+		// Invalidate cache and refresh data after edit
 		m.loading = true
-		return m, tea.Batch(cmd, m.loader.Tick(), m.fetchInputs())
+		return m, tea.Batch(
+			cmd,
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
+			m.fetchAndCacheInputs(),
+		)
 	}
 
 	// Handle save result message
@@ -249,11 +375,14 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		if saveMsg.Err == nil {
 			m.editing = false
 			m.editModal = m.editModal.Hide()
-			// Refresh data after successful save
+			// Invalidate cache and refresh data after successful save
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchInputs(), func() tea.Msg {
-				return EditClosedMsg{Saved: true}
-			})
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
+				m.fetchAndCacheInputs(),
+				func() tea.Msg { return EditClosedMsg{Saved: true} },
+			)
 		}
 	}
 
@@ -268,10 +397,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 	// Handle action keys
 	switch msg.String() {
-	case "r":
+	case "R":
+		// Refresh list - invalidate cache and fetch fresh data
 		if !m.loading && m.device != "" {
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.fetchInputs())
+			return m, tea.Batch(
+				m.loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
+				m.fetchAndCacheInputs(),
+			)
 		}
 	case "e", "enter":
 		// Open edit modal for selected input
@@ -345,9 +479,13 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 
-	// Footer with keybindings (shown when focused)
+	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		r.SetFooter("r:refresh")
+		footer := "e:edit R:refresh"
+		if cs := m.cacheStatus.View(); cs != "" {
+			footer = cs + " " + footer
+		}
+		r.SetFooter(footer)
 	}
 	return r.Render()
 }

@@ -10,13 +10,16 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -30,8 +33,9 @@ type Schedule struct {
 
 // ListDeps holds the dependencies for the schedules list component.
 type ListDeps struct {
-	Ctx context.Context
-	Svc *automation.Service
+	Ctx       context.Context
+	Svc       *automation.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -42,7 +46,13 @@ func (d ListDeps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
+}
+
+// CachedSchedulesData holds schedules for caching.
+type CachedSchedulesData struct {
+	Schedules []Schedule `json:"schedules"`
 }
 
 // LoadedMsg signals that schedules were loaded.
@@ -70,19 +80,21 @@ type CreateScheduleMsg struct {
 
 // ListModel displays schedules for a device.
 type ListModel struct {
-	ctx        context.Context
-	svc        *automation.Service
-	device     string
-	schedules  []Schedule
-	scroller   *panel.Scroller
-	loading    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int // 1-based panel index for Shift+N hotkey hint
-	styles     ListStyles
-	loader     loading.Model
+	ctx         context.Context
+	svc         *automation.Service
+	fileCache   *cache.FileCache
+	device      string
+	schedules   []Schedule
+	scroller    *panel.Scroller
+	loading     bool
+	err         error
+	width       int
+	height      int
+	focused     bool
+	panelIndex  int // 1-based panel index for Shift+N hotkey hint
+	styles      ListStyles
+	loader      loading.Model
+	cacheStatus cachestatus.Model
 }
 
 // ListStyles holds styles for the list component.
@@ -127,11 +139,13 @@ func NewList(deps ListDeps) ListModel {
 	}
 
 	return ListModel{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 10),
-		loading:  false,
-		styles:   DefaultListStyles(),
+		ctx:         deps.Ctx,
+		svc:         deps.Svc,
+		fileCache:   deps.FileCache,
+		scroller:    panel.NewScroller(0, 10),
+		loading:     false,
+		styles:      DefaultListStyles(),
+		cacheStatus: cachestatus.New(),
 		loader: loading.New(
 			loading.WithMessage("Loading schedules..."),
 			loading.WithStyle(loading.StyleDot),
@@ -152,13 +166,14 @@ func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 	m.scroller.SetItemCount(0)
 	m.scroller.CursorToStart()
 	m.err = nil
+	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
 		return m, nil
 	}
 
-	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
+	// Try to load from cache first
+	return m, panelcache.LoadWithCache(m.fileCache, device, cache.TypeSchedules)
 }
 
 // fetchSchedules creates a command to fetch schedules from the device.
@@ -184,6 +199,56 @@ func (m ListModel) fetchSchedules() tea.Cmd {
 
 		return LoadedMsg{Schedules: result}
 	}
+}
+
+// fetchAndCacheSchedules fetches fresh data and caches it.
+func (m ListModel) fetchAndCacheSchedules() tea.Cmd {
+	return panelcache.FetchAndCache(m.fileCache, m.device, cache.TypeSchedules, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		jobs, err := m.svc.ListSchedules(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Schedule, len(jobs))
+		for i, job := range jobs {
+			result[i] = Schedule{
+				ID:       job.ID,
+				Enable:   job.Enable,
+				Timespec: job.Timespec,
+				Calls:    job.Calls,
+			}
+		}
+
+		return CachedSchedulesData{Schedules: result}, nil
+	})
+}
+
+// backgroundRefresh refreshes data in the background without blocking.
+func (m ListModel) backgroundRefresh() tea.Cmd {
+	return panelcache.BackgroundRefresh(m.fileCache, m.device, cache.TypeSchedules, cache.TTLAutomation, func() (any, error) {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		jobs, err := m.svc.ListSchedules(ctx, m.device)
+		if err != nil {
+			return nil, err
+		}
+
+		result := make([]Schedule, len(jobs))
+		for i, job := range jobs {
+			result[i] = Schedule{
+				ID:       job.ID,
+				Enable:   job.Enable,
+				Timespec: job.Timespec,
+				Calls:    job.Calls,
+			}
+		}
+
+		return CachedSchedulesData{Schedules: result}, nil
+	})
 }
 
 // SetSize sets the component dimensions.
@@ -216,47 +281,128 @@ func (m ListModel) SetPanelIndex(index int) ListModel {
 func (m ListModel) Update(msg tea.Msg) (ListModel, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing LoadedMsg/ActionMsg even during loading
-		switch msg.(type) {
-		case LoadedMsg, ActionMsg:
-			// Pass through to main switch below
-		default:
-			if cmd != nil {
-				return m, cmd
-			}
+		if model, cmd, done := m.updateLoading(msg); done {
+			return model, cmd
 		}
 	}
 
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
+
+	return m.handleMessage(msg)
+}
+
+func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 	switch msg := msg.(type) {
+	case panelcache.CacheHitMsg:
+		return m.handleCacheHit(msg)
+	case panelcache.CacheMissMsg:
+		return m.handleCacheMiss(msg)
+	case panelcache.RefreshCompleteMsg:
+		return m.handleRefreshComplete(msg)
 	case LoadedMsg:
-		m.loading = false
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.schedules = msg.Schedules
-		m.scroller.SetItemCount(len(m.schedules))
-		m.scroller.CursorToStart()
-		return m, nil
-
+		return m.handleLoaded(msg)
 	case ActionMsg:
-		if msg.Err != nil {
-			m.err = msg.Err
-			return m, nil
-		}
-		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
-
+		return m.handleAction(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
 		}
 		return m.handleKey(msg)
 	}
-
 	return m, nil
+}
+
+func (m ListModel) updateLoading(msg tea.Msg) (ListModel, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.loader, cmd = m.loader.Update(msg)
+	// Continue processing these messages even during loading
+	switch msg.(type) {
+	case LoadedMsg, ActionMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
+		return m, nil, false
+	default:
+		if cmd != nil {
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m ListModel) handleCacheHit(msg panelcache.CacheHitMsg) (ListModel, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSchedules {
+		return m, nil
+	}
+
+	data, err := panelcache.Unmarshal[CachedSchedulesData](msg.Data)
+	if err == nil {
+		m.schedules = data.Schedules
+		m.scroller.SetItemCount(len(m.schedules))
+		m.scroller.CursorToStart()
+	}
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
+
+	if msg.NeedsRefresh {
+		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
+		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+	}
+	return m, nil
+}
+
+func (m ListModel) handleCacheMiss(msg panelcache.CacheMissMsg) (ListModel, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSchedules {
+		return m, nil
+	}
+	m.loading = true
+	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheSchedules())
+}
+
+func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (ListModel, tea.Cmd) {
+	if msg.Device != m.device || msg.DataType != cache.TypeSchedules {
+		return m, nil
+	}
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		iostreams.DebugErr("schedules background refresh", msg.Err)
+		return m, nil
+	}
+	if data, ok := msg.Data.(CachedSchedulesData); ok {
+		m.schedules = data.Schedules
+		m.scroller.SetItemCount(len(m.schedules))
+	}
+	return m, nil
+}
+
+func (m ListModel) handleLoaded(msg LoadedMsg) (ListModel, tea.Cmd) {
+	m.loading = false
+	m.cacheStatus = m.cacheStatus.StopRefresh()
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.schedules = msg.Schedules
+	m.scroller.SetItemCount(len(m.schedules))
+	m.scroller.CursorToStart()
+	return m, nil
+}
+
+func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	// Invalidate cache and refresh after action
+	m.loading = true
+	return m, tea.Batch(
+		m.loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
+		m.fetchAndCacheSchedules(),
+	)
 }
 
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
@@ -280,9 +426,13 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// New schedule - will be handled by parent
 		return m, m.createSchedule()
 	case "R":
-		// Refresh list
+		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
+		return m, tea.Batch(
+			m.loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
+			m.fetchAndCacheSchedules(),
+		)
 	}
 
 	return m, nil
@@ -357,9 +507,13 @@ func (m ListModel) View() string {
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
 
-	// Add footer with keybindings when focused
+	// Add footer with keybindings and cache status when focused
 	if m.focused && m.device != "" && len(m.schedules) > 0 {
-		r.SetFooter("e:edit t:toggle d:del n:new")
+		footer := "e:edit t:toggle d:del n:new"
+		if cs := m.cacheStatus.View(); cs != "" {
+			footer = cs + " " + footer
+		}
+		r.SetFooter(footer)
 	}
 
 	if m.device == "" {

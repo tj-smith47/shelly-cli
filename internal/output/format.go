@@ -473,6 +473,36 @@ func FormatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dd", days)
 }
 
+// FormatAge formats a time as a human-readable age string (e.g., "5 minutes ago").
+func FormatAge(t time.Time) string {
+	if t.IsZero() {
+		return "never"
+	}
+	age := time.Since(t)
+	switch {
+	case age < time.Minute:
+		return "just now"
+	case age < time.Hour:
+		mins := int(age.Minutes())
+		if mins == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", mins)
+	case age < 24*time.Hour:
+		hours := int(age.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	default:
+		days := int(age.Hours() / 24)
+		if days == 1 {
+			return "1 day ago"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	}
+}
+
 // FormatParamsInline formats parameters as an inline string.
 // Example: key1=value1, key2=value2.
 func FormatParamsInline(params map[string]any) string {

@@ -14,18 +14,27 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cache",
 		Short: "Manage CLI cache",
-		Long: `Manage the Shelly CLI cache directory.
+		Long: `Manage the Shelly CLI file cache.
 
-The cache stores:
-  - Device discovery results
-  - Firmware update information
-  - Version check data`,
+The cache stores device data for faster access:
+  - Device information and configuration
+  - Firmware update status
+  - Automation settings (schedules, webhooks, scripts)
+  - Protocol configurations (MQTT, Modbus)
+
+Cache data has type-specific TTLs and is shared between CLI and TUI.`,
 		Aliases: []string{"ca"},
 		Example: `  # Show cache statistics
   shelly cache show
 
-  # Clear the cache
-  shelly cache clear`,
+  # Clear all cache
+  shelly cache clear
+
+  # Clear cache for specific device
+  shelly cache clear --device kitchen
+
+  # Clear only expired entries
+  shelly cache clear --expired`,
 	}
 
 	cmd.AddCommand(clearcmd.NewCommand(f))

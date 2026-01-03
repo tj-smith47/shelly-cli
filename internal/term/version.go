@@ -79,3 +79,22 @@ func DisplayUpdateStatus(ios *iostreams.IOStreams, currentVersion, availableVers
 		ios.Printf("Already at latest version (%s)\n", currentVersion)
 	}
 }
+
+// CacheInfo holds cache statistics for display.
+type CacheInfo struct {
+	Location    string
+	Entries     int
+	Size        string
+	DeviceCount int
+}
+
+// DisplayCacheInfo shows cache statistics in version output.
+func DisplayCacheInfo(ios *iostreams.IOStreams, info CacheInfo) {
+	ios.Printf("\nCache:\n")
+	ios.Printf("  location: %s\n", info.Location)
+	ios.Printf("  entries: %d\n", info.Entries)
+	ios.Printf("  size: %s\n", info.Size)
+	if info.DeviceCount > 0 {
+		ios.Printf("  devices: %d\n", info.DeviceCount)
+	}
+}
