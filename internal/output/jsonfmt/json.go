@@ -41,3 +41,17 @@ func (f *Formatter) Format(w io.Writer, data any) error {
 	_, err := io.WriteString(w, output)
 	return err
 }
+
+// PrettyString takes a JSON string and returns it formatted with indentation.
+// If the input is not valid JSON, it returns the original string unchanged.
+func PrettyString(s string) string {
+	var parsed any
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return s
+	}
+	jsonBytes, err := json.MarshalIndent(parsed, "", "  ")
+	if err != nil {
+		return s
+	}
+	return string(jsonBytes)
+}

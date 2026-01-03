@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/output/jsonfmt"
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
@@ -140,7 +141,8 @@ func formatValueForEdit(value any) string {
 
 	switch v := value.(type) {
 	case string:
-		return v
+		// Try to parse as JSON and pretty-print
+		return jsonfmt.PrettyString(v)
 	case float64:
 		if v == float64(int64(v)) {
 			return fmt.Sprintf("%d", int64(v))
@@ -229,6 +231,13 @@ func (m EditModel) handleKey(msg tea.KeyPressMsg) (EditModel, tea.Cmd) {
 	case "ctrl+s":
 		return m.save()
 
+	case "ctrl+f":
+		// Format JSON in value field
+		if m.cursor == EditFieldValue {
+			return m.formatValueField(), nil
+		}
+		return m, nil
+
 	case "tab":
 		return m.nextField(), nil
 
@@ -281,6 +290,20 @@ func (m EditModel) prevField() EditModel {
 		m.cursor = EditFieldValue
 	}
 	m = m.focusCurrentField()
+	return m
+}
+
+func (m EditModel) formatValueField() EditModel {
+	valueStr := m.valueInput.Value()
+	if valueStr == "" {
+		return m
+	}
+
+	// Try to parse and reformat as JSON
+	formatted := jsonfmt.PrettyString(valueStr)
+	if formatted != valueStr {
+		m.valueInput = m.valueInput.SetValue(formatted)
+	}
 	return m
 }
 
@@ -371,7 +394,7 @@ func (m EditModel) View() string {
 	}
 
 	// Build footer with keybindings
-	footer := "Tab: Next | Ctrl+S: Save | Esc: Cancel"
+	footer := "Tab: Next | Ctrl+F: Format | Ctrl+S: Save | Esc: Cancel"
 	if m.saving {
 		footer = "Saving..."
 	}
