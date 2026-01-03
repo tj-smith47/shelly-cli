@@ -165,9 +165,11 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.lora = nil
 	m.activeProtocol = ProtocolMatter
 	m.err = nil
+	m.loading = true
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
+		m.loading = false
 		return m, nil
 	}
 

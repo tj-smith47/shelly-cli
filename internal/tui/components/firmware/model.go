@@ -12,10 +12,12 @@ import (
 	"charm.land/lipgloss/v2"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
@@ -25,8 +27,9 @@ import (
 
 // Deps holds the dependencies for the Firmware component.
 type Deps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -37,6 +40,7 @@ func (d Deps) Validate() error {
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
 	}
+	// FileCache is optional - caching is disabled if nil
 	return nil
 }
 
@@ -69,6 +73,7 @@ type UpdateCompleteMsg struct {
 type Model struct {
 	ctx          context.Context
 	svc          *shelly.Service
+	fileCache    *cache.FileCache
 	devices      []DeviceFirmware
 	scroller     *panel.Scroller
 	checking     bool
@@ -81,6 +86,8 @@ type Model struct {
 	styles       Styles
 	checkLoader  loading.Model
 	updateLoader loading.Model
+	cacheStatus  cachestatus.Model
+	lastChecked  time.Time
 }
 
 // Styles holds styles for the Firmware component.
@@ -139,10 +146,11 @@ func New(deps Deps) Model {
 	}
 
 	return Model{
-		ctx:      deps.Ctx,
-		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultStyles(),
+		ctx:       deps.Ctx,
+		svc:       deps.Svc,
+		fileCache: deps.FileCache,
+		scroller:  panel.NewScroller(0, 10),
+		styles:    DefaultStyles(),
 		checkLoader: loading.New(
 			loading.WithMessage("Checking firmware..."),
 			loading.WithStyle(loading.StyleDot),
@@ -153,6 +161,7 @@ func New(deps Deps) Model {
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(false, false),
 		),
+		cacheStatus: cachestatus.New(),
 	}
 }
 
@@ -161,7 +170,7 @@ func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-// LoadDevices loads registered devices.
+// LoadDevices loads registered devices and their cached firmware status.
 func (m Model) LoadDevices() Model {
 	cfg := config.Get()
 	if cfg == nil {
@@ -169,15 +178,66 @@ func (m Model) LoadDevices() Model {
 	}
 
 	m.devices = make([]DeviceFirmware, 0, len(cfg.Devices))
+	var oldestCache time.Time
+
 	for name, dev := range cfg.Devices {
-		m.devices = append(m.devices, DeviceFirmware{
+		df := DeviceFirmware{
 			Name:    name,
 			Address: dev.Address,
-		})
+		}
+
+		// Try to load cached firmware status
+		if cached := m.loadCachedFirmware(name); cached != nil {
+			df.Current = cached.Current
+			df.Available = cached.Available
+			df.HasUpdate = cached.HasUpdate
+			df.Checked = true
+
+			if oldestCache.IsZero() || cached.CachedAt.Before(oldestCache) {
+				oldestCache = cached.CachedAt
+			}
+		}
+
+		m.devices = append(m.devices, df)
+	}
+
+	// Set cache status if we loaded any cached data
+	if !oldestCache.IsZero() {
+		m.lastChecked = oldestCache
+		m.cacheStatus = m.cacheStatus.SetUpdatedAt(oldestCache)
 	}
 
 	m.scroller.SetItemCount(len(m.devices))
 	return m
+}
+
+// cachedFirmwareInfo holds cached firmware info with metadata.
+type cachedFirmwareInfo struct {
+	Current   string
+	Available string
+	HasUpdate bool
+	CachedAt  time.Time
+}
+
+// loadCachedFirmware loads firmware info from file cache for a device.
+func (m Model) loadCachedFirmware(name string) *cachedFirmwareInfo {
+	if m.fileCache == nil {
+		return nil
+	}
+	entry, err := m.fileCache.Get(name, cache.TypeFirmware)
+	if err != nil || entry == nil {
+		return nil
+	}
+	var info shelly.FirmwareInfo
+	if err := entry.Unmarshal(&info); err != nil {
+		return nil
+	}
+	return &cachedFirmwareInfo{
+		Current:   info.Current,
+		Available: info.Available,
+		HasUpdate: info.HasUpdate,
+		CachedAt:  entry.CachedAt,
+	}
 }
 
 // SetSize sets the component dimensions.
@@ -369,15 +429,38 @@ func (m Model) updateLoaders(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		}
 	}
+	// Update cache status spinner
+	if m.cacheStatus.IsRefreshing() {
+		var cmd tea.Cmd
+		m.cacheStatus, cmd = m.cacheStatus.Update(msg)
+		if cmd != nil {
+			return m, cmd
+		}
+	}
 	return m, nil
 }
 
 func (m Model) handleCheckComplete(msg CheckCompleteMsg) Model {
 	m.checking = false
+	m.lastChecked = time.Now()
+	m.cacheStatus = m.cacheStatus.SetUpdatedAt(m.lastChecked)
+
 	for _, result := range msg.Results {
 		for i := range m.devices {
 			if m.devices[i].Name == result.Name {
 				m.devices[i] = result
+
+				// Cache successful results to file cache
+				if m.fileCache != nil && result.Err == nil && result.Checked {
+					info := shelly.FirmwareInfo{
+						Current:   result.Current,
+						Available: result.Available,
+						HasUpdate: result.HasUpdate,
+					}
+					if err := m.fileCache.Set(result.Name, cache.TypeFirmware, info, cache.TTLFirmware); err != nil {
+						iostreams.DebugErr("cache firmware "+result.Name, err)
+					}
+				}
 				break
 			}
 		}
@@ -403,6 +486,13 @@ func (m Model) handleUpdateComplete(msg UpdateCompleteMsg) Model {
 func (m Model) handleBatchComplete() Model {
 	m.updating = false
 	for i := range m.devices {
+		if m.devices[i].Updating {
+			// Invalidate cache for updated devices
+			if m.fileCache != nil {
+				iostreams.DebugErr("invalidate firmware cache "+m.devices[i].Name,
+					m.fileCache.Invalidate(m.devices[i].Name, cache.TypeFirmware))
+			}
+		}
 		m.devices[i].Updating = false
 		m.devices[i].Selected = false
 	}
@@ -473,9 +563,13 @@ func (m Model) View() string {
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
 
-	// Add footer with keybindings when focused
+	// Add footer with keybindings and cache status when focused
 	if m.focused {
-		r.SetFooter("c:check u:update spc:sel a:all")
+		footer := "c:check u:update spc:sel a:all r:refresh"
+		if cs := m.cacheStatus.View(); cs != "" {
+			footer += " | " + cs
+		}
+		r.SetFooter(footer)
 	}
 
 	var content strings.Builder

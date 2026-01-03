@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -35,8 +36,9 @@ const (
 
 // ManageDeps holds dependencies for the manage view.
 type ManageDeps struct {
-	Ctx context.Context
-	Svc *shelly.Service
+	Ctx       context.Context
+	Svc       *shelly.Service
+	FileCache *cache.FileCache
 }
 
 // Validate ensures all required dependencies are set.
@@ -106,7 +108,7 @@ func NewManage(deps ManageDeps) *Manage {
 
 	discoveryDeps := discovery.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	batchDeps := batch.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
-	firmwareDeps := firmware.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
+	firmwareDeps := firmware.Deps{Ctx: deps.Ctx, Svc: deps.Svc, FileCache: deps.FileCache}
 	backupDeps := backup.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	provisioningDeps := provisioning.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 

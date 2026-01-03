@@ -182,9 +182,11 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.scroller.SetItemCount(0)
 	m.scroller.CursorToStart()
 	m.err = nil
+	m.loading = true
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
+		m.loading = false
 		return m, nil
 	}
 

@@ -194,9 +194,11 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.ethernet = nil
 	m.activeProtocol = ProtocolMQTT
 	m.err = nil
+	m.loading = true
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
+		m.loading = false
 		return m, nil
 	}
 

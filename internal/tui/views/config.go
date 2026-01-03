@@ -19,8 +19,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
-	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )

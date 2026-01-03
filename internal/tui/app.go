@@ -282,8 +282,9 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 	// Register Manage view
 	manage := views.NewManage(views.ManageDeps{
-		Ctx: ctx,
-		Svc: f.ShellyService(),
+		Ctx:       ctx,
+		Svc:       f.ShellyService(),
+		FileCache: f.FileCache(),
 	})
 	vm.Register(manage)
 

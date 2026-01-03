@@ -821,9 +821,7 @@ func TestExecute_ZeroWarmup(t *testing.T) {
 }
 
 // TestExecute_JSONOutput tests benchmark with JSON output format.
-func TestExecute_JSONOutput(t *testing.T) {
-	t.Parallel()
-
+func TestExecute_JSONOutput(t *testing.T) { //nolint:paralleltest // Modifies global viper state
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

@@ -161,9 +161,11 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.scroller.SetItemCount(0)
 	m.scroller.CursorToStart()
 	m.err = nil
+	m.loading = true
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
+		m.loading = false
 		return m, nil
 	}
 
@@ -397,7 +399,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 	// Handle action keys
 	switch msg.String() {
-	case "R":
+	case "r", "R":
 		// Refresh list - invalidate cache and fetch fresh data
 		if !m.loading && m.device != "" {
 			m.loading = true

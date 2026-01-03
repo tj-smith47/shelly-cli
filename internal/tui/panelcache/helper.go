@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -74,6 +75,11 @@ type RefreshStartedMsg struct {
 //	    m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt).SetRefreshing(false)
 func LoadWithCache(fc *cache.FileCache, device, dataType string) tea.Cmd {
 	return func() tea.Msg {
+		// Respect --refresh global flag to bypass cache
+		if viper.GetBool("refresh") {
+			return CacheMissMsg{Device: device, DataType: dataType}
+		}
+
 		if fc == nil {
 			return CacheMissMsg{Device: device, DataType: dataType}
 		}

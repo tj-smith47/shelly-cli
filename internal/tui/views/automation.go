@@ -21,8 +21,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/virtuals"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/webhooks"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
-	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -616,13 +616,6 @@ func (a *Automation) handleScheduleSelect(msg schedules.SelectScheduleMsg) tea.C
 	return nil
 }
 
-func handleKVSEditClosed(msg kvs.EditClosedMsg) tea.Cmd {
-	if msg.Saved {
-		return toast.Success("KVS entry saved")
-	}
-	return nil
-}
-
 func handleKVSAction(msg kvs.ActionMsg) tea.Cmd {
 	if msg.Action != actionDelete {
 		return nil
@@ -631,13 +624,6 @@ func handleKVSAction(msg kvs.ActionMsg) tea.Cmd {
 		return toast.Error("Failed to delete: " + msg.Err.Error())
 	}
 	return toast.Success("KVS entry deleted")
-}
-
-func handleWebhookEditClosed(msg webhooks.EditClosedMsg) tea.Cmd {
-	if msg.Saved {
-		return toast.Success("Webhook saved")
-	}
-	return nil
 }
 
 func handleWebhookAction(msg webhooks.ActionMsg) tea.Cmd {
@@ -651,13 +637,6 @@ func handleWebhookAction(msg webhooks.ActionMsg) tea.Cmd {
 		return toast.Success("Webhook disabled")
 	case actionDelete:
 		return toast.Success("Webhook deleted")
-	}
-	return nil
-}
-
-func handleVirtualEditClosed(msg virtuals.EditClosedMsg) tea.Cmd {
-	if msg.Saved {
-		return toast.Success("Virtual component saved")
 	}
 	return nil
 }

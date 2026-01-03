@@ -159,9 +159,11 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.config = nil
 	m.cursor = FieldName
 	m.err = nil
+	m.loading = true
 	m.cacheStatus = cachestatus.New()
 
 	if device == "" {
+		m.loading = false
 		return m, nil
 	}
 
