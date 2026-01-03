@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/wifi"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
@@ -357,34 +358,9 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 
 // handleEditClosedMsg processes edit completion messages and returns toast commands.
 func (c *Config) handleEditClosedMsg(msg tea.Msg) tea.Cmd {
-	switch editMsg := msg.(type) {
-	case wifi.EditClosedMsg:
+	if editMsg, ok := msg.(messages.EditClosedMsg); ok {
 		if editMsg.Saved {
-			return toast.Success("WiFi settings saved")
-		}
-	case system.EditClosedMsg:
-		if editMsg.Saved {
-			return toast.Success("System settings saved")
-		}
-	case security.EditClosedMsg:
-		if editMsg.Saved {
-			return toast.Success("Authentication settings saved")
-		}
-	case cloud.EditClosedMsg:
-		if editMsg.Saved {
-			return toast.Success("Cloud settings saved")
-		}
-	case protocols.MQTTEditClosedMsg:
-		if editMsg.Saved {
-			return toast.Success("MQTT settings saved")
-		}
-	case inputs.EditClosedMsg:
-		if editMsg.Saved {
-			return toast.Success("Input settings saved")
-		}
-	case ble.EditClosedMsg:
-		if editMsg.Saved {
-			return toast.Success("Bluetooth settings saved")
+			return toast.Success("Settings saved")
 		}
 	}
 	return nil

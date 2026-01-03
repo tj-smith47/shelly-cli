@@ -13,6 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -524,11 +525,7 @@ func (m Model) formatError(err error) string {
 	if err == nil {
 		return "unreachable"
 	}
-	errMsg := err.Error()
-	if len(errMsg) > 40 {
-		return errMsg[:40] + "..."
-	}
-	return errMsg
+	return output.Truncate(err.Error(), 40)
 }
 
 // buildMetricsList builds the list of metric strings for a device.

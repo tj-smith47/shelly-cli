@@ -11,22 +11,18 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
-// EditSaveResultMsg signals a save operation completed.
-type EditSaveResultMsg struct {
-	Enabled bool
-	Err     error
-}
+// EditSaveResultMsg is an alias for the shared save result message.
+type EditSaveResultMsg = messages.SaveResultMsg
 
-// EditOpenedMsg signals the edit modal was opened.
-type EditOpenedMsg struct{}
+// EditOpenedMsg is an alias for the shared edit opened message.
+type EditOpenedMsg = messages.EditOpenedMsg
 
-// EditClosedMsg signals the edit modal was closed.
-type EditClosedMsg struct {
-	Saved bool
-}
+// EditClosedMsg is an alias for the shared edit closed message.
+type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the cloud configuration edit modal.
 type EditModel struct {
@@ -102,14 +98,14 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case EditSaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
 			return m, nil
 		}
 		// Success - update state and close modal
-		m.enabled = msg.Enabled
+		m.enabled = m.pendingEnabled
 		m = m.Hide()
 		return m, func() tea.Msg { return EditClosedMsg{Saved: true} }
 
@@ -167,7 +163,10 @@ func (m EditModel) createSaveCmd() tea.Cmd {
 		defer cancel()
 
 		err := m.svc.SetCloudEnabled(ctx, m.device, newEnabled)
-		return EditSaveResultMsg{Enabled: newEnabled, Err: err}
+		if err != nil {
+			return messages.NewSaveError(nil, err)
+		}
+		return messages.NewSaveResult(nil)
 	}
 }
 

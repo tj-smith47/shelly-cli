@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -569,10 +570,7 @@ func (m Model) renderNetworkLine(netw network.WiFiNetworkFull, isSelected bool) 
 		authIcon = "🔒"
 	}
 
-	ssid := netw.SSID
-	if len(ssid) > 20 {
-		ssid = ssid[:17] + "..."
-	}
+	ssid := output.Truncate(netw.SSID, 20)
 
 	line := fmt.Sprintf("%s%s %-20s %s",
 		selector,

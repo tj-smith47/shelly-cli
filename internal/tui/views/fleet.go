@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/fleet"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/toast"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
@@ -268,20 +269,9 @@ func (f *Fleet) Update(msg tea.Msg) (View, tea.Cmd) {
 // handleGroupEditMsg processes group edit completion messages and returns toast commands.
 func (f *Fleet) handleGroupEditMsg(msg tea.Msg) tea.Cmd {
 	switch editMsg := msg.(type) {
-	case fleet.GroupEditClosedMsg:
+	case messages.EditClosedMsg:
 		if editMsg.Saved {
 			return toast.Success("Group saved")
-		}
-	case fleet.GroupEditSaveResultMsg:
-		if editMsg.Err == nil {
-			switch editMsg.Mode {
-			case fleet.GroupEditModeCreate:
-				return toast.Success("Group created")
-			case fleet.GroupEditModeEdit:
-				return toast.Success("Group updated")
-			case fleet.GroupEditModeDelete:
-				return toast.Success("Group deleted")
-			}
 		}
 	case fleet.GroupCommandResultMsg:
 		if editMsg.Err != nil {

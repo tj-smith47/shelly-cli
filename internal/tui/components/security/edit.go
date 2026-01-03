@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -40,18 +41,14 @@ const (
 	StrengthStrong
 )
 
-// EditSaveResultMsg signals a save operation completed.
-type EditSaveResultMsg struct {
-	Err error
-}
+// EditSaveResultMsg is an alias for the shared save result message.
+type EditSaveResultMsg = messages.SaveResultMsg
 
-// EditOpenedMsg signals the edit modal was opened.
-type EditOpenedMsg struct{}
+// EditOpenedMsg is an alias for the shared edit opened message.
+type EditOpenedMsg = messages.EditOpenedMsg
 
-// EditClosedMsg signals the edit modal was closed.
-type EditClosedMsg struct {
-	Saved bool
-}
+// EditClosedMsg is an alias for the shared edit closed message.
+type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the auth configuration edit modal.
 type EditModel struct {
@@ -345,7 +342,10 @@ func (m EditModel) disableAuth() (EditModel, tea.Cmd) {
 		defer cancel()
 
 		err := m.svc.DisableAuth(ctx, m.device)
-		return EditSaveResultMsg{Err: err}
+		if err != nil {
+			return messages.NewSaveError(nil, err)
+		}
+		return messages.NewSaveResult(nil)
 	}
 }
 
@@ -356,7 +356,10 @@ func (m EditModel) createSaveCmd(password string) tea.Cmd {
 
 		// Use standard admin user and device realm
 		err := m.svc.SetAuth(ctx, m.device, "admin", m.device, password)
-		return EditSaveResultMsg{Err: err}
+		if err != nil {
+			return messages.NewSaveError(nil, err)
+		}
+		return messages.NewSaveResult(nil)
 	}
 }
 

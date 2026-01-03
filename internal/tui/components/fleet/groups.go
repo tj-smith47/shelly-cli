@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
@@ -448,10 +449,7 @@ func (m GroupsModel) View() string {
 			cursor = m.styles.Cursor.Render("> ")
 		}
 
-		name := group.Name
-		if len(name) > 20 {
-			name = name[:17] + "..."
-		}
+		name := output.Truncate(group.Name, 20)
 
 		deviceCount := len(group.DeviceIDs)
 		countStr := fmt.Sprintf("(%d devices)", deviceCount)

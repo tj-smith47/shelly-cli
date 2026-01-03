@@ -12,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -493,10 +494,7 @@ func (m Model) renderItemLine(item Item, isSelected bool) string {
 	}
 
 	// Key (truncate if too long)
-	key := item.Key
-	if len(key) > 20 {
-		key = key[:17] + "..."
-	}
+	key := output.Truncate(item.Key, 20)
 	keyStr := m.styles.Key.Render(fmt.Sprintf("%-20s", key))
 
 	// Value display
@@ -517,10 +515,7 @@ func (m Model) formatValue(value any) string {
 
 	switch v := value.(type) {
 	case string:
-		display := v
-		if len(display) > 30 {
-			display = display[:27] + "..."
-		}
+		display := output.Truncate(v, 30)
 		return m.styles.String.Render(fmt.Sprintf("%q", display))
 	case float64:
 		if v == float64(int64(v)) {
@@ -534,10 +529,7 @@ func (m Model) formatValue(value any) string {
 		if err != nil {
 			return m.styles.Object.Render("{...}")
 		}
-		display := string(jsonBytes)
-		if len(display) > 30 {
-			display = display[:27] + "..."
-		}
+		display := output.Truncate(string(jsonBytes), 30)
 		return m.styles.Object.Render(display)
 	default:
 		return m.styles.Value.Render(fmt.Sprintf("%v", v))

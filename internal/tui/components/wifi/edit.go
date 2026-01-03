@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -37,12 +38,8 @@ const (
 	FieldCount
 )
 
-// SaveResultMsg signals that a save operation completed.
-type SaveResultMsg struct {
-	Success bool
-	Error   error
-	Message string
-}
+// SaveResultMsg is an alias for the shared save result message.
+type SaveResultMsg = messages.SaveResultMsg
 
 // EditModel provides a modal form for editing WiFi settings.
 type EditModel struct {
@@ -192,12 +189,12 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case SaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Success {
 			m = m.Hide()
 		} else {
-			m.err = msg.Error
+			m.err = msg.Err
 		}
 		return m, nil
 
@@ -342,7 +339,7 @@ func (m EditModel) save() tea.Cmd {
 		if m.staSSID.Value() != "" {
 			err := m.svc.SetWiFiStation(ctx, m.device, m.staSSID.Value(), m.staPassword.Value(), m.staEnabled)
 			if err != nil {
-				return SaveResultMsg{Success: false, Error: fmt.Errorf("station: %w", err)}
+				return messages.NewSaveError(nil, fmt.Errorf("station: %w", err))
 			}
 		}
 
@@ -350,11 +347,11 @@ func (m EditModel) save() tea.Cmd {
 		if m.apSSID.Value() != "" {
 			err := m.svc.SetWiFiAP(ctx, m.device, m.apSSID.Value(), m.apPassword.Value(), m.apEnabled)
 			if err != nil {
-				return SaveResultMsg{Success: false, Error: fmt.Errorf("AP: %w", err)}
+				return messages.NewSaveError(nil, fmt.Errorf("AP: %w", err))
 			}
 		}
 
-		return SaveResultMsg{Success: true, Message: "WiFi settings saved"}
+		return messages.NewSaveResultWithMessage(nil, "WiFi settings saved")
 	}
 }
 

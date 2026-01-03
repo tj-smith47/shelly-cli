@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -607,9 +608,7 @@ func (m Model) renderVirtualLine(v Virtual, isSelected bool) string {
 	if name == "" {
 		name = fmt.Sprintf("#%d", v.ID)
 	}
-	if len(name) > 15 {
-		name = name[:12] + "..."
-	}
+	name = output.Truncate(name, 15)
 	nameStr := m.styles.Name.Render(fmt.Sprintf("%-15s", name))
 
 	// Value display
@@ -642,10 +641,7 @@ func (m Model) formatValue(v Virtual) string {
 		}
 	case shelly.VirtualText:
 		if v.StrValue != nil {
-			text := *v.StrValue
-			if len(text) > 20 {
-				text = text[:17] + "..."
-			}
+			text := output.Truncate(*v.StrValue, 20)
 			return m.styles.Value.Render(fmt.Sprintf("%q", text))
 		}
 	case shelly.VirtualEnum:

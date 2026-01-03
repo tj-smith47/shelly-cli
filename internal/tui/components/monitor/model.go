@@ -16,6 +16,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
@@ -721,10 +722,7 @@ func (m Model) renderDeviceCard(s DeviceStatus, isSelected bool) string {
 	if !s.Online {
 		errMsg := "unreachable"
 		if s.Error != nil {
-			errMsg = s.Error.Error()
-			if len(errMsg) > 40 {
-				errMsg = errMsg[:40] + "..."
-			}
+			errMsg = output.Truncate(s.Error.Error(), 40)
 		}
 		line2 := "    " + theme.StatusError().Render(errMsg)
 		return rowStyle.Render(line1+"\n"+line2) + "\n"

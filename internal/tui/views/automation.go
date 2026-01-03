@@ -21,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/virtuals"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/webhooks"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
@@ -549,16 +550,15 @@ func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 		return a.handleCodeUploaded(msg)
 	case schedules.SelectScheduleMsg:
 		return a.handleScheduleSelect(msg)
-	case kvs.EditClosedMsg:
-		return handleKVSEditClosed(msg)
+	case messages.EditClosedMsg:
+		// Handle any component edit close
+		if msg.Saved {
+			return toast.Success("Changes saved")
+		}
 	case kvs.ActionMsg:
 		return handleKVSAction(msg)
-	case webhooks.EditClosedMsg:
-		return handleWebhookEditClosed(msg)
 	case webhooks.ActionMsg:
 		return handleWebhookAction(msg)
-	case virtuals.EditClosedMsg:
-		return handleVirtualEditClosed(msg)
 	case virtuals.ActionMsg:
 		return handleVirtualAction(msg)
 	}

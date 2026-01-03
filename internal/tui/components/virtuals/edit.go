@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -27,19 +28,14 @@ const (
 	EditFieldCount
 )
 
-// EditSaveResultMsg signals a save operation completed.
-type EditSaveResultMsg struct {
-	Key string
-	Err error
-}
+// EditSaveResultMsg is an alias for the shared save result message.
+type EditSaveResultMsg = messages.SaveResultMsg
 
-// EditOpenedMsg signals the edit modal was opened.
-type EditOpenedMsg struct{}
+// EditOpenedMsg is an alias for the shared edit opened message.
+type EditOpenedMsg = messages.EditOpenedMsg
 
-// EditClosedMsg signals the edit modal was closed.
-type EditClosedMsg struct {
-	Saved bool
-}
+// EditClosedMsg is an alias for the shared edit closed message.
+type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the virtual component edit modal.
 type EditModel struct {
@@ -59,12 +55,12 @@ type EditModel struct {
 	virtual *Virtual
 
 	// Form inputs
-	typeDropdown form.Dropdown
+	typeDropdown form.Select
 	nameInput    form.TextInput
 	boolToggle   form.Toggle
 	numberInput  form.TextInput
 	textInput    form.TextInput
-	enumDropdown form.Dropdown
+	enumDropdown form.Select
 }
 
 // NewEditModel creates a new virtual component edit modal.
@@ -103,12 +99,12 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 		ctx:          ctx,
 		svc:          svc,
 		styles:       editmodal.DefaultStyles().WithLabelWidth(10),
-		typeDropdown: form.NewDropdown(form.WithDropdownOptions(typeOptions)),
+		typeDropdown: form.NewSelect(form.WithSelectOptions(typeOptions)),
 		nameInput:    nameInput,
 		boolToggle:   boolToggle,
 		numberInput:  numberInput,
 		textInput:    textInput,
-		enumDropdown: form.NewDropdown(),
+		enumDropdown: form.NewSelect(),
 	}
 }
 
@@ -173,7 +169,7 @@ func (m EditModel) ShowEdit(device string, v *Virtual) EditModel {
 				selectedIdx = i
 			}
 		}
-		m.enumDropdown = form.NewDropdown(form.WithDropdownOptions(v.Options))
+		m.enumDropdown = form.NewSelect(form.WithSelectOptions(v.Options))
 		m.enumDropdown = m.enumDropdown.SetSelected(selectedIdx)
 		m.enumDropdown = m.enumDropdown.Focus()
 	case shelly.VirtualButton, shelly.VirtualGroup:
@@ -220,7 +216,7 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case EditSaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -440,7 +436,7 @@ func (m EditModel) createNewComponent(vType shelly.VirtualComponentType) tea.Cmd
 
 		id, err := m.svc.AddVirtualComponent(ctx, m.device, params)
 		if err != nil {
-			return EditSaveResultMsg{Err: err}
+			return messages.NewSaveError(nil, err)
 		}
 
 		// Now set the initial value
@@ -449,9 +445,10 @@ func (m EditModel) createNewComponent(vType shelly.VirtualComponentType) tea.Cmd
 			val := m.boolToggle.Value()
 			err = m.svc.SetVirtualBoolean(ctx, m.device, id, val)
 		case shelly.VirtualNumber:
+			key := fmt.Sprintf("virtual:%d", id)
 			val, parseErr := strconv.ParseFloat(strings.TrimSpace(m.numberInput.Value()), 64)
 			if parseErr != nil {
-				return EditSaveResultMsg{Err: fmt.Errorf("invalid number: %w", parseErr)}
+				return messages.NewSaveError(key, fmt.Errorf("invalid number: %w", parseErr))
 			}
 			err = m.svc.SetVirtualNumber(ctx, m.device, id, val)
 		case shelly.VirtualText:
@@ -466,14 +463,18 @@ func (m EditModel) createNewComponent(vType shelly.VirtualComponentType) tea.Cmd
 			// No initial value to set for buttons/groups
 		}
 
-		return EditSaveResultMsg{Key: fmt.Sprintf("virtual:%d", id), Err: err}
+		key := fmt.Sprintf("virtual:%d", id)
+		if err != nil {
+			return messages.NewSaveError(key, err)
+		}
+		return messages.NewSaveResult(key)
 	}
 }
 
 func (m EditModel) updateExistingComponent(vType shelly.VirtualComponentType) tea.Cmd {
 	if m.virtual == nil {
 		return func() tea.Msg {
-			return EditSaveResultMsg{Err: fmt.Errorf("no component to update")}
+			return messages.NewSaveError(nil, fmt.Errorf("no component to update"))
 		}
 	}
 
@@ -491,7 +492,7 @@ func (m EditModel) updateExistingComponent(vType shelly.VirtualComponentType) te
 		case shelly.VirtualNumber:
 			val, parseErr := strconv.ParseFloat(strings.TrimSpace(m.numberInput.Value()), 64)
 			if parseErr != nil {
-				return EditSaveResultMsg{Err: fmt.Errorf("invalid number: %w", parseErr)}
+				return messages.NewSaveError(m.virtual.Key, fmt.Errorf("invalid number: %w", parseErr))
 			}
 			err = m.svc.SetVirtualNumber(ctx, m.device, id, val)
 		case shelly.VirtualText:
@@ -506,7 +507,10 @@ func (m EditModel) updateExistingComponent(vType shelly.VirtualComponentType) te
 			// Buttons are triggered, not edited; groups contain other components
 		}
 
-		return EditSaveResultMsg{Key: m.virtual.Key, Err: err}
+		if err != nil {
+			return messages.NewSaveError(m.virtual.Key, err)
+		}
+		return messages.NewSaveResult(m.virtual.Key)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -509,19 +510,13 @@ func (m Model) renderWebhookLine(webhook Webhook, isSelected bool) string {
 	}
 
 	// Event type (truncate if too long)
-	event := webhook.Event
-	if len(event) > 25 {
-		event = event[:22] + "..."
-	}
+	event := output.Truncate(webhook.Event, 25)
 	eventStr := m.styles.Event.Render(event)
 
 	// URL count or first URL
 	urlInfo := ""
 	if len(webhook.URLs) > 0 {
-		url := webhook.URLs[0]
-		if len(url) > 30 {
-			url = url[:27] + "..."
-		}
+		url := output.Truncate(webhook.URLs[0], 30)
 		if len(webhook.URLs) > 1 {
 			urlInfo = fmt.Sprintf("%s +%d", url, len(webhook.URLs)-1)
 		} else {

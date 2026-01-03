@@ -85,18 +85,18 @@ type CloseMsg struct {
 
 // Model holds the modal state.
 type Model struct {
-	title           string
-	content         string
-	footer          string
-	visible         bool
-	size            Size
-	containerWidth  int
-	containerHeight int
-	scrollOffset    int
-	contentHeight   int
-	styles          Styles
-	closeOnEsc      bool
-	confirmOnEnter  bool
+	title          string
+	content        string
+	footer         string
+	visible        bool
+	size           Size
+	width          int
+	height         int
+	scrollOffset   int
+	contentHeight  int
+	styles         Styles
+	closeOnEsc     bool
+	confirmOnEnter bool
 }
 
 // Option configures the modal model.
@@ -371,13 +371,13 @@ func (m Model) scrollIndicator() string {
 }
 
 func (m Model) centerInContainer(modal string, modalWidth, modalHeight int) string {
-	if m.containerWidth == 0 || m.containerHeight == 0 {
+	if m.width == 0 || m.height == 0 {
 		return modal
 	}
 
 	// Calculate padding for centering
-	leftPad := (m.containerWidth - modalWidth) / 2
-	topPad := (m.containerHeight - modalHeight) / 2
+	leftPad := (m.width - modalWidth) / 2
+	topPad := (m.height - modalHeight) / 2
 
 	if leftPad < 0 {
 		leftPad = 0
@@ -392,7 +392,7 @@ func (m Model) centerInContainer(modal string, modalWidth, modalHeight int) stri
 
 	// Top padding
 	for range topPad {
-		result.WriteString(strings.Repeat(" ", m.containerWidth) + "\n")
+		result.WriteString(strings.Repeat(" ", m.width) + "\n")
 	}
 
 	// Modal lines with left padding
@@ -402,9 +402,9 @@ func (m Model) centerInContainer(modal string, modalWidth, modalHeight int) stri
 	}
 
 	// Bottom padding (fill remaining space)
-	bottomPad := m.containerHeight - topPad - len(lines)
+	bottomPad := m.height - topPad - len(lines)
 	for range bottomPad {
-		result.WriteString(strings.Repeat(" ", m.containerWidth) + "\n")
+		result.WriteString(strings.Repeat(" ", m.width) + "\n")
 	}
 
 	return result.String()
@@ -415,8 +415,8 @@ func (m Model) calculateWidth() int {
 		return m.clampWidth(m.size.Width)
 	}
 
-	if m.containerWidth > 0 && m.size.WidthPct > 0 {
-		calculated := m.containerWidth * m.size.WidthPct / 100
+	if m.width > 0 && m.size.WidthPct > 0 {
+		calculated := m.width * m.size.WidthPct / 100
 		return m.clampWidth(calculated)
 	}
 
@@ -428,44 +428,44 @@ func (m Model) calculateHeight() int {
 		return m.clampHeight(m.size.Height)
 	}
 
-	if m.containerHeight > 0 && m.size.HeightPct > 0 {
-		calculated := m.containerHeight * m.size.HeightPct / 100
+	if m.height > 0 && m.size.HeightPct > 0 {
+		calculated := m.height * m.size.HeightPct / 100
 		return m.clampHeight(calculated)
 	}
 
 	return m.clampHeight(20) // Default fallback
 }
 
-func (m Model) clampWidth(width int) int {
-	if m.size.MinWidth > 0 && width < m.size.MinWidth {
-		width = m.size.MinWidth
+func (m Model) clampWidth(w int) int {
+	if m.size.MinWidth > 0 && w < m.size.MinWidth {
+		w = m.size.MinWidth
 	}
-	if m.size.MaxWidth > 0 && width > m.size.MaxWidth {
-		width = m.size.MaxWidth
+	if m.size.MaxWidth > 0 && w > m.size.MaxWidth {
+		w = m.size.MaxWidth
 	}
-	if m.containerWidth > 0 && width > m.containerWidth {
-		width = m.containerWidth
+	if m.width > 0 && w > m.width {
+		w = m.width
 	}
-	return width
+	return w
 }
 
-func (m Model) clampHeight(height int) int {
-	if m.size.MinHeight > 0 && height < m.size.MinHeight {
-		height = m.size.MinHeight
+func (m Model) clampHeight(h int) int {
+	if m.size.MinHeight > 0 && h < m.size.MinHeight {
+		h = m.size.MinHeight
 	}
-	if m.size.MaxHeight > 0 && height > m.size.MaxHeight {
-		height = m.size.MaxHeight
+	if m.size.MaxHeight > 0 && h > m.size.MaxHeight {
+		h = m.size.MaxHeight
 	}
-	if m.containerHeight > 0 && height > m.containerHeight {
-		height = m.containerHeight
+	if m.height > 0 && h > m.height {
+		h = m.height
 	}
-	return height
+	return h
 }
 
 // SetSize sets the container dimensions for centering.
-func (m Model) SetSize(width, height int) Model {
-	m.containerWidth = width
-	m.containerHeight = height
+func (m Model) SetSize(w, h int) Model {
+	m.width = w
+	m.height = h
 	return m
 }
 
@@ -529,12 +529,101 @@ func (m Model) Overlay(base string) string {
 		return base
 	}
 
-	modalView := m.View()
-	if modalView == "" {
-		return base
+	if m.width == 0 || m.height == 0 {
+		return m.View()
 	}
 
-	// For now, just return the modal view
-	// In a full implementation, this would composite the modal over the base
-	return modalView
+	modalWidth := m.calculateWidth()
+	modalHeight := m.calculateHeight()
+
+	// Dim the base view
+	dimmedLines := m.dimBaseView(base)
+
+	// Render the modal box
+	modalLines := m.renderModalBox(modalWidth, modalHeight)
+
+	// Calculate centered position
+	leftPad, topPad := m.calculateOverlayPosition(modalWidth, modalHeight)
+
+	// Composite modal over dimmed base
+	return m.compositeOverlay(dimmedLines, modalLines, leftPad, topPad)
+}
+
+func (m Model) dimBaseView(base string) []string {
+	baseLines := strings.Split(base, "\n")
+	dimmedLines := make([]string, len(baseLines))
+	for i, line := range baseLines {
+		dimmedLines[i] = m.styles.Backdrop.Render(line)
+	}
+	return dimmedLines
+}
+
+func (m Model) renderModalBox(modalWidth, modalHeight int) []string {
+	var sections []string
+
+	if m.title != "" {
+		sections = append(sections, m.renderTitleBar(modalWidth))
+	}
+
+	if m.content != "" {
+		contentWidth := modalWidth - 6
+		visibleRows := m.visibleContentRows()
+		scrolledContent := m.getScrolledContent(visibleRows)
+		sections = append(sections, m.styles.Content.Width(contentWidth).Render(scrolledContent))
+	}
+
+	if m.footer != "" {
+		footerWidth := modalWidth - 4
+		footerContent := m.styles.FooterHint.Render(m.footer)
+		sections = append(sections, m.styles.Footer.Width(footerWidth).Render(footerContent))
+	}
+
+	innerContent := lipgloss.JoinVertical(lipgloss.Left, sections...)
+	modal := m.styles.Container.Width(modalWidth).Height(modalHeight).Render(innerContent)
+	return strings.Split(modal, "\n")
+}
+
+func (m Model) renderTitleBar(modalWidth int) string {
+	titleContent := m.styles.Title.Render(m.title)
+	closeHint := m.styles.CloseHint.Render("(Esc to close)")
+	titleWidth := modalWidth - 4
+	spacing := titleWidth - lipgloss.Width(titleContent) - lipgloss.Width(closeHint)
+	if spacing < 1 {
+		spacing = 1
+	}
+	titleLine := titleContent + strings.Repeat(" ", spacing) + closeHint
+	return m.styles.TitleBar.Width(titleWidth).Render(titleLine)
+}
+
+func (m Model) calculateOverlayPosition(modalWidth, modalHeight int) (leftPad, topPad int) {
+	leftPad = (m.width - modalWidth) / 2
+	topPad = (m.height - modalHeight) / 2
+	if leftPad < 0 {
+		leftPad = 0
+	}
+	if topPad < 0 {
+		topPad = 0
+	}
+	return leftPad, topPad
+}
+
+func (m Model) compositeOverlay(dimmedLines, modalLines []string, leftPad, topPad int) string {
+	result := make([]string, m.height)
+	for i := range m.height {
+		if i < len(dimmedLines) {
+			result[i] = dimmedLines[i]
+		} else {
+			result[i] = ""
+		}
+	}
+
+	leftPadStr := strings.Repeat(" ", leftPad)
+	for i, modalLine := range modalLines {
+		row := topPad + i
+		if row >= 0 && row < m.height {
+			result[row] = leftPadStr + modalLine
+		}
+	}
+
+	return strings.Join(result, "\n")
 }

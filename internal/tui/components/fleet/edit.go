@@ -9,9 +9,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/tj-smith47/shelly-go/integrator"
 
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -36,20 +38,14 @@ const (
 	GroupEditFieldCount
 )
 
-// GroupEditSaveResultMsg signals a save operation completed.
-type GroupEditSaveResultMsg struct {
-	GroupID string
-	Mode    GroupEditMode
-	Err     error
-}
+// GroupEditSaveResultMsg is an alias for the shared save result message.
+type GroupEditSaveResultMsg = messages.SaveResultMsg
 
-// GroupEditOpenedMsg signals the edit modal was opened.
-type GroupEditOpenedMsg struct{}
+// GroupEditOpenedMsg is an alias for the shared edit opened message.
+type GroupEditOpenedMsg = messages.EditOpenedMsg
 
-// GroupEditClosedMsg signals the edit modal was closed.
-type GroupEditClosedMsg struct {
-	Saved bool
-}
+// GroupEditClosedMsg is an alias for the shared edit closed message.
+type GroupEditClosedMsg = messages.EditClosedMsg
 
 // GroupEditModel represents the group edit modal.
 type GroupEditModel struct {
@@ -203,7 +199,7 @@ func (m GroupEditModel) Update(msg tea.Msg) (GroupEditModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case GroupEditSaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -375,23 +371,23 @@ func (m GroupEditModel) save() (GroupEditModel, tea.Cmd) {
 func (m GroupEditModel) createSaveCmd(name string, deviceIDs []string) tea.Cmd {
 	return func() tea.Msg {
 		if m.fleet == nil {
-			return GroupEditSaveResultMsg{Err: fmt.Errorf("not connected to fleet")}
+			return messages.NewSaveError(nil, fmt.Errorf("not connected to fleet"))
 		}
 
 		switch m.mode {
 		case GroupEditModeCreate:
 			group := m.fleet.CreateGroup(m.groupID, name, deviceIDs)
 			if group == nil {
-				return GroupEditSaveResultMsg{Err: fmt.Errorf("failed to create group")}
+				return messages.NewSaveError(nil, fmt.Errorf("failed to create group"))
 			}
-			return GroupEditSaveResultMsg{GroupID: group.ID, Mode: m.mode}
+			return messages.NewSaveResult(group.ID)
 
 		case GroupEditModeEdit:
 			// For edit, we need to update name and devices
 			// First get the current group
 			group, ok := m.fleet.GetGroup(m.groupID)
 			if !ok {
-				return GroupEditSaveResultMsg{Err: fmt.Errorf("group not found")}
+				return messages.NewSaveError(m.groupID, fmt.Errorf("group not found"))
 			}
 
 			// Update name by recreating with new name but same devices temporarily
@@ -402,16 +398,16 @@ func (m GroupEditModel) createSaveCmd(name string, deviceIDs []string) tea.Cmd {
 			if newGroup == nil {
 				// Try to restore original
 				m.fleet.CreateGroup(group.ID, group.Name, group.DeviceIDs)
-				return GroupEditSaveResultMsg{Err: fmt.Errorf("failed to update group")}
+				return messages.NewSaveError(m.groupID, fmt.Errorf("failed to update group"))
 			}
-			return GroupEditSaveResultMsg{GroupID: m.groupID, Mode: m.mode}
+			return messages.NewSaveResult(m.groupID)
 
 		case GroupEditModeDelete:
 			// Delete mode is handled by doDelete(), not createSaveCmd
-			return GroupEditSaveResultMsg{Err: fmt.Errorf("delete mode should use doDelete()")}
+			return messages.NewSaveError(nil, fmt.Errorf("delete mode should use doDelete()"))
 		}
 
-		return GroupEditSaveResultMsg{Err: fmt.Errorf("invalid mode")}
+		return messages.NewSaveError(nil, fmt.Errorf("invalid mode"))
 	}
 }
 
@@ -425,15 +421,15 @@ func (m GroupEditModel) doDelete() (GroupEditModel, tea.Cmd) {
 
 	return m, func() tea.Msg {
 		if m.fleet == nil {
-			return GroupEditSaveResultMsg{Err: fmt.Errorf("not connected to fleet")}
+			return messages.NewSaveError(nil, fmt.Errorf("not connected to fleet"))
 		}
 
 		ok := m.fleet.DeleteGroup(m.groupID)
 		if !ok {
-			return GroupEditSaveResultMsg{Err: fmt.Errorf("failed to delete group")}
+			return messages.NewSaveError(m.groupID, fmt.Errorf("failed to delete group"))
 		}
 
-		return GroupEditSaveResultMsg{GroupID: m.groupID, Mode: GroupEditModeDelete}
+		return messages.NewSaveResult(m.groupID)
 	}
 }
 
@@ -609,9 +605,7 @@ func (m GroupEditModel) renderDeviceLine(device integrator.AccountDevice, isSele
 	if name == "" {
 		name = device.DeviceID
 	}
-	if len(name) > 25 {
-		name = name[:22] + "..."
-	}
+	name = output.Truncate(name, 25)
 
 	if isCursor {
 		line.WriteString(m.styles.Selected.Render(name))

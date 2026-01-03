@@ -14,6 +14,7 @@ import (
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -27,19 +28,14 @@ const (
 	EditFieldCount
 )
 
-// EditSaveResultMsg signals a save operation completed.
-type EditSaveResultMsg struct {
-	Key string
-	Err error
-}
+// EditSaveResultMsg is an alias for the shared save result message.
+type EditSaveResultMsg = messages.SaveResultMsg
 
-// EditOpenedMsg signals the edit modal was opened.
-type EditOpenedMsg struct{}
+// EditOpenedMsg is an alias for the shared edit opened message.
+type EditOpenedMsg = messages.EditOpenedMsg
 
-// EditClosedMsg signals the edit modal was closed.
-type EditClosedMsg struct {
-	Saved bool
-}
+// EditClosedMsg is an alias for the shared edit closed message.
+type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the KVS edit modal.
 type EditModel struct {
@@ -202,7 +198,7 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case EditSaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -377,7 +373,10 @@ func (m EditModel) createSaveCmd(key, valueStr string) tea.Cmd {
 		defer cancel()
 
 		err := m.svc.Set(ctx, m.device, key, value)
-		return EditSaveResultMsg{Key: key, Err: err}
+		if err != nil {
+			return messages.NewSaveError(key, err)
+		}
+		return messages.NewSaveResult(key)
 	}
 }
 

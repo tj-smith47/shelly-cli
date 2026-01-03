@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -29,19 +30,14 @@ const (
 	EditFieldCount
 )
 
-// EditSaveResultMsg signals a save operation completed.
-type EditSaveResultMsg struct {
-	InputID int
-	Err     error
-}
+// EditSaveResultMsg is an alias for the shared save result message.
+type EditSaveResultMsg = messages.SaveResultMsg
 
-// EditOpenedMsg signals the edit modal was opened.
-type EditOpenedMsg struct{}
+// EditOpenedMsg is an alias for the shared edit opened message.
+type EditOpenedMsg = messages.EditOpenedMsg
 
-// EditClosedMsg signals the edit modal was closed.
-type EditClosedMsg struct {
-	Saved bool
-}
+// EditClosedMsg is an alias for the shared edit closed message.
+type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the input edit modal.
 type EditModel struct {
@@ -62,7 +58,7 @@ type EditModel struct {
 
 	// Form inputs
 	nameInput          form.TextInput
-	typeDropdown       form.Dropdown
+	typeDropdown       form.Select
 	enableToggle       form.Toggle
 	invertToggle       form.Toggle
 	factoryResetToggle form.Toggle
@@ -77,9 +73,9 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 		form.WithHelp("Optional display name for this input"),
 	)
 
-	typeDropdown := form.NewDropdown(
-		form.WithDropdownOptions([]string{"button", "switch"}),
-		form.WithDropdownHelp("Input type (button=momentary, switch=toggle)"),
+	typeDropdown := form.NewSelect(
+		form.WithSelectOptions([]string{"button", "switch"}),
+		form.WithSelectHelp("Input type (button=momentary, switch=toggle)"),
 	)
 
 	enableToggle := form.NewToggle(
@@ -136,7 +132,7 @@ func (m EditModel) fetchConfig() tea.Cmd {
 
 		config, err := m.svc.InputGetConfig(ctx, m.device, m.inputID)
 		if err != nil {
-			return EditSaveResultMsg{InputID: m.inputID, Err: err}
+			return messages.NewSaveError(m.inputID, err)
 		}
 
 		return configLoadedMsg{config: config}
@@ -182,7 +178,7 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 		m = m.populateFromConfig(msg.config)
 		return m, nil
 
-	case EditSaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -418,7 +414,10 @@ func (m EditModel) createSaveCmd(cfg *model.InputConfig) tea.Cmd {
 		defer cancel()
 
 		err := m.svc.InputSetConfig(ctx, m.device, m.inputID, cfg)
-		return EditSaveResultMsg{InputID: m.inputID, Err: err}
+		if err != nil {
+			return messages.NewSaveError(m.inputID, err)
+		}
+		return messages.NewSaveResult(m.inputID)
 	}
 }
 

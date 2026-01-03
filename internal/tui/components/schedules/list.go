@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -426,10 +427,7 @@ func (m ListModel) renderScheduleLine(schedule Schedule, isSelected bool) string
 	}
 
 	// Timespec (truncate if too long)
-	timespec := schedule.Timespec
-	if len(timespec) > 20 {
-		timespec = timespec[:17] + "..."
-	}
+	timespec := output.Truncate(schedule.Timespec, 20)
 	timespecStr := m.styles.Timespec.Render(timespec)
 
 	// Primary method

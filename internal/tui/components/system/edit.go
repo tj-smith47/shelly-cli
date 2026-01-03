@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -33,18 +34,14 @@ const (
 	EditFieldCount
 )
 
-// EditSaveResultMsg signals a save operation completed.
-type EditSaveResultMsg struct {
-	Err error
-}
+// EditSaveResultMsg is an alias for the shared save result message.
+type EditSaveResultMsg = messages.SaveResultMsg
 
-// EditOpenedMsg signals the edit modal was opened.
-type EditOpenedMsg struct{}
+// EditOpenedMsg is an alias for the shared edit opened message.
+type EditOpenedMsg = messages.EditOpenedMsg
 
-// EditClosedMsg signals the edit modal was closed.
-type EditClosedMsg struct {
-	Saved bool
-}
+// EditClosedMsg is an alias for the shared edit closed message.
+type EditClosedMsg = messages.EditClosedMsg
 
 // EditModel represents the system settings edit modal.
 type EditModel struct {
@@ -62,7 +59,7 @@ type EditModel struct {
 
 	// Form inputs
 	nameInput        textinput.Model
-	timezoneDropdown form.SearchableDropdown
+	timezoneDropdown form.Select
 	latitudeInput    textinput.Model
 	longitudeInput   textinput.Model
 
@@ -90,10 +87,12 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	nameInput.SetWidth(35)
 	nameInput.SetStyles(inputStyles)
 
-	timezoneDropdown := form.NewSearchableDropdown().
-		SetOptions(CommonTimezones).
-		SetHelp("Type to filter, Enter to select").
-		SetMaxVisible(10)
+	timezoneDropdown := form.NewSelect(
+		form.WithSelectOptions(CommonTimezones),
+		form.WithSelectHelp("Type to filter, Enter to select"),
+		form.WithSelectMaxVisible(10),
+		form.WithSelectFiltering(true),
+	)
 
 	latitudeInput := textinput.New()
 	latitudeInput.Placeholder = "e.g., 40.7128"
@@ -211,7 +210,7 @@ func (m EditModel) Update(msg tea.Msg) (EditModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case EditSaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -555,7 +554,10 @@ func (m EditModel) createSaveCmd(data saveFormData) tea.Cmd {
 			}
 		}
 
-		return EditSaveResultMsg{Err: lastErr}
+		if lastErr != nil {
+			return messages.NewSaveError(nil, lastErr)
+		}
+		return messages.NewSaveResult(nil)
 	}
 }
 
@@ -567,14 +569,14 @@ func formatFloat(f float64) string {
 func (m EditModel) initializeInputs(sysConfig *shelly.SysConfig) EditModel {
 	if sysConfig == nil {
 		m.nameInput.SetValue("")
-		m.timezoneDropdown = m.timezoneDropdown.SetSelected("")
+		m.timezoneDropdown = m.timezoneDropdown.SetSelectedValue("")
 		m.latitudeInput.SetValue("")
 		m.longitudeInput.SetValue("")
 		return m
 	}
 
 	m.nameInput.SetValue(sysConfig.Name)
-	m.timezoneDropdown = m.timezoneDropdown.SetSelected(sysConfig.Timezone)
+	m.timezoneDropdown = m.timezoneDropdown.SetSelectedValue(sysConfig.Timezone)
 	m.latitudeInput.SetValue(formatCoord(sysConfig.Lat))
 	m.longitudeInput.SetValue(formatCoord(sysConfig.Lng))
 	return m

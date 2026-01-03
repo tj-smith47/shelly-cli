@@ -237,100 +237,6 @@ func TestToggleView(t *testing.T) {
 	}
 }
 
-// TestDropdownNew tests Dropdown creation.
-func TestDropdownNew(t *testing.T) {
-	t.Parallel()
-	d := NewDropdown(
-		WithDropdownOptions([]string{"Option A", "Option B", "Option C"}),
-	)
-
-	if d.Selected() != 0 {
-		t.Errorf("expected selected 0, got %d", d.Selected())
-	}
-	if d.SelectedValue() != "Option A" {
-		t.Errorf("expected 'Option A', got %q", d.SelectedValue())
-	}
-}
-
-func TestDropdownWithOptions(t *testing.T) {
-	t.Parallel()
-	d := NewDropdown(
-		WithDropdownLabel("Choose option"),
-		WithDropdownOptions([]string{"A", "B", "C"}),
-		WithDropdownSelected(1),
-		WithDropdownMaxVisible(3),
-	)
-
-	if d.label != "Choose option" {
-		t.Errorf("expected label, got %q", d.label)
-	}
-	if d.Selected() != 1 {
-		t.Errorf("expected selected 1, got %d", d.Selected())
-	}
-	if d.SelectedValue() != "B" {
-		t.Errorf("expected 'B', got %q", d.SelectedValue())
-	}
-}
-
-func TestDropdownNavigation(t *testing.T) {
-	t.Parallel()
-	d := NewDropdown(
-		WithDropdownOptions([]string{"A", "B", "C"}),
-	)
-	d = d.Focus()
-
-	// Expand
-	keyMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
-	d, _ = d.Update(keyMsg)
-	if !d.IsExpanded() {
-		t.Error("expected expanded after enter")
-	}
-
-	// Navigate down
-	keyMsg = tea.KeyPressMsg{Code: 'j'}
-	d, _ = d.Update(keyMsg)
-	if d.cursor != 1 {
-		t.Errorf("expected cursor 1, got %d", d.cursor)
-	}
-
-	// Select
-	keyMsg = tea.KeyPressMsg{Code: tea.KeyEnter}
-	d, _ = d.Update(keyMsg)
-	if d.Selected() != 1 {
-		t.Errorf("expected selected 1, got %d", d.Selected())
-	}
-	if d.IsExpanded() {
-		t.Error("expected collapsed after selection")
-	}
-}
-
-func TestDropdownSetOptions(t *testing.T) {
-	t.Parallel()
-	d := NewDropdown(WithDropdownOptions([]string{"A", "B"}))
-	d = d.SetSelected(1)
-	d = d.SetOptions([]string{"X"})
-
-	if d.Selected() != 0 {
-		t.Errorf("expected selected clamped to 0, got %d", d.Selected())
-	}
-	if d.SelectedValue() != "X" {
-		t.Errorf("expected 'X', got %q", d.SelectedValue())
-	}
-}
-
-func TestDropdownView(t *testing.T) {
-	t.Parallel()
-	d := NewDropdown(
-		WithDropdownLabel("Test"),
-		WithDropdownOptions([]string{"A", "B"}),
-	)
-	view := d.View()
-
-	if view == "" {
-		t.Error("expected non-empty view")
-	}
-}
-
 // TestSliderNew tests Slider creation.
 func TestSliderNew(t *testing.T) {
 	t.Parallel()
@@ -516,6 +422,357 @@ func TestTextAreaView(t *testing.T) {
 	}
 }
 
+// TestSelectNew tests Select creation.
+func TestSelectNew(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(
+		WithSelectOptions([]string{"Option A", "Option B", "Option C"}),
+	)
+
+	if s.Selected() != 0 {
+		t.Errorf("expected selected 0, got %d", s.Selected())
+	}
+	if s.SelectedValue() != "Option A" {
+		t.Errorf("expected 'Option A', got %q", s.SelectedValue())
+	}
+	if s.IsExpanded() {
+		t.Error("expected not expanded by default")
+	}
+	if s.IsFiltering() {
+		t.Error("expected not filtering by default")
+	}
+}
+
+func TestSelectWithOptions(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(
+		WithSelectLabel("Choose option"),
+		WithSelectOptions([]string{"A", "B", "C"}),
+		WithSelectSelected(1),
+		WithSelectMaxVisible(3),
+		WithSelectHelp("Pick one"),
+		WithSelectFiltering(true),
+	)
+
+	if s.label != "Choose option" {
+		t.Errorf("expected label, got %q", s.label)
+	}
+	if s.Selected() != 1 {
+		t.Errorf("expected selected 1, got %d", s.Selected())
+	}
+	if s.SelectedValue() != "B" {
+		t.Errorf("expected 'B', got %q", s.SelectedValue())
+	}
+	if s.help != "Pick one" {
+		t.Errorf("expected help 'Pick one', got %q", s.help)
+	}
+	if !s.filterEnabled {
+		t.Error("expected filtering enabled")
+	}
+}
+
+func TestSelectNavigation(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(
+		WithSelectOptions([]string{"A", "B", "C"}),
+	)
+	s = s.Focus()
+
+	// Expand with enter
+	keyMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	s, _ = s.Update(keyMsg)
+	if !s.IsExpanded() {
+		t.Error("expected expanded after enter")
+	}
+
+	// Navigate down with 'j'
+	keyMsg = tea.KeyPressMsg{Code: 'j'}
+	s, _ = s.Update(keyMsg)
+	if s.cursor != 1 {
+		t.Errorf("expected cursor 1, got %d", s.cursor)
+	}
+
+	// Navigate down with 'down'
+	keyMsg = tea.KeyPressMsg{Code: tea.KeyDown}
+	s, _ = s.Update(keyMsg)
+	if s.cursor != 2 {
+		t.Errorf("expected cursor 2, got %d", s.cursor)
+	}
+
+	// Navigate up with 'k'
+	keyMsg = tea.KeyPressMsg{Code: 'k'}
+	s, _ = s.Update(keyMsg)
+	if s.cursor != 1 {
+		t.Errorf("expected cursor 1, got %d", s.cursor)
+	}
+
+	// Home with 'g'
+	keyMsg = tea.KeyPressMsg{Code: 'g'}
+	s, _ = s.Update(keyMsg)
+	if s.cursor != 0 {
+		t.Errorf("expected cursor 0, got %d", s.cursor)
+	}
+
+	// End with 'G'
+	keyMsg = tea.KeyPressMsg{Code: 'G', Mod: tea.ModShift}
+	s, _ = s.Update(keyMsg)
+	if s.cursor != 2 {
+		t.Errorf("expected cursor 2, got %d", s.cursor)
+	}
+
+	// Select with enter
+	keyMsg = tea.KeyPressMsg{Code: tea.KeyEnter}
+	s, _ = s.Update(keyMsg)
+	if s.Selected() != 2 {
+		t.Errorf("expected selected 2, got %d", s.Selected())
+	}
+	if s.IsExpanded() {
+		t.Error("expected collapsed after selection")
+	}
+}
+
+func TestSelectEscape(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(
+		WithSelectOptions([]string{"A", "B", "C"}),
+	)
+	s = s.Focus()
+
+	// Expand
+	keyMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	s, _ = s.Update(keyMsg)
+	if !s.IsExpanded() {
+		t.Error("expected expanded")
+	}
+
+	// Escape closes without selecting
+	keyMsg = tea.KeyPressMsg{Code: tea.KeyEscape}
+	s, _ = s.Update(keyMsg)
+	if s.IsExpanded() {
+		t.Error("expected collapsed after escape")
+	}
+}
+
+func TestSelectFiltering(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(
+		WithSelectOptions([]string{"Apple", "Banana", "Cherry", "Apricot"}),
+		WithSelectFiltering(true),
+	)
+	s = s.Focus()
+
+	// Expand
+	keyMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	s, _ = s.Update(keyMsg)
+
+	// Enter filter mode with '/'
+	keyMsg = tea.KeyPressMsg{Code: '/', Text: "/"}
+	s, _ = s.Update(keyMsg)
+	if !s.IsFiltering() {
+		t.Error("expected filtering mode active")
+	}
+
+	// Type 'a' to filter (Text field required for textinput in bubbletea v2)
+	keyMsg = tea.KeyPressMsg{Code: 'a', Text: "a"}
+	s, _ = s.Update(keyMsg)
+	// Should show: Apple, Banana, Apricot (contain 'a', Cherry doesn't)
+	if len(s.filtered) != 3 {
+		t.Errorf("expected 3 filtered options (Apple, Banana, Apricot), got %d", len(s.filtered))
+	}
+
+	// Type 'p' to narrow filter to 'ap'
+	keyMsg = tea.KeyPressMsg{Code: 'p', Text: "p"}
+	s, _ = s.Update(keyMsg)
+	// Should show: Apple, Apricot (contain 'ap')
+	if len(s.filtered) != 2 {
+		t.Errorf("expected 2 filtered options, got %d", len(s.filtered))
+	}
+
+	// Press escape to exit filter mode
+	keyMsg = tea.KeyPressMsg{Code: tea.KeyEscape}
+	s, _ = s.Update(keyMsg)
+	if s.IsFiltering() {
+		t.Error("expected filtering mode exited")
+	}
+	// Filter should be cleared, all options visible
+	if len(s.filtered) != 4 {
+		t.Errorf("expected all 4 options after escape, got %d", len(s.filtered))
+	}
+}
+
+func TestSelectSetOptions(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B"}))
+	s = s.SetSelected(1)
+	s = s.SetOptions([]string{"X"})
+
+	if s.Selected() != 0 {
+		t.Errorf("expected selected clamped to 0, got %d", s.Selected())
+	}
+	if s.SelectedValue() != "X" {
+		t.Errorf("expected 'X', got %q", s.SelectedValue())
+	}
+}
+
+func TestSelectSetSelectedValue(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B", "C"}))
+	s = s.SetSelectedValue("C")
+
+	if s.Selected() != 2 {
+		t.Errorf("expected selected 2, got %d", s.Selected())
+	}
+	if s.SelectedValue() != "C" {
+		t.Errorf("expected 'C', got %q", s.SelectedValue())
+	}
+}
+
+func TestSelectFocusBlur(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B"}))
+
+	s = s.Focus()
+	if !s.Focused() {
+		t.Error("expected focused")
+	}
+
+	// Expand
+	keyMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	s, _ = s.Update(keyMsg)
+	if !s.IsExpanded() {
+		t.Error("expected expanded")
+	}
+
+	// Blur collapses
+	s = s.Blur()
+	if s.Focused() {
+		t.Error("expected not focused after blur")
+	}
+	if s.IsExpanded() {
+		t.Error("expected collapsed after blur")
+	}
+}
+
+func TestSelectExpandCollapse(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B"}))
+
+	s = s.Expand()
+	if !s.IsExpanded() {
+		t.Error("expected expanded")
+	}
+
+	s = s.Collapse()
+	if s.IsExpanded() {
+		t.Error("expected collapsed")
+	}
+}
+
+func TestSelectView(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(
+		WithSelectLabel("Test"),
+		WithSelectOptions([]string{"A", "B"}),
+	)
+	view := s.View()
+
+	if view == "" {
+		t.Error("expected non-empty view")
+	}
+}
+
+func TestSelectViewExpanded(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(
+		WithSelectLabel("Test"),
+		WithSelectOptions([]string{"A", "B", "C"}),
+		WithSelectFiltering(true),
+	)
+	s = s.Expand()
+	view := s.View()
+
+	if view == "" {
+		t.Error("expected non-empty view")
+	}
+}
+
+func TestSelectNoOptions(t *testing.T) {
+	t.Parallel()
+	s := NewSelect()
+
+	if s.SelectedValue() != "" {
+		t.Errorf("expected empty value, got %q", s.SelectedValue())
+	}
+}
+
+func TestSelectDownExpandsWhenCollapsed(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B"}))
+	s = s.Focus()
+
+	// Down arrow should expand when collapsed
+	keyMsg := tea.KeyPressMsg{Code: tea.KeyDown}
+	s, _ = s.Update(keyMsg)
+	if !s.IsExpanded() {
+		t.Error("expected expanded after down arrow on collapsed select")
+	}
+}
+
+func TestSelectSpaceToggles(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B"}))
+	s = s.Focus()
+
+	// Space should expand
+	keyMsg := tea.KeyPressMsg{Code: ' '}
+	s, _ = s.Update(keyMsg)
+	if !s.IsExpanded() {
+		t.Error("expected expanded after space")
+	}
+
+	// Space again should select and collapse
+	keyMsg = tea.KeyPressMsg{Code: ' '}
+	s, _ = s.Update(keyMsg)
+	if s.IsExpanded() {
+		t.Error("expected collapsed after second space")
+	}
+}
+
+func TestSelectTab(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B", "C"}))
+	s = s.Focus()
+	s = s.Expand()
+
+	// Move cursor to B
+	keyMsg := tea.KeyPressMsg{Code: 'j'}
+	s, _ = s.Update(keyMsg)
+
+	// Tab selects and closes
+	keyMsg = tea.KeyPressMsg{Code: tea.KeyTab}
+	s, _ = s.Update(keyMsg)
+
+	if s.SelectedValue() != "B" {
+		t.Errorf("expected 'B', got %q", s.SelectedValue())
+	}
+	if s.IsExpanded() {
+		t.Error("expected collapsed after tab")
+	}
+}
+
+func TestSelectNotFocusedIgnoresInput(t *testing.T) {
+	t.Parallel()
+	s := NewSelect(WithSelectOptions([]string{"A", "B"}))
+	// Not focused
+
+	keyMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	s, _ = s.Update(keyMsg)
+
+	if s.IsExpanded() {
+		t.Error("expected still collapsed when not focused")
+	}
+}
+
 // TestDefaultStyles tests that default styles are created without panicking.
 func TestDefaultStyles(t *testing.T) {
 	t.Parallel()
@@ -523,7 +780,7 @@ func TestDefaultStyles(t *testing.T) {
 	// These should not panic
 	_ = DefaultTextInputStyles()
 	_ = DefaultToggleStyles()
-	_ = DefaultDropdownStyles()
 	_ = DefaultSliderStyles()
 	_ = DefaultTextAreaStyles()
+	_ = DefaultSelectStyles()
 }

@@ -14,6 +14,9 @@ type SaveResultMsg struct {
 
 	// Err contains any error that occurred during the save operation.
 	Err error
+
+	// Message is an optional message for toast/feedback display.
+	Message string
 }
 
 // NewSaveResult creates a SaveResultMsg for a successful save.
@@ -30,6 +33,15 @@ func NewSaveError(componentID any, err error) SaveResultMsg {
 		ComponentID: componentID,
 		Success:     false,
 		Err:         err,
+	}
+}
+
+// NewSaveResultWithMessage creates a SaveResultMsg for a successful save with a message.
+func NewSaveResultWithMessage(componentID any, message string) SaveResultMsg {
+	return SaveResultMsg{
+		ComponentID: componentID,
+		Success:     true,
+		Message:     message,
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -41,18 +42,14 @@ const (
 	TLSUserCA
 )
 
-// MQTTEditSaveResultMsg signals a save operation completed.
-type MQTTEditSaveResultMsg struct {
-	Err error
-}
+// MQTTEditSaveResultMsg is an alias for the shared save result message.
+type MQTTEditSaveResultMsg = messages.SaveResultMsg
 
-// MQTTEditOpenedMsg signals the edit modal was opened.
-type MQTTEditOpenedMsg struct{}
+// MQTTEditOpenedMsg is an alias for the shared edit opened message.
+type MQTTEditOpenedMsg = messages.EditOpenedMsg
 
-// MQTTEditClosedMsg signals the edit modal was closed.
-type MQTTEditClosedMsg struct {
-	Saved bool
-}
+// MQTTEditClosedMsg is an alias for the shared edit closed message.
+type MQTTEditClosedMsg = messages.EditClosedMsg
 
 // MQTTEditModel represents the MQTT configuration edit modal.
 type MQTTEditModel struct {
@@ -77,7 +74,7 @@ type MQTTEditModel struct {
 	passwordInput    form.Password
 	clientIDInput    form.TextInput
 	topicPrefixInput form.TextInput
-	tlsDropdown      form.Dropdown
+	tlsDropdown      form.Select
 }
 
 // NewMQTTEditModel creates a new MQTT configuration edit modal.
@@ -121,10 +118,10 @@ func NewMQTTEditModel(ctx context.Context, svc *shelly.Service) MQTTEditModel {
 		form.WithHelp("Max 300 chars, no $, #, +, %, ?"),
 	)
 
-	tlsDropdown := form.NewDropdown(
-		form.WithDropdownOptions([]string{"No TLS", "TLS (no verify)", "TLS (default CA)", "TLS (user CA)"}),
-		form.WithDropdownSelected(0),
-		form.WithDropdownMaxVisible(4),
+	tlsDropdown := form.NewSelect(
+		form.WithSelectOptions([]string{"No TLS", "TLS (no verify)", "TLS (default CA)", "TLS (user CA)"}),
+		form.WithSelectSelected(0),
+		form.WithSelectMaxVisible(4),
 	)
 
 	return MQTTEditModel{
@@ -179,7 +176,7 @@ func (m MQTTEditModel) Show(device string, data *MQTTData) MQTTEditModel {
 }
 
 // setTLSFromSSLCA converts SSLCA config value to dropdown selection.
-func (m MQTTEditModel) setTLSFromSSLCA(sslca string) form.Dropdown {
+func (m MQTTEditModel) setTLSFromSSLCA(sslca string) form.Select {
 	switch sslca {
 	case "":
 		return m.tlsDropdown.SetSelected(0) // No TLS
@@ -239,7 +236,7 @@ func (m MQTTEditModel) Update(msg tea.Msg) (MQTTEditModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case MQTTEditSaveResultMsg:
+	case messages.SaveResultMsg:
 		m.saving = false
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -438,7 +435,10 @@ func (m MQTTEditModel) createSaveCmd() tea.Cmd {
 		defer cancel()
 
 		err := m.svc.SetMQTTConfigFull(ctx, m.device, params)
-		return MQTTEditSaveResultMsg{Err: err}
+		if err != nil {
+			return messages.NewSaveError(nil, err)
+		}
+		return messages.NewSaveResult(nil)
 	}
 }
 

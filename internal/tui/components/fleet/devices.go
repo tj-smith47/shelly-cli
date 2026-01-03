@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-go/integrator"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
@@ -330,15 +331,10 @@ func (m DevicesModel) renderDeviceLine(idx int) string {
 	if name == "" {
 		name = device.DeviceID
 	}
-	if len(name) > 20 {
-		name = name[:17] + "..."
-	}
+	name = output.Truncate(name, 20)
 
 	// Device type (truncate if needed)
-	deviceType := device.DeviceType
-	if len(deviceType) > 12 {
-		deviceType = deviceType[:12]
-	}
+	deviceType := output.Truncate(device.DeviceType, 12)
 
 	line := fmt.Sprintf("%s%s %s %s",
 		cursor,

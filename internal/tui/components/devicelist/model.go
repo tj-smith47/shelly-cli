@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -542,10 +543,7 @@ func (m Model) renderDeviceStatus(d *cache.DeviceData) string {
 	default:
 		status := m.styles.Offline.Render("○ Offline")
 		if d.Error != nil {
-			errMsg := d.Error.Error()
-			if len(errMsg) > 40 {
-				errMsg = errMsg[:40] + "..."
-			}
+			errMsg := output.Truncate(d.Error.Error(), 40)
 			status += " - " + m.styles.StatusError.Render(errMsg)
 		}
 		return status
