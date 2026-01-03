@@ -2,7 +2,7 @@
 .TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-cache-clear - Clear the discovery cache
+shelly-cache-clear - Clear the cache
 
 
 .SH SYNOPSIS
@@ -10,12 +10,39 @@ shelly-cache-clear - Clear the discovery cache
 
 
 .SH DESCRIPTION
-Clear all cached device discovery results.
+Clear cached device data.
+
+.PP
+Use flags to specify what to clear:
+  --all      Clear all cached data (requires confirmation)
+  --device   Clear cache for a specific device
+  --type     Clear cache for a specific data type (requires --device)
+  --expired  Clear only expired entries
 
 
 .SH OPTIONS
+\fB-a\fP, \fB--all\fP[=false]
+	Clear all cached data
+
+.PP
+\fB-d\fP, \fB--device\fP=""
+	Clear cache for specific device
+
+.PP
+\fB-e\fP, \fB--expired\fP[=false]
+	Clear only expired entries
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for clear
+
+.PP
+\fB-t\fP, \fB--type\fP=""
+	Clear cache for specific data type (requires --device)
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -51,6 +78,10 @@ Clear all cached device discovery results.
 	Suppress non-essential output
 
 .PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
 \fB--template\fP=""
 	Go template string for output (use with -o template)
 
@@ -61,8 +92,17 @@ Clear all cached device discovery results.
 
 .SH EXAMPLE
 .EX
-  # Clear the discovery cache
-  shelly cache clear
+  # Clear all cache
+  shelly cache clear --all
+
+  # Clear cache for a specific device
+  shelly cache clear --device kitchen
+
+  # Clear cache for specific device and type
+  shelly cache clear --device kitchen --type firmware
+
+  # Clear only expired entries
+  shelly cache clear --expired
 .EE
 
 

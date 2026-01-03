@@ -10,13 +10,17 @@ shelly-cache - Manage CLI cache
 
 
 .SH DESCRIPTION
-Manage the Shelly CLI cache directory.
+Manage the Shelly CLI file cache.
 
 .PP
-The cache stores:
-  - Device discovery results
-  - Firmware update information
-  - Version check data
+The cache stores device data for faster access:
+  - Device information and configuration
+  - Firmware update status
+  - Automation settings (schedules, webhooks, scripts)
+  - Protocol configurations (MQTT, Modbus)
+
+.PP
+Cache data has type-specific TTLs and is shared between CLI and TUI.
 
 
 .SH OPTIONS
@@ -57,6 +61,10 @@ The cache stores:
 	Suppress non-essential output
 
 .PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
 \fB--template\fP=""
 	Go template string for output (use with -o template)
 
@@ -70,8 +78,14 @@ The cache stores:
   # Show cache statistics
   shelly cache show
 
-  # Clear the cache
+  # Clear all cache
   shelly cache clear
+
+  # Clear cache for specific device
+  shelly cache clear --device kitchen
+
+  # Clear only expired entries
+  shelly cache clear --expired
 .EE
 
 

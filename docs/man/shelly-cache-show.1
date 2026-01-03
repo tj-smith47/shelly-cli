@@ -10,7 +10,15 @@ shelly-cache-show - Show cache statistics
 
 
 .SH DESCRIPTION
-Display information about the discovery cache.
+Display detailed information about the file cache.
+
+.PP
+Shows cache statistics including:
+  - Total entries and size
+  - Entries by data type
+  - Device count
+  - Expired entry count
+  - Oldest and newest entries
 
 
 .SH OPTIONS
@@ -51,6 +59,10 @@ Display information about the discovery cache.
 	Suppress non-essential output
 
 .PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
 \fB--template\fP=""
 	Go template string for output (use with -o template)
 
@@ -63,6 +75,9 @@ Display information about the discovery cache.
 .EX
   # Show cache statistics
   shelly cache show
+
+  # Show cache stats in JSON format
+  shelly cache show -o json
 .EE
 
 
