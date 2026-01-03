@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Size specifies how the modal dimensions are calculated.
@@ -52,10 +53,7 @@ func DefaultStyles() Styles {
 	return Styles{
 		Backdrop: lipgloss.NewStyle().
 			Background(lipgloss.Color("#000000")),
-		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Highlight).
-			Padding(0, 1),
+		Container: tuistyles.ModalBorder().Padding(0, 1),
 		Title: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Text),

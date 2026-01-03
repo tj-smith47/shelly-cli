@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/modal"
+	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // ConfirmedMsg signals that the user confirmed the operation.
@@ -55,10 +56,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Border: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Error).
-			Padding(1, 2),
+		Border: tuistyles.ErrorBorder().Padding(1, 2),
 		Title: lipgloss.NewStyle().
 			Foreground(colors.Error).
 			Bold(true),

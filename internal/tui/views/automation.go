@@ -22,6 +22,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/webhooks"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
 
@@ -155,12 +156,8 @@ type AutomationStyles struct {
 func DefaultAutomationStyles() AutomationStyles {
 	colors := theme.GetSemanticColors()
 	return AutomationStyles{
-		Panel: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder),
-		PanelActive: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Highlight),
+		Panel:       styles.PanelBorder(),
+		PanelActive: styles.PanelBorderActive(),
 		Title: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true),

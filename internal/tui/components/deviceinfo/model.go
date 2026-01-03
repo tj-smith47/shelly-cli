@@ -13,6 +13,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // RequestJSONMsg is sent when user requests JSON view for an endpoint.
@@ -99,9 +100,7 @@ func DefaultStyles() Styles {
 		Power: lipgloss.NewStyle().
 			Foreground(colors.Warning).
 			Bold(true),
-		Focused: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Highlight),
+		Focused: styles.PanelBorderActive(),
 		FocusBorder: lipgloss.NewStyle().
 			Foreground(colors.Highlight),
 		BlurBorder: lipgloss.NewStyle().

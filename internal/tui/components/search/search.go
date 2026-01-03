@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // FilterChangedMsg signals that the filter value has changed.
@@ -41,10 +42,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Container: lipgloss.NewStyle().
-			Padding(0, 1).
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder),
+		Container: tuistyles.PanelBorder().Padding(0, 1),
 		Label: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true),

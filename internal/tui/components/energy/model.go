@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Deps holds the dependencies for the energy component.
@@ -110,17 +111,12 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(1, 2),
+		Container: styles.PanelBorder().Padding(1, 2),
 		Header: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Highlight).
 			MarginBottom(1),
-		Card: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
+		Card: styles.PanelBorder().
 			Padding(0, 1).
 			MarginRight(1).
 			MarginBottom(1),

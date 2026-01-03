@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Bar represents a single energy bar.
@@ -56,10 +57,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(1, 2),
+		Container: styles.PanelBorder().Padding(1, 2),
 		Header: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true),

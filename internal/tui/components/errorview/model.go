@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // DisplayMode determines how errors are displayed.
@@ -76,10 +77,7 @@ func DefaultStyles() Styles {
 		Compact: lipgloss.NewStyle().
 			Foreground(colors.Error).
 			Italic(true),
-		Detailed: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Error).
-			Padding(1, 2),
+		Detailed: tuistyles.ErrorBorder().Padding(1, 2),
 		DetailHeader: lipgloss.NewStyle().
 			Foreground(colors.Error).
 			Bold(true).

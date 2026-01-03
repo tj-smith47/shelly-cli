@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // DeviceSelectedMsg is sent when a device is selected.
@@ -74,16 +75,9 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Container: lipgloss.NewStyle().
-			Padding(0),
-		ListPanel: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(0, 1),
-		DetailPanel: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(1, 2),
+		Container:   lipgloss.NewStyle().Padding(0),
+		ListPanel:   styles.PanelBorder().Padding(0, 1),
+		DetailPanel: styles.PanelBorder().Padding(1, 2),
 		ListHeader: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Highlight).
@@ -126,9 +120,7 @@ func DefaultStyles() Styles {
 			Foreground(colors.Success),
 		StatusError: lipgloss.NewStyle().
 			Foreground(colors.Error),
-		Table: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder),
+		Table: styles.PanelBorder(),
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Styles contains all styles for the TUI components.
@@ -117,11 +118,8 @@ func DefaultStyles() Styles {
 		Title: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Primary),
-		Border: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder),
-		Spinner: lipgloss.NewStyle().
-			Foreground(colors.Info),
+		Border:  styles.PanelBorder(),
+		Spinner: lipgloss.NewStyle().Foreground(colors.Info),
 	}
 }
 

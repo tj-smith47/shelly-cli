@@ -23,6 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Deps holds the dependencies for the monitor component.
@@ -172,9 +173,7 @@ func DefaultStyles() Styles {
 			Foreground(colors.Warning),
 		Separator: lipgloss.NewStyle().
 			Foreground(colors.Muted),
-		SummaryCard: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
+		SummaryCard: styles.PanelBorder().
 			Padding(0, 1).
 			MarginRight(1),
 		SummaryValue: lipgloss.NewStyle().

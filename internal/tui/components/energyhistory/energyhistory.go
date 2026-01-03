@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Sparkline characters for different heights (0-7).
@@ -72,10 +73,7 @@ func DefaultStyles() Styles {
 	}
 
 	return Styles{
-		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
-			Padding(1, 2),
+		Container: styles.PanelBorder().Padding(1, 2),
 		Header: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true),

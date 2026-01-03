@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // CloseMsg is sent when help is closed.
@@ -49,10 +50,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Highlight).
-			Padding(1, 2),
+		Container: styles.ModalBorder().Padding(1, 2),
 		Title: lipgloss.NewStyle().
 			Foreground(colors.Highlight).
 			Bold(true).
