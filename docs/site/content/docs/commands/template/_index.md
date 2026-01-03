@@ -1,0 +1,80 @@
+---
+title: "shelly template"
+description: "shelly template"
+weight: 630
+sidebar:
+  collapsed: true
+---
+
+## shelly template
+
+Manage device configuration templates
+
+### Synopsis
+
+Manage configuration templates for Shelly devices.
+
+Templates capture device configuration that can be applied to other
+devices of the same model. This enables consistent configuration
+across multiple devices and easy provisioning.
+
+Templates store:
+  - Device configuration (WiFi excluded by default)
+  - Component settings (switches, lights, covers, etc.)
+  - Schedules, scripts, and webhooks
+  - Network settings (optional)
+
+### Examples
+
+```
+  # List all templates
+  shelly template list
+
+  # Create a template from a device
+  shelly template create my-config living-room
+
+  # Apply a template to a device
+  shelly template apply my-config bedroom
+
+  # Preview changes without applying
+  shelly template diff my-config bedroom
+
+  # Export template to file
+  shelly template export my-config template.yaml
+
+  # Import template from file
+  shelly template import template.yaml
+```
+
+### Options
+
+```
+  -h, --help   help for template
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly template apply](shelly_template_apply.md)	 - Apply a template to a device
+* [shelly template create](shelly_template_create.md)	 - Create a template from a device
+* [shelly template delete](shelly_template_delete.md)	 - Delete a template
+* [shelly template diff](shelly_template_diff.md)	 - Compare a template with a device
+* [shelly template export](shelly_template_export.md)	 - Export a template to a file
+* [shelly template import](shelly_template_import.md)	 - Import a template from a file
+* [shelly template list](shelly_template_list.md)	 - List templates
+

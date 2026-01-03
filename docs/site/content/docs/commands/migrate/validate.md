@@ -1,0 +1,52 @@
+---
+title: "shelly migrate validate"
+description: "shelly migrate validate"
+---
+
+## shelly migrate validate
+
+Validate a backup file
+
+### Synopsis
+
+Validate a backup file for structural integrity.
+
+Checks that the backup file is properly formatted and contains
+all required fields.
+
+```
+shelly migrate validate <backup-file> [flags]
+```
+
+### Examples
+
+```
+  # Validate a backup file
+  shelly migrate validate backup.json
+```
+
+### Options
+
+```
+  -h, --help   help for validate
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly migrate](shelly_migrate.md)	 - Migrate configuration between devices
+

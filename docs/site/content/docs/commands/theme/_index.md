@@ -1,0 +1,83 @@
+---
+title: "shelly theme"
+description: "shelly theme"
+weight: 640
+sidebar:
+  collapsed: true
+---
+
+## shelly theme
+
+Manage CLI color themes
+
+### Synopsis
+
+Manage CLI color themes using bubbletint.
+
+The Shelly CLI supports 280+ built-in terminal color themes. Themes affect
+all CLI output including tables, status indicators, and the TUI dashboard.
+
+Popular themes include:
+  - dracula (default)
+  - nord
+  - tokyo-night
+  - github-dark
+  - gruvbox
+  - catppuccin
+  - one-dark
+  - solarized
+
+### Examples
+
+```
+  # List all available themes
+  shelly theme list
+
+  # Set a theme
+  shelly theme set nord
+
+  # Preview a theme
+  shelly theme preview tokyo-night
+
+  # Show current theme
+  shelly theme current
+
+  # Cycle through themes
+  shelly theme next
+  shelly theme prev
+```
+
+### Options
+
+```
+  -h, --help   help for theme
+```
+
+### Options inherited from parent commands
+
+```
+      --config string           Config file (default $HOME/.config/shelly/config.yaml)
+      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+      --log-json                Output logs in JSON format
+      --no-color                Disable colored output
+      --no-headers              Hide table headers in output
+  -o, --output string           Output format (table, json, yaml, template) (default "table")
+      --plain                   Disable borders and colors (machine-readable output)
+  -q, --quiet                   Suppress non-essential output
+      --template string         Go template string for output (use with -o template)
+  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+```
+
+### SEE ALSO
+
+* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly theme current](shelly_theme_current.md)	 - Show current theme
+* [shelly theme export](shelly_theme_export.md)	 - Export current theme
+* [shelly theme import](shelly_theme_import.md)	 - Import theme from file
+* [shelly theme list](shelly_theme_list.md)	 - List available themes
+* [shelly theme next](shelly_theme_next.md)	 - Cycle to next theme
+* [shelly theme prev](shelly_theme_prev.md)	 - Cycle to previous theme
+* [shelly theme preview](shelly_theme_preview.md)	 - Preview a theme
+* [shelly theme semantic](shelly_theme_semantic.md)	 - Show semantic color mappings
+* [shelly theme set](shelly_theme_set.md)	 - Set the current theme
+
