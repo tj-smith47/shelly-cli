@@ -7,7 +7,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/github"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/term"
 	"github.com/tj-smith47/shelly-cli/internal/version"
 )
@@ -76,6 +79,22 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	term.DisplayVersionInfo(ios, info.Version, info.Commit, info.Date, info.BuiltBy, info.GoVersion, info.OS, info.Arch)
+
+	// Show cache info when verbose (-v)
+	if iostreams.IsVerbose() { //nolint:nestif // nested ifs for optional cache info with early-exit on errors
+		if cacheDir, err := config.CacheDir(); err == nil {
+			if fc := opts.Factory.FileCache(); fc != nil {
+				if stats, err := fc.Stats(); err == nil {
+					term.DisplayCacheInfo(ios, term.CacheInfo{
+						Location:    cacheDir,
+						Entries:     stats.TotalEntries,
+						Size:        output.FormatSize(stats.TotalSize),
+						DeviceCount: stats.DeviceCount,
+					})
+				}
+			}
+		}
+	}
 
 	if opts.CheckUpdate {
 		term.RunUpdateCheck(ctx, ios, checker)
