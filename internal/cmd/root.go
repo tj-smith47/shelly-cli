@@ -222,6 +222,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("log-json", false, "Output logs in JSON format")
 	rootCmd.PersistentFlags().String("log-categories", "", "Filter logs by category (comma-separated: network,api,device,config,auth,plugin)")
 	rootCmd.PersistentFlags().Bool("refresh", false, "Bypass cache and fetch fresh data from device")
+	rootCmd.PersistentFlags().Bool("offline", false, "Only read from cache, error on cache miss")
 
 	// Bind to viper - errors indicate programming bugs, panic is appropriate
 	utils.Must(viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output")))
@@ -234,6 +235,7 @@ func init() {
 	utils.Must(viper.BindPFlag("log.json", rootCmd.PersistentFlags().Lookup("log-json")))
 	utils.Must(viper.BindPFlag("log.categories", rootCmd.PersistentFlags().Lookup("log-categories")))
 	utils.Must(viper.BindPFlag("refresh", rootCmd.PersistentFlags().Lookup("refresh")))
+	utils.Must(viper.BindPFlag("offline", rootCmd.PersistentFlags().Lookup("offline")))
 
 	// Define command groups for organized help output
 	rootCmd.AddGroup(

@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -68,11 +69,18 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %q...", opts.Key), func(ctx context.Context) error {
-		if err := kvsSvc.Delete(ctx, opts.Device, opts.Key); err != nil {
-			return err
+	err = cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %q...", opts.Key), func(ctx context.Context) error {
+		if deleteErr := kvsSvc.Delete(ctx, opts.Device, opts.Key); deleteErr != nil {
+			return deleteErr
 		}
 		ios.Success("Key %q deleted", opts.Key)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached KVS list
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeKVS)
+	return nil
 }

@@ -1,48 +1,55 @@
 package config
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
-func TestSaveSyncConfig(t *testing.T) {
-	t.Parallel()
+const testSyncDir = "/test/sync"
 
-	tmpDir := t.TempDir()
+//nolint:paralleltest // Test modifies global state via SetFs
+func TestSaveSyncConfig(t *testing.T) {
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+
+	syncDir := testSyncDir
 	cfg := map[string]any{
 		"setting1": "value1",
 		"setting2": float64(42),
 		"setting3": true,
 	}
 
-	if err := SaveSyncConfig(tmpDir, "device1", cfg); err != nil {
+	if err := SaveSyncConfig(syncDir, "device1", cfg); err != nil {
 		t.Fatalf("SaveSyncConfig() error: %v", err)
 	}
 
 	// Verify file was created
-	expectedPath := filepath.Join(tmpDir, "device1.json")
-	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-		t.Errorf("expected file %s to exist", expectedPath)
+	expectedPath := filepath.Join(syncDir, "device1.json")
+	if _, err := Fs().Stat(expectedPath); err != nil {
+		t.Errorf("expected file %s to exist: %v", expectedPath, err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestLoadSyncConfig(t *testing.T) {
-	t.Parallel()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
-	tmpDir := t.TempDir()
+	syncDir := testSyncDir
 
 	// Save a config first
 	original := map[string]any{
 		"setting1": "value1",
 		"setting2": float64(42),
 	}
-	if err := SaveSyncConfig(tmpDir, "device1", original); err != nil {
+	if err := SaveSyncConfig(syncDir, "device1", original); err != nil {
 		t.Fatalf("SaveSyncConfig() error: %v", err)
 	}
 
 	// Load it back
-	loaded, err := LoadSyncConfig(tmpDir, "device1.json")
+	loaded, err := LoadSyncConfig(syncDir, "device1.json")
 	if err != nil {
 		t.Fatalf("LoadSyncConfig() error: %v", err)
 	}
@@ -55,52 +62,64 @@ func TestLoadSyncConfig(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestLoadSyncConfig_NotFound(t *testing.T) {
-	t.Parallel()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
-	tmpDir := t.TempDir()
+	syncDir := testSyncDir
 
-	_, err := LoadSyncConfig(tmpDir, "nonexistent.json")
+	_, err := LoadSyncConfig(syncDir, "nonexistent.json")
 	if err == nil {
 		t.Error("expected error loading nonexistent config")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestLoadSyncConfig_InvalidJSON(t *testing.T) {
-	t.Parallel()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	invalidPath := filepath.Join(tmpDir, "invalid.json")
+	syncDir := testSyncDir
+	invalidPath := filepath.Join(syncDir, "invalid.json")
 
-	// Write invalid JSON
-	if err := os.WriteFile(invalidPath, []byte("not valid json"), 0o600); err != nil {
+	// Create directory and write invalid JSON
+	if err := Fs().MkdirAll(syncDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	if err := afero.WriteFile(Fs(), invalidPath, []byte("not valid json"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
-	_, err := LoadSyncConfig(tmpDir, "invalid.json")
+	_, err := LoadSyncConfig(syncDir, "invalid.json")
 	if err == nil {
 		t.Error("expected error loading invalid JSON")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestSaveSyncConfig_MarshalError(t *testing.T) {
-	t.Parallel()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
-	tmpDir := t.TempDir()
+	syncDir := testSyncDir
 
 	// Channels cannot be marshaled to JSON
 	cfg := map[string]any{
 		"channel": make(chan int),
 	}
 
-	err := SaveSyncConfig(tmpDir, "device1", cfg)
+	err := SaveSyncConfig(syncDir, "device1", cfg)
 	if err == nil {
 		t.Error("expected error marshaling unmarshalable value")
 	}
 }
 
-//nolint:paralleltest // Test creates a real directory (not parallel-safe)
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestGetSyncDir(t *testing.T) {
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+
 	syncDir, err := GetSyncDir()
 	if err != nil {
 		t.Fatalf("GetSyncDir() error: %v", err)
@@ -110,23 +129,27 @@ func TestGetSyncDir(t *testing.T) {
 		t.Error("GetSyncDir() returned empty string")
 	}
 
-	// Verify directory exists
-	if stat, err := os.Stat(syncDir); err != nil {
+	// Verify directory exists in afero filesystem
+	if stat, err := Fs().Stat(syncDir); err != nil {
 		t.Errorf("sync directory should exist: %v", err)
 	} else if !stat.IsDir() {
 		t.Error("sync directory should be a directory")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestSaveSyncConfig_WriteError(t *testing.T) {
-	t.Parallel()
+	// Use a read-only filesystem to force write failure
+	baseFs := afero.NewMemMapFs()
+	roFs := afero.NewReadOnlyFs(baseFs)
+	SetFs(roFs)
+	t.Cleanup(func() { SetFs(nil) })
 
-	// Use a path that doesn't exist as a directory
-	nonExistentDir := "/nonexistent/path/to/sync"
+	syncDir := testSyncDir
 	cfg := map[string]any{"test": "value"}
 
-	err := SaveSyncConfig(nonExistentDir, "device1", cfg)
+	err := SaveSyncConfig(syncDir, "device1", cfg)
 	if err == nil {
-		t.Error("expected error writing to non-existent directory")
+		t.Error("expected error writing to read-only filesystem")
 	}
 }

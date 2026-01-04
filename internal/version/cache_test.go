@@ -3,10 +3,12 @@ package version
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 const (
@@ -49,9 +51,9 @@ func containsHelper(s, substr string) bool {
 }
 
 func TestWriteCache_ReadCachedVersion(t *testing.T) {
-	// Create a temp directory for the test cache
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
 
 	// Write a version to cache
 	testVersion := "1.2.3"
@@ -68,9 +70,9 @@ func TestWriteCache_ReadCachedVersion(t *testing.T) {
 }
 
 func TestReadCachedVersion_NoCache(t *testing.T) {
-	// Create a temp directory with no cache file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
 
 	// Should return empty string when no cache exists
 	cached := ReadCachedVersion()
@@ -80,24 +82,27 @@ func TestReadCachedVersion_NoCache(t *testing.T) {
 }
 
 func TestReadCachedVersion_StaleCache(t *testing.T) {
-	// Create a temp directory for the test cache
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	const testHome = "/test/home"
+	t.Setenv("HOME", testHome)
 
 	// Manually create a cache file
-	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
-	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+	cachePath := testHome + "/.config/shelly/cache"
+	if err := fs.MkdirAll(cachePath, 0o750); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
 
-	cacheFile := filepath.Join(cachePath, "latest-version")
-	if err := os.WriteFile(cacheFile, []byte("1.0.0"), 0o600); err != nil {
+	cacheFile := cachePath + "/latest-version"
+	if err := afero.WriteFile(fs, cacheFile, []byte("1.0.0"), 0o600); err != nil {
 		t.Fatalf("failed to write cache file: %v", err)
 	}
 
 	// Set the file modification time to 25 hours ago (stale)
 	staleTime := time.Now().Add(-25 * time.Hour)
-	if err := os.Chtimes(cacheFile, staleTime, staleTime); err != nil {
+	if err := fs.Chtimes(cacheFile, staleTime, staleTime); err != nil {
 		t.Fatalf("failed to set mtime: %v", err)
 	}
 
@@ -145,9 +150,9 @@ func TestCheckForUpdates_EmptyVersion(t *testing.T) {
 }
 
 func TestCheckForUpdates_UpdateAvailable(t *testing.T) {
-	// Use temp dir to avoid affecting real cache
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
 
 	fetcher := func(_ context.Context) (string, error) {
 		return testVersion2, nil
@@ -177,9 +182,9 @@ func TestCheckForUpdates_UpdateAvailable(t *testing.T) {
 }
 
 func TestCheckForUpdates_NoUpdate(t *testing.T) {
-	// Use temp dir to avoid affecting real cache
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
 
 	fetcher := func(_ context.Context) (string, error) {
 		return testVersion1, nil

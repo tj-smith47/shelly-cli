@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
@@ -78,9 +79,9 @@ func run(ctx context.Context, opts *Options) error {
 		enable = &t
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Configuring MQTT...", func(ctx context.Context) error {
-		if err := svc.SetMQTTConfig(ctx, opts.Device, enable, opts.Server, opts.User, opts.Password, opts.TopicPrefix); err != nil {
-			return fmt.Errorf("failed to configure MQTT: %w", err)
+	err := cmdutil.RunWithSpinner(ctx, ios, "Configuring MQTT...", func(ctx context.Context) error {
+		if setErr := svc.SetMQTTConfig(ctx, opts.Device, enable, opts.Server, opts.User, opts.Password, opts.TopicPrefix); setErr != nil {
+			return fmt.Errorf("failed to configure MQTT: %w", setErr)
 		}
 		ios.Success("MQTT configured on %s", opts.Device)
 		if opts.Server != "" {
@@ -88,4 +89,11 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached MQTT status
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeMQTT)
+	return nil
 }

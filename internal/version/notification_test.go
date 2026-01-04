@@ -2,8 +2,11 @@ package version
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 func TestShowUpdateNotification_EnvDisabled(t *testing.T) {
@@ -14,29 +17,31 @@ func TestShowUpdateNotification_EnvDisabled(t *testing.T) {
 	// We just verify it doesn't panic
 	ShowUpdateNotification()
 }
-
 func TestShowUpdateNotification_NoCache(t *testing.T) {
-	// Create a temp directory with no cache
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	// Create a virtual home with no cache
+	t.Setenv("HOME", "/test/home")
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Should not panic with no cache
 	ShowUpdateNotification()
 }
-
 func TestShowUpdateNotification_DevBuild(t *testing.T) {
-	// Create a temp directory with a cache file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	const testHome = "/test/home"
+	t.Setenv("HOME", testHome)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Create cache with a version
-	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
-	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+	cachePath := testHome + "/.config/shelly/cache"
+	if err := config.Fs().MkdirAll(cachePath, 0o750); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("2.0.0"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), cachePath+"/latest-version", []byte("2.0.0"), 0o600); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
@@ -48,19 +53,20 @@ func TestShowUpdateNotification_DevBuild(t *testing.T) {
 	// Should return early for dev builds without panic
 	ShowUpdateNotification()
 }
-
 func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
-	// Create a temp directory with a cache file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	const testHome = "/test/home"
+	t.Setenv("HOME", testHome)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Create cache with a newer version
-	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
-	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+	cachePath := testHome + "/.config/shelly/cache"
+	if err := config.Fs().MkdirAll(cachePath, 0o750); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("2.0.0"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), cachePath+"/latest-version", []byte("2.0.0"), 0o600); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
@@ -70,7 +76,7 @@ func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
 
 	// Test skipped commands
 	skippedCommands := []string{"version", "update", "completion", "help"}
-	//nolint:paralleltest // Subtests cannot run in parallel as they modify global os.Args
+	//nolint:paralleltest // Subtests modify global os.Args and can't run in parallel
 	for _, cmd := range skippedCommands {
 		t.Run("skip_"+cmd, func(t *testing.T) {
 			os.Args = []string{"shelly", cmd}
@@ -79,11 +85,11 @@ func TestShowUpdateNotification_SkippedCommands(t *testing.T) {
 		})
 	}
 }
-
 func TestShowUpdateNotification_NoArgs(t *testing.T) {
-	// Create a temp directory with a cache file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	t.Setenv("HOME", "/test/home")
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Save original args
@@ -96,19 +102,20 @@ func TestShowUpdateNotification_NoArgs(t *testing.T) {
 	// Should not panic with no args
 	ShowUpdateNotification()
 }
-
 func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
-	// Create a temp directory with a cache file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	const testHome = "/test/home"
+	t.Setenv("HOME", testHome)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Create cache with a newer version
-	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
-	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+	cachePath := testHome + "/.config/shelly/cache"
+	if err := config.Fs().MkdirAll(cachePath, 0o750); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("99.0.0"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), cachePath+"/latest-version", []byte("99.0.0"), 0o600); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
@@ -128,19 +135,20 @@ func TestShowUpdateNotification_UpdateAvailable(t *testing.T) {
 	// (we can't easily verify the output, but we ensure it doesn't panic)
 	ShowUpdateNotification()
 }
-
 func TestShowUpdateNotification_EmptyVersion(t *testing.T) {
-	// Create a temp directory with a cache file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	const testHome = "/test/home"
+	t.Setenv("HOME", testHome)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Create cache with a version
-	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
-	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+	cachePath := testHome + "/.config/shelly/cache"
+	if err := config.Fs().MkdirAll(cachePath, 0o750); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("2.0.0"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), cachePath+"/latest-version", []byte("2.0.0"), 0o600); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 
@@ -152,19 +160,20 @@ func TestShowUpdateNotification_EmptyVersion(t *testing.T) {
 	// Should return early for empty version
 	ShowUpdateNotification()
 }
-
 func TestShowUpdateNotification_NoUpdate(t *testing.T) {
-	// Create a temp directory with a cache file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	const testHome = "/test/home"
+	t.Setenv("HOME", testHome)
 	t.Setenv("SHELLY_NO_UPDATE_CHECK", "")
 
 	// Create cache with same version (no update)
-	cachePath := filepath.Join(tmpDir, ".config", "shelly", "cache")
-	if err := os.MkdirAll(cachePath, 0o750); err != nil {
+	cachePath := testHome + "/.config/shelly/cache"
+	if err := config.Fs().MkdirAll(cachePath, 0o750); err != nil {
 		t.Fatalf("failed to create cache dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cachePath, "latest-version"), []byte("1.0.0"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), cachePath+"/latest-version", []byte("1.0.0"), 0o600); err != nil {
 		t.Fatalf("failed to write cache: %v", err)
 	}
 

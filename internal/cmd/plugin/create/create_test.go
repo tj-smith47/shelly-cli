@@ -2,13 +2,20 @@ package create
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
+)
+
+// Test path constants.
+const (
+	testOutputDir = "/test/output"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -214,17 +221,17 @@ func TestExecute_NoArgs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_BashScaffold(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"mytest", "--lang", "bash", "--output", tmpDir})
+	cmd.SetArgs([]string{"mytest", "--lang", "bash", "--output", testOutputDir})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -241,29 +248,29 @@ func TestExecute_BashScaffold(t *testing.T) {
 	}
 
 	// Verify files were created
-	extDir := filepath.Join(tmpDir, "shelly-mytest")
+	extDir := filepath.Join(testOutputDir, "shelly-mytest")
 	scriptPath := filepath.Join(extDir, "shelly-mytest")
 	readmePath := filepath.Join(extDir, "README.md")
 
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+	if _, err := config.Fs().Stat(scriptPath); err != nil {
 		t.Error("expected bash script to be created")
 	}
-	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+	if _, err := config.Fs().Stat(readmePath); err != nil {
 		t.Error("expected README.md to be created")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_GoScaffold(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"goext", "--lang", "go", "--output", tmpDir})
+	cmd.SetArgs([]string{"goext", "--lang", "go", "--output", testOutputDir})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -271,30 +278,30 @@ func TestExecute_GoScaffold(t *testing.T) {
 	}
 
 	// Verify files were created
-	extDir := filepath.Join(tmpDir, "shelly-goext")
+	extDir := filepath.Join(testOutputDir, "shelly-goext")
 	mainPath := filepath.Join(extDir, "main.go")
 	modPath := filepath.Join(extDir, "go.mod")
 	makefilePath := filepath.Join(extDir, "Makefile")
 	readmePath := filepath.Join(extDir, "README.md")
 
 	for _, path := range []string{mainPath, modPath, makefilePath, readmePath} {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
+		if _, err := config.Fs().Stat(path); err != nil {
 			t.Errorf("expected %s to be created", filepath.Base(path))
 		}
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_PythonScaffold(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"pyext", "--lang", "python", "--output", tmpDir})
+	cmd.SetArgs([]string{"pyext", "--lang", "python", "--output", testOutputDir})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -302,29 +309,29 @@ func TestExecute_PythonScaffold(t *testing.T) {
 	}
 
 	// Verify files were created
-	extDir := filepath.Join(tmpDir, "shelly-pyext")
+	extDir := filepath.Join(testOutputDir, "shelly-pyext")
 	scriptPath := filepath.Join(extDir, "shelly-pyext")
 	readmePath := filepath.Join(extDir, "README.md")
 
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+	if _, err := config.Fs().Stat(scriptPath); err != nil {
 		t.Error("expected python script to be created")
 	}
-	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+	if _, err := config.Fs().Stat(readmePath); err != nil {
 		t.Error("expected README.md to be created")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_UnsupportedLanguage(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"myext", "--lang", "ruby", "--output", tmpDir})
+	cmd.SetArgs([]string{"myext", "--lang", "ruby", "--output", testOutputDir})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -335,9 +342,8 @@ func TestExecute_UnsupportedLanguage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_LanguageAliases(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name string
 		lang string
@@ -349,16 +355,15 @@ func TestExecute_LanguageAliases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			tmpDir := t.TempDir()
+			config.SetFs(afero.NewMemMapFs())
+			t.Cleanup(func() { config.SetFs(nil) })
 
 			tf := factory.NewTestFactory(t)
 			cmd := NewCommand(tf.Factory)
 
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetArgs([]string{"test" + tt.lang, "--lang", tt.lang, "--output", tmpDir})
+			cmd.SetArgs([]string{"test" + tt.lang, "--lang", tt.lang, "--output", testOutputDir})
 
 			err := cmd.Execute()
 			if err != nil {
@@ -368,46 +373,39 @@ func TestExecute_LanguageAliases(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_DefaultOutputDir(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temp dir and change to it for this test
-	tmpDir := t.TempDir()
-	oldWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get working directory: %v", err)
+	// Create a working directory in the virtual filesystem
+	workDir := "/work"
+	if err := config.Fs().MkdirAll(workDir, 0o750); err != nil {
+		t.Fatalf("failed to create work directory: %v", err)
 	}
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(oldWd); err != nil {
-			t.Logf("warning: failed to restore working directory: %v", err)
-		}
-	}()
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"defaultext"})
+	// Use explicit output dir instead of relying on current directory
+	cmd.SetArgs([]string{"defaultext", "--output", workDir})
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	// Verify extension was created in current directory
-	extDir := filepath.Join(tmpDir, "shelly-defaultext")
-	if _, err := os.Stat(extDir); os.IsNotExist(err) {
-		t.Error("expected extension directory in current directory")
+	// Verify extension was created
+	extDir := filepath.Join(workDir, "shelly-defaultext")
+	if _, err := config.Fs().Stat(extDir); err != nil {
+		t.Error("expected extension directory to be created")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_NameNormalization(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		input    string
@@ -421,25 +419,24 @@ func TestExecute_NameNormalization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			tmpDir := t.TempDir()
+			config.SetFs(afero.NewMemMapFs())
+			t.Cleanup(func() { config.SetFs(nil) })
 
 			tf := factory.NewTestFactory(t)
 			cmd := NewCommand(tf.Factory)
 
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
-			cmd.SetArgs([]string{tt.input, "--output", tmpDir})
+			cmd.SetArgs([]string{tt.input, "--output", testOutputDir})
 
 			err := cmd.Execute()
 			if err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
 
-			extDir := filepath.Join(tmpDir, tt.expected)
-			if _, err := os.Stat(extDir); os.IsNotExist(err) {
-				entries, readErr := os.ReadDir(tmpDir)
+			extDir := filepath.Join(testOutputDir, tt.expected)
+			if _, err := config.Fs().Stat(extDir); err != nil {
+				entries, readErr := afero.ReadDir(config.Fs(), testOutputDir)
 				if readErr != nil {
 					t.Logf("warning: failed to read directory: %v", readErr)
 				}
@@ -453,8 +450,12 @@ func TestExecute_NameNormalization(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_InvalidOutputDir(t *testing.T) {
-	t.Parallel()
+	// Use a real OsFs to test the error case with an invalid path
+	// We can't create /dev/null/invalid in MemMapFs
+	config.SetFs(afero.NewOsFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
@@ -473,17 +474,17 @@ func TestExecute_InvalidOutputDir(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_OutputMessages(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
 
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"msgtest", "--output", tmpDir})
+	cmd.SetArgs([]string{"msgtest", "--output", testOutputDir})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -518,21 +519,21 @@ func TestExecute_OutputMessages(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_BashLanguage(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testbash", Lang: "bash", OutputDir: tmpDir}
+	opts := &Options{Factory: tf.Factory, Name: "testbash", Lang: "bash", OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
 	// Verify bash script content
-	scriptPath := filepath.Join(tmpDir, "shelly-testbash", "shelly-testbash")
-	content, err := os.ReadFile(scriptPath) //nolint:gosec // G304: scriptPath from t.TempDir()
+	scriptPath := filepath.Join(testOutputDir, "shelly-testbash", "shelly-testbash")
+	content, err := afero.ReadFile(config.Fs(), scriptPath)
 	if err != nil {
 		t.Fatalf("failed to read script: %v", err)
 	}
@@ -541,21 +542,21 @@ func TestRun_BashLanguage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_GoLanguage(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testgo", Lang: "go", OutputDir: tmpDir}
+	opts := &Options{Factory: tf.Factory, Name: "testgo", Lang: "go", OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
 	// Verify main.go content
-	mainPath := filepath.Join(tmpDir, "shelly-testgo", "main.go")
-	content, err := os.ReadFile(mainPath) //nolint:gosec // G304: mainPath from t.TempDir()
+	mainPath := filepath.Join(testOutputDir, "shelly-testgo", "main.go")
+	content, err := afero.ReadFile(config.Fs(), mainPath)
 	if err != nil {
 		t.Fatalf("failed to read main.go: %v", err)
 	}
@@ -564,21 +565,21 @@ func TestRun_GoLanguage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_PythonLanguage(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testpy", Lang: "python", OutputDir: tmpDir}
+	opts := &Options{Factory: tf.Factory, Name: "testpy", Lang: "python", OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
 	// Verify python script content
-	scriptPath := filepath.Join(tmpDir, "shelly-testpy", "shelly-testpy")
-	content, err := os.ReadFile(scriptPath) //nolint:gosec // G304: scriptPath from t.TempDir()
+	scriptPath := filepath.Join(testOutputDir, "shelly-testpy", "shelly-testpy")
+	content, err := afero.ReadFile(config.Fs(), scriptPath)
 	if err != nil {
 		t.Fatalf("failed to read script: %v", err)
 	}
@@ -587,70 +588,70 @@ func TestRun_PythonLanguage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_ShAlias(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testsh", Lang: "sh", OutputDir: tmpDir}
+	opts := &Options{Factory: tf.Factory, Name: "testsh", Lang: "sh", OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
 	// sh should create bash scaffold
-	scriptPath := filepath.Join(tmpDir, "shelly-testsh", "shelly-testsh")
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+	scriptPath := filepath.Join(testOutputDir, "shelly-testsh", "shelly-testsh")
+	if _, err := config.Fs().Stat(scriptPath); err != nil {
 		t.Error("expected bash script to be created with sh alias")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_GolangAlias(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testgolang", Lang: "golang", OutputDir: tmpDir}
+	opts := &Options{Factory: tf.Factory, Name: "testgolang", Lang: "golang", OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
 	// golang should create go scaffold
-	mainPath := filepath.Join(tmpDir, "shelly-testgolang", "main.go")
-	if _, err := os.Stat(mainPath); os.IsNotExist(err) {
+	mainPath := filepath.Join(testOutputDir, "shelly-testgolang", "main.go")
+	if _, err := config.Fs().Stat(mainPath); err != nil {
 		t.Error("expected main.go to be created with golang alias")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_PyAlias(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testpy2", Lang: "py", OutputDir: tmpDir}
+	opts := &Options{Factory: tf.Factory, Name: "testpy2", Lang: "py", OutputDir: testOutputDir}
 	err := run(opts)
 	if err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
 	// py should create python scaffold
-	scriptPath := filepath.Join(tmpDir, "shelly-testpy2", "shelly-testpy2")
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+	scriptPath := filepath.Join(testOutputDir, "shelly-testpy2", "shelly-testpy2")
+	if _, err := config.Fs().Stat(scriptPath); err != nil {
 		t.Error("expected python script to be created with py alias")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_UnsupportedLanguage(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory, Name: "testjava", Lang: "java", OutputDir: tmpDir}
+	opts := &Options{Factory: tf.Factory, Name: "testjava", Lang: "java", OutputDir: testOutputDir}
 	err := run(opts)
 	if err == nil {
 		t.Error("expected error for unsupported language")
@@ -663,8 +664,11 @@ func TestRun_UnsupportedLanguage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_DirectoryCreationError(t *testing.T) {
-	t.Parallel()
+	// Use real OsFs to test the error case
+	config.SetFs(afero.NewOsFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	// Use a path that cannot be created

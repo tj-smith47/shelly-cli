@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -341,4 +343,177 @@ func PrintListResult[T any](ios *iostreams.IOStreams, items []T, display ListDis
 		display(ios, items)
 		return nil
 	}
+}
+
+// RunCachedDeviceStatus executes a device status fetch with cache integration.
+// It checks cache first (unless --refresh), fetches if miss, and caches the result.
+// Respects --offline flag (cache only mode).
+func RunCachedDeviceStatus[T any](
+	ctx context.Context,
+	f *Factory,
+	device string,
+	cacheType string,
+	cacheTTL time.Duration,
+	spinnerMsg string,
+	fetcher DeviceStatusFetcher[T],
+	display StatusDisplay[T],
+) error {
+	// Check for flag conflict early
+	if err := CheckCacheFlags(); err != nil {
+		return err
+	}
+
+	ios := f.IOStreams()
+	svc := f.ShellyService()
+
+	result, err := CachedFetch(ctx, f, device, cacheType, cacheTTL, func(ctx context.Context) (T, error) {
+		// Only show spinner for fresh fetches
+		return RunWithSpinnerResult(ctx, ios, spinnerMsg, func(ctx context.Context) (T, error) {
+			return fetcher(ctx, svc, device)
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	return PrintResult(ios, result.Data, display)
+}
+
+// RunCachedList executes a list fetch with cache integration.
+// It checks cache first (unless --refresh), fetches if miss, and caches the result.
+// Respects --offline flag (cache only mode).
+func RunCachedList[T any](
+	ctx context.Context,
+	f *Factory,
+	device string,
+	cacheType string,
+	cacheTTL time.Duration,
+	spinnerMsg string,
+	emptyMsg string,
+	fetcher ListFetcher[T],
+	display ListDisplay[T],
+) error {
+	// Check for flag conflict early
+	if err := CheckCacheFlags(); err != nil {
+		return err
+	}
+
+	ios := f.IOStreams()
+	svc := f.ShellyService()
+
+	result, err := CachedFetchList(ctx, f, device, cacheType, cacheTTL, func(ctx context.Context) ([]T, error) {
+		// Only show spinner for fresh fetches
+		return RunWithSpinnerResult(ctx, ios, spinnerMsg, func(ctx context.Context) ([]T, error) {
+			return fetcher(ctx, svc, device)
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(result.Data) == 0 {
+		ios.NoResults(emptyMsg)
+		return nil
+	}
+
+	return PrintListResult(ios, result.Data, display)
+}
+
+// RunCachedStatus executes a component status fetch with cache integration.
+// Similar to RunCachedDeviceStatus but includes component ID.
+func RunCachedStatus[T any](
+	ctx context.Context,
+	f *Factory,
+	device string,
+	componentID int,
+	cacheType string,
+	cacheTTL time.Duration,
+	spinnerMsg string,
+	fetcher StatusFetcher[T],
+	display StatusDisplay[T],
+) error {
+	// Check for flag conflict early
+	if err := CheckCacheFlags(); err != nil {
+		return err
+	}
+
+	ios := f.IOStreams()
+	svc := f.ShellyService()
+
+	// Include component ID in cache key
+	cacheKey := fmt.Sprintf("%s:%d", cacheType, componentID)
+
+	result, err := CachedFetch(ctx, f, device, cacheKey, cacheTTL, func(ctx context.Context) (T, error) {
+		return RunWithSpinnerResult(ctx, ios, spinnerMsg, func(ctx context.Context) (T, error) {
+			return fetcher(ctx, svc, device, componentID)
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	return PrintResult(ios, result.Data, display)
+}
+
+// InvalidateCacheAfterMutation invalidates the appropriate cache after a mutation.
+// Call this after successful create/update/delete operations.
+func InvalidateCacheAfterMutation(f *Factory, device, cacheType string) {
+	fc := f.FileCache()
+	if fc == nil {
+		return
+	}
+
+	if err := fc.Invalidate(device, cacheType); err != nil {
+		f.IOStreams().DebugErr("invalidate cache "+cacheType, err)
+	}
+}
+
+// InvalidateCacheTypes invalidates multiple cache types for a device.
+// Useful when a mutation affects multiple cached data types.
+func InvalidateCacheTypes(f *Factory, device string, cacheTypes ...string) {
+	fc := f.FileCache()
+	if fc == nil {
+		return
+	}
+
+	for _, cacheType := range cacheTypes {
+		if err := fc.Invalidate(device, cacheType); err != nil {
+			f.IOStreams().DebugErr("invalidate cache "+cacheType, err)
+		}
+	}
+}
+
+// CacheTypes provides access to cache type constants for convenience.
+var CacheTypes = struct {
+	Firmware   string
+	System     string
+	WiFi       string
+	Security   string
+	Cloud      string
+	BLE        string
+	MQTT       string
+	Schedules  string
+	Webhooks   string
+	Virtuals   string
+	Inputs     string
+	KVS        string
+	Scripts    string
+	DeviceInfo string
+	Components string
+}{
+	Firmware:   cache.TypeFirmware,
+	System:     cache.TypeSystem,
+	WiFi:       cache.TypeWiFi,
+	Security:   cache.TypeSecurity,
+	Cloud:      cache.TypeCloud,
+	BLE:        cache.TypeBLE,
+	MQTT:       cache.TypeMQTT,
+	Schedules:  cache.TypeSchedules,
+	Webhooks:   cache.TypeWebhooks,
+	Virtuals:   cache.TypeVirtuals,
+	Inputs:     cache.TypeInputs,
+	KVS:        cache.TypeKVS,
+	Scripts:    cache.TypeScripts,
+	DeviceInfo: cache.TypeDeviceInfo,
+	Components: cache.TypeComponents,
 }

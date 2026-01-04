@@ -53,6 +53,7 @@ Check for updates, update to the latest version, or rollback to a previous versi
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
+      --offline                 Only read from cache, error on cache miss
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output

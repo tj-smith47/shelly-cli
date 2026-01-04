@@ -11,6 +11,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
+const testDeviceName = "test-device"
+
 func TestNewComponentCommand_On(t *testing.T) {
 	t.Parallel()
 
@@ -59,7 +61,7 @@ func TestNewComponentCommand_On(t *testing.T) {
 	}
 
 	// Execute command
-	cmd.SetArgs([]string{"test-device"})
+	cmd.SetArgs([]string{testDeviceName})
 	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Execute() error = %v", err)
@@ -68,8 +70,8 @@ func TestNewComponentCommand_On(t *testing.T) {
 	if !actionCalled {
 		t.Error("action should have been called")
 	}
-	if receivedDevice != "test-device" {
-		t.Errorf("device = %q, want %q", receivedDevice, "test-device")
+	if receivedDevice != testDeviceName {
+		t.Errorf("device = %q, want %q", receivedDevice, testDeviceName)
 	}
 	if receivedID != 0 {
 		t.Errorf("id = %d, want 0 (default)", receivedID)

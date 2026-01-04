@@ -3,16 +3,22 @@ package list
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+)
+
+// Test path constants.
+const (
+	testBackupDir = "/test/backups"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -69,8 +75,10 @@ func TestNewCommand_OptionalArgs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_DirectoryNotExist(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -79,7 +87,7 @@ func TestRun_DirectoryNotExist(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	cmd := NewCommand(f)
-	nonExistentDir := filepath.Join(t.TempDir(), "nonexistent", "backups")
+	nonExistentDir := "/nonexistent/backups"
 	cmd.SetArgs([]string{nonExistentDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
@@ -95,8 +103,10 @@ func TestRun_DirectoryNotExist(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_NotADirectory(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -105,9 +115,8 @@ func TestRun_NotADirectory(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	// Create a file instead of directory
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "not-a-directory")
-	if err := os.WriteFile(filePath, []byte("test"), 0o600); err != nil {
+	filePath := "/test/not-a-directory"
+	if err := afero.WriteFile(config.Fs(), filePath, []byte("test"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -126,8 +135,10 @@ func TestRun_NotADirectory(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_EmptyDirectory(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -135,9 +146,13 @@ func TestRun_EmptyDirectory(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	// Create empty directory
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -152,8 +167,10 @@ func TestRun_EmptyDirectory(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_DirectoryWithNonBackupFiles(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -161,18 +178,19 @@ func TestRun_DirectoryWithNonBackupFiles(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-
-	// Create non-backup files
-	if err := os.WriteFile(filepath.Join(tmpDir, "readme.txt"), []byte("readme"), 0o600); err != nil {
+	// Create directory with non-backup files
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+	if err := afero.WriteFile(config.Fs(), filepath.Join(testBackupDir, "readme.txt"), []byte("readme"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "config.toml"), []byte("toml"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filepath.Join(testBackupDir, "config.toml"), []byte("toml"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -211,13 +229,15 @@ func createTestBackupFile(t *testing.T, dir, filename string) {
 	}
 
 	filePath := filepath.Join(dir, filename)
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, data, 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_WithBackupFiles(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -225,12 +245,14 @@ func TestRun_WithBackupFiles(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-	createTestBackupFile(t, tmpDir, "device1.json")
-	createTestBackupFile(t, tmpDir, "device2.json")
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+	createTestBackupFile(t, testBackupDir, "device1.json")
+	createTestBackupFile(t, testBackupDir, "device2.json")
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -249,8 +271,10 @@ func TestRun_WithBackupFiles(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_WithInvalidBackupFiles(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -258,19 +282,21 @@ func TestRun_WithInvalidBackupFiles(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
 
 	// Create an invalid JSON file
-	invalidPath := filepath.Join(tmpDir, "invalid.json")
-	if err := os.WriteFile(invalidPath, []byte("not valid json"), 0o600); err != nil {
+	invalidPath := filepath.Join(testBackupDir, "invalid.json")
+	if err := afero.WriteFile(config.Fs(), invalidPath, []byte("not valid json"), 0o600); err != nil {
 		t.Fatalf("failed to create invalid file: %v", err)
 	}
 
 	// Create a valid backup file
-	createTestBackupFile(t, tmpDir, "valid.json")
+	createTestBackupFile(t, testBackupDir, "valid.json")
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -287,8 +313,10 @@ func TestRun_WithInvalidBackupFiles(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_WithYamlBackupFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -296,25 +324,27 @@ func TestRun_WithYamlBackupFile(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
 
 	// Create a YAML file with .yaml extension (won't be valid backup but tests extension detection)
-	yamlPath := filepath.Join(tmpDir, "backup.yaml")
-	if err := os.WriteFile(yamlPath, []byte("invalid: yaml"), 0o600); err != nil {
+	yamlPath := filepath.Join(testBackupDir, "backup.yaml")
+	if err := afero.WriteFile(config.Fs(), yamlPath, []byte("invalid: yaml"), 0o600); err != nil {
 		t.Fatalf("failed to create yaml file: %v", err)
 	}
 
 	// Also create a .yml file
-	ymlPath := filepath.Join(tmpDir, "backup.yml")
-	if err := os.WriteFile(ymlPath, []byte("invalid: yml"), 0o600); err != nil {
+	ymlPath := filepath.Join(testBackupDir, "backup.yml")
+	if err := afero.WriteFile(config.Fs(), ymlPath, []byte("invalid: yml"), 0o600); err != nil {
 		t.Fatalf("failed to create yml file: %v", err)
 	}
 
 	// Create a valid JSON backup
-	createTestBackupFile(t, tmpDir, "backup.json")
+	createTestBackupFile(t, testBackupDir, "backup.json")
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -330,8 +360,10 @@ func TestRun_WithYamlBackupFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_DirectoryWithSubdirectories(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -339,11 +371,13 @@ func TestRun_DirectoryWithSubdirectories(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
 
 	// Create a subdirectory (should be ignored)
-	subDir := filepath.Join(tmpDir, "subdir")
-	if err := os.MkdirAll(subDir, 0o750); err != nil {
+	subDir := filepath.Join(testBackupDir, "subdir")
+	if err := config.Fs().MkdirAll(subDir, 0o750); err != nil {
 		t.Fatalf("failed to create subdir: %v", err)
 	}
 
@@ -352,7 +386,7 @@ func TestRun_DirectoryWithSubdirectories(t *testing.T) {
 
 	// No backups in root directory
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -368,8 +402,10 @@ func TestRun_DirectoryWithSubdirectories(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_BackupWithMissingVersion(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -377,7 +413,9 @@ func TestRun_BackupWithMissingVersion(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
 
 	// Create backup JSON without version field
 	invalidBackup := map[string]any{
@@ -391,12 +429,12 @@ func TestRun_BackupWithMissingVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "no-version.json"), data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filepath.Join(testBackupDir, "no-version.json"), data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -412,8 +450,10 @@ func TestRun_BackupWithMissingVersion(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_BackupWithMissingDeviceInfo(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -421,7 +461,9 @@ func TestRun_BackupWithMissingDeviceInfo(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
 
 	// Create backup JSON without device_info
 	invalidBackup := map[string]any{
@@ -432,12 +474,12 @@ func TestRun_BackupWithMissingDeviceInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "no-device.json"), data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filepath.Join(testBackupDir, "no-device.json"), data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -453,8 +495,10 @@ func TestRun_BackupWithMissingDeviceInfo(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_BackupWithMissingConfig(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -462,7 +506,9 @@ func TestRun_BackupWithMissingConfig(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
 
 	// Create backup JSON without config
 	invalidBackup := map[string]any{
@@ -476,12 +522,12 @@ func TestRun_BackupWithMissingConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "no-config.json"), data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filepath.Join(testBackupDir, "no-config.json"), data, 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
@@ -497,8 +543,10 @@ func TestRun_BackupWithMissingConfig(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_MultipleValidBackups(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -506,15 +554,17 @@ func TestRun_MultipleValidBackups(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
+	if err := config.Fs().MkdirAll(testBackupDir, 0o750); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
 
 	// Create multiple valid backup files
-	createTestBackupFile(t, tmpDir, "living-room.json")
-	createTestBackupFile(t, tmpDir, "kitchen.json")
-	createTestBackupFile(t, tmpDir, "bedroom.json")
+	createTestBackupFile(t, testBackupDir, "living-room.json")
+	createTestBackupFile(t, testBackupDir, "kitchen.json")
+	createTestBackupFile(t, testBackupDir, "bedroom.json")
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{tmpDir})
+	cmd.SetArgs([]string{testBackupDir})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 

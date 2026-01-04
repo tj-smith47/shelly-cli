@@ -15,7 +15,8 @@ const (
 func TestPluginDiscoverer_New(t *testing.T) {
 	t.Parallel()
 
-	registry := plugins.NewRegistryWithDir("/tmp/test-plugins")
+	// Use a virtual path - NewRegistryWithDir doesn't create the directory
+	registry := plugins.NewRegistryWithDir("/test/plugins")
 	discoverer := NewPluginDiscoverer(registry)
 
 	if discoverer == nil {

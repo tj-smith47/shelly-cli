@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
@@ -62,23 +63,32 @@ Columns: ID, Name, Enabled (yes/no), Running (running/stopped)`,
 }
 
 func run(ctx context.Context, opts *Options) error {
+	// Check for flag conflict early
+	if err := cmdutil.CheckCacheFlags(); err != nil {
+		return err
+	}
+
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.AutomationService()
 
-	items, err := cmdutil.RunWithSpinnerResult(ctx, ios, "Getting scripts...", func(ctx context.Context) ([]automation.ScriptInfo, error) {
-		return svc.ListScripts(ctx, opts.Device)
-	})
+	result, err := cmdutil.CachedFetchList(ctx, opts.Factory, opts.Device,
+		cache.TypeScripts, cache.TTLAutomation,
+		func(ctx context.Context) ([]automation.ScriptInfo, error) {
+			ios.StartProgress("Getting scripts...")
+			defer ios.StopProgress()
+			return svc.ListScripts(ctx, opts.Device)
+		})
 	if err != nil {
 		return err
 	}
 
-	if len(items) == 0 {
+	if len(result.Data) == 0 {
 		ios.NoResults("scripts")
 		return nil
 	}
 
-	return cmdutil.PrintListResult(ios, items, term.DisplayScriptList)
+	return cmdutil.PrintListResult(ios, result.Data, term.DisplayScriptList)
 }

@@ -311,8 +311,10 @@ func TestRun_WithMockDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test uses SetupTestFs which modifies global state
 func TestRun_CancelledContext(t *testing.T) {
-	t.Parallel()
+	// Use in-memory filesystem to ensure clean cache state
+	factory.SetupTestFs(t)
 
 	tf := factory.NewTestFactory(t)
 

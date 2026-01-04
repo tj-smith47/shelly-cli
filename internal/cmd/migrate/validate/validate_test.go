@@ -4,14 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+)
+
+const (
+	testBackupDir = "/test/backups"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -145,8 +150,8 @@ func createValidBackupFile(t *testing.T, dir, name string) string {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
 
-	filePath := filepath.Join(dir, name)
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	filePath := dir + "/" + name
+	if err := afero.WriteFile(config.Fs(), filePath, data, 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
@@ -179,8 +184,8 @@ func createBackupWithScripts(t *testing.T, dir, name string) string {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
 
-	filePath := filepath.Join(dir, name)
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	filePath := dir + "/" + name
+	if err := afero.WriteFile(config.Fs(), filePath, data, 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
@@ -188,28 +193,28 @@ func createBackupWithScripts(t *testing.T, dir, name string) string {
 }
 
 // createInvalidBackupFile creates an invalid backup file for error testing.
-func createInvalidBackupFile(t *testing.T, dir, name, content string) string {
+func createInvalidBackupFile(t *testing.T, name, content string) string {
 	t.Helper()
 
-	filePath := filepath.Join(dir, name)
-	if err := os.WriteFile(filePath, []byte(content), 0o600); err != nil {
+	filePath := testBackupDir + "/" + name
+	if err := afero.WriteFile(config.Fs(), filePath, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
 	return filePath
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_ValidBackup(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create valid backup file
-	validFile := createValidBackupFile(t, tmpDir, "valid.json")
+	validFile := createValidBackupFile(t, testBackupDir, "valid.json")
 
 	opts := &Options{Factory: f, FilePath: validFile}
 	err := run(opts)
@@ -235,17 +240,17 @@ func TestRun_ValidBackup(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_ValidBackupWithScripts(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create backup with scripts
-	scriptsFile := createBackupWithScripts(t, tmpDir, "scripts.json")
+	scriptsFile := createBackupWithScripts(t, testBackupDir, "scripts.json")
 
 	opts := &Options{Factory: f, FilePath: scriptsFile}
 	err := run(opts)
@@ -261,8 +266,10 @@ func TestRun_ValidBackupWithScripts(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_NonExistentFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -280,17 +287,17 @@ func TestRun_NonExistentFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_InvalidJSON(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create invalid JSON file
-	invalidFile := createInvalidBackupFile(t, tmpDir, "invalid.json", "{ not valid json }")
+	invalidFile := createInvalidBackupFile(t, "invalid.json", "{ not valid json }")
 
 	opts := &Options{Factory: f, FilePath: invalidFile}
 	err := run(opts)
@@ -299,17 +306,17 @@ func TestRun_InvalidJSON(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_MissingVersion(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create JSON without version field
-	missingVersionFile := createInvalidBackupFile(t, tmpDir, "missing-version.json",
+	missingVersionFile := createInvalidBackupFile(t, "missing-version.json",
 		`{"device_info": {"id": "test"}, "config": {}}`)
 
 	opts := &Options{Factory: f, FilePath: missingVersionFile}
@@ -319,17 +326,17 @@ func TestRun_MissingVersion(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_MissingDeviceInfo(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create JSON without device_info
-	missingInfoFile := createInvalidBackupFile(t, tmpDir, "missing-info.json",
+	missingInfoFile := createInvalidBackupFile(t, "missing-info.json",
 		`{"version": 1, "config": {}}`)
 
 	opts := &Options{Factory: f, FilePath: missingInfoFile}
@@ -339,17 +346,17 @@ func TestRun_MissingDeviceInfo(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_MissingConfig(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create JSON without config
-	missingConfigFile := createInvalidBackupFile(t, tmpDir, "missing-config.json",
+	missingConfigFile := createInvalidBackupFile(t, "missing-config.json",
 		`{"version": 1, "device_info": {"id": "test"}}`)
 
 	opts := &Options{Factory: f, FilePath: missingConfigFile}
@@ -359,17 +366,17 @@ func TestRun_MissingConfig(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_EmptyFile(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create empty file
-	emptyFile := createInvalidBackupFile(t, tmpDir, "empty.json", "")
+	emptyFile := createInvalidBackupFile(t, "empty.json", "")
 
 	opts := &Options{Factory: f, FilePath: emptyFile}
 	err := run(opts)
@@ -378,18 +385,19 @@ func TestRun_EmptyFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_FileIsDirectory(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create a directory instead of a file
-	dirPath := filepath.Join(tmpDir, "not-a-file")
-	if err := os.MkdirAll(dirPath, 0o700); err != nil {
+	dirPath := testBackupDir + "/not-a-file"
+	if err := fs.MkdirAll(dirPath, 0o700); err != nil {
 		t.Fatalf("failed to create directory: %v", err)
 	}
 
@@ -400,10 +408,10 @@ func TestRun_FileIsDirectory(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_OutputShowsConfigKeys(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -425,8 +433,8 @@ func TestRun_OutputShowsConfigKeys(t *testing.T) {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
 
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, data, 0o600); err != nil {
+	configFile := testBackupDir + "/config.json"
+	if err := afero.WriteFile(config.Fs(), configFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
@@ -443,10 +451,10 @@ func TestRun_OutputShowsConfigKeys(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_OutputShowsVersion(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -468,8 +476,8 @@ func TestRun_OutputShowsVersion(t *testing.T) {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
 
-	versionFile := filepath.Join(tmpDir, "version.json")
-	if err := os.WriteFile(versionFile, data, 0o600); err != nil {
+	versionFile := testBackupDir + "/version.json"
+	if err := afero.WriteFile(config.Fs(), versionFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
@@ -486,13 +494,16 @@ func TestRun_OutputShowsVersion(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_PermissionDenied(t *testing.T) {
 	// Skip on Windows where permissions work differently
 	if os.Getenv("OS") == "Windows_NT" {
 		t.Skip("skipping permission test on Windows")
 	}
 
-	t.Parallel()
+	// Use real filesystem for permission testing
+	config.SetFs(afero.NewOsFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tmpDir := t.TempDir()
 
@@ -501,7 +512,7 @@ func TestRun_PermissionDenied(t *testing.T) {
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create file with no read permissions
-	noReadFile := filepath.Join(tmpDir, "noaccess.json")
+	noReadFile := tmpDir + "/noaccess.json"
 	if err := os.WriteFile(noReadFile, []byte("{}"), 0o000); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
@@ -519,10 +530,10 @@ func TestRun_PermissionDenied(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_OutputShowsFirmware(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -545,8 +556,8 @@ func TestRun_OutputShowsFirmware(t *testing.T) {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
 
-	fwFile := filepath.Join(tmpDir, "firmware.json")
-	if err := os.WriteFile(fwFile, data, 0o600); err != nil {
+	fwFile := testBackupDir + "/firmware.json"
+	if err := afero.WriteFile(config.Fs(), fwFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 

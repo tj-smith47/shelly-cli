@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -76,7 +77,8 @@ func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Devices[0],
+	return cmdutil.RunCachedDeviceStatus(ctx, opts.Factory, opts.Devices[0],
+		cache.TypeFirmware, cache.TTLFirmware,
 		"Checking for updates...",
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.FirmwareInfo, error) {
 			return svc.CheckFirmware(ctx, device)

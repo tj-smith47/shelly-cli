@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -85,5 +86,8 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	ios.Success("Deleted virtual component %s", opts.Key)
+
+	// Invalidate cached virtual component list
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeVirtuals)
 	return nil
 }

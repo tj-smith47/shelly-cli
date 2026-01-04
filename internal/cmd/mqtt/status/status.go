@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -49,10 +50,8 @@ func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
-
-	return cmdutil.RunDeviceStatus(ctx, ios, svc, opts.Device,
+	return cmdutil.RunCachedDeviceStatus(ctx, opts.Factory, opts.Device,
+		cache.TypeMQTT, cache.TTLProtocols,
 		"Getting MQTT status...",
 		func(ctx context.Context, svc *shelly.Service, device string) (*shelly.MQTTStatus, error) {
 			return svc.GetMQTTStatus(ctx, device)

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -76,11 +77,11 @@ func run(ctx context.Context, opts *Options) error {
 		code = string(data)
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Creating script...", func(ctx context.Context) error {
+	err := cmdutil.RunWithSpinner(ctx, ios, "Creating script...", func(ctx context.Context) error {
 		// Create the script
-		id, err := svc.CreateScript(ctx, opts.Device, opts.Name)
-		if err != nil {
-			return fmt.Errorf("failed to create script: %w", err)
+		id, createErr := svc.CreateScript(ctx, opts.Device, opts.Name)
+		if createErr != nil {
+			return fmt.Errorf("failed to create script: %w", createErr)
 		}
 
 		// Upload code if provided
@@ -110,4 +111,11 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached script list
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeScripts)
+	return nil
 }

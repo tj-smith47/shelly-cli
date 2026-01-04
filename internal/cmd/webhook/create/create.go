@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -75,7 +76,7 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Creating webhook...", func(ctx context.Context) error {
+	err := cmdutil.RunWithSpinner(ctx, ios, "Creating webhook...", func(ctx context.Context) error {
 		params := shelly.CreateWebhookParams{
 			Event:  opts.Event,
 			URLs:   opts.URLs,
@@ -84,9 +85,9 @@ func run(ctx context.Context, opts *Options) error {
 			Cid:    opts.Cid,
 		}
 
-		id, err := svc.CreateWebhook(ctx, opts.Device, params)
-		if err != nil {
-			return fmt.Errorf("failed to create webhook: %w", err)
+		id, createErr := svc.CreateWebhook(ctx, opts.Device, params)
+		if createErr != nil {
+			return fmt.Errorf("failed to create webhook: %w", createErr)
 		}
 
 		ios.Success("Webhook created on %s", opts.Device)
@@ -94,4 +95,11 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Printf("  Event: %s\n", opts.Event)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached webhook list
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeWebhooks)
+	return nil
 }

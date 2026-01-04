@@ -46,6 +46,7 @@ shelly lora send <device> <data> [flags]
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
+      --offline                 Only read from cache, error on cache miss
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output

@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
@@ -55,20 +56,14 @@ func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
-	ios := opts.Factory.IOStreams()
-	svc := opts.Factory.ShellyService()
-
-	var components []shelly.VirtualComponent
-	err := cmdutil.RunWithSpinner(ctx, ios, "Fetching virtual components...", func(ctx context.Context) error {
-		var fetchErr error
-		components, fetchErr = svc.ListVirtualComponents(ctx, opts.Device)
-		return fetchErr
-	})
-	if err != nil {
-		return err
-	}
-
-	return cmdutil.PrintListResult(ios, components, func(ios *iostreams.IOStreams, items []shelly.VirtualComponent) {
-		term.DisplayVirtualComponents(ios, items)
-	})
+	return cmdutil.RunCachedList(ctx, opts.Factory, opts.Device,
+		cache.TypeVirtuals, cache.TTLAutomation,
+		"Fetching virtual components...",
+		"virtual components",
+		func(ctx context.Context, svc *shelly.Service, device string) ([]shelly.VirtualComponent, error) {
+			return svc.ListVirtualComponents(ctx, device)
+		},
+		func(ios *iostreams.IOStreams, items []shelly.VirtualComponent) {
+			term.DisplayVirtualComponents(ios, items)
+		})
 }

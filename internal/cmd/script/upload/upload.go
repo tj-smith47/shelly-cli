@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -72,7 +73,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 	code := string(data)
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Uploading script...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Uploading script...", func(ctx context.Context) error {
 		if uploadErr := svc.UpdateScriptCode(ctx, opts.Device, opts.ID, code, opts.Append); uploadErr != nil {
 			return fmt.Errorf("failed to upload script: %w", uploadErr)
 		}
@@ -84,4 +85,11 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached script list
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeScripts)
+	return nil
 }

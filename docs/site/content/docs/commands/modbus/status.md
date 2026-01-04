@@ -40,6 +40,7 @@ shelly modbus status <device> [flags]
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
+      --offline                 Only read from cache, error on cache miss
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
       --refresh                 Bypass cache and fetch fresh data from device

@@ -3,14 +3,19 @@ package bulk
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
+)
+
+const (
+	testConfigDir = "/test/config"
 )
 
 const (
@@ -227,16 +232,16 @@ func TestRun_MissingConfigFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_InvalidYAML(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "invalid.yaml")
+	configFile := testConfigDir + "/invalid.yaml"
 
 	// Write invalid YAML
-	err := os.WriteFile(configFile, []byte("invalid: yaml: content: :"), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte("invalid: yaml: content: :"), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -246,22 +251,22 @@ func TestRun_InvalidYAML(t *testing.T) {
 		Parallel:   5,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for invalid YAML")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_NoDevices(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "empty.yaml")
+	configFile := testConfigDir + "/empty.yaml"
 
 	// Write config with no devices
-	err := os.WriteFile(configFile, []byte("wifi:\n  ssid: MyNetwork\n  password: secret\ndevices: []\n"), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte("wifi:\n  ssid: MyNetwork\n  password: secret\ndevices: []\n"), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -271,7 +276,7 @@ func TestRun_NoDevices(t *testing.T) {
 		Parallel:   5,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected error for no devices")
 	}
@@ -280,15 +285,15 @@ func TestRun_NoDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_DryRunSuccess(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "dryrun.yaml")
+	configFile := testConfigDir + "/dryrun.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfigTwoDevices), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfigTwoDevices), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -299,7 +304,7 @@ func TestRun_DryRunSuccess(t *testing.T) {
 		DryRun:     true,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("Expected no error for dry run, got: %v", err)
 	}
@@ -314,22 +319,22 @@ func TestRun_DryRunSuccess(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_UnregisteredDeviceNoAddress(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "validation.yaml")
+	configFile := testConfigDir + "/validation.yaml"
 
 	// Device without address and not registered
-	config := `wifi:
+	configContent := `wifi:
   ssid: MyNetwork
   password: secret
 devices:
   - name: unregistered-device
 `
-	err := os.WriteFile(configFile, []byte(config), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -339,7 +344,7 @@ devices:
 		Parallel:   5,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err == nil {
 		t.Error("Expected validation error for unregistered device")
 	}
@@ -348,8 +353,10 @@ devices:
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_RegisteredDeviceNoAddress(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactoryWithDevices(t, map[string]model.Device{
 		"my-device": {
@@ -357,18 +364,16 @@ func TestRun_RegisteredDeviceNoAddress(t *testing.T) {
 			Address: "192.168.1.100",
 		},
 	})
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "registered.yaml")
+	configFile := testConfigDir + "/registered.yaml"
 
 	// Device registered, no address needed
-	config := `wifi:
+	configContent := `wifi:
   ssid: MyNetwork
   password: secret
 devices:
   - name: my-device
 `
-	err := os.WriteFile(configFile, []byte(config), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -379,20 +384,21 @@ devices:
 		DryRun:     true, // Use dry run to avoid actual provisioning
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("Expected no error for registered device, got: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_PerDeviceWiFiOverride(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "override.yaml")
+	configFile := testConfigDir + "/override.yaml"
 
-	config := `wifi:
+	configContent := `wifi:
   ssid: DefaultNetwork
   password: default-secret
 devices:
@@ -404,8 +410,7 @@ devices:
       ssid: CustomNetwork
       password: custom-secret
 `
-	err := os.WriteFile(configFile, []byte(config), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -416,7 +421,7 @@ devices:
 		DryRun:     true,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -448,15 +453,15 @@ func TestExecute_NoArgs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_WithConfigFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "exec.yaml")
+	configFile := testConfigDir + "/exec.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfig), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfig), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -467,21 +472,21 @@ func TestExecute_WithConfigFile(t *testing.T) {
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_WithParallelFlag(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "parallel.yaml")
+	configFile := testConfigDir + "/parallel.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfigTwoDevices), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfigTwoDevices), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -492,28 +497,28 @@ func TestExecute_WithParallelFlag(t *testing.T) {
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_DryRunFlag(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "dryrun-exec.yaml")
+	configFile := testConfigDir + "/dryrun-exec.yaml"
 
-	config := `wifi:
+	configContent := `wifi:
   ssid: TestNetwork
   password: test-secret
 devices:
   - name: test-device
     address: 192.168.1.100
 `
-	err := os.WriteFile(configFile, []byte(config), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -524,7 +529,7 @@ devices:
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -536,22 +541,22 @@ devices:
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_WithAlias_batch(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "alias-batch.yaml")
+	configFile := testConfigDir + "/alias-batch.yaml"
 
-	config := `wifi:
+	configContent := `wifi:
   ssid: MyNetwork
   password: secret
 devices:
   - name: device1
     address: 192.168.1.100
 `
-	err := os.WriteFile(configFile, []byte(config), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -588,15 +593,15 @@ func TestExecute_WithAlias_mass(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_MultipleDevices(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "multiple.yaml")
+	configFile := testConfigDir + "/multiple.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfigThreeDevices), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfigThreeDevices), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -607,7 +612,7 @@ func TestRun_MultipleDevices(t *testing.T) {
 		DryRun:     true,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -624,15 +629,15 @@ func TestRun_MultipleDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_NotDryRunPath(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "not-dryrun.yaml")
+	configFile := testConfigDir + "/not-dryrun.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfig), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfig), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -649,22 +654,22 @@ func TestRun_NotDryRunPath(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err = run(ctx, opts)
+	err := run(ctx, opts)
 	// We expect an error due to context cancellation in the provisioning path
 	if err == nil {
 		t.Logf("No error (context cancelled, expected)")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_NotDryRunInfoMessage(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "info-message.yaml")
+	configFile := testConfigDir + "/info-message.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfigTwoDevices), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfigTwoDevices), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -679,7 +684,7 @@ func TestRun_NotDryRunInfoMessage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	err = run(ctx, opts)
+	err := run(ctx, opts)
 	// We expect an error due to context cancellation
 	if err == nil {
 		t.Logf("No error (context cancelled, expected)")
@@ -692,8 +697,10 @@ func TestRun_NotDryRunInfoMessage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_DifferentParallelLevels(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tests := []struct {
 		name     string
@@ -706,14 +713,10 @@ func TestRun_DifferentParallelLevels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			tf := factory.NewTestFactory(t)
-			tmpDir := t.TempDir()
-			configFile := filepath.Join(tmpDir, "parallel-test.yaml")
+			configFile := testConfigDir + "/" + tt.name + "-parallel-test.yaml"
 
-			err := os.WriteFile(configFile, []byte(validConfig), 0o600)
-			if err != nil {
+			if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfig), 0o600); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
 
@@ -724,7 +727,7 @@ func TestRun_DifferentParallelLevels(t *testing.T) {
 				DryRun:     true,
 			}
 
-			err = run(context.Background(), opts)
+			err := run(context.Background(), opts)
 			if err != nil {
 				t.Errorf("Expected no error with parallel=%d, got: %v", tt.parallel, err)
 			}
@@ -732,15 +735,15 @@ func TestRun_DifferentParallelLevels(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_BulkAlias(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "bulk-alias.yaml")
+	configFile := testConfigDir + "/bulk-alias.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfig), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfig), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -753,14 +756,16 @@ func TestExecute_BulkAlias(t *testing.T) {
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
-	err = cmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_FactoryGetDevice(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	devices := map[string]model.Device{
 		"kitchen-light": {
@@ -774,11 +779,9 @@ func TestRun_FactoryGetDevice(t *testing.T) {
 	}
 
 	tf := factory.NewTestFactoryWithDevices(t, devices)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "registered-devices.yaml")
+	configFile := testConfigDir + "/registered-devices.yaml"
 
-	err := os.WriteFile(configFile, []byte(registeredDevicesConfig), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(registeredDevicesConfig), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -789,7 +792,7 @@ func TestRun_FactoryGetDevice(t *testing.T) {
 		DryRun:     true,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
@@ -803,15 +806,15 @@ func TestRun_FactoryGetDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_SingleDevice(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "single-device.yaml")
+	configFile := testConfigDir + "/single-device.yaml"
 
-	err := os.WriteFile(configFile, []byte(validConfig), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(validConfig), 0o600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -822,7 +825,7 @@ func TestRun_SingleDevice(t *testing.T) {
 		DryRun:     true,
 	}
 
-	err = run(context.Background(), opts)
+	err := run(context.Background(), opts)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}

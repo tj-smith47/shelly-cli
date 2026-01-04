@@ -19,16 +19,11 @@ type Registry struct {
 }
 
 // NewRegistry creates a new plugin registry.
+// Note: The plugins directory is created lazily on first install, not during initialization.
 func NewRegistry() (*Registry, error) {
 	pluginsDir, err := config.PluginsDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get plugins directory: %w", err)
-	}
-
-	// Ensure plugins directory exists using afero (allows test isolation)
-	fs := config.Fs()
-	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
-		return nil, fmt.Errorf("failed to create plugins directory: %w", err)
 	}
 
 	return &Registry{

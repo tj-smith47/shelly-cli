@@ -3,26 +3,32 @@ package output
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
+const (
+	testOutputDir = "/test/output"
+)
+
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestWriteFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	t.Run("write to new file", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		file := filepath.Join(tmpDir, "test.txt")
+		file := testOutputDir + "/test.txt"
 		data := []byte("hello world")
 
 		if err := WriteFile(file, data); err != nil {
 			t.Fatalf("WriteFile() error: %v", err)
 		}
 
-		got, err := os.ReadFile(file) //nolint:gosec // test uses t.TempDir()
+		got, err := afero.ReadFile(config.Fs(), file)
 		if err != nil {
 			t.Fatalf("ReadFile() error: %v", err)
 		}
@@ -32,9 +38,7 @@ func TestWriteFile(t *testing.T) {
 	})
 
 	t.Run("creates parent directories", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		file := filepath.Join(tmpDir, "a", "b", "c", "test.txt")
+		file := testOutputDir + "/a/b/c/test.txt"
 		data := []byte("nested")
 
 		if err := WriteFile(file, data); err != nil {
@@ -42,22 +46,20 @@ func TestWriteFile(t *testing.T) {
 		}
 
 		// Verify file exists
-		if _, err := os.Stat(file); os.IsNotExist(err) {
+		if _, err := config.Fs().Stat(file); os.IsNotExist(err) {
 			t.Error("file should exist")
 		}
 	})
 
 	t.Run("file has secure permissions", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		file := filepath.Join(tmpDir, "secret.txt")
+		file := testOutputDir + "/secret.txt"
 		data := []byte("secret data")
 
 		if err := WriteFile(file, data); err != nil {
 			t.Fatalf("WriteFile() error: %v", err)
 		}
 
-		info, err := os.Stat(file)
+		info, err := config.Fs().Stat(file)
 		if err != nil {
 			t.Fatalf("Stat() error: %v", err)
 		}
@@ -70,8 +72,11 @@ func TestWriteFile(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs and working directory
 func TestWriteFile_CurrentDir(t *testing.T) {
-	t.Parallel()
+	// Use real filesystem for os.Chdir test
+	config.SetFs(afero.NewOsFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	// Save current dir and change to temp
 	tmpDir := t.TempDir()
@@ -96,7 +101,7 @@ func TestWriteFile_CurrentDir(t *testing.T) {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
-	got, err := os.ReadFile(file)
+	got, err := afero.ReadFile(config.Fs(), file)
 	if err != nil {
 		t.Fatalf("ReadFile() error: %v", err)
 	}
@@ -105,11 +110,12 @@ func TestWriteFile_CurrentDir(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestGetWriter(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	t.Run("empty path returns stdout", func(t *testing.T) {
-		t.Parallel()
 		ios := newTestIOStreams()
 		writer, closer, err := GetWriter(ios, "")
 		if err != nil {
@@ -126,9 +132,7 @@ func TestGetWriter(t *testing.T) {
 	})
 
 	t.Run("file path creates file", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		file := filepath.Join(tmpDir, "output.txt")
+		file := testOutputDir + "/output.txt"
 
 		ios := newTestIOStreams()
 		writer, closer, err := GetWriter(ios, file)
@@ -149,11 +153,12 @@ func TestGetWriter(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExportToFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	t.Run("export to stdout", func(t *testing.T) {
-		t.Parallel()
 		ios := newTestIOStreams()
 		data := map[string]string{"key": "value"}
 		err := ExportToFile(ios, data, "", FormatJSON, "JSON")
@@ -163,9 +168,7 @@ func TestExportToFile(t *testing.T) {
 	})
 
 	t.Run("export to file", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		file := filepath.Join(tmpDir, "export.json")
+		file := testOutputDir + "/export.json"
 
 		ios := newTestIOStreams()
 		data := map[string]string{"key": "value"}
@@ -175,17 +178,18 @@ func TestExportToFile(t *testing.T) {
 		}
 
 		// Verify file was created
-		if _, err := os.Stat(file); os.IsNotExist(err) {
+		if _, err := config.Fs().Stat(file); os.IsNotExist(err) {
 			t.Error("file should exist")
 		}
 	})
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExportCSV(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	t.Run("export to stdout", func(t *testing.T) {
-		t.Parallel()
 		ios := newTestIOStreams()
 		formatter := func() ([]byte, error) {
 			return []byte("col1,col2\nval1,val2\n"), nil
@@ -197,9 +201,7 @@ func TestExportCSV(t *testing.T) {
 	})
 
 	t.Run("export to file", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		file := filepath.Join(tmpDir, "export.csv")
+		file := testOutputDir + "/export.csv"
 
 		ios := newTestIOStreams()
 		formatter := func() ([]byte, error) {
@@ -211,7 +213,7 @@ func TestExportCSV(t *testing.T) {
 		}
 
 		// Verify file was created
-		content, err := os.ReadFile(file) //nolint:gosec // test uses t.TempDir()
+		content, err := afero.ReadFile(config.Fs(), file)
 		if err != nil {
 			t.Fatalf("ReadFile() error: %v", err)
 		}
@@ -221,7 +223,6 @@ func TestExportCSV(t *testing.T) {
 	})
 
 	t.Run("formatter error", func(t *testing.T) {
-		t.Parallel()
 		ios := newTestIOStreams()
 		formatter := func() ([]byte, error) {
 			return nil, os.ErrInvalid

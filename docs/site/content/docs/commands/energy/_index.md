@@ -55,6 +55,7 @@ For power meters with energy totals (PM/PM1 components), use 'shelly power'.
       --log-json                Output logs in JSON format
       --no-color                Disable colored output
       --no-headers              Hide table headers in output
+      --offline                 Only read from cache, error on cache miss
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -114,15 +113,9 @@ func TestValidateGroupName(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo // test function with many assertions
+//nolint:gocyclo,paralleltest // test function with many assertions; modifies global state via SetFs
 func TestManager_GroupOperations(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Create a group
 	if err := m.CreateGroup("lights"); err != nil {
@@ -189,14 +182,9 @@ func TestManager_GroupOperations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CreateGroup_Duplicate(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.CreateGroup("lights"); err != nil {
 		t.Fatalf("CreateGroup() error: %v", err)
@@ -209,14 +197,9 @@ func TestManager_CreateGroup_Duplicate(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddDeviceToGroup_Errors(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Add device to nonexistent group
 	err := m.AddDeviceToGroup("nonexistent", "device")
@@ -242,14 +225,9 @@ func TestManager_AddDeviceToGroup_Errors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RenameDevice(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register a device
 	if err := m.RegisterDevice("old-name", testDeviceIP, 2, "", "", nil); err != nil {
@@ -277,14 +255,9 @@ func TestManager_RenameDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RenameDevice_Errors(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Rename nonexistent device
 	err := m.RenameDevice("nonexistent", "new-name")
@@ -307,14 +280,9 @@ func TestManager_RenameDevice_Errors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UpdateDeviceAddress(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register a device
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
@@ -333,14 +301,9 @@ func TestManager_UpdateDeviceAddress(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UnregisterDevice(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register a device
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
@@ -359,14 +322,9 @@ func TestManager_UnregisterDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UnregisterDevice_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	err := m.UnregisterDevice("nonexistent")
 	if err == nil {
@@ -380,6 +338,19 @@ func setupDevicesTest(t *testing.T) {
 	SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { SetFs(nil) })
 	ResetDefaultManagerForTesting()
+}
+
+// setupManagerTest sets up an isolated Manager for testing.
+// It uses an in-memory filesystem to avoid touching real files.
+func setupManagerTest(t *testing.T) *Manager {
+	t.Helper()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+	m := NewManager("/test/config/config.yaml")
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	return m
 }
 
 //nolint:paralleltest // Tests modify global state
@@ -444,14 +415,9 @@ func TestPackageLevel_UpdateDeviceInfo(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RegisterDeviceWithPlatform_Direct(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with platform
 	auth := &model.Auth{Username: "testAuthAdmin", Password: "pass"}
@@ -473,14 +439,9 @@ func TestManager_RegisterDeviceWithPlatform_Direct(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RegisterDeviceWithPlatform_InvalidName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with invalid name (empty after normalization)
 	err := m.RegisterDeviceWithPlatform("!!!", testDeviceIP, 0, "", "", "", nil)
@@ -489,14 +450,9 @@ func TestManager_RegisterDeviceWithPlatform_InvalidName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UnregisterDevice_WithDisplayName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with display name
 	if err := m.RegisterDevice("Master Bathroom", testDeviceIP, 2, "", "", nil); err != nil {
@@ -515,14 +471,9 @@ func TestManager_UnregisterDevice_WithDisplayName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UnregisterDevice_CleanupAliasesAndGroups(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device with alias and add to group
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
@@ -561,14 +512,9 @@ func TestManager_UnregisterDevice_CleanupAliasesAndGroups(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UpdateDeviceAddress_SameAddress(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
@@ -581,14 +527,9 @@ func TestManager_UpdateDeviceAddress_SameAddress(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UpdateDeviceAddress_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	err := m.UpdateDeviceAddress("nonexistent", "testDeviceIP00")
 	if err == nil {
@@ -596,14 +537,9 @@ func TestManager_UpdateDeviceAddress_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RenameDevice_InvalidNewName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -616,14 +552,9 @@ func TestManager_RenameDevice_InvalidNewName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_GetDeviceAliases_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	_, err := m.GetDeviceAliases("nonexistent")
 	if err == nil {
@@ -631,14 +562,9 @@ func TestManager_GetDeviceAliases_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddDeviceAlias_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	err := m.AddDeviceAlias("nonexistent", "alias1")
 	if err == nil {
@@ -646,14 +572,9 @@ func TestManager_AddDeviceAlias_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddDeviceAlias_InvalidAlias(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -666,14 +587,9 @@ func TestManager_AddDeviceAlias_InvalidAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveDeviceAlias_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -686,14 +602,9 @@ func TestManager_RemoveDeviceAlias_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ResolveDevice_ByMAC(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device with MAC
 	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
@@ -713,14 +624,9 @@ func TestManager_ResolveDevice_ByMAC(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CheckAliasConflict_NoConflict(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// No devices, no conflict
 	err := m.CheckAliasConflict("new-alias", "")
@@ -729,14 +635,9 @@ func TestManager_CheckAliasConflict_NoConflict(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CheckAliasConflict_WithExclude(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device with alias
 	if err := m.RegisterDevice("device1", testDeviceIP, 2, "", "", nil); err != nil {
@@ -759,14 +660,9 @@ func TestManager_CheckAliasConflict_WithExclude(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_GetGroupDevices_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	_, err := m.GetGroupDevices("nonexistent")
 	if err == nil {
@@ -774,14 +670,9 @@ func TestManager_GetGroupDevices_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveDeviceFromGroup_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	err := m.RemoveDeviceFromGroup("nonexistent", "device1")
 	if err == nil {
@@ -789,14 +680,9 @@ func TestManager_RemoveDeviceFromGroup_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveDeviceFromGroup_DeviceNotInGroup(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.CreateGroup("lights"); err != nil {
 		t.Fatalf("CreateGroup() error: %v", err)
@@ -808,14 +694,9 @@ func TestManager_RemoveDeviceFromGroup_DeviceNotInGroup(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_DeleteGroup_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	err := m.DeleteGroup("nonexistent")
 	if err == nil {
@@ -823,14 +704,9 @@ func TestManager_DeleteGroup_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RenameDevice_SameName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -851,14 +727,9 @@ func TestManager_RenameDevice_SameName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RenameDevice_AlreadyExists(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -874,14 +745,9 @@ func TestManager_RenameDevice_AlreadyExists(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveDeviceAlias_AliasNotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -894,14 +760,9 @@ func TestManager_RemoveDeviceAlias_AliasNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_GetGroupDevices_FallbackToAddress(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.CreateGroup("test-group"); err != nil {
 		t.Fatalf("CreateGroup() error: %v", err)
@@ -927,14 +788,9 @@ func TestManager_GetGroupDevices_FallbackToAddress(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CreateGroup_ValidationError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Try to create group with invalid name
 	err := m.CreateGroup("")
@@ -943,14 +799,9 @@ func TestManager_CreateGroup_ValidationError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ResolveDevice_ByAlias(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice("kitchen-light", testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -970,14 +821,9 @@ func TestManager_ResolveDevice_ByAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CheckAliasConflict_WithExcludedDevice(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -993,14 +839,9 @@ func TestManager_CheckAliasConflict_WithExcludedDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UnregisterDevice_CleanupFromGroup(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device and add to group
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
@@ -1030,14 +871,9 @@ func TestManager_UnregisterDevice_CleanupFromGroup(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RenameDevice_UpdatesGroupReferences(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device and add to group
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
@@ -1074,14 +910,9 @@ func TestManager_RenameDevice_UpdatesGroupReferences(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddDeviceAlias_ToDeviceWithExistingAliases(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -1107,14 +938,9 @@ func TestManager_AddDeviceAlias_ToDeviceWithExistingAliases(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveDeviceAlias_SingleAlias(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -1146,14 +972,9 @@ func TestManager_RemoveDeviceAlias_SingleAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CheckAliasConflict_ConflictsWithName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device with display name "Kitchen Light"
 	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
@@ -1167,14 +988,9 @@ func TestManager_CheckAliasConflict_ConflictsWithName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CheckAliasConflict_ConflictsWithOtherAlias(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -1195,14 +1011,9 @@ func TestManager_CheckAliasConflict_ConflictsWithOtherAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddDeviceAlias_DuplicateOnSameDevice(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
 		t.Fatalf("RegisterDevice() error: %v", err)
@@ -1220,14 +1031,9 @@ func TestManager_AddDeviceAlias_DuplicateOnSameDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddDeviceAlias_ByNormalizedName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with display name
 	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
@@ -1249,14 +1055,9 @@ func TestManager_AddDeviceAlias_ByNormalizedName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveDeviceAlias_ByNormalizedName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with display name
 	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
@@ -1283,14 +1084,9 @@ func TestManager_RemoveDeviceAlias_ByNormalizedName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveDeviceAlias_ByDisplayName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with display name (stored under normalized key)
 	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
@@ -1317,14 +1113,9 @@ func TestManager_RemoveDeviceAlias_ByDisplayName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UnregisterDevice_ByDisplayName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with display name
 	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
@@ -1343,14 +1134,9 @@ func TestManager_UnregisterDevice_ByDisplayName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ResolveDevice_ByDisplayName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register with specific display name
 	if err := m.RegisterDevice("Kitchen Light", testDeviceIP, 2, "", "", nil); err != nil {
@@ -1368,14 +1154,9 @@ func TestManager_ResolveDevice_ByDisplayName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ResolveDevice_ByExactMAC(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device with MAC
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {
@@ -1395,14 +1176,9 @@ func TestManager_ResolveDevice_ByExactMAC(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UnregisterDevice_CleanupFromMultipleGroups(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupManagerTest(t)
 
 	// Register device and add to multiple groups
 	if err := m.RegisterDevice(testDeviceName, testDeviceIP, 2, "", "", nil); err != nil {

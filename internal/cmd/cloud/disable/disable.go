@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
@@ -48,11 +49,18 @@ func run(ctx context.Context, opts *Options) error {
 	ios := opts.Factory.IOStreams()
 	svc := opts.Factory.ShellyService()
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Disabling cloud connection...", func(ctx context.Context) error {
-		if err := svc.SetCloudEnabled(ctx, opts.Device, false); err != nil {
-			return fmt.Errorf("failed to disable cloud: %w", err)
+	err := cmdutil.RunWithSpinner(ctx, ios, "Disabling cloud connection...", func(ctx context.Context) error {
+		if setErr := svc.SetCloudEnabled(ctx, opts.Device, false); setErr != nil {
+			return fmt.Errorf("failed to disable cloud: %w", setErr)
 		}
 		ios.Success("Cloud connection disabled on %s", opts.Device)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached cloud status
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeCloud)
+	return nil
 }

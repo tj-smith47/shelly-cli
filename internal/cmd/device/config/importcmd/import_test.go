@@ -3,15 +3,15 @@ package configimport
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -23,6 +23,12 @@ const testFilePerms = 0o600
 const (
 	flagDefFalse = "false"
 	flagDefTrue  = "true"
+)
+
+// Test path constants.
+const (
+	testConfigPath     = "/test/config.json"
+	testConfigYAMLPath = "/test/config.yaml"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -268,16 +274,16 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_ContextCancelled(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -295,16 +301,16 @@ func TestRun_ContextCancelled(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_Timeout(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -324,8 +330,10 @@ func TestRun_Timeout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_FileNotFound(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
@@ -344,16 +352,16 @@ func TestRun_FileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_InvalidJSON(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file with invalid JSON
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(`{invalid json`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{invalid json`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	opts := &Options{
@@ -371,16 +379,16 @@ func TestRun_InvalidJSON(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_InvalidYAML(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file with invalid YAML (not valid JSON either)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
-	if err := os.WriteFile(configFile, []byte("invalid:\n  - @#$%^&*(\n  unclosed:"), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigYAMLPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte("invalid:\n  - @#$%^&*(\n  unclosed:"), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	opts := &Options{
@@ -482,16 +490,16 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestNewCommand_RunE_PassesArgs(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	cmd := NewCommand(tf.Factory)
@@ -508,16 +516,16 @@ func TestNewCommand_RunE_PassesArgs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestNewCommand_RunE_WithDryRun(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	cmd := NewCommand(tf.Factory)
@@ -552,6 +560,9 @@ func TestNewCommand_Help(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_ImportJSONConfig(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -587,16 +598,14 @@ func TestRun_ImportJSONConfig(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file with JSON config
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
+	configFile := testConfigPath
 	configData := `{
 		"sys": {
 			"device": {"name": "New Name"}
 		}
 	}`
-	if err := os.WriteFile(configFile, []byte(configData), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configData), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create and execute command
@@ -619,6 +628,9 @@ func TestRun_ImportJSONConfig(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_ImportYAMLConfig(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -654,15 +666,13 @@ func TestRun_ImportYAMLConfig(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file with YAML config
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := testConfigYAMLPath
 	configData := `sys:
   device:
     name: New Name
 `
-	if err := os.WriteFile(configFile, []byte(configData), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configData), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create and execute command
@@ -685,6 +695,9 @@ func TestRun_ImportYAMLConfig(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_DryRun(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -720,12 +733,10 @@ func TestRun_DryRun(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file with JSON config
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
+	configFile := testConfigPath
 	configData := `{"sys": {"device": {"name": "Updated Name"}}}`
-	if err := os.WriteFile(configFile, []byte(configData), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configData), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create and execute command with --dry-run
@@ -748,6 +759,9 @@ func TestRun_DryRun(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_DeviceNotFound(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{},
@@ -762,11 +776,9 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{"sys":{"name":"test"}}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	cmd := NewCommand(tf.Factory)
@@ -782,6 +794,9 @@ func TestRun_DeviceNotFound(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_WithOverwriteFlag(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -817,12 +832,10 @@ func TestRun_WithOverwriteFlag(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file with JSON config
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
+	configFile := testConfigPath
 	configData := `{"sys": {"device": {"name": "Overwritten"}}}`
-	if err := os.WriteFile(configFile, []byte(configData), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configData), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create and execute command with --overwrite
@@ -881,16 +894,16 @@ func TestOptions_Fields(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_EmptyConfigFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file with empty JSON object
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(`{}`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	configFile := testConfigPath
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create a cancelled context to just test file parsing
@@ -916,6 +929,9 @@ func TestRun_EmptyConfigFile(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_ComplexJSONConfig(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -951,9 +967,7 @@ func TestRun_ComplexJSONConfig(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file with complex nested JSON config
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
+	configFile := testConfigPath
 	configData := `{
 		"sys": {
 			"device": {
@@ -972,8 +986,8 @@ func TestRun_ComplexJSONConfig(t *testing.T) {
 			}
 		}
 	}`
-	if err := os.WriteFile(configFile, []byte(configData), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configData), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create and execute command
@@ -996,6 +1010,9 @@ func TestRun_ComplexJSONConfig(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_ComplexYAMLConfig(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1031,9 +1048,7 @@ func TestRun_ComplexYAMLConfig(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file with complex YAML config
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := testConfigYAMLPath
 	configData := `sys:
   device:
     name: YAML Complex Device
@@ -1046,8 +1061,8 @@ wifi:
     ssid: HomeNetwork
     pass: secret123
 `
-	if err := os.WriteFile(configFile, []byte(configData), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configData), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create and execute command
@@ -1112,6 +1127,9 @@ func TestNewCommand_OverwriteFlagDefault(t *testing.T) {
 
 //nolint:paralleltest // Uses shared mock server
 func TestRun_DryRunWithDiffOutput(t *testing.T) {
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Create fixtures with a Gen2 switch device
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -1147,12 +1165,10 @@ func TestRun_DryRunWithDiffOutput(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file with config that has different values
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
+	configFile := testConfigPath
 	configData := `{"sys": {"device": {"name": "Changed Name", "eco_mode": true}}}`
-	if err := os.WriteFile(configFile, []byte(configData), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(configData), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	// Create and execute command with --dry-run
@@ -1177,17 +1193,18 @@ func TestRun_DryRunWithDiffOutput(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_JSONParsedFirstBeforeYAML(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
-	// Create temp file with valid JSON (even though it has .yaml extension)
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	// Create file with valid JSON (even though it has .yaml extension)
+	configFile := testConfigYAMLPath
 	// This is valid JSON, should be parsed as JSON first
-	if err := os.WriteFile(configFile, []byte(`{"test": "value"}`), testFilePerms); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
+	if err := afero.WriteFile(config.Fs(), configFile, []byte(`{"test": "value"}`), testFilePerms); err != nil {
+		t.Fatalf("failed to write file: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

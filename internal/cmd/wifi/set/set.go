@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
@@ -88,9 +89,9 @@ func run(ctx context.Context, opts *Options) error {
 		return fmt.Errorf("--ssid is required (or use --disable to disable WiFi)")
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Configuring WiFi...", func(ctx context.Context) error {
-		if err := svc.SetWiFiConfig(ctx, opts.Device, opts.SSID, opts.Password, enable); err != nil {
-			return fmt.Errorf("failed to configure WiFi: %w", err)
+	err := cmdutil.RunWithSpinner(ctx, ios, "Configuring WiFi...", func(ctx context.Context) error {
+		if setErr := svc.SetWiFiConfig(ctx, opts.Device, opts.SSID, opts.Password, enable); setErr != nil {
+			return fmt.Errorf("failed to configure WiFi: %w", setErr)
 		}
 
 		if opts.Disable {
@@ -103,4 +104,11 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached WiFi status
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeWiFi)
+	return nil
 }

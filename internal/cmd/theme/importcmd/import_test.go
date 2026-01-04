@@ -3,13 +3,21 @@ package importcmd
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
+)
+
+// Test path constants.
+const (
+	testThemePath   = "/test/theme.yaml"
+	testInvalidPath = "/test/invalid.yaml"
+	testEmptyPath   = "/test/empty.yaml"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -124,18 +132,19 @@ func TestNewCommand_Help(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_ValidThemeFileWithoutApply(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file with valid name
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "theme.yaml")
+	// Create a theme file with valid name
+	themeFile := testThemePath
 	content := `name: dracula
 colors:
   foreground: "#f8f8f2"
   background: "#282a36"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -157,17 +166,18 @@ colors:
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_ValidThemeFileWithApply(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file with valid name
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "theme.yaml")
+	// Create a theme file with valid name
+	themeFile := testThemePath
 	content := `name: dracula
 colors:
   foreground: "#f8f8f2"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -189,12 +199,13 @@ colors:
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_ValidThemeWithColorOverrides(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file with custom colors
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "custom.yaml")
+	// Create a theme file with custom colors
+	themeFile := "/test/custom.yaml"
 	content := `name: dracula
 colors:
   foreground: "#ffffff"
@@ -203,7 +214,7 @@ colors:
   red: "#ff0000"
   blue: "#0000ff"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -226,15 +237,16 @@ colors:
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_InvalidThemeNotBuiltIn(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file with non-existent theme
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "invalid.yaml")
+	// Create a theme file with non-existent theme
+	themeFile := testInvalidPath
 	content := `name: nonexistent-theme-xyz
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -275,14 +287,15 @@ func TestExecute_FileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_InvalidYAML(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary file with invalid YAML
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "invalid.yaml")
+	// Create a file with invalid YAML
+	themeFile := testInvalidPath
 	content := `{invalid: yaml: [structure`
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -303,16 +316,17 @@ func TestExecute_InvalidYAML(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_MissingThemeAndColors(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file with neither name nor colors
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "empty.yaml")
+	// Create a theme file with neither name nor colors
+	themeFile := testEmptyPath
 	content := `# Empty theme file with no name or colors
 id: ""
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -333,16 +347,17 @@ id: ""
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_OldFormatWithID(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file using old format (id field instead of name)
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "old_format.yaml")
+	// Create a theme file using old format (id field instead of name)
+	themeFile := "/test/old_format.yaml"
 	content := `id: dracula
 display_name: "Dracula Theme"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -364,17 +379,18 @@ display_name: "Dracula Theme"
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_ColorOnlyTheme(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file with only colors, no theme name
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "colors_only.yaml")
+	// Create a theme file with only colors, no theme name
+	themeFile := "/test/colors_only.yaml"
 	content := `colors:
   foreground: "#aabbcc"
   background: "#112233"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -396,16 +412,17 @@ func TestExecute_ColorOnlyTheme(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_ApplyColorOnlyTheme(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file with only colors and apply flag
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "colors_apply.yaml")
+	// Create a theme file with only colors and apply flag
+	themeFile := "/test/colors_apply.yaml"
 	content := `colors:
   green: "#00ff00"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -427,15 +444,16 @@ func TestExecute_ApplyColorOnlyTheme(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_ValidThemeWithoutApply(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "theme.yaml")
+	// Create a theme file
+	themeFile := testThemePath
 	content := `name: dracula
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -452,17 +470,18 @@ func TestRun_ValidThemeWithoutApply(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_ValidThemeWithApply(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary theme file
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "theme.yaml")
+	// Create a theme file
+	themeFile := testThemePath
 	content := `name: dracula
 colors:
   foreground: "#fff"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -490,13 +509,14 @@ func TestRun_FileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_InvalidYAML(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "bad.yaml")
+	themeFile := "/test/bad.yaml"
 	content := `[invalid: yaml`
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -508,14 +528,15 @@ func TestRun_InvalidYAML(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_InvalidThemeName(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "theme.yaml")
+	themeFile := testThemePath
 	content := `name: this-theme-does-not-exist-xyz
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -531,14 +552,15 @@ func TestRun_InvalidThemeName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_MissingNameAndColors(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "empty.yaml")
+	themeFile := testEmptyPath
 	content := `# No name or colors
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -554,18 +576,19 @@ func TestRun_MissingNameAndColors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestRun_WithColorOverrides(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "colors.yaml")
+	themeFile := "/test/colors.yaml"
 	content := `name: dracula
 colors:
   foreground: "#ffffff"
   background: "#000000"
   green: "#00ff00"
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -583,14 +606,15 @@ colors:
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_ApplyWithInvalidTheme(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "invalid.yaml")
+	themeFile := testInvalidPath
 	content := `name: this-does-not-exist
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -607,13 +631,14 @@ func TestExecute_ApplyWithInvalidTheme(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_EmptyFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "empty.yaml")
+	themeFile := testEmptyPath
 	// Create empty file
-	if err := os.WriteFile(themeFile, []byte(""), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(""), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -634,14 +659,15 @@ func TestExecute_EmptyFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestExecute_AlternateAlias(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	themeFile := filepath.Join(tmpDir, "theme.yaml")
+	themeFile := testThemePath
 	content := `name: dracula
 `
-	if err := os.WriteFile(themeFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), themeFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 

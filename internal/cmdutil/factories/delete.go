@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -125,7 +126,7 @@ func runDeviceDelete(ctx context.Context, f *cmdutil.Factory, opts DeviceDeleteO
 	defer cancel()
 
 	resourceCapitalized := capitalize(opts.Resource)
-	return cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %s...", opts.Resource), func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Deleting %s...", opts.Resource), func(ctx context.Context) error {
 		var deleteErr error
 		if opts.AutomationServiceFunc != nil {
 			deleteErr = opts.AutomationServiceFunc(ctx, f.AutomationService(), device, id)
@@ -138,4 +139,28 @@ func runDeviceDelete(ctx context.Context, f *cmdutil.Factory, opts DeviceDeleteO
 		ios.Success("%s %d deleted", resourceCapitalized, id)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached data for this resource type
+	cacheType := cacheTypeForResource(opts.Resource)
+	if cacheType != "" {
+		cmdutil.InvalidateCache(f, device, cacheType)
+	}
+	return nil
+}
+
+// cacheTypeForResource maps a resource name to its cache type constant.
+func cacheTypeForResource(resource string) string {
+	switch resource {
+	case "schedule":
+		return cache.TypeSchedules
+	case "script":
+		return cache.TypeScripts
+	case "webhook":
+		return cache.TypeWebhooks
+	default:
+		return ""
+	}
 }

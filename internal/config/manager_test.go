@@ -14,11 +14,24 @@ const (
 	testScriptCode = "console.log('hello');"
 )
 
-func TestManager_Path(t *testing.T) {
-	t.Parallel()
+// setupTestManager sets up an isolated Manager for testing.
+// It uses an in-memory filesystem to avoid touching real files.
+func setupTestManager(t *testing.T) *Manager {
+	t.Helper()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+	m := NewManager("/test/config/config.yaml")
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	return m
+}
 
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "config.yaml")
+//nolint:paralleltest // Test modifies global state via SetFs
+func TestManager_Path(t *testing.T) {
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+	path := "/test/config/config.yaml"
 	m := NewManager(path)
 
 	if m.Path() != path {
@@ -26,6 +39,8 @@ func TestManager_Path(t *testing.T) {
 	}
 }
 
+// TestManager_Reload tests real file persistence across Reload().
+// Uses t.TempDir() because the test specifically validates disk I/O.
 func TestManager_Reload(t *testing.T) {
 	t.Parallel()
 
@@ -51,28 +66,22 @@ func TestManager_Reload(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SaveWithoutLoad(t *testing.T) {
-	t.Parallel()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+	m := NewManager("/test/config/config.yaml")
 
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-
-	// Try to save without loading first
+	// Try to save without loading first (don't call Load())
 	err := m.Save()
 	if err == nil {
 		t.Error("Save() should fail when config is not loaded")
 	}
 }
 
-//nolint:gocyclo // test function with many assertions
+//nolint:gocyclo,paralleltest // test function with many assertions; modifies global state via SetFs
 func TestManager_SceneOperations(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Create a scene
 	if err := m.CreateScene("movie-night", "Dim lights for movies"); err != nil {
@@ -148,14 +157,9 @@ func TestManager_SceneOperations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SceneOperations_Errors(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Create scene to test duplicate error
 	if err := m.CreateScene("test-scene", ""); err != nil {
@@ -188,14 +192,9 @@ func TestManager_SceneOperations_Errors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_DeviceTemplateOperations(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Create template
 	cfg := map[string]any{"setting1": "value1"}
@@ -259,14 +258,9 @@ func TestManager_DeviceTemplateOperations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_DeviceTemplateOperations_Errors(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Create template
 	if err := m.CreateDeviceTemplate("test", "", "Model", "", 2, map[string]any{}, ""); err != nil {
@@ -289,14 +283,9 @@ func TestManager_DeviceTemplateOperations_Errors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ScriptTemplateOperations(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Save script template
 	tpl := ScriptTemplate{
@@ -334,14 +323,9 @@ func TestManager_ScriptTemplateOperations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ScriptTemplateOperations_Errors(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Delete nonexistent
 	if err := m.DeleteScriptTemplate("nonexistent"); err == nil {
@@ -349,14 +333,9 @@ func TestManager_ScriptTemplateOperations_Errors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AlertOperations(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Create alert
 	if err := m.CreateAlert("power-alert", "High power warning", "device1", "power>100", "notify", true); err != nil {
@@ -411,14 +390,9 @@ func TestManager_AlertOperations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AlertOperations_Errors(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Create alert
 	if err := m.CreateAlert("test", "", "", "", "", true); err != nil {
@@ -441,14 +415,9 @@ func TestManager_AlertOperations_Errors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ListAliasesMap(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	if err := m.AddAlias("test1", "cmd1", false); err != nil {
 		t.Fatalf("AddAlias() error: %v", err)
@@ -470,14 +439,9 @@ func TestManager_ListAliasesMap(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SetDeviceAuth(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Register device
 	if err := m.RegisterDevice("test", "192.168.1.1", 2, "", "", nil); err != nil {
@@ -511,28 +475,18 @@ func TestManager_SetDeviceAuth(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SetDeviceAuth_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	if err := m.SetDeviceAuth("nonexistent", "user", "pass"); err == nil {
 		t.Error("expected error setting auth on nonexistent device")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CreateScene_ValidationError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Try to create scene with invalid name
 	if err := m.CreateScene("", "description"); err == nil {
@@ -540,14 +494,9 @@ func TestManager_CreateScene_ValidationError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SaveScene_Overwrite(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Create initial scene
 	scene1 := Scene{
@@ -577,14 +526,9 @@ func TestManager_SaveScene_Overwrite(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SaveScene_ValidationError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Try to save scene with invalid name
 	scene := Scene{Name: ""}
@@ -593,14 +537,9 @@ func TestManager_SaveScene_ValidationError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UpdateScene_DescriptionOnly(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	if err := m.CreateScene("test-scene", "Original"); err != nil {
 		t.Fatalf("CreateScene() error: %v", err)
@@ -620,14 +559,9 @@ func TestManager_UpdateScene_DescriptionOnly(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_CreateDeviceTemplate_ValidationError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Try to create template with invalid name
 	if err := m.CreateDeviceTemplate("", "desc", "model", "app", 2, nil, ""); err == nil {
@@ -635,14 +569,9 @@ func TestManager_CreateDeviceTemplate_ValidationError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SaveDeviceTemplate_ValidationError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Try to save template with invalid name
 	tpl := DeviceTemplate{Name: ""}
@@ -651,14 +580,9 @@ func TestManager_SaveDeviceTemplate_ValidationError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_SaveScriptTemplate_ValidationError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Try to save script template with invalid name
 	tpl := ScriptTemplate{Name: ""}
@@ -667,14 +591,15 @@ func TestManager_SaveScriptTemplate_ValidationError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_Load_InvalidYAML(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
+	fs := afero.NewMemMapFs()
+	SetFs(fs)
+	t.Cleanup(func() { SetFs(nil) })
+	configPath := "/test/config/config.yaml"
 
 	// Write invalid YAML
-	if err := afero.WriteFile(afero.NewOsFs(), configPath, []byte(":\ninvalid yaml content"), 0o600); err != nil {
+	if err := afero.WriteFile(fs, configPath, []byte(":\ninvalid yaml content"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
@@ -684,14 +609,9 @@ func TestManager_Load_InvalidYAML(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddAlias_NilMap(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	// Force nil aliases map
 	m.mu.Lock()
@@ -712,14 +632,9 @@ func TestManager_AddAlias_NilMap(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UpdateScene_RenameValidationError(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	if err := m.CreateScene("original", "description"); err != nil {
 		t.Fatalf("CreateScene() error: %v", err)
@@ -732,14 +647,9 @@ func TestManager_UpdateScene_RenameValidationError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UpdateScene_RenameAlreadyExists(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	if err := m.CreateScene("scene1", "description1"); err != nil {
 		t.Fatalf("CreateScene() error: %v", err)
@@ -755,14 +665,9 @@ func TestManager_UpdateScene_RenameAlreadyExists(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_UpdateScene_RenameWithValidation(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupTestManager(t)
 
 	if err := m.CreateScene("original", "description"); err != nil {
 		t.Fatalf("CreateScene() error: %v", err)

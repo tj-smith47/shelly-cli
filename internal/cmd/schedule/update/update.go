@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
@@ -106,7 +107,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Updating schedule...", func(ctx context.Context) error {
+	err := cmdutil.RunWithSpinner(ctx, ios, "Updating schedule...", func(ctx context.Context) error {
 		if updateErr := svc.UpdateSchedule(ctx, opts.Device, opts.ID, enablePtr, timespecPtr, calls); updateErr != nil {
 			return fmt.Errorf("failed to update schedule: %w", updateErr)
 		}
@@ -127,4 +128,11 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached schedule list
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeSchedules)
+	return nil
 }

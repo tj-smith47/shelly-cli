@@ -222,12 +222,19 @@ func run(ctx context.Context, opts *Options) error {
 	updateCtx, cancel := f.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	return cmdutil.RunWithSpinner(updateCtx, ios, "Updating firmware...", func(ctx context.Context) error {
-		if err := svc.UpdateDeviceFirmware(ctx, device, opts.Beta, opts.URL); err != nil {
-			return fmt.Errorf("failed to start update: %w", err)
+	err = cmdutil.RunWithSpinner(updateCtx, ios, "Updating firmware...", func(ctx context.Context) error {
+		if updateErr := svc.UpdateDeviceFirmware(ctx, device, opts.Beta, opts.URL); updateErr != nil {
+			return fmt.Errorf("failed to start update: %w", updateErr)
 		}
 		ios.Success("Firmware update started on %s", opts.Device)
 		ios.Info("The device will reboot automatically. Use 'shelly firmware status %s' to check progress.", opts.Device)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate all cached data for this device since firmware updates affect everything
+	cmdutil.InvalidateDeviceCache(f, opts.Device)
+	return nil
 }

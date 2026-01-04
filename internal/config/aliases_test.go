@@ -2,13 +2,27 @@ package config
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
 )
+
+const testImportFile = "/test/import.yaml"
+
+// setupAliasTest sets up an isolated Manager for alias testing.
+// It uses an in-memory filesystem to avoid touching real files.
+func setupAliasTest(t *testing.T) *Manager {
+	t.Helper()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+	m := NewManager("/test/config/config.yaml")
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	return m
+}
 
 func TestValidateAliasName(t *testing.T) {
 	t.Parallel()
@@ -118,15 +132,9 @@ func TestExpandAlias(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AliasOperations(t *testing.T) {
-	t.Parallel()
-
-	// Create temp dir for isolated config
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	// Test AddAlias
 	err := m.AddAlias("ss", "switch status", false)
@@ -166,14 +174,9 @@ func TestManager_AliasOperations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ExportAliases(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	if err := m.AddAlias("ss", "switch status", false); err != nil {
 		t.Fatalf("AddAlias(ss) error: %v", err)
@@ -182,21 +185,15 @@ func TestManager_ExportAliases(t *testing.T) {
 		t.Fatalf("AddAlias(st) error: %v", err)
 	}
 
-	exportPath := filepath.Join(tmpDir, "aliases.yaml")
-	_, err := m.ExportAliases(exportPath)
+	_, err := m.ExportAliases("/test/aliases.yaml")
 	if err != nil {
 		t.Fatalf("ExportAliases() error: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	// Add and export aliases first
 	if err := m.AddAlias("ss", "switch status", false); err != nil {
@@ -206,7 +203,7 @@ func TestManager_ImportAliases(t *testing.T) {
 		t.Fatalf("AddAlias(st) error: %v", err)
 	}
 
-	exportPath := filepath.Join(tmpDir, "aliases.yaml")
+	exportPath := "/test/aliases.yaml"
 	if _, err := m.ExportAliases(exportPath); err != nil {
 		t.Fatalf("ExportAliases() error: %v", err)
 	}
@@ -237,14 +234,9 @@ func TestManager_ImportAliases(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases_MergeMode(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	// Add and export aliases
 	if err := m.AddAlias("ss", "switch status", false); err != nil {
@@ -254,7 +246,7 @@ func TestManager_ImportAliases_MergeMode(t *testing.T) {
 		t.Fatalf("AddAlias(st) error: %v", err)
 	}
 
-	exportPath := filepath.Join(tmpDir, "aliases.yaml")
+	exportPath := "/test/aliases.yaml"
 	if _, err := m.ExportAliases(exportPath); err != nil {
 		t.Fatalf("ExportAliases() error: %v", err)
 	}
@@ -516,30 +508,30 @@ func TestPackageLevelAliasFunctions(t *testing.T) {
 	// not afero. These are tested in Manager tests with temp directories instead.
 }
 
-//nolint:paralleltest // Test modifies global state via ResetDefaultManagerForTesting and SetDefaultManager
+//nolint:paralleltest // Test modifies global state via SetFs, ResetDefaultManagerForTesting and SetDefaultManager
 func TestPackageLevel_ImportAliases(t *testing.T) {
-	// Use temp dir for file operations
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
+	// Set up in-memory fs
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
 	// Reset default manager
 	ResetDefaultManagerForTesting()
 	t.Cleanup(func() { ResetDefaultManagerForTesting() })
 
-	// Set up a real manager (not in-memory fs since ImportAliases uses os.ReadFile)
-	mgr := NewManager(configPath)
+	// Set up a manager with in-memory fs
+	mgr := NewManager("/test/config/config.yaml")
 	if err := mgr.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
 	SetDefaultManager(mgr)
 
-	// Create an import file
-	importFile := filepath.Join(tmpDir, "import.yaml")
+	// Create an import file in in-memory fs
+	importFile := testImportFile
 	importContent := `aliases:
   import-test: device info $1
   shell-alias: "!echo hello"
 `
-	if err := os.WriteFile(importFile, []byte(importContent), 0o600); err != nil {
+	if err := afero.WriteFile(mgr.Fs(), importFile, []byte(importContent), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
@@ -568,35 +560,24 @@ func TestPackageLevel_ImportAliases(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases_FileNotFound(t *testing.T) {
-	t.Parallel()
+	m := setupAliasTest(t)
 
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-
-	// Use a path that's guaranteed not to exist
-	nonExistentPath := filepath.Join(tmpDir, "nonexistent_subdir", "aliases.yaml")
-	_, _, err := m.ImportAliases(nonExistentPath, false)
+	// Use a path that's guaranteed not to exist in the in-memory fs
+	_, _, err := m.ImportAliases("/test/nonexistent_subdir/aliases.yaml", false)
 	if err == nil {
 		t.Error("ImportAliases() should error for nonexistent file")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases_InvalidYAML(t *testing.T) {
-	t.Parallel()
+	m := setupAliasTest(t)
 
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-
-	// Create invalid YAML file
-	invalidFile := filepath.Join(tmpDir, "invalid.yaml")
-	if err := os.WriteFile(invalidFile, []byte(":\ninvalid yaml here"), 0o600); err != nil {
+	// Create invalid YAML file in in-memory fs
+	invalidFile := "/test/invalid.yaml"
+	if err := afero.WriteFile(m.Fs(), invalidFile, []byte(":\ninvalid yaml here"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
@@ -606,21 +587,16 @@ func TestManager_ImportAliases_InvalidYAML(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases_InvalidAliasName(t *testing.T) {
-	t.Parallel()
+	m := setupAliasTest(t)
 
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-
-	// Create file with reserved command as alias name
-	invalidFile := filepath.Join(tmpDir, "reserved.yaml")
+	// Create file with reserved command as alias name in in-memory fs
+	invalidFile := "/test/reserved.yaml"
 	content := `aliases:
   help: this should fail validation
 `
-	if err := os.WriteFile(invalidFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(m.Fs(), invalidFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
@@ -630,21 +606,16 @@ func TestManager_ImportAliases_InvalidAliasName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases_ShellAlias(t *testing.T) {
-	t.Parallel()
+	m := setupAliasTest(t)
 
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-
-	// Create file with shell alias (! prefix)
-	shellFile := filepath.Join(tmpDir, "shell.yaml")
+	// Create file with shell alias (! prefix) in in-memory fs
+	shellFile := "/test/shell.yaml"
 	content := `aliases:
   myshell: "!ls -la"
 `
-	if err := os.WriteFile(shellFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(m.Fs(), shellFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
@@ -692,14 +663,9 @@ func TestManager_AddAlias_NilAliasesMap(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_AddAlias_InvalidName(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	// Try to add alias with empty name
 	err := m.AddAlias("", "echo test", false)
@@ -714,14 +680,9 @@ func TestManager_AddAlias_InvalidName(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_RemoveAlias_NotFound(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	err := m.RemoveAlias("nonexistent-alias")
 	if err == nil {
@@ -729,14 +690,9 @@ func TestManager_RemoveAlias_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ExportAliases_ToFile(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	// Add both regular and shell alias
 	if err := m.AddAlias("regular", "device info", false); err != nil {
@@ -746,8 +702,8 @@ func TestManager_ExportAliases_ToFile(t *testing.T) {
 		t.Fatalf("AddAlias() error: %v", err)
 	}
 
-	// Export to file
-	exportPath := filepath.Join(tmpDir, "exported.yaml")
+	// Export to file in in-memory fs
+	exportPath := "/test/exported.yaml"
 	result, err := m.ExportAliases(exportPath)
 	if err != nil {
 		t.Fatalf("ExportAliases() error: %v", err)
@@ -770,6 +726,8 @@ func TestManager_ExportAliases_ToFile(t *testing.T) {
 	}
 }
 
+// TestManager_ExportAliases_WriteError tests filesystem error handling.
+// Uses t.TempDir() because MemMapFs auto-creates parent directories.
 func TestManager_ExportAliases_WriteError(t *testing.T) {
 	t.Parallel()
 
@@ -791,10 +749,11 @@ func TestManager_ExportAliases_WriteError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases_NilAliasesMap(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	// Set up in-memory fs
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
 	// Create a config with nil Aliases map
 	cfg := &Config{
@@ -802,12 +761,12 @@ func TestManager_ImportAliases_NilAliasesMap(t *testing.T) {
 	}
 	m := NewTestManager(cfg)
 
-	// Create import file
-	importFile := filepath.Join(tmpDir, "import.yaml")
+	// Create import file in in-memory fs
+	importFile := testImportFile
 	content := `aliases:
   imported: echo test
 `
-	if err := os.WriteFile(importFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(m.Fs(), importFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
@@ -821,14 +780,9 @@ func TestManager_ImportAliases_NilAliasesMap(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ExportAliases_EmptyFilename(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	// Add some aliases including a shell alias
 	if err := m.AddAlias("test", "device info $1", false); err != nil {
@@ -855,26 +809,21 @@ func TestManager_ExportAliases_EmptyFilename(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ImportAliases_NonMergeOverwrite(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	m := setupAliasTest(t)
 
 	// Add an existing alias
 	if err := m.AddAlias("existing", "original command", false); err != nil {
 		t.Fatalf("AddAlias() error: %v", err)
 	}
 
-	// Create import file with same alias name
-	importFile := filepath.Join(tmpDir, "import.yaml")
+	// Create import file with same alias name in in-memory fs
+	importFile := testImportFile
 	content := `aliases:
   existing: new command
 `
-	if err := os.WriteFile(importFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(m.Fs(), importFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 

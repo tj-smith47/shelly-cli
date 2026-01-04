@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
@@ -77,41 +78,66 @@ structured output suitable for scripting.`,
 }
 
 func run(ctx context.Context, opts *Options) error {
+	if err := cmdutil.CheckCacheFlags(); err != nil {
+		return err
+	}
+
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := opts.Factory.IOStreams()
 	kvsSvc := opts.Factory.KVSService()
 
-	// If values requested or pattern match, use GetMany
-	if opts.Values || opts.Match != "" {
-		match := opts.Match
-		if match == "" {
-			match = "*"
+	// Default: just list keys (cached)
+	if !opts.Values && opts.Match == "" {
+		result, err := cmdutil.CachedFetch(ctx, opts.Factory, opts.Device,
+			cache.TypeKVS+":keys", cache.TTLAutomation,
+			func(ctx context.Context) (*kvs.ListResult, error) {
+				ios.StartProgress("Getting KVS keys...")
+				defer ios.StopProgress()
+				return kvsSvc.List(ctx, opts.Device)
+			})
+		if err != nil {
+			return err
 		}
+		return cmdutil.PrintResult(ios, result.Data, term.DisplayKVSKeys)
+	}
 
+	// Values or pattern match requested - use GetMany
+	match := opts.Match
+	if match == "" {
+		match = "*"
+	}
+
+	// Filtered results - fetch without caching
+	if match != "*" {
 		items, err := cmdutil.RunWithSpinnerResult(ctx, ios, "Getting KVS data...", func(ctx context.Context) ([]kvs.Item, error) {
 			return kvsSvc.GetMany(ctx, opts.Device, match)
 		})
 		if err != nil {
 			return err
 		}
-
 		if len(items) == 0 {
 			ios.NoResults("No keys found")
 			return nil
 		}
-
 		return cmdutil.PrintListResult(ios, items, term.DisplayKVSItems)
 	}
 
-	// Default: just list keys
-	result, err := cmdutil.RunWithSpinnerResult(ctx, ios, "Getting KVS keys...", func(ctx context.Context) (*kvs.ListResult, error) {
-		return kvsSvc.List(ctx, opts.Device)
-	})
+	// All values (unfiltered) - use cache
+	result, err := cmdutil.CachedFetchList(ctx, opts.Factory, opts.Device,
+		cache.TypeKVS, cache.TTLAutomation,
+		func(ctx context.Context) ([]kvs.Item, error) {
+			ios.StartProgress("Getting KVS data...")
+			defer ios.StopProgress()
+			return kvsSvc.GetMany(ctx, opts.Device, "*")
+		})
 	if err != nil {
 		return err
 	}
-
-	return cmdutil.PrintResult(ios, result, term.DisplayKVSKeys)
+	if len(result.Data) == 0 {
+		ios.NoResults("No keys found")
+		return nil
+	}
+	return cmdutil.PrintListResult(ios, result.Data, term.DisplayKVSItems)
 }

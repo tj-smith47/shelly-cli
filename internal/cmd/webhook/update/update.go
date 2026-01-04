@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -91,11 +92,18 @@ func run(ctx context.Context, opts *Options) error {
 		params.Enable = &f
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Updating webhook...", func(ctx context.Context) error {
-		if err := svc.UpdateWebhook(ctx, opts.Device, opts.WebhookID, params); err != nil {
-			return fmt.Errorf("failed to update webhook: %w", err)
+	err := cmdutil.RunWithSpinner(ctx, ios, "Updating webhook...", func(ctx context.Context) error {
+		if updateErr := svc.UpdateWebhook(ctx, opts.Device, opts.WebhookID, params); updateErr != nil {
+			return fmt.Errorf("failed to update webhook: %w", updateErr)
 		}
 		ios.Success("Webhook %d updated on %s", opts.WebhookID, opts.Device)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Invalidate cached webhook list
+	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeWebhooks)
+	return nil
 }

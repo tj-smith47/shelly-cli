@@ -1,4 +1,4 @@
-package cmdutil_test
+package factories_test
 
 import (
 	"bytes"
