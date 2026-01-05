@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly bthome on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/</link><description>Recent content in shelly bthome on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly bthome add</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/add/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/add/</guid><description>&lt;h2 id="shelly-bthome-add"&gt;shelly bthome add&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly bthome on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/bthome/</link><description>Recent content in shelly bthome on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/bthome/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly bthome add</title><link>http://localhost:1313/shelly-cli/docs/commands/bthome/add/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/bthome/add/</guid><description>&lt;h2 id="shelly-bthome-add"&gt;shelly bthome add&lt;/h2&gt;
 &lt;p&gt;Add a BTHome device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Add a BTHome device to a Shelly gateway.&lt;/p&gt;
@@ -136,7 +136,7 @@ can be monitored with &amp;lsquo;shelly monitor events&amp;rsquo;.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly bthome list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/list/</guid><description>&lt;h2 id="shelly-bthome-list"&gt;shelly bthome list&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly bthome list</title><link>http://localhost:1313/shelly-cli/docs/commands/bthome/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/bthome/list/</guid><description>&lt;h2 id="shelly-bthome-list"&gt;shelly bthome list&lt;/h2&gt;
 &lt;p&gt;List BTHome devices&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;List all BTHome devices connected to a Shelly gateway.&lt;/p&gt;
@@ -146,7 +146,7 @@ device that collects their readings.&lt;/p&gt;
 &lt;p&gt;Shows configured BTHomeDevice components with their current status,
 signal strength (RSSI), battery level, and last update time.&lt;/p&gt;
 &lt;p&gt;Use &amp;lsquo;shelly bthome add&amp;rsquo; to discover and pair new devices.
-Use &amp;lsquo;shelly bthome sensors&amp;rsquo; to view sensor readings.&lt;/p&gt;</description></item><item><title>shelly bthome remove</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/remove/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/remove/</guid><description>&lt;h2 id="shelly-bthome-remove"&gt;shelly bthome remove&lt;/h2&gt;
+Use &amp;lsquo;shelly bthome sensors&amp;rsquo; to view sensor readings.&lt;/p&gt;</description></item><item><title>shelly bthome remove</title><link>http://localhost:1313/shelly-cli/docs/commands/bthome/remove/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/bthome/remove/</guid><description>&lt;h2 id="shelly-bthome-remove"&gt;shelly bthome remove&lt;/h2&gt;
 &lt;p&gt;Remove a BTHome device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Remove a BTHome device from a Shelly gateway.&lt;/p&gt;
@@ -263,7 +263,7 @@ components. The physical device will no longer be tracked by the gateway.&lt;/p&
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_bthome.md"&gt;shelly bthome&lt;/a&gt;	 - Manage BTHome Bluetooth devices&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly bthome status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/bthome/status/</guid><description>&lt;h2 id="shelly-bthome-status"&gt;shelly bthome status&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly bthome status</title><link>http://localhost:1313/shelly-cli/docs/commands/bthome/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/bthome/status/</guid><description>&lt;h2 id="shelly-bthome-status"&gt;shelly bthome status&lt;/h2&gt;
 &lt;p&gt;Show BTHome device status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Show detailed status of BTHome devices.&lt;/p&gt;

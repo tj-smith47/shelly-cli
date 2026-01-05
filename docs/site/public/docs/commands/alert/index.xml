@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly alert on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/</link><description>Recent content in shelly alert on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/alert/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly alert create</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/create/</guid><description>&lt;h2 id="shelly-alert-create"&gt;shelly alert create&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly alert on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/alert/</link><description>Recent content in shelly alert on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/alert/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly alert create</title><link>http://localhost:1313/shelly-cli/docs/commands/alert/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/alert/create/</guid><description>&lt;h2 id="shelly-alert-create"&gt;shelly alert create&lt;/h2&gt;
 &lt;p&gt;Create a monitoring alert&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Create a new monitoring alert for device conditions.&lt;/p&gt;
@@ -139,7 +139,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_alert.md"&gt;shelly alert&lt;/a&gt;	 - Manage monitoring alerts&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly alert list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/list/</guid><description>&lt;h2 id="shelly-alert-list"&gt;shelly alert list&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly alert list</title><link>http://localhost:1313/shelly-cli/docs/commands/alert/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/alert/list/</guid><description>&lt;h2 id="shelly-alert-list"&gt;shelly alert list&lt;/h2&gt;
 &lt;p&gt;List configured alerts&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;List all configured monitoring alerts.&lt;/p&gt;
@@ -245,7 +245,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_alert.md"&gt;shelly alert&lt;/a&gt;	 - Manage monitoring alerts&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly alert snooze</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/snooze/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/snooze/</guid><description>&lt;h2 id="shelly-alert-snooze"&gt;shelly alert snooze&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly alert snooze</title><link>http://localhost:1313/shelly-cli/docs/commands/alert/snooze/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/alert/snooze/</guid><description>&lt;h2 id="shelly-alert-snooze"&gt;shelly alert snooze&lt;/h2&gt;
 &lt;p&gt;Snooze an alert temporarily&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Snooze an alert for a specified duration.&lt;/p&gt;
@@ -368,7 +368,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_alert.md"&gt;shelly alert&lt;/a&gt;	 - Manage monitoring alerts&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly alert test</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/test/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/test/</guid><description>&lt;h2 id="shelly-alert-test"&gt;shelly alert test&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly alert test</title><link>http://localhost:1313/shelly-cli/docs/commands/alert/test/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/alert/test/</guid><description>&lt;h2 id="shelly-alert-test"&gt;shelly alert test&lt;/h2&gt;
 &lt;p&gt;Test an alert by triggering it&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Test an alert by manually triggering its action.&lt;/p&gt;
@@ -475,7 +475,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_alert.md"&gt;shelly alert&lt;/a&gt;	 - Manage monitoring alerts&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly alert watch</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/watch/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/alert/watch/</guid><description>&lt;h2 id="shelly-alert-watch"&gt;shelly alert watch&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly alert watch</title><link>http://localhost:1313/shelly-cli/docs/commands/alert/watch/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/alert/watch/</guid><description>&lt;h2 id="shelly-alert-watch"&gt;shelly alert watch&lt;/h2&gt;
 &lt;p&gt;Monitor alerts in real-time&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Monitor configured alerts and trigger actions when conditions are met.&lt;/p&gt;

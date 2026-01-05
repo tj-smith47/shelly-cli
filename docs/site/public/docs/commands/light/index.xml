@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly light on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/</link><description>Recent content in shelly light on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/light/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly light list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/list/</guid><description>&lt;h2 id="shelly-light-list"&gt;shelly light list&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly light on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/light/</link><description>Recent content in shelly light on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/light/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly light list</title><link>http://localhost:1313/shelly-cli/docs/commands/light/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/light/list/</guid><description>&lt;h2 id="shelly-light-list"&gt;shelly light list&lt;/h2&gt;
 &lt;p&gt;List light components&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;List all light components on the specified device with their current status.&lt;/p&gt;
@@ -6,7 +6,7 @@
 name, state (ON/OFF), brightness level (percentage), and power consumption
 if supported. Some lights also support color temperature or RGB values.&lt;/p&gt;
 &lt;p&gt;Output is formatted as a table by default. Use -o json or -o yaml for
-structured output suitable for scripting.&lt;/p&gt;</description></item><item><title>shelly light off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/off/</guid><description>&lt;h2 id="shelly-light-off"&gt;shelly light off&lt;/h2&gt;
+structured output suitable for scripting.&lt;/p&gt;</description></item><item><title>shelly light off</title><link>http://localhost:1313/shelly-cli/docs/commands/light/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/light/off/</guid><description>&lt;h2 id="shelly-light-off"&gt;shelly light off&lt;/h2&gt;
 &lt;p&gt;Turn light off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Turn off a light component on the specified device.&lt;/p&gt;
@@ -120,7 +120,7 @@ structured output suitable for scripting.&lt;/p&gt;</description></item><item><t
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly light on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/on/</guid><description>&lt;h2 id="shelly-light-on"&gt;shelly light on&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly light on</title><link>http://localhost:1313/shelly-cli/docs/commands/light/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/light/on/</guid><description>&lt;h2 id="shelly-light-on"&gt;shelly light on&lt;/h2&gt;
 &lt;p&gt;Turn light on&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Turn on a light component on the specified device.&lt;/p&gt;
@@ -234,7 +234,7 @@ structured output suitable for scripting.&lt;/p&gt;</description></item><item><t
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly light set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/set/</guid><description>&lt;h2 id="shelly-light-set"&gt;shelly light set&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly light set</title><link>http://localhost:1313/shelly-cli/docs/commands/light/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/light/set/</guid><description>&lt;h2 id="shelly-light-set"&gt;shelly light set&lt;/h2&gt;
 &lt;p&gt;Set light parameters&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Set parameters of a light component on the specified device.&lt;/p&gt;
@@ -354,7 +354,7 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly light status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/status/</guid><description>&lt;h2 id="shelly-light-status"&gt;shelly light status&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly light status</title><link>http://localhost:1313/shelly-cli/docs/commands/light/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/light/status/</guid><description>&lt;h2 id="shelly-light-status"&gt;shelly light status&lt;/h2&gt;
 &lt;p&gt;Show light status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Show the current status of a light component on the specified device.&lt;/p&gt;
@@ -468,7 +468,7 @@ Values not specified will be left unchanged.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_light.md"&gt;shelly light&lt;/a&gt;	 - Control light components&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly light toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/light/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/light/toggle/</guid><description>&lt;h2 id="shelly-light-toggle"&gt;shelly light toggle&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly light toggle</title><link>http://localhost:1313/shelly-cli/docs/commands/light/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/light/toggle/</guid><description>&lt;h2 id="shelly-light-toggle"&gt;shelly light toggle&lt;/h2&gt;
 &lt;p&gt;Toggle light on/off&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Toggle a light component on or off on the specified device.&lt;/p&gt;

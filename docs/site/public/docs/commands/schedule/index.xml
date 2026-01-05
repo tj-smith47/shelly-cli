@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly schedule on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/</link><description>Recent content in shelly schedule on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly schedule create</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/create/</guid><description>&lt;h2 id="shelly-schedule-create"&gt;shelly schedule create&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly schedule on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/</link><description>Recent content in shelly schedule on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/schedule/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly schedule create</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/create/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/schedule/create/</guid><description>&lt;h2 id="shelly-schedule-create"&gt;shelly schedule create&lt;/h2&gt;
 &lt;p&gt;Create a new schedule&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Create a new schedule on a Gen2+ Shelly device.&lt;/p&gt;
@@ -143,7 +143,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_schedule.md"&gt;shelly schedule&lt;/a&gt;	 - Manage device schedules&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly schedule delete</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/delete/</guid><description>&lt;h2 id="shelly-schedule-delete"&gt;shelly schedule delete&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly schedule delete</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/delete/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/schedule/delete/</guid><description>&lt;h2 id="shelly-schedule-delete"&gt;shelly schedule delete&lt;/h2&gt;
 &lt;p&gt;Delete a schedule&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Delete a schedule from a Gen2+ Shelly device.&lt;/p&gt;
@@ -257,7 +257,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_schedule.md"&gt;shelly schedule&lt;/a&gt;	 - Manage device schedules&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly schedule delete-all</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/delete-all/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/delete-all/</guid><description>&lt;h2 id="shelly-schedule-delete-all"&gt;shelly schedule delete-all&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly schedule delete-all</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/delete-all/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/schedule/delete-all/</guid><description>&lt;h2 id="shelly-schedule-delete-all"&gt;shelly schedule delete-all&lt;/h2&gt;
 &lt;p&gt;Delete all schedules&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Delete all schedules from a Gen2+ Shelly device.&lt;/p&gt;
@@ -371,7 +371,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_schedule.md"&gt;shelly schedule&lt;/a&gt;	 - Manage device schedules&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly schedule disable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/disable/</guid><description>&lt;h2 id="shelly-schedule-disable"&gt;shelly schedule disable&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly schedule disable</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/schedule/disable/</guid><description>&lt;h2 id="shelly-schedule-disable"&gt;shelly schedule disable&lt;/h2&gt;
 &lt;p&gt;Disable a schedule&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Disable a schedule on a Gen2+ Shelly device.&lt;/p&gt;
@@ -477,7 +477,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_schedule.md"&gt;shelly schedule&lt;/a&gt;	 - Manage device schedules&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly schedule enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/enable/</guid><description>&lt;h2 id="shelly-schedule-enable"&gt;shelly schedule enable&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly schedule enable</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/schedule/enable/</guid><description>&lt;h2 id="shelly-schedule-enable"&gt;shelly schedule enable&lt;/h2&gt;
 &lt;p&gt;Enable a schedule&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Enable a schedule on a Gen2+ Shelly device.&lt;/p&gt;
@@ -583,7 +583,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_schedule.md"&gt;shelly schedule&lt;/a&gt;	 - Manage device schedules&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly schedule list</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/list/</guid><description>&lt;h2 id="shelly-schedule-list"&gt;shelly schedule list&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly schedule list</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/list/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/schedule/list/</guid><description>&lt;h2 id="shelly-schedule-list"&gt;shelly schedule list&lt;/h2&gt;
 &lt;p&gt;List schedules on a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;List all schedules on a Gen2+ Shelly device.&lt;/p&gt;
@@ -725,7 +725,7 @@ structured output suitable for scripting.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_schedule.md"&gt;shelly schedule&lt;/a&gt;	 - Manage device schedules&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly schedule update</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/update/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/schedule/update/</guid><description>&lt;h2 id="shelly-schedule-update"&gt;shelly schedule update&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly schedule update</title><link>http://localhost:1313/shelly-cli/docs/commands/schedule/update/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/schedule/update/</guid><description>&lt;h2 id="shelly-schedule-update"&gt;shelly schedule update&lt;/h2&gt;
 &lt;p&gt;Update a schedule&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Update an existing schedule on a Gen2+ Shelly device.&lt;/p&gt;

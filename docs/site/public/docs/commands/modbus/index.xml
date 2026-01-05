@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly modbus on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/</link><description>Recent content in shelly modbus on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly modbus disable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/disable/</guid><description>&lt;h2 id="shelly-modbus-disable"&gt;shelly modbus disable&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly modbus on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/modbus/</link><description>Recent content in shelly modbus on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/modbus/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly modbus disable</title><link>http://localhost:1313/shelly-cli/docs/commands/modbus/disable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/modbus/disable/</guid><description>&lt;h2 id="shelly-modbus-disable"&gt;shelly modbus disable&lt;/h2&gt;
 &lt;p&gt;Disable Modbus-TCP server&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Disable the Modbus-TCP server on a Shelly device.&lt;/p&gt;
@@ -104,7 +104,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly modbus enable</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/enable/</guid><description>&lt;h2 id="shelly-modbus-enable"&gt;shelly modbus enable&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly modbus enable</title><link>http://localhost:1313/shelly-cli/docs/commands/modbus/enable/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/modbus/enable/</guid><description>&lt;h2 id="shelly-modbus-enable"&gt;shelly modbus enable&lt;/h2&gt;
 &lt;p&gt;Enable Modbus-TCP server&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Enable the Modbus-TCP server on a Shelly device.&lt;/p&gt;
@@ -211,7 +211,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_modbus.md"&gt;shelly modbus&lt;/a&gt;	 - Manage Modbus-TCP configuration&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly modbus status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/modbus/status/</guid><description>&lt;h2 id="shelly-modbus-status"&gt;shelly modbus status&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly modbus status</title><link>http://localhost:1313/shelly-cli/docs/commands/modbus/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/modbus/status/</guid><description>&lt;h2 id="shelly-modbus-status"&gt;shelly modbus status&lt;/h2&gt;
 &lt;p&gt;Show Modbus-TCP status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Show the current Modbus-TCP server status and configuration.&lt;/p&gt;

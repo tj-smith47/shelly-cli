@@ -1,4 +1,4 @@
-.PHONY: audit build build-test check clean completions deps docs fmt generate help install lint manpages push release-local test test-coverage
+.PHONY: audit build build-test check clean completions deps docs docs-serve fmt generate help install lint manpages push release-local test test-coverage
 
 # Build variables
 BINARY_NAME := shelly
@@ -81,6 +81,11 @@ docs:
 	@./scripts/migrate-commands.sh
 	@./scripts/migrate-examples.sh
 	@echo "Hugo site updated in docs/site/"
+
+## docs-serve: Run Hugo development server on all interfaces
+docs-serve:
+	@echo "Starting Hugo server at http://0.0.0.0:1313..."
+	@cd docs/site && hugo server --bind 0.0.0.0 --port 1313
 
 ## fmt: Format code
 fmt:

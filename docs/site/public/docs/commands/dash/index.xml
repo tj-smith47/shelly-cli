@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly dash on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/dash/</link><description>Recent content in shelly dash on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/dash/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly dash devices</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/dash/devices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/dash/devices/</guid><description>&lt;h2 id="shelly-dash-devices"&gt;shelly dash devices&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly dash on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/dash/</link><description>Recent content in shelly dash on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/dash/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly dash devices</title><link>http://localhost:1313/shelly-cli/docs/commands/dash/devices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/dash/devices/</guid><description>&lt;h2 id="shelly-dash-devices"&gt;shelly dash devices&lt;/h2&gt;
 &lt;p&gt;Launch dashboard in devices view&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Launch the TUI dashboard directly in the devices view.&lt;/p&gt;
@@ -120,7 +120,7 @@ status, power consumption, and quick actions.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_dash.md"&gt;shelly dash&lt;/a&gt;	 - Launch interactive TUI dashboard&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly dash events</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/dash/events/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/dash/events/</guid><description>&lt;h2 id="shelly-dash-events"&gt;shelly dash events&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly dash events</title><link>http://localhost:1313/shelly-cli/docs/commands/dash/events/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/dash/events/</guid><description>&lt;h2 id="shelly-dash-events"&gt;shelly dash events&lt;/h2&gt;
 &lt;p&gt;Launch dashboard in events view&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Launch the TUI dashboard directly in the events view.&lt;/p&gt;

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly ethernet on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/ethernet/</link><description>Recent content in shelly ethernet on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/ethernet/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly ethernet set</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/ethernet/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/ethernet/set/</guid><description>&lt;h2 id="shelly-ethernet-set"&gt;shelly ethernet set&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly ethernet on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/ethernet/</link><description>Recent content in shelly ethernet on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/ethernet/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly ethernet set</title><link>http://localhost:1313/shelly-cli/docs/commands/ethernet/set/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/ethernet/set/</guid><description>&lt;h2 id="shelly-ethernet-set"&gt;shelly ethernet set&lt;/h2&gt;
 &lt;p&gt;Configure Ethernet connection&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Configure the Ethernet connection for a device.&lt;/p&gt;
@@ -135,7 +135,7 @@ options to configure a fixed IP address.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_ethernet.md"&gt;shelly ethernet&lt;/a&gt;	 - Manage device Ethernet configuration&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly ethernet status</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/ethernet/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/ethernet/status/</guid><description>&lt;h2 id="shelly-ethernet-status"&gt;shelly ethernet status&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly ethernet status</title><link>http://localhost:1313/shelly-cli/docs/commands/ethernet/status/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/ethernet/status/</guid><description>&lt;h2 id="shelly-ethernet-status"&gt;shelly ethernet status&lt;/h2&gt;
 &lt;p&gt;Show Ethernet status&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Show the current Ethernet status for a device.&lt;/p&gt;

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly migrate on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/migrate/</link><description>Recent content in shelly migrate on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/migrate/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly migrate diff</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/migrate/diff/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/migrate/diff/</guid><description>&lt;h2 id="shelly-migrate-diff"&gt;shelly migrate diff&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly migrate on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/migrate/</link><description>Recent content in shelly migrate on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/migrate/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly migrate diff</title><link>http://localhost:1313/shelly-cli/docs/commands/migrate/diff/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/migrate/diff/</guid><description>&lt;h2 id="shelly-migrate-diff"&gt;shelly migrate diff&lt;/h2&gt;
 &lt;p&gt;Show differences between device and backup&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Show the differences between a device&amp;rsquo;s current state and a backup file.&lt;/p&gt;
@@ -105,7 +105,7 @@
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_migrate.md"&gt;shelly migrate&lt;/a&gt;	 - Migrate configuration between devices&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly migrate validate</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/migrate/validate/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/migrate/validate/</guid><description>&lt;h2 id="shelly-migrate-validate"&gt;shelly migrate validate&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly migrate validate</title><link>http://localhost:1313/shelly-cli/docs/commands/migrate/validate/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/migrate/validate/</guid><description>&lt;h2 id="shelly-migrate-validate"&gt;shelly migrate validate&lt;/h2&gt;
 &lt;p&gt;Validate a backup file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Validate a backup file for structural integrity.&lt;/p&gt;

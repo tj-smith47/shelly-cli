@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly discover on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/</link><description>Recent content in shelly discover on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/discover/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly discover ble</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/ble/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/ble/</guid><description>&lt;h2 id="shelly-discover-ble"&gt;shelly discover ble&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly discover on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/discover/</link><description>Recent content in shelly discover on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/discover/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly discover ble</title><link>http://localhost:1313/shelly-cli/docs/commands/discover/ble/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/discover/ble/</guid><description>&lt;h2 id="shelly-discover-ble"&gt;shelly discover ble&lt;/h2&gt;
 &lt;p&gt;Discover devices using Bluetooth Low Energy&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Discover Shelly devices using Bluetooth Low Energy (BLE).&lt;/p&gt;
@@ -136,7 +136,7 @@ BLU devices broadcasting BTHome sensor data.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_discover.md"&gt;shelly discover&lt;/a&gt;	 - Discover Shelly devices on the network&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly discover coiot</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/coiot/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/coiot/</guid><description>&lt;h2 id="shelly-discover-coiot"&gt;shelly discover coiot&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly discover coiot</title><link>http://localhost:1313/shelly-cli/docs/commands/discover/coiot/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/discover/coiot/</guid><description>&lt;h2 id="shelly-discover-coiot"&gt;shelly discover coiot&lt;/h2&gt;
 &lt;p&gt;Discover devices via CoIoT&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Discover Shelly devices on the network using CoIoT multicast.&lt;/p&gt;
@@ -283,7 +283,7 @@ multicast group 224.0.1.187:5683.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_discover.md"&gt;shelly discover&lt;/a&gt;	 - Discover Shelly devices on the network&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly discover http</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/http/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/http/</guid><description>&lt;h2 id="shelly-discover-http"&gt;shelly discover http&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly discover http</title><link>http://localhost:1313/shelly-cli/docs/commands/discover/http/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/discover/http/</guid><description>&lt;h2 id="shelly-discover-http"&gt;shelly discover http&lt;/h2&gt;
 &lt;p&gt;Discover devices via HTTP subnet scanning&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Discover Shelly devices by probing HTTP endpoints on a subnet.&lt;/p&gt;
@@ -292,7 +292,7 @@ This method is slower than mDNS or CoIoT but works when multicast
 is blocked or devices are on different VLANs.&lt;/p&gt;
 &lt;p&gt;The scan probes each IP address in the subnet range for Shelly device
 HTTP endpoints. Progress is shown in real-time. Discovered devices
-can be automatically registered with &amp;ndash;register.&lt;/p&gt;</description></item><item><title>shelly discover mdns</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/mdns/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/discover/mdns/</guid><description>&lt;h2 id="shelly-discover-mdns"&gt;shelly discover mdns&lt;/h2&gt;
+can be automatically registered with &amp;ndash;register.&lt;/p&gt;</description></item><item><title>shelly discover mdns</title><link>http://localhost:1313/shelly-cli/docs/commands/discover/mdns/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/discover/mdns/</guid><description>&lt;h2 id="shelly-discover-mdns"&gt;shelly discover mdns&lt;/h2&gt;
 &lt;p&gt;Discover devices using mDNS/Zeroconf&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Discover Shelly devices using mDNS/Zeroconf.&lt;/p&gt;

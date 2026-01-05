@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly cert on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cert/</link><description>Recent content in shelly cert on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/cert/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly cert install</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cert/install/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/cert/install/</guid><description>&lt;h2 id="shelly-cert-install"&gt;shelly cert install&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly cert on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/cert/</link><description>Recent content in shelly cert on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/cert/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly cert install</title><link>http://localhost:1313/shelly-cli/docs/commands/cert/install/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/cert/install/</guid><description>&lt;h2 id="shelly-cert-install"&gt;shelly cert install&lt;/h2&gt;
 &lt;p&gt;Install a certificate on a device&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Install a TLS certificate on a Gen2+ Shelly device.&lt;/p&gt;
@@ -118,7 +118,7 @@ as well as client certificates for mutual TLS authentication.&lt;/p&gt;
 &lt;h3 id="see-also"&gt;SEE ALSO&lt;/h3&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;a href="shelly_cert.md"&gt;shelly cert&lt;/a&gt;	 - Manage device TLS certificates&lt;/li&gt;
-&lt;/ul&gt;</description></item><item><title>shelly cert show</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/cert/show/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/cert/show/</guid><description>&lt;h2 id="shelly-cert-show"&gt;shelly cert show&lt;/h2&gt;
+&lt;/ul&gt;</description></item><item><title>shelly cert show</title><link>http://localhost:1313/shelly-cli/docs/commands/cert/show/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/cert/show/</guid><description>&lt;h2 id="shelly-cert-show"&gt;shelly cert show&lt;/h2&gt;
 &lt;p&gt;Show device TLS configuration&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Display TLS certificate configuration for a Gen2+ device.&lt;/p&gt;

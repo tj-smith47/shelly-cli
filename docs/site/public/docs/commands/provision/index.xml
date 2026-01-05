@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly provision on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/</link><description>Recent content in shelly provision on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/provision/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly provision ble</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/ble/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/ble/</guid><description>&lt;h2 id="shelly-provision-ble"&gt;shelly provision ble&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly provision on Shelly CLI</title><link>http://localhost:1313/shelly-cli/docs/commands/provision/</link><description>Recent content in shelly provision on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="http://localhost:1313/shelly-cli/docs/commands/provision/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly provision ble</title><link>http://localhost:1313/shelly-cli/docs/commands/provision/ble/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/provision/ble/</guid><description>&lt;h2 id="shelly-provision-ble"&gt;shelly provision ble&lt;/h2&gt;
 &lt;p&gt;Provision a device via Bluetooth Low Energy&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Provision a Shelly device using Bluetooth Low Energy (BLE).&lt;/p&gt;
@@ -10,7 +10,7 @@ on a new device without connecting to its AP network first.&lt;/p&gt;
 &lt;li&gt;The device to be in BLE advertising mode (typically when unconfigured)&lt;/li&gt;
 &lt;li&gt;The device&amp;rsquo;s BLE address (usually shown as ShellyXXX-YYYYYYYY)&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.&lt;/p&gt;</description></item><item><title>shelly provision bulk</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/bulk/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/bulk/</guid><description>&lt;h2 id="shelly-provision-bulk"&gt;shelly provision bulk&lt;/h2&gt;
+&lt;p&gt;Gen2+ devices support BLE provisioning. Gen1 devices do not have BLE capability.&lt;/p&gt;</description></item><item><title>shelly provision bulk</title><link>http://localhost:1313/shelly-cli/docs/commands/provision/bulk/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/provision/bulk/</guid><description>&lt;h2 id="shelly-provision-bulk"&gt;shelly provision bulk&lt;/h2&gt;
 &lt;p&gt;Bulk provision from config file&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Provision multiple devices from a YAML configuration file.&lt;/p&gt;
@@ -27,7 +27,7 @@ device_name: &amp;ldquo;Living Room Light&amp;rdquo; # optional device name to s
 - name: bedroom
 wifi: # optional per-device WiFi override
 ssid: &amp;ldquo;OtherNetwork&amp;rdquo;
-password: &amp;ldquo;other-secret&amp;rdquo;&lt;/p&gt;</description></item><item><title>shelly provision wifi</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/wifi/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/provision/wifi/</guid><description>&lt;h2 id="shelly-provision-wifi"&gt;shelly provision wifi&lt;/h2&gt;
+password: &amp;ldquo;other-secret&amp;rdquo;&lt;/p&gt;</description></item><item><title>shelly provision wifi</title><link>http://localhost:1313/shelly-cli/docs/commands/provision/wifi/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>http://localhost:1313/shelly-cli/docs/commands/provision/wifi/</guid><description>&lt;h2 id="shelly-provision-wifi"&gt;shelly provision wifi&lt;/h2&gt;
 &lt;p&gt;Interactive WiFi provisioning&lt;/p&gt;
 &lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
 &lt;p&gt;Provision WiFi settings interactively for a device.&lt;/p&gt;
