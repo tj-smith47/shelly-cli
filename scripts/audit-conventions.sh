@@ -449,7 +449,7 @@ if [[ $AUDIT_ONLY == "false" ]]; then
     fi
 
     section "Linting"
-    if golangci-lint run -j 1 --timeout 5m ./... 2>&1; then
+    if golangci-lint run --timeout 5m ./... 2>&1; then
         success "Lint passed"
     else
         error "Lint failed"
