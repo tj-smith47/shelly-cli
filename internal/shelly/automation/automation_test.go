@@ -42,7 +42,7 @@ func TestNew(t *testing.T) {
 	t.Parallel()
 
 	provider := &mockConnectionProvider{}
-	svc := New(provider, nil)
+	svc := New(provider, nil, nil)
 
 	if svc == nil {
 		t.Fatal("expected non-nil service")

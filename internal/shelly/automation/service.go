@@ -7,6 +7,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
@@ -34,11 +35,12 @@ type EventStreamProvider interface {
 type Service struct {
 	parent ConnectionProvider
 	cache  *cache.FileCache
+	ios    *iostreams.IOStreams
 }
 
 // New creates a new automation service.
-func New(parent ConnectionProvider, fc *cache.FileCache) *Service {
-	return &Service{parent: parent, cache: fc}
+func New(parent ConnectionProvider, fc *cache.FileCache, ios *iostreams.IOStreams) *Service {
+	return &Service{parent: parent, cache: fc, ios: ios}
 }
 
 // invalidateCache invalidates cached data for a device/type after mutations.
@@ -47,7 +49,7 @@ func (s *Service) invalidateCache(device, dataType string) {
 	if s.cache == nil {
 		return
 	}
-	// Best-effort: cache invalidation failures are non-fatal
-	//nolint:errcheck // intentionally ignored - cache invalidation is best-effort
-	s.cache.Invalidate(device, dataType)
+	if err := s.cache.Invalidate(device, dataType); err != nil && s.ios != nil {
+		s.ios.DebugErr("cache invalidate "+device+"/"+dataType, err)
+	}
 }

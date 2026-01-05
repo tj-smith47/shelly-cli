@@ -335,9 +335,7 @@ fi
 section "Error Handling Checks"
 
 # Check for //nolint:errcheck without approval
-# Exclude: shelly/automation/service.go (cache invalidation is best-effort, no IOStreams available)
-NOLINT_ERRCHECK=$(search_go "//nolint:errcheck" "internal/" | \
-    grep -v "internal/shelly/automation/service.go" || true)
+NOLINT_ERRCHECK=$(search_go "//nolint:errcheck" "internal/")
 if [[ -n "$NOLINT_ERRCHECK" ]]; then
     warn "Found //nolint:errcheck (requires approval):"
     show_results "$NOLINT_ERRCHECK" 5

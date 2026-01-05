@@ -368,7 +368,7 @@ func fetchScripts(device string) []scriptEntry {
 	defer cancel()
 
 	shellySvc := shelly.NewService()
-	autoSvc := automation.New(shellySvc, nil)
+	autoSvc := automation.New(shellySvc, nil, nil)
 	scripts, err := autoSvc.ListScripts(ctx, device)
 	if err != nil {
 		return nil
@@ -394,7 +394,7 @@ func fetchSchedules(device string) []scheduleEntry {
 	defer cancel()
 
 	shellySvc := shelly.NewService()
-	autoSvc := automation.New(shellySvc, nil)
+	autoSvc := automation.New(shellySvc, nil, nil)
 	schedules, err := autoSvc.ListSchedules(ctx, device)
 	if err != nil {
 		return nil

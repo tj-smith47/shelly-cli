@@ -223,10 +223,10 @@ func (f *Factory) KVSService() *kvs.Service {
 
 // AutomationService returns the automation service, lazily initialized.
 // Provides script, schedule, and event streaming functionality.
-// Cache is injected for automatic invalidation on mutations.
+// Cache and IOStreams are injected for automatic invalidation on mutations.
 func (f *Factory) AutomationService() *automation.Service {
 	if f.automationService == nil {
-		f.automationService = automation.New(f.ShellyService(), f.FileCache())
+		f.automationService = automation.New(f.ShellyService(), f.FileCache(), f.IOStreams())
 	}
 	return f.automationService
 }
