@@ -366,6 +366,8 @@ done
 if [[ -n "$MISSING_ALIASES" ]]; then
     warn "Commands potentially missing Aliases:"
     echo -e "$MISSING_ALIASES" | head -10
+else
+    success "All commands have Aliases"
 fi
 
 # Check for commands missing Example
@@ -378,6 +380,8 @@ done
 if [[ -n "$MISSING_EXAMPLES" ]]; then
     warn "Commands potentially missing Examples:"
     echo -e "$MISSING_EXAMPLES" | head -10
+else
+    success "All commands have Examples"
 fi
 
 # ==============================================================================
@@ -400,6 +404,8 @@ TEMP_DIR_COUNT=$(count_matches "$TEMP_DIR")
 if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
     warn "Found $TEMP_DIR_COUNT uses of t.TempDir() (prefer afero.NewMemMapFs with SetFs):"
     show_results "$TEMP_DIR" 5
+else
+    success "No t.TempDir() usage (using afero for test isolation)"
 fi
 
 # Check for os.MkdirTemp usage in tests
@@ -414,6 +420,8 @@ MKDIR_TEMP_COUNT=$(count_matches "$MKDIR_TEMP")
 if [[ "$MKDIR_TEMP_COUNT" -gt 0 ]]; then
     warn "Found $MKDIR_TEMP_COUNT uses of os.MkdirTemp in tests (prefer afero):"
     show_results "$MKDIR_TEMP" 5
+else
+    success "No os.MkdirTemp usage (using afero for test isolation)"
 fi
 
 # Check for os.WriteFile usage in tests (should use afero.WriteFile)
@@ -430,17 +438,19 @@ OS_WRITEFILE_COUNT=$(count_matches "$OS_WRITEFILE")
 if [[ "$OS_WRITEFILE_COUNT" -gt 0 ]]; then
     warn "Found $OS_WRITEFILE_COUNT uses of os.WriteFile in tests (prefer afero.WriteFile with SetFs):"
     show_results "$OS_WRITEFILE" 5
+else
+    success "No os.WriteFile usage (using afero for test isolation)"
 fi
 
 # ==============================================================================
-# SECTION 9: Build, Lint, Test
+# SECTION 9: Build, Lint, Test, Docs
 # ==============================================================================
-echo ""
-echo "=========================================="
-echo "  BUILD, LINT, TEST"
-echo "=========================================="
-
 if [[ $AUDIT_ONLY == "false" ]]; then
+    echo ""
+    echo "=========================================="
+    echo "  BUILD, LINT, TEST"
+    echo "=========================================="
+
     section "Building"
     if go build ./...; then
         success "Build passed"
@@ -461,13 +471,13 @@ if [[ $AUDIT_ONLY == "false" ]]; then
     else
         error "Tests failed"
     fi
-fi
 
-section "Generating Docs"
-if make docs 2>&1; then
-    success "Docs generated"
-else
-    error "Docs generation failed"
+    section "Generating Docs"
+    if make docs 2>&1; then
+        success "Docs generated"
+    else
+        error "Docs generation failed"
+    fi
 fi
 
 # ==============================================================================

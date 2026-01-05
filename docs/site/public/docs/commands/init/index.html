@@ -46,36 +46,42 @@ Discovery, completions, aliases, and cloud are opt-in via flags.</p><p>Use &ndas
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-fallback data-lang=fallback><span style=display:flex><span>  # Interactive setup wizard
 </span></span><span style=display:flex><span>  shelly init
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  # Check current setup without changes
 </span></span><span style=display:flex><span>  shelly init --check
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>  # Headless: register devices directly
+</span></span><span style=display:flex><span>  # Non-interactive: register devices directly
 </span></span><span style=display:flex><span>  shelly init --device kitchen=192.168.1.100 --device bedroom=192.168.1.101
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>  # Headless: device with authentication
+</span></span><span style=display:flex><span>  # Non-interactive: device with authentication
 </span></span><span style=display:flex><span>  shelly init --device secure=192.168.1.102:admin:secret
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>  # Headless: import from JSON file
+</span></span><span style=display:flex><span>  # Non-interactive: import from JSON file
 </span></span><span style=display:flex><span>  shelly init --devices-json devices.json
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>  # Headless: inline JSON
+</span></span><span style=display:flex><span>  # Non-interactive: inline JSON
 </span></span><span style=display:flex><span>  shelly init --devices-json &#39;{&#34;name&#34;:&#34;kitchen&#34;,&#34;address&#34;:&#34;192.168.1.100&#34;}&#39;
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>  # Headless: with discovery and completions
+</span></span><span style=display:flex><span>  # Non-interactive: with discovery and completions
 </span></span><span style=display:flex><span>  shelly init --discover --discover-modes http,mdns --completions bash,zsh
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>  # Headless: full CI/CD setup
+</span></span><span style=display:flex><span>  # Non-interactive: full CI/CD setup
 </span></span><span style=display:flex><span>  shelly init \
 </span></span><span style=display:flex><span>    --device kitchen=192.168.1.100 \
 </span></span><span style=display:flex><span>    --theme dracula \
 </span></span><span style=display:flex><span>    --api-mode local \
 </span></span><span style=display:flex><span>    --no-color
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>  # Headless: with cloud credentials
-</span></span><span style=display:flex><span>  shelly init --cloud-email user@example.com --cloud-password secret</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=options>Options</h3><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span></span><span style=display:flex><span>  # Non-interactive: with cloud credentials
+</span></span><span style=display:flex><span>  shelly init --cloud-email user@example.com --cloud-password secret
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  # Non-interactive: enable anonymous telemetry
+</span></span><span style=display:flex><span>  shelly init --telemetry</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=options>Options</h3><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
@@ -92,6 +98,7 @@ Discovery, completions, aliases, and cloud are opt-in via flags.</p><p>Use &ndas
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-fallback data-lang=fallback><span style=display:flex><span>      --aliases                     Install default command aliases (opt-in)
 </span></span><span style=display:flex><span>      --api-mode string             API mode: local,cloud,auto (default: local)
 </span></span><span style=display:flex><span>      --check                       Verify current setup without making changes
@@ -108,21 +115,26 @@ Discovery, completions, aliases, and cloud are opt-in via flags.</p><p>Use &ndas
 </span></span><span style=display:flex><span>      --network string              Subnet for HTTP probe discovery (e.g., 192.168.1.0/24)
 </span></span><span style=display:flex><span>      --no-color                    Disable colors in output
 </span></span><span style=display:flex><span>      --output-format string        Set output format: table,json,yaml (default: table)
-</span></span><span style=display:flex><span>      --theme string                Set theme (default: dracula)</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=options-inherited-from-parent-commands>Options inherited from parent commands</h3><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
-</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">9
+</span></span><span style=display:flex><span>      --telemetry                   Enable anonymous usage telemetry (opt-in)
+</span></span><span style=display:flex><span>      --theme string                Set theme (default: dracula)</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=options-inherited-from-parent-commands>Options inherited from parent commands</h3><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-fallback data-lang=fallback><span style=display:flex><span>      --config string           Config file (default $HOME/.config/shelly/config.yaml)
 </span></span><span style=display:flex><span>      --log-categories string   Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
 </span></span><span style=display:flex><span>      --log-json                Output logs in JSON format
 </span></span><span style=display:flex><span>      --no-headers              Hide table headers in output
+</span></span><span style=display:flex><span>      --offline                 Only read from cache, error on cache miss
 </span></span><span style=display:flex><span>  -o, --output string           Output format (table, json, yaml, template) (default &#34;table&#34;)
 </span></span><span style=display:flex><span>      --plain                   Disable borders and colors (machine-readable output)
 </span></span><span style=display:flex><span>  -q, --quiet                   Suppress non-essential output
+</span></span><span style=display:flex><span>      --refresh                 Bypass cache and fetch fresh data from device
 </span></span><span style=display:flex><span>      --template string         Go template string for output (use with -o template)
 </span></span><span style=display:flex><span>  -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=see-also>SEE ALSO</h3><ul><li><a href=shelly.md>shelly</a> - CLI for controlling Shelly smart home devices</li></ul></div><div class=card-list></div></article></div></div></div></div><footer class="footer text-muted"><div class=container-lg><div class=row><div class="col-lg-8 text-center text-lg-start"><ul class=list-inline><li class=list-inline-item><a class=text-muted href=/shelly-cli/docs/>Docs</a></li><li class=list-inline-item><a class=text-muted href=/shelly-cli/docs/commands/>Commands</a></li><li class=list-inline-item><a class=text-muted href=https://github.com/tj-smith47/shelly-cli>GitHub</a></li></ul></div><div class="col-lg-8 text-center text-lg-end"><ul class=list-inline><li class=list-inline-item></li></ul></div></div></div></footer><script async src=/shelly-cli/js/app.19b73e0182301dd61c9211c2f6890104740e2eb9eb12fe4ba8d4f31435b22ed6.js integrity="sha256-Gbc+AYIwHdYckhHC9okBBHQOLrnrEv5LqNTzFDWyLtY="></script><script async src=/shelly-cli/js/flexsearch.113b7edaabeb04644a4b0da964854226f135a5e10d3341884f25bd0ad1ee4def.js integrity="sha256-ETt+2qvrBGRKSw2pZIVCJvE1peENM0GITyW9CtHuTe8="></script><script async src=/shelly-cli/js/search-modal.96e662d8f691fe25c859a3437074b485f2d7bed0bca612725028c6cf4322e2f2.js integrity="sha256-luZi2PaR/iXIWaNDcHS0hfLXvtC8phJyUCjGz0Mi4vI="></script></body></html>
