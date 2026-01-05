@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
-
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -394,14 +392,10 @@ func TestExecute_JSONOutput(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Set JSON output mode
-	viper.Set("output", "json")
-	defer viper.Set("output", "")
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"json-device"})
+	cmd.SetArgs([]string{"json-device", "-o", "json"})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 
@@ -444,14 +438,10 @@ func TestExecute_YAMLOutput(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Set YAML output mode
-	viper.Set("output", "yaml")
-	defer viper.Set("output", "")
-
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
 	cmd.SetContext(context.Background())
-	cmd.SetArgs([]string{"yaml-device"})
+	cmd.SetArgs([]string{"yaml-device", "-o", "yaml"})
 	cmd.SetOut(&buf)
 	cmd.SetErr(&buf)
 

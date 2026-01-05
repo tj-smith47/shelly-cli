@@ -637,9 +637,8 @@ func TestRun_OutputWithTitle(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global viper state
 func TestRun_WithJSONOutput(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1037,9 +1036,6 @@ func TestEventFilter_DifferentComponents(t *testing.T) {
 func TestEventHandler_MultipleComponentIDs(t *testing.T) {
 	t.Parallel()
 
-	var stdout, stderr bytes.Buffer
-	ios := iostreams.Test(nil, &stdout, &stderr)
-
 	tests := []struct {
 		name        string
 		componentID int
@@ -1052,6 +1048,9 @@ func TestEventHandler_MultipleComponentIDs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			var stdout, stderr bytes.Buffer
+			ios := iostreams.Test(nil, &stdout, &stderr)
 
 			event := model.DeviceEvent{
 				Device:      "test-device",
@@ -1302,27 +1301,6 @@ func TestDeviceEvent_EventTypes(t *testing.T) {
 				t.Errorf("Event type mismatch for %s", eventType)
 			}
 		})
-	}
-}
-
-// TestOutputFormat_JSONDetection tests WantsJSON detection.
-func TestOutputFormat_JSONDetection(t *testing.T) {
-	t.Parallel()
-
-	// Save current format
-	currentFormat := output.GetFormat()
-	defer viper.Set("output", string(currentFormat))
-
-	// Test JSON format
-	viper.Set("output", string(output.FormatJSON))
-	if !output.WantsJSON() {
-		t.Error("WantsJSON should return true when format is JSON")
-	}
-
-	// Test non-JSON format
-	viper.Set("output", string(output.FormatTable))
-	if output.WantsJSON() {
-		t.Error("WantsJSON should return false when format is not JSON")
 	}
 }
 

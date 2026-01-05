@@ -133,8 +133,8 @@ func TestRun_InvalidFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global viper state
 func TestRun_ValidSetting(t *testing.T) {
-	t.Parallel()
 	tf := factory.NewTestFactory(t)
 
 	// This will fail because config.SetSetting needs a real config setup
@@ -147,8 +147,8 @@ func TestRun_ValidSetting(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global viper state
 func TestRun_MultipleSettings(t *testing.T) {
-	t.Parallel()
 	tf := factory.NewTestFactory(t)
 
 	opts := &Options{Factory: tf.Factory, Args: []string{"key1=value1", "key2=value2"}}
@@ -159,8 +159,8 @@ func TestRun_MultipleSettings(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global viper state
 func TestRun_EmptyValue(t *testing.T) {
-	t.Parallel()
 	tf := factory.NewTestFactory(t)
 
 	// key= should be valid (empty value)
@@ -171,8 +171,8 @@ func TestRun_EmptyValue(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global viper state
 func TestRun_ValueWithEquals(t *testing.T) {
-	t.Parallel()
 	tf := factory.NewTestFactory(t)
 
 	// key=value=with=equals should be valid

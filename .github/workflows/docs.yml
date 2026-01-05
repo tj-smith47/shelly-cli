@@ -69,15 +69,22 @@ jobs:
       - name: Check for changes
         id: diff
         run: |
-          if git diff --quiet docs/; then
+          # Check for meaningful changes (ignore date-only differences in man pages)
+          # Man pages have dates like "Jan 2026" in .TH headers that change monthly
+          DIFF_OUTPUT=$(git diff docs/ | grep -v '^[+-]\.TH.*"[A-Z][a-z][a-z] [0-9]\{4\}"' | grep '^[+-]' | grep -v '^[+-][+-][+-]' || true)
+
+          if [ -z "$DIFF_OUTPUT" ]; then
             echo "status=clean" >> $GITHUB_OUTPUT
-            echo "Documentation is up to date"
+            echo "Documentation is up to date (ignoring date-only changes)"
           else
             echo "status=dirty" >> $GITHUB_OUTPUT
             echo "Documentation is out of date!"
             echo ""
             echo "Changed files:"
             git diff --name-only docs/
+            echo ""
+            echo "Meaningful changes:"
+            echo "$DIFF_OUTPUT" | head -50
             echo ""
             echo "Run 'make docs' and 'make manpages' to update"
             exit 1
