@@ -466,7 +466,7 @@ if [[ $AUDIT_ONLY == "false" ]]; then
     fi
 
     section "Testing"
-    if go test ./... 2>&1; then
+    if go test -race ./... 2>&1; then
         success "Tests passed"
     else
         error "Tests failed"

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -169,18 +170,18 @@ func TestRunBatch(t *testing.T) {
 		ios, _, _ := testIOStreams()
 		svc := shelly.NewService()
 		targets := []string{"device1", "device2", "device3"}
-		callCount := 0
+		var callCount atomic.Int32
 
 		err := cmdutil.RunBatch(context.Background(), ios, svc, targets, 5, func(_ context.Context, _ *shelly.Service, _ string) error {
-			callCount++
+			callCount.Add(1)
 			return nil
 		})
 
 		if err != nil {
 			t.Errorf("RunBatch() error = %v, want nil", err)
 		}
-		if callCount != 3 {
-			t.Errorf("action called %d times, want 3", callCount)
+		if callCount.Load() != 3 {
+			t.Errorf("action called %d times, want 3", callCount.Load())
 		}
 	})
 
