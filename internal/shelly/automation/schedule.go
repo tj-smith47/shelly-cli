@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
@@ -91,12 +92,15 @@ func (s *Service) CreateSchedule(ctx context.Context, identifier string, enable 
 		result = resp.ID
 		return nil
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeSchedules)
+	}
 	return result, err
 }
 
 // UpdateSchedule updates an existing schedule on a device.
 func (s *Service) UpdateSchedule(ctx context.Context, identifier string, id int, enable *bool, timespec *string, calls []ScheduleCall) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 
 		req := &components.ScheduleUpdateRequest{
@@ -119,24 +123,36 @@ func (s *Service) UpdateSchedule(ctx context.Context, identifier string, id int,
 		_, err := schedule.Update(ctx, req)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeSchedules)
+	}
+	return err
 }
 
 // DeleteSchedule deletes a schedule from a device.
 func (s *Service) DeleteSchedule(ctx context.Context, identifier string, id int) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 		_, err := schedule.Delete(ctx, id)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeSchedules)
+	}
+	return err
 }
 
 // DeleteAllSchedules deletes all schedules from a device.
 func (s *Service) DeleteAllSchedules(ctx context.Context, identifier string) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		schedule := components.NewSchedule(conn.RPCClient())
 		_, err := schedule.DeleteAll(ctx)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeSchedules)
+	}
+	return err
 }
 
 // EnableSchedule enables a schedule on a device.

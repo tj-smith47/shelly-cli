@@ -115,9 +115,9 @@ func run(ctx context.Context, opts *Options) error {
 			toggleState = !toggleState
 
 			for _, device := range opts.Devices {
-				go func(dev string) {
-					svc.PartyToggleDevice(partyCtx, ios, dev, toggleState)
-				}(device)
+				go func(dev string, state bool) {
+					svc.PartyToggleDevice(partyCtx, ios, dev, state)
+				}(device, toggleState)
 			}
 		}
 	}

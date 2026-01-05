@@ -88,7 +88,7 @@ func run(ctx context.Context, opts *Options) error {
 		code = string(data)
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Updating script...", func(ctx context.Context) error {
+	err := cmdutil.RunWithSpinner(ctx, ios, "Updating script...", func(ctx context.Context) error {
 		updated := false
 
 		// Update code if provided
@@ -136,4 +136,5 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Success("Script %d updated", opts.ID)
 		return nil
 	})
+	return err
 }

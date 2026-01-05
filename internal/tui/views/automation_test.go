@@ -19,7 +19,7 @@ func TestNewAutomation(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	autoSvc := automation.New(svc)
+	autoSvc := automation.New(svc, nil)
 	kvsSvc := kvs.NewService(svc.WithConnection)
 	deps := AutomationDeps{Ctx: ctx, Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 
@@ -48,7 +48,7 @@ func TestNewAutomation_PanicOnNilCtx(t *testing.T) {
 	}()
 
 	svc := &shelly.Service{}
-	autoSvc := automation.New(svc)
+	autoSvc := automation.New(svc, nil)
 	kvsSvc := kvs.NewService(svc.WithConnection)
 	deps := AutomationDeps{Ctx: nil, Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 	NewAutomation(deps)
@@ -63,7 +63,7 @@ func TestNewAutomation_PanicOnNilSvc(t *testing.T) {
 	}()
 
 	svc := &shelly.Service{}
-	autoSvc := automation.New(svc)
+	autoSvc := automation.New(svc, nil)
 	kvsSvc := kvs.NewService(svc.WithConnection)
 	deps := AutomationDeps{Ctx: context.Background(), Svc: nil, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 	NewAutomation(deps)
@@ -72,7 +72,7 @@ func TestNewAutomation_PanicOnNilSvc(t *testing.T) {
 func TestAutomationDeps_Validate(t *testing.T) {
 	t.Parallel()
 	svc := &shelly.Service{}
-	autoSvc := automation.New(svc)
+	autoSvc := automation.New(svc, nil)
 	kvsSvc := kvs.NewService(svc.WithConnection)
 	tests := []struct {
 		name    string
@@ -339,7 +339,7 @@ func TestAutomationDeps_Errors(t *testing.T) {
 func newTestAutomation() *Automation {
 	ctx := context.Background()
 	svc := &shelly.Service{}
-	autoSvc := automation.New(svc)
+	autoSvc := automation.New(svc, nil)
 	kvsSvc := kvs.NewService(svc.WithConnection)
 	deps := AutomationDeps{Ctx: ctx, Svc: svc, AutoSvc: autoSvc, KVSSvc: kvsSvc}
 	return NewAutomation(deps)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
@@ -32,9 +33,21 @@ type EventStreamProvider interface {
 // script, schedule, and event streaming functionality.
 type Service struct {
 	parent ConnectionProvider
+	cache  *cache.FileCache
 }
 
 // New creates a new automation service.
-func New(parent ConnectionProvider) *Service {
-	return &Service{parent: parent}
+func New(parent ConnectionProvider, fc *cache.FileCache) *Service {
+	return &Service{parent: parent, cache: fc}
+}
+
+// invalidateCache invalidates cached data for a device/type after mutations.
+// Errors are logged but not returned (cache invalidation is best-effort).
+func (s *Service) invalidateCache(device, dataType string) {
+	if s.cache == nil {
+		return
+	}
+	// Best-effort: cache invalidation failures are non-fatal
+	//nolint:errcheck // intentionally ignored - cache invalidation is best-effort
+	s.cache.Invalidate(device, dataType)
 }

@@ -42,13 +42,16 @@ func TestNew(t *testing.T) {
 	t.Parallel()
 
 	provider := &mockConnectionProvider{}
-	svc := New(provider)
+	svc := New(provider, nil)
 
 	if svc == nil {
 		t.Fatal("expected non-nil service")
 	}
 	if svc.parent != provider {
 		t.Error("expected parent to be set")
+	}
+	if svc.cache != nil {
+		t.Error("expected cache to be nil when not provided")
 	}
 }
 

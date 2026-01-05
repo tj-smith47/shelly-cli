@@ -64,11 +64,12 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	return cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
+	err = cmdutil.RunWithSpinner(ctx, ios, "Deleting all schedules...", func(ctx context.Context) error {
 		if err := svc.DeleteAllSchedules(ctx, opts.Device); err != nil {
 			return fmt.Errorf("failed to delete schedules: %w", err)
 		}
 		ios.Success("All schedules deleted")
 		return nil
 	})
+	return err
 }

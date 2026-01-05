@@ -17,10 +17,11 @@ type BackupConnector struct {
 }
 
 // NewBackupConnector creates a BackupConnector from a Service.
+// Note: cache is nil since backup only uses read operations.
 func NewBackupConnector(svc *Service) *BackupConnector {
 	return &BackupConnector{
 		svc:     svc,
-		autoSvc: automation.New(svc),
+		autoSvc: automation.New(svc, nil),
 	}
 }
 

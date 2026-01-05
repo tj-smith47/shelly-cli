@@ -6,6 +6,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
@@ -146,20 +147,27 @@ func (s *Service) CreateScript(ctx context.Context, identifier, name string) (in
 		result = resp.ID
 		return nil
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeScripts)
+	}
 	return result, err
 }
 
 // UpdateScriptCode updates the code of an existing script.
 func (s *Service) UpdateScriptCode(ctx context.Context, identifier string, id int, code string, appendCode bool) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		return script.PutCode(ctx, id, code, appendCode)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeScripts)
+	}
+	return err
 }
 
 // UpdateScriptConfig updates the configuration of a script.
 func (s *Service) UpdateScriptConfig(ctx context.Context, identifier string, id int, name *string, enable *bool) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		config := &components.ScriptConfig{
 			Name:   name,
@@ -167,14 +175,22 @@ func (s *Service) UpdateScriptConfig(ctx context.Context, identifier string, id 
 		}
 		return script.SetConfig(ctx, id, config)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeScripts)
+	}
+	return err
 }
 
 // DeleteScript deletes a script from a device.
 func (s *Service) DeleteScript(ctx context.Context, identifier string, id int) error {
-	return s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		script := components.NewScript(conn.RPCClient())
 		return script.Delete(ctx, id)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeScripts)
+	}
+	return err
 }
 
 // StartScript starts a script on a device.
@@ -250,6 +266,9 @@ func (s *Service) InstallScript(ctx context.Context, identifier, name, code stri
 
 		return nil
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeScripts)
+	}
 
 	return &result, err
 }
