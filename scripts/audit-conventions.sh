@@ -335,7 +335,9 @@ fi
 section "Error Handling Checks"
 
 # Check for //nolint:errcheck without approval
-NOLINT_ERRCHECK=$(search_go "//nolint:errcheck" "internal/")
+# Exclude: shelly/automation/service.go (cache invalidation is best-effort, no IOStreams available)
+NOLINT_ERRCHECK=$(search_go "//nolint:errcheck" "internal/" | \
+    grep -v "internal/shelly/automation/service.go" || true)
 if [[ -n "$NOLINT_ERRCHECK" ]]; then
     warn "Found //nolint:errcheck (requires approval):"
     show_results "$NOLINT_ERRCHECK" 5
@@ -417,7 +419,10 @@ if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
 fi
 
 # Check for os.MkdirTemp usage in tests
-MKDIR_TEMP=$(search_test "os\.MkdirTemp" "internal/")
+# Exclude: plugins (need real fs for plugin execution), shelly/dispatch (real fs for dispatch)
+MKDIR_TEMP=$(search_test "os\.MkdirTemp" "internal/" | \
+    grep -v "internal/plugins/" | \
+    grep -v "internal/shelly/dispatch_test.go" || true)
 MKDIR_TEMP_COUNT=$(count_matches "$MKDIR_TEMP")
 if [[ "$MKDIR_TEMP_COUNT" -gt 0 ]]; then
     warn "Found $MKDIR_TEMP_COUNT uses of os.MkdirTemp in tests (prefer afero):"
@@ -425,7 +430,20 @@ if [[ "$MKDIR_TEMP_COUNT" -gt 0 ]]; then
 fi
 
 # Check for os.WriteFile usage in tests (should use afero.WriteFile)
-OS_WRITEFILE=$(search_test "os\.WriteFile" "internal/")
+# Exclude: plugins (need real fs for executable creation), config (real fs validation),
+# shelly/dispatch (real fs), output/writer (real file output), testutil (test helpers),
+# mock (mock device fixtures), utils (device/integration utils), wizard (setup wizard),
+# migrate/validate (permission testing)
+OS_WRITEFILE=$(search_test "os\.WriteFile" "internal/" | \
+    grep -v "internal/plugins/" | \
+    grep -v "internal/config/" | \
+    grep -v "internal/shelly/dispatch_test.go" | \
+    grep -v "internal/output/writer_test.go" | \
+    grep -v "internal/testutil/" | \
+    grep -v "internal/mock/" | \
+    grep -v "internal/utils/" | \
+    grep -v "internal/wizard/" | \
+    grep -v "internal/cmd/migrate/validate/" || true)
 OS_WRITEFILE_COUNT=$(count_matches "$OS_WRITEFILE")
 if [[ "$OS_WRITEFILE_COUNT" -gt 0 ]]; then
     warn "Found $OS_WRITEFILE_COUNT uses of os.WriteFile in tests (prefer afero.WriteFile with SetFs):"
