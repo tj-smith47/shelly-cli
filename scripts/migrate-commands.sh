@@ -84,8 +84,12 @@ mkdir -p "$TARGET_DIR"
 declare -A parents
 declare -A parent_weights
 
+# Sort file list for deterministic ordering across systems
+# Use C locale to ensure consistent sort order regardless of system locale
+mapfile -t sorted_files < <(ls -1 "$SOURCE_DIR"/*.md | LC_ALL=C sort)
+
 weight=10
-for file in "$SOURCE_DIR"/*.md; do
+for file in "${sorted_files[@]}"; do
     filename=$(basename "$file" .md)
     underscores=$(echo "$filename" | tr -cd '_' | wc -c)
 
@@ -99,8 +103,8 @@ done
 
 echo "Found ${#parents[@]} parent command groups"
 
-# Second pass: migrate files
-for file in "$SOURCE_DIR"/*.md; do
+# Second pass: migrate files (use same sorted order)
+for file in "${sorted_files[@]}"; do
     filename=$(basename "$file" .md)
     underscores=$(echo "$filename" | tr -cd '_' | wc -c)
     cmd_name=$(echo "$filename" | sed 's/shelly_//' | tr '_' ' ')
