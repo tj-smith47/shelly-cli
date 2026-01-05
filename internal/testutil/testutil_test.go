@@ -41,16 +41,12 @@ func TestCaptureOutput_Empty(t *testing.T) {
 	}
 }
 
-func TestResetViper(t *testing.T) {
-	t.Parallel()
-
+func TestResetViper(t *testing.T) { //nolint:paralleltest // uses global viper instance
 	// Just verify it doesn't panic
 	ResetViper()
 }
 
-func TestSetupTestConfig(t *testing.T) {
-	t.Parallel()
-
+func TestSetupTestConfig(t *testing.T) { //nolint:paralleltest // uses global viper instance
 	// Just verify it doesn't panic
 	SetupTestConfig(t)
 }
