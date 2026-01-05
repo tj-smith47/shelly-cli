@@ -64,6 +64,13 @@
   position: relative;
   overflow: hidden;
   padding: 4rem 0 5rem;
+  // Break out of constrained parent container
+  width: 100vw;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  background: inherit;
 
   // ASCII banner as subtle background
   &::before {
@@ -113,8 +120,14 @@
     gap: 1.5rem;
     justify-content: center;
     flex-wrap: wrap;
-    margin-bottom: 3rem;
+    margin-bottom: 0;  // Let hero-section padding handle spacing
   }
+}
+
+// Ensure visual separation between hero and features
+.hero-section + .features-section,
+.hero-section ~ .features-section {
+  margin-top: 2rem;
 }
 
 // Responsive hero
@@ -350,34 +363,47 @@ code:not(.highlight code) {
 // -----------------------------------------------------------------------------
 .features-section {
   padding: 3rem 0 4rem;
+  // Break out of constrained parent container
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  background: inherit;
 
   .container {
-    max-width: 1200px;
+    max-width: 1140px;
     margin: 0 auto;
-    padding: 0 1rem;
+    padding: 0 15px;
   }
 
   .row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin: 0 -0.75rem;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    margin: 0 -15px;
   }
 
-  // Force 3 columns on larger screens (override Bootstrap if needed)
-  .col-md-4 {
-    flex: 0 0 33.333%;
-    max-width: 33.333%;
-    padding: 0 0.75rem;
+  // Force 3 columns on larger screens (override Bootstrap)
+  .col-md-4,
+  [class*="col-md-4"] {
+    flex: 0 0 33.333% !important;
+    max-width: 33.333% !important;
+    width: 33.333% !important;
+    padding: 0 15px;
+    box-sizing: border-box;
 
     @media (max-width: 991px) {
-      flex: 0 0 50%;
-      max-width: 50%;
+      flex: 0 0 50% !important;
+      max-width: 50% !important;
+      width: 50% !important;
     }
 
     @media (max-width: 575px) {
-      flex: 0 0 100%;
-      max-width: 100%;
+      flex: 0 0 100% !important;
+      max-width: 100% !important;
+      width: 100% !important;
     }
   }
 }

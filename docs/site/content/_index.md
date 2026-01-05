@@ -21,7 +21,7 @@ Control Gen1, Gen2, Gen3, and Gen4 Shelly devices with a unified CLI. Features b
 Get Started
 {{< /button >}}
 
-{{< button href="/docs/commands/" >}}
+{{< button href="/docs/commands/" outline="true" >}}
 Command Reference
 {{< /button >}}
 </div>
