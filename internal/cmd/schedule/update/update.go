@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
@@ -128,10 +127,5 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeSchedules)
-	return nil
+	return err
 }

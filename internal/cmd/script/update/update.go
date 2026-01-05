@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -72,7 +71,6 @@ Use --append to add code to the existing script instead of replacing it.`,
 	return cmd
 }
 
-//nolint:gocyclo,nestif // Complexity from handling multiple optional update fields in one function
 func run(ctx context.Context, opts *Options) error {
 	ctx, cancel := opts.Factory.WithDefaultTimeout(ctx)
 	defer cancel()
@@ -90,17 +88,11 @@ func run(ctx context.Context, opts *Options) error {
 		code = string(data)
 	}
 
-	// Check if anything was specified
-	hasCode := code != ""
-	hasConfig := opts.Name != "" || opts.Enable
-	if !hasCode && !hasConfig {
-		ios.Warning("No changes specified")
-		return nil
-	}
-
 	err := cmdutil.RunWithSpinner(ctx, ios, "Updating script...", func(ctx context.Context) error {
+		updated := false
+
 		// Update code if provided
-		if hasCode {
+		if code != "" {
 			if uploadErr := svc.UpdateScriptCode(ctx, opts.Device, opts.ID, code, opts.Append); uploadErr != nil {
 				return fmt.Errorf("failed to update code: %w", uploadErr)
 			}
@@ -109,20 +101,21 @@ func run(ctx context.Context, opts *Options) error {
 			} else {
 				ios.Info("Code updated (%d bytes)", len(code))
 			}
+			updated = true
 		}
 
 		// Update config if name or enable specified
-		if hasConfig {
-			var namePtr *string
-			var enablePtr *bool
-			if opts.Name != "" {
-				namePtr = &opts.Name
-			}
-			if opts.Enable {
-				enable := true
-				enablePtr = &enable
-			}
+		var namePtr *string
+		var enablePtr *bool
+		if opts.Name != "" {
+			namePtr = &opts.Name
+		}
+		if opts.Enable {
+			enable := true
+			enablePtr = &enable
+		}
 
+		if namePtr != nil || enablePtr != nil {
 			if configErr := svc.UpdateScriptConfig(ctx, opts.Device, opts.ID, namePtr, enablePtr); configErr != nil {
 				return fmt.Errorf("failed to update config: %w", configErr)
 			}
@@ -132,15 +125,16 @@ func run(ctx context.Context, opts *Options) error {
 			if enablePtr != nil {
 				ios.Info("Script enabled")
 			}
+			updated = true
+		}
+
+		if !updated {
+			ios.Warning("No changes specified")
+			return nil
 		}
 
 		ios.Success("Script %d updated", opts.ID)
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeScripts)
-	return nil
+	return err
 }
