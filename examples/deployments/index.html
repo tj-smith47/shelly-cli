@@ -1,0 +1,701 @@
+<!doctype html><html lang=en-US data-bs-theme=auto><head><meta charset=utf-8><meta http-equiv=x-ua-compatible content="ie=edge"><meta name=viewport content="width=device-width,initial-scale=1"><link rel=preload href=https://tj-smith47.github.io/shelly-cli/fonts/vendor/jost/jost-v4-latin-regular.woff2 as=font type=font/woff2 crossorigin><link rel=preload href=https://tj-smith47.github.io/shelly-cli/fonts/vendor/jost/jost-v4-latin-500.woff2 as=font type=font/woff2 crossorigin><link rel=preload href=https://tj-smith47.github.io/shelly-cli/fonts/vendor/jost/jost-v4-latin-700.woff2 as=font type=font/woff2 crossorigin><script src=/shelly-cli/js/color-mode.86a91f050a481d0a3f0c72ac26543cb6228c770875981c58dcbc008fd3f875c8.js integrity="sha256-hqkfBQpIHQo/DHKsJlQ8tiKMdwh1mBxY3LwAj9P4dcg="></script><link rel=stylesheet href="/shelly-cli/main.3261b46b6cd1c89e0311ee7de87e11b70cd4705a1c47f9d5d70c412474687797018c86c6e61ab511be1958a1cb56580b62888ac053a91f43dbd62e6574c4205b.css" integrity="sha512-MmG0a2zRyJ4DEe596H4RtwzUcFocR/nV1wxBJHRod5cBjIbG5hq1Eb4ZWKHLVlgLYoiKwFOpH0Pb1i5ldMQgWw==" crossorigin=anonymous><noscript><style>img.lazyload{display:none}</style></noscript><base href=https://tj-smith47.github.io/shelly-cli/examples/deployments/><link rel=canonical href=https://tj-smith47.github.io/shelly-cli/examples/deployments/><link rel=alternate type=application/rss+xml href=https://tj-smith47.github.io/shelly-cli/examples/deployments/index.xml title="Deployment Examples | Shelly CLI"><title>Deployment Examples | Shelly CLI</title><meta name=description content="Docker and Kubernetes deployment examples"><link rel=icon href=/shelly-cli/favicon.ico sizes=32x32><link rel=apple-touch-icon href=/shelly-cli/shelly-cli/apple-touch-icon.png sizes=180x180 type=image/png><link rel=icon href=/shelly-cli/favicon-192x192.png sizes=192x192 type=image/png><link rel=icon href=/shelly-cli/favicon-512x512.png sizes=512x512 type=image/png><link rel=manifest href=/shelly-cli/manifest.webmanifest><meta property="og:url" content="https://tj-smith47.github.io/shelly-cli/examples/deployments/"><meta property="og:site_name" content="Shelly CLI"><meta property="og:title" content="Deployment Examples"><meta property="og:description" content="Docker and Kubernetes deployment examples"><meta property="og:locale" content="en_US"><meta property="og:type" content="website"><meta property="og:image" content="https://tj-smith47.github.io/shelly-cli/images/og-image.png"><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content="https://tj-smith47.github.io/shelly-cli/images/og-image.png"><meta name=twitter:title content="Deployment Examples"><meta name=twitter:description content="Docker and Kubernetes deployment examples"><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://tj-smith47.github.io/shelly-cli/","name":"Shelly CLI","position":1},{"@type":"ListItem","item":"https://tj-smith47.github.io/shelly-cli/examples/","name":"Examples","position":2},{"@type":"ListItem","name":"Deployment Examples","position":3}]}</script></head><body class="list section examples" data-bs-spy=scroll data-bs-target=#toc data-bs-root-margin="0px 0px -60%" data-bs-smooth-scroll=true tabindex=0><div class=sticky-top><header class="navbar navbar-expand-lg"><div class=container-lg><a class="navbar-brand me-auto me-lg-3" href=/shelly-cli/>Shelly CLI</a>
+<button type=button id=searchToggleMobile class="btn btn-link nav-link mx-2 d-lg-none" aria-label="Search website">
+<svg class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+</button>
+<button class="btn btn-link nav-link mx-2 order-3 d-lg-none" type=button data-bs-toggle=offcanvas data-bs-target=#offcanvasNavMain aria-controls=offcanvasNavMain aria-label="Open main navigation menu">
+<svg class="icon icon-tabler icon-tabler-menu" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/></svg></button><div class="offcanvas offcanvas-end h-auto" tabindex=-1 id=offcanvasNavMain aria-labelledby=offcanvasNavMainLabel><div class=offcanvas-header><h5 class=offcanvas-title id=offcanvasNavMainLabel>Shelly CLI</h5><button type=button class="btn btn-link nav-link p-0 ms-auto" data-bs-dismiss=offcanvas aria-label=Close>
+<svg class="icon icon-tabler icon-tabler-x" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div><div class="offcanvas-body d-flex flex-column flex-lg-row justify-content-between"><ul class="navbar-nav flex-grow-1"><li class=nav-item><a class=nav-link href=https://tj-smith47.github.io/shelly-cli/docs/>Docs</a></li><li class=nav-item><a class=nav-link href=https://tj-smith47.github.io/shelly-cli/docs/commands/>Commands</a></li><li class=nav-item><a class="nav-link active" href=https://tj-smith47.github.io/shelly-cli/examples/ aria-current=true>Examples</a></li><li class=nav-item><a class=nav-link href=https://github.com/tj-smith47/shelly-cli>GitHub</a></li></ul><button type=button id=searchToggleDesktop class="btn btn-link nav-link p-2 d-none d-lg-block" aria-label="Search website">
+<svg class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg></button><div class="dropdown mt-1 order-lg-3"><button class="btn btn-dropdown dropdown-toggle" id=doks-versions data-bs-toggle=dropdown aria-expanded=false data-bs-display=static aria-label="Toggle version menu">
+<span class=d-none>Doks</span> vlatest
+<span class=dropdown-caret><svg class="icon icon-tabler icon-tabler-chevron-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 9l6 6 6-6"/></svg></span></button><ul class="dropdown-menu dropdown-menu-lg-end me-lg-2 shadow rounded border-0" aria-labelledby=doks-versions><li><a class="dropdown-item current" aria-current=true href=/docs/latest/prologue/introduction/>Latest (latest.x)</a></li><li><hr class=dropdown-divider></li><li><a class=dropdown-item href=/docs/0.2/prologue/introduction/>v0.2.x</a></li><li><a class=dropdown-item href=/docs/0.1/prologue/introduction/>v0.1.x</a></li><li><hr class=dropdown-divider></li><li><a class=dropdown-item href=/docs/versions/>All versions</a></li></ul></div><button id=buttonColorMode class="btn btn-link mx-auto nav-link p-0 ms-lg-2 me-lg-1" type=button aria-label="Toggle theme">
+<svg data-bs-theme-value="dark" class="icon icon-tabler icon-tabler-moon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3c.132.0.263.0.393.0a7.5 7.5.0 007.92 12.446A9 9 0 1112 2.992z"/></svg>
+<svg data-bs-theme-value="light" class="icon icon-tabler icon-tabler-sun" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12m-4 0a4 4 0 108 0 4 4 0 10-8 0m-5 0h1m8-9v1m8 8h1m-9 8v1M5.6 5.6l.7.7m12.1-.7-.7.7m0 11.4.7.7m-12.1-.7-.7.7"/></svg></button></div></div></div></header></div><div class=modal id=searchModal tabindex=-1 aria-labelledby=searchModalLabel aria-hidden=true><div class="modal-dialog modal-dialog-scrollable modal-fullscreen-md-down"><div class=modal-content><div class=modal-header><h1 class="modal-title fs-5 visually-hidden" id=searchModalLabel>Search</h1><button type=button class="btn-close visually-hidden" data-bs-dismiss=modal aria-label=Close></button><div class="search-input flex-grow-1 d-none"><form id=search-form class=search-form action=# method=post accept-charset=UTF-8 role=search><label for=query class=visually-hidden>Search</label><div class=d-flex><input type=search id=query name=query class="search-text form-control form-control-lg" placeholder=Search aria-label=Search maxlength=128 autocomplete=off>
+<button type=button class="btn btn-link text-decoration-none px-0 ms-3 d-md-none" data-bs-dismiss=modal aria-label=Close>Cancel</button></div></form></div></div><div class=modal-body><p class="search-loading status message d-none mt-3 text-center">Loading search index…</p><p class="search-no-recent message d-none mt-3 text-center">No recent searches</p><p class="search-no-results message d-none mt-3 text-center">No results for "<strong><span class=query-no-results>Query here</span></strong>"</p><div id=searchResults class=search-results></div><template><article class="search-result list-view"><div class="card my-3"><div class=card-body><header><h2 class="h5 title title-submitted mb-0"><a class="stretched-link text-decoration-none text-reset" href=#>Title here</a></h2><div class="submitted d-none"><time class=created-date>Date here</time></div></header><div class=content>Summary here</div></div></div></article></template></div><div class=modal-footer><ul class="list-inline me-auto d-none d-md-block"><li class=list-inline-item><kbd class=me-2><svg width="15" height="15" aria-label="Enter key" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M12 3.53088v3c0 1-1 2-2 2H4m3 3-3-3 3-3"/></g></svg></kbd><span class=DocSearch-Label>to select</span></li><li class=list-inline-item><kbd class=me-2><svg width="15" height="15" aria-label="Arrow down" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M7.5 3.5v8m3-3-3 3-3-3"/></g></svg></kbd><kbd class=me-2><svg width="15" height="15" aria-label="Arrow up" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M7.5 11.5v-8m3 3-3-3-3 3"/></g></svg></kbd><span class=DocSearch-Label>to navigate</span></li><li class=list-inline-item><kbd class=me-2><svg width="15" height="15" aria-label="Escape key" role="img"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"><path d="M13.6167 8.936c-.1065.3583-.6883.962-1.4875.962-.7993.0-1.653-.9165-1.653-2.1258v-.5678c0-1.2548.7896-2.1016 1.653-2.1016s1.3601.4778 1.4875 1.0724M9 6c-.1352-.4735-.7506-.9219-1.46-.8972-.7092.0246-1.344.57-1.344 1.2166s.4198.8812 1.3445.9805C8.465 7.3992 8.968 7.9337 9 8.5s-.454 1.398-1.4595 1.398C6.6593 9.898 6 9 5.963 8.4851m-1.4748.5368c-.2635.5941-.8099.876-1.5443.876s-1.7073-.6248-1.7073-2.204v-.4603c0-1.0416.721-2.131 1.7073-2.131.9864.0 1.6425 1.031 1.5443 2.2492h-2.956"/></g></svg></kbd><span class=DocSearch-Label>to close</span></li></ul><p class=d-md-none>Search by <a class=text-decoration-none href=https://github.com/nextapps-de/flexsearch>FlexSearch</a></p></div></div></div></div><div class="wrap container-lg" role=document><div class=content><div class="row justify-content-center"><div class="col-md-12 col-lg-10 col-xl-8"><article><h1 class=text-center>Deployment Examples</h1><div class=text-center><p>Container and orchestration examples for running Shelly CLI as a metrics exporter.</p><p>Examples for deploying shelly-cli as a Prometheus metrics exporter.</p><h2 id=deployment-options>Deployment Options</h2><table><thead><tr><th>Method</th><th>Directory</th><th>Description</th></tr></thead><tbody><tr><td><a href=kubernetes/>Kubernetes</a></td><td><code>kubernetes/</code></td><td>Kustomize manifests for K8s deployment</td></tr><tr><td><a href=docker/>Docker</a></td><td><code>docker/</code></td><td>Docker Compose with optional Prometheus/Grafana</td></tr></tbody></table><h2 id=configuration>Configuration</h2><p>Generate a config file with <code>shelly init</code> or create one manually.</p><p>See <a href=../config/>example configs</a> for reference.</p><h3 id=headless-init>Headless Init</h3><p>Use <code>shelly init</code> flags to configure without interactive prompts:</p><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Register devices directly</span>
+</span></span><span style=display:flex><span>shelly init --device <span style=color:#8be9fd;font-style:italic>kitchen</span><span style=color:#ff79c6>=</span>192.168.1.100 --device <span style=color:#8be9fd;font-style:italic>bedroom</span><span style=color:#ff79c6>=</span>192.168.1.101
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Device with authentication</span>
+</span></span><span style=display:flex><span>shelly init --device <span style=color:#8be9fd;font-style:italic>secure</span><span style=color:#ff79c6>=</span>192.168.1.102:admin:secret
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Bulk import from JSON</span>
+</span></span><span style=display:flex><span>shelly init --devices-json devices.json</span></span></code></pre></td></tr></table></div></div></figure></div><p>See the <a href=docker/>Docker</a> and <a href=kubernetes/>Kubernetes</a> READMEs for container-specific examples using init containers and run args.</p><h2 id=quick-start>Quick Start</h2><h3 id=kubernetes-kustomize>Kubernetes (Kustomize)</h3><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Use as remote base with your config</span>
+</span></span><span style=display:flex><span>cat <span style=color:#f1fa8c>&lt;&lt;EOF &gt; kustomization.yaml
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>apiVersion: kustomize.config.k8s.io/v1beta1
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>kind: Kustomization
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>resources:
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>  - https://github.com/tj-smith47/shelly-cli//examples/deployments/kubernetes
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>configMapGenerator:
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>  - name: shelly-config
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>    behavior: replace
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>    files:
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>      - config.yaml=~/.config/shelly/config.yaml
+</span></span></span><span style=display:flex><span><span style=color:#f1fa8c>EOF</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>kustomize build . | kubectl apply -f -</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=docker-compose>Docker Compose</h3><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#8be9fd;font-style:italic>cd</span> docker/
+</span></span><span style=display:flex><span>docker compose up -d</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=docker>Docker</h3><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>docker run -d <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -p 9090:9090 <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v ~/.config/shelly:/root/.config/shelly:ro <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  --name shelly-exporter <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  ghcr.io/tj-smith47/shelly-cli:latest <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  metrics prometheus --port <span style=color:#bd93f9>9090</span></span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=metrics-exported>Metrics Exported</h2><table><thead><tr><th>Metric</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>shelly_device_online</code></td><td>gauge</td><td>Device reachability (0/1)</td></tr><tr><td><code>shelly_wifi_rssi</code></td><td>gauge</td><td>WiFi signal strength (dBm)</td></tr><tr><td><code>shelly_uptime_seconds</code></td><td>counter</td><td>Device uptime</td></tr><tr><td><code>shelly_temperature_celsius</code></td><td>gauge</td><td>Device temperature</td></tr><tr><td><code>shelly_switch_on</code></td><td>gauge</td><td>Switch state (0/1)</td></tr><tr><td><code>shelly_power_watts</code></td><td>gauge</td><td>Active power consumption</td></tr><tr><td><code>shelly_voltage_volts</code></td><td>gauge</td><td>Voltage reading</td></tr><tr><td><code>shelly_current_amps</code></td><td>gauge</td><td>Current reading</td></tr><tr><td><code>shelly_energy_wh_total</code></td><td>counter</td><td>Total energy consumed</td></tr><tr><td><code>shelly_frequency_hz</code></td><td>gauge</td><td>AC frequency</td></tr><tr><td><code>shelly_ram_free_bytes</code></td><td>gauge</td><td>Free RAM</td></tr><tr><td><code>shelly_ram_total_bytes</code></td><td>gauge</td><td>Total RAM</td></tr></tbody></table><h2 id=prometheus-configuration>Prometheus Configuration</h2><p>Add to your <code>prometheus.yml</code>:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>scrape_configs</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#ff79c6>job_name</span>: <span style=color:#f1fa8c>&#39;shelly&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>static_configs</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>targets</span>: [<span style=color:#f1fa8c>&#39;shelly-exporter:9090&#39;</span>]  <span style=color:#6272a4># or localhost:9090</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>scrape_interval</span>: 30s</span></span></code></pre></td></tr></table></div></div></figure></div><hr><h2 id=docker-compose-1>Docker Compose</h2><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">56
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">57
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">58
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">63
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">64
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">65
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">66
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">67
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">68
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">69
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">70
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># Shelly CLI Prometheus Exporter</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4>#</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Configuration: Generate config with `shelly init` or place manually at ~/.config/shelly/config.yaml</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Example configs: https://github.com/tj-smith47/shelly-cli/tree/master/examples/config</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>services</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>shelly-exporter</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>image</span>: ghcr.io/tj-smith47/shelly-cli:latest
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>container_name</span>: shelly-exporter
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>command</span>: [<span style=color:#f1fa8c>&#34;metrics&#34;</span>, <span style=color:#f1fa8c>&#34;prometheus&#34;</span>, <span style=color:#f1fa8c>&#34;--port&#34;</span>, <span style=color:#f1fa8c>&#34;9090&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#f1fa8c>&#34;9090:9090&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>volumes</span>:
+</span></span><span style=display:flex><span>      - ${XDG_CONFIG_HOME:-$HOME/.config}/shelly:/root/.config/shelly:ro
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>restart</span>: unless-stopped
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>networks</span>:
+</span></span><span style=display:flex><span>      - monitoring
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>healthcheck</span>:
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>test</span>: [<span style=color:#f1fa8c>&#34;CMD&#34;</span>, <span style=color:#f1fa8c>&#34;wget&#34;</span>, <span style=color:#f1fa8c>&#34;-q&#34;</span>, <span style=color:#f1fa8c>&#34;--spider&#34;</span>, <span style=color:#f1fa8c>&#34;http://localhost:9090/metrics&#34;</span>]
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>interval</span>: 30s
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>timeout</span>: 10s
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>retries</span>: <span style=color:#bd93f9>3</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Optional: Prometheus to scrape metrics</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>prometheus</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>image</span>: prom/prometheus:latest
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>container_name</span>: prometheus
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#f1fa8c>&#34;9091:9090&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>volumes</span>:
+</span></span><span style=display:flex><span>      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+</span></span><span style=display:flex><span>      - prometheus-data:/prometheus
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>command</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#f1fa8c>&#39;--config.file=/etc/prometheus/prometheus.yml&#39;</span>
+</span></span><span style=display:flex><span>      - <span style=color:#f1fa8c>&#39;--storage.tsdb.path=/prometheus&#39;</span>
+</span></span><span style=display:flex><span>      - <span style=color:#f1fa8c>&#39;--storage.tsdb.retention.time=15d&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>restart</span>: unless-stopped
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>networks</span>:
+</span></span><span style=display:flex><span>      - monitoring
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>depends_on</span>:
+</span></span><span style=display:flex><span>      - shelly-exporter
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>profiles</span>:
+</span></span><span style=display:flex><span>      - full
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  <span style=color:#6272a4># Optional: Grafana for dashboards</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>grafana</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>image</span>: grafana/grafana:latest
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>container_name</span>: grafana
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>ports</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#f1fa8c>&#34;3000:3000&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>volumes</span>:
+</span></span><span style=display:flex><span>      - grafana-data:/var/lib/grafana
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>environment</span>:
+</span></span><span style=display:flex><span>      - GF_SECURITY_ADMIN_PASSWORD=admin
+</span></span><span style=display:flex><span>      - GF_USERS_ALLOW_SIGN_UP=false
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>restart</span>: unless-stopped
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>networks</span>:
+</span></span><span style=display:flex><span>      - monitoring
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>depends_on</span>:
+</span></span><span style=display:flex><span>      - prometheus
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>profiles</span>:
+</span></span><span style=display:flex><span>      - full
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>networks</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>monitoring</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>driver</span>: bridge
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>volumes</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>prometheus-data</span>:
+</span></span><span style=display:flex><span>  grafana-data:</span></span></code></pre></td></tr></table></div></div></figure></div><p>Run shelly-cli as a Prometheus metrics exporter using Docker or Docker Compose.</p><h2 id=prerequisites>Prerequisites</h2><ul><li>Docker 20.10+</li><li>Docker Compose v2 (optional)</li><li>Shelly config at <code>~/.config/shelly/config.yaml</code> (generate with <code>shelly init</code>)</li></ul><h2 id=quick-start-1>Quick Start</h2><h3 id=using-docker-compose>Using Docker Compose</h3><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Start just the exporter</span>
+</span></span><span style=display:flex><span>docker compose up -d shelly-exporter
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Start with full monitoring stack (Prometheus + Grafana)</span>
+</span></span><span style=display:flex><span>docker compose --profile full up -d
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># View logs</span>
+</span></span><span style=display:flex><span>docker compose logs -f shelly-exporter
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Stop services</span>
+</span></span><span style=display:flex><span>docker compose down</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=using-docker-directly>Using Docker Directly</h3><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>docker run -d <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -p 9090:9090 <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v ~/.config/shelly:/root/.config/shelly:ro <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  --name shelly-exporter <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  ghcr.io/tj-smith47/shelly-cli:latest <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  metrics prometheus --port <span style=color:#bd93f9>9090</span></span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=configuration-1>Configuration</h2><p>Generate a config file with <code>shelly init</code> or create one manually.</p><p>See <a href=https://github.com/tj-smith47/shelly-cli/tree/master/examples/config>example configs</a> for reference.</p><h3 id=container-init-setup>Container Init Setup</h3><p>Initialize config inside the container using run args:</p><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># One-liner: init then run metrics</span>
+</span></span><span style=display:flex><span>docker run -d <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -p 9090:9090 <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v shelly-config:/root/.config/shelly <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  --name shelly-exporter <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  ghcr.io/tj-smith47/shelly-cli:latest <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  sh -c <span style=color:#f1fa8c>&#39;shelly init --device=kitchen=192.168.1.100 --device=bedroom=192.168.1.101 --no-color &amp;&amp; shelly metrics prometheus --port 9090&#39;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Or init first, then run</span>
+</span></span><span style=display:flex><span>docker run --rm <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v shelly-config:/root/.config/shelly <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  ghcr.io/tj-smith47/shelly-cli:latest <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  init --device<span style=color:#ff79c6>=</span><span style=color:#8be9fd;font-style:italic>kitchen</span><span style=color:#ff79c6>=</span>192.168.1.100 --no-color
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>docker run -d <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -p 9090:9090 <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v shelly-config:/root/.config/shelly <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  --name shelly-exporter <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  ghcr.io/tj-smith47/shelly-cli:latest <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  metrics prometheus --port <span style=color:#bd93f9>9090</span></span></span></code></pre></td></tr></table></div></div></figure></div><p>Import devices from a JSON file:</p><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>docker run --rm <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v shelly-config:/root/.config/shelly <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v ./devices.json:/config/devices.json:ro <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  ghcr.io/tj-smith47/shelly-cli:latest <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  init --devices-json /config/devices.json --no-color</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=network-mode>Network Mode</h3><p>For device discovery to work, you may need host network mode:</p><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>docker run -d <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  --network host <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  -v ~/.config/shelly:/root/.config/shelly:ro <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  --name shelly-exporter <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  ghcr.io/tj-smith47/shelly-cli:latest <span style=color:#f1fa8c>\
+</span></span></span><span style=display:flex><span>  metrics prometheus --port <span style=color:#bd93f9>9090</span></span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=files>Files</h2><table><thead><tr><th>File</th><th>Description</th></tr></thead><tbody><tr><td><code>docker-compose.yml</code></td><td>Docker Compose configuration</td></tr><tr><td><code>prometheus.yml</code></td><td>Prometheus scrape configuration (for full profile)</td></tr></tbody></table><h2 id=profiles>Profiles</h2><p>The Docker Compose file supports profiles:</p><ul><li><strong>Default</strong> (no profile): Just the shelly-exporter</li><li><strong>full</strong>: Includes Prometheus and Grafana</li></ul><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Exporter only</span>
+</span></span><span style=display:flex><span>docker compose up -d
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Full monitoring stack</span>
+</span></span><span style=display:flex><span>docker compose --profile full up -d</span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=verification>Verification</h2><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Check container status</span>
+</span></span><span style=display:flex><span>docker compose ps
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Test metrics endpoint</span>
+</span></span><span style=display:flex><span>curl http://localhost:9090/metrics
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># View exporter logs</span>
+</span></span><span style=display:flex><span>docker compose logs shelly-exporter</span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=grafana-setup>Grafana Setup</h2><p>When using the full profile, Grafana is available at http://localhost:3000</p><ol><li>Login with admin/admin</li><li>Add Prometheus data source: http://prometheus:9090</li><li>Import or create dashboards for Shelly metrics</li></ol><hr><h2 id=kubernetes>Kubernetes</h2><p>Deploy shelly-cli as a Prometheus metrics exporter in Kubernetes using Kustomize.</p><h2 id=prerequisites-1>Prerequisites</h2><ul><li>Kubernetes cluster (1.19+)</li><li>kubectl configured</li><li>kustomize (or kubectl with kustomize support)</li><li>Shelly config file (generate with <code>shelly init</code>)</li></ul><h2 id=quick-start-2>Quick Start</h2><h3 id=using-as-remote-base-recommended>Using as Remote Base (Recommended)</h3><p>Create an overlay that references this as a remote base:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># my-shelly/kustomization.yaml</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>apiVersion</span>: kustomize.config.k8s.io/v1beta1
+</span></span><span style=display:flex><span><span style=color:#ff79c6>kind</span>: Kustomization
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>resources</span>:
+</span></span><span style=display:flex><span>  - https://github.com/tj-smith47/shelly-cli//examples/deployments/kubernetes
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Provide your config file</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>configMapGenerator</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#ff79c6>name</span>: shelly-config
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>behavior</span>: replace
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>files</span>:
+</span></span><span style=display:flex><span>      - config.yaml=~/.config/shelly/config.yaml</span></span></code></pre></td></tr></table></div></div></figure></div><p>Then apply:</p><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>kustomize build my-shelly/ | kubectl apply -f -</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=local-clone>Local Clone</h3><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">9
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Clone and provide your config</span>
+</span></span><span style=display:flex><span>git clone https://github.com/tj-smith47/shelly-cli.git
+</span></span><span style=display:flex><span><span style=color:#8be9fd;font-style:italic>cd</span> shelly-cli/examples/deployments/kubernetes
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Copy your config (or symlink)</span>
+</span></span><span style=display:flex><span>cp ~/.config/shelly/config.yaml .
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Apply</span>
+</span></span><span style=display:flex><span>kustomize build . | kubectl apply -f -</span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=configuration-2>Configuration</h2><p>Generate a config file with <code>shelly init</code> or create one manually.</p><p>See <a href=https://github.com/tj-smith47/shelly-cli/tree/master/examples/config>example configs</a> for reference.</p><h3 id=init-container-setup>Init Container Setup</h3><p>Use an init container to configure devices at pod startup:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># In your deployment overlay</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>spec</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>template</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>spec</span>:
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>initContainers</span>:
+</span></span><span style=display:flex><span>        - <span style=color:#ff79c6>name</span>: init-config
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>image</span>: ghcr.io/tj-smith47/shelly-cli:latest
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>command</span>:
+</span></span><span style=display:flex><span>            - shelly
+</span></span><span style=display:flex><span>            - init
+</span></span><span style=display:flex><span>            - --device=kitchen=192.168.1.100
+</span></span><span style=display:flex><span>            - --device=bedroom=192.168.1.101
+</span></span><span style=display:flex><span>            - --api-mode=local
+</span></span><span style=display:flex><span>            - --<span style=color:#ff79c6>no</span>-color
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>volumeMounts</span>:
+</span></span><span style=display:flex><span>            - <span style=color:#ff79c6>name</span>: shelly-config
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>mountPath</span>: /root/.config/shelly
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>volumes</span>:
+</span></span><span style=display:flex><span>        - <span style=color:#ff79c6>name</span>: shelly-config
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>emptyDir</span>: {}</span></span></code></pre></td></tr></table></div></div></figure></div><p>Or import from a ConfigMap containing device JSON:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">9
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>initContainers</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#ff79c6>name</span>: init-config
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>image</span>: ghcr.io/tj-smith47/shelly-cli:latest
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>command</span>: [<span style=color:#f1fa8c>&#34;sh&#34;</span>, <span style=color:#f1fa8c>&#34;-c&#34;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>args</span>:
+</span></span><span style=display:flex><span>      - shelly init --devices-json /config/devices.json --no-color
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>volumeMounts</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>name</span>: devices-json
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>mountPath</span>: /config</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=image-version>Image Version</h3><p>To use a specific version in your overlay:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>images</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#ff79c6>name</span>: ghcr.io/tj-smith47/shelly-cli
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>newTag</span>: v1.0.0</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=prometheus-operator>Prometheus Operator</h3><p>If you have Prometheus Operator installed, add the ServiceMonitor to your overlay:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>resources</span>:
+</span></span><span style=display:flex><span>  - https://github.com/tj-smith47/shelly-cli//examples/deployments/kubernetes
+</span></span><span style=display:flex><span>  - https://github.com/tj-smith47/shelly-cli//examples/deployments/kubernetes/servicemonitor.yaml</span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=files-1>Files</h2><table><thead><tr><th>File</th><th>Description</th></tr></thead><tbody><tr><td><code>kustomization.yaml</code></td><td>Kustomize configuration with configMapGenerator</td></tr><tr><td><code>namespace.yaml</code></td><td>Creates the monitoring namespace</td></tr><tr><td><code>deployment.yaml</code></td><td>Exporter deployment</td></tr><tr><td><code>service.yaml</code></td><td>ClusterIP service for scraping</td></tr><tr><td><code>servicemonitor.yaml</code></td><td>Prometheus Operator ServiceMonitor (optional)</td></tr></tbody></table><h2 id=verification-1>Verification</h2><div class=expressive-code><figure class="frame is-terminal not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">9
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span><span style=color:#6272a4># Check deployment status</span>
+</span></span><span style=display:flex><span>kubectl get pods -n monitoring -l <span style=color:#8be9fd;font-style:italic>app</span><span style=color:#ff79c6>=</span>shelly-exporter
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># View logs</span>
+</span></span><span style=display:flex><span>kubectl logs -n monitoring -l <span style=color:#8be9fd;font-style:italic>app</span><span style=color:#ff79c6>=</span>shelly-exporter
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Test metrics endpoint</span>
+</span></span><span style=display:flex><span>kubectl port-forward -n monitoring svc/shelly-exporter 9090:9090
+</span></span><span style=display:flex><span>curl http://localhost:9090/metrics</span></span></code></pre></td></tr></table></div></div></figure></div><h2 id=prometheus-configuration-1>Prometheus Configuration</h2><p>If not using Prometheus Operator, add this to your <code>prometheus.yml</code>:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>scrape_configs</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#ff79c6>job_name</span>: <span style=color:#f1fa8c>&#39;shelly&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>kubernetes_sd_configs</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>role</span>: endpoints
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>namespaces</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>names</span>:
+</span></span><span style=display:flex><span>            - monitoring
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>relabel_configs</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>source_labels</span>: [__meta_kubernetes_service_label_app_kubernetes_io_name]
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>regex</span>: shelly-exporter
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>action</span>: keep</span></span></code></pre></td></tr></table></div></div></figure></div><p>Or use static config:</p><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>scrape_configs</span>:
+</span></span><span style=display:flex><span>  - <span style=color:#ff79c6>job_name</span>: <span style=color:#f1fa8c>&#39;shelly&#39;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>static_configs</span>:
+</span></span><span style=display:flex><span>      - <span style=color:#ff79c6>targets</span>: [<span style=color:#f1fa8c>&#39;shelly-exporter.monitoring.svc.cluster.local:9090&#39;</span>]
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>scrape_interval</span>: 30s</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=deploymentyaml>deployment.yaml</h3><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">56
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">57
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">58
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">63
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">64
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">65
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">66
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">67
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">68
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">69
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>apiVersion</span>: apps/v1
+</span></span><span style=display:flex><span><span style=color:#ff79c6>kind</span>: Deployment
+</span></span><span style=display:flex><span><span style=color:#ff79c6>metadata</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>name</span>: shelly-exporter
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>namespace</span>: monitoring
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>labels</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>app.kubernetes.io/name</span>: shelly-exporter
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>app.kubernetes.io/component</span>: exporter
+</span></span><span style=display:flex><span><span style=color:#ff79c6>spec</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>replicas</span>: <span style=color:#bd93f9>1</span>
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>selector</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>matchLabels</span>:
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>app</span>: shelly-exporter
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>template</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>metadata</span>:
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>labels</span>:
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>app</span>: shelly-exporter
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>app.kubernetes.io/name</span>: shelly-exporter
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>annotations</span>:
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>prometheus.io/scrape</span>: <span style=color:#f1fa8c>&#34;true&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>prometheus.io/port</span>: <span style=color:#f1fa8c>&#34;9090&#34;</span>
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>prometheus.io/path</span>: <span style=color:#f1fa8c>&#34;/metrics&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>spec</span>:
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>containers</span>:
+</span></span><span style=display:flex><span>        - <span style=color:#ff79c6>name</span>: shelly-exporter
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>image</span>: ghcr.io/tj-smith47/shelly-cli:latest
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>args</span>:
+</span></span><span style=display:flex><span>            - metrics
+</span></span><span style=display:flex><span>            - prometheus
+</span></span><span style=display:flex><span>            - --port
+</span></span><span style=display:flex><span>            - <span style=color:#f1fa8c>&#34;9090&#34;</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>ports</span>:
+</span></span><span style=display:flex><span>            - <span style=color:#ff79c6>containerPort</span>: <span style=color:#bd93f9>9090</span>
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>name</span>: metrics
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>protocol</span>: TCP
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>volumeMounts</span>:
+</span></span><span style=display:flex><span>            - <span style=color:#ff79c6>name</span>: config
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>mountPath</span>: /root/.config/shelly
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>readOnly</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>resources</span>:
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>requests</span>:
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>cpu</span>: 10m
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>memory</span>: 32Mi
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>limits</span>:
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>cpu</span>: 100m
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>memory</span>: 64Mi
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>livenessProbe</span>:
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>httpGet</span>:
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>path</span>: /metrics
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>port</span>: <span style=color:#bd93f9>9090</span>
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>initialDelaySeconds</span>: <span style=color:#bd93f9>10</span>
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>periodSeconds</span>: <span style=color:#bd93f9>30</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>readinessProbe</span>:
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>httpGet</span>:
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>path</span>: /metrics
+</span></span><span style=display:flex><span>              <span style=color:#ff79c6>port</span>: <span style=color:#bd93f9>9090</span>
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>initialDelaySeconds</span>: <span style=color:#bd93f9>5</span>
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>periodSeconds</span>: <span style=color:#bd93f9>10</span>
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>securityContext</span>:
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>readOnlyRootFilesystem</span>: <span style=color:#ff79c6>true</span>
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>runAsNonRoot</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>allowPrivilegeEscalation</span>: <span style=color:#ff79c6>false</span>
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>volumes</span>:
+</span></span><span style=display:flex><span>        - <span style=color:#ff79c6>name</span>: config
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>configMap</span>:
+</span></span><span style=display:flex><span>            <span style=color:#ff79c6>name</span>: shelly-config
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>securityContext</span>:
+</span></span><span style=display:flex><span>        <span style=color:#ff79c6>seccompProfile</span>:
+</span></span><span style=display:flex><span>          <span style=color:#ff79c6>type</span>: RuntimeDefault</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=serviceyaml>service.yaml</h3><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#ff79c6>apiVersion</span>: v1
+</span></span><span style=display:flex><span><span style=color:#ff79c6>kind</span>: Service
+</span></span><span style=display:flex><span><span style=color:#ff79c6>metadata</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>name</span>: shelly-exporter
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>namespace</span>: monitoring
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>labels</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>app.kubernetes.io/name</span>: shelly-exporter
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>app.kubernetes.io/component</span>: exporter
+</span></span><span style=display:flex><span><span style=color:#ff79c6>spec</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>type</span>: ClusterIP
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>ports</span>:
+</span></span><span style=display:flex><span>    - <span style=color:#ff79c6>port</span>: <span style=color:#bd93f9>9090</span>
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>targetPort</span>: <span style=color:#bd93f9>9090</span>
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>name</span>: metrics
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>protocol</span>: TCP
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>selector</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>app</span>: shelly-exporter</span></span></code></pre></td></tr></table></div></div></figure></div><h3 id=servicemonitoryaml>servicemonitor.yaml</h3><div class=expressive-code><figure class="frame not-content"><figcaption class=header><span class=title></span></figcaption><div class=highlight><div style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-yaml data-lang=yaml><span style=display:flex><span><span style=color:#6272a4># ServiceMonitor for Prometheus Operator</span>
+</span></span><span style=display:flex><span><span style=color:#6272a4># Only apply if you have Prometheus Operator installed</span>
+</span></span><span style=display:flex><span><span style=color:#ff79c6>apiVersion</span>: monitoring.coreos.com/v1
+</span></span><span style=display:flex><span><span style=color:#ff79c6>kind</span>: ServiceMonitor
+</span></span><span style=display:flex><span><span style=color:#ff79c6>metadata</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>name</span>: shelly-exporter
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>namespace</span>: monitoring
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>labels</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>app.kubernetes.io/name</span>: shelly-exporter
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>app.kubernetes.io/component</span>: monitoring
+</span></span><span style=display:flex><span><span style=color:#ff79c6>spec</span>:
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>selector</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>matchLabels</span>:
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>app</span>: shelly-exporter
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>namespaceSelector</span>:
+</span></span><span style=display:flex><span>    <span style=color:#ff79c6>matchNames</span>:
+</span></span><span style=display:flex><span>      - monitoring
+</span></span><span style=display:flex><span>  <span style=color:#ff79c6>endpoints</span>:
+</span></span><span style=display:flex><span>    - <span style=color:#ff79c6>port</span>: metrics
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>interval</span>: 30s
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>path</span>: /metrics
+</span></span><span style=display:flex><span>      <span style=color:#ff79c6>scrapeTimeout</span>: 10s</span></span></code></pre></td></tr></table></div></div></figure></div></div><div class=card-list></div></article></div></div></div></div><footer class="footer text-muted"><div class=container-lg><div class=row><div class="col-lg-8 text-center text-lg-start"><ul class=list-inline><li class=list-inline-item><a class=text-muted href=/shelly-cli/docs/>Docs</a></li><li class=list-inline-item><a class=text-muted href=/shelly-cli/docs/commands/>Commands</a></li><li class=list-inline-item><a class=text-muted href=https://github.com/tj-smith47/shelly-cli>GitHub</a></li></ul></div><div class="col-lg-8 text-center text-lg-end"><ul class=list-inline><li class=list-inline-item></li></ul></div></div></div></footer><script async src=/shelly-cli/js/app.19b73e0182301dd61c9211c2f6890104740e2eb9eb12fe4ba8d4f31435b22ed6.js integrity="sha256-Gbc+AYIwHdYckhHC9okBBHQOLrnrEv5LqNTzFDWyLtY="></script><script async src=/shelly-cli/js/flexsearch.113b7edaabeb04644a4b0da964854226f135a5e10d3341884f25bd0ad1ee4def.js integrity="sha256-ETt+2qvrBGRKSw2pZIVCJvE1peENM0GITyW9CtHuTe8="></script><script async src=/shelly-cli/js/search-modal.96e662d8f691fe25c859a3437074b485f2d7bed0bca612725028c6cf4322e2f2.js integrity="sha256-luZi2PaR/iXIWaNDcHS0hfLXvtC8phJyUCjGz0Mi4vI="></script></body></html>

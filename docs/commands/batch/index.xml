@@ -1,53 +1,53 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly batch on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/</link><description>Recent content in shelly batch on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/batch/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly batch command</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/command/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/command/</guid><description>&lt;h2 id="shelly-batch-command">shelly batch command&lt;/h2>
-&lt;p>Send RPC command to devices&lt;/p>
-&lt;h3 id="synopsis">Synopsis&lt;/h3>
-&lt;p>Send a raw RPC command to multiple devices simultaneously.&lt;/p>
-&lt;p>The method is the RPC method name (e.g., &amp;ldquo;Switch.Set&amp;rdquo;, &amp;ldquo;Shelly.GetStatus&amp;rdquo;).
-Params should be a JSON object (e.g., &amp;lsquo;{&amp;ldquo;id&amp;rdquo;:0,&amp;ldquo;on&amp;rdquo;:true}&amp;rsquo;).&lt;/p>
-&lt;p>Target devices can be specified multiple ways:&lt;/p>
-&lt;ul>
-&lt;li>As arguments: device names or addresses after the method/params&lt;/li>
-&lt;li>Via stdin: pipe device names (one per line or space-separated)&lt;/li>
-&lt;li>Via group: &amp;ndash;group flag targets all devices in a group&lt;/li>
-&lt;li>Via all: &amp;ndash;all flag targets all registered devices&lt;/li>
-&lt;/ul>
-&lt;p>Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p></description></item><item><title>shelly batch off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/off/</guid><description>&lt;h2 id="shelly-batch-off">shelly batch off&lt;/h2>
-&lt;p>Turn off switches&lt;/p>
-&lt;h3 id="synopsis">Synopsis&lt;/h3>
-&lt;p>Turn off switches multiple switch components simultaneously.&lt;/p>
-&lt;p>By default, targets switch component 0 on each device.
-Use &amp;ndash;switch to specify a different component ID.&lt;/p>
-&lt;p>Target devices can be specified multiple ways:&lt;/p>
-&lt;ul>
-&lt;li>As arguments: device names or addresses&lt;/li>
-&lt;li>Via stdin: pipe device names (one per line or space-separated)&lt;/li>
-&lt;li>Via group: &amp;ndash;group flag targets all devices in a group&lt;/li>
-&lt;li>Via all: &amp;ndash;all flag targets all registered devices&lt;/li>
-&lt;/ul>
-&lt;p>Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p></description></item><item><title>shelly batch on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/on/</guid><description>&lt;h2 id="shelly-batch-on">shelly batch on&lt;/h2>
-&lt;p>Turn on switches&lt;/p>
-&lt;h3 id="synopsis">Synopsis&lt;/h3>
-&lt;p>Turn on switches multiple switch components simultaneously.&lt;/p>
-&lt;p>By default, targets switch component 0 on each device.
-Use &amp;ndash;switch to specify a different component ID.&lt;/p>
-&lt;p>Target devices can be specified multiple ways:&lt;/p>
-&lt;ul>
-&lt;li>As arguments: device names or addresses&lt;/li>
-&lt;li>Via stdin: pipe device names (one per line or space-separated)&lt;/li>
-&lt;li>Via group: &amp;ndash;group flag targets all devices in a group&lt;/li>
-&lt;li>Via all: &amp;ndash;all flag targets all registered devices&lt;/li>
-&lt;/ul>
-&lt;p>Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p></description></item><item><title>shelly batch toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/toggle/</guid><description>&lt;h2 id="shelly-batch-toggle">shelly batch toggle&lt;/h2>
-&lt;p>Toggle switches&lt;/p>
-&lt;h3 id="synopsis">Synopsis&lt;/h3>
-&lt;p>Toggle switches multiple switch components simultaneously.&lt;/p>
-&lt;p>By default, targets switch component 0 on each device.
-Use &amp;ndash;switch to specify a different component ID.&lt;/p>
-&lt;p>Target devices can be specified multiple ways:&lt;/p>
-&lt;ul>
-&lt;li>As arguments: device names or addresses&lt;/li>
-&lt;li>Via stdin: pipe device names (one per line or space-separated)&lt;/li>
-&lt;li>Via group: &amp;ndash;group flag targets all devices in a group&lt;/li>
-&lt;li>Via all: &amp;ndash;all flag targets all registered devices&lt;/li>
-&lt;/ul>
-&lt;p>Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p></description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>shelly batch on Shelly CLI</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/</link><description>Recent content in shelly batch on Shelly CLI</description><generator>Hugo</generator><language>en-US</language><atom:link href="https://tj-smith47.github.io/shelly-cli/docs/commands/batch/index.xml" rel="self" type="application/rss+xml"/><item><title>shelly batch command</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/command/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/command/</guid><description>&lt;h2 id="shelly-batch-command"&gt;shelly batch command&lt;/h2&gt;
+&lt;p&gt;Send RPC command to devices&lt;/p&gt;
+&lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
+&lt;p&gt;Send a raw RPC command to multiple devices simultaneously.&lt;/p&gt;
+&lt;p&gt;The method is the RPC method name (e.g., &amp;ldquo;Switch.Set&amp;rdquo;, &amp;ldquo;Shelly.GetStatus&amp;rdquo;).
+Params should be a JSON object (e.g., &amp;lsquo;{&amp;ldquo;id&amp;rdquo;:0,&amp;ldquo;on&amp;rdquo;:true}&amp;rsquo;).&lt;/p&gt;
+&lt;p&gt;Target devices can be specified multiple ways:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;As arguments: device names or addresses after the method/params&lt;/li&gt;
+&lt;li&gt;Via stdin: pipe device names (one per line or space-separated)&lt;/li&gt;
+&lt;li&gt;Via group: &amp;ndash;group flag targets all devices in a group&lt;/li&gt;
+&lt;li&gt;Via all: &amp;ndash;all flag targets all registered devices&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p&gt;</description></item><item><title>shelly batch off</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/off/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/off/</guid><description>&lt;h2 id="shelly-batch-off"&gt;shelly batch off&lt;/h2&gt;
+&lt;p&gt;Turn off switches&lt;/p&gt;
+&lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
+&lt;p&gt;Turn off switches multiple switch components simultaneously.&lt;/p&gt;
+&lt;p&gt;By default, targets switch component 0 on each device.
+Use &amp;ndash;switch to specify a different component ID.&lt;/p&gt;
+&lt;p&gt;Target devices can be specified multiple ways:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;As arguments: device names or addresses&lt;/li&gt;
+&lt;li&gt;Via stdin: pipe device names (one per line or space-separated)&lt;/li&gt;
+&lt;li&gt;Via group: &amp;ndash;group flag targets all devices in a group&lt;/li&gt;
+&lt;li&gt;Via all: &amp;ndash;all flag targets all registered devices&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p&gt;</description></item><item><title>shelly batch on</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/on/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/on/</guid><description>&lt;h2 id="shelly-batch-on"&gt;shelly batch on&lt;/h2&gt;
+&lt;p&gt;Turn on switches&lt;/p&gt;
+&lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
+&lt;p&gt;Turn on switches multiple switch components simultaneously.&lt;/p&gt;
+&lt;p&gt;By default, targets switch component 0 on each device.
+Use &amp;ndash;switch to specify a different component ID.&lt;/p&gt;
+&lt;p&gt;Target devices can be specified multiple ways:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;As arguments: device names or addresses&lt;/li&gt;
+&lt;li&gt;Via stdin: pipe device names (one per line or space-separated)&lt;/li&gt;
+&lt;li&gt;Via group: &amp;ndash;group flag targets all devices in a group&lt;/li&gt;
+&lt;li&gt;Via all: &amp;ndash;all flag targets all registered devices&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p&gt;</description></item><item><title>shelly batch toggle</title><link>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/toggle/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://tj-smith47.github.io/shelly-cli/docs/commands/batch/toggle/</guid><description>&lt;h2 id="shelly-batch-toggle"&gt;shelly batch toggle&lt;/h2&gt;
+&lt;p&gt;Toggle switches&lt;/p&gt;
+&lt;h3 id="synopsis"&gt;Synopsis&lt;/h3&gt;
+&lt;p&gt;Toggle switches multiple switch components simultaneously.&lt;/p&gt;
+&lt;p&gt;By default, targets switch component 0 on each device.
+Use &amp;ndash;switch to specify a different component ID.&lt;/p&gt;
+&lt;p&gt;Target devices can be specified multiple ways:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;As arguments: device names or addresses&lt;/li&gt;
+&lt;li&gt;Via stdin: pipe device names (one per line or space-separated)&lt;/li&gt;
+&lt;li&gt;Via group: &amp;ndash;group flag targets all devices in a group&lt;/li&gt;
+&lt;li&gt;Via all: &amp;ndash;all flag targets all registered devices&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Priority: explicit args &amp;gt; stdin &amp;gt; group &amp;gt; all&lt;/p&gt;</description></item></channel></rss>
