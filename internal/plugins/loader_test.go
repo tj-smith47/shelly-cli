@@ -1,10 +1,23 @@
 package plugins
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
+
+const testLoaderDir = "/test/loader"
+
+func setupLoaderTestFs(t *testing.T) afero.Fs {
+	t.Helper()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	return fs
+}
 
 func TestNewLoader(t *testing.T) {
 	t.Parallel()
@@ -18,21 +31,16 @@ func TestNewLoader(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoader_Discover_Empty(t *testing.T) {
-	t.Parallel()
+	fs := setupLoaderTestFs(t)
+	pluginsDir := testLoaderDir + "/empty"
 
-	// Create temp dir with no plugins.
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
-	loader := &Loader{paths: []string{tmpDir}}
+	loader := &Loader{paths: []string{pluginsDir}}
 	plugins, err := loader.Discover()
 	if err != nil {
 		t.Fatalf("Discover() error: %v", err)
@@ -43,29 +51,22 @@ func TestLoader_Discover_Empty(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoader_Discover_FindsPlugins(t *testing.T) {
-	t.Parallel()
+	fs := setupLoaderTestFs(t)
+	pluginsDir := testLoaderDir + "/finds"
 
-	// Create temp dir with a fake plugin.
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create fake plugin executable.
-	pluginPath := filepath.Join(tmpDir, "shelly-test-plugin")
-	//nolint:gosec // Test file needs to be executable
-	err = os.WriteFile(pluginPath, []byte("#!/bin/bash\necho test"), 0o755)
-	if err != nil {
+	pluginPath := filepath.Join(pluginsDir, "shelly-test-plugin")
+	if err := afero.WriteFile(fs, pluginPath, []byte("#!/bin/bash\necho test"), 0o755); err != nil {
 		t.Fatalf("failed to create fake plugin: %v", err)
 	}
 
-	loader := &Loader{paths: []string{tmpDir}}
+	loader := &Loader{paths: []string{pluginsDir}}
 	plugins, err := loader.Discover()
 	if err != nil {
 		t.Fatalf("Discover() error: %v", err)
@@ -83,29 +84,22 @@ func TestLoader_Discover_FindsPlugins(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoader_Find(t *testing.T) {
-	t.Parallel()
+	fs := setupLoaderTestFs(t)
+	pluginsDir := testLoaderDir + "/find"
 
-	// Create temp dir with a fake plugin.
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create fake plugin executable.
-	pluginPath := filepath.Join(tmpDir, "shelly-myplugin")
-	//nolint:gosec // Test file needs to be executable
-	err = os.WriteFile(pluginPath, []byte("#!/bin/bash\necho test"), 0o755)
-	if err != nil {
+	pluginPath := filepath.Join(pluginsDir, "shelly-myplugin")
+	if err := afero.WriteFile(fs, pluginPath, []byte("#!/bin/bash\necho test"), 0o755); err != nil {
 		t.Fatalf("failed to create fake plugin: %v", err)
 	}
 
-	loader := &Loader{paths: []string{tmpDir}}
+	loader := &Loader{paths: []string{pluginsDir}}
 
 	// Find by name without prefix.
 	plugin, err := loader.Find("myplugin")
@@ -138,33 +132,24 @@ func TestLoader_Find(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestIsExecutable(t *testing.T) {
-	t.Parallel()
+	fs := setupLoaderTestFs(t)
+	pluginsDir := testLoaderDir + "/executable"
 
-	// Create temp dir.
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create executable file.
-	execPath := filepath.Join(tmpDir, "executable")
-	//nolint:gosec // Test file needs to be executable
-	err = os.WriteFile(execPath, []byte("test"), 0o755)
-	if err != nil {
+	execPath := filepath.Join(pluginsDir, "executable")
+	if err := afero.WriteFile(fs, execPath, []byte("test"), 0o755); err != nil {
 		t.Fatalf("failed to create executable: %v", err)
 	}
 
 	// Create non-executable file.
-	noExecPath := filepath.Join(tmpDir, "not-executable")
-	//nolint:gosec // G306: Test file intentionally needs specific permissions (0o644)
-	err = os.WriteFile(noExecPath, []byte("test"), 0o644)
-	if err != nil {
+	noExecPath := filepath.Join(pluginsDir, "not-executable")
+	if err := afero.WriteFile(fs, noExecPath, []byte("test"), 0o644); err != nil {
 		t.Fatalf("failed to create non-executable: %v", err)
 	}
 
@@ -180,7 +165,7 @@ func TestIsExecutable(t *testing.T) {
 		t.Error("isExecutable() returned true for nonexistent path")
 	}
 
-	if isExecutable(tmpDir) {
+	if isExecutable(pluginsDir) {
 		t.Error("isExecutable() returned true for directory")
 	}
 }

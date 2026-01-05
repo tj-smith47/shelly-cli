@@ -2,11 +2,12 @@ package config
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testImportFile = "/test/import.yaml"
@@ -431,81 +432,79 @@ func TestExecuteShellAlias_NoShell(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Test modifies global state via SetFs and ResetDefaultManagerForTesting
-func TestPackageLevelAliasFunctions(t *testing.T) {
-	// Use in-memory filesystem for test isolation
+// setupPackageLevelAliasTest sets up an in-memory filesystem for alias package-level tests.
+func setupPackageLevelAliasTest(t *testing.T) {
+	t.Helper()
 	SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { SetFs(nil) })
 	ResetDefaultManagerForTesting()
+}
 
-	// Test AddAlias
-	if err := AddAlias("test1", "device info", false); err != nil {
-		t.Fatalf("AddAlias() error: %v", err)
-	}
+//nolint:paralleltest // Test modifies global state via SetFs and ResetDefaultManagerForTesting
+func TestPackageLevel_AddGetIsAlias(t *testing.T) {
+	setupPackageLevelAliasTest(t)
 
-	// Test GetAlias
+	// Add an alias
+	err := AddAlias("test1", "device info", false)
+	require.NoError(t, err, "AddAlias() error")
+
+	// GetAlias returns the alias
 	alias, ok := GetAlias("test1")
-	if !ok {
-		t.Fatal("GetAlias() returned false for existing alias")
-	}
-	if alias.Command != "device info" {
-		t.Errorf("GetAlias() command = %q, want %q", alias.Command, "device info")
-	}
+	require.True(t, ok, "GetAlias() returned false for existing alias")
+	assert.Equal(t, "device info", alias.Command, "GetAlias() command mismatch")
 
-	// Test IsAlias
-	if !IsAlias("test1") {
-		t.Error("IsAlias() returned false for existing alias")
-	}
-	if IsAlias("nonexistent") {
-		t.Error("IsAlias() returned true for nonexistent alias")
-	}
+	// IsAlias returns true for existing, false for nonexistent
+	assert.True(t, IsAlias("test1"), "IsAlias() false for existing")
+	assert.False(t, IsAlias("nonexistent"), "IsAlias() true for nonexistent")
+}
 
-	// Add another alias for list tests
-	if err := AddAlias("aaa", "switch on", false); err != nil {
-		t.Fatalf("AddAlias(aaa) error: %v", err)
-	}
+//nolint:paralleltest // Test modifies global state via SetFs and ResetDefaultManagerForTesting
+func TestPackageLevel_ListAliases(t *testing.T) {
+	setupPackageLevelAliasTest(t)
 
-	// Test ListAliases
+	require.NoError(t, AddAlias("test1", "device info", false))
+	require.NoError(t, AddAlias("aaa", "switch on", false))
+
+	// ListAliases returns map with all aliases
 	aliases := ListAliases()
-	if len(aliases) != 2 {
-		t.Errorf("ListAliases() returned %d aliases, want 2", len(aliases))
-	}
-	if _, ok := aliases["test1"]; !ok {
-		t.Error("ListAliases() missing test1")
-	}
+	assert.Len(t, aliases, 2)
+	assert.Contains(t, aliases, "test1")
 
-	// Test ListAliasesSorted
+	// ListAliasesSorted returns sorted slice
 	sorted := ListAliasesSorted()
-	if len(sorted) != 2 {
-		t.Errorf("ListAliasesSorted() returned %d aliases, want 2", len(sorted))
-	}
-	// Should be sorted: aaa comes before test1
-	if sorted[0].Name != "aaa" {
-		t.Errorf("ListAliasesSorted() first = %q, want %q", sorted[0].Name, "aaa")
-	}
+	assert.Len(t, sorted, 2)
+	assert.Equal(t, "aaa", sorted[0].Name, "first alias should be 'aaa'")
+}
 
-	// Test ExportAliases (to stdout)
+//nolint:paralleltest // Test modifies global state via SetFs and ResetDefaultManagerForTesting
+func TestPackageLevel_ExportAliases(t *testing.T) {
+	setupPackageLevelAliasTest(t)
+
+	require.NoError(t, AddAlias("test1", "device info", false))
+
+	// Export to stdout returns YAML string
 	output, err := ExportAliases("")
-	if err != nil {
-		t.Fatalf("ExportAliases() error: %v", err)
-	}
-	if !strings.Contains(output, "test1:") {
-		t.Error("ExportAliases() output missing test1")
-	}
+	require.NoError(t, err)
+	assert.Contains(t, output, "test1:")
 
-	// Note: ExportAliases(file) uses os.WriteFile directly, not afero.
-	// File export is tested in Manager tests with temp directories instead.
+	// Export to file creates the file
+	exportFile := "/test/aliases-export.yaml"
+	_, err = ExportAliases(exportFile)
+	require.NoError(t, err)
+	_, err = Fs().Stat(exportFile)
+	assert.NoError(t, err, "ExportAliases() did not create file")
+}
 
-	// Test RemoveAlias
-	if err := RemoveAlias("test1"); err != nil {
-		t.Fatalf("RemoveAlias() error: %v", err)
-	}
-	if IsAlias("test1") {
-		t.Error("alias test1 still exists after RemoveAlias()")
-	}
+//nolint:paralleltest // Test modifies global state via SetFs and ResetDefaultManagerForTesting
+func TestPackageLevel_RemoveAlias(t *testing.T) {
+	setupPackageLevelAliasTest(t)
 
-	// Note: ImportAliases and ExportAliases(file) tests use os.ReadFile/WriteFile directly,
-	// not afero. These are tested in Manager tests with temp directories instead.
+	require.NoError(t, AddAlias("test1", "device info", false))
+	require.True(t, IsAlias("test1"))
+
+	err := RemoveAlias("test1")
+	require.NoError(t, err)
+	assert.False(t, IsAlias("test1"), "alias still exists after RemoveAlias()")
 }
 
 //nolint:paralleltest // Test modifies global state via SetFs, ResetDefaultManagerForTesting and SetDefaultManager
@@ -727,25 +726,24 @@ func TestManager_ExportAliases_ToFile(t *testing.T) {
 }
 
 // TestManager_ExportAliases_WriteError tests filesystem error handling.
-// Uses t.TempDir() because MemMapFs auto-creates parent directories.
+//
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_ExportAliases_WriteError(t *testing.T) {
-	t.Parallel()
+	// Use read-only fs to simulate write error
+	memFs := afero.NewMemMapFs()
+	SetFs(afero.NewReadOnlyFs(memFs))
+	t.Cleanup(func() { SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
-	if err := m.Load(); err != nil {
-		t.Fatalf("Load() error: %v", err)
+	// Create config directly with alias (read-only fs can't save)
+	cfg := &Config{
+		Aliases: map[string]Alias{"test": {Name: "test", Command: "echo"}},
 	}
+	m := NewTestManager(cfg)
 
-	if err := m.AddAlias("test", "echo", false); err != nil {
-		t.Fatalf("AddAlias() error: %v", err)
-	}
-
-	// Try to export to a non-existent directory within tmpDir
-	nonExistentPath := filepath.Join(tmpDir, "nonexistent_subdir", "aliases.yaml")
-	_, err := m.ExportAliases(nonExistentPath)
+	// Export should fail on read-only filesystem
+	_, err := m.ExportAliases("/test/exported.yaml")
 	if err == nil {
-		t.Error("ExportAliases() should error for non-writable path")
+		t.Error("ExportAliases() should error on read-only filesystem")
 	}
 }
 

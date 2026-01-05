@@ -2,13 +2,26 @@ package plugins
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
+
+const testManifestDir = "/test/manifest"
+
+func setupManifestTestFs(t *testing.T) afero.Fs {
+	t.Helper()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	return fs
+}
 
 const (
 	testPluginName = "test-plugin"
@@ -198,35 +211,32 @@ func TestNewManifest(t *testing.T) {
 }
 
 // TestManifest_Save tests Manifest Save method.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestManifest_Save(t *testing.T) {
-	t.Parallel()
+	fs := setupManifestTestFs(t)
+	pluginDir := testManifestDir + "/save"
 
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	manifest := NewManifest("test", ParseLocalSource("/path/to/plugin"))
 	manifest.Version = testVersion100
 	manifest.Description = "Test plugin"
 
-	if err := manifest.Save(tmpDir); err != nil {
+	if err := manifest.Save(pluginDir); err != nil {
 		t.Fatalf("Save() error: %v", err)
 	}
 
 	// Verify file was created
-	manifestPath := filepath.Join(tmpDir, ManifestFileName)
-	if _, err := os.Stat(manifestPath); err != nil {
+	manifestPath := filepath.Join(pluginDir, ManifestFileName)
+	if _, err := fs.Stat(manifestPath); err != nil {
 		t.Errorf("manifest file not created: %v", err)
 	}
 
 	// Verify we can load it back
-	loaded, err := LoadManifest(tmpDir)
+	loaded, err := LoadManifest(pluginDir)
 	if err != nil {
 		t.Fatalf("LoadManifest() error: %v", err)
 	}
@@ -250,70 +260,59 @@ func TestManifest_Save_InvalidDir(t *testing.T) {
 }
 
 // TestLoadManifest_FileNotFound tests LoadManifest with missing file.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoadManifest_FileNotFound(t *testing.T) {
-	t.Parallel()
+	fs := setupManifestTestFs(t)
+	pluginDir := testManifestDir + "/notfound"
 
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
-	_, err = LoadManifest(tmpDir)
+	_, err := LoadManifest(pluginDir)
 	if err == nil {
 		t.Error("LoadManifest() should fail when file doesn't exist")
 	}
 }
 
 // TestLoadManifest_InvalidJSON tests LoadManifest with invalid JSON.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoadManifest_InvalidJSON(t *testing.T) {
-	t.Parallel()
+	fs := setupManifestTestFs(t)
+	pluginDir := testManifestDir + "/invalidjson"
 
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Write invalid JSON
-	manifestPath := filepath.Join(tmpDir, ManifestFileName)
-	//nolint:gosec // G306: test file
-	if err := os.WriteFile(manifestPath, []byte("not valid json"), 0o644); err != nil {
+	manifestPath := filepath.Join(pluginDir, ManifestFileName)
+	if err := afero.WriteFile(fs, manifestPath, []byte("not valid json"), 0o644); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	_, err = LoadManifest(tmpDir)
+	_, err := LoadManifest(pluginDir)
 	if err == nil {
 		t.Error("LoadManifest() should fail with invalid JSON")
 	}
 }
 
 // TestManifest_SetBinaryInfo tests SetBinaryInfo method.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestManifest_SetBinaryInfo(t *testing.T) {
-	t.Parallel()
+	fs := setupManifestTestFs(t)
+	pluginDir := testManifestDir + "/binaryinfo"
 
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create a test binary
-	binaryPath := filepath.Join(tmpDir, "shelly-test")
-	//nolint:gosec // Test file
-	if err := os.WriteFile(binaryPath, []byte("test binary content"), 0o755); err != nil {
+	binaryPath := filepath.Join(pluginDir, "shelly-test")
+	if err := afero.WriteFile(fs, binaryPath, []byte("test binary content"), 0o755); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -369,23 +368,19 @@ func TestManifest_MarkUpdated(t *testing.T) {
 }
 
 // TestComputeChecksum tests ComputeChecksum function.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestComputeChecksum(t *testing.T) {
-	t.Parallel()
+	fs := setupManifestTestFs(t)
+	pluginDir := testManifestDir + "/checksum"
 
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create a test file
-	testFile := filepath.Join(tmpDir, "test.bin")
-	//nolint:gosec // Test file
-	if err := os.WriteFile(testFile, []byte("hello world"), 0o644); err != nil {
+	testFile := filepath.Join(pluginDir, "test.bin")
+	if err := afero.WriteFile(fs, testFile, []byte("hello world"), 0o644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
@@ -419,23 +414,19 @@ func TestComputeChecksum_FileNotFound(t *testing.T) {
 }
 
 // TestManifest_VerifyChecksum tests VerifyChecksum method.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestManifest_VerifyChecksum(t *testing.T) {
-	t.Parallel()
+	fs := setupManifestTestFs(t)
+	pluginDir := testManifestDir + "/verifychecksum"
 
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create a test file
-	testFile := filepath.Join(tmpDir, "test.bin")
-	//nolint:gosec // Test file
-	if err := os.WriteFile(testFile, []byte("test content"), 0o644); err != nil {
+	testFile := filepath.Join(pluginDir, "test.bin")
+	if err := afero.WriteFile(fs, testFile, []byte("test content"), 0o644); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 

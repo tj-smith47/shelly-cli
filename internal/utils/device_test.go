@@ -4,14 +4,14 @@ package utils
 import (
 	"fmt"
 	"net"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/discovery"
 	"github.com/tj-smith47/shelly-go/types"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
@@ -154,15 +154,16 @@ func TestParseDevicesJSON_SingleObject(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseDevicesJSON_FromFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temp file with device JSON
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "devices.json")
-
+	// Create a file with device JSON
+	tmpFile := "/test/devices.json"
 	content := `[{"name":"filedev","address":"10.0.0.1"}]`
-	if err := os.WriteFile(tmpFile, []byte(content), 0o600); err != nil {
+	if err := afero.WriteFile(fs, tmpFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
@@ -380,26 +381,48 @@ func TestPluginDevice_Struct(t *testing.T) {
 	}
 }
 
+// errorOnReadFs wraps an afero.Fs and returns an error for specific paths.
+type errorOnReadFs struct {
+	afero.Fs
+	errorPath string
+}
+
+func (e *errorOnReadFs) Open(name string) (afero.File, error) {
+	if name == e.errorPath {
+		return nil, fmt.Errorf("simulated read error for %s", name)
+	}
+	return e.Fs.Open(name)
+}
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseDevicesJSON_FileReadError(t *testing.T) {
-	t.Parallel()
+	memFs := afero.NewMemMapFs()
+	// Create a file that "exists" for afero.Exists check
+	if err := afero.WriteFile(memFs, "/test/errorfile.json", []byte("test"), 0o600); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
 
-	// Test with a directory path (cannot be read as file)
-	tmpDir := t.TempDir()
+	// Wrap with error-injecting fs
+	errorFs := &errorOnReadFs{Fs: memFs, errorPath: "/test/errorfile.json"}
+	config.SetFs(errorFs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	_, err := ParseDevicesJSON(tmpDir)
+	// Should error when file read fails
+	_, err := ParseDevicesJSON("/test/errorfile.json")
 	if err == nil {
-		t.Error("ParseDevicesJSON() should error when reading a directory")
+		t.Error("ParseDevicesJSON() should error when file read fails")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseDevicesJSON_EmptyFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create an empty temp file
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "empty.json")
-
-	if err := os.WriteFile(tmpFile, []byte(""), 0o600); err != nil {
+	// Create an empty file
+	tmpFile := "/test/empty.json"
+	if err := afero.WriteFile(fs, tmpFile, []byte(""), 0o600); err != nil {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
@@ -412,14 +435,15 @@ func TestParseDevicesJSON_EmptyFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseDevicesJSON_WhitespaceOnlyFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	// Create a file with only whitespace
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "whitespace.json")
-
-	if err := os.WriteFile(tmpFile, []byte("   \n\t  \n"), 0o600); err != nil {
+	tmpFile := "/test/whitespace.json"
+	if err := afero.WriteFile(fs, tmpFile, []byte("   \n\t  \n"), 0o600); err != nil {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 

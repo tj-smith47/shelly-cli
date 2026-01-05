@@ -1,12 +1,23 @@
 package plugins
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
+
+const testMigrateDir = "/test/migrate"
+
+func setupMigrateTestFs(t *testing.T) afero.Fs {
+	t.Helper()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	return fs
+}
 
 // TestErrAlreadyMigrated tests ErrAlreadyMigrated error.
 func TestErrAlreadyMigrated(t *testing.T) {
@@ -59,23 +70,18 @@ func TestMigrationResult_Empty(t *testing.T) {
 }
 
 // TestHasOldFormatPlugins tests hasOldFormatPlugins function.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestHasOldFormatPlugins(t *testing.T) {
-	t.Parallel()
+	fs := setupMigrateTestFs(t)
+	pluginsDir := testMigrateDir + "/hasold"
 
-	fs := afero.NewOsFs()
-
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Empty directory - no old format plugins
-	has, err := hasOldFormatPlugins(fs, tmpDir)
+	has, err := hasOldFormatPlugins(fs, pluginsDir)
 	if err != nil {
 		t.Fatalf("hasOldFormatPlugins() error: %v", err)
 	}
@@ -84,12 +90,12 @@ func TestHasOldFormatPlugins(t *testing.T) {
 	}
 
 	// Add a new format plugin (directory)
-	newPluginDir := filepath.Join(tmpDir, "shelly-new")
-	if err := os.MkdirAll(newPluginDir, 0o750); err != nil {
+	newPluginDir := filepath.Join(pluginsDir, "shelly-new")
+	if err := fs.MkdirAll(newPluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
-	has, err = hasOldFormatPlugins(fs, tmpDir)
+	has, err = hasOldFormatPlugins(fs, pluginsDir)
 	if err != nil {
 		t.Fatalf("hasOldFormatPlugins() error: %v", err)
 	}
@@ -98,13 +104,12 @@ func TestHasOldFormatPlugins(t *testing.T) {
 	}
 
 	// Add an old format plugin (bare binary)
-	oldPluginPath := filepath.Join(tmpDir, "shelly-old")
-	//nolint:gosec // Test file
-	if err := os.WriteFile(oldPluginPath, []byte("test"), 0o755); err != nil {
+	oldPluginPath := filepath.Join(pluginsDir, "shelly-old")
+	if err := afero.WriteFile(fs, oldPluginPath, []byte("test"), 0o755); err != nil {
 		t.Fatalf("failed to create old plugin: %v", err)
 	}
 
-	has, err = hasOldFormatPlugins(fs, tmpDir)
+	has, err = hasOldFormatPlugins(fs, pluginsDir)
 	if err != nil {
 		t.Fatalf("hasOldFormatPlugins() error: %v", err)
 	}
@@ -129,35 +134,30 @@ func TestHasOldFormatPlugins_NonexistentDir(t *testing.T) {
 }
 
 // TestMigrateEntry_SkipsDirectories tests migrateEntry skips directories.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestMigrateEntry_SkipsDirectories(t *testing.T) {
-	t.Parallel()
+	fs := setupMigrateTestFs(t)
+	pluginsDir := testMigrateDir + "/skipsdirs"
 
-	fs := afero.NewOsFs()
-
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create a directory (should be skipped)
-	pluginDir := filepath.Join(tmpDir, "shelly-existing")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-existing")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create dir: %v", err)
 	}
 
-	entries, err := afero.ReadDir(fs, tmpDir)
+	entries, err := afero.ReadDir(fs, pluginsDir)
 	if err != nil {
 		t.Fatalf("failed to read dir: %v", err)
 	}
 
 	result := &MigrationResult{}
 	for _, entry := range entries {
-		migrateEntry(fs, tmpDir, entry, result)
+		migrateEntry(fs, pluginsDir, entry, result)
 	}
 
 	// Directories should be skipped, not migrated
@@ -167,35 +167,29 @@ func TestMigrateEntry_SkipsDirectories(t *testing.T) {
 }
 
 // TestMigrateEntry_SkipsNonPluginFiles tests migrateEntry skips non-plugin files.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestMigrateEntry_SkipsNonPluginFiles(t *testing.T) {
-	t.Parallel()
+	fs := setupMigrateTestFs(t)
+	pluginsDir := testMigrateDir + "/skipsnonplugin"
 
-	fs := afero.NewOsFs()
-
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create a file without shelly- prefix (should be skipped)
-	//nolint:gosec // Test file
-	if err := os.WriteFile(filepath.Join(tmpDir, "other-file"), []byte("test"), 0o644); err != nil {
+	if err := afero.WriteFile(fs, filepath.Join(pluginsDir, "other-file"), []byte("test"), 0o644); err != nil {
 		t.Fatalf("failed to create file: %v", err)
 	}
 
-	entries, err := afero.ReadDir(fs, tmpDir)
+	entries, err := afero.ReadDir(fs, pluginsDir)
 	if err != nil {
 		t.Fatalf("failed to read dir: %v", err)
 	}
 
 	result := &MigrationResult{}
 	for _, entry := range entries {
-		migrateEntry(fs, tmpDir, entry, result)
+		migrateEntry(fs, pluginsDir, entry, result)
 	}
 
 	// Non-plugin files should be skipped
@@ -205,35 +199,29 @@ func TestMigrateEntry_SkipsNonPluginFiles(t *testing.T) {
 }
 
 // TestMigrateEntry_SkipsHiddenFiles tests migrateEntry skips hidden files.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestMigrateEntry_SkipsHiddenFiles(t *testing.T) {
-	t.Parallel()
+	fs := setupMigrateTestFs(t)
+	pluginsDir := testMigrateDir + "/skipshidden"
 
-	fs := afero.NewOsFs()
-
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create a hidden file (should be skipped)
-	//nolint:gosec // Test file
-	if err := os.WriteFile(filepath.Join(tmpDir, ".hidden"), []byte("test"), 0o644); err != nil {
+	if err := afero.WriteFile(fs, filepath.Join(pluginsDir, ".hidden"), []byte("test"), 0o644); err != nil {
 		t.Fatalf("failed to create file: %v", err)
 	}
 
-	entries, err := afero.ReadDir(fs, tmpDir)
+	entries, err := afero.ReadDir(fs, pluginsDir)
 	if err != nil {
 		t.Fatalf("failed to read dir: %v", err)
 	}
 
 	result := &MigrationResult{}
 	for _, entry := range entries {
-		migrateEntry(fs, tmpDir, entry, result)
+		migrateEntry(fs, pluginsDir, entry, result)
 	}
 
 	// Hidden files should be skipped
@@ -243,31 +231,25 @@ func TestMigrateEntry_SkipsHiddenFiles(t *testing.T) {
 }
 
 // TestMigratePlugin_Success tests migratePlugin successful migration.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestMigratePlugin_Success(t *testing.T) {
-	t.Parallel()
+	fs := setupMigrateTestFs(t)
+	pluginsDir := testMigrateDir + "/success"
 
-	fs := afero.NewOsFs()
-
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create an old-format plugin
 	pluginName := "shelly-testplugin"
-	oldPath := filepath.Join(tmpDir, pluginName)
-	//nolint:gosec // Test file needs to be executable
-	if err := os.WriteFile(oldPath, []byte("#!/bin/bash\necho test"), 0o755); err != nil {
+	oldPath := filepath.Join(pluginsDir, pluginName)
+	if err := afero.WriteFile(fs, oldPath, []byte("#!/bin/bash\necho test"), 0o755); err != nil {
 		t.Fatalf("failed to create plugin: %v", err)
 	}
 
 	result := &MigrationResult{}
-	err = migratePlugin(fs, tmpDir, pluginName, oldPath, result)
+	err := migratePlugin(fs, pluginsDir, pluginName, oldPath, result)
 	if err != nil {
 		t.Fatalf("migratePlugin() error: %v", err)
 	}
@@ -277,65 +259,59 @@ func TestMigratePlugin_Success(t *testing.T) {
 	}
 
 	// Verify new directory structure
-	newDir := filepath.Join(tmpDir, pluginName)
-	if info, err := os.Stat(newDir); err != nil || !info.IsDir() {
+	newDir := filepath.Join(pluginsDir, pluginName)
+	if info, err := fs.Stat(newDir); err != nil || !info.IsDir() {
 		t.Error("new plugin directory not created")
 	}
 
 	// Verify binary was moved
 	newBinaryPath := filepath.Join(newDir, pluginName)
-	if _, err := os.Stat(newBinaryPath); err != nil {
+	if _, err := fs.Stat(newBinaryPath); err != nil {
 		t.Error("binary not moved to new directory")
 	}
 
 	// Verify manifest was created
 	manifestPath := filepath.Join(newDir, ManifestFileName)
-	if _, err := os.Stat(manifestPath); err != nil {
+	if _, err := fs.Stat(manifestPath); err != nil {
 		t.Error("manifest not created")
 	}
 }
 
 // TestCleanupMigrationFailure tests cleanupMigrationFailure function.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestCleanupMigrationFailure(t *testing.T) {
-	t.Parallel()
+	fs := setupMigrateTestFs(t)
+	pluginsDir := testMigrateDir + "/cleanup"
 
-	fs := afero.NewOsFs()
-
-	tmpDir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("warning: failed to remove temp dir: %v", err)
-		}
-	})
 
 	// Create temp file simulating migration in progress
-	tempPath := filepath.Join(tmpDir, "plugin.migrating")
-	oldPath := filepath.Join(tmpDir, "plugin")
-	newDir := filepath.Join(tmpDir, "plugin-dir")
+	tempPath := filepath.Join(pluginsDir, "plugin.migrating")
+	oldPath := filepath.Join(pluginsDir, "plugin")
+	newDir := filepath.Join(pluginsDir, "plugin-dir")
 
-	//nolint:gosec // Test file
-	if err := os.WriteFile(tempPath, []byte("test"), 0o644); err != nil {
+	if err := afero.WriteFile(fs, tempPath, []byte("test"), 0o644); err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	if err := os.MkdirAll(newDir, 0o750); err != nil {
+	if err := fs.MkdirAll(newDir, 0o750); err != nil {
 		t.Fatalf("failed to create new dir: %v", err)
 	}
 
-	err = cleanupMigrationFailure(fs, tempPath, oldPath, newDir)
+	err := cleanupMigrationFailure(fs, tempPath, oldPath, newDir)
 	if err != nil {
 		t.Fatalf("cleanupMigrationFailure() error: %v", err)
 	}
 
 	// Verify temp file was renamed back
-	if _, err := os.Stat(oldPath); err != nil {
+	if _, err := fs.Stat(oldPath); err != nil {
 		t.Error("temp file not restored to original path")
 	}
 
 	// Verify new directory was removed
-	if _, err := os.Stat(newDir); !os.IsNotExist(err) {
+	if _, statErr := fs.Stat(newDir); statErr == nil {
 		t.Error("new directory should have been removed")
 	}
 }

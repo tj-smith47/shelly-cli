@@ -4,6 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
@@ -82,8 +85,12 @@ func TestDevice_FullDevice(t *testing.T) {
 }
 
 func TestDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	// Cannot run in parallel - modifies global state via config.SetFs
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	testConfigHome := "/test/config"
+	t.Setenv("XDG_CONFIG_HOME", testConfigHome)
 
 	dir, err := mock.Dir()
 	if err != nil {
@@ -94,9 +101,9 @@ func TestDir(t *testing.T) {
 		t.Error("Dir() returned empty string")
 	}
 
-	// Verify it's in the temp directory, not real config
-	if !strings.HasPrefix(dir, tmpDir) {
-		t.Errorf("Dir() = %q, expected to be under %q", dir, tmpDir)
+	// Verify it's in the config directory, not real config
+	if !strings.HasPrefix(dir, testConfigHome) {
+		t.Errorf("Dir() = %q, expected to be under %q", dir, testConfigHome)
 	}
 }
 

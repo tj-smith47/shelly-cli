@@ -201,9 +201,8 @@ func TestOptions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test uses global config via completion.ExpandDeviceArgs
 func TestExecute_NoDevices(t *testing.T) {
-	t.Parallel()
-
 	// No devices configured - should error "no devices specified"
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
@@ -834,9 +833,8 @@ func TestYamlExtensions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test uses global config via completion.ExpandDeviceArgs
 func TestExecute_WithAtAll(t *testing.T) {
-	t.Parallel()
-
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

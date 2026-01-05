@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -1953,12 +1954,15 @@ func TestSelectDiscoveryMethods_InteractiveFallback(t *testing.T) {
 
 // TestCheckExistingConfig_HomeError tests CheckExistingConfig behavior.
 func TestCheckExistingConfig_HomeError(t *testing.T) {
-	// Use temp dir for HOME
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	// Use afero in-memory filesystem
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Even with invalid HOME, should not panic
-	// Note: this may still work on some systems due to /etc/passwd fallback
+	// Use virtual path for HOME
+	t.Setenv("HOME", "/test/home")
+
+	// Even with empty HOME, should not panic
+	// Config won't exist since the path doesn't exist in MemMapFs
 	exists, path := CheckExistingConfig()
 
 	// Just verify it returns without panicking
@@ -2310,9 +2314,12 @@ func TestValidateConfig_Themes(t *testing.T) {
 
 // TestCheckAndConfirmConfig_InteractiveNoConfig tests interactive mode without existing config.
 func TestCheckAndConfirmConfig_InteractiveNoConfig(t *testing.T) {
-	// Create temp directory for testing
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	// Use afero in-memory filesystem
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	// Use virtual path for HOME
+	t.Setenv("HOME", "/test/home")
 
 	ios, _, _ := testIOStreams()
 	opts := &Options{} // Interactive mode
@@ -3033,16 +3040,18 @@ func TestStepFlagDevices_MoreCases(t *testing.T) {
 
 // TestCheckAndConfirmConfig_MorePaths tests more CheckAndConfirmConfig scenarios.
 func TestCheckAndConfirmConfig_MorePaths(t *testing.T) {
-	// Create temp dir with config file
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	configDir := filepath.Join(tmpDir, ".config", "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	t.Setenv("HOME", "/test/home")
+
+	// Create config file
+	configPath := "/test/home/.config/shelly/config.yaml"
+	if err := fs.MkdirAll("/test/home/.config/shelly", 0o750); err != nil {
 		t.Fatal(err)
 	}
-	configPath := filepath.Join(configDir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("output: table\n"), 0o600); err != nil {
+	if err := afero.WriteFile(fs, configPath, []byte("output: table\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

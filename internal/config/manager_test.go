@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -39,13 +38,14 @@ func TestManager_Path(t *testing.T) {
 	}
 }
 
-// TestManager_Reload tests real file persistence across Reload().
-// Uses t.TempDir() because the test specifically validates disk I/O.
+// TestManager_Reload tests file persistence across Reload().
+//
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestManager_Reload(t *testing.T) {
-	t.Parallel()
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	m := NewManager(filepath.Join(tmpDir, "config.yaml"))
+	m := NewManager("/test/config/config.yaml")
 	if err := m.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}

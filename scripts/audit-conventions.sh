@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 
 # Default to repo root if no path specified
 AUDIT_PATH="${1:-.}"
-SKIP_CI="${SKIP_CI:-false}"
+AUDIT_ONLY="${AUDIT_ONLY:-false}"
 ERRORS=0
 WARNINGS=0
 
@@ -393,23 +393,9 @@ search_test() {
 }
 
 # Check for t.TempDir() usage (should use afero instead)
-# Exclude: migrate/validate (TestRun_PermissionDenied requires real fs for permission testing)
-# Exclude: plugins/upgrader (uses real filesystem for plugin operations)
-# Exclude: config tests (tests validate real disk I/O, documented inline)
-# Exclude: testutil tests (tests for test helpers that use real filesystem)
-# Exclude: mock tests (tests mock device functionality with real filesystem)
-# Exclude: output/writer tests (tests file output to real filesystem)
-# Exclude: wizard tests (tests setup wizard which validates real disk I/O)
-# Exclude: utils tests (tests device utilities that work with real filesystem)
+# Exclude: migrate/validate/validate_test.go:508 - TestRun_PermissionDenied requires real fs for permission testing
 TEMP_DIR=$(search_test "t\.TempDir()" "internal/" | \
-    grep -v "internal/cmd/migrate/validate/validate_test.go" | \
-    grep -v "internal/plugins/upgrader" | \
-    grep -v "internal/config/" | \
-    grep -v "internal/testutil/" | \
-    grep -v "internal/mock/" | \
-    grep -v "internal/output/writer_test.go" | \
-    grep -v "internal/wizard/wizard_test.go" | \
-    grep -v "internal/utils/" || true)
+    grep -v "internal/cmd/migrate/validate/validate_test.go" || true)
 TEMP_DIR_COUNT=$(count_matches "$TEMP_DIR")
 if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
     warn "Found $TEMP_DIR_COUNT uses of t.TempDir() (prefer afero.NewMemMapFs with SetFs):"
@@ -417,9 +403,12 @@ if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
 fi
 
 # Check for os.MkdirTemp usage in tests
-# Exclude: plugins (need real fs for plugin execution), shelly/dispatch (real fs for dispatch)
+# Legitimate exclusions (execute actual scripts/binaries, need real filesystem):
+# - plugins/hooks_test.go, plugins/executor_test.go: execute hook scripts
+# - shelly/dispatch_test.go: dispatches to plugin processes
 MKDIR_TEMP=$(search_test "os\.MkdirTemp" "internal/" | \
-    grep -v "internal/plugins/" | \
+    grep -v "internal/plugins/hooks_test.go" | \
+    grep -v "internal/plugins/executor_test.go" | \
     grep -v "internal/shelly/dispatch_test.go" || true)
 MKDIR_TEMP_COUNT=$(count_matches "$MKDIR_TEMP")
 if [[ "$MKDIR_TEMP_COUNT" -gt 0 ]]; then
@@ -428,19 +417,14 @@ if [[ "$MKDIR_TEMP_COUNT" -gt 0 ]]; then
 fi
 
 # Check for os.WriteFile usage in tests (should use afero.WriteFile)
-# Exclude: plugins (need real fs for executable creation), config (real fs validation),
-# shelly/dispatch (real fs), output/writer (real file output), testutil (test helpers),
-# mock (mock device fixtures), utils (device/integration utils), wizard (setup wizard),
-# migrate/validate (permission testing)
+# Legitimate exclusions (create executable scripts for process execution):
+# - plugins/hooks_test.go, plugins/executor_test.go: create executable hook scripts
+# - shelly/dispatch_test.go: creates plugin executables
+# - migrate/validate: permission testing on real filesystem
 OS_WRITEFILE=$(search_test "os\.WriteFile" "internal/" | \
-    grep -v "internal/plugins/" | \
-    grep -v "internal/config/" | \
+    grep -v "internal/plugins/hooks_test.go" | \
+    grep -v "internal/plugins/executor_test.go" | \
     grep -v "internal/shelly/dispatch_test.go" | \
-    grep -v "internal/output/writer_test.go" | \
-    grep -v "internal/testutil/" | \
-    grep -v "internal/mock/" | \
-    grep -v "internal/utils/" | \
-    grep -v "internal/wizard/" | \
     grep -v "internal/cmd/migrate/validate/" || true)
 OS_WRITEFILE_COUNT=$(count_matches "$OS_WRITEFILE")
 if [[ "$OS_WRITEFILE_COUNT" -gt 0 ]]; then
@@ -456,7 +440,7 @@ echo "=========================================="
 echo "  BUILD, LINT, TEST"
 echo "=========================================="
 
-if [[ $SKIP_CI == "false" ]]; then
+if [[ $AUDIT_ONLY == "false" ]]; then
     section "Building"
     if go build ./...; then
         success "Build passed"
@@ -465,7 +449,7 @@ if [[ $SKIP_CI == "false" ]]; then
     fi
 
     section "Linting"
-    if golangci-lint run -j 3 ./... 2>&1; then
+    if golangci-lint run -j 1 --timeout 5m ./... 2>&1; then
         success "Lint passed"
     else
         error "Lint failed"

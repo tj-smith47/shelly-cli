@@ -200,11 +200,6 @@ func (m *Manager) saveWithoutLock() error {
 		return nil
 	}
 
-	// Skip disk write when using test filesystem
-	if IsTestFs() {
-		return nil
-	}
-
 	fs := m.Fs()
 	if err := fs.MkdirAll(filepath.Dir(m.path), 0o750); err != nil {
 		return fmt.Errorf("create config dir: %w", err)

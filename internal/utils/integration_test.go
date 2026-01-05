@@ -7,10 +7,9 @@ package utils
 
 import (
 	"net"
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/discovery"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -24,31 +23,30 @@ func setupTestConfig(t *testing.T) {
 	t.Helper()
 
 	// Reset the config singleton BEFORE changing HOME
-	// This ensures the next call to getDefaultManager will use the new HOME
 	config.ResetDefaultManagerForTesting()
 
-	// Create temp directory for test config
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Setenv("HOME", "/test/home")
 
-	// Create config directory
-	configDir := filepath.Join(tmpDir, ".config", "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	// Create config directory and write minimal config
+	configDir := "/test/home/.config/shelly"
+	if err := fs.MkdirAll(configDir, 0o750); err != nil {
 		t.Fatalf("failed to create config dir: %v", err)
 	}
 
-	// Write minimal config
-	configPath := filepath.Join(configDir, "config.yaml")
+	configPath := configDir + "/config.yaml"
 	configContent := `
 devices: {}
 groups: {}
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	if err := afero.WriteFile(fs, configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Reset singleton on cleanup
+	// Reset on cleanup
 	t.Cleanup(func() {
+		config.SetFs(nil)
 		config.ResetDefaultManagerForTesting()
 	})
 }

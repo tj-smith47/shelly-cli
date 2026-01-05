@@ -4,15 +4,30 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 )
 
-const testVersion = "1.0.0"
+// setupTestFs creates a virtual filesystem for testing and returns it.
+// The caller must call config.SetFs(nil) in cleanup.
+func setupTestFs(t *testing.T) afero.Fs {
+	t.Helper()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	return fs
+}
+
+const (
+	testVersion    = "1.0.0"
+	testPluginsDir = "/test/plugins"
+)
 
 func TestResult_Fields(t *testing.T) {
 	t.Parallel()
@@ -90,12 +105,12 @@ func TestNew(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestNew_WithRegistry(t *testing.T) {
-	t.Parallel()
+	setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir("/test/plugins")
 
 	upgrader := plugins.New(registry, ios)
 	if upgrader == nil {
@@ -520,18 +535,19 @@ func TestResult_AllFieldsCombinations(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_EmptyRegistry(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create plugins directory to avoid "directory not found" error
-	if err := os.MkdirAll(tmpDir, 0o750); err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
+	if err := fs.MkdirAll(pluginsDir, 0o750); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
@@ -545,13 +561,12 @@ func TestUpgradeAll_EmptyRegistry(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeOne_NotInstalled(t *testing.T) {
-	t.Parallel()
+	setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
-
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir("/test/plugins")
 	upgrader := plugins.New(registry, ios)
 
 	_, err := upgrader.UpgradeOne(context.Background(), "nonexistent")
@@ -564,21 +579,22 @@ func TestUpgradeOne_NotInstalled(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_WithLocalPlugin(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "shelly-testplugin")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-testplugin")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
-	// Create a binary file - needs executable permissions for plugin testing
+	// Create a binary file
 	binaryPath := filepath.Join(pluginDir, "shelly-testplugin")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -589,7 +605,7 @@ func TestUpgradeAll_WithLocalPlugin(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
@@ -613,21 +629,22 @@ func TestUpgradeAll_WithLocalPlugin(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeOne_WithLocalPlugin(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "shelly-localplugin")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-localplugin")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
-	// Create a binary file - needs executable permissions for plugin testing
+	// Create a binary file
 	binaryPath := filepath.Join(pluginDir, "shelly-localplugin")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -638,7 +655,7 @@ func TestUpgradeOne_WithLocalPlugin(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	// UpgradeOne uses a Loader that searches default paths (not our temp dir)
@@ -659,21 +676,22 @@ func TestUpgradeOne_WithLocalPlugin(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_WithGitHubPlugin(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "shelly-ghplugin")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-ghplugin")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
-	// Create a binary file - needs executable permissions for plugin testing
+	// Create a binary file
 	binaryPath := filepath.Join(pluginDir, "shelly-ghplugin")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -684,7 +702,7 @@ func TestUpgradeAll_WithGitHubPlugin(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	// Use a context with very short timeout to avoid actual network calls
@@ -709,21 +727,22 @@ func TestUpgradeAll_WithGitHubPlugin(t *testing.T) {
 	_ = results[0].Error
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeOne_WithGitHubPlugin(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "shelly-ghplugin2")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-ghplugin2")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
-	// Create a binary file - needs executable permissions for plugin testing
+	// Create a binary file
 	binaryPath := filepath.Join(pluginDir, "shelly-ghplugin2")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -734,7 +753,7 @@ func TestUpgradeOne_WithGitHubPlugin(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	// Use a context with very short timeout to avoid actual network calls
@@ -758,25 +777,26 @@ func TestUpgradeOne_WithGitHubPlugin(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_WithNoManifest(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure (old format without manifest)
-	pluginDir := filepath.Join(tmpDir, "shelly-oldplugin")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-oldplugin")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	// Create just a binary file (no manifest)
 	binaryPath := filepath.Join(pluginDir, "shelly-oldplugin")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	// Use a context with very short timeout to avoid actual network calls
@@ -794,21 +814,22 @@ func TestUpgradeAll_WithNoManifest(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_WithUnknownSourceManifest(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "shelly-unknownplugin")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-unknownplugin")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	// Create a binary file
 	binaryPath := filepath.Join(pluginDir, "shelly-unknownplugin")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -819,7 +840,7 @@ func TestUpgradeAll_WithUnknownSourceManifest(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
@@ -839,21 +860,22 @@ func TestUpgradeAll_WithUnknownSourceManifest(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_WithURLSourceManifest(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "shelly-urlplugin")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-urlplugin")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	// Create a binary file
 	binaryPath := filepath.Join(pluginDir, "shelly-urlplugin")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -864,7 +886,7 @@ func TestUpgradeAll_WithURLSourceManifest(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
@@ -884,21 +906,22 @@ func TestUpgradeAll_WithURLSourceManifest(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_MultiplePlugins(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create multiple plugins
 	for _, name := range []string{"plugin1", "plugin2", "plugin3"} {
-		pluginDir := filepath.Join(tmpDir, "shelly-"+name)
-		if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+		pluginDir := filepath.Join(pluginsDir, "shelly-"+name)
+		if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 			t.Fatalf("failed to create plugin dir: %v", err)
 		}
 
 		binaryPath := filepath.Join(pluginDir, "shelly-"+name)
-		if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho "+name), 0o750); err != nil { //nolint:gosec // G306: executable script
+		if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho "+name), 0o750); err != nil {
 			t.Fatalf("failed to create binary: %v", err)
 		}
 
@@ -909,7 +932,7 @@ func TestUpgradeAll_MultiplePlugins(t *testing.T) {
 		}
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
@@ -930,14 +953,14 @@ func TestUpgradeAll_MultiplePlugins(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeOne_PluginFoundInLoaderButNotRegistry(t *testing.T) {
-	t.Parallel()
+	setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
 
 	// Create empty registry (plugin not installed according to registry)
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir("/test/plugins")
 	upgrader := plugins.New(registry, ios)
 
 	// Try to upgrade a plugin that's not in registry
@@ -978,21 +1001,22 @@ func TestResult_ZeroValue(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_WithInvalidGitHubURL(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin directory structure
-	pluginDir := filepath.Join(tmpDir, "shelly-invalidgh")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-invalidgh")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	// Create a binary file
 	binaryPath := filepath.Join(pluginDir, "shelly-invalidgh")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -1007,7 +1031,7 @@ func TestUpgradeAll_WithInvalidGitHubURL(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
@@ -1027,20 +1051,21 @@ func TestUpgradeAll_WithInvalidGitHubURL(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_ContextCanceled(t *testing.T) {
-	t.Parallel()
+	fs := setupTestFs(t)
 
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin with GitHub source
-	pluginDir := filepath.Join(tmpDir, "shelly-ghctxtest")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-ghctxtest")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	binaryPath := filepath.Join(pluginDir, "shelly-ghctxtest")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -1050,7 +1075,7 @@ func TestUpgradeAll_ContextCanceled(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	// Create already-cancelled context
@@ -1069,20 +1094,20 @@ func TestUpgradeAll_ContextCanceled(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_WithValidGitHubManifest(t *testing.T) {
-	t.Parallel()
-
+	fs := setupTestFs(t)
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin with valid GitHub source format
-	pluginDir := filepath.Join(tmpDir, "shelly-validgh")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-validgh")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	binaryPath := filepath.Join(pluginDir, "shelly-validgh")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -1094,7 +1119,7 @@ func TestUpgradeAll_WithValidGitHubManifest(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	// Use very short timeout - will fail on network but exercise code paths
@@ -1118,20 +1143,20 @@ func TestUpgradeAll_WithValidGitHubManifest(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_PluginWithEmptyVersion(t *testing.T) {
-	t.Parallel()
-
+	fs := setupTestFs(t)
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create a plugin with empty version
-	pluginDir := filepath.Join(tmpDir, "shelly-nover")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := filepath.Join(pluginsDir, "shelly-nover")
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	binaryPath := filepath.Join(pluginDir, "shelly-nover")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+	if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create binary: %v", err)
 	}
 
@@ -1142,7 +1167,7 @@ func TestUpgradeAll_PluginWithEmptyVersion(t *testing.T) {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())
@@ -1161,13 +1186,13 @@ func TestUpgradeAll_PluginWithEmptyVersion(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeOne_NotFound(t *testing.T) {
-	t.Parallel()
-
+	setupTestFs(t)
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	// Try to upgrade an extension that doesn't exist
@@ -1182,11 +1207,11 @@ func TestUpgradeOne_NotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestUpgradeAll_SourceTypeFiltering(t *testing.T) {
-	t.Parallel()
-
+	fs := setupTestFs(t)
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
-	tmpDir := t.TempDir()
+	pluginsDir := testPluginsDir
 
 	// Create plugins with different source types
 	sourceTypes := []struct {
@@ -1200,13 +1225,13 @@ func TestUpgradeAll_SourceTypeFiltering(t *testing.T) {
 	}
 
 	for _, st := range sourceTypes {
-		pluginDir := filepath.Join(tmpDir, "shelly-"+st.name)
-		if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+		pluginDir := filepath.Join(pluginsDir, "shelly-"+st.name)
+		if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 			t.Fatalf("failed to create plugin dir: %v", err)
 		}
 
 		binaryPath := filepath.Join(pluginDir, "shelly-"+st.name)
-		if err := os.WriteFile(binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: executable script
+		if err := afero.WriteFile(fs, binaryPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 			t.Fatalf("failed to create binary: %v", err)
 		}
 
@@ -1217,7 +1242,7 @@ func TestUpgradeAll_SourceTypeFiltering(t *testing.T) {
 		}
 	}
 
-	registry := plugins.NewRegistryWithDir(tmpDir)
+	registry := plugins.NewRegistryWithDir(pluginsDir)
 	upgrader := plugins.New(registry, ios)
 
 	results, err := upgrader.UpgradeAll(context.Background())

@@ -72,26 +72,10 @@ func TestWriteFile(t *testing.T) {
 	})
 }
 
-//nolint:paralleltest // Test modifies global state via SetFs and working directory
+//nolint:paralleltest // Test modifies global state via SetFs
 func TestWriteFile_CurrentDir(t *testing.T) {
-	// Use real filesystem for os.Chdir test
-	config.SetFs(afero.NewOsFs())
+	config.SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { config.SetFs(nil) })
-
-	// Save current dir and change to temp
-	tmpDir := t.TempDir()
-	originalWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() error: %v", err)
-	}
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("Chdir() error: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalWd); err != nil {
-			t.Logf("warning: failed to restore working directory: %v", err)
-		}
-	}()
 
 	// Write to current directory (no parent path)
 	file := "local.txt"

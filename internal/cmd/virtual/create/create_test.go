@@ -67,8 +67,6 @@ func TestNewCommand_Structure(t *testing.T) {
 func TestNewCommand_Args(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewCommand(cmdutil.NewFactory())
-
 	tests := []struct {
 		name    string
 		args    []string
@@ -83,6 +81,7 @@ func TestNewCommand_Args(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			cmd := NewCommand(cmdutil.NewFactory()) // Fresh cmd per subtest
 			err := cmd.Args(cmd, tt.args)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Args() error = %v, wantErr %v", err, tt.wantErr)
@@ -93,8 +92,6 @@ func TestNewCommand_Args(t *testing.T) {
 
 func TestNewCommand_Flags(t *testing.T) {
 	t.Parallel()
-
-	cmd := NewCommand(cmdutil.NewFactory())
 
 	tests := []struct {
 		name     string
@@ -107,6 +104,7 @@ func TestNewCommand_Flags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			cmd := NewCommand(cmdutil.NewFactory()) // Fresh cmd per subtest
 			flag := cmd.Flags().Lookup(tt.name)
 			if flag == nil {
 				t.Fatalf("flag %q not found", tt.name)
@@ -471,12 +469,13 @@ func TestRun_AllTypes(t *testing.T) {
 	}
 	t.Cleanup(demo.Cleanup)
 
-	tf := factory.NewTestFactory(t)
-	demo.InjectIntoFactory(tf.Factory)
-
 	for _, vType := range types {
 		t.Run(vType, func(t *testing.T) {
 			t.Parallel()
+
+			// Create fresh TestFactory per subtest to avoid race on IOStreams
+			tf := factory.NewTestFactory(t)
+			demo.InjectIntoFactory(tf.Factory)
 
 			opts := &Options{
 				Device:  "test-device",

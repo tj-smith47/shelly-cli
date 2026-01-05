@@ -5,35 +5,10 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/spf13/viper"
 )
-
-// TempDir creates a temporary directory for testing and returns a cleanup function.
-func TempDir(t *testing.T) (dir string, cleanup func()) {
-	t.Helper()
-	dir, err := os.MkdirTemp("", "shelly-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	return dir, func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Logf("warning: failed to remove temp dir %s: %v", dir, err)
-		}
-	}
-}
-
-// TempFile creates a temporary file with the given content.
-func TempFile(t *testing.T, dir, name, content string) string {
-	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("failed to write temp file: %v", err)
-	}
-	return path
-}
 
 // CaptureOutput captures stdout/stderr during test execution.
 type CaptureOutput struct {

@@ -111,6 +111,18 @@ jobs:
           path: bin/shelly
           retention-days: 7
 
+  audit:
+    name: Convention Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run convention audit
+        env:
+          AUDIT_ONLY: "true"
+        run: ./scripts/audit-conventions.sh
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest

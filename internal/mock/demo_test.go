@@ -2,13 +2,14 @@ package mock
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 func TestIsDemoMode(t *testing.T) {
@@ -33,32 +34,29 @@ func TestIsDemoMode(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests use t.Setenv and os.Chdir, cannot run in parallel
+//nolint:paralleltest // Tests use t.Setenv and config.SetFs, cannot run in parallel
 func TestStart(t *testing.T) {
 	t.Run("fails with default path when file missing", func(t *testing.T) {
 		if err := os.Unsetenv("SHELLY_DEMO_FIXTURES"); err != nil {
 			t.Logf("warning: %v", err)
 		}
 
-		tmpDir := t.TempDir()
-		origDir, err := os.Getwd()
-		require.NoError(t, err)
-		defer func() {
-			if err := os.Chdir(origDir); err != nil {
-				t.Logf("warning: %v", err)
-			}
-		}()
-		err = os.Chdir(tmpDir)
-		require.NoError(t, err)
+		// Use empty in-memory fs - default fixture path won't exist
+		fs := afero.NewMemMapFs()
+		config.SetFs(fs)
+		t.Cleanup(func() { config.SetFs(nil) })
 
-		_, err = Start()
+		_, err := Start()
 		assert.Error(t, err)
 	})
 
 	t.Run("succeeds with custom fixture path", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		fixturePath := filepath.Join(tmpDir, "fixtures.yaml")
-		err := os.WriteFile(fixturePath, []byte(`version: "1"`), 0o600)
+		fs := afero.NewMemMapFs()
+		config.SetFs(fs)
+		t.Cleanup(func() { config.SetFs(nil) })
+
+		fixturePath := "/test/fixtures.yaml"
+		err := afero.WriteFile(fs, fixturePath, []byte(`version: "1"`), 0o600)
 		require.NoError(t, err)
 
 		t.Setenv("SHELLY_DEMO_FIXTURES", fixturePath)
@@ -69,13 +67,14 @@ func TestStart(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest,tparallel // Subtests modify global state via config.SetFs
 func TestStartWithPath(t *testing.T) {
-	t.Parallel()
-
 	t.Run("loads fixtures from path", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		fixturePath := filepath.Join(tmpDir, "fixtures.yaml")
+		fs := afero.NewMemMapFs()
+		config.SetFs(fs)
+		t.Cleanup(func() { config.SetFs(nil) })
+
+		fixturePath := "/test/fixtures.yaml"
 		yaml := []byte(`
 version: "1"
 config:
@@ -83,7 +82,7 @@ config:
     - name: "Test Device"
       address: "192.168.1.1"
 `)
-		err := os.WriteFile(fixturePath, yaml, 0o600)
+		err := afero.WriteFile(fs, fixturePath, yaml, 0o600)
 		require.NoError(t, err)
 
 		demo, err := StartWithPath(fixturePath)

@@ -1577,26 +1577,26 @@ func TestGetThemeConfig_ThemeConfigPointer(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Tests modify global HOME and default manager
+//nolint:paralleltest // Tests modify global state via SetFs and SetDefaultManager
 func TestPackageLevel_Save_NonTestFs(t *testing.T) {
 	// Reset at start and end
 	ResetDefaultManagerForTesting()
-	t.Cleanup(func() { ResetDefaultManagerForTesting() })
+	t.Cleanup(func() {
+		SetFs(nil)
+		ResetDefaultManagerForTesting()
+	})
 
-	// Use a temp directory for the config file
-	tmpDir := t.TempDir()
+	fs := afero.NewMemMapFs()
+	SetFs(fs)
 
-	// Create a manager pointing to the temp dir
-	mgr := NewManager(tmpDir + "/config.yaml")
+	// Create a manager pointing to a test path
+	mgr := NewManager("/test/config/config.yaml")
 	if err := mgr.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
 	SetDefaultManager(mgr)
 
-	// Ensure we're NOT in test mode (no memory fs)
-	SetFs(nil)
-
-	// Save should work on real filesystem
+	// Save should work
 	if err := Save(); err != nil {
 		t.Errorf("Save() error: %v", err)
 	}

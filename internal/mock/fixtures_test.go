@@ -2,16 +2,17 @@ package mock
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
+//nolint:paralleltest,tparallel // Subtests modify global state via config.SetFs
 func TestLoadFixtures(t *testing.T) {
-	t.Parallel()
-
 	t.Run("loads valid fixtures", func(t *testing.T) {
 		t.Parallel()
 		fixtures, err := LoadFixtures("../../testdata/demo/fixtures.yaml")
@@ -28,11 +29,14 @@ func TestLoadFixtures(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	//nolint:paralleltest // Test modifies global state via config.SetFs
 	t.Run("returns error for invalid YAML", func(t *testing.T) {
-		t.Parallel()
-		tmpDir := t.TempDir()
-		badFile := filepath.Join(tmpDir, "bad.yaml")
-		err := os.WriteFile(badFile, []byte("not: valid: yaml: ["), 0o600)
+		fs := afero.NewMemMapFs()
+		config.SetFs(fs)
+		t.Cleanup(func() { config.SetFs(nil) })
+
+		badFile := "/test/bad.yaml"
+		err := afero.WriteFile(fs, badFile, []byte("not: valid: yaml: ["), 0o600)
 		require.NoError(t, err)
 
 		_, err = LoadFixtures(badFile)
