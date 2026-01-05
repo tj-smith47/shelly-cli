@@ -44,32 +44,44 @@ type Logger struct {
 }
 
 // globalLogger is the shared logger instance for trace logging.
-var globalLogger *Logger
+var (
+	globalLogger   *Logger
+	globalLoggerMu sync.RWMutex
+)
 
 // SetGlobal sets the global logger instance for trace logging.
 // This should be called once when the app starts.
 func SetGlobal(l *Logger) {
+	globalLoggerMu.Lock()
+	defer globalLoggerMu.Unlock()
 	globalLogger = l
+}
+
+// getGlobal returns the global logger instance safely.
+func getGlobal() *Logger {
+	globalLoggerMu.RLock()
+	defer globalLoggerMu.RUnlock()
+	return globalLogger
 }
 
 // TraceLock logs a lock acquisition from any component.
 func TraceLock(component, lockType, caller string) {
-	if globalLogger != nil {
-		globalLogger.LogLock(component, lockType, caller)
+	if l := getGlobal(); l != nil {
+		l.LogLock(component, lockType, caller)
 	}
 }
 
 // TraceUnlock logs a lock release from any component.
 func TraceUnlock(component, lockType, caller string) {
-	if globalLogger != nil {
-		globalLogger.LogUnlock(component, lockType, caller)
+	if l := getGlobal(); l != nil {
+		l.LogUnlock(component, lockType, caller)
 	}
 }
 
 // TraceNetwork logs a network operation from any component.
 func TraceNetwork(operation, device, method string, err error) {
-	if globalLogger != nil {
-		globalLogger.LogNetwork(operation, device, method, err)
+	if l := getGlobal(); l != nil {
+		l.LogNetwork(operation, device, method, err)
 	}
 }
 

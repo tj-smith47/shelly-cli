@@ -1,3 +1,6 @@
+// Package output_test contains tests for the output package.
+//
+//nolint:paralleltest // viper/synfmt global state causes races between parallel tests
 package output
 
 import (
@@ -26,8 +29,6 @@ func viperSetOutput(t *testing.T, value string) {
 }
 
 func TestGetFormat(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name string
 		want Format
@@ -37,15 +38,12 @@ func TestGetFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			// Test would require viper setup
 		})
 	}
 }
 
 func TestParseFormat(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		input   string
 		want    Format
@@ -69,7 +67,6 @@ func TestParseFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			t.Parallel()
 			got, err := ParseFormat(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseFormat(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
@@ -83,8 +80,6 @@ func TestParseFormat(t *testing.T) {
 }
 
 func TestValidFormats(t *testing.T) {
-	t.Parallel()
-
 	formats := ValidFormats()
 	if len(formats) != 5 {
 		t.Errorf("expected 5 formats, got %d", len(formats))
@@ -99,8 +94,6 @@ func TestValidFormats(t *testing.T) {
 }
 
 func TestJSONFormatter(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
@@ -122,8 +115,6 @@ func TestJSONFormatter(t *testing.T) {
 }
 
 func TestYAMLFormatter(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
@@ -145,8 +136,6 @@ func TestYAMLFormatter(t *testing.T) {
 }
 
 func TestTextFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		data     any
@@ -159,7 +148,6 @@ func TestTextFormatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			var buf bytes.Buffer
 			f := NewTextFormatter()
 			err := f.Format(&buf, tt.data)
@@ -174,8 +162,6 @@ func TestTextFormatter(t *testing.T) {
 }
 
 func TestJSON(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]int{"count": 42}
 	var buf bytes.Buffer
 
@@ -190,8 +176,6 @@ func TestJSON(t *testing.T) {
 }
 
 func TestYAML(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]int{"count": 42}
 	var buf bytes.Buffer
 
@@ -206,8 +190,6 @@ func TestYAML(t *testing.T) {
 }
 
 func TestTemplateFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		template string
@@ -273,7 +255,6 @@ func TestTemplateFormatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			var buf bytes.Buffer
 			f := tmplfmt.New(tt.template)
 			err := f.Format(&buf, tt.data)
@@ -290,8 +271,6 @@ func TestTemplateFormatter(t *testing.T) {
 }
 
 func TestTemplate(t *testing.T) {
-	t.Parallel()
-
 	data := struct {
 		ID   int
 		Name string
@@ -310,8 +289,6 @@ func TestTemplate(t *testing.T) {
 }
 
 func TestTemplateFormatter_ComplexData(t *testing.T) {
-	t.Parallel()
-
 	type Device struct {
 		ID     int
 		Name   string
@@ -344,8 +321,6 @@ func TestTemplateFormatter_ComplexData(t *testing.T) {
 }
 
 func TestFormatConstants(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name   string
 		format Format
@@ -360,7 +335,6 @@ func TestFormatConstants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if string(tt.format) != tt.want {
 				t.Errorf("Format constant %s = %q, want %q", tt.name, tt.format, tt.want)
 			}
@@ -369,8 +343,6 @@ func TestFormatConstants(t *testing.T) {
 }
 
 func TestNewFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name   string
 		format Format
@@ -384,7 +356,6 @@ func TestNewFormatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			formatter := NewFormatter(tt.format)
 			if formatter == nil {
 				t.Errorf("NewFormatter(%q) returned nil", tt.format)
@@ -394,10 +365,7 @@ func TestNewFormatter(t *testing.T) {
 }
 
 func TestFormatReleaseNotes(t *testing.T) {
-	t.Parallel()
-
 	t.Run("short notes", func(t *testing.T) {
-		t.Parallel()
 		body := "Line1\nLine2"
 		result := FormatReleaseNotes(body)
 		if !strings.Contains(result, "  Line1") {
@@ -406,7 +374,6 @@ func TestFormatReleaseNotes(t *testing.T) {
 	})
 
 	t.Run("long notes truncated", func(t *testing.T) {
-		t.Parallel()
 		body := strings.Repeat("a", 600)
 		result := FormatReleaseNotes(body)
 		if !strings.HasSuffix(result, "...") {
@@ -416,10 +383,7 @@ func TestFormatReleaseNotes(t *testing.T) {
 }
 
 func TestTableFormatter_Format(t *testing.T) {
-	t.Parallel()
-
 	t.Run("struct slice", func(t *testing.T) {
-		t.Parallel()
 		type item struct {
 			Name  string
 			Value int
@@ -443,7 +407,6 @@ func TestTableFormatter_Format(t *testing.T) {
 	})
 
 	t.Run("non-tabular data", func(t *testing.T) {
-		t.Parallel()
 		var buf bytes.Buffer
 		f := NewTableFormatter()
 		err := f.Format(&buf, "just a string")
@@ -465,8 +428,6 @@ func (ts testStringer) String() string {
 }
 
 func TestTextFormatter_Stringer(t *testing.T) {
-	t.Parallel()
-
 	var buf bytes.Buffer
 	f := NewTextFormatter()
 	err := f.Format(&buf, testStringer{})
@@ -479,8 +440,6 @@ func TestTextFormatter_Stringer(t *testing.T) {
 }
 
 func TestFormatPlaceholder(t *testing.T) {
-	t.Parallel()
-
 	result := FormatPlaceholder("placeholder text")
 	if result == "" {
 		t.Error("FormatPlaceholder returned empty string")
@@ -492,7 +451,6 @@ func TestFormatPlaceholder(t *testing.T) {
 }
 
 func TestGetFormat_Default(t *testing.T) {
-	t.Parallel()
 	// Test default format (when no config is set)
 	format := GetFormat()
 	// Default should be table
@@ -502,7 +460,6 @@ func TestGetFormat_Default(t *testing.T) {
 }
 
 func TestGetTemplate_Default(t *testing.T) {
-	t.Parallel()
 	// Test that GetTemplate returns empty string when not configured
 	tmpl := GetTemplate()
 	// Default template should be empty
@@ -512,8 +469,6 @@ func TestGetTemplate_Default(t *testing.T) {
 }
 
 func TestPrintTo(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 	err := PrintTo(&buf, data)
@@ -527,7 +482,6 @@ func TestPrintTo(t *testing.T) {
 }
 
 func TestPrintTemplate(t *testing.T) {
-	t.Parallel()
 	// PrintTemplate writes to os.Stdout which we can't easily capture
 	// But we can verify it doesn't panic and returns no error for valid template
 	data := struct{ Name string }{"Test"}
@@ -538,7 +492,6 @@ func TestPrintTemplate(t *testing.T) {
 }
 
 func TestIsQuiet_Default(t *testing.T) {
-	t.Parallel()
 	// Test that IsQuiet returns false when not configured
 	quiet := IsQuiet()
 	if quiet {
@@ -547,7 +500,6 @@ func TestIsQuiet_Default(t *testing.T) {
 }
 
 func TestIsVerbose_Default(t *testing.T) {
-	t.Parallel()
 	// Test that IsVerbose returns false when not configured
 	verbose := IsVerbose()
 	if verbose {
@@ -556,7 +508,6 @@ func TestIsVerbose_Default(t *testing.T) {
 }
 
 func TestWantsJSON_Default(t *testing.T) {
-	t.Parallel()
 	// Test that WantsJSON returns false when default format is table
 	want := WantsJSON()
 	if want {
@@ -565,7 +516,6 @@ func TestWantsJSON_Default(t *testing.T) {
 }
 
 func TestWantsYAML_Default(t *testing.T) {
-	t.Parallel()
 	// Test that WantsYAML returns false when default format is table
 	want := WantsYAML()
 	if want {
@@ -574,7 +524,6 @@ func TestWantsYAML_Default(t *testing.T) {
 }
 
 func TestWantsTable_Default(t *testing.T) {
-	t.Parallel()
 	// Test that WantsTable returns true when default format is table
 	want := WantsTable()
 	if !want {
@@ -583,7 +532,6 @@ func TestWantsTable_Default(t *testing.T) {
 }
 
 func TestWantsStructured_Default(t *testing.T) {
-	t.Parallel()
 	// Test that WantsStructured returns false when default format is table
 	want := WantsStructured()
 	if want {
@@ -592,8 +540,6 @@ func TestWantsStructured_Default(t *testing.T) {
 }
 
 func TestFormatOutput(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 	err := FormatOutput(&buf, data)
@@ -606,11 +552,9 @@ func TestFormatOutput(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // synfmt functions read viper which races with tests that write it
 func TestHighlightCode(t *testing.T) {
-	t.Parallel()
-
 	t.Run("json syntax", func(t *testing.T) {
-		t.Parallel()
 		code := `{"key": "value"}`
 		result := synfmt.HighlightCode(code, "json")
 		// Should return non-empty result
@@ -620,7 +564,6 @@ func TestHighlightCode(t *testing.T) {
 	})
 
 	t.Run("yaml syntax", func(t *testing.T) {
-		t.Parallel()
 		code := "name: test"
 		result := synfmt.HighlightCode(code, "yaml")
 		if result == "" {
@@ -629,7 +572,6 @@ func TestHighlightCode(t *testing.T) {
 	})
 
 	t.Run("unknown lexer returns code unchanged", func(t *testing.T) {
-		t.Parallel()
 		code := "some text"
 		result := synfmt.HighlightCode(code, "nonexistent-language-xyz123")
 		// Should return original code when lexer not found
@@ -639,9 +581,8 @@ func TestHighlightCode(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // synfmt functions read viper which races with tests that write it
 func TestGetChromaStyle(t *testing.T) {
-	t.Parallel()
-
 	// Test that GetChromaStyle returns a non-nil style
 	style := synfmt.GetChromaStyle()
 	if style == nil {
@@ -725,8 +666,6 @@ func TestGetFormat_WithViper(t *testing.T) {
 }
 
 func TestShouldHighlight(t *testing.T) {
-	t.Parallel()
-
 	// In test environment, terminal is not a TTY so shouldHighlight should return false
 	if synfmt.ShouldHighlight() {
 		// Not expected in test environment, but if it's true, that's also valid
@@ -735,8 +674,6 @@ func TestShouldHighlight(t *testing.T) {
 }
 
 func TestColorEnabled(t *testing.T) {
-	t.Parallel()
-
 	// In test environment, terminal is not a TTY so colorEnabled should return false
 	if colorEnabled() {
 		// Not expected in test environment, but if it's true, that's also valid
@@ -745,8 +682,6 @@ func TestColorEnabled(t *testing.T) {
 }
 
 func TestNewFormatter_Template(t *testing.T) {
-	t.Parallel()
-
 	// Test that NewFormatter with FormatTemplate creates a TemplateFormatter
 	viperSetOutput(t, "template")
 	formatter := NewFormatter(FormatTemplate)
@@ -756,8 +691,6 @@ func TestNewFormatter_Template(t *testing.T) {
 }
 
 func TestJSONFormatter_WithHighlight(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
@@ -773,8 +706,6 @@ func TestJSONFormatter_WithHighlight(t *testing.T) {
 }
 
 func TestJSONFormatter_NoIndent(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
@@ -791,8 +722,6 @@ func TestJSONFormatter_NoIndent(t *testing.T) {
 }
 
 func TestYAMLFormatter_WithHighlight(t *testing.T) {
-	t.Parallel()
-
 	data := map[string]string{"key": "value"}
 	var buf bytes.Buffer
 
@@ -807,8 +736,6 @@ func TestYAMLFormatter_WithHighlight(t *testing.T) {
 }
 
 func TestTemplateFormatter_ExecutionError(t *testing.T) {
-	t.Parallel()
-
 	// Template that tries to access a non-existent field
 	tmpl := "{{.NonExistent.Field}}"
 	data := struct{ Name string }{"test"}
@@ -823,8 +750,6 @@ func TestTemplateFormatter_ExecutionError(t *testing.T) {
 }
 
 func TestFormatDisplayValue_Float(t *testing.T) {
-	t.Parallel()
-
 	got := FormatDisplayValue(float64(3.14159))
 	if !strings.Contains(got, "3.14") {
 		t.Errorf("expected float format, got %q", got)
@@ -832,8 +757,6 @@ func TestFormatDisplayValue_Float(t *testing.T) {
 }
 
 func TestRenderProgressBar_OverMax(t *testing.T) {
-	t.Parallel()
-
 	// Test when value exceeds max
 	got := RenderProgressBar(25, 10)
 	if got == "" {
@@ -842,8 +765,6 @@ func TestRenderProgressBar_OverMax(t *testing.T) {
 }
 
 func TestExtractMapSection_InvalidJSON(t *testing.T) {
-	t.Parallel()
-
 	// Test with a type that can't be marshaled to JSON properly
 	ch := make(chan int)
 	got := ExtractMapSection(ch, "key")
@@ -853,8 +774,6 @@ func TestExtractMapSection_InvalidJSON(t *testing.T) {
 }
 
 func TestExtractMapSection_InvalidUnmarshal(t *testing.T) {
-	t.Parallel()
-
 	// This should work - just test non-map section
 	data := map[string]any{
 		"notamap": "just a string",
@@ -888,7 +807,6 @@ func TestGetChromaStyle_Themes(t *testing.T) {
 // TestPrint_Stdout tests Print functions that write to os.Stdout.
 // We can't easily capture stdout in parallel tests, but we can verify they don't error.
 func TestPrint_Stdout(t *testing.T) {
-	t.Parallel()
 	// Print, PrintJSON, PrintYAML write to os.Stdout
 	// These are thin wrappers around PrintTo/JSON/YAML which are tested
 	// Verify they exist and compile correctly by calling PrintTo instead
@@ -994,8 +912,6 @@ func TestShouldHighlight_Flags(t *testing.T) {
 }
 
 func TestFormatConfigValue_NestedMap(t *testing.T) {
-	t.Parallel()
-
 	// Test nested map that causes JSON marshaling
 	nestedMap := map[string]any{
 		"nested": map[string]any{
@@ -1022,8 +938,6 @@ func (e errorMarshaler) MarshalYAML() (interface{}, error) {
 var errTestMarshal = errors.New("test marshal error")
 
 func TestYAMLFormatter_MarshalError(t *testing.T) {
-	t.Parallel()
-
 	var buf bytes.Buffer
 	f := yamlfmt.New()
 	err := f.Format(&buf, errorMarshaler{})
@@ -1033,8 +947,6 @@ func TestYAMLFormatter_MarshalError(t *testing.T) {
 }
 
 func TestJSONFormatter_MarshalError(t *testing.T) {
-	t.Parallel()
-
 	var buf bytes.Buffer
 	f := jsonfmt.New()
 	err := f.Format(&buf, errorMarshaler{})
@@ -1214,11 +1126,9 @@ func TestNewYAMLFormatter_WithTTY(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // synfmt functions read viper which races with tests that write it
 func TestHighlightCode_Languages(t *testing.T) {
-	t.Parallel()
-
 	t.Run("unknown language returns plain code", func(t *testing.T) {
-		t.Parallel()
 		code := "some code"
 		result := synfmt.HighlightCode(code, "nonexistent-language-xyz")
 		if result != code {
@@ -1227,7 +1137,6 @@ func TestHighlightCode_Languages(t *testing.T) {
 	})
 
 	t.Run("json language highlights", func(t *testing.T) {
-		t.Parallel()
 		code := `{"key": "value"}`
 		result := synfmt.HighlightCode(code, "json")
 		// Result should be non-empty (may or may not have ANSI depending on formatter)
@@ -1237,7 +1146,6 @@ func TestHighlightCode_Languages(t *testing.T) {
 	})
 
 	t.Run("yaml language highlights", func(t *testing.T) {
-		t.Parallel()
 		code := "key: value"
 		result := synfmt.HighlightCode(code, "yaml")
 		if result == "" {
@@ -1262,8 +1170,6 @@ func TestGetChromaStyle_AllThemes(t *testing.T) {
 }
 
 func TestFormatComponentStatus(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name      string
 		component string
@@ -1364,7 +1270,6 @@ func TestFormatComponentStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := FormatComponentStatus(tt.component, tt.status)
 			for _, want := range tt.contains {
 				if !strings.Contains(result, want) {
@@ -1377,8 +1282,6 @@ func TestFormatComponentStatus(t *testing.T) {
 }
 
 func TestExtractComponentType(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name string
 		want string
@@ -1394,7 +1297,6 @@ func TestExtractComponentType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got := extractComponentType(tt.name)
 			if got != tt.want {
 				t.Errorf("extractComponentType(%q) = %q, want %q", tt.name, got, tt.want)
@@ -1404,8 +1306,6 @@ func TestExtractComponentType(t *testing.T) {
 }
 
 func TestFormatPowerCompact(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		watts float64
 		want  string
@@ -1420,7 +1320,6 @@ func TestFormatPowerCompact(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			t.Parallel()
 			got := FormatPowerCompact(tt.watts)
 			if got != tt.want {
 				t.Errorf("FormatPowerCompact(%v) = %q, want %q", tt.watts, got, tt.want)
@@ -1430,8 +1329,6 @@ func TestFormatPowerCompact(t *testing.T) {
 }
 
 func TestGetStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		componentType string
 		wantFormatter string // type name for verification
@@ -1453,7 +1350,6 @@ func TestGetStatusFormatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.componentType, func(t *testing.T) {
-			t.Parallel()
 			formatter := GetStatusFormatter(tt.componentType)
 			if formatter == nil {
 				t.Errorf("GetStatusFormatter(%q) returned nil", tt.componentType)
@@ -1463,8 +1359,6 @@ func TestGetStatusFormatter(t *testing.T) {
 }
 
 func TestRegisterStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	// Create a custom formatter
 	customFormatter := &testStatusFormatter{output: "custom output"}
 
@@ -1493,8 +1387,6 @@ func (f *testStatusFormatter) Format(_ string, _ map[string]any) string {
 }
 
 func TestSwitchStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		status   map[string]any
@@ -1525,7 +1417,6 @@ func TestSwitchStatusFormatter(t *testing.T) {
 	formatter := switchStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format("switch", tt.status)
 			for _, want := range tt.contains {
 				if !strings.Contains(result, want) {
@@ -1537,8 +1428,6 @@ func TestSwitchStatusFormatter(t *testing.T) {
 }
 
 func TestLightStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		status   map[string]any
@@ -1564,7 +1453,6 @@ func TestLightStatusFormatter(t *testing.T) {
 	formatter := lightStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format("light", tt.status)
 			for _, want := range tt.contains {
 				if !strings.Contains(result, want) {
@@ -1576,8 +1464,6 @@ func TestLightStatusFormatter(t *testing.T) {
 }
 
 func TestCoverStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		status   map[string]any
@@ -1608,7 +1494,6 @@ func TestCoverStatusFormatter(t *testing.T) {
 	formatter := coverStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format("cover", tt.status)
 			for _, want := range tt.contains {
 				if !strings.Contains(result, want) {
@@ -1620,8 +1505,6 @@ func TestCoverStatusFormatter(t *testing.T) {
 }
 
 func TestInputStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		status   map[string]any
@@ -1642,7 +1525,6 @@ func TestInputStatusFormatter(t *testing.T) {
 	formatter := inputStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format("input", tt.status)
 			if !strings.Contains(result, tt.contains) {
 				t.Errorf("Format() = %q, want to contain %q", result, tt.contains)
@@ -1652,8 +1534,6 @@ func TestInputStatusFormatter(t *testing.T) {
 }
 
 func TestPowerMeterStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		status   map[string]any
@@ -1674,7 +1554,6 @@ func TestPowerMeterStatusFormatter(t *testing.T) {
 	formatter := powerMeterStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format("pm1", tt.status)
 			for _, want := range tt.contains {
 				if !strings.Contains(result, want) {
@@ -1686,8 +1565,6 @@ func TestPowerMeterStatusFormatter(t *testing.T) {
 }
 
 func TestSensorStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		compType string
@@ -1729,7 +1606,6 @@ func TestSensorStatusFormatter(t *testing.T) {
 	formatter := sensorStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format(tt.compType, tt.status)
 			if !strings.Contains(result, tt.contains) {
 				t.Errorf("Format(%q) = %q, want to contain %q", tt.compType, result, tt.contains)
@@ -1739,8 +1615,6 @@ func TestSensorStatusFormatter(t *testing.T) {
 }
 
 func TestSysStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		status   map[string]any
@@ -1771,7 +1645,6 @@ func TestSysStatusFormatter(t *testing.T) {
 	formatter := sysStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format("sys", tt.status)
 			for _, want := range tt.contains {
 				if !strings.Contains(result, want) {
@@ -1783,8 +1656,6 @@ func TestSysStatusFormatter(t *testing.T) {
 }
 
 func TestNetworkStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		compType string
@@ -1844,7 +1715,6 @@ func TestNetworkStatusFormatter(t *testing.T) {
 	formatter := networkStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format(tt.compType, tt.status)
 			if !strings.Contains(result, tt.contains) {
 				t.Errorf("Format(%q) = %q, want to contain %q", tt.compType, result, tt.contains)
@@ -1854,8 +1724,6 @@ func TestNetworkStatusFormatter(t *testing.T) {
 }
 
 func TestSystemComponentStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		compType string
@@ -1885,7 +1753,6 @@ func TestSystemComponentStatusFormatter(t *testing.T) {
 	formatter := systemComponentStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format(tt.compType, tt.status)
 			if !strings.Contains(result, tt.contains) {
 				t.Errorf("Format(%q) = %q, want to contain %q", tt.compType, result, tt.contains)
@@ -1895,8 +1762,6 @@ func TestSystemComponentStatusFormatter(t *testing.T) {
 }
 
 func TestGenericStatusFormatter(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name     string
 		status   map[string]any
@@ -1922,7 +1787,6 @@ func TestGenericStatusFormatter(t *testing.T) {
 	formatter := genericStatusFormatter{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatter.Format("unknown", tt.status)
 			for _, want := range tt.contains {
 				if !strings.Contains(result, want) {
@@ -1934,8 +1798,6 @@ func TestGenericStatusFormatter(t *testing.T) {
 }
 
 func TestFormatSimpleValueInternal(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name  string
 		value any
@@ -1953,7 +1815,6 @@ func TestFormatSimpleValueInternal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := formatSimpleValueInternal(tt.value)
 			if result != tt.want {
 				t.Errorf("formatSimpleValueInternal(%v) = %q, want %q", tt.value, result, tt.want)
@@ -1962,8 +1823,6 @@ func TestFormatSimpleValueInternal(t *testing.T) {
 	}
 }
 func TestFormatConfigValue(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name  string
 		input interface{}
@@ -1983,7 +1842,6 @@ func TestFormatConfigValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got := FormatConfigValue(tt.input)
 			if got != tt.want {
 				t.Errorf("FormatConfigValue(%v) = %q, want %q", tt.input, got, tt.want)
@@ -1993,8 +1851,6 @@ func TestFormatConfigValue(t *testing.T) {
 }
 
 func TestFormatDeviceCount(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		count int
 		want  string
@@ -2014,8 +1870,6 @@ func TestFormatDeviceCount(t *testing.T) {
 }
 
 func TestFormatActionCount(t *testing.T) {
-	t.Parallel()
-
 	// Just test that it doesn't panic and returns non-empty strings
 	got0 := FormatActionCount(0)
 	if got0 == "" {
@@ -2034,8 +1888,6 @@ func TestFormatActionCount(t *testing.T) {
 }
 
 func TestFormatFloat(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		input float64
 		want  string
@@ -2055,8 +1907,6 @@ func TestFormatFloat(t *testing.T) {
 }
 
 func TestFormatFloatPtr(t *testing.T) {
-	t.Parallel()
-
 	got := FormatFloatPtr(nil)
 	if got != "" {
 		t.Errorf("FormatFloatPtr(nil) = %q, want empty", got)
@@ -2070,8 +1920,6 @@ func TestFormatFloatPtr(t *testing.T) {
 }
 
 func TestFormatSize(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		size int64
 		want string
@@ -2094,8 +1942,6 @@ func TestFormatSize(t *testing.T) {
 }
 
 func TestFormatJSONValue(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name  string
 		input any
@@ -2112,7 +1958,6 @@ func TestFormatJSONValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got := FormatJSONValue(tt.input)
 			if got != tt.want {
 				t.Errorf("FormatJSONValue(%v) = %q, want %q", tt.input, got, tt.want)
@@ -2122,8 +1967,6 @@ func TestFormatJSONValue(t *testing.T) {
 }
 
 func TestFormatDisplayValue(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name  string
 		input any
@@ -2142,7 +1985,6 @@ func TestFormatDisplayValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got := FormatDisplayValue(tt.input)
 			if got != tt.want {
 				t.Errorf("FormatDisplayValue(%v) = %q, want %q", tt.input, got, tt.want)
@@ -2152,8 +1994,6 @@ func TestFormatDisplayValue(t *testing.T) {
 }
 
 func TestValueType(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		input any
 		want  string
@@ -2176,8 +2016,6 @@ func TestValueType(t *testing.T) {
 }
 
 func TestFormatDuration(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		input time.Duration
 		want  string
@@ -2198,8 +2036,6 @@ func TestFormatDuration(t *testing.T) {
 }
 
 func TestFormatParamsInline(t *testing.T) {
-	t.Parallel()
-
 	got := FormatParamsInline(nil)
 	if got != "" {
 		t.Errorf("FormatParamsInline(nil) = %q, want empty", got)
@@ -2217,8 +2053,6 @@ func TestFormatParamsInline(t *testing.T) {
 }
 
 func TestFormatParamsTable(t *testing.T) {
-	t.Parallel()
-
 	got := FormatParamsTable(nil)
 	if got != "-" {
 		t.Errorf("FormatParamsTable(nil) = %q, want %q", got, "-")
@@ -2236,8 +2070,6 @@ func TestFormatParamsTable(t *testing.T) {
 }
 
 func TestTruncate(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		input  string
 		maxLen int
@@ -2259,8 +2091,6 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestPadRight(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		input string
 		width int
@@ -2280,8 +2110,6 @@ func TestPadRight(t *testing.T) {
 }
 
 func TestRenderProgressBar(t *testing.T) {
-	t.Parallel()
-
 	// Just test that it doesn't panic and returns expected structure
 	got := RenderProgressBar(5, 10)
 	if got == "" {
@@ -2295,8 +2123,6 @@ func TestRenderProgressBar(t *testing.T) {
 }
 
 func TestEscapeWiFiQR(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		input string
 		want  string
@@ -2318,8 +2144,6 @@ func TestEscapeWiFiQR(t *testing.T) {
 }
 
 func TestFormatWiFiSignalStrength(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		rssi int
 		want string
@@ -2343,8 +2167,6 @@ func TestFormatWiFiSignalStrength(t *testing.T) {
 }
 
 func TestFormatDeviceGeneration(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		gen  int
 		want string
@@ -2363,8 +2185,6 @@ func TestFormatDeviceGeneration(t *testing.T) {
 }
 
 func TestExtractMapSection(t *testing.T) {
-	t.Parallel()
-
 	// Test with nil
 	got := ExtractMapSection(nil, "key")
 	if got != nil {
@@ -2393,8 +2213,6 @@ func TestExtractMapSection(t *testing.T) {
 }
 
 func TestFormatConfigTable(t *testing.T) {
-	t.Parallel()
-
 	// Test with non-map
 	got := FormatConfigTable("not a map")
 	if got != nil {
