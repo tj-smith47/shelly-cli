@@ -3,9 +3,10 @@ package control
 import (
 	"bytes"
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -280,11 +281,14 @@ func TestNewCommand_LongMentionsAuthentication(t *testing.T) {
 	}
 }
 
-// setupTestManagerWithCloud creates a test config manager with cloud settings.
+// setupTestManagerWithCloud creates a test config manager with cloud settings using afero.
 func setupTestManagerWithCloud(t *testing.T, accessToken string) *config.Manager {
 	t.Helper()
-	tmpDir := t.TempDir()
-	mgr := config.NewManager(filepath.Join(tmpDir, "config.yaml"))
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	mgr := config.NewManager("/test/config/config.yaml")
 	if err := mgr.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}

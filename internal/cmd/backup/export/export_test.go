@@ -6,7 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
@@ -172,8 +175,11 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_NoDevices(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// No devices configured - should show info message
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
@@ -186,7 +192,7 @@ func TestExecute_NoDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
+	dir := "/test/backups"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -201,8 +207,11 @@ func TestExecute_NoDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithDevices(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -231,7 +240,7 @@ func TestExecute_WithDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
+	dir := "/test/backups"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -247,8 +256,11 @@ func TestExecute_WithDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_YAMLFormat(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -274,7 +286,7 @@ func TestExecute_YAMLFormat(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
+	dir := "/test/backups-yaml"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -289,8 +301,11 @@ func TestExecute_YAMLFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_NoDevices(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -302,7 +317,7 @@ func TestRun_NoDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
+	dir := "/test/run-no-devices"
 	opts := &Options{
 		Factory:   tf.Factory,
 		Directory: dir,
@@ -316,8 +331,11 @@ func TestRun_NoDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WithDevices(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -343,7 +361,7 @@ func TestRun_WithDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
+	dir := "/test/run-with-devices"
 	opts := &Options{
 		Factory:   tf.Factory,
 		Directory: dir,
@@ -398,8 +416,11 @@ func TestRun_InvalidDirectory(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_MultipleDevices(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -433,7 +454,7 @@ func TestRun_MultipleDevices(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
+	dir := "/test/run-multiple-devices"
 	opts := &Options{
 		Factory:   tf.Factory,
 		Directory: dir,

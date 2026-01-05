@@ -3,16 +3,19 @@ package update
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testScriptsDir = "/test/scripts"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -410,12 +413,18 @@ func TestExecute_FileNotFound(t *testing.T) {
 }
 
 func TestExecute_WithFileFlag(t *testing.T) { //nolint:paralleltest // Uses global mock state
-	// Create a temporary file with script code
-	tmpDir := t.TempDir()
-	scriptPath := filepath.Join(tmpDir, "test-script.js")
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	// Create a script file in the virtual filesystem
+	if err := fs.MkdirAll(testScriptsDir, 0o750); err != nil {
+		t.Fatalf("failed to create scripts dir: %v", err)
+	}
+	scriptPath := testScriptsDir + "/test-script.js"
 	scriptContent := "print('Hello from file!');"
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o600); err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+	if err := afero.WriteFile(fs, scriptPath, []byte(scriptContent), 0o600); err != nil {
+		t.Fatalf("failed to create script file: %v", err)
 	}
 
 	fixtures := &mock.Fixtures{
@@ -755,12 +764,18 @@ func TestRun_NoChanges(t *testing.T) { //nolint:paralleltest // Uses global mock
 }
 
 func TestRun_WithFileFlag(t *testing.T) { //nolint:paralleltest // Uses global mock state
-	// Create a temporary file with script code
-	tmpDir := t.TempDir()
-	scriptPath := filepath.Join(tmpDir, "update-script.js")
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	// Create a script file in the virtual filesystem
+	if err := fs.MkdirAll(testScriptsDir, 0o750); err != nil {
+		t.Fatalf("failed to create scripts dir: %v", err)
+	}
+	scriptPath := testScriptsDir + "/update-script.js"
 	scriptContent := "print('Script from file');\nlet x = 42;"
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o600); err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+	if err := afero.WriteFile(fs, scriptPath, []byte(scriptContent), 0o600); err != nil {
+		t.Fatalf("failed to create script file: %v", err)
 	}
 
 	fixtures := &mock.Fixtures{
@@ -799,12 +814,18 @@ func TestRun_WithFileFlag(t *testing.T) { //nolint:paralleltest // Uses global m
 }
 
 func TestRun_WithFileAndAppend(t *testing.T) { //nolint:paralleltest // Uses global mock state
-	// Create a temporary file with script code
-	tmpDir := t.TempDir()
-	scriptPath := filepath.Join(tmpDir, "append-script.js")
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	// Create a script file in the virtual filesystem
+	if err := fs.MkdirAll(testScriptsDir, 0o750); err != nil {
+		t.Fatalf("failed to create scripts dir: %v", err)
+	}
+	scriptPath := testScriptsDir + "/append-script.js"
 	scriptContent := "// Additional function\nfunction extra() { }"
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o600); err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+	if err := afero.WriteFile(fs, scriptPath, []byte(scriptContent), 0o600); err != nil {
+		t.Fatalf("failed to create script file: %v", err)
 	}
 
 	fixtures := &mock.Fixtures{

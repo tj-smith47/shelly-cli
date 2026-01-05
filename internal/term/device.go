@@ -200,3 +200,21 @@ func displayPluginEnergy(ios *iostreams.IOStreams, energy *plugins.EnergyStatus)
 		ios.Printf("  Total:   %.3f kWh\n", energy.Total)
 	}
 }
+
+// DisplayDeviceInfo renders device info as a formatted table.
+func DisplayDeviceInfo(ios *iostreams.IOStreams, info *shelly.DeviceInfo) {
+	builder := table.NewBuilder("Property", "Value")
+
+	builder.AddRow("ID", info.ID)
+	builder.AddRow("MAC", info.MAC)
+	builder.AddRow("Model", info.Model)
+	builder.AddRow("Generation", output.RenderGeneration(info.Generation))
+	builder.AddRow("Firmware", info.Firmware)
+	builder.AddRow("Application", info.App)
+	builder.AddRow("Auth Enabled", output.RenderAuthRequired(info.AuthEn))
+
+	tbl := builder.WithModeStyle(ios).Build()
+	if err := tbl.PrintTo(ios.Out); err != nil {
+		ios.DebugErr("print device info table", err)
+	}
+}

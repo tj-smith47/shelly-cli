@@ -2,15 +2,18 @@ package completion_test
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
+
+const testFakeHome = "/test/home"
 
 func TestGenerateAndInstall_UnsupportedShell(t *testing.T) {
 	t.Parallel()
@@ -25,9 +28,12 @@ func TestGenerateAndInstall_UnsupportedShell(t *testing.T) {
 }
 
 func TestGenerateAndInstall_Bash(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)
@@ -45,9 +51,12 @@ func TestGenerateAndInstall_Bash(t *testing.T) {
 }
 
 func TestGenerateAndInstall_Zsh(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)
@@ -64,9 +73,12 @@ func TestGenerateAndInstall_Zsh(t *testing.T) {
 }
 
 func TestGenerateAndInstall_Fish(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)
@@ -83,9 +95,12 @@ func TestGenerateAndInstall_Fish(t *testing.T) {
 }
 
 func TestGenerateAndInstall_PowerShell(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)
@@ -102,9 +117,12 @@ func TestGenerateAndInstall_PowerShell(t *testing.T) {
 }
 
 func TestInstallBash(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)
@@ -121,9 +139,12 @@ func TestInstallBash(t *testing.T) {
 }
 
 func TestInstallZsh(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)
@@ -138,17 +159,20 @@ func TestInstallZsh(t *testing.T) {
 		t.Logf("InstallZsh() error: %v (may be expected)", err)
 	}
 
-	// Verify completion file was created
+	// Verify completion file was created in virtual filesystem
 	expectedPath := filepath.Join(fakeHome, ".zsh", "completions", "_shelly")
-	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-		t.Logf("completion file not created at %s (may be expected)", expectedPath)
+	if _, err := fs.Stat(expectedPath); err != nil {
+		t.Logf("completion file not created at %s (may be expected): %v", expectedPath, err)
 	}
 }
 
 func TestInstallFish(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)
@@ -163,17 +187,20 @@ func TestInstallFish(t *testing.T) {
 		t.Logf("InstallFish() error: %v (may be expected)", err)
 	}
 
-	// Verify completion file was created
+	// Verify completion file was created in virtual filesystem
 	expectedPath := filepath.Join(fakeHome, ".config", "fish", "completions", "shelly.fish")
-	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-		t.Logf("completion file not created at %s (may be expected)", expectedPath)
+	if _, err := fs.Stat(expectedPath); err != nil {
+		t.Logf("completion file not created at %s (may be expected): %v", expectedPath, err)
 	}
 }
 
 func TestInstallPowerShell(t *testing.T) {
-	tmpDir := t.TempDir()
-	fakeHome := filepath.Join(tmpDir, "home")
-	if err := os.MkdirAll(fakeHome, 0o750); err != nil {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	fakeHome := testFakeHome
+	if err := fs.MkdirAll(fakeHome, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
 	t.Setenv("HOME", fakeHome)

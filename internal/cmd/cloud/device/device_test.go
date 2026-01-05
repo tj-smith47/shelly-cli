@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -18,11 +20,16 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
+const testConfigDir = "/test/config"
+
 // setupTestEnv sets up an isolated environment for tests that modify config.
 func setupTestEnv(t *testing.T) {
 	t.Helper()
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", testConfigDir)
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 	config.ResetDefaultManagerForTesting()
 	t.Cleanup(func() {
 		config.ResetDefaultManagerForTesting()

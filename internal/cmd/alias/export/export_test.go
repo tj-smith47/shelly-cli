@@ -1,16 +1,17 @@
 package export
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testExportDir = "/test/export"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -240,8 +241,11 @@ func TestRun_WithAliasesToStdout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_WithAliasesToFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
@@ -254,9 +258,8 @@ func TestRun_WithAliasesToFile(t *testing.T) {
 		},
 	}
 
-	// Create a temporary file
-	tmpDir := t.TempDir()
-	filename := filepath.Join(tmpDir, "aliases.yaml")
+	// Use virtual path for file
+	filename := testExportDir + "/aliases.yaml"
 
 	opts := &Options{Factory: tf.Factory, Filename: filename}
 	err := run(opts)
@@ -265,8 +268,8 @@ func TestRun_WithAliasesToFile(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		t.Errorf("expected file %s to be created", filename)
+	if _, err := fs.Stat(filename); err != nil {
+		t.Errorf("expected file %s to be created: %v", filename, err)
 	}
 
 	// Should print success message
@@ -388,8 +391,11 @@ func TestNewCommand_RunE_NoArgs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestNewCommand_RunE_WithFilename(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
@@ -404,9 +410,8 @@ func TestNewCommand_RunE_WithFilename(t *testing.T) {
 
 	cmd := NewCommand(tf.Factory)
 
-	// Create a temporary file
-	tmpDir := t.TempDir()
-	filename := filepath.Join(tmpDir, "test-aliases.yaml")
+	// Use virtual path for file
+	filename := testExportDir + "/test-aliases.yaml"
 
 	// Execute command with filename arg
 	err := cmd.RunE(cmd, []string{filename})
@@ -415,7 +420,7 @@ func TestNewCommand_RunE_WithFilename(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		t.Errorf("expected file %s to be created", filename)
+	if _, err := fs.Stat(filename); err != nil {
+		t.Errorf("expected file %s to be created: %v", filename, err)
 	}
 }

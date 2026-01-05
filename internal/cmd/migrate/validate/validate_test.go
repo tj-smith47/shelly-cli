@@ -501,7 +501,7 @@ func TestRun_PermissionDenied(t *testing.T) {
 		t.Skip("skipping permission test on Windows")
 	}
 
-	// Use real filesystem for permission testing
+	// Use real filesystem for permission testing (MemMapFs doesn't enforce permissions)
 	config.SetFs(afero.NewOsFs())
 	t.Cleanup(func() { config.SetFs(nil) })
 

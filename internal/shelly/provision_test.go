@@ -1,10 +1,11 @@
 package shelly
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
@@ -113,14 +114,13 @@ func TestValidateBulkProvisionConfig(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseBulkProvisionFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	t.Run("valid YAML file", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		tmpFile := filepath.Join(tmpDir, "provision.yaml")
+		tmpFile := "/test/provision.yaml"
 		content := `wifi:
   ssid: "MyNetwork"
   password: "secret123"
@@ -130,7 +130,7 @@ devices:
   - name: device2
     address: 192.168.1.101
 `
-		if err := os.WriteFile(tmpFile, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), tmpFile, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 
@@ -153,8 +153,6 @@ devices:
 	})
 
 	t.Run("non-existent file", func(t *testing.T) {
-		t.Parallel()
-
 		_, err := ParseBulkProvisionFile("/nonexistent/file.yaml")
 
 		if err == nil {
@@ -163,12 +161,9 @@ devices:
 	})
 
 	t.Run("invalid YAML", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		tmpFile := filepath.Join(tmpDir, "invalid.yaml")
+		tmpFile := "/test/invalid.yaml"
 		content := `{invalid yaml: [unterminated`
-		if err := os.WriteFile(tmpFile, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), tmpFile, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 
@@ -180,11 +175,8 @@ devices:
 	})
 
 	t.Run("empty file", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		tmpFile := filepath.Join(tmpDir, "empty.yaml")
-		if err := os.WriteFile(tmpFile, []byte(""), 0o600); err != nil {
+		tmpFile := "/test/empty.yaml"
+		if err := afero.WriteFile(config.Fs(), tmpFile, []byte(""), 0o600); err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 

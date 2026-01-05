@@ -3,14 +3,17 @@ package install
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
+
+const testConfigDir = "/test/config"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -187,13 +190,17 @@ func TestNewCommand_RunE(t *testing.T) {
 }
 
 func TestRun_InvalidPrefix(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
-	// Create a temp directory and file without shelly- prefix
-	tmpDir := t.TempDir()
-	invalidFile := filepath.Join(tmpDir, "myext")
-	// Needs executable permissions for plugin testing
-	if err := os.WriteFile(invalidFile, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: test executable
+	// Create a file without shelly- prefix
+	invalidFile := "/test/plugins/myext"
+	if err := fs.MkdirAll("/test/plugins", 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	if err := afero.WriteFile(fs, invalidFile, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 
@@ -237,15 +244,17 @@ func TestRun_NonExistentLocalFile(t *testing.T) {
 }
 
 func TestRun_ValidLocalFile(t *testing.T) {
-	// Set XDG_CONFIG_HOME to use temp directory for plugins
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
-	// Create a temp directory and file with shelly- prefix
-	tmpDir := t.TempDir()
-	validFile := filepath.Join(tmpDir, "shelly-testplugin")
-	// Needs executable permissions for plugin testing
-	if err := os.WriteFile(validFile, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: test executable
+	// Create a file with shelly- prefix
+	validFile := "/test/plugins/shelly-testplugin"
+	if err := fs.MkdirAll("/test/plugins", 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	if err := afero.WriteFile(fs, validFile, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 
@@ -259,7 +268,7 @@ func TestRun_ValidLocalFile(t *testing.T) {
 		Source:  validFile,
 		Force:   false,
 	}
-	// This will try to install to the real plugins dir
+	// This will try to install to the plugins dir
 	// It should succeed or fail with a registry-related error
 	err := run(context.Background(), opts)
 
@@ -270,8 +279,10 @@ func TestRun_ValidLocalFile(t *testing.T) {
 }
 
 func TestRun_GitHubSourceParsing(t *testing.T) {
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	tests := []struct {
 		name   string
@@ -287,7 +298,7 @@ func TestRun_GitHubSourceParsing(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests { //nolint:paralleltest // uses t.Setenv
+	for _, tt := range tests { //nolint:paralleltest // subtests cannot run in parallel
 		t.Run(tt.name, func(t *testing.T) {
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
@@ -317,8 +328,10 @@ func TestRun_GitHubSourceParsing(t *testing.T) {
 }
 
 func TestRun_URLSourceParsing(t *testing.T) {
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	tests := []struct {
 		name   string
@@ -334,7 +347,7 @@ func TestRun_URLSourceParsing(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests { //nolint:paralleltest // uses t.Setenv
+	for _, tt := range tests { //nolint:paralleltest // subtests cannot run in parallel
 		t.Run(tt.name, func(t *testing.T) {
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
@@ -397,14 +410,17 @@ func TestRun_SourceTypeDetection(t *testing.T) {
 }
 
 func TestRun_ForceFlag(t *testing.T) {
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	// Create a temp file
-	tmpDir := t.TempDir()
-	validFile := filepath.Join(tmpDir, "shelly-forcetestplugin")
-	// Needs executable permissions for plugin testing
-	if err := os.WriteFile(validFile, []byte("#!/bin/bash\necho test"), 0o750); err != nil { //nolint:gosec // G306: test executable
+	validFile := "/test/plugins/shelly-forcetestplugin"
+	if err := fs.MkdirAll("/test/plugins", 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	if err := afero.WriteFile(fs, validFile, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 

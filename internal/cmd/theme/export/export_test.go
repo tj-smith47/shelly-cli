@@ -3,16 +3,19 @@ package export
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
+
+const testExportDir = "/test/export"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -143,12 +146,16 @@ func TestRun_ExportToStdout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_ExportToFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create temp directory
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "theme-export.yaml")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	tmpFile := testExportDir + "/theme-export.yaml"
 
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
@@ -164,12 +171,12 @@ func TestRun_ExportToFile(t *testing.T) {
 	}
 
 	// File should be created
-	if _, err := os.Stat(tmpFile); os.IsNotExist(err) {
+	if _, err := fs.Stat(tmpFile); os.IsNotExist(err) {
 		t.Fatal("Export file should be created")
 	}
 
 	// Read file content
-	content, err := os.ReadFile(tmpFile) //nolint:gosec // G304: tmpFile is from t.TempDir(), safe for tests
+	content, err := afero.ReadFile(fs, tmpFile)
 	if err != nil {
 		t.Fatalf("Failed to read export file: %v", err)
 	}
@@ -230,11 +237,16 @@ func TestRun_ExportContainsAllColors(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_ExportShowsSuccessMessage(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "test-theme.yaml")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	tmpFile := testExportDir + "/test-theme.yaml"
 
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
@@ -282,11 +294,16 @@ func TestRun_ExportInvalidPath(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_ExportFilePermissions(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "permissions-test.yaml")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	tmpFile := testExportDir + "/permissions-test.yaml"
 
 	var outBuf, errBuf bytes.Buffer
 	ios := iostreams.Test(strings.NewReader(""), &outBuf, &errBuf)
@@ -301,7 +318,7 @@ func TestRun_ExportFilePermissions(t *testing.T) {
 	}
 
 	// Check file permissions - should be 0600 (user read/write only)
-	info, err := os.Stat(tmpFile)
+	info, err := fs.Stat(tmpFile)
 	if err != nil {
 		t.Fatalf("Failed to stat file: %v", err)
 	}

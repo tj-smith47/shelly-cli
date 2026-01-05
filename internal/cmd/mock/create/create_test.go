@@ -4,20 +4,27 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
-// setupTestEnv sets up an isolated XDG_CONFIG_HOME for tests.
-func setupTestEnv(t *testing.T) {
+const testConfigDir = "/test/config"
+
+// setupTestEnv sets up an isolated environment for tests using afero.
+func setupTestEnv(t *testing.T) afero.Fs {
 	t.Helper()
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
+	return fs
 }
 
 func TestNewCommand(t *testing.T) {
@@ -144,9 +151,9 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_CreateDevice(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -169,21 +176,21 @@ func TestRun_CreateDevice(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "my-device.json")
-	if _, err := os.Stat(deviceFile); os.IsNotExist(err) {
+	deviceFile := mockDir + "/my-device.json"
+	if _, err := fs.Stat(deviceFile); err != nil {
 		t.Errorf("expected device file to be created: %s", deviceFile)
 	}
 
 	output := stdout.String() + stderr.String()
 	// Should mention device name
-	if !bytes.Contains([]byte(output), []byte("my-device")) {
+	if !strings.Contains(output, "my-device") {
 		t.Errorf("output should mention my-device, got: %s", output)
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_CustomModel(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -201,8 +208,8 @@ func TestRun_CustomModel(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "custom-device.json")
-	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	deviceFile := mockDir + "/custom-device.json"
+	data, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -217,9 +224,9 @@ func TestRun_CustomModel(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_CustomFirmware(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -237,8 +244,8 @@ func TestRun_CustomFirmware(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "fw-device.json")
-	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	deviceFile := mockDir + "/fw-device.json"
+	data, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -253,9 +260,9 @@ func TestRun_CustomFirmware(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_DeviceHasMAC(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -273,8 +280,8 @@ func TestRun_DeviceHasMAC(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "mac-device.json")
-	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	deviceFile := mockDir + "/mac-device.json"
+	data, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -295,9 +302,9 @@ func TestRun_DeviceHasMAC(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_DeviceHasInitialState(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -315,8 +322,8 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "state-device.json")
-	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	deviceFile := mockDir + "/state-device.json"
+	data, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -353,9 +360,9 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_OutputContainsModelAndFirmware(t *testing.T) {
-	setupTestEnv(t)
+	_ = setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -370,19 +377,19 @@ func TestRun_OutputContainsModelAndFirmware(t *testing.T) {
 	output := stdout.String()
 
 	// Should display model
-	if !bytes.Contains([]byte(output), []byte("Plug S")) {
+	if !strings.Contains(output, "Plug S") {
 		t.Errorf("output should contain model 'Plug S', got: %s", output)
 	}
 
 	// Should display firmware
-	if !bytes.Contains([]byte(output), []byte("3.0.0")) {
+	if !strings.Contains(output, "3.0.0") {
 		t.Errorf("output should contain firmware '3.0.0', got: %s", output)
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_FilePermissions(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -400,22 +407,23 @@ func TestRun_FilePermissions(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "perms-device.json")
-	info, err := os.Stat(deviceFile)
+	deviceFile := mockDir + "/perms-device.json"
+	info, err := fs.Stat(deviceFile)
 	if err != nil {
 		t.Fatalf("failed to stat device file: %v", err)
 	}
 
 	// Should have 0600 permissions (owner read/write only)
+	// Note: afero.MemMapFs preserves permission bits that were set
 	mode := info.Mode().Perm()
 	if mode != 0o600 {
 		t.Errorf("file permissions = %o, want %o", mode, 0o600)
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_DeterministicMAC(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -434,8 +442,8 @@ func TestRun_DeterministicMAC(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "deterministic.json")
-	data1, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	deviceFile := mockDir + "/deterministic.json"
+	data1, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -455,7 +463,7 @@ func TestRun_DeterministicMAC(t *testing.T) {
 	}
 
 	// Read second MAC
-	data2, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	data2, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file second time: %v", err)
 	}

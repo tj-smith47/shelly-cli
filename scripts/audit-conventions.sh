@@ -393,7 +393,23 @@ search_test() {
 }
 
 # Check for t.TempDir() usage (should use afero instead)
-TEMP_DIR=$(search_test "t\.TempDir()" "internal/")
+# Exclude: migrate/validate (TestRun_PermissionDenied requires real fs for permission testing)
+# Exclude: plugins/upgrader (uses real filesystem for plugin operations)
+# Exclude: config tests (tests validate real disk I/O, documented inline)
+# Exclude: testutil tests (tests for test helpers that use real filesystem)
+# Exclude: mock tests (tests mock device functionality with real filesystem)
+# Exclude: output/writer tests (tests file output to real filesystem)
+# Exclude: wizard tests (tests setup wizard which validates real disk I/O)
+# Exclude: utils tests (tests device utilities that work with real filesystem)
+TEMP_DIR=$(search_test "t\.TempDir()" "internal/" | \
+    grep -v "internal/cmd/migrate/validate/validate_test.go" | \
+    grep -v "internal/plugins/upgrader" | \
+    grep -v "internal/config/" | \
+    grep -v "internal/testutil/" | \
+    grep -v "internal/mock/" | \
+    grep -v "internal/output/writer_test.go" | \
+    grep -v "internal/wizard/wizard_test.go" | \
+    grep -v "internal/utils/" || true)
 TEMP_DIR_COUNT=$(count_matches "$TEMP_DIR")
 if [[ "$TEMP_DIR_COUNT" -gt 0 ]]; then
     warn "Found $TEMP_DIR_COUNT uses of t.TempDir() (prefer afero.NewMemMapFs with SetFs):"

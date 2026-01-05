@@ -3,8 +3,6 @@ package importcmd
 import (
 	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,6 +13,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testAuthImportDir = "/test/auth/import"
 
 // setupTest initializes the test environment with isolated filesystem.
 // Uses global config.SetFs which cannot be parallelized.
@@ -266,8 +266,15 @@ func TestRun_FileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_InvalidJSON(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -275,9 +282,8 @@ func TestRun_InvalidJSON(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-	invalidFile := filepath.Join(tmpDir, "invalid.json")
-	if err := os.WriteFile(invalidFile, []byte("not valid json"), 0o600); err != nil {
+	invalidFile := testAuthImportDir + "/invalid.json"
+	if err := afero.WriteFile(fs, invalidFile, []byte("not valid json"), 0o600); err != nil {
 		t.Fatalf("failed to create invalid file: %v", err)
 	}
 
@@ -296,8 +302,15 @@ func TestRun_InvalidJSON(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_EmptyCredentials(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -305,8 +318,7 @@ func TestRun_EmptyCredentials(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-	emptyFile := filepath.Join(tmpDir, "empty.json")
+	emptyFile := testAuthImportDir + "/empty.json"
 
 	// Create a valid JSON file with empty credentials
 	export := map[string]any{
@@ -318,7 +330,7 @@ func TestRun_EmptyCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal JSON: %v", err)
 	}
-	if err := os.WriteFile(emptyFile, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, emptyFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
@@ -339,8 +351,15 @@ func TestRun_EmptyCredentials(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_DryRun(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -348,8 +367,7 @@ func TestRun_DryRun(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-	credFile := filepath.Join(tmpDir, "credentials.json")
+	credFile := testAuthImportDir + "/credentials.json"
 
 	// Create a valid credentials file
 	export := map[string]any{
@@ -370,7 +388,7 @@ func TestRun_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal JSON: %v", err)
 	}
-	if err := os.WriteFile(credFile, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, credFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
@@ -397,8 +415,15 @@ func TestRun_DryRun(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_DryRunShowsDevices(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -406,8 +431,7 @@ func TestRun_DryRunShowsDevices(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-	credFile := filepath.Join(tmpDir, "credentials.json")
+	credFile := testAuthImportDir + "/credentials.json"
 
 	// Create a valid credentials file
 	export := map[string]any{
@@ -424,7 +448,7 @@ func TestRun_DryRunShowsDevices(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal JSON: %v", err)
 	}
-	if err := os.WriteFile(credFile, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, credFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
@@ -495,8 +519,11 @@ func TestRun_ImportWithTestFactory(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_DirectoryAsFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -504,9 +531,8 @@ func TestRun_DirectoryAsFile(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-	subDir := filepath.Join(tmpDir, "subdir")
-	if err := os.MkdirAll(subDir, 0o750); err != nil {
+	subDir := testAuthImportDir + "/subdir"
+	if err := fs.MkdirAll(subDir, 0o750); err != nil {
 		t.Fatalf("failed to create subdir: %v", err)
 	}
 
@@ -550,8 +576,15 @@ func TestOptions_FieldsSet(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_MissingExportedAt(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -559,8 +592,7 @@ func TestRun_MissingExportedAt(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
-	tmpDir := t.TempDir()
-	credFile := filepath.Join(tmpDir, "credentials.json")
+	credFile := testAuthImportDir + "/credentials.json"
 
 	// Create a file with credentials but missing exported_at
 	export := map[string]any{
@@ -576,7 +608,7 @@ func TestRun_MissingExportedAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal JSON: %v", err)
 	}
-	if err := os.WriteFile(credFile, data, 0o600); err != nil {
+	if err := afero.WriteFile(fs, credFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
@@ -612,9 +644,8 @@ func TestNewCommand_Long_Description(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_ValidCredentialsFileFormats(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name    string
 		content map[string]any
@@ -660,21 +691,26 @@ func TestRun_ValidCredentialsFileFormats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			fs := afero.NewMemMapFs()
+			config.SetFs(fs)
+			t.Cleanup(func() { config.SetFs(nil) })
+
+			if err := fs.MkdirAll(testAuthImportDir, 0o755); err != nil {
+				t.Fatalf("failed to create test dir: %v", err)
+			}
 
 			out := &bytes.Buffer{}
 			errOut := &bytes.Buffer{}
 			ios := iostreams.Test(nil, out, errOut)
 			f := cmdutil.NewFactory().SetIOStreams(ios)
 
-			tmpDir := t.TempDir()
-			credFile := filepath.Join(tmpDir, "credentials.json")
+			credFile := testAuthImportDir + "/credentials.json"
 
 			data, err := json.Marshal(tt.content)
 			if err != nil {
 				t.Fatalf("failed to marshal JSON: %v", err)
 			}
-			if err := os.WriteFile(credFile, data, 0o600); err != nil {
+			if err := afero.WriteFile(fs, credFile, data, 0o600); err != nil {
 				t.Fatalf("failed to write file: %v", err)
 			}
 
@@ -691,9 +727,8 @@ func TestRun_ValidCredentialsFileFormats(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_InvalidJSONFormats(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name    string
 		content string
@@ -728,17 +763,22 @@ func TestRun_InvalidJSONFormats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			fs := afero.NewMemMapFs()
+			config.SetFs(fs)
+			t.Cleanup(func() { config.SetFs(nil) })
+
+			if err := fs.MkdirAll(testAuthImportDir, 0o755); err != nil {
+				t.Fatalf("failed to create test dir: %v", err)
+			}
 
 			out := &bytes.Buffer{}
 			errOut := &bytes.Buffer{}
 			ios := iostreams.Test(nil, out, errOut)
 			f := cmdutil.NewFactory().SetIOStreams(ios)
 
-			tmpDir := t.TempDir()
-			credFile := filepath.Join(tmpDir, "credentials.json")
+			credFile := testAuthImportDir + "/credentials.json"
 
-			if err := os.WriteFile(credFile, []byte(tt.content), 0o600); err != nil {
+			if err := afero.WriteFile(fs, credFile, []byte(tt.content), 0o600); err != nil {
 				t.Fatalf("failed to write file: %v", err)
 			}
 

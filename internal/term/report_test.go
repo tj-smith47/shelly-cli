@@ -1,12 +1,13 @@
 package term
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
@@ -71,8 +72,11 @@ func TestOutputReport_InvalidFormat(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOutputReport_ToFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	ios, out, _ := testIOStreams()
 	report := model.DeviceReport{
@@ -83,8 +87,7 @@ func TestOutputReport_ToFile(t *testing.T) {
 		},
 	}
 
-	tmpDir := t.TempDir()
-	outputPath := filepath.Join(tmpDir, "report.json")
+	outputPath := "/test/output/report.json"
 
 	err := OutputReport(ios, report, "json", outputPath)
 	if err != nil {
@@ -96,8 +99,8 @@ func TestOutputReport_ToFile(t *testing.T) {
 		t.Error("expected save success message")
 	}
 
-	// Verify file was created
-	content, err := os.ReadFile(outputPath) //nolint:gosec // G304: outputPath is from t.TempDir(), safe in test
+	// Verify file was created in virtual filesystem
+	content, err := afero.ReadFile(fs, outputPath)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
 	}
@@ -106,8 +109,11 @@ func TestOutputReport_ToFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOutputReport_ToFileText(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	ios, out, _ := testIOStreams()
 	report := model.DeviceReport{
@@ -118,8 +124,7 @@ func TestOutputReport_ToFileText(t *testing.T) {
 		},
 	}
 
-	tmpDir := t.TempDir()
-	outputPath := filepath.Join(tmpDir, "report.txt")
+	outputPath := "/test/output/report.txt"
 
 	err := OutputReport(ios, report, "text", outputPath)
 	if err != nil {
@@ -130,8 +135,8 @@ func TestOutputReport_ToFileText(t *testing.T) {
 		t.Error("expected save success message")
 	}
 
-	// Verify file exists
-	_, err = os.Stat(outputPath)
+	// Verify file exists in virtual filesystem
+	_, err = fs.Stat(outputPath)
 	if err != nil {
 		t.Error("expected output file to exist")
 	}

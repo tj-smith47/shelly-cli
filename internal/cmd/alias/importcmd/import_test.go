@@ -3,7 +3,6 @@ package importcmd
 import (
 	"bytes"
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,6 +13,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testImportDir = "/test/import"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -161,8 +162,8 @@ func TestNewCommand_LongDescription(t *testing.T) {
 	}
 }
 
-// setupTestConfigEnv sets up an isolated config environment for testing.
-// Returns a cleanup function that should be called via t.Cleanup().
+// setupTestConfigEnv sets up an isolated config environment for testing using afero.
+// Returns the virtual config directory path.
 func setupTestConfigEnv(t *testing.T) string {
 	t.Helper()
 
@@ -173,12 +174,10 @@ func setupTestConfigEnv(t *testing.T) string {
 	// Reset the singleton before changing HOME
 	config.ResetDefaultManagerForTesting()
 
-	tmpDir := t.TempDir()
-
 	// Register cleanup to reset singleton after test
 	t.Cleanup(config.ResetDefaultManagerForTesting)
 
-	return tmpDir
+	return testImportDir
 }
 
 //nolint:paralleltest // Test modifies global state via t.Setenv and ResetDefaultManagerForTesting.
@@ -186,7 +185,7 @@ func TestRun_Success(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a valid aliases YAML file
-	aliasFile := filepath.Join(tmpDir, "aliases.yaml")
+	aliasFile := tmpDir + "/aliases.yaml"
 	content := `aliases:
   st: "status kitchen"
   rb: "device reboot"
@@ -232,7 +231,7 @@ func TestRun_InvalidYAML(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create an invalid YAML file
-	aliasFile := filepath.Join(tmpDir, "invalid.yaml")
+	aliasFile := tmpDir + "/invalid.yaml"
 	content := `this is not valid yaml: [unclosed bracket`
 	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
@@ -256,7 +255,7 @@ func TestRun_ShellAliases(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a YAML file with shell aliases (prefixed with !)
-	aliasFile := filepath.Join(tmpDir, "shell-aliases.yaml")
+	aliasFile := tmpDir + "/shell-aliases.yaml"
 	content := `aliases:
   ls: "!ls -la"
   myecho: "!echo hello"
@@ -290,7 +289,7 @@ func TestRun_MergeMode(t *testing.T) {
 	}
 
 	// Create a YAML file with overlapping and new aliases
-	aliasFile := filepath.Join(tmpDir, "merge-aliases.yaml")
+	aliasFile := tmpDir + "/merge-aliases.yaml"
 	content := `aliases:
   st: "status kitchen"
   newcmd: "device info"
@@ -329,7 +328,7 @@ func TestRun_OverwriteMode(t *testing.T) {
 	}
 
 	// Create a YAML file with overlapping alias
-	aliasFile := filepath.Join(tmpDir, "overwrite-aliases.yaml")
+	aliasFile := tmpDir + "/overwrite-aliases.yaml"
 	content := `aliases:
   st: "status kitchen"
 `
@@ -358,7 +357,7 @@ func TestRun_InvalidAliasName(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a YAML file with invalid alias name (reserved command)
-	aliasFile := filepath.Join(tmpDir, "invalid-name.yaml")
+	aliasFile := tmpDir + "/invalid-name.yaml"
 	content := `aliases:
   help: "some command"
 `
@@ -384,7 +383,7 @@ func TestRun_EmptyFile(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create an empty YAML file (no aliases section)
-	aliasFile := filepath.Join(tmpDir, "empty.yaml")
+	aliasFile := tmpDir + "/empty.yaml"
 	content := `aliases:`
 	if err := afero.WriteFile(config.Fs(), aliasFile, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
@@ -410,7 +409,7 @@ func TestExecute_Success(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a valid aliases YAML file
-	aliasFile := filepath.Join(tmpDir, "aliases.yaml")
+	aliasFile := tmpDir + "/aliases.yaml"
 	content := `aliases:
   st: "status kitchen"
 `
@@ -446,7 +445,7 @@ func TestExecute_WithMergeFlag(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a valid aliases YAML file
-	aliasFile := filepath.Join(tmpDir, "aliases.yaml")
+	aliasFile := tmpDir + "/aliases.yaml"
 	content := `aliases:
   newcmd: "device info"
 `
@@ -482,7 +481,7 @@ func TestExecute_ShortMergeFlag(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a valid aliases YAML file
-	aliasFile := filepath.Join(tmpDir, "aliases.yaml")
+	aliasFile := tmpDir + "/aliases.yaml"
 	content := `aliases:
   newcmd: "device info"
 `
@@ -569,7 +568,7 @@ func TestExecute_MergeWithExisting(t *testing.T) {
 	}
 
 	// Create a YAML file with overlapping and new aliases
-	aliasFile := filepath.Join(tmpDir, "merge-aliases.yaml")
+	aliasFile := tmpDir + "/merge-aliases.yaml"
 	content := `aliases:
   existing: "new command for existing"
   brandnew: "brand new command"
@@ -611,7 +610,7 @@ func TestExecute_MultipleAliases(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a YAML file with multiple aliases
-	aliasFile := filepath.Join(tmpDir, "multi-aliases.yaml")
+	aliasFile := tmpDir + "/multi-aliases.yaml"
 	content := `aliases:
   st: "status kitchen"
   rb: "device reboot"
@@ -650,7 +649,7 @@ func TestExecute_MixedAliases(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a YAML file with both regular and shell aliases
-	aliasFile := filepath.Join(tmpDir, "mixed-aliases.yaml")
+	aliasFile := tmpDir + "/mixed-aliases.yaml"
 	content := `aliases:
   st: "status kitchen"
   myls: "!ls -la"
@@ -689,7 +688,7 @@ func TestExecute_AliasWithWhitespace(t *testing.T) {
 	tmpDir := setupTestConfigEnv(t)
 
 	// Create a YAML file with alias name containing whitespace (should fail)
-	aliasFile := filepath.Join(tmpDir, "whitespace-alias.yaml")
+	aliasFile := tmpDir + "/whitespace-alias.yaml"
 	content := `aliases:
   "my alias": "status kitchen"
 `

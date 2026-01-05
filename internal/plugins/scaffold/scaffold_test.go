@@ -2,16 +2,18 @@ package scaffold_test
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/plugins/scaffold"
 )
 
-func TestBash(t *testing.T) {
-	t.Parallel()
+const testScaffoldDir = "/test/scaffold"
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestBash(t *testing.T) {
 	tests := []struct {
 		name    string
 		extName string
@@ -31,20 +33,24 @@ func TestBash(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tmpDir := t.TempDir()
+			fs := afero.NewMemMapFs()
+			config.SetFs(fs)
+			t.Cleanup(func() { config.SetFs(nil) })
 
-			err := scaffold.Bash(tmpDir, tt.extName, tt.cmdName)
+			// Create test directory
+			if err := fs.MkdirAll(testScaffoldDir, 0o755); err != nil {
+				t.Fatalf("failed to create test dir: %v", err)
+			}
+
+			err := scaffold.Bash(testScaffoldDir, tt.extName, tt.cmdName)
 			if err != nil {
 				t.Fatalf("Bash() error = %v", err)
 			}
 
 			// Check script file exists
-			scriptPath := filepath.Join(tmpDir, tt.extName)
-			info, err := os.Stat(scriptPath)
-			if os.IsNotExist(err) {
-				t.Errorf("script file not created: %s", scriptPath)
-			} else if err != nil {
+			scriptPath := testScaffoldDir + "/" + tt.extName
+			info, err := fs.Stat(scriptPath)
+			if err != nil {
 				t.Errorf("failed to stat script: %v", err)
 			}
 
@@ -54,7 +60,7 @@ func TestBash(t *testing.T) {
 			}
 
 			// Read and verify content
-			content, err := os.ReadFile(scriptPath) //nolint:gosec // G304: scriptPath from t.TempDir()
+			content, err := afero.ReadFile(fs, scriptPath)
 			if err != nil {
 				t.Fatalf("failed to read script: %v", err)
 			}
@@ -65,17 +71,16 @@ func TestBash(t *testing.T) {
 			}
 
 			// Check README exists
-			readmePath := filepath.Join(tmpDir, "README.md")
-			if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+			readmePath := testScaffoldDir + "/README.md"
+			if _, err := fs.Stat(readmePath); err != nil {
 				t.Error("README.md not created")
 			}
 		})
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestGo(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name    string
 		extName string
@@ -90,22 +95,28 @@ func TestGo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tmpDir := t.TempDir()
+			fs := afero.NewMemMapFs()
+			config.SetFs(fs)
+			t.Cleanup(func() { config.SetFs(nil) })
 
-			err := scaffold.Go(tmpDir, tt.extName, tt.cmdName)
+			// Create test directory
+			if err := fs.MkdirAll(testScaffoldDir, 0o755); err != nil {
+				t.Fatalf("failed to create test dir: %v", err)
+			}
+
+			err := scaffold.Go(testScaffoldDir, tt.extName, tt.cmdName)
 			if err != nil {
 				t.Fatalf("Go() error = %v", err)
 			}
 
 			// Check main.go exists
-			mainPath := filepath.Join(tmpDir, "main.go")
-			if _, err := os.Stat(mainPath); os.IsNotExist(err) {
+			mainPath := testScaffoldDir + "/main.go"
+			if _, err := fs.Stat(mainPath); err != nil {
 				t.Error("main.go not created")
 			}
 
 			// Read and verify main.go content
-			content, err := os.ReadFile(mainPath) //nolint:gosec // G304: mainPath from t.TempDir()
+			content, err := afero.ReadFile(fs, mainPath)
 			if err != nil {
 				t.Fatalf("failed to read main.go: %v", err)
 			}
@@ -120,29 +131,28 @@ func TestGo(t *testing.T) {
 			}
 
 			// Check go.mod exists
-			modPath := filepath.Join(tmpDir, "go.mod")
-			if _, err := os.Stat(modPath); os.IsNotExist(err) {
+			modPath := testScaffoldDir + "/go.mod"
+			if _, err := fs.Stat(modPath); err != nil {
 				t.Error("go.mod not created")
 			}
 
 			// Check Makefile exists
-			makefilePath := filepath.Join(tmpDir, "Makefile")
-			if _, err := os.Stat(makefilePath); os.IsNotExist(err) {
+			makefilePath := testScaffoldDir + "/Makefile"
+			if _, err := fs.Stat(makefilePath); err != nil {
 				t.Error("Makefile not created")
 			}
 
 			// Check README exists
-			readmePath := filepath.Join(tmpDir, "README.md")
-			if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+			readmePath := testScaffoldDir + "/README.md"
+			if _, err := fs.Stat(readmePath); err != nil {
 				t.Error("README.md not created")
 			}
 		})
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestPython(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name    string
 		extName string
@@ -157,20 +167,24 @@ func TestPython(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tmpDir := t.TempDir()
+			fs := afero.NewMemMapFs()
+			config.SetFs(fs)
+			t.Cleanup(func() { config.SetFs(nil) })
 
-			err := scaffold.Python(tmpDir, tt.extName, tt.cmdName)
+			// Create test directory
+			if err := fs.MkdirAll(testScaffoldDir, 0o755); err != nil {
+				t.Fatalf("failed to create test dir: %v", err)
+			}
+
+			err := scaffold.Python(testScaffoldDir, tt.extName, tt.cmdName)
 			if err != nil {
 				t.Fatalf("Python() error = %v", err)
 			}
 
 			// Check script file exists
-			scriptPath := filepath.Join(tmpDir, tt.extName)
-			info, err := os.Stat(scriptPath)
-			if os.IsNotExist(err) {
-				t.Errorf("script file not created: %s", scriptPath)
-			} else if err != nil {
+			scriptPath := testScaffoldDir + "/" + tt.extName
+			info, err := fs.Stat(scriptPath)
+			if err != nil {
 				t.Errorf("failed to stat script: %v", err)
 			}
 
@@ -180,7 +194,7 @@ func TestPython(t *testing.T) {
 			}
 
 			// Read and verify content
-			content, err := os.ReadFile(scriptPath) //nolint:gosec // G304: scriptPath from t.TempDir()
+			content, err := afero.ReadFile(fs, scriptPath)
 			if err != nil {
 				t.Fatalf("failed to read script: %v", err)
 			}
@@ -191,17 +205,16 @@ func TestPython(t *testing.T) {
 			}
 
 			// Check README exists
-			readmePath := filepath.Join(tmpDir, "README.md")
-			if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+			readmePath := testScaffoldDir + "/README.md"
+			if _, err := fs.Stat(readmePath); err != nil {
 				t.Error("README.md not created")
 			}
 		})
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestReadme(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name    string
 		extName string
@@ -216,16 +229,22 @@ func TestReadme(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tmpDir := t.TempDir()
+			fs := afero.NewMemMapFs()
+			config.SetFs(fs)
+			t.Cleanup(func() { config.SetFs(nil) })
 
-			err := scaffold.Readme(tmpDir, tt.extName, tt.cmdName)
+			// Create test directory
+			if err := fs.MkdirAll(testScaffoldDir, 0o755); err != nil {
+				t.Fatalf("failed to create test dir: %v", err)
+			}
+
+			err := scaffold.Readme(testScaffoldDir, tt.extName, tt.cmdName)
 			if err != nil {
 				t.Fatalf("Readme() error = %v", err)
 			}
 
-			readmePath := filepath.Join(tmpDir, "README.md")
-			content, err := os.ReadFile(readmePath) //nolint:gosec // G304: readmePath from t.TempDir()
+			readmePath := testScaffoldDir + "/README.md"
+			content, err := afero.ReadFile(fs, readmePath)
 			if err != nil {
 				t.Fatalf("failed to read README.md: %v", err)
 			}
@@ -319,40 +338,56 @@ func TestFullName(t *testing.T) {
 	}
 }
 
-func TestBash_InvalidDirectory(t *testing.T) {
-	t.Parallel()
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestBash_ReadOnlyDirectory(t *testing.T) {
+	baseFs := afero.NewMemMapFs()
+	roFs := afero.NewReadOnlyFs(baseFs)
+	config.SetFs(roFs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Try to create in a directory that doesn't exist
-	err := scaffold.Bash("/nonexistent/path/that/should/fail", "shelly-test", "test")
+	// Try to create in a read-only filesystem
+	err := scaffold.Bash("/test/scaffold", "shelly-test", "test")
 	if err == nil {
-		t.Error("Bash() should error for invalid directory")
+		t.Error("Bash() should error for read-only filesystem")
 	}
 }
 
-func TestGo_InvalidDirectory(t *testing.T) {
-	t.Parallel()
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestGo_ReadOnlyDirectory(t *testing.T) {
+	baseFs := afero.NewMemMapFs()
+	roFs := afero.NewReadOnlyFs(baseFs)
+	config.SetFs(roFs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	err := scaffold.Go("/nonexistent/path/that/should/fail", "shelly-test", "test")
+	err := scaffold.Go("/test/scaffold", "shelly-test", "test")
 	if err == nil {
-		t.Error("Go() should error for invalid directory")
+		t.Error("Go() should error for read-only filesystem")
 	}
 }
 
-func TestPython_InvalidDirectory(t *testing.T) {
-	t.Parallel()
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestPython_ReadOnlyDirectory(t *testing.T) {
+	baseFs := afero.NewMemMapFs()
+	roFs := afero.NewReadOnlyFs(baseFs)
+	config.SetFs(roFs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	err := scaffold.Python("/nonexistent/path/that/should/fail", "shelly-test", "test")
+	err := scaffold.Python("/test/scaffold", "shelly-test", "test")
 	if err == nil {
-		t.Error("Python() should error for invalid directory")
+		t.Error("Python() should error for read-only filesystem")
 	}
 }
 
-func TestReadme_InvalidDirectory(t *testing.T) {
-	t.Parallel()
+//nolint:paralleltest // Test modifies global state via config.SetFs
+func TestReadme_ReadOnlyDirectory(t *testing.T) {
+	baseFs := afero.NewMemMapFs()
+	roFs := afero.NewReadOnlyFs(baseFs)
+	config.SetFs(roFs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	err := scaffold.Readme("/nonexistent/path/that/should/fail", "shelly-test", "test")
+	err := scaffold.Readme("/test/scaffold", "shelly-test", "test")
 	if err == nil {
-		t.Error("Readme() should error for invalid directory")
+		t.Error("Readme() should error for read-only filesystem")
 	}
 }
 

@@ -2,15 +2,18 @@ package terraform
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testExportDir = "/test/export"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -417,12 +420,16 @@ func TestRun_WithCustomResourceName(t *testing.T) {
 	}
 }
 
-// TestRun_WriteToFile tests run with file output.
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WriteToFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tempDir := t.TempDir()
-	outputFile := filepath.Join(tempDir, "devices.tf")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create export dir: %v", err)
+	}
+	outputFile := testExportDir + "/devices.tf"
 
 	tf := factory.NewTestFactory(t)
 
@@ -581,16 +588,19 @@ func TestRun_StdoutOutput(t *testing.T) {
 	}
 }
 
-// TestRun_FileExistsOverwrite tests overwriting existing file.
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_FileExistsOverwrite(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tempDir := t.TempDir()
-	outputFile := filepath.Join(tempDir, "existing.tf")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create export dir: %v", err)
+	}
+	outputFile := testExportDir + "/existing.tf"
 
 	// Create existing file
-	err := os.WriteFile(outputFile, []byte("existing content"), 0o600)
-	if err != nil {
+	if err := afero.WriteFile(fs, outputFile, []byte("existing content"), 0o600); err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 

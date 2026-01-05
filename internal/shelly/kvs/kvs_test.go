@@ -6,11 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 func TestItem_Fields(t *testing.T) {
@@ -186,11 +187,12 @@ func getTypeName(v any) string {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseImportFile_JSON(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "import.json")
+	filePath := "/test/import.json"
 
 	exportData := Export{
 		Items: []Item{
@@ -206,7 +208,7 @@ func TestParseImportFile_JSON(t *testing.T) {
 		t.Fatalf("failed to marshal test data: %v", err)
 	}
 
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, data, 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -226,11 +228,12 @@ func TestParseImportFile_JSON(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseImportFile_YAML(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "import.yaml")
+	filePath := "/test/import.yaml"
 
 	yamlContent := `
 items:
@@ -242,7 +245,7 @@ version: 1
 rev: 5
 `
 
-	if err := os.WriteFile(filePath, []byte(yamlContent), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, []byte(yamlContent), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -268,13 +271,14 @@ func TestParseImportFile_FileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseImportFile_InvalidContent(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "invalid.json")
+	filePath := "/test/invalid.json"
 
-	if err := os.WriteFile(filePath, []byte("not valid json or yaml {{{{"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, []byte("not valid json or yaml {{{{"), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -815,14 +819,15 @@ func TestItem_ComplexValue(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseImportFile_EmptyFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "empty.json")
+	filePath := "/test/empty.json"
 
 	// Write empty JSON object
-	if err := os.WriteFile(filePath, []byte("{}"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, []byte("{}"), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -839,11 +844,12 @@ func TestParseImportFile_EmptyFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestParseImportFile_YAMLWithAllTypes(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "alltypes.yaml")
+	filePath := "/test/alltypes.yaml"
 
 	yamlContent := `
 items:
@@ -866,7 +872,7 @@ version: 1
 rev: 100
 `
 
-	if err := os.WriteFile(filePath, []byte(yamlContent), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, []byte(yamlContent), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 

@@ -2,18 +2,21 @@ package influxdb
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testMetricsDir = "/test/metrics"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -416,12 +419,18 @@ func TestExecute_WithTagsFlag(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithOutputFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testMetricsDir, 0o750); err != nil {
+		t.Fatalf("failed to create metrics dir: %v", err)
+	}
+	outputFile := testMetricsDir + "/metrics.txt"
 
 	tf := factory.NewTestFactory(t)
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "metrics.txt")
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetArgs([]string{"--output", outputFile})
@@ -491,17 +500,22 @@ func TestExecute_ContinuousShort(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_AllFlags(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testMetricsDir, 0o750); err != nil {
+		t.Fatalf("failed to create metrics dir: %v", err)
+	}
+	outputFile := testMetricsDir + "/metrics.txt"
 
 	tf := factory.NewTestFactoryWithDevices(t, map[string]model.Device{
 		"kitchen": {
 			Address: "192.168.1.100",
 		},
 	})
-
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "metrics.txt")
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetArgs([]string{

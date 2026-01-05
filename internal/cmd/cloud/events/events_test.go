@@ -7,12 +7,12 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
@@ -178,11 +178,14 @@ func TestExecute_NotLoggedIn(t *testing.T) {
 	}
 }
 
-// setupTestManagerWithCloud creates a test manager with cloud config.
+// setupTestManagerWithCloud creates a test manager with cloud config using afero.
 func setupTestManagerWithCloud(t *testing.T, accessToken, serverURL string) *config.Manager {
 	t.Helper()
-	tmpDir := t.TempDir()
-	mgr := config.NewManager(filepath.Join(tmpDir, "config.yaml"))
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	mgr := config.NewManager("/test/config/config.yaml")
 	if err := mgr.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}

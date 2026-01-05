@@ -6,7 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
@@ -326,8 +329,11 @@ func TestExecute_WithMockDevice(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithOutputFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -356,8 +362,7 @@ func TestExecute_WithOutputFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
-	filePath := dir + "/backup.json"
+	filePath := "/test/backup.json"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -619,8 +624,11 @@ func TestRun_Success(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WriteToFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -649,8 +657,7 @@ func TestRun_WriteToFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
-	filePath := dir + "/backup.json"
+	filePath := "/test/backup.json"
 
 	opts := &Options{
 		Factory:  tf.Factory,

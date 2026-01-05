@@ -4,15 +4,17 @@ package backup
 import (
 	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
+
+const testBackupFilePath = "/test/backup.json"
 
 func TestDeviceBackup_Device(t *testing.T) {
 	t.Parallel()
@@ -366,11 +368,12 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestSaveToFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "subdir", "backup.json")
+	filePath := "/test/subdir/backup.json"
 	data := []byte(`{"test": "data"}`)
 
 	err := SaveToFile(data, filePath)
@@ -379,7 +382,7 @@ func TestSaveToFile(t *testing.T) {
 	}
 
 	// Verify file was created
-	content, err := os.ReadFile(filePath) //nolint:gosec // test file path from t.TempDir()
+	content, err := afero.ReadFile(config.Fs(), filePath)
 	if err != nil {
 		t.Fatalf("failed to read file: %v", err)
 	}
@@ -389,7 +392,7 @@ func TestSaveToFile(t *testing.T) {
 	}
 
 	// Verify permissions
-	info, err := os.Stat(filePath)
+	info, err := config.Fs().Stat(filePath)
 	if err != nil {
 		t.Fatalf("failed to stat file: %v", err)
 	}
@@ -398,14 +401,15 @@ func TestSaveToFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoadFromFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "backup.json")
+	filePath := testBackupFilePath
 	expectedData := []byte(`{"test": "data"}`)
 
-	if err := os.WriteFile(filePath, expectedData, 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, expectedData, 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -428,11 +432,13 @@ func TestLoadFromFile_NotExists(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestIsFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test.json")
+	filePath := "/test/test.json"
+	dirPath := "/test"
 
 	// Before file exists
 	if IsFile(filePath) {
@@ -440,7 +446,7 @@ func TestIsFile(t *testing.T) {
 	}
 
 	// Create file
-	if err := os.WriteFile(filePath, []byte("test"), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, []byte("test"), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -449,7 +455,7 @@ func TestIsFile(t *testing.T) {
 	}
 
 	// Check directory returns false
-	if IsFile(tmpDir) {
+	if IsFile(dirPath) {
 		t.Error("expected false for directory")
 	}
 }
@@ -748,11 +754,12 @@ func TestDiffBackups(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoadAndValidate(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "backup.json")
+	filePath := testBackupFilePath
 
 	// Create a valid backup file
 	backupData := `{
@@ -762,7 +769,7 @@ func TestLoadAndValidate(t *testing.T) {
 		"created_at": "` + time.Now().Format(time.RFC3339) + `"
 	}`
 
-	if err := os.WriteFile(filePath, []byte(backupData), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, []byte(backupData), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
@@ -785,14 +792,15 @@ func TestLoadAndValidate_FileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoadAndValidate_InvalidBackup(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "backup.json")
+	filePath := testBackupFilePath
 
 	// Create an invalid backup file
-	if err := os.WriteFile(filePath, []byte(`{"version": 0}`), 0o600); err != nil {
+	if err := afero.WriteFile(config.Fs(), filePath, []byte(`{"version": 0}`), 0o600); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 

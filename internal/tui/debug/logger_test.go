@@ -5,6 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 //nolint:paralleltest // Tests that modify environment variables cannot run in parallel.
@@ -25,9 +29,10 @@ func TestNew_DisabledByDefault(t *testing.T) {
 }
 
 func TestNew_EnabledWithEnv(t *testing.T) {
-	// Use temp dir to avoid creating debug directory in real config
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	// Use memory filesystem to avoid real disk operations
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
 	t.Setenv(EnvKey, "1")
 
@@ -52,9 +57,10 @@ func TestNew_EnabledWithEnv(t *testing.T) {
 }
 
 func TestLogger_Log(t *testing.T) {
-	// Use temp dir to avoid creating debug directory in real config
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	// Use memory filesystem to avoid real disk operations
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 	t.Setenv(EnvKey, "1")
 
 	l := New()
@@ -74,8 +80,8 @@ func TestLogger_Log(t *testing.T) {
 		t.Logf("warning: close: %v", err)
 	}
 
-	// Read log file
-	content, err := os.ReadFile(logPath) //nolint:gosec // Path from SessionDir()
+	// Read log file from virtual filesystem
+	content, err := afero.ReadFile(config.Fs(), logPath)
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}
@@ -103,8 +109,9 @@ func TestLogger_Log(t *testing.T) {
 }
 
 func TestLogger_SkipDuplicateViews(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 	t.Setenv(EnvKey, "1")
 
 	l := New()
@@ -123,8 +130,8 @@ func TestLogger_SkipDuplicateViews(t *testing.T) {
 		t.Logf("warning: close: %v", err)
 	}
 
-	// Read and count occurrences
-	content, err := os.ReadFile(logPath) //nolint:gosec // Path from SessionDir()
+	// Read and count occurrences from virtual filesystem
+	content, err := afero.ReadFile(config.Fs(), logPath)
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}
@@ -145,8 +152,9 @@ func TestLogger_SkipDuplicateViews(t *testing.T) {
 }
 
 func TestLogger_SessionDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 	t.Setenv(EnvKey, "1")
 
 	l := New()
@@ -161,8 +169,8 @@ func TestLogger_SessionDir(t *testing.T) {
 
 	sessionDir := l.SessionDir()
 
-	// Verify session directory exists
-	info, err := os.Stat(sessionDir)
+	// Verify session directory exists in virtual filesystem
+	info, err := config.Fs().Stat(sessionDir)
 	if err != nil {
 		t.Fatalf("session dir stat: %v", err)
 	}
@@ -216,13 +224,16 @@ func TestLogger_Writer(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestCleanupOldSessions(t *testing.T) {
-	t.Parallel()
+	// Use memory filesystem to avoid real disk operations
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create temp debug directory with 30 sessions
-	tmpDir := t.TempDir()
-	debugDir := filepath.Join(tmpDir, DebugDir)
-	if err := os.MkdirAll(debugDir, 0o700); err != nil {
+	// Create debug directory with 30 sessions
+	debugDir := "/test/config/shelly/debug"
+	if err := fs.MkdirAll(debugDir, 0o700); err != nil {
 		t.Fatalf("mkdir debug dir: %v", err)
 	}
 
@@ -230,13 +241,13 @@ func TestCleanupOldSessions(t *testing.T) {
 	for i := range 30 {
 		sessionName := "2025-01-" + string(rune('0'+i/10)) + string(rune('0'+i%10)) + "_12-00-00"
 		sessionPath := filepath.Join(debugDir, sessionName)
-		if err := os.MkdirAll(sessionPath, 0o700); err != nil {
+		if err := fs.MkdirAll(sessionPath, 0o700); err != nil {
 			t.Fatalf("mkdir session %d: %v", i, err)
 		}
 	}
 
 	// Verify we have 30 sessions
-	entries, err := os.ReadDir(debugDir)
+	entries, err := afero.ReadDir(fs, debugDir)
 	if err != nil {
 		t.Fatalf("read debug dir: %v", err)
 	}
@@ -248,7 +259,7 @@ func TestCleanupOldSessions(t *testing.T) {
 	cleanupOldSessions(debugDir)
 
 	// Verify we now have MaxSessions
-	entries, err = os.ReadDir(debugDir)
+	entries, err = afero.ReadDir(fs, debugDir)
 	if err != nil {
 		t.Fatalf("read debug dir after cleanup: %v", err)
 	}
@@ -270,9 +281,10 @@ func TestCleanupOldSessions(t *testing.T) {
 }
 
 func TestLogger_Toggle(t *testing.T) {
-	// Use temp dir for config
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	// Use memory filesystem for config
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
 	l := New()
 	if l == nil {

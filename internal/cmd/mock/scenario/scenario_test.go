@@ -4,20 +4,27 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
-// setupTestEnv sets up an isolated XDG_CONFIG_HOME for tests.
-func setupTestEnv(t *testing.T) {
+const testConfigDir = "/test/config"
+
+// setupTestEnv sets up an isolated environment for tests using afero.
+func setupTestEnv(t *testing.T) afero.Fs {
 	t.Helper()
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
+	return fs
 }
 
 func TestNewCommand(t *testing.T) {
@@ -123,9 +130,9 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_UnknownScenario(t *testing.T) {
-	setupTestEnv(t)
+	_ = setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -138,14 +145,14 @@ func TestRun_UnknownScenario(t *testing.T) {
 	}
 
 	// Should mention available scenarios
-	if err != nil && !bytes.Contains([]byte(err.Error()), []byte("unknown scenario")) {
+	if err != nil && !strings.Contains(err.Error(), "unknown scenario") {
 		t.Errorf("error should mention unknown scenario, got: %v", err)
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_MinimalScenario(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -164,21 +171,21 @@ func TestRun_MinimalScenario(t *testing.T) {
 	}
 
 	// Check that device file was created
-	deviceFile := filepath.Join(mockDir, "test-switch.json")
-	if _, err := os.Stat(deviceFile); os.IsNotExist(err) {
+	deviceFile := mockDir + "/test-switch.json"
+	if _, err := fs.Stat(deviceFile); err != nil {
 		t.Errorf("expected device file to be created: %s", deviceFile)
 	}
 
 	output := stdout.String() + stderr.String()
 	// Should mention test-switch
-	if !bytes.Contains([]byte(output), []byte("test-switch")) {
+	if !strings.Contains(output, "test-switch") {
 		t.Errorf("output should mention test-switch, got: %s", output)
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_HomeScenario(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -198,8 +205,8 @@ func TestRun_HomeScenario(t *testing.T) {
 
 	expectedDevices := []string{"living-room.json", "bedroom.json", "kitchen.json"}
 	for _, device := range expectedDevices {
-		deviceFile := filepath.Join(mockDir, device)
-		if _, err := os.Stat(deviceFile); os.IsNotExist(err) {
+		deviceFile := mockDir + "/" + device
+		if _, err := fs.Stat(deviceFile); err != nil {
 			t.Errorf("expected device file to be created: %s", deviceFile)
 		}
 	}
@@ -207,15 +214,15 @@ func TestRun_HomeScenario(t *testing.T) {
 	output := stdout.String() + stderr.String()
 	// Should mention all devices
 	for _, name := range []string{"living-room", "bedroom", "kitchen"} {
-		if !bytes.Contains([]byte(output), []byte(name)) {
+		if !strings.Contains(output, name) {
 			t.Errorf("output should mention %s, got: %s", name, output)
 		}
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_OfficeScenario(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -241,22 +248,22 @@ func TestRun_OfficeScenario(t *testing.T) {
 		"heater.json",
 	}
 	for _, device := range expectedDevices {
-		deviceFile := filepath.Join(mockDir, device)
-		if _, err := os.Stat(deviceFile); os.IsNotExist(err) {
+		deviceFile := mockDir + "/" + device
+		if _, err := fs.Stat(deviceFile); err != nil {
 			t.Errorf("expected device file to be created: %s", deviceFile)
 		}
 	}
 
 	output := stdout.String() + stderr.String()
 	// Should mention success and device count
-	if !bytes.Contains([]byte(output), []byte("5")) {
+	if !strings.Contains(output, "5") {
 		t.Errorf("output should mention 5 devices created, got: %s", output)
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -274,8 +281,8 @@ func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "test-switch.json")
-	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	deviceFile := mockDir + "/test-switch.json"
+	data, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}
@@ -308,9 +315,9 @@ func TestRun_ScenarioCreatesValidJSON(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_DeviceHasInitialState(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -328,8 +335,8 @@ func TestRun_DeviceHasInitialState(t *testing.T) {
 		t.Fatalf("failed to get mock dir: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "test-switch.json")
-	data, err := os.ReadFile(deviceFile) //nolint:gosec // Test file path from temp dir
+	deviceFile := mockDir + "/test-switch.json"
+	data, err := afero.ReadFile(fs, deviceFile)
 	if err != nil {
 		t.Fatalf("failed to read device file: %v", err)
 	}

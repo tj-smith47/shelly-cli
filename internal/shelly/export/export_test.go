@@ -2,13 +2,13 @@
 package export
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 )
@@ -123,26 +123,26 @@ func TestBuildTerraformConfig(t *testing.T) {
 		},
 	}
 
-	config, err := BuildTerraformConfig(devices, "shelly_devices")
+	tfConfig, err := BuildTerraformConfig(devices, "shelly_devices")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if config == "" {
+	if tfConfig == "" {
 		t.Fatal("expected non-empty config")
 	}
 
 	// Check expected content
-	if !strings.Contains(config, "shelly_devices") {
+	if !strings.Contains(tfConfig, "shelly_devices") {
 		t.Error("expected config to contain resource name")
 	}
-	if !strings.Contains(config, "living_room") {
+	if !strings.Contains(tfConfig, "living_room") {
 		t.Error("expected config to contain normalized device name")
 	}
-	if !strings.Contains(config, testAddress) {
+	if !strings.Contains(tfConfig, testAddress) {
 		t.Error("expected config to contain device address")
 	}
-	if !strings.Contains(config, "Plus2PM") {
+	if !strings.Contains(tfConfig, "Plus2PM") {
 		t.Error("expected config to contain app name")
 	}
 }
@@ -332,10 +332,10 @@ func TestSanitizeFilename(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestWriteBackupFile(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	bkp := &backup.DeviceBackup{}
 
@@ -351,9 +351,7 @@ func TestWriteBackupFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			filePath := filepath.Join(tmpDir, "backup-"+tt.format+"."+tt.format)
+			filePath := "/test/backup-" + tt.format + "." + tt.format
 			err := WriteBackupFile(bkp, filePath, tt.format)
 
 			if tt.wantErr {
@@ -367,7 +365,7 @@ func TestWriteBackupFile(t *testing.T) {
 			}
 
 			// Verify file was created
-			if _, statErr := os.Stat(filePath); os.IsNotExist(statErr) {
+			if _, statErr := config.Fs().Stat(filePath); statErr != nil {
 				t.Error("expected file to be created")
 			}
 		})

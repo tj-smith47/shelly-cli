@@ -4,21 +4,27 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
-// setupTestEnv sets up an isolated environment for tests.
-func setupTestEnv(t *testing.T) {
+const testConfigDir = "/test/config"
+
+// setupTestEnv sets up an isolated environment for tests using afero.
+func setupTestEnv(t *testing.T) afero.Fs {
 	t.Helper()
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", testConfigDir)
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
+	return fs
 }
 
 func TestNewCommand(t *testing.T) {
@@ -119,9 +125,9 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_NoDevices(t *testing.T) {
-	setupTestEnv(t)
+	_ = setupTestEnv(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -139,9 +145,9 @@ func TestRun_NoDevices(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_WithDevices(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	// Create mock dir and device
 	mockDir, err := mock.Dir()
@@ -162,8 +168,8 @@ func TestRun_WithDevices(t *testing.T) {
 		t.Fatalf("failed to marshal device: %v", err)
 	}
 
-	filename := filepath.Join(mockDir, "test-device.json")
-	if err := os.WriteFile(filename, data, 0o600); err != nil {
+	filename := mockDir + "/test-device.json"
+	if err := afero.WriteFile(fs, filename, data, 0o600); err != nil {
 		t.Fatalf("failed to write device file: %v", err)
 	}
 
@@ -188,9 +194,9 @@ func TestRun_WithDevices(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_SkipsNonJSONFiles(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	// Create mock dir
 	mockDir, err := mock.Dir()
@@ -199,8 +205,8 @@ func TestRun_SkipsNonJSONFiles(t *testing.T) {
 	}
 
 	// Create a non-JSON file
-	txtFile := filepath.Join(mockDir, "readme.txt")
-	if err := os.WriteFile(txtFile, []byte("This is not a device"), 0o600); err != nil {
+	txtFile := mockDir + "/readme.txt"
+	if err := afero.WriteFile(fs, txtFile, []byte("This is not a device"), 0o600); err != nil {
 		t.Fatalf("failed to write txt file: %v", err)
 	}
 
@@ -217,8 +223,8 @@ func TestRun_SkipsNonJSONFiles(t *testing.T) {
 		t.Fatalf("failed to marshal device: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "valid-device.json")
-	if err := os.WriteFile(deviceFile, data, 0o600); err != nil {
+	deviceFile := mockDir + "/valid-device.json"
+	if err := afero.WriteFile(fs, deviceFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write device file: %v", err)
 	}
 
@@ -243,9 +249,9 @@ func TestRun_SkipsNonJSONFiles(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_SkipsDirectories(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	// Create mock dir
 	mockDir, err := mock.Dir()
@@ -254,8 +260,8 @@ func TestRun_SkipsDirectories(t *testing.T) {
 	}
 
 	// Create a subdirectory
-	subDir := filepath.Join(mockDir, "subdir")
-	if err := os.MkdirAll(subDir, 0o700); err != nil {
+	subDir := mockDir + "/subdir"
+	if err := fs.MkdirAll(subDir, 0o700); err != nil {
 		t.Fatalf("failed to create subdir: %v", err)
 	}
 
@@ -276,9 +282,9 @@ func TestRun_SkipsDirectories(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Manipulates XDG_CONFIG_HOME environment variable
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_SkipsInvalidJSON(t *testing.T) {
-	setupTestEnv(t)
+	fs := setupTestEnv(t)
 
 	// Create mock dir
 	mockDir, err := mock.Dir()
@@ -287,8 +293,8 @@ func TestRun_SkipsInvalidJSON(t *testing.T) {
 	}
 
 	// Create an invalid JSON file
-	invalidFile := filepath.Join(mockDir, "invalid.json")
-	if err := os.WriteFile(invalidFile, []byte("{ not valid json "), 0o600); err != nil {
+	invalidFile := mockDir + "/invalid.json"
+	if err := afero.WriteFile(fs, invalidFile, []byte("{ not valid json "), 0o600); err != nil {
 		t.Fatalf("failed to write invalid file: %v", err)
 	}
 
@@ -305,8 +311,8 @@ func TestRun_SkipsInvalidJSON(t *testing.T) {
 		t.Fatalf("failed to marshal device: %v", err)
 	}
 
-	deviceFile := filepath.Join(mockDir, "valid-device.json")
-	if err := os.WriteFile(deviceFile, data, 0o600); err != nil {
+	deviceFile := mockDir + "/valid-device.json"
+	if err := afero.WriteFile(fs, deviceFile, data, 0o600); err != nil {
 		t.Fatalf("failed to write device file: %v", err)
 	}
 

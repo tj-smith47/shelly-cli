@@ -1,9 +1,11 @@
 package shelly
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 const (
@@ -39,13 +41,14 @@ func TestIsConfigFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestIsConfigFile_ExistingFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	// Create a temp file without config extension
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "existing-file")
-	if err := os.WriteFile(tmpFile, []byte("{}"), 0o600); err != nil {
+	tmpFile := "/test/existing-file"
+	if err := afero.WriteFile(config.Fs(), tmpFile, []byte("{}"), 0o600); err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 
@@ -54,16 +57,15 @@ func TestIsConfigFile_ExistingFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestLoadConfigFromFile(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	t.Run("valid JSON file", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		tmpFile := filepath.Join(tmpDir, "config.json")
+		tmpFile := "/test/config.json"
 		content := `{"switch:0":{"name":"test"}}`
-		if err := os.WriteFile(tmpFile, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), tmpFile, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 
@@ -81,8 +83,6 @@ func TestLoadConfigFromFile(t *testing.T) {
 	})
 
 	t.Run("non-existent file", func(t *testing.T) {
-		t.Parallel()
-
 		_, _, err := LoadConfigFromFile("/nonexistent/file.json")
 
 		if err == nil {
@@ -91,11 +91,8 @@ func TestLoadConfigFromFile(t *testing.T) {
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		t.Parallel()
-
-		tmpDir := t.TempDir()
-		tmpFile := filepath.Join(tmpDir, "invalid.json")
-		if err := os.WriteFile(tmpFile, []byte("{invalid json}"), 0o600); err != nil {
+		tmpFile := "/test/invalid.json"
+		if err := afero.WriteFile(config.Fs(), tmpFile, []byte("{invalid json}"), 0o600); err != nil {
 			t.Fatalf("failed to create temp file: %v", err)
 		}
 

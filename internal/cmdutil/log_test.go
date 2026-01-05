@@ -1,12 +1,13 @@
 package cmdutil_test
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 const testLine3 = "line3"
@@ -27,17 +28,15 @@ func TestGetLogPath(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo // test function with many sub-tests
+//nolint:paralleltest,gocyclo // Test modifies global state via config.SetFs
 func TestReadLastLines(t *testing.T) {
-	t.Parallel()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	t.Run("read all lines when less than N", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		path := filepath.Join(dir, "test.log")
+		path := "/test/read-all.log"
 		content := "line1\nline2\nline3\n"
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), path, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to write file: %v", err)
 		}
 
@@ -55,12 +54,9 @@ func TestReadLastLines(t *testing.T) {
 	})
 
 	t.Run("read last N lines", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		path := filepath.Join(dir, "test.log")
+		path := "/test/last-n.log"
 		content := "line1\nline2\nline3\nline4\nline5\n"
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), path, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to write file: %v", err)
 		}
 
@@ -78,11 +74,8 @@ func TestReadLastLines(t *testing.T) {
 	})
 
 	t.Run("empty file", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		path := filepath.Join(dir, "test.log")
-		if err := os.WriteFile(path, []byte(""), 0o600); err != nil {
+		path := "/test/empty.log"
+		if err := afero.WriteFile(config.Fs(), path, []byte(""), 0o600); err != nil {
 			t.Fatalf("failed to write file: %v", err)
 		}
 
@@ -97,22 +90,16 @@ func TestReadLastLines(t *testing.T) {
 	})
 
 	t.Run("file not found", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		_, err := cmdutil.ReadLastLines(filepath.Join(dir, "nonexistent.log"), 10)
+		_, err := cmdutil.ReadLastLines("/test/nonexistent.log", 10)
 		if err == nil {
 			t.Error("ReadLastLines() should error for nonexistent file")
 		}
 	})
 
 	t.Run("file without trailing newline", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		path := filepath.Join(dir, "test.log")
+		path := "/test/no-trailing.log"
 		content := "line1\nline2\nline3" // No trailing newline
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), path, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to write file: %v", err)
 		}
 
@@ -130,12 +117,9 @@ func TestReadLastLines(t *testing.T) {
 	})
 
 	t.Run("exact number of lines", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		path := filepath.Join(dir, "test.log")
+		path := "/test/exact.log"
 		content := "a\nb\nc\n"
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), path, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to write file: %v", err)
 		}
 
@@ -150,12 +134,9 @@ func TestReadLastLines(t *testing.T) {
 	})
 
 	t.Run("request more lines than exist", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		path := filepath.Join(dir, "test.log")
+		path := "/test/fewer.log"
 		content := "only\ntwo\n"
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		if err := afero.WriteFile(config.Fs(), path, []byte(content), 0o600); err != nil {
 			t.Fatalf("failed to write file: %v", err)
 		}
 

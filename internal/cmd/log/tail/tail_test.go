@@ -3,24 +3,30 @@ package tail
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
-// setupTestEnv sets up an isolated config environment for tests.
-// Returns the temp directory path.
-func setupTestEnv(t *testing.T) string {
+const testConfigDir = "/test/config"
+
+// setupTestEnv sets up an isolated config environment for tests using afero.
+// Returns the filesystem and the config directory path.
+func setupTestEnv(t *testing.T) (fs afero.Fs, configDir string) {
 	t.Helper()
-	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	return tmpDir
+	fs = afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	configDir = testConfigDir
+	t.Setenv("HOME", testConfigDir)
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
+	return fs, configDir
 }
 
 func TestNewCommand(t *testing.T) {
@@ -178,13 +184,13 @@ func TestOptions_Struct(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_NoLogFile(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory but no log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
@@ -208,20 +214,20 @@ func TestRun_NoLogFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_WithLogFile(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
 	// Create log file with some content
-	logPath := filepath.Join(shellyDir, "shelly.log")
+	logPath := shellyDir + "/shelly.log"
 	logContent := "line1\nline2\nline3\nline4\nline5\n"
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 
@@ -252,13 +258,13 @@ func TestRun_WithLogFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_ShowsLast20Lines(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
@@ -267,8 +273,8 @@ func TestRun_ShowsLast20Lines(t *testing.T) {
 	for i := 1; i <= 30; i++ {
 		logContent += fmt.Sprintf("line%02d\n", i)
 	}
-	logPath := filepath.Join(shellyDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	logPath := shellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 
@@ -320,19 +326,19 @@ func TestNewCommand_CommandChain(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_EmptyLogFile(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and empty log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
 	// Create empty log file
-	logPath := filepath.Join(shellyDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte(""), 0o600); err != nil {
+	logPath := shellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte(""), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 
@@ -355,13 +361,13 @@ func TestRun_EmptyLogFile(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_FewerThan20Lines(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
@@ -370,8 +376,8 @@ func TestRun_FewerThan20Lines(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		logContent += fmt.Sprintf("log entry %d\n", i)
 	}
-	logPath := filepath.Join(shellyDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	logPath := shellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 
@@ -397,13 +403,13 @@ func TestRun_FewerThan20Lines(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_Exactly20Lines(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
@@ -412,8 +418,8 @@ func TestRun_Exactly20Lines(t *testing.T) {
 	for i := 1; i <= 20; i++ {
 		logContent += fmt.Sprintf("log line %02d\n", i)
 	}
-	logPath := filepath.Join(shellyDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	logPath := shellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 
@@ -439,19 +445,19 @@ func TestRun_Exactly20Lines(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestCommand_Execute(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
 	// Create log file with some content
-	logPath := filepath.Join(shellyDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte("test line\n"), 0o600); err != nil {
+	logPath := shellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte("test line\n"), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 
@@ -477,19 +483,19 @@ func TestCommand_Execute(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_SingleLine(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
 	// Create log file with a single line
-	logPath := filepath.Join(shellyDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte("single line\n"), 0o600); err != nil {
+	logPath := shellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte("single line\n"), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 
@@ -512,19 +518,19 @@ func TestRun_SingleLine(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // Cannot run in parallel because we modify HOME/XDG env vars
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_NoTrailingNewline(t *testing.T) {
-	tmpDir := setupTestEnv(t)
+	fs, configDir := setupTestEnv(t)
 
 	// Create shelly config directory and log file
-	shellyDir := filepath.Join(tmpDir, "shelly")
-	if err := os.MkdirAll(shellyDir, 0o750); err != nil {
+	shellyDir := configDir + "/shelly"
+	if err := fs.MkdirAll(shellyDir, 0o750); err != nil {
 		t.Fatalf("failed to create shelly config dir: %v", err)
 	}
 
 	// Create log file without trailing newline
-	logPath := filepath.Join(shellyDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte("line1\nline2"), 0o600); err != nil {
+	logPath := shellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte("line1\nline2"), 0o600); err != nil {
 		t.Fatalf("failed to create log file: %v", err)
 	}
 

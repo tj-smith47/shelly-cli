@@ -46,6 +46,11 @@ func CachedFetch[T any](
 ) (CacheResult[T], error) {
 	var zero CacheResult[T]
 
+	// Check context cancellation early
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+
 	refresh := viper.GetBool("refresh")
 	offline := viper.GetBool("offline")
 

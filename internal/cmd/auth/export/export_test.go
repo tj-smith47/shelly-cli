@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testAuthExportDir = "/test/auth/export"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -192,8 +195,15 @@ func TestRun_AllWithNoCredentials(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_NoDevicesNoAll_ReturnsError(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	// Add a device with credentials so creds is non-empty
@@ -209,7 +219,7 @@ func TestRun_NoDevicesNoAll_ReturnsError(t *testing.T) {
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{},
-		Output:  filepath.Join(t.TempDir(), "test-export.json"),
+		Output:  testAuthExportDir + "/test-export.json",
 	}
 	// All is false (default), no devices provided
 
@@ -222,8 +232,15 @@ func TestRun_NoDevicesNoAll_ReturnsError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_AllWithCredentials_Success(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	// Add devices with credentials
@@ -244,7 +261,7 @@ func TestRun_AllWithCredentials_Success(t *testing.T) {
 		},
 	}
 
-	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
+	outputPath := testAuthExportDir + "/exported-creds.json"
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{},
@@ -264,7 +281,7 @@ func TestRun_AllWithCredentials_Success(t *testing.T) {
 	}
 
 	// Verify file was created
-	data, err := os.ReadFile(outputPath) //nolint:gosec // Test file with known path
+	data, err := afero.ReadFile(fs, outputPath)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
 	}
@@ -289,8 +306,15 @@ func TestRun_AllWithCredentials_Success(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_FilterSpecificDevices_Success(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	// Add multiple devices with credentials
@@ -319,7 +343,7 @@ func TestRun_FilterSpecificDevices_Success(t *testing.T) {
 		},
 	}
 
-	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
+	outputPath := testAuthExportDir + "/exported-creds.json"
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{"kitchen", "bedroom"},
@@ -340,7 +364,7 @@ func TestRun_FilterSpecificDevices_Success(t *testing.T) {
 	}
 
 	// Verify file was created and contains only filtered devices
-	data, err := os.ReadFile(outputPath) //nolint:gosec // Test file with known path
+	data, err := afero.ReadFile(fs, outputPath)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
 	}
@@ -367,8 +391,15 @@ func TestRun_FilterSpecificDevices_Success(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_FilterNoMatchingDevices_Warning(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	// Add device with credentials
@@ -381,7 +412,7 @@ func TestRun_FilterNoMatchingDevices_Warning(t *testing.T) {
 		},
 	}
 
-	outputPath := filepath.Join(t.TempDir(), "exported-creds.json")
+	outputPath := testAuthExportDir + "/exported-creds.json"
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{"nonexistent"},
@@ -402,8 +433,11 @@ func TestRun_FilterNoMatchingDevices_Warning(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_CreateNestedDirectory_Success(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	tf.Config.Devices["test-device"] = model.Device{
@@ -416,7 +450,7 @@ func TestRun_CreateNestedDirectory_Success(t *testing.T) {
 	}
 
 	// Use a nested path that needs to be created
-	outputPath := filepath.Join(t.TempDir(), "nested", "dir", "creds.json")
+	outputPath := testAuthExportDir + "/nested/dir/creds.json"
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{},
@@ -430,13 +464,18 @@ func TestRun_CreateNestedDirectory_Success(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, err := os.Stat(outputPath); err != nil {
+	if _, err := fs.Stat(outputPath); err != nil {
 		t.Errorf("expected output file to exist: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WriteFileError(t *testing.T) {
-	t.Parallel()
+	// Use read-only filesystem to trigger write error
+	baseFs := afero.NewMemMapFs()
+	roFs := afero.NewReadOnlyFs(baseFs)
+	config.SetFs(roFs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 	tf.Config.Devices["test-device"] = model.Device{
@@ -448,32 +487,28 @@ func TestRun_WriteFileError(t *testing.T) {
 		},
 	}
 
-	// Use an invalid path (write to a directory that exists as a file)
-	tmpFile := filepath.Join(t.TempDir(), "file-not-dir")
-	if err := os.WriteFile(tmpFile, []byte("content"), 0o600); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
-
-	outputPath := filepath.Join(tmpFile, "creds.json")
 	opts := &Options{
 		Factory: tf.Factory,
 		Devices: []string{},
-		Output:  outputPath,
+		Output:  "/test/creds.json",
 	}
 	opts.All = true
 
 	err := run(t.Context(), opts)
 	if err == nil {
-		t.Fatal("expected error when writing to invalid path")
-	}
-	// Error could be "create directory" or "write file" depending on OS
-	if !strings.Contains(err.Error(), "create directory") && !strings.Contains(err.Error(), "write file") {
-		t.Errorf("unexpected error message: %v", err)
+		t.Fatal("expected error when writing to read-only filesystem")
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithAllFlag(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	tf.Config.Devices["test-device"] = model.Device{
@@ -485,7 +520,7 @@ func TestExecute_WithAllFlag(t *testing.T) {
 		},
 	}
 
-	outputPath := filepath.Join(t.TempDir(), "creds.json")
+	outputPath := testAuthExportDir + "/creds.json"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -500,13 +535,20 @@ func TestExecute_WithAllFlag(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, err := os.Stat(outputPath); err != nil {
+	if _, err := fs.Stat(outputPath); err != nil {
 		t.Errorf("expected output file to exist: %v", err)
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithSpecificDevices(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	tf.Config.Devices["kitchen"] = model.Device{
@@ -526,7 +568,7 @@ func TestExecute_WithSpecificDevices(t *testing.T) {
 		},
 	}
 
-	outputPath := filepath.Join(t.TempDir(), "creds.json")
+	outputPath := testAuthExportDir + "/creds.json"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -541,7 +583,7 @@ func TestExecute_WithSpecificDevices(t *testing.T) {
 	}
 
 	// Verify file was created with only kitchen
-	data, err := os.ReadFile(outputPath) //nolint:gosec // Test file with known path
+	data, err := afero.ReadFile(fs, outputPath)
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
 	}
@@ -562,13 +604,20 @@ func TestExecute_WithSpecificDevices(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_NoCredentialsWarning(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testAuthExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
 
 	tf := factory.NewTestFactory(t)
 	// No devices with credentials
 
-	outputPath := filepath.Join(t.TempDir(), "creds.json")
+	outputPath := testAuthExportDir + "/creds.json"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)

@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testMigrateDir = "/test/migrate"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -297,8 +299,8 @@ func TestNewCommand_Structure(t *testing.T) {
 	}
 }
 
-// createValidBackupFile creates a test backup file with valid structure.
-func createValidBackupFile(t *testing.T, dir, name string) string {
+// createValidBackupFile creates a test backup file with valid structure using afero.
+func createValidBackupFile(t *testing.T, fs afero.Fs, dir, name string) string {
 	t.Helper()
 
 	bkp := shellybackup.Backup{
@@ -320,20 +322,20 @@ func createValidBackupFile(t *testing.T, dir, name string) string {
 		t.Fatalf("failed to marshal backup: %v", err)
 	}
 
-	filePath := filepath.Join(dir, name)
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	filePath := dir + "/" + name
+	if err := afero.WriteFile(fs, filePath, data, 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
 	return filePath
 }
 
-// createInvalidBackupFile creates an invalid backup file for error testing.
-func createInvalidBackupFile(t *testing.T, dir, name, content string) string {
+// createInvalidBackupFile creates an invalid backup file for error testing using afero.
+func createInvalidBackupFile(t *testing.T, fs afero.Fs, dir, name, content string) string {
 	t.Helper()
 
-	filePath := filepath.Join(dir, name)
-	if err := os.WriteFile(filePath, []byte(content), 0o600); err != nil {
+	filePath := dir + "/" + name
+	if err := afero.WriteFile(fs, filePath, []byte(content), 0o600); err != nil {
 		t.Fatalf("failed to write backup file: %v", err)
 	}
 
@@ -359,14 +361,16 @@ func TestRun_SourceFileNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_InvalidBackupFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
 	tf := factory.NewTestFactory(t)
 
 	// Create invalid backup file
-	invalidFile := createInvalidBackupFile(t, tmpDir, "invalid.json", "{ not valid json }")
+	invalidFile := createInvalidBackupFile(t, fs, testMigrateDir, "invalid.json", "{ not valid json }")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -380,14 +384,16 @@ func TestRun_InvalidBackupFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_ValidBackupFileUnreachableTarget(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
 	tf := factory.NewTestFactory(t)
 
 	// Create valid backup file
-	validFile := createValidBackupFile(t, tmpDir, "valid.json")
+	validFile := createValidBackupFile(t, fs, testMigrateDir, "valid.json")
 
 	// Use unreachable target device address
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -601,17 +607,18 @@ func TestNewCommand_ForceFlagParsed(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Modifies global state via config.SetFs
 func TestRun_ValidFileSourceFormat(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 	f := cmdutil.NewWithIOStreams(ios)
 
 	// Create a valid backup file
-	validFile := createValidBackupFile(t, tmpDir, "test.json")
+	validFile := createValidBackupFile(t, fs, testMigrateDir, "test.json")
 
 	// Create context with short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)

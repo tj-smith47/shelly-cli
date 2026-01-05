@@ -3,24 +3,24 @@ package export
 import (
 	"bytes"
 	"context"
-	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
 const (
-	formatJSON = "json"
-	formatYAML = "yaml"
+	formatJSON    = "json"
+	formatYAML    = "yaml"
+	testExportDir = "/test/kvs/export"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -361,12 +361,18 @@ func TestNewCommand_WithTestIOStreams(t *testing.T) {
 }
 
 // TestRun_WriteToFile tests writing export data to a file.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WriteToFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	// Create a temporary directory for the output file
-	tempDir := t.TempDir()
-	outputFile := filepath.Join(tempDir, "export.json")
+	if err := fs.MkdirAll(testExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
+	outputFile := testExportDir + "/export.json"
 
 	// Create a mock shelly service that provides a mock connection
 	// For this test, we verify the file writing logic by testing the format validation
@@ -609,11 +615,18 @@ func TestNewCommand_ExecuteWithDeviceArg(t *testing.T) {
 }
 
 // TestNewCommand_ExecuteWithDeviceAndFileArgs tests command with device and file arguments.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestNewCommand_ExecuteWithDeviceAndFileArgs(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tempDir := t.TempDir()
-	outputFile := filepath.Join(tempDir, "test-export.json")
+	if err := fs.MkdirAll(testExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
+	outputFile := testExportDir + "/test-export.json"
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -742,14 +755,21 @@ func TestRun_OptionsFactoryAccess(t *testing.T) {
 
 // TestRun_FileOutputSuccess tests successful file output when device responds.
 // This is a more comprehensive integration-style test.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_FileOutputSuccess(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tempDir := t.TempDir()
-	outputFile := filepath.Join(tempDir, "kvs-export.json")
+	if err := fs.MkdirAll(testExportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
+	outputFile := testExportDir + "/kvs-export.json"
 
 	// Verify file doesn't exist yet
-	if _, err := os.Stat(outputFile); !errors.Is(err, os.ErrNotExist) {
+	if _, err := fs.Stat(outputFile); err == nil {
 		t.Fatalf("Output file should not exist before test")
 	}
 
@@ -768,7 +788,7 @@ func TestRun_FileOutputSuccess(t *testing.T) {
 	// We expect an error because there's no real device
 	if err == nil {
 		// If it somehow succeeded, verify the file was created
-		if _, statErr := os.Stat(outputFile); statErr != nil {
+		if _, statErr := fs.Stat(outputFile); statErr != nil {
 			t.Errorf("File should have been created on success")
 		}
 	}

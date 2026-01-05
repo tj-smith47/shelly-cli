@@ -3,17 +3,19 @@ package download
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testDownloadDir = "/test/scripts"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -242,7 +244,12 @@ func TestExecute_MissingArgs(t *testing.T) {
 	}
 }
 
-func TestRun_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses global mock state
+//nolint:paralleltest // Uses global mock state and config.SetFs
+func TestRun_WithMockDevice(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -280,9 +287,8 @@ func TestRun_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses global
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Create temp file for output
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "script.js")
+	// Create output file path
+	outputFile := testDownloadDir + "/script.js"
 
 	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
 	err = run(context.Background(), opts)
@@ -291,13 +297,12 @@ func TestRun_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses global
 	}
 
 	// Verify file was created
-	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+	if _, statErr := fs.Stat(outputFile); statErr != nil {
 		t.Error("expected output file to be created")
 	}
 
 	// Verify file content
-	//nolint:gosec // G304: outputFile is constructed from t.TempDir() which is safe
-	content, readErr := os.ReadFile(outputFile)
+	content, readErr := afero.ReadFile(fs, outputFile)
 	if readErr != nil {
 		t.Fatalf("failed to read output file: %v", readErr)
 	}
@@ -313,7 +318,12 @@ func TestRun_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses global
 	}
 }
 
-func TestRun_DeviceNotFound(t *testing.T) { //nolint:paralleltest // Uses global mock state
+//nolint:paralleltest // Uses global mock state and config.SetFs
+func TestRun_DeviceNotFound(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{Version: "1", Config: mock.ConfigFixture{}}
 
 	demo, err := mock.StartWithFixtures(fixtures)
@@ -325,8 +335,7 @@ func TestRun_DeviceNotFound(t *testing.T) { //nolint:paralleltest // Uses global
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "script.js")
+	outputFile := testDownloadDir + "/script.js"
 
 	opts := &Options{Factory: tf.Factory, Device: "nonexistent-device", ID: 1, File: outputFile}
 	err = run(context.Background(), opts)
@@ -335,7 +344,12 @@ func TestRun_DeviceNotFound(t *testing.T) { //nolint:paralleltest // Uses global
 	}
 }
 
-func TestRun_EmptyScriptCode(t *testing.T) { //nolint:paralleltest // Uses global mock state
+//nolint:paralleltest // Uses global mock state and config.SetFs
+func TestRun_EmptyScriptCode(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -373,8 +387,7 @@ func TestRun_EmptyScriptCode(t *testing.T) { //nolint:paralleltest // Uses globa
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "script.js")
+	outputFile := testDownloadDir + "/script.js"
 
 	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
 	err = run(context.Background(), opts)
@@ -389,7 +402,12 @@ func TestRun_EmptyScriptCode(t *testing.T) { //nolint:paralleltest // Uses globa
 	}
 }
 
-func TestRun_CreateDirectory(t *testing.T) { //nolint:paralleltest // Uses global mock state
+//nolint:paralleltest // Uses global mock state and config.SetFs
+func TestRun_CreateDirectory(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -425,9 +443,8 @@ func TestRun_CreateDirectory(t *testing.T) { //nolint:paralleltest // Uses globa
 	demo.InjectIntoFactory(tf.Factory)
 
 	// Create path with nested directory that doesn't exist
-	tmpDir := t.TempDir()
-	nestedDir := filepath.Join(tmpDir, "scripts", "nested")
-	outputFile := filepath.Join(nestedDir, "script.js")
+	nestedDir := testDownloadDir + "/scripts/nested"
+	outputFile := nestedDir + "/script.js"
 
 	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
 	err = run(context.Background(), opts)
@@ -436,17 +453,22 @@ func TestRun_CreateDirectory(t *testing.T) { //nolint:paralleltest // Uses globa
 	}
 
 	// Verify directory was created
-	if _, statErr := os.Stat(nestedDir); os.IsNotExist(statErr) {
+	if _, statErr := fs.Stat(nestedDir); statErr != nil {
 		t.Error("expected nested directory to be created")
 	}
 
 	// Verify file exists
-	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+	if _, statErr := fs.Stat(outputFile); statErr != nil {
 		t.Error("expected output file to be created")
 	}
 }
 
-func TestExecute_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses global mock state
+//nolint:paralleltest // Uses global mock state and config.SetFs
+func TestExecute_WithMockDevice(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -481,8 +503,7 @@ func TestExecute_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses gl
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "downloaded.js")
+	outputFile := testDownloadDir + "/downloaded.js"
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
@@ -495,12 +516,17 @@ func TestExecute_WithMockDevice(t *testing.T) { //nolint:paralleltest // Uses gl
 	}
 
 	// Verify file was created
-	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+	if _, statErr := fs.Stat(outputFile); statErr != nil {
 		t.Error("expected output file to be created")
 	}
 }
 
-func TestExecute_ScriptNotFound(t *testing.T) { //nolint:paralleltest // Uses global mock state
+//nolint:paralleltest // Uses global mock state and config.SetFs
+func TestExecute_ScriptNotFound(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -532,8 +558,7 @@ func TestExecute_ScriptNotFound(t *testing.T) { //nolint:paralleltest // Uses gl
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	tmpDir := t.TempDir()
-	outputFile := filepath.Join(tmpDir, "script.js")
+	outputFile := testDownloadDir + "/script.js"
 
 	cmd := NewCommand(tf.Factory)
 	cmd.SetOut(&bytes.Buffer{})
@@ -554,7 +579,12 @@ func TestExecute_ScriptNotFound(t *testing.T) { //nolint:paralleltest // Uses gl
 	}
 }
 
-func TestRun_CurrentDirectory(t *testing.T) { //nolint:paralleltest // Uses global mock state
+//nolint:paralleltest // Uses global mock state and config.SetFs
+func TestRun_CurrentDirectory(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -589,22 +619,8 @@ func TestRun_CurrentDirectory(t *testing.T) { //nolint:paralleltest // Uses glob
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	// Change to temp dir for test
-	tmpDir := t.TempDir()
-	origDir, getErr := os.Getwd()
-	if getErr != nil {
-		t.Fatalf("failed to get current dir: %v", getErr)
-	}
-	if chdirErr := os.Chdir(tmpDir); chdirErr != nil {
-		t.Fatalf("failed to change to temp dir: %v", chdirErr)
-	}
-	defer func() {
-		if chdirErr := os.Chdir(origDir); chdirErr != nil {
-			t.Logf("failed to restore dir: %v", chdirErr)
-		}
-	}()
-
-	// Use just filename (current directory)
+	// Use just filename (simulates current directory usage)
+	// With afero, we test the file is created at the specified path
 	outputFile := "local-script.js"
 
 	opts := &Options{Factory: tf.Factory, Device: "test-device", ID: 1, File: outputFile}
@@ -613,9 +629,8 @@ func TestRun_CurrentDirectory(t *testing.T) { //nolint:paralleltest // Uses glob
 		t.Fatalf("run() error = %v", err)
 	}
 
-	// Verify file was created in current directory
-	fullPath := filepath.Join(tmpDir, outputFile)
-	if _, statErr := os.Stat(fullPath); os.IsNotExist(statErr) {
-		t.Error("expected output file to be created in current directory")
+	// Verify file was created
+	if _, statErr := fs.Stat(outputFile); statErr != nil {
+		t.Error("expected output file to be created")
 	}
 }

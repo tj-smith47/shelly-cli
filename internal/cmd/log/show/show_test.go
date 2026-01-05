@@ -2,15 +2,19 @@ package show
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testConfigDir = "/test/config"
+const testShellyDir = "/test/config/shelly"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -133,24 +137,25 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	}
 }
 
-// setConfigHome sets the XDG_CONFIG_HOME environment variable for testing.
-// This test helper is NOT parallel safe.
-func setConfigHome(t *testing.T, tempDir string) {
+// setupLogTest sets up the test filesystem with XDG_CONFIG_HOME.
+// Uses config.SetFs for filesystem isolation.
+func setupLogTest(t *testing.T) afero.Fs {
 	t.Helper()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
+	return fs
 }
 
 // TestExecute_NoLogFile tests when the log file does not exist.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_NoLogFile(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	fs := setupLogTest(t)
 
 	// Create config dir but no log file
-	configDir := filepath.Join(tempDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testShellyDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
 
@@ -176,20 +181,17 @@ func TestExecute_NoLogFile(t *testing.T) {
 }
 
 // TestExecute_EmptyLogFile tests when the log file exists but is empty.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_EmptyLogFile(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	fs := setupLogTest(t)
 
 	// Create config dir and empty log file
-	configDir := filepath.Join(tempDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testShellyDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
-	logPath := filepath.Join(configDir, "shelly.log")
-	if err := os.WriteFile(logPath, []byte(""), 0o600); err != nil {
+	logPath := testShellyDir + "/shelly.log"
+	if err := afero.WriteFile(fs, logPath, []byte(""), 0o600); err != nil {
 		t.Fatalf("Failed to create log file: %v", err)
 	}
 
@@ -212,24 +214,21 @@ func TestExecute_EmptyLogFile(t *testing.T) {
 }
 
 // TestExecute_WithLogContent tests when the log file has content.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithLogContent(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	fs := setupLogTest(t)
 
 	// Create config dir and log file with content
-	configDir := filepath.Join(tempDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testShellyDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
-	logPath := filepath.Join(configDir, "shelly.log")
+	logPath := testShellyDir + "/shelly.log"
 	logContent := `2024-01-15 10:00:00 INFO Starting shelly CLI
 2024-01-15 10:00:01 DEBUG Connecting to device 192.168.1.100
 2024-01-15 10:00:02 INFO Device connected successfully
 `
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("Failed to create log file: %v", err)
 	}
 
@@ -255,19 +254,16 @@ func TestExecute_WithLogContent(t *testing.T) {
 }
 
 // TestExecute_WithLinesFlag tests the -n/--lines flag.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithLinesFlag(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	fs := setupLogTest(t)
 
 	// Create config dir and log file with many lines
-	configDir := filepath.Join(tempDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testShellyDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
-	logPath := filepath.Join(configDir, "shelly.log")
+	logPath := testShellyDir + "/shelly.log"
 
 	// Create log with 10 lines
 	var lines []string
@@ -275,7 +271,7 @@ func TestExecute_WithLinesFlag(t *testing.T) {
 		lines = append(lines, "Line "+strings.Repeat("x", i))
 	}
 	logContent := strings.Join(lines, "\n") + "\n"
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("Failed to create log file: %v", err)
 	}
 
@@ -308,23 +304,20 @@ func TestExecute_WithLinesFlag(t *testing.T) {
 }
 
 // TestExecute_AllLines tests when requested lines exceeds file length.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_AllLines(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	fs := setupLogTest(t)
 
 	// Create config dir and log file with few lines
-	configDir := filepath.Join(tempDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testShellyDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
-	logPath := filepath.Join(configDir, "shelly.log")
+	logPath := testShellyDir + "/shelly.log"
 
 	// Create log with only 3 lines
 	logContent := "Line 1\nLine 2\nLine 3\n"
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("Failed to create log file: %v", err)
 	}
 
@@ -353,22 +346,19 @@ func TestExecute_AllLines(t *testing.T) {
 }
 
 // TestExecute_LongLinesFlag tests using the long --lines flag.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_LongLinesFlag(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	fs := setupLogTest(t)
 
 	// Create config dir and log file
-	configDir := filepath.Join(tempDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testShellyDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
-	logPath := filepath.Join(configDir, "shelly.log")
+	logPath := testShellyDir + "/shelly.log"
 
 	logContent := "Line A\nLine B\nLine C\nLine D\nLine E\n"
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("Failed to create log file: %v", err)
 	}
 
@@ -396,12 +386,10 @@ func TestExecute_LongLinesFlag(t *testing.T) {
 }
 
 // TestExecute_InvalidArgs tests with unexpected arguments.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_InvalidArgs(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	_ = setupLogTest(t)
 
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
@@ -419,21 +407,18 @@ func TestExecute_InvalidArgs(t *testing.T) {
 }
 
 // TestExecute_Aliases tests command execution via aliases.
-// This test is NOT parallel because it modifies environment variables.
 //
-//nolint:paralleltest // Modifies environment variables
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_Aliases(t *testing.T) {
-	tempDir := t.TempDir()
-	setConfigHome(t, tempDir)
+	fs := setupLogTest(t)
 
 	// Create config dir and log file
-	configDir := filepath.Join(tempDir, "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testShellyDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
-	logPath := filepath.Join(configDir, "shelly.log")
+	logPath := testShellyDir + "/shelly.log"
 	logContent := "Test log line\n"
-	if err := os.WriteFile(logPath, []byte(logContent), 0o600); err != nil {
+	if err := afero.WriteFile(fs, logPath, []byte(logContent), 0o600); err != nil {
 		t.Fatalf("Failed to create log file: %v", err)
 	}
 

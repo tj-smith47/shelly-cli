@@ -2,13 +2,13 @@ package edit
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
@@ -162,14 +162,14 @@ func TestNewCommand_LongDescription(t *testing.T) {
 }
 
 func TestRun_ConfigNotFound(t *testing.T) {
-	// Cannot use t.Parallel() with t.Setenv()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	// Set HOME to a virtual path with no config
+	t.Setenv("HOME", "/test")
 
 	tf := factory.NewTestFactory(t)
 	opts := &Options{Factory: tf.Factory}
-
-	// Set HOME to a temp directory with no config
-	tempDir := t.TempDir()
-	t.Setenv("HOME", tempDir)
 
 	err := run(context.Background(), opts)
 	if err == nil {
@@ -184,30 +184,31 @@ func TestRun_ConfigNotFound(t *testing.T) {
 }
 
 func TestRun_NoEditorFound(t *testing.T) {
-	// Cannot use t.Parallel() with t.Setenv()
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tf := factory.NewTestFactory(t)
-	opts := &Options{Factory: tf.Factory}
+	// Set HOME to virtual path
+	t.Setenv("HOME", "/test")
 
-	// Create a temp directory with a config file
-	tempDir := t.TempDir()
-	configDir := filepath.Join(tempDir, ".config", "shelly")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
+	// Create config file in virtual filesystem
+	configDir := "/test/.config/shelly"
+	if err := config.Fs().MkdirAll(configDir, 0o750); err != nil {
 		t.Fatalf("Failed to create config dir: %v", err)
 	}
-	configPath := filepath.Join(configDir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("output: table\n"), 0o600); err != nil {
+	configPath := configDir + "/config.yaml"
+	if err := afero.WriteFile(config.Fs(), configPath, []byte("output: table\n"), 0o600); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	// Set HOME to our temp directory
-	t.Setenv("HOME", tempDir)
 	// Clear editor environment variables
 	t.Setenv("EDITOR", "")
 	t.Setenv("VISUAL", "")
 
 	// Modify PATH to ensure no editor can be found
-	t.Setenv("PATH", tempDir)
+	t.Setenv("PATH", "/nonexistent")
+
+	tf := factory.NewTestFactory(t)
+	opts := &Options{Factory: tf.Factory}
 
 	err := run(context.Background(), opts)
 	if err == nil {

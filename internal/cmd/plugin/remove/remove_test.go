@@ -3,14 +3,21 @@ package remove
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
+)
+
+const (
+	testConfigDir  = "/test/config"
+	testPluginsDir = "/test/config/shelly/plugins"
 )
 
 func TestNewCommand(t *testing.T) {
@@ -238,9 +245,10 @@ func TestExecute_MissingArgs(t *testing.T) {
 }
 
 func TestExecute_PluginNotFound(t *testing.T) {
-	// Set XDG_CONFIG_HOME to temp directory
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -263,21 +271,20 @@ func TestExecute_PluginNotFound(t *testing.T) {
 }
 
 func TestExecute_Success(t *testing.T) {
-	// Set XDG_CONFIG_HOME to temp directory
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	// Create a fake plugin in the plugins directory
-	pluginsDir := filepath.Join(configDir, "shelly", "plugins")
-	pluginDir := filepath.Join(pluginsDir, "shelly-testplugin")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := testPluginsDir + "/shelly-testplugin"
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
 
 	// Create a fake executable
-	pluginPath := filepath.Join(pluginDir, "shelly-testplugin")
-	//nolint:gosec // G306: test executable needs to be executable
-	if err := os.WriteFile(pluginPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
+	pluginPath := pluginDir + "/shelly-testplugin"
+	if err := afero.WriteFile(fs, pluginPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create plugin file: %v", err)
 	}
 
@@ -303,26 +310,25 @@ func TestExecute_Success(t *testing.T) {
 	}
 
 	// Verify plugin directory was removed
-	if _, err := os.Stat(pluginDir); !os.IsNotExist(err) {
+	if _, err := fs.Stat(pluginDir); !os.IsNotExist(err) {
 		t.Error("plugin directory should be removed")
 	}
 }
 
 func TestExecute_OldFormat(t *testing.T) {
-	// Set XDG_CONFIG_HOME to temp directory
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	// Create a fake plugin as a bare binary (old format)
-	pluginsDir := filepath.Join(configDir, "shelly", "plugins")
-	if err := os.MkdirAll(pluginsDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testPluginsDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugins dir: %v", err)
 	}
 
 	// Create a fake executable directly in plugins dir (old format)
-	pluginPath := filepath.Join(pluginsDir, "shelly-oldplugin")
-	//nolint:gosec // G306: test executable needs to be executable
-	if err := os.WriteFile(pluginPath, []byte("#!/bin/bash\necho old"), 0o750); err != nil {
+	pluginPath := testPluginsDir + "/shelly-oldplugin"
+	if err := afero.WriteFile(fs, pluginPath, []byte("#!/bin/bash\necho old"), 0o750); err != nil {
 		t.Fatalf("failed to create plugin file: %v", err)
 	}
 
@@ -342,27 +348,29 @@ func TestExecute_OldFormat(t *testing.T) {
 	}
 
 	// Verify plugin file was removed
-	if _, err := os.Stat(pluginPath); !os.IsNotExist(err) {
+	if _, err := fs.Stat(pluginPath); !os.IsNotExist(err) {
 		t.Error("plugin file should be removed")
 	}
 }
 
 func TestExecute_PluginNotInUserDir(t *testing.T) {
-	// Set XDG_CONFIG_HOME to temp directory
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	// Create the plugins directory (empty)
-	pluginsDir := filepath.Join(configDir, "shelly", "plugins")
-	if err := os.MkdirAll(pluginsDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testPluginsDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugins dir: %v", err)
 	}
 
 	// Create a fake plugin in a different directory and add it to PATH
-	otherDir := t.TempDir()
-	pluginPath := filepath.Join(otherDir, "shelly-pathplugin")
-	//nolint:gosec // G306: test executable needs to be executable
-	if err := os.WriteFile(pluginPath, []byte("#!/bin/bash\necho path"), 0o750); err != nil {
+	otherDir := "/test/path"
+	if err := fs.MkdirAll(otherDir, 0o750); err != nil {
+		t.Fatalf("failed to create path dir: %v", err)
+	}
+	pluginPath := otherDir + "/shelly-pathplugin"
+	if err := afero.WriteFile(fs, pluginPath, []byte("#!/bin/bash\necho path"), 0o750); err != nil {
 		t.Fatalf("failed to create plugin file: %v", err)
 	}
 
@@ -390,7 +398,7 @@ func TestExecute_PluginNotInUserDir(t *testing.T) {
 	}
 
 	// Verify plugin file still exists (wasn't removed)
-	if _, err := os.Stat(pluginPath); os.IsNotExist(err) {
+	if _, err := fs.Stat(pluginPath); os.IsNotExist(err) {
 		t.Error("plugin file should NOT be removed (it's not in user dir)")
 	}
 }
@@ -405,24 +413,23 @@ func TestNewCommand_ValidArgsFunction(t *testing.T) {
 }
 
 func TestRun_Success(t *testing.T) {
-	// Set XDG_CONFIG_HOME to temp directory
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	// Create and install a fake plugin using the registry
-	pluginsDir := filepath.Join(configDir, "shelly", "plugins")
-	if err := os.MkdirAll(pluginsDir, 0o750); err != nil {
+	if err := fs.MkdirAll(testPluginsDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugins dir: %v", err)
 	}
 
 	// Create plugin directory and file (new format)
-	pluginDir := filepath.Join(pluginsDir, "shelly-testrun")
-	if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+	pluginDir := testPluginsDir + "/shelly-testrun"
+	if err := fs.MkdirAll(pluginDir, 0o750); err != nil {
 		t.Fatalf("failed to create plugin dir: %v", err)
 	}
-	pluginPath := filepath.Join(pluginDir, "shelly-testrun")
-	//nolint:gosec // G306: test executable needs to be executable
-	if err := os.WriteFile(pluginPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
+	pluginPath := pluginDir + "/shelly-testrun"
+	if err := afero.WriteFile(fs, pluginPath, []byte("#!/bin/bash\necho test"), 0o750); err != nil {
 		t.Fatalf("failed to create plugin file: %v", err)
 	}
 
@@ -445,9 +452,10 @@ func TestRun_Success(t *testing.T) {
 }
 
 func TestRun_PluginNotFound(t *testing.T) {
-	// Set XDG_CONFIG_HOME to temp directory
-	configDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configDir)
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}

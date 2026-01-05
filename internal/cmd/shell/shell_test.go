@@ -6,11 +6,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testConfigDir = "/test/config"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -333,9 +338,10 @@ func TestNewCommand_LongDescription(t *testing.T) {
 
 // TestRun_Gen2Device tests that run works with a Gen2 device fixture.
 func TestRun_Gen2Device(t *testing.T) {
-	// Set up temp config dir to avoid creating shell_history in real config
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	// Use afero to avoid creating shell_history in real config
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -405,9 +411,10 @@ func TestRun_Gen2Device(t *testing.T) {
 
 // TestRun_Gen1DeviceRejection tests that run rejects Gen1 devices.
 func TestRun_Gen1DeviceRejection(t *testing.T) {
-	// Set up temp config dir to avoid creating shell_history in real config
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	// Use afero to avoid creating shell_history in real config
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -459,9 +466,10 @@ func TestRun_Gen1DeviceRejection(t *testing.T) {
 
 // TestRun_WithInvalidDevice tests error handling for non-existent devices.
 func TestRun_WithInvalidDevice(t *testing.T) {
-	// Set up temp config dir to avoid creating shell_history in real config
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	// Use afero to avoid creating shell_history in real config
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -498,9 +506,10 @@ func TestRun_WithInvalidDevice(t *testing.T) {
 func TestRun_ContextCancellation(t *testing.T) {
 	// Cannot use t.Parallel() with t.Setenv()
 
-	// Set up temp config dir to avoid creating shell_history in real config
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	// Use afero to avoid creating shell_history in real config
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	fixtures := &mock.Fixtures{
 		Version: "1",

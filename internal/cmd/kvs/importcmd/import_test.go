@@ -3,15 +3,18 @@ package importcmd
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testImportDir = "/test/kvs"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -237,8 +240,17 @@ func TestExecute_InvalidFile(t *testing.T) {
 }
 
 // TestExecute_DryRun tests the --dry-run flag functionality.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_DryRun(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -262,8 +274,7 @@ func TestExecute_DryRun(t *testing.T) {
 	defer demo.Cleanup()
 
 	// Create a temporary KVS import file
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-import.json")
+	importFile := testImportDir + "/kvs-import.json"
 	importData := `{
   "items": [
     {"key": "key1", "value": "value1"},
@@ -272,7 +283,7 @@ func TestExecute_DryRun(t *testing.T) {
   "version": 1,
   "rev": 0
 }`
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -299,8 +310,17 @@ func TestExecute_DryRun(t *testing.T) {
 }
 
 // TestExecute_EmptyFile tests handling of empty KVS import file.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_EmptyFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -324,14 +344,13 @@ func TestExecute_EmptyFile(t *testing.T) {
 	defer demo.Cleanup()
 
 	// Create a temporary KVS import file with empty items
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-empty.json")
+	importFile := testImportDir + "/kvs-empty.json"
 	importData := `{
   "items": [],
   "version": 1,
   "rev": 0
 }`
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -357,8 +376,17 @@ func TestExecute_EmptyFile(t *testing.T) {
 }
 
 // TestExecute_DeviceNotFound tests handling of nonexistent device.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_DeviceNotFound(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{},
@@ -371,10 +399,9 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 	defer demo.Cleanup()
 
 	// Create a temporary KVS import file
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-import.json")
+	importFile := testImportDir + "/kvs-import.json"
 	importData := `{"items": [{"key": "test", "value": "data"}], "version": 1, "rev": 0}`
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -397,8 +424,17 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 }
 
 // TestExecute_MalformedJSON tests handling of malformed JSON import file.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_MalformedJSON(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -422,9 +458,8 @@ func TestExecute_MalformedJSON(t *testing.T) {
 	defer demo.Cleanup()
 
 	// Create a temporary file with malformed JSON
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "malformed.json")
-	if err := os.WriteFile(importFile, []byte(`{invalid json`), 0o600); err != nil {
+	importFile := testImportDir + "/malformed.json"
+	if err := afero.WriteFile(fs, importFile, []byte(`{invalid json`), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -445,8 +480,17 @@ func TestExecute_MalformedJSON(t *testing.T) {
 }
 
 // TestExecute_WithOverwrite tests the --overwrite flag functionality.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithOverwrite(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -469,10 +513,9 @@ func TestExecute_WithOverwrite(t *testing.T) {
 	}
 	defer demo.Cleanup()
 
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-import.json")
+	importFile := testImportDir + "/kvs-import.json"
 	importData := `{"items": [{"key": "test", "value": "data"}], "version": 1, "rev": 0}`
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -493,8 +536,17 @@ func TestExecute_WithOverwrite(t *testing.T) {
 }
 
 // TestRun_WithOptions tests the run function with various options.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WithOptions(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -517,10 +569,9 @@ func TestRun_WithOptions(t *testing.T) {
 	}
 	defer demo.Cleanup()
 
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-import.json")
+	importFile := testImportDir + "/kvs-import.json"
 	importData := `{"items": [{"key": "key1", "value": "value1"}], "version": 1, "rev": 0}`
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -543,8 +594,17 @@ func TestRun_WithOptions(t *testing.T) {
 }
 
 // TestExecute_YAMLFile tests import with YAML format file.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_YAMLFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -567,8 +627,7 @@ func TestExecute_YAMLFile(t *testing.T) {
 	}
 	defer demo.Cleanup()
 
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-import.yaml")
+	importFile := testImportDir + "/kvs-import.yaml"
 	importData := `items:
   - key: key1
     value: value1
@@ -577,7 +636,7 @@ func TestExecute_YAMLFile(t *testing.T) {
 version: 1
 rev: 0
 `
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -598,8 +657,17 @@ rev: 0
 }
 
 // TestExecute_ConfirmationDenied tests behavior when user denies confirmation.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_ConfirmationDenied(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -622,10 +690,9 @@ func TestExecute_ConfirmationDenied(t *testing.T) {
 	}
 	defer demo.Cleanup()
 
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-import.json")
+	importFile := testImportDir + "/kvs-import.json"
 	importData := `{"items": [{"key": "key1", "value": "value1"}], "version": 1, "rev": 0}`
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -655,8 +722,17 @@ func TestExecute_ConfirmationDenied(t *testing.T) {
 }
 
 // TestExecute_ComplexValues tests import with various JSON value types.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_ComplexValues(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -679,8 +755,7 @@ func TestExecute_ComplexValues(t *testing.T) {
 	}
 	defer demo.Cleanup()
 
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs-complex.json")
+	importFile := testImportDir + "/kvs-complex.json"
 	importData := `{
   "items": [
     {"key": "string_key", "value": "string_value"},
@@ -692,7 +767,7 @@ func TestExecute_ComplexValues(t *testing.T) {
   "version": 1,
   "rev": 0
 }`
-	if err := os.WriteFile(importFile, []byte(importData), 0o600); err != nil {
+	if err := afero.WriteFile(fs, importFile, []byte(importData), 0o600); err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
 
@@ -814,13 +889,21 @@ func TestNewCommand_FullConfiguration(t *testing.T) {
 }
 
 // TestExecute_FlagParsing tests flag parsing with various combinations.
+//
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_FlagParsing(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+
+	if err := fs.MkdirAll(testImportDir, 0o755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+
 	tf := factory.NewTestFactory(t)
 
-	tempDir := t.TempDir()
-	importFile := filepath.Join(tempDir, "kvs.json")
-	if err := os.WriteFile(importFile, []byte(`{"items": [], "version": 1}`), 0o600); err != nil {
+	importFile := testImportDir + "/kvs.json"
+	if err := afero.WriteFile(fs, importFile, []byte(`{"items": [], "version": 1}`), 0o600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -852,7 +935,6 @@ func TestExecute_FlagParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			var buf bytes.Buffer
 			cmd := NewCommand(tf.Factory)
 			cmd.SetContext(context.Background())

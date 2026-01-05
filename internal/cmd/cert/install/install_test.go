@@ -3,17 +3,21 @@ package install
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
 
-const testStringType = "string"
+const (
+	testStringType = "string"
+	testCertDir    = "/test/certs"
+)
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -395,8 +399,12 @@ func TestOptions_Validate_AllFlags(t *testing.T) {
 }
 
 // Test Options.loadCertData function.
+
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOptions_LoadCertData_NonexistentCAFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	opts := &Options{
 		CAFile: "/nonexistent/path/to/ca.pem",
@@ -412,8 +420,11 @@ func TestOptions_LoadCertData_NonexistentCAFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOptions_LoadCertData_NonexistentClientCert(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	opts := &Options{
 		ClientCert: "/nonexistent/path/to/cert.pem",
@@ -430,14 +441,16 @@ func TestOptions_LoadCertData_NonexistentClientCert(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOptions_LoadCertData_ValidCAFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	// Create temp CA file
-	tmpDir := t.TempDir()
-	caFile := filepath.Join(tmpDir, "ca.pem")
+	caFile := testCertDir + "/ca.pem"
 	caContent := []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----")
-	if err := os.WriteFile(caFile, caContent, 0o600); err != nil {
+	if err := afero.WriteFile(fs, caFile, caContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp CA file: %v", err)
 	}
 
@@ -455,20 +468,22 @@ func TestOptions_LoadCertData_ValidCAFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOptions_LoadCertData_ValidClientCertAndKey(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	// Create temp cert and key files
-	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	keyFile := filepath.Join(tmpDir, "key.pem")
+	certFile := testCertDir + "/cert.pem"
+	keyFile := testCertDir + "/key.pem"
 	certContent := []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----")
 	keyContent := []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----")
 
-	if err := os.WriteFile(certFile, certContent, 0o600); err != nil {
+	if err := afero.WriteFile(fs, certFile, certContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp cert file: %v", err)
 	}
-	if err := os.WriteFile(keyFile, keyContent, 0o600); err != nil {
+	if err := afero.WriteFile(fs, keyFile, keyContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp key file: %v", err)
 	}
 
@@ -490,15 +505,17 @@ func TestOptions_LoadCertData_ValidClientCertAndKey(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOptions_LoadCertData_NonexistentClientKey(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	// Create temp cert file only
-	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
+	certFile := testCertDir + "/cert.pem"
 	certContent := []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----")
 
-	if err := os.WriteFile(certFile, certContent, 0o600); err != nil {
+	if err := afero.WriteFile(fs, certFile, certContent, 0o600); err != nil {
 		t.Fatalf("failed to create temp cert file: %v", err)
 	}
 
@@ -517,8 +534,11 @@ func TestOptions_LoadCertData_NonexistentClientKey(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestOptions_LoadCertData_NoFiles(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	opts := &Options{}
 	data, err := opts.loadCertData()
@@ -562,12 +582,14 @@ func TestExecute_ValidationError_NoFlags(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_ValidationError_ClientCertWithoutKey(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	if err := os.WriteFile(certFile, []byte("test cert"), 0o600); err != nil {
+	certFile := testCertDir + "/cert.pem"
+	if err := afero.WriteFile(fs, certFile, []byte("test cert"), 0o600); err != nil {
 		t.Fatalf("failed to create cert file: %v", err)
 	}
 
@@ -589,8 +611,11 @@ func TestExecute_ValidationError_ClientCertWithoutKey(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_LoadCertDataError_NonexistentCAFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
@@ -610,8 +635,11 @@ func TestExecute_LoadCertDataError_NonexistentCAFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_Gen1DeviceError(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -642,9 +670,8 @@ func TestExecute_Gen1DeviceError(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	// Create temp CA file
-	tmpDir := t.TempDir()
-	caFile := filepath.Join(tmpDir, "ca.pem")
-	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+	caFile := testCertDir + "/ca.pem"
+	if err := afero.WriteFile(fs, caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
 		t.Fatalf("failed to create CA file: %v", err)
 	}
 
@@ -664,8 +691,11 @@ func TestExecute_Gen1DeviceError(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_Gen2DeviceWithCA(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -696,9 +726,8 @@ func TestExecute_Gen2DeviceWithCA(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	// Create temp CA file
-	tmpDir := t.TempDir()
-	caFile := filepath.Join(tmpDir, "ca.pem")
-	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+	caFile := testCertDir + "/ca.pem"
+	if err := afero.WriteFile(fs, caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
 		t.Fatalf("failed to create CA file: %v", err)
 	}
 
@@ -720,8 +749,11 @@ func TestExecute_Gen2DeviceWithCA(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_Gen2DeviceWithClientCert(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -752,13 +784,12 @@ func TestExecute_Gen2DeviceWithClientCert(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	// Create temp cert and key files
-	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	keyFile := filepath.Join(tmpDir, "key.pem")
-	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----"), 0o600); err != nil {
+	certFile := testCertDir + "/cert.pem"
+	keyFile := testCertDir + "/key.pem"
+	if err := afero.WriteFile(fs, certFile, []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----"), 0o600); err != nil {
 		t.Fatalf("failed to create cert file: %v", err)
 	}
-	if err := os.WriteFile(keyFile, []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"), 0o600); err != nil {
+	if err := afero.WriteFile(fs, keyFile, []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"), 0o600); err != nil {
 		t.Fatalf("failed to create key file: %v", err)
 	}
 
@@ -780,8 +811,11 @@ func TestExecute_Gen2DeviceWithClientCert(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_Gen2DeviceWithBothCerts(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -812,17 +846,16 @@ func TestExecute_Gen2DeviceWithBothCerts(t *testing.T) {
 	demo.InjectIntoFactory(tf.Factory)
 
 	// Create temp files
-	tmpDir := t.TempDir()
-	caFile := filepath.Join(tmpDir, "ca.pem")
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	keyFile := filepath.Join(tmpDir, "key.pem")
-	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----"), 0o600); err != nil {
+	caFile := testCertDir + "/ca.pem"
+	certFile := testCertDir + "/cert.pem"
+	keyFile := testCertDir + "/key.pem"
+	if err := afero.WriteFile(fs, caFile, []byte("-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----"), 0o600); err != nil {
 		t.Fatalf("failed to create CA file: %v", err)
 	}
-	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----"), 0o600); err != nil {
+	if err := afero.WriteFile(fs, certFile, []byte("-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----"), 0o600); err != nil {
 		t.Fatalf("failed to create cert file: %v", err)
 	}
-	if err := os.WriteFile(keyFile, []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"), 0o600); err != nil {
+	if err := afero.WriteFile(fs, keyFile, []byte("-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"), 0o600); err != nil {
 		t.Fatalf("failed to create key file: %v", err)
 	}
 
@@ -875,15 +908,17 @@ func TestExecute_Help(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_DeviceNotFound(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	tf := factory.NewTestFactory(t)
 
 	// Create temp CA file
-	tmpDir := t.TempDir()
-	caFile := filepath.Join(tmpDir, "ca.pem")
-	if err := os.WriteFile(caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+	caFile := testCertDir + "/ca.pem"
+	if err := afero.WriteFile(fs, caFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
 		t.Fatalf("failed to create CA file: %v", err)
 	}
 
@@ -899,12 +934,14 @@ func TestExecute_DeviceNotFound(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_LoadCertDataError_NonexistentClientKey(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
-	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
+	certFile := testCertDir + "/cert.pem"
+	if err := afero.WriteFile(fs, certFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), 0o600); err != nil {
 		t.Fatalf("failed to create cert file: %v", err)
 	}
 

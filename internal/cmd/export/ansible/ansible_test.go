@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
+
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/mock"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/factory"
 )
+
+const testExportDir = "/test/export"
 
 func TestNewCommand(t *testing.T) {
 	t.Parallel()
@@ -280,8 +284,11 @@ func TestExecute_WithDevices_Stdout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithDevices_ToFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -311,8 +318,10 @@ func TestExecute_WithDevices_ToFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
-	outputFile := filepath.Join(dir, "inventory.yaml")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	outputFile := testExportDir + "/inventory.yaml"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -327,7 +336,7 @@ func TestExecute_WithDevices_ToFile(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+	if _, statErr := fs.Stat(outputFile); os.IsNotExist(statErr) {
 		t.Error("Expected output file to be created")
 	}
 
@@ -338,7 +347,7 @@ func TestExecute_WithDevices_ToFile(t *testing.T) {
 	}
 
 	// Verify file content
-	content, readErr := os.ReadFile(outputFile) //nolint:gosec // test file path from t.TempDir()
+	content, readErr := afero.ReadFile(fs, outputFile)
 	if readErr != nil {
 		t.Fatalf("Failed to read output file: %v", readErr)
 	}
@@ -347,8 +356,11 @@ func TestExecute_WithDevices_ToFile(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_WithYMLExtension(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -378,8 +390,10 @@ func TestExecute_WithYMLExtension(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
-	outputFile := filepath.Join(dir, "inventory.yml") // Use .yml extension
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	outputFile := testExportDir + "/inventory.yml" // Use .yml extension
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -394,7 +408,7 @@ func TestExecute_WithYMLExtension(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+	if _, statErr := fs.Stat(outputFile); os.IsNotExist(statErr) {
 		t.Error("Expected output file to be created")
 	}
 }
@@ -630,8 +644,11 @@ func TestRun_WithDevices_Stdout(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestRun_WithDevices_ToFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -661,8 +678,10 @@ func TestRun_WithDevices_ToFile(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
-	outputFile := filepath.Join(dir, "inventory.yaml")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	outputFile := testExportDir + "/inventory.yaml"
 
 	opts := &Options{
 		Devices:   []string{"test-device"},
@@ -677,7 +696,7 @@ func TestRun_WithDevices_ToFile(t *testing.T) {
 	}
 
 	// Verify file was created
-	if _, statErr := os.Stat(outputFile); os.IsNotExist(statErr) {
+	if _, statErr := fs.Stat(outputFile); os.IsNotExist(statErr) {
 		t.Error("Expected output file to be created")
 	}
 
@@ -874,8 +893,11 @@ func TestExecute_WithAtAll(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Test modifies global state via config.SetFs
 func TestExecute_DeviceWithFileArg(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
 
 	fixtures := &mock.Fixtures{
 		Version: "1",
@@ -905,8 +927,10 @@ func TestExecute_DeviceWithFileArg(t *testing.T) {
 	tf := factory.NewTestFactory(t)
 	demo.InjectIntoFactory(tf.Factory)
 
-	dir := t.TempDir()
-	outputFile := filepath.Join(dir, "hosts.yaml")
+	if err := fs.MkdirAll(testExportDir, 0o750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	outputFile := testExportDir + "/hosts.yaml"
 
 	var buf bytes.Buffer
 	cmd := NewCommand(tf.Factory)
@@ -922,7 +946,7 @@ func TestExecute_DeviceWithFileArg(t *testing.T) {
 	}
 
 	// Verify file was created with custom group name
-	content, readErr := os.ReadFile(outputFile) //nolint:gosec // test file path from t.TempDir()
+	content, readErr := afero.ReadFile(fs, outputFile)
 	if readErr != nil {
 		t.Fatalf("Failed to read output file: %v", readErr)
 	}
