@@ -234,17 +234,12 @@ func (m Model) SetPanelIndex(index int) Model {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	// Forward tick messages to loader when executing
 	if m.executing {
 		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		switch msg.(type) {
-		case CompleteMsg:
-			// Pass through to main switch below
-		default:
-			if cmd != nil {
-				return m, cmd
-			}
+		var consumed bool
+		m, cmd, consumed = m.updateLoading(msg)
+		if consumed {
+			return m, cmd
 		}
 	}
 
@@ -262,6 +257,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
+	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		_, ok := msg.(CompleteMsg)
+		return ok
+	})
+	m.loader = result.Loader
+	return m, result.Cmd, result.Consumed
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {

@@ -423,22 +423,26 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // Returns updated model and command if the message was consumed.
 func (m Model) updateLoaders(msg tea.Msg) (Model, tea.Cmd) {
 	if m.checking {
-		var cmd tea.Cmd
-		m.checkLoader, cmd = m.checkLoader.Update(msg)
-		if _, ok := msg.(CheckCompleteMsg); !ok && cmd != nil {
-			return m, cmd
+		result := generics.UpdateLoader(m.checkLoader, msg, func(msg tea.Msg) bool {
+			_, ok := msg.(CheckCompleteMsg)
+			return ok
+		})
+		m.checkLoader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 	if m.updating {
-		var cmd tea.Cmd
-		m.updateLoader, cmd = m.updateLoader.Update(msg)
-		switch msg.(type) {
-		case updateBatchComplete, UpdateCompleteMsg:
-			// Pass through
-		default:
-			if cmd != nil {
-				return m, cmd
+		result := generics.UpdateLoader(m.updateLoader, msg, func(msg tea.Msg) bool {
+			switch msg.(type) {
+			case updateBatchComplete, UpdateCompleteMsg:
+				return true
 			}
+			return false
+		})
+		m.updateLoader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 	// Update cache status spinner

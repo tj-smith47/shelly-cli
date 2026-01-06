@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -320,18 +321,14 @@ func (m Model) updateEditing(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	var cmd tea.Cmd
-	m.loader, cmd = m.loader.Update(msg)
-	// Continue processing messages even during loading
-	switch msg.(type) {
-	case StatusLoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
-		return m, nil, false // Continue processing
-	default:
-		if cmd != nil {
-			return m, cmd, true
+	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		if _, ok := msg.(StatusLoadedMsg); ok {
+			return true
 		}
-	}
-	return m, nil, false
+		return generics.IsPanelCacheMsg(msg)
+	})
+	m.loader = result.Loader
+	return m, result.Cmd, result.Consumed
 }
 
 func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {

@@ -141,13 +141,10 @@ func DefaultStyles() Styles {
 		Tab: lipgloss.NewStyle().
 			Foreground(colors.Muted).
 			Padding(0, 2),
-		TabActive: lipgloss.NewStyle().
+		TabActive: styles.TabUnderlineActive().
 			Foreground(colors.Highlight).
 			Bold(true).
-			Padding(0, 2).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderForeground(colors.Highlight),
+			Padding(0, 2),
 	}
 }
 

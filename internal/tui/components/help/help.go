@@ -194,13 +194,7 @@ func (m Model) ViewCompact() string {
 		content += b
 	}
 
-	return lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(colors.TableBorder).
-		BorderTop(true).
-		BorderBottom(false).
-		BorderLeft(false).
-		BorderRight(false).
+	return styles.SeparatorTop().
 		Padding(0, 1).
 		Width(m.width - 2).
 		Render(content)

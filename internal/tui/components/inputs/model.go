@@ -266,18 +266,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	var cmd tea.Cmd
-	m.loader, cmd = m.loader.Update(msg)
-	// Continue processing these messages even during loading
-	switch msg.(type) {
-	case LoadedMsg, panelcache.CacheHitMsg, panelcache.CacheMissMsg, panelcache.RefreshCompleteMsg:
-		return m, nil, false
-	default:
-		if cmd != nil {
-			return m, cmd, true
+	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		if _, ok := msg.(LoadedMsg); ok {
+			return true
 		}
-	}
-	return m, nil, false
+		return generics.IsPanelCacheMsg(msg)
+	})
+	m.loader = result.Loader
+	return m, result.Cmd, result.Consumed
 }
 
 func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {

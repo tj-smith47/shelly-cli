@@ -79,12 +79,9 @@ func DefaultStyles() Styles {
 		Container:   lipgloss.NewStyle().Padding(0),
 		ListPanel:   styles.PanelBorder().Padding(0, 1),
 		DetailPanel: styles.PanelBorder().Padding(1, 2),
-		ListHeader: lipgloss.NewStyle().
+		ListHeader: styles.SeparatorBottom().
 			Bold(true).
 			Foreground(colors.Highlight).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(colors.TableBorder).
-			BorderBottom(true).
 			MarginBottom(1),
 		DetailHeader: lipgloss.NewStyle().
 			Bold(true).

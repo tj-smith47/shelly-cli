@@ -95,3 +95,30 @@ func PrimaryBorder() lipgloss.Style {
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(colors.Primary)
 }
+
+// SeparatorBottom returns a style with only a bottom border for header separators.
+func SeparatorBottom() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(colors.TableBorder).
+		BorderBottom(true)
+}
+
+// SeparatorTop returns a style with only a top border for footer separators.
+func SeparatorTop() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(colors.TableBorder).
+		BorderTop(true)
+}
+
+// TabUnderlineActive returns a style with a bottom border for active tab underlines.
+func TabUnderlineActive() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(colors.Highlight).
+		BorderBottom(true)
+}

@@ -58,17 +58,11 @@ func DefaultStyles() Styles {
 		Title: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colors.Text),
-		TitleBar: lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderForeground(colors.TableBorder).
+		TitleBar: tuistyles.SeparatorBottom().
 			MarginBottom(1),
 		Content: lipgloss.NewStyle().
 			Padding(0, 1),
-		Footer: lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderTop(true).
-			BorderForeground(colors.TableBorder).
+		Footer: tuistyles.SeparatorTop().
 			MarginTop(1).
 			Padding(0, 1),
 		FooterHint: lipgloss.NewStyle().

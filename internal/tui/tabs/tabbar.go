@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // TabID identifies a tab.
@@ -106,10 +107,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Container: lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(colors.TableBorder).
-			BorderBottom(true).
+		Container: styles.SeparatorBottom().
 			Padding(0, 1),
 		Tab: lipgloss.NewStyle(),
 		Active: lipgloss.NewStyle().
