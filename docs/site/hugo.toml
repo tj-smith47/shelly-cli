@@ -95,10 +95,6 @@ summaryLength = 70
     [[params.versions.list]]
       version = "latest"
       url = "/docs/"
-    # Add versioned docs here as releases happen:
-    # [[params.versions.list]]
-    #   version = "v1.0"
-    #   url = "/docs/v1.0/"
 
   # Doks theme settings
   [params.doks]
@@ -125,7 +121,7 @@ summaryLength = 70
     alertDismissable = true
 
     # Bootstrap
-    bootstrapJavascript = false
+    bootstrapJavascript = true
 
     # Nav
     sectionNav = ["docs"]
@@ -138,7 +134,7 @@ summaryLength = 70
     multilingualMode = false
     showMissingLanguages = true
 
-    # Versioning - dynamically populated from versions.json
+    # Versioning
     docsVersioning = true
     docsVersion = "latest"
 

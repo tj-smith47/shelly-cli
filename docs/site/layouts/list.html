@@ -1,0 +1,21 @@
+{{ define "main" }}
+	<div class="row flex-xl-nowrap">
+		{{ if (in site.Params.doks.sectionNav .Section) -}}
+		<div class="col-lg-5 col-xl-4 docs-sidebar{{ if ne site.Params.doks.navbarSticky true }} docs-sidebar-top{{ end }}{{ if site.Params.doks.headerBar }} docs-sidebar-offset{{ end }} d-none d-lg-block">
+			{{ partial "sidebar/section-menu.html" . }}
+		</div>
+		{{ end -}}
+		<main class="docs-content col-lg-11 col-xl-9 mx-xl-auto">
+			{{ if site.Params.doks.breadcrumbTrail -}}
+				<nav aria-label="breadcrumb">
+					<ol class="breadcrumb">
+						{{ partial "main/breadcrumb" . -}}
+						<li class="breadcrumb-item active" aria-current="page">{{ .Title }}</li>
+					</ol>
+				</nav>
+			{{ end }}
+			<h1>{{ if eq .CurrentSection .FirstSection }}{{ .Section | humanize }}{{ else }}{{ .Title }}{{ end }}</h1>
+			{{ with .Content }}<div>{{ . }}</div>{{ end }}
+		</main>
+	</div>
+{{ end }}

@@ -358,37 +358,18 @@ code:not(.highlight code) {
   }
 }
 
-// Remove bold from summary elements (commands with subcommands)
-// Browser default makes summary bold; dropdown arrow is sufficient indicator
-.docs-links summary,
-.section-nav summary {
-  font-weight: normal;
+// Make ALL sidebar items identical: same font-weight, color, and size
+// Summary = commands with subcommands, a = commands without subcommands
+.section-nav summary,
+.section-nav a {
+  font-weight: normal !important;
+  font-size: 1rem !important;
+  color: var(--body-color) !important;
 }
 
-// -----------------------------------------------------------------------------
-// CARD LIST - Grid Layout for Child Pages
-// -----------------------------------------------------------------------------
-// Style the auto-generated card list (command index pages) as a 3-column grid
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-
-  @media (max-width: 991px) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  @media (max-width: 575px) {
-    grid-template-columns: 1fr;
-  }
-
-  .card {
-    margin: 0 !important;  // Override my-3
-
-    .card-body {
-      padding: 0.75rem 1rem;
-    }
-  }
+.section-nav summary:hover,
+.section-nav a:hover {
+  color: var(--shelly-blue) !important;
 }
 
 // -----------------------------------------------------------------------------
