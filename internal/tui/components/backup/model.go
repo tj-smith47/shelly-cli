@@ -22,6 +22,7 @@ import (
 	shellybackup "github.com/tj-smith47/shelly-cli/internal/shelly/backup"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -76,6 +77,16 @@ type DeviceBackup struct {
 	FilePath  string
 	Err       error
 }
+
+// IsSelected implements generics.Selectable.
+func (d *DeviceBackup) IsSelected() bool { return d.Selected }
+
+// SetSelected implements generics.Selectable.
+func (d *DeviceBackup) SetSelected(v bool) { d.Selected = v }
+
+// Selection helpers for value slices.
+func deviceBackupGet(d *DeviceBackup) bool    { return d.Selected }
+func deviceBackupSet(d *DeviceBackup, v bool) { d.Selected = v }
 
 // File represents a backup file available for import.
 type File struct {
@@ -611,39 +622,28 @@ func (m Model) handleNavKey(key string) bool {
 }
 
 func (m Model) toggleSelection() Model {
-	cursor := m.scroller.Cursor()
-	if m.mode == ModeExport && len(m.devices) > 0 && cursor < len(m.devices) {
-		m.devices[cursor].Selected = !m.devices[cursor].Selected
+	if m.mode == ModeExport {
+		generics.ToggleAtFunc(m.devices, m.scroller.Cursor(), deviceBackupGet, deviceBackupSet)
 	}
 	return m
 }
 
 func (m Model) selectAll() Model {
 	if m.mode == ModeExport {
-		for i := range m.devices {
-			m.devices[i].Selected = true
-		}
+		generics.SelectAllFunc(m.devices, deviceBackupSet)
 	}
 	return m
 }
 
 func (m Model) selectNone() Model {
 	if m.mode == ModeExport {
-		for i := range m.devices {
-			m.devices[i].Selected = false
-		}
+		generics.SelectNoneFunc(m.devices, deviceBackupSet)
 	}
 	return m
 }
 
 func (m Model) selectedDevices() []DeviceBackup {
-	selected := make([]DeviceBackup, 0)
-	for _, d := range m.devices {
-		if d.Selected {
-			selected = append(selected, d)
-		}
-	}
-	return selected
+	return generics.Filter(m.devices, func(d DeviceBackup) bool { return d.Selected })
 }
 
 // View renders the Backup component.
@@ -903,13 +903,7 @@ func (m Model) Cursor() int {
 
 // SelectedCount returns the number of selected devices.
 func (m Model) SelectedCount() int {
-	count := 0
-	for _, d := range m.devices {
-		if d.Selected {
-			count++
-		}
-	}
-	return count
+	return generics.CountSelectedFunc(m.devices, deviceBackupGet)
 }
 
 // BackupDir returns the backup directory path.

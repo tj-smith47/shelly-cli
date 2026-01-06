@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -76,6 +77,16 @@ type DeviceSelection struct {
 	Address  string
 	Selected bool
 }
+
+// IsSelected implements generics.Selectable.
+func (d *DeviceSelection) IsSelected() bool { return d.Selected }
+
+// SetSelected implements generics.Selectable.
+func (d *DeviceSelection) SetSelected(v bool) { d.Selected = v }
+
+// Selection helpers for value slices.
+func deviceSelectionGet(d *DeviceSelection) bool    { return d.Selected }
+func deviceSelectionSet(d *DeviceSelection, v bool) { d.Selected = v }
 
 // OperationResult represents the result of an operation on a single device.
 type OperationResult struct {
@@ -293,35 +304,22 @@ func (m Model) handleNavKey(key string) bool {
 }
 
 func (m Model) toggleSelection() Model {
-	cursor := m.scroller.Cursor()
-	if len(m.devices) > 0 && cursor < len(m.devices) {
-		m.devices[cursor].Selected = !m.devices[cursor].Selected
-	}
+	generics.ToggleAtFunc(m.devices, m.scroller.Cursor(), deviceSelectionGet, deviceSelectionSet)
 	return m
 }
 
 func (m Model) selectAll() Model {
-	for i := range m.devices {
-		m.devices[i].Selected = true
-	}
+	generics.SelectAllFunc(m.devices, deviceSelectionSet)
 	return m
 }
 
 func (m Model) selectNone() Model {
-	for i := range m.devices {
-		m.devices[i].Selected = false
-	}
+	generics.SelectNoneFunc(m.devices, deviceSelectionSet)
 	return m
 }
 
 func (m Model) selectedDevices() []DeviceSelection {
-	selected := make([]DeviceSelection, 0)
-	for _, d := range m.devices {
-		if d.Selected {
-			selected = append(selected, d)
-		}
-	}
-	return selected
+	return generics.Filter(m.devices, func(d DeviceSelection) bool { return d.Selected })
 }
 
 func (m Model) execute() (Model, tea.Cmd) {
@@ -587,13 +585,7 @@ func (m Model) Cursor() int {
 
 // SelectedCount returns the number of selected devices.
 func (m Model) SelectedCount() int {
-	count := 0
-	for _, d := range m.devices {
-		if d.Selected {
-			count++
-		}
-	}
-	return count
+	return generics.CountSelectedFunc(m.devices, deviceSelectionGet)
 }
 
 // Refresh reloads devices and clears state.

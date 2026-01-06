@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -56,6 +57,17 @@ type DeviceFirmware struct {
 	Checked   bool
 	Err       error
 }
+
+// IsSelected implements generics.Selectable.
+func (d *DeviceFirmware) IsSelected() bool { return d.Selected }
+
+// SetSelected implements generics.Selectable.
+func (d *DeviceFirmware) SetSelected(v bool) { d.Selected = v }
+
+// Selection helpers for value slices.
+func deviceFirmwareGet(d *DeviceFirmware) bool       { return d.Selected }
+func deviceFirmwareSet(d *DeviceFirmware, v bool)    { d.Selected = v }
+func deviceFirmwareHasUpdate(d *DeviceFirmware) bool { return d.HasUpdate }
 
 // CheckCompleteMsg signals that firmware check completed.
 type CheckCompleteMsg struct {
@@ -523,37 +535,22 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) toggleSelection() Model {
-	cursor := m.scroller.Cursor()
-	if len(m.devices) > 0 && cursor < len(m.devices) {
-		m.devices[cursor].Selected = !m.devices[cursor].Selected
-	}
+	generics.ToggleAtFunc(m.devices, m.scroller.Cursor(), deviceFirmwareGet, deviceFirmwareSet)
 	return m
 }
 
 func (m Model) selectAllWithUpdates() Model {
-	for i := range m.devices {
-		if m.devices[i].HasUpdate {
-			m.devices[i].Selected = true
-		}
-	}
+	generics.SelectWhereFunc(m.devices, deviceFirmwareHasUpdate, deviceFirmwareSet)
 	return m
 }
 
 func (m Model) selectNone() Model {
-	for i := range m.devices {
-		m.devices[i].Selected = false
-	}
+	generics.SelectNoneFunc(m.devices, deviceFirmwareSet)
 	return m
 }
 
 func (m Model) selectedDevices() []DeviceFirmware {
-	selected := make([]DeviceFirmware, 0)
-	for _, d := range m.devices {
-		if d.Selected {
-			selected = append(selected, d)
-		}
-	}
-	return selected
+	return generics.Filter(m.devices, func(d DeviceFirmware) bool { return d.Selected })
 }
 
 // View renders the Firmware component.
@@ -748,24 +745,12 @@ func (m Model) Cursor() int {
 
 // SelectedCount returns the number of selected devices.
 func (m Model) SelectedCount() int {
-	count := 0
-	for _, d := range m.devices {
-		if d.Selected {
-			count++
-		}
-	}
-	return count
+	return generics.CountSelectedFunc(m.devices, deviceFirmwareGet)
 }
 
 // UpdateCount returns the number of devices with updates.
 func (m Model) UpdateCount() int {
-	count := 0
-	for _, d := range m.devices {
-		if d.HasUpdate {
-			count++
-		}
-	}
-	return count
+	return generics.CountWhereFunc(m.devices, deviceFirmwareHasUpdate)
 }
 
 // Refresh reloads devices and clears state.
