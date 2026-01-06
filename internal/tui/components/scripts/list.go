@@ -374,16 +374,20 @@ func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Lis
 	if msg.Device != m.device || msg.DataType != cache.TypeScripts {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("scripts background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit LoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return LoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedScriptsData); ok {
 		m.scripts = data.Scripts
 		m.scroller.SetItemCount(len(m.scripts))
 	}
-	return m, nil
+	// Emit LoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return LoadedMsg{Scripts: m.scripts} }
 }
 
 func (m ListModel) handleLoaded(msg LoadedMsg) (ListModel, tea.Cmd) {

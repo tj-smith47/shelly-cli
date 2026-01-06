@@ -355,17 +355,21 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	if msg.Device != m.device || msg.DataType != cache.TypeMatter {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("smarthome background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit StatusLoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return StatusLoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedSmartHomeData); ok {
 		m.matter = data.Matter
 		m.zigbee = data.Zigbee
 		m.lora = data.LoRa
 	}
-	return m, nil
+	// Emit StatusLoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return StatusLoadedMsg{Matter: m.matter, Zigbee: m.zigbee, LoRa: m.lora} }
 }
 
 func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {

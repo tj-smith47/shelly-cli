@@ -387,16 +387,20 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	if msg.Device != m.device || msg.DataType != cache.TypeWebhooks {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("webhooks background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit LoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return LoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedWebhooksData); ok {
 		m.webhooks = data.Webhooks
 		m.scroller.SetItemCount(len(m.webhooks))
 	}
-	return m, nil
+	// Emit LoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return LoadedMsg{Webhooks: m.webhooks} }
 }
 
 func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {

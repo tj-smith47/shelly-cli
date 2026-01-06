@@ -330,16 +330,20 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	if msg.Device != m.device || msg.DataType != cache.TypeInputs {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("inputs background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit LoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return LoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedInputsData); ok {
 		m.inputs = data.Inputs
 		m.scroller.SetItemCount(len(m.inputs))
 	}
-	return m, nil
+	// Emit LoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return LoadedMsg{Inputs: m.inputs} }
 }
 
 func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {

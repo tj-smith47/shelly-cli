@@ -399,17 +399,21 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	if msg.Device != m.device || msg.DataType != cache.TypeCloud {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("cloud background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit StatusLoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return StatusLoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedCloudData); ok {
 		m.connected = data.Connected
 		m.enabled = data.Enabled
 		m.server = data.Server
 	}
-	return m, nil
+	// Emit StatusLoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return StatusLoadedMsg{Enabled: m.enabled, Server: m.server} }
 }
 
 func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {

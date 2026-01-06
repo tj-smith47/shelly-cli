@@ -375,16 +375,20 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	if msg.Device != m.device || msg.DataType != cache.TypeBLE {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("ble background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit StatusLoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return StatusLoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedBLEData); ok {
 		m.ble = data.BLE
 		m.discovery = data.Discovery
 	}
-	return m, nil
+	// Emit StatusLoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return StatusLoadedMsg{BLE: m.ble, Discovery: m.discovery} }
 }
 
 func (m Model) handleStatusLoaded(msg StatusLoadedMsg) (Model, tea.Cmd) {

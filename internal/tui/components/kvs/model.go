@@ -391,16 +391,20 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	if msg.Device != m.device || msg.DataType != cache.TypeKVS {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("kvs background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit LoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return LoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedKVSData); ok {
 		m.items = data.Items
 		m.scroller.SetItemCount(len(m.items))
 	}
-	return m, nil
+	// Emit LoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return LoadedMsg{Items: m.items} }
 }
 
 func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {

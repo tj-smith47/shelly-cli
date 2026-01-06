@@ -367,16 +367,20 @@ func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Lis
 	if msg.Device != m.device || msg.DataType != cache.TypeSchedules {
 		return m, nil
 	}
+	m.loading = false
 	m.cacheStatus = m.cacheStatus.StopRefresh()
 	if msg.Err != nil {
 		iostreams.DebugErr("schedules background refresh", msg.Err)
-		return m, nil
+		m.err = msg.Err
+		// Emit LoadedMsg with error so sequential loading can advance
+		return m, func() tea.Msg { return LoadedMsg{Err: msg.Err} }
 	}
 	if data, ok := msg.Data.(CachedSchedulesData); ok {
 		m.schedules = data.Schedules
 		m.scroller.SetItemCount(len(m.schedules))
 	}
-	return m, nil
+	// Emit LoadedMsg so sequential loading can advance
+	return m, func() tea.Msg { return LoadedMsg{Schedules: m.schedules} }
 }
 
 func (m ListModel) handleLoaded(msg LoadedMsg) (ListModel, tea.Cmd) {
