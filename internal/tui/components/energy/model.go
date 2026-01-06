@@ -17,8 +17,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -71,18 +71,15 @@ type RefreshTickMsg struct{}
 
 // Model holds the energy dashboard state.
 type Model struct {
+	helpers.Sizable
 	ctx             context.Context
 	svc             *shelly.Service
 	ios             *iostreams.IOStreams
 	devices         []DeviceEnergy
-	scroller        *panel.Scroller
 	loading         bool
 	err             error
-	width           int
-	height          int
 	styles          Styles
 	refreshInterval time.Duration
-	loader          loading.Model
 }
 
 // Styles for the energy component.
@@ -179,27 +176,24 @@ func New(deps Deps) Model {
 		refreshInterval = 5 * time.Second
 	}
 
-	return Model{
+	m := Model{
+		Sizable:         helpers.NewSizable(10, panel.NewScroller(0, 10)),
 		ctx:             deps.Ctx,
 		svc:             deps.Svc,
 		ios:             deps.IOS,
 		devices:         []DeviceEnergy{},
-		scroller:        panel.NewScroller(0, 10),
 		loading:         true,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
-		loader: loading.New(
-			loading.WithMessage("Fetching energy data..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Fetching energy data...")
+	return m
 }
 
 // Init returns the initial command for energy.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		m.fetchEnergy(),
 		m.scheduleRefresh(),
 	)
@@ -346,11 +340,11 @@ func (m Model) Refresh() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			_, ok := msg.(UpdateMsg)
 			return ok
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -364,7 +358,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.devices = msg.Devices
-		m.scroller.SetItemCount(len(m.devices))
+		m.Scroller.SetItemCount(len(m.devices))
 		return m, nil
 
 	case RefreshTickMsg:
@@ -381,13 +375,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
-	keys.HandleScrollNavigation(msg.String(), m.scroller)
+	keys.HandleScrollNavigation(msg.String(), m.Scroller)
 	return m
 }
 
 // visibleDevices calculates how many device rows can be displayed.
 func (m Model) visibleDevices() int {
-	availableHeight := m.height - 10 // Account for header, summary, footer
+	availableHeight := m.Height - 10 // Account for header, summary, footer
 	if availableHeight < 1 {
 		return 3
 	}
@@ -396,9 +390,10 @@ func (m Model) visibleDevices() int {
 
 // SetSize sets the component size.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.scroller.SetVisibleRows(m.visibleDevices())
+	m.Width = width
+	m.Height = height
+	m.Loader = m.Loader.SetSize(width-helpers.LoaderBorderOffset, height-helpers.LoaderBorderOffset)
+	m.Scroller.SetVisibleRows(m.visibleDevices())
 	return m
 }
 
@@ -406,21 +401,21 @@ func (m Model) SetSize(width, height int) Model {
 func (m Model) View() string {
 	if m.loading {
 		return m.styles.Container.
-			Width(m.width - 4).
-			Height(m.height).
-			Render(m.loader.SetSize(m.width-4, m.height).View())
+			Width(m.Width - 4).
+			Height(m.Height).
+			Render(m.Loader.SetSize(m.Width-4, m.Height).View())
 	}
 
 	if m.err != nil {
 		return m.styles.Container.
-			Width(m.width - 4).
+			Width(m.Width - 4).
 			Render(theme.StatusError().Render("Error: " + m.err.Error()))
 	}
 
 	if len(m.devices) == 0 {
 		return m.styles.Container.
-			Width(m.width-4).
-			Height(m.height).
+			Width(m.Width-4).
+			Height(m.Height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("No devices with energy monitoring.\nAdd devices with power metering to see energy data.")
 	}
@@ -449,12 +444,12 @@ func (m Model) View() string {
 	)
 
 	// Device rows with scrolling
-	startIdx, endIdx := m.scroller.VisibleRange()
+	startIdx, endIdx := m.Scroller.VisibleRange()
 
 	var deviceRows string
 	for i := startIdx; i < endIdx; i++ {
 		d := m.devices[i]
-		isSelected := m.scroller.IsCursorAt(i)
+		isSelected := m.Scroller.IsCursorAt(i)
 		deviceRows += m.renderDeviceRow(d, isSelected)
 		if i < endIdx-1 {
 			deviceRows += m.styles.Separator.Render("─────────────────────────────────────────────────") + "\n"
@@ -467,11 +462,11 @@ func (m Model) View() string {
 
 	// Footer with scroll info
 	footer := m.styles.Footer.Render(
-		fmt.Sprintf("Last updated: %s  j/k: scroll %s", time.Now().Format("15:04:05"), m.scroller.ScrollInfo()),
+		fmt.Sprintf("Last updated: %s  j/k: scroll %s", time.Now().Format("15:04:05"), m.Scroller.ScrollInfo()),
 	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, header, summary, "", deviceRows, footer)
-	return m.styles.Container.Width(m.width - 4).Render(content)
+	return m.styles.Container.Width(m.Width - 4).Render(content)
 }
 
 func (m Model) renderSummaryCard(label, value string) string {
@@ -608,7 +603,7 @@ func (m Model) DeviceCount() int {
 
 // SelectedDevice returns the currently selected device, if any.
 func (m Model) SelectedDevice() *DeviceEnergy {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.devices) == 0 || cursor < 0 || cursor >= len(m.devices) {
 		return nil
 	}
@@ -617,7 +612,7 @@ func (m Model) SelectedDevice() *DeviceEnergy {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // FooterText returns keybinding hints for the footer.

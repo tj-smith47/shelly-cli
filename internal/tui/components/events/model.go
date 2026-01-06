@@ -20,6 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -109,15 +110,13 @@ type RefreshTickMsg struct{}
 
 // Model holds the events state.
 type Model struct {
+	helpers.Sizable
 	ctx         context.Context
 	svc         *shelly.Service
 	ios         *iostreams.IOStreams
 	eventStream *automation.EventStream
 	state       *sharedState
-	scroller    *panel.Scroller
 	maxItems    int
-	width       int
-	height      int
 	styles      Styles
 	paused      bool
 	autoScroll  bool // Auto-scroll to top when new events arrive (newest at top)
@@ -224,13 +223,13 @@ func New(deps Deps) Model {
 	sysPag.InactiveDot = lipgloss.NewStyle().Foreground(theme.Red()).Render("○")
 
 	return Model{
+		Sizable:         helpers.NewSizable(1, panel.NewScroller(0, 10)), // overhead: 1 row for header
 		ctx:             deps.Ctx,
 		svc:             deps.Svc,
 		ios:             deps.IOS,
 		eventStream:     deps.EventStream,
-		scroller:        panel.NewScroller(0, 10), // Will be updated by SetSize
-		maxItems:        50,                       // Per list - each category capped at 50
-		autoScroll:      true,                     // Start with auto-scroll enabled (cursor stays at top/newest)
+		maxItems:        50,       // Per list - each category capped at 50
+		autoScroll:      true,     // Start with auto-scroll enabled (cursor stays at top/newest)
 		focused:         false,
 		focusedColumn:   ColumnUser, // Start with user column focused
 		userCursor:      0,
@@ -405,10 +404,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case RefreshTickMsg:
 		// Update scroller with current event count
-		m.scroller.SetItemCount(m.eventCount())
+		m.Scroller.SetItemCount(m.eventCount())
 		// Auto-scroll to top if enabled (newest events appear at top)
 		if m.autoScroll {
-			m.scroller.CursorToStart()
+			m.Scroller.CursorToStart()
 		}
 		// Reschedule next refresh - the tick itself triggers a re-render
 		// which will pick up any events added by background goroutines
@@ -589,8 +588,8 @@ func (m Model) eventCount() int {
 
 // SetSize sets the component size.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
 
 	// For dual columns: 4 reserved lines (title + column headers + separator + pagination dots)
 	// Calculate events per page
@@ -608,7 +607,7 @@ func (m Model) SetSize(width, height int) Model {
 	if visibleRows < 1 {
 		visibleRows = 1
 	}
-	m.scroller.SetVisibleRows(visibleRows)
+	m.Scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -625,15 +624,15 @@ func (m Model) View() string {
 
 	if len(userEvents) == 0 && len(systemEvents) == 0 {
 		return lipgloss.NewStyle().
-			Width(m.width).
-			Height(m.height).
+			Width(m.Width).
+			Height(m.Height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Foreground(m.styles.Footer.GetForeground()).
 			Render("Waiting for events...")
 	}
 
 	// Use dual column layout when width permits
-	if m.width >= dualColumnMinWidth {
+	if m.Width >= dualColumnMinWidth {
 		return m.renderDualColumnsDirect(userEvents, systemEvents)
 	}
 
@@ -645,7 +644,7 @@ func (m Model) View() string {
 // renderSingleColumn renders events in a single column (original layout).
 func (m Model) renderSingleColumn(eventList []Event) string {
 	// Get visible range from scroller
-	startIdx, endIdx := m.scroller.VisibleRange()
+	startIdx, endIdx := m.Scroller.VisibleRange()
 	if endIdx > len(eventList) {
 		endIdx = len(eventList)
 	}
@@ -679,7 +678,7 @@ func (m Model) renderSingleColumn(eventList []Event) string {
 	var rows string
 	for i, e := range eventsToShow {
 		actualIdx := startIdx + i
-		isSelected := m.scroller.IsCursorAt(actualIdx)
+		isSelected := m.Scroller.IsCursorAt(actualIdx)
 		rows += m.renderEventRow(e, isSelected, colTime, colDevice, colComp, colLevel)
 	}
 
@@ -706,7 +705,7 @@ func (m Model) renderEventRow(e Event, isSelected bool, colTime, colDevice, colC
 
 	// Description gets all remaining width
 	fixedWidth := colTime + colDevice + colComp + colLevel
-	descWidth := m.width - fixedWidth - 2 // 2 for minimal padding
+	descWidth := m.Width - fixedWidth - 2 // 2 for minimal padding
 	if descWidth < 20 {
 		descWidth = 20
 	}
@@ -1047,7 +1046,7 @@ type dualColumnRenderState struct {
 // Takes pre-split user and system event lists.
 func (m Model) renderDualColumnsDirect(userEvents, systemEvents []Event) string {
 	colors := theme.GetSemanticColors()
-	layout := computeColumnLayout(m.width, userEvents, systemEvents)
+	layout := computeColumnLayout(m.Width, userEvents, systemEvents)
 
 	m.userPaginator.SetTotalPages(len(userEvents))
 	m.systemPaginator.SetTotalPages(len(systemEvents))

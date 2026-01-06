@@ -21,7 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -81,6 +81,7 @@ type DeviceEventMsg struct {
 
 // Model holds the monitor state.
 type Model struct {
+	helpers.Sizable
 	ctx             context.Context
 	svc             *shelly.Service
 	ios             *iostreams.IOStreams
@@ -93,12 +94,8 @@ type Model struct {
 	ownsEventStream bool                     // True if we created the event stream (so we should stop it)
 	eventChan       chan events.Event        // Channel for WebSocket events
 	err             error
-	width           int
-	height          int
 	styles          Styles
 	refreshInterval time.Duration
-	scroller        *panel.Scroller
-	loader          loading.Model // Loading spinner
 }
 
 // Styles for the monitor component.
@@ -217,7 +214,8 @@ func New(deps Deps) Model {
 		}
 	})
 
-	return Model{
+	m := Model{
+		Sizable:         helpers.NewSizable(11, panel.NewScroller(0, 10)),
 		ctx:             deps.Ctx,
 		svc:             deps.Svc,
 		ios:             deps.IOS,
@@ -231,20 +229,16 @@ func New(deps Deps) Model {
 		eventChan:       eventChan,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
-		scroller:        panel.NewScroller(0, 10),
-		loader: loading.New(
-			loading.WithMessage("Fetching device statuses..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Fetching device statuses...")
+	return m
 }
 
 // Init returns the initial command for the monitor.
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.fetchStatuses(), // Initial HTTP fetch for immediate data
-		m.loader.Init(),   // Start spinner animation
+		m.Loader.Init(),   // Start spinner animation
 	}
 
 	if m.useWebSocket {
@@ -426,7 +420,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Update loader for spinner animation during initial load
 	if m.initialLoad {
 		var loaderCmd tea.Cmd
-		m.loader, loaderCmd = m.loader.Update(msg)
+		m.Loader, loaderCmd = m.Loader.Update(msg)
 		if loaderCmd != nil {
 			// Continue to process StatusUpdateMsg even during loading
 			if statusMsg, ok := msg.(StatusUpdateMsg); ok {
@@ -478,7 +472,7 @@ func (m Model) handleStatusUpdate(msg StatusUpdateMsg, additionalCmd tea.Cmd) (M
 		return m, additionalCmd
 	}
 	m.statuses = msg.Statuses
-	m.scroller.SetItemCount(len(m.statuses))
+	m.Scroller.SetItemCount(len(m.statuses))
 	// Build status map for O(1) updates
 	m.statusMap = make(map[string]*DeviceStatus, len(m.statuses))
 	for i := range m.statuses {
@@ -563,14 +557,15 @@ func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
-	keys.HandleScrollNavigation(msg.String(), m.scroller)
+	keys.HandleScrollNavigation(msg.String(), m.Scroller)
 	return m
 }
 
 // SetSize sets the component size.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
+	m.Width = width
+	m.Height = height
+	m.Loader = m.Loader.SetSize(width-helpers.LoaderBorderOffset, height-helpers.LoaderBorderOffset)
 	// Account for: header (2), summary (4), empty line (1), footer (2), container padding (2) = 11 lines overhead
 	// Each card: 2 lines content + 1 margin + 1 separator = 4 lines
 	availableHeight := height - 11
@@ -578,7 +573,7 @@ func (m Model) SetSize(width, height int) Model {
 	if visibleRows < 1 {
 		visibleRows = 1
 	}
-	m.scroller.SetVisibleRows(visibleRows)
+	m.Scroller.SetVisibleRows(visibleRows)
 	return m
 }
 
@@ -586,21 +581,21 @@ func (m Model) SetSize(width, height int) Model {
 func (m Model) View() string {
 	if m.initialLoad {
 		return m.styles.Container.
-			Width(m.width).
-			Height(m.height).
-			Render(m.loader.SetSize(m.width, m.height).View())
+			Width(m.Width).
+			Height(m.Height).
+			Render(m.Loader.SetSize(m.Width, m.Height).View())
 	}
 
 	if m.err != nil {
 		return m.styles.Container.
-			Width(m.width).
+			Width(m.Width).
 			Render(theme.StatusError().Render("Error: " + m.err.Error()))
 	}
 
 	if len(m.statuses) == 0 {
 		return m.styles.Container.
-			Width(m.width).
-			Height(m.height).
+			Width(m.Width).
+			Height(m.Height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("No devices to monitor.\nUse 'shelly device add' to add devices.")
 	}
@@ -626,18 +621,18 @@ func (m Model) View() string {
 	)
 
 	// Get visible range from scroller
-	startIdx, endIdx := m.scroller.VisibleRange()
+	startIdx, endIdx := m.Scroller.VisibleRange()
 	if endIdx > len(m.statuses) {
 		endIdx = len(m.statuses)
 	}
 
 	// Calculate content width (container width minus padding)
-	contentWidth := m.width - 6 // 2 padding + 2 border on each side
+	contentWidth := m.Width - 6 // 2 padding + 2 border on each side
 
 	var rows string
 	for i := startIdx; i < endIdx; i++ {
 		s := m.statuses[i]
-		isSelected := m.scroller.IsCursorAt(i)
+		isSelected := m.Scroller.IsCursorAt(i)
 		rows += m.renderDeviceCard(s, isSelected)
 		if i < endIdx-1 {
 			separator := m.styles.Separator.Render(strings.Repeat("─", contentWidth))
@@ -647,7 +642,7 @@ func (m Model) View() string {
 
 	// Scroll indicator
 	scrollInfo := ""
-	if info := m.scroller.ScrollInfo(); info != "" {
+	if info := m.Scroller.ScrollInfo(); info != "" {
 		scrollInfo = m.styles.LastUpdated.Render(" " + info + " ")
 	}
 
@@ -656,7 +651,7 @@ func (m Model) View() string {
 	) + scrollInfo
 
 	content := lipgloss.JoinVertical(lipgloss.Left, summary, "", rows, footer)
-	return m.styles.Container.Width(m.width).Height(m.height).Render(content)
+	return m.styles.Container.Width(m.Width).Height(m.Height).Render(content)
 }
 
 // renderSummaryCard renders a summary card with label and value.
@@ -788,7 +783,7 @@ func (m Model) StatusCount() (online, offline int) {
 
 // SelectedDevice returns the currently selected device, if any.
 func (m Model) SelectedDevice() *DeviceStatus {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.statuses) == 0 || cursor < 0 || cursor >= len(m.statuses) {
 		return nil
 	}
@@ -797,7 +792,7 @@ func (m Model) SelectedDevice() *DeviceStatus {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // IsRefreshing returns true if the monitor is currently refreshing.

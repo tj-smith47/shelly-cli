@@ -13,8 +13,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -32,17 +32,14 @@ type OpenBrowserMsg struct {
 
 // Model holds the device list state.
 type Model struct {
-	cache      *cache.Cache    // Shared device cache
-	filter     string          // Current filter string
-	scroller   *panel.Scroller // Shared scroll/cursor management
-	focused    bool            // Whether this component has focus
-	listOnly   bool            // When true, only render list panel (detail rendered separately)
-	gPressed   bool            // Tracks if 'g' was just pressed (for vim-style gx, gg commands)
+	helpers.Sizable
+	cache      *cache.Cache // Shared device cache
+	filter     string       // Current filter string
+	focused    bool         // Whether this component has focus
+	listOnly   bool         // When true, only render list panel (detail rendered separately)
+	gPressed   bool         // Tracks if 'g' was just pressed (for vim-style gx, gg commands)
 	panelIndex int
-	width      int
-	height     int
 	styles     Styles
-	loader     loading.Model // Loading spinner for initial load
 
 	// Cached filtered devices to avoid calling GetAllDevices on every View()
 	cachedDevices []*cache.DeviceData
@@ -126,15 +123,11 @@ func DefaultStyles() Styles {
 // New creates a new device list model using the shared cache.
 func New(c *cache.Cache) Model {
 	m := Model{
-		cache:    c,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultStyles(),
-		loader: loading.New(
-			loading.WithMessage("Loading devices..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
+		Sizable: helpers.NewSizable(5, panel.NewScroller(0, 10)),
+		cache:   c,
+		styles:  DefaultStyles(),
 	}
+	m.Loader = m.Loader.SetMessage("Loading devices...")
 	// Initialize cached devices immediately so DeviceCount() works without Update()
 	return m.refreshCachedDevices()
 }
@@ -143,7 +136,7 @@ func New(c *cache.Cache) Model {
 // The cache handles device loading and refresh, but we start the spinner if loading.
 func (m Model) Init() tea.Cmd {
 	if m.cache != nil && m.cache.IsLoading() {
-		return m.loader.Init()
+		return m.Loader.Init()
 	}
 	return nil
 }
@@ -155,12 +148,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Update loader for spinner animation when loading (needed for header spinner)
 	if m.cache != nil && m.cache.IsLoading() {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			// Continue processing for key events so navigation works during loading
 			_, ok := msg.(tea.KeyPressMsg)
 			return ok
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -169,13 +162,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		// Sync item count from cache before handling key
 		devices := m.getFilteredDevices()
-		m.scroller.SetItemCount(len(devices))
+		m.Scroller.SetItemCount(len(devices))
 
-		oldCursor := m.scroller.Cursor()
+		oldCursor := m.Scroller.Cursor()
 		var cmd tea.Cmd
 		m, cmd = m.handleKeyPress(keyMsg)
 		// Emit selection change if cursor moved (unless a command is already being returned)
-		if m.scroller.Cursor() != oldCursor && cmd == nil {
+		if m.Scroller.Cursor() != oldCursor && cmd == nil {
 			return m, m.emitSelection()
 		}
 		return m, cmd
@@ -200,7 +193,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			return m, nil
 		case "g":
 			// gg: go to top
-			m.scroller.CursorToStart()
+			m.Scroller.CursorToStart()
 			return m, nil
 		}
 		// Other keys after g: just process normally
@@ -208,19 +201,19 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 	switch key {
 	case "j", "down":
-		m.scroller.CursorDown()
+		m.Scroller.CursorDown()
 	case "k", "up":
-		m.scroller.CursorUp()
+		m.Scroller.CursorUp()
 	case "g":
 		// Start g-prefix mode (for gg, gx commands)
 		m.gPressed = true
 		return m, nil
 	case "G":
-		m.scroller.CursorToEnd()
+		m.Scroller.CursorToEnd()
 	case "pgdown", "ctrl+d":
-		m.scroller.PageDown()
+		m.Scroller.PageDown()
 	case "pgup", "ctrl+u":
-		m.scroller.PageUp()
+		m.Scroller.PageUp()
 	}
 	return m, nil
 }
@@ -228,7 +221,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // emitSelection returns a command that emits a DeviceSelectedMsg for the current selection.
 func (m Model) emitSelection() tea.Cmd {
 	devices := m.getFilteredDevices()
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor < 0 || cursor >= len(devices) {
 		return nil
 	}
@@ -291,7 +284,7 @@ func (m Model) SetFilter(filter string) Model {
 	// Refresh cached devices with new filter
 	m = m.refreshCachedDevices()
 	// Update item count for new filter
-	m.scroller.SetItemCount(len(m.cachedDevices))
+	m.Scroller.SetItemCount(len(m.cachedDevices))
 	return m
 }
 
@@ -311,7 +304,7 @@ func (m Model) SetPanelIndex(index int) Model {
 func (m Model) SetListOnly(listOnly bool) Model {
 	m.listOnly = listOnly
 	// Update visible rows as overhead differs between modes
-	m.scroller.SetVisibleRows(m.visibleRows())
+	m.Scroller.SetVisibleRows(m.visibleRows())
 	return m
 }
 
@@ -336,7 +329,7 @@ func (m Model) visibleRows() int {
 		overhead = 5
 	}
 
-	available := m.height - overhead
+	available := m.Height - overhead
 	if available < 1 {
 		return 1
 	}
@@ -345,19 +338,20 @@ func (m Model) visibleRows() int {
 
 // listPanelWidth returns the width of the list panel (40% of total).
 func (m Model) listPanelWidth() int {
-	return (m.width * 40) / 100
+	return (m.Width * 40) / 100
 }
 
 // detailPanelWidth returns the width of the detail panel (60% of total).
 func (m Model) detailPanelWidth() int {
-	return m.width - m.listPanelWidth() - 1 // -1 for gap
+	return m.Width - m.listPanelWidth() - 1 // -1 for gap
 }
 
 // SetSize sets the component size.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.scroller.SetVisibleRows(m.visibleRows())
+	m.Width = width
+	m.Height = height
+	m.Loader = m.Loader.SetSize(width-helpers.LoaderBorderOffset, height-helpers.LoaderBorderOffset)
+	m.Scroller.SetVisibleRows(m.visibleRows())
 	return m
 }
 
@@ -365,8 +359,8 @@ func (m Model) SetSize(width, height int) Model {
 func (m Model) View() string {
 	if m.cache == nil {
 		return m.styles.Table.
-			Width(m.width-4).
-			Height(m.height).
+			Width(m.Width-4).
+			Height(m.Height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("No cache available")
 	}
@@ -375,30 +369,30 @@ func (m Model) View() string {
 
 	if m.cache.IsLoading() && len(devices) == 0 {
 		return m.styles.Table.
-			Width(m.width - 4).
-			Height(m.height).
-			Render(m.loader.SetSize(m.width-4, m.height).View())
+			Width(m.Width - 4).
+			Height(m.Height).
+			Render(m.Loader.SetSize(m.Width-4, m.Height).View())
 	}
 
 	if m.cache.DeviceCount() == 0 {
 		return m.styles.Table.
-			Width(m.width-4).
-			Height(m.height).
+			Width(m.Width-4).
+			Height(m.Height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("No devices registered.\nUse 'shelly device add' to add devices.")
 	}
 
 	if len(devices) == 0 && m.filter != "" {
 		return m.styles.Table.
-			Width(m.width-4).
-			Height(m.height).
+			Width(m.Width-4).
+			Height(m.Height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render(fmt.Sprintf("No devices match filter %q.\nPress / to clear or modify filter.", m.filter))
 	}
 
 	// List-only mode: render just the list panel at full width
 	if m.listOnly {
-		return m.renderListPanel(devices, m.width)
+		return m.renderListPanel(devices, m.Width)
 	}
 
 	// Split pane layout
@@ -416,10 +410,10 @@ func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 	colors := theme.GetSemanticColors()
 
 	// Update scroller with current device count
-	m.scroller.SetItemCount(len(devices))
+	m.Scroller.SetItemCount(len(devices))
 
 	// Get visible range from scroller
-	startIdx, endIdx := m.scroller.VisibleRange()
+	startIdx, endIdx := m.Scroller.VisibleRange()
 
 	// In list-only mode, renderer adds borders (2) + padding (2) = 4 chars
 	// So content rows should be width - 4 to fit properly
@@ -431,7 +425,7 @@ func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 	var rows strings.Builder
 	for i := startIdx; i < endIdx; i++ {
 		d := devices[i]
-		isSelected := m.scroller.IsCursorAt(i)
+		isSelected := m.Scroller.IsCursorAt(i)
 		row := m.renderListRow(d, isSelected, rowWidth)
 		rows.WriteString(row + "\n")
 	}
@@ -453,7 +447,7 @@ func (m Model) renderListPanel(devices []*cache.DeviceData, width int) string {
 
 	return panelStyle.
 		Width(width).
-		Height(m.height).
+		Height(m.Height).
 		Render(header + "\n" + content)
 }
 
@@ -500,11 +494,11 @@ func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string 
 	panelStyle := m.styles.DetailPanel.BorderForeground(borderColor)
 
 	// Get selected device
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(devices) == 0 || cursor < 0 || cursor >= len(devices) {
 		return panelStyle.
 			Width(width).
-			Height(m.height).
+			Height(m.Height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("No device selected")
 	}
@@ -530,7 +524,7 @@ func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string 
 
 	return panelStyle.
 		Width(width).
-		Height(m.height).
+		Height(m.Height).
 		Render(content.String())
 }
 
@@ -612,7 +606,7 @@ func (m Model) renderDetailRow(label, value string) string {
 // SelectedDevice returns the currently selected device, if any.
 func (m Model) SelectedDevice() *cache.DeviceData {
 	devices := m.getFilteredDevices()
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor < 0 || cursor >= len(devices) {
 		return nil
 	}
@@ -621,17 +615,17 @@ func (m Model) SelectedDevice() *cache.DeviceData {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // SetCursor sets the cursor position.
 func (m Model) SetCursor(cursor int) Model {
 	devices := m.getFilteredDevices()
-	m.scroller.SetItemCount(len(devices))
+	m.Scroller.SetItemCount(len(devices))
 	if cursor < 0 || cursor >= len(devices) {
 		return m
 	}
-	m.scroller.SetCursor(cursor)
+	m.Scroller.SetCursor(cursor)
 	return m
 }
 
@@ -714,5 +708,5 @@ func (m Model) IsLoading() bool {
 
 // SpinnerFrame returns the current spinner frame for use in headers/badges.
 func (m Model) SpinnerFrame() string {
-	return m.loader.SpinnerFrame()
+	return m.Loader.SpinnerFrame()
 }
