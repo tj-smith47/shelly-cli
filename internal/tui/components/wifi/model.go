@@ -731,11 +731,18 @@ func (m Model) renderNetworkLine(netw network.WiFiNetworkFull, isSelected bool) 
 		authIcon = "🔒"
 	}
 
-	ssid := output.Truncate(netw.SSID, 20)
+	// Calculate available width for SSID
+	// Fixed: selector(2) + signalIcon(2) + space(1) + authIcon(2) = 7
+	ssidWidth := output.ContentWidth(m.width, 4+7)
+	if ssidWidth < 10 {
+		ssidWidth = 10
+	}
+	ssid := output.Truncate(netw.SSID, ssidWidth)
 
-	line := fmt.Sprintf("%s%s %-20s %s",
+	line := fmt.Sprintf("%s%s %-*s %s",
 		selector,
 		signalStyle.Render(signalIcon),
+		ssidWidth,
 		m.styles.SSID.Render(ssid),
 		authIcon,
 	)

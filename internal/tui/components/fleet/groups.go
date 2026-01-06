@@ -449,10 +449,13 @@ func (m GroupsModel) View() string {
 			cursor = m.styles.Cursor.Render("> ")
 		}
 
-		name := output.Truncate(group.Name, 20)
-
 		deviceCount := len(group.DeviceIDs)
 		countStr := fmt.Sprintf("(%d devices)", deviceCount)
+
+		// Calculate available width for name
+		// Fixed: cursor(2) + space(1) + countStr length
+		available := output.ContentWidth(m.width, 4+3+len(countStr))
+		name := output.Truncate(group.Name, max(available, 10))
 
 		line := fmt.Sprintf("%s%s %s",
 			cursor,

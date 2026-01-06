@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Level indicates the toast notification level.
@@ -84,16 +85,11 @@ type Styles struct {
 
 // DefaultStyles returns default styles for toasts.
 func DefaultStyles() Styles {
-	colors := theme.GetSemanticColors()
-	baseStyle := lipgloss.NewStyle().
-		Padding(0, 1).
-		BorderStyle(lipgloss.RoundedBorder())
-
 	return Styles{
-		Info:    baseStyle.BorderForeground(colors.Info),
-		Success: baseStyle.BorderForeground(colors.Success),
-		Warning: baseStyle.BorderForeground(colors.Warning),
-		Error:   baseStyle.BorderForeground(colors.Error),
+		Info:    tuistyles.InfoBorder().Padding(0, 1),
+		Success: tuistyles.SuccessBorder().Padding(0, 1),
+		Warning: tuistyles.WarningBorder().Padding(0, 1),
+		Error:   tuistyles.ErrorBorder().Padding(0, 1),
 	}
 }
 

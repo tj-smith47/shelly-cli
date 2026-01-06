@@ -580,8 +580,13 @@ func (m ListModel) renderScheduleLine(schedule Schedule, isSelected bool) string
 		selector = "▶ "
 	}
 
+	// Calculate available width for timespec and method
+	// Fixed: selector(2) + icon(2) + spaces(2) = 6
+	available := output.ContentWidth(m.width, 4+6)
+	timespecWidth, methodWidth := output.SplitWidth(available, 50, 12, 15)
+
 	// Timespec (truncate if too long)
-	timespec := output.Truncate(schedule.Timespec, 20)
+	timespec := output.Truncate(schedule.Timespec, timespecWidth)
 	timespecStr := m.styles.Timespec.Render(timespec)
 
 	// Primary method
@@ -591,7 +596,7 @@ func (m ListModel) renderScheduleLine(schedule Schedule, isSelected bool) string
 		if len(schedule.Calls) > 1 {
 			method = fmt.Sprintf("%s +%d", method, len(schedule.Calls)-1)
 		}
-		methodStr = m.styles.Method.Render(method)
+		methodStr = m.styles.Method.Render(output.Truncate(method, methodWidth))
 	}
 
 	line := fmt.Sprintf("%s%s %s %s", selector, icon, timespecStr, methodStr)

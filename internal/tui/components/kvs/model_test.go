@@ -416,9 +416,9 @@ func TestModel_FormatValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := m.formatValue(tt.value)
+			result := m.formatValueWithWidth(tt.value, 30)
 			if result == "" {
-				t.Errorf("formatValue(%v) returned empty string", tt.value)
+				t.Errorf("formatValueWithWidth(%v) returned empty string", tt.value)
 			}
 		})
 	}

@@ -486,9 +486,9 @@ func TestModel_FormatValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := m.formatValue(tt.virtual)
+			got := m.formatValueWithWidth(tt.virtual, 30)
 			if !strings.Contains(got, tt.want) {
-				t.Errorf("formatValue() = %q, should contain %q", got, tt.want)
+				t.Errorf("formatValueWithWidth() = %q, should contain %q", got, tt.want)
 			}
 		})
 	}

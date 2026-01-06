@@ -657,12 +657,17 @@ func (m Model) renderItemLine(item Item, isSelected bool) string {
 		selector = "▶ "
 	}
 
+	// Calculate available width for key and value
+	// Fixed: selector(2) + " = "(3) = 5
+	available := output.ContentWidth(m.width, 4+5)
+	keyWidth, valueWidth := output.SplitWidth(available, 40, 10, 15)
+
 	// Key (truncate if too long)
-	key := output.Truncate(item.Key, 20)
-	keyStr := m.styles.Key.Render(fmt.Sprintf("%-20s", key))
+	key := output.Truncate(item.Key, keyWidth)
+	keyStr := m.styles.Key.Render(fmt.Sprintf("%-*s", keyWidth, key))
 
 	// Value display
-	valueStr := m.formatValue(item.Value)
+	valueStr := m.formatValueWithWidth(item.Value, valueWidth)
 
 	line := fmt.Sprintf("%s%s = %s", selector, keyStr, valueStr)
 
@@ -672,14 +677,20 @@ func (m Model) renderItemLine(item Item, isSelected bool) string {
 	return line
 }
 
-func (m Model) formatValue(value any) string {
+func (m Model) formatValueWithWidth(value any, maxWidth int) string {
 	if value == nil {
 		return m.styles.Null.Render("null")
 	}
 
+	// Account for quotes in string display
+	strWidth := maxWidth - 2
+	if strWidth < 10 {
+		strWidth = 10
+	}
+
 	switch v := value.(type) {
 	case string:
-		display := output.Truncate(v, 30)
+		display := output.Truncate(v, strWidth)
 		return m.styles.String.Render(fmt.Sprintf("%q", display))
 	case float64:
 		if v == float64(int64(v)) {
@@ -693,7 +704,7 @@ func (m Model) formatValue(value any) string {
 		if err != nil {
 			return m.styles.Object.Render("{...}")
 		}
-		display := output.Truncate(string(jsonBytes), 30)
+		display := output.Truncate(string(jsonBytes), maxWidth)
 		return m.styles.Object.Render(display)
 	default:
 		return m.styles.Value.Render(fmt.Sprintf("%v", v))

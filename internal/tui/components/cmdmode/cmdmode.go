@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Command types that can be executed.
@@ -60,10 +61,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Container: lipgloss.NewStyle().
-			Padding(0, 1).
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Primary),
+		Container: tuistyles.PrimaryBorder().Padding(0, 1),
 		Prompt: lipgloss.NewStyle().
 			Foreground(colors.Primary).
 			Bold(true),

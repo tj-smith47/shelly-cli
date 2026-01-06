@@ -779,16 +779,21 @@ func (m Model) renderVirtualLine(v Virtual, isSelected bool) string {
 		selector = "▶ "
 	}
 
+	// Calculate available width for name and value
+	// Fixed: selector(2) + type(4) + spaces(2) = 8
+	available := output.ContentWidth(m.width, 4+8)
+	nameWidth, valueWidth := output.SplitWidth(available, 40, 10, 15)
+
 	// Name or ID
 	name := v.Name
 	if name == "" {
 		name = fmt.Sprintf("#%d", v.ID)
 	}
-	name = output.Truncate(name, 15)
-	nameStr := m.styles.Name.Render(fmt.Sprintf("%-15s", name))
+	name = output.Truncate(name, nameWidth)
+	nameStr := m.styles.Name.Render(fmt.Sprintf("%-*s", nameWidth, name))
 
 	// Value display
-	valueStr := m.formatValue(v)
+	valueStr := m.formatValueWithWidth(v, valueWidth)
 
 	line := fmt.Sprintf("%s%s %s %s", selector, typeStr, nameStr, valueStr)
 
@@ -798,7 +803,7 @@ func (m Model) renderVirtualLine(v Virtual, isSelected bool) string {
 	return line
 }
 
-func (m Model) formatValue(v Virtual) string {
+func (m Model) formatValueWithWidth(v Virtual, maxWidth int) string {
 	switch v.Type {
 	case shelly.VirtualBoolean:
 		if v.BoolValue != nil {
@@ -817,7 +822,11 @@ func (m Model) formatValue(v Virtual) string {
 		}
 	case shelly.VirtualText:
 		if v.StrValue != nil {
-			text := output.Truncate(*v.StrValue, 20)
+			textWidth := maxWidth - 2 // Account for quotes
+			if textWidth < 10 {
+				textWidth = 10
+			}
+			text := output.Truncate(*v.StrValue, textWidth)
 			return m.styles.Value.Render(fmt.Sprintf("%q", text))
 		}
 	case shelly.VirtualEnum:

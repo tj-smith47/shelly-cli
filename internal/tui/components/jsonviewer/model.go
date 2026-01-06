@@ -44,7 +44,7 @@ type Model struct {
 	endpointIdx   int
 	data          map[string]any
 	viewport      viewport.Model
-	isLoading     bool
+	loading       bool
 	error         error
 	visible       bool
 	width         int
@@ -136,7 +136,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	// Update loader for spinner animation when loading
-	if m.isLoading {
+	if m.loading {
 		var cmd tea.Cmd
 		m.loader, cmd = m.loader.Update(msg)
 		return m, cmd
@@ -152,7 +152,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 // handleFetchedMsg processes the FetchedMsg when data arrives.
 func (m Model) handleFetchedMsg(msg FetchedMsg) (Model, tea.Cmd) {
-	m.isLoading = false
+	m.loading = false
 	if msg.Error != nil {
 		m.error = msg.Error
 	} else {
@@ -183,7 +183,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 
 	case key.Matches(msg, key.NewBinding(key.WithKeys("r"))):
-		m.isLoading = true
+		m.loading = true
 		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
 	}
 
@@ -198,7 +198,7 @@ func (m Model) prevEndpoint() (Model, tea.Cmd) {
 	if len(m.endpoints) > 1 && m.endpointIdx > 0 {
 		m.endpointIdx--
 		m.endpoint = m.endpoints[m.endpointIdx]
-		m.isLoading = true
+		m.loading = true
 		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
 	}
 	return m, nil
@@ -209,7 +209,7 @@ func (m Model) nextEndpoint() (Model, tea.Cmd) {
 	if len(m.endpoints) > 1 && m.endpointIdx < len(m.endpoints)-1 {
 		m.endpointIdx++
 		m.endpoint = m.endpoints[m.endpointIdx]
-		m.isLoading = true
+		m.loading = true
 		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
 	}
 	return m, nil
@@ -237,7 +237,7 @@ func (m Model) View() string {
 
 	// Content
 	switch {
-	case m.isLoading:
+	case m.loading:
 		content.WriteString(m.loader.View())
 	case m.error != nil:
 		content.WriteString(m.styles.Error.Render("Error: " + m.error.Error()))
@@ -396,7 +396,7 @@ func (m Model) fetchEndpoint() tea.Cmd {
 // Open opens the JSON viewer for a device endpoint.
 func (m Model) Open(deviceAddress, endpoint string, endpoints []string) (Model, tea.Cmd) {
 	m.visible = true
-	m.isLoading = true
+	m.loading = true
 	m.error = nil
 	m.data = nil
 	m.deviceAddress = deviceAddress
@@ -462,7 +462,7 @@ func (m Model) SetSize(width, height int) Model {
 
 // Loading returns whether the viewer is loading.
 func (m Model) Loading() bool {
-	return m.isLoading
+	return m.loading
 }
 
 // Error returns any error that occurred.

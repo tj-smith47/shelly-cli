@@ -52,7 +52,8 @@ func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
 		Backdrop: lipgloss.NewStyle().
-			Background(lipgloss.Color("#000000")),
+			Faint(true).
+			Foreground(colors.Muted),
 		Container: tuistyles.ModalBorder().Padding(0, 1),
 		Title: lipgloss.NewStyle().
 			Bold(true).

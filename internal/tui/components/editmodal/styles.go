@@ -5,6 +5,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // Styles contains the common styles used by edit modal components.
@@ -82,9 +83,7 @@ type Styles struct {
 func DefaultStyles() Styles {
 	colors := theme.GetSemanticColors()
 	return Styles{
-		Modal: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colors.TableBorder).
+		Modal: styles.PanelBorder().
 			Background(colors.Background).
 			Padding(1, 2),
 		Title: lipgloss.NewStyle().
@@ -112,14 +111,8 @@ func DefaultStyles() Styles {
 			Foreground(colors.Muted),
 		Overlay: lipgloss.NewStyle().
 			Background(colors.Background),
-		Input: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Muted).
-			Padding(0, 1),
-		InputFocus: lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colors.Highlight).
-			Padding(0, 1),
+		Input:      styles.MutedBorder().Padding(0, 1),
+		InputFocus: styles.PanelBorderActive().Padding(0, 1),
 		Button: lipgloss.NewStyle().
 			Foreground(colors.Text).
 			Background(colors.AltBackground).

@@ -677,14 +677,19 @@ func (m Model) renderWebhookLine(webhook Webhook, isSelected bool) string {
 		selector = "▶ "
 	}
 
+	// Calculate available width for event and URL
+	// Fixed: selector(2) + icon(2) + spaces(2) = 6
+	available := output.ContentWidth(m.width, 4+6)
+	eventWidth, urlWidth := output.SplitWidth(available, 40, 15, 20)
+
 	// Event type (truncate if too long)
-	event := output.Truncate(webhook.Event, 25)
+	event := output.Truncate(webhook.Event, eventWidth)
 	eventStr := m.styles.Event.Render(event)
 
 	// URL count or first URL
 	urlInfo := ""
 	if len(webhook.URLs) > 0 {
-		url := output.Truncate(webhook.URLs[0], 30)
+		url := output.Truncate(webhook.URLs[0], urlWidth)
 		if len(webhook.URLs) > 1 {
 			urlInfo = fmt.Sprintf("%s +%d", url, len(webhook.URLs)-1)
 		} else {

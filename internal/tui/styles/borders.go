@@ -50,3 +50,48 @@ func ErrorBorder() lipgloss.Style {
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(colors.Error)
 }
+
+// InfoBorder returns a style with a rounded border using the info color.
+// Use this for informational messages and hints.
+func InfoBorder() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colors.Info)
+}
+
+// SuccessBorder returns a style with a rounded border using the success color.
+// Use this for success messages and confirmations.
+func SuccessBorder() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colors.Success)
+}
+
+// WarningBorder returns a style with a rounded border using the warning color.
+// Use this for warning messages and cautions.
+func WarningBorder() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colors.Warning)
+}
+
+// MutedBorder returns a style with a rounded border using the muted color.
+// Use this for unfocused inputs or secondary elements.
+func MutedBorder() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colors.Muted)
+}
+
+// PrimaryBorder returns a style with a rounded border using the primary color.
+// Use this for primary interactive elements like command mode.
+func PrimaryBorder() lipgloss.Style {
+	colors := theme.GetSemanticColors()
+	return lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colors.Primary)
+}

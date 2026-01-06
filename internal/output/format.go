@@ -545,6 +545,37 @@ func Truncate(s string, maxLen int) string {
 	return ansi.Truncate(s, maxLen, "...")
 }
 
+// SplitWidth divides available width between two fields based on percentage.
+// percent1 is the percentage (0-100) allocated to the first field.
+// min1 and min2 are the minimum widths for each field.
+// Returns (field1Width, field2Width).
+func SplitWidth(available, percent1, min1, min2 int) (w1, w2 int) {
+	if available < min1+min2 {
+		return min1, min2
+	}
+	w1 = available * percent1 / 100
+	w2 = available - w1
+	if w1 < min1 {
+		w1 = min1
+		w2 = available - w1
+	}
+	if w2 < min2 {
+		w2 = min2
+		w1 = available - w2
+	}
+	return w1, w2
+}
+
+// ContentWidth calculates the usable content width from a panel width.
+// Subtracts the given overhead (typically border + padding).
+func ContentWidth(panelWidth, overhead int) int {
+	w := panelWidth - overhead
+	if w < 1 {
+		return 1
+	}
+	return w
+}
+
 // PadRight pads a string with spaces to reach the specified visual width.
 // Uses ansi.StringWidth for proper calculation with ANSI escape codes.
 func PadRight(s string, width int) string {

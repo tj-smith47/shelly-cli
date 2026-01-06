@@ -66,7 +66,7 @@ func TestModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := New(context.Background(), nil).SetSize(80, 24)
 	m.visible = true
-	m.isLoading = true
+	m.loading = true
 
 	view := m.View()
 	if view == "" {

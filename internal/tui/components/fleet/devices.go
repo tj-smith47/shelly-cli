@@ -326,15 +326,20 @@ func (m DevicesModel) renderDeviceLine(idx int) string {
 		cursor = m.styles.Cursor.Render("> ")
 	}
 
+	// Calculate available width for name and type
+	// Fixed: cursor(2) + status(2) + spaces(2) + parens(2) = 8
+	available := output.ContentWidth(m.width, 4+8) // panel border + fixed elements
+	nameWidth, typeWidth := output.SplitWidth(available, 60, 10, 8)
+
 	// Device name (truncate if needed)
 	name := device.Name
 	if name == "" {
 		name = device.DeviceID
 	}
-	name = output.Truncate(name, 20)
+	name = output.Truncate(name, nameWidth)
 
 	// Device type (truncate if needed)
-	deviceType := output.Truncate(device.DeviceType, 12)
+	deviceType := output.Truncate(device.DeviceType, typeWidth)
 
 	line := fmt.Sprintf("%s%s %s %s",
 		cursor,
