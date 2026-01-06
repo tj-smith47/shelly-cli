@@ -365,11 +365,14 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
+	// Emit LoadedMsg so sequential loading in Automation view can advance
+	loadedCmd := func() tea.Msg { return LoadedMsg{} }
+
 	if msg.NeedsRefresh {
 		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
-		return m, tea.Batch(m.cacheStatus.Tick(), m.backgroundRefresh())
+		return m, tea.Batch(loadedCmd, m.cacheStatus.Tick(), m.backgroundRefresh())
 	}
-	return m, nil
+	return m, loadedCmd
 }
 
 func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
