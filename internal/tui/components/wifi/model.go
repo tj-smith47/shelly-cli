@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -697,21 +698,16 @@ func (m Model) renderNetworks() string {
 	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Available Networks (%d):", len(m.networks))))
 	content.WriteString("\n")
 
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		netw := m.networks[i]
-		isSelected := m.scroller.IsCursorAt(i)
-
-		line := m.renderNetworkLine(netw, isSelected)
-		content.WriteString(line)
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	// Network list with scroll indicator
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[network.WiFiNetworkFull]{
+		Items:    m.networks,
+		Scroller: m.scroller,
+		RenderItem: func(netw network.WiFiNetworkFull, _ int, isCursor bool) string {
+			return m.renderNetworkLine(netw, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	return content.String()
 }

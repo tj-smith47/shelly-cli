@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -543,25 +544,17 @@ func (m ListModel) View() string {
 		return r.Render()
 	}
 
-	var content strings.Builder
+	content := generics.RenderScrollableList(generics.ListRenderConfig[Schedule]{
+		Items:    m.schedules,
+		Scroller: m.scroller,
+		RenderItem: func(schedule Schedule, _ int, isCursor bool) string {
+			return m.renderScheduleLine(schedule, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	})
 
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		schedule := m.schedules[i]
-		isSelected := m.scroller.IsCursorAt(i)
-
-		line := m.renderScheduleLine(schedule, isSelected)
-		content.WriteString(line)
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
-
-	r.SetContent(content.String())
+	r.SetContent(content)
 	return r.Render()
 }
 

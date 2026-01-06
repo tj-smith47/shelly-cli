@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -641,25 +642,15 @@ func (m Model) getErrorContent() string {
 
 // renderWebhookList renders the list of webhooks.
 func (m Model) renderWebhookList() string {
-	var content strings.Builder
-	start, end := m.scroller.VisibleRange()
-
-	for i := start; i < end; i++ {
-		webhook := m.webhooks[i]
-		isSelected := m.scroller.IsCursorAt(i)
-
-		line := m.renderWebhookLine(webhook, isSelected)
-		content.WriteString(line)
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	if m.scroller.HasMore() || m.scroller.HasPrevious() {
-		content.WriteString(m.styles.Muted.Render("\n" + m.scroller.ScrollInfo()))
-	}
-
-	return content.String()
+	return generics.RenderScrollableList(generics.ListRenderConfig[Webhook]{
+		Items:    m.webhooks,
+		Scroller: m.scroller,
+		RenderItem: func(webhook Webhook, _ int, isCursor bool) string {
+			return m.renderWebhookLine(webhook, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoWhenNeeded,
+	})
 }
 
 func (m Model) renderWebhookLine(webhook Webhook, isSelected bool) string {

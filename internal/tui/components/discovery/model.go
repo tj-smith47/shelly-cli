@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -345,19 +346,15 @@ func (m Model) renderDeviceList() string {
 	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Found %d device(s):", len(m.devices))))
 	content.WriteString("\n\n")
 
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		device := m.devices[i]
-		isSelected := m.scroller.IsCursorAt(i)
-		content.WriteString(m.renderDeviceLine(device, isSelected))
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[shelly.DiscoveredDevice]{
+		Items:    m.devices,
+		Scroller: m.scroller,
+		RenderItem: func(device shelly.DiscoveredDevice, _ int, isCursor bool) string {
+			return m.renderDeviceLine(device, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	return content.String()
 }

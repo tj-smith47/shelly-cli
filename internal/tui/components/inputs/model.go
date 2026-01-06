@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -464,20 +465,16 @@ func (m Model) View() string {
 	content.WriteString(m.styles.Label.Render(fmt.Sprintf("Inputs (%d):", len(m.inputs))))
 	content.WriteString("\n\n")
 
-	// Input list
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		input := m.inputs[i]
-		isSelected := m.scroller.IsCursorAt(i)
-		content.WriteString(m.renderInputLine(input, isSelected))
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	// Input list with scroll indicator
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[shelly.InputInfo]{
+		Items:    m.inputs,
+		Scroller: m.scroller,
+		RenderItem: func(input shelly.InputInfo, _ int, isCursor bool) string {
+			return m.renderInputLine(input, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	r.SetContent(content.String())
 

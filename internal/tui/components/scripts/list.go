@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -587,26 +588,15 @@ func (m ListModel) renderError() string {
 }
 
 func (m ListModel) renderScriptsList() string {
-	var content strings.Builder
-	start, end := m.scroller.VisibleRange()
-
-	for i := start; i < end; i++ {
-		script := m.scripts[i]
-		isSelected := m.scroller.IsCursorAt(i)
-
-		line := m.renderScriptLine(script, isSelected)
-		content.WriteString(line)
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Add scroll indicator if needed
-	if m.scroller.HasMore() || m.scroller.HasPrevious() {
-		content.WriteString(m.styles.Muted.Render("\n" + m.scroller.ScrollInfo()))
-	}
-
-	return content.String()
+	return generics.RenderScrollableList(generics.ListRenderConfig[Script]{
+		Items:    m.scripts,
+		Scroller: m.scroller,
+		RenderItem: func(script Script, _ int, isCursor bool) string {
+			return m.renderScriptLine(script, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoWhenNeeded,
+	})
 }
 
 func (m ListModel) renderScriptLine(script Script, isSelected bool) string {

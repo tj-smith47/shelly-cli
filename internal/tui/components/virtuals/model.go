@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -724,21 +725,16 @@ func (m Model) View() string {
 
 	var content strings.Builder
 
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		v := m.virtuals[i]
-		isSelected := m.scroller.IsCursorAt(i)
-
-		line := m.renderVirtualLine(v, isSelected)
-		content.WriteString(line)
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	// Virtual list with scroll indicator
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[Virtual]{
+		Items:    m.virtuals,
+		Scroller: m.scroller,
+		RenderItem: func(v Virtual, _ int, isCursor bool) string {
+			return m.renderVirtualLine(v, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	r.SetContent(content.String())
 

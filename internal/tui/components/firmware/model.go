@@ -632,31 +632,22 @@ func (m Model) renderActions() string {
 func (m Model) renderDeviceList() string {
 	var content strings.Builder
 
-	// Summary
-	updateCount := 0
-	for _, d := range m.devices {
-		if d.HasUpdate {
-			updateCount++
-		}
-	}
+	// Summary - use CountWhereFunc for consistency
+	updateCount := generics.CountWhereFunc(m.devices, deviceFirmwareHasUpdate)
 	content.WriteString(m.styles.Label.Render(
 		fmt.Sprintf("Devices (%d with updates):", updateCount),
 	))
 	content.WriteString("\n\n")
 
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		device := m.devices[i]
-		isCursor := m.scroller.IsCursorAt(i)
-		content.WriteString(m.renderDeviceLine(device, isCursor))
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[DeviceFirmware]{
+		Items:    m.devices,
+		Scroller: m.scroller,
+		RenderItem: func(device DeviceFirmware, _ int, isCursor bool) string {
+			return m.renderDeviceLine(device, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	return content.String()
 }

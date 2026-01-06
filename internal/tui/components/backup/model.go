@@ -738,25 +738,15 @@ func (m Model) renderExportView() string {
 	))
 	content.WriteString("\n\n")
 
-	startIdx, endIdx := m.scroller.VisibleRange()
-	if endIdx > len(m.devices) {
-		endIdx = len(m.devices)
-	}
-
-	for i := startIdx; i < endIdx; i++ {
-		device := m.devices[i]
-		isCursor := m.scroller.IsCursorAt(i)
-		content.WriteString(m.renderExportDeviceLine(device, isCursor))
-		if i < endIdx-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	if m.scroller.HasMore() || m.scroller.HasPrevious() {
-		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
-	}
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[DeviceBackup]{
+		Items:    m.devices,
+		Scroller: m.scroller,
+		RenderItem: func(device DeviceBackup, _ int, isCursor bool) string {
+			return m.renderExportDeviceLine(device, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoWhenNeeded,
+	}))
 
 	return content.String()
 }
@@ -813,25 +803,15 @@ func (m Model) renderImportView() string {
 	))
 	content.WriteString("\n\n")
 
-	startIdx, endIdx := m.scroller.VisibleRange()
-	if endIdx > len(m.backupFiles) {
-		endIdx = len(m.backupFiles)
-	}
-
-	for i := startIdx; i < endIdx; i++ {
-		backupFile := m.backupFiles[i]
-		isCursor := m.scroller.IsCursorAt(i)
-		content.WriteString(m.renderBackupFileLine(backupFile, isCursor))
-		if i < endIdx-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	if m.scroller.HasMore() || m.scroller.HasPrevious() {
-		content.WriteString("\n")
-		content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
-	}
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[File]{
+		Items:    m.backupFiles,
+		Scroller: m.scroller,
+		RenderItem: func(backupFile File, _ int, isCursor bool) string {
+			return m.renderBackupFileLine(backupFile, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoWhenNeeded,
+	}))
 
 	return content.String()
 }

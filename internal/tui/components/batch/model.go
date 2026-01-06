@@ -477,19 +477,15 @@ func (m Model) renderDeviceList() string {
 	))
 	content.WriteString("\n\n")
 
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		device := m.devices[i]
-		isCursor := m.scroller.IsCursorAt(i)
-		content.WriteString(m.renderDeviceLine(device, isCursor))
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	content.WriteString("\n")
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[DeviceSelection]{
+		Items:    m.devices,
+		Scroller: m.scroller,
+		RenderItem: func(device DeviceSelection, _ int, isCursor bool) string {
+			return m.renderDeviceLine(device, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	return content.String()
 }
