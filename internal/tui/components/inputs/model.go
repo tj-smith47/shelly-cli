@@ -15,7 +15,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -68,21 +67,18 @@ type EditRequestMsg struct {
 
 // Model displays input settings for a device.
 type Model struct {
+	helpers.Sizable
 	ctx         context.Context
 	svc         *shelly.Service
 	fileCache   *cache.FileCache
 	device      string
 	inputs      []shelly.InputInfo
-	scroller    *panel.Scroller
 	loading     bool
 	editing     bool
 	err         error
-	width       int
-	height      int
 	focused     bool
 	panelIndex  int // 1-based panel index for Shift+N hotkey hint
 	styles      Styles
-	loader      loading.Model
 	editModal   EditModel
 	cacheStatus cachestatus.Model
 }
@@ -134,21 +130,18 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("inputs: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:     helpers.NewSizable(6, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
-		scroller:    panel.NewScroller(0, 10),
 		loading:     false,
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading inputs..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
-		editModal: NewEditModel(deps.Ctx, deps.Svc),
+		editModal:   NewEditModel(deps.Ctx, deps.Svc),
 	}
+	m.Loader = m.Loader.SetMessage("Loading inputs...")
+	return m
 }
 
 // Init returns the initial command.
@@ -160,8 +153,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.inputs = nil
-	m.scroller.SetItemCount(0)
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(0)
+	m.Scroller.CursorToStart()
 	m.err = nil
 	m.loading = true
 	m.cacheStatus = cachestatus.New()
@@ -217,10 +210,7 @@ func (m Model) backgroundRefresh() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 6, m.scroller) // Reserve space for header and footer
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -263,13 +253,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		if _, ok := msg.(LoadedMsg); ok {
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -300,8 +290,8 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	data, err := panelcache.Unmarshal[CachedInputsData](msg.Data)
 	if err == nil {
 		m.inputs = data.Inputs
-		m.scroller.SetItemCount(len(m.inputs))
-		m.scroller.CursorToStart()
+		m.Scroller.SetItemCount(len(m.inputs))
+		m.Scroller.CursorToStart()
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
@@ -320,7 +310,7 @@ func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheInputs())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheInputs())
 }
 
 func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
@@ -337,7 +327,7 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	}
 	if data, ok := msg.Data.(CachedInputsData); ok {
 		m.inputs = data.Inputs
-		m.scroller.SetItemCount(len(m.inputs))
+		m.Scroller.SetItemCount(len(m.inputs))
 	}
 	// Emit LoadedMsg so sequential loading can advance
 	return m, func() tea.Msg { return LoadedMsg{Inputs: m.inputs} }
@@ -351,8 +341,8 @@ func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.inputs = msg.Inputs
-	m.scroller.SetItemCount(len(m.inputs))
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(len(m.inputs))
+	m.Scroller.CursorToStart()
 	return m, nil
 }
 
@@ -367,7 +357,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading = true
 		return m, tea.Batch(
 			cmd,
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
 			m.fetchAndCacheInputs(),
 		)
@@ -381,7 +371,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 			// Invalidate cache and refresh data after successful save
 			m.loading = true
 			return m, tea.Batch(
-				m.loader.Tick(),
+				m.Loader.Tick(),
 				panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
 				m.fetchAndCacheInputs(),
 				func() tea.Msg { return EditClosedMsg{Saved: true} },
@@ -394,7 +384,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -405,7 +395,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if !m.loading && m.device != "" {
 			m.loading = true
 			return m, tea.Batch(
-				m.loader.Tick(),
+				m.Loader.Tick(),
 				panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
 				m.fetchAndCacheInputs(),
 			)
@@ -413,9 +403,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "e", "enter":
 		// Open edit modal for selected input
 		if len(m.inputs) > 0 && !m.loading {
-			input := m.inputs[m.scroller.Cursor()]
+			input := m.inputs[m.Scroller.Cursor()]
 			m.editing = true
-			m.editModal = m.editModal.SetSize(m.width, m.height)
+			m.editModal = m.editModal.SetSize(m.Width, m.Height)
 			var cmd tea.Cmd
 			m.editModal, cmd = m.editModal.Show(m.device, input.ID)
 			return m, tea.Batch(cmd, func() tea.Msg {
@@ -434,7 +424,7 @@ func (m Model) View() string {
 		return m.editModal.View()
 	}
 
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Inputs").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -445,7 +435,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -468,7 +458,7 @@ func (m Model) View() string {
 	// Input list with scroll indicator
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[shelly.InputInfo]{
 		Items:    m.inputs,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(input shelly.InputInfo, _ int, isCursor bool) string {
 			return m.renderInputLine(input, isCursor)
 		},
@@ -546,7 +536,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // Refresh triggers a refresh of the inputs.
@@ -555,7 +545,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchInputs())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchInputs())
 }
 
 // FooterText returns keybinding hints for the footer.
@@ -568,7 +558,7 @@ func (m Model) SelectedInput() *shelly.InputInfo {
 	if len(m.inputs) == 0 {
 		return nil
 	}
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor < 0 || cursor >= len(m.inputs) {
 		return nil
 	}

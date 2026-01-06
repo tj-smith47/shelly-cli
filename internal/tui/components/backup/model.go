@@ -121,23 +121,20 @@ type ImportCompleteMsg struct {
 
 // Model displays backup and restore operations.
 type Model struct {
+	helpers.Sizable
 	ctx          context.Context
 	svc          *shelly.Service
 	mode         Mode
 	devices      []DeviceBackup
 	backupFiles  []File
-	scroller     *panel.Scroller
 	exporting    bool
 	importing    bool
 	backupDir    string
 	err          error
-	width        int
-	height       int
 	focused      bool
 	panelIndex   int
 	styles       Styles
-	exportLoader loading.Model
-	importLoader loading.Model
+	importLoader loading.Model // Extra loader for import step
 }
 
 // Styles holds styles for the Backup component.
@@ -203,24 +200,21 @@ func New(deps Deps) Model {
 	}
 	backupDir := filepath.Join(homeDir, ".shelly", "backups")
 
-	return Model{
+	m := Model{
+		Sizable:   helpers.NewSizable(10, panel.NewScroller(0, 10)),
 		ctx:       deps.Ctx,
 		svc:       deps.Svc,
 		mode:      ModeExport,
-		scroller:  panel.NewScroller(0, 10),
 		backupDir: backupDir,
 		styles:    DefaultStyles(),
-		exportLoader: loading.New(
-			loading.WithMessage("Exporting backups..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(false, false),
-		),
 		importLoader: loading.New(
 			loading.WithMessage("Importing backup..."),
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(false, false),
 		),
 	}
+	m.Loader = m.Loader.SetMessage("Exporting backups...")
+	return m
 }
 
 // Init returns the initial command.
@@ -245,7 +239,7 @@ func (m Model) LoadDevices() Model {
 
 	// Update scroller if in export mode
 	if m.mode == ModeExport {
-		m.scroller.SetItemCount(len(m.devices))
+		m.Scroller.SetItemCount(len(m.devices))
 	}
 
 	return m
@@ -299,7 +293,7 @@ func (m Model) LoadBackupFiles() Model {
 
 	// Update scroller if in import mode
 	if m.mode == ModeImport {
-		m.scroller.SetItemCount(len(m.backupFiles))
+		m.Scroller.SetItemCount(len(m.backupFiles))
 	}
 
 	return m
@@ -307,11 +301,8 @@ func (m Model) LoadBackupFiles() Model {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.exportLoader = helpers.SetLoaderSize(m.exportLoader, width, height)
-	m.importLoader = helpers.SetLoaderSize(m.importLoader, width, height)
-	helpers.SetScrollerRows(height, 10, m.scroller) // mode selector + header + borders
+	resized := m.ApplySizeWithExtraLoaders(width, height, m.importLoader)
+	m.importLoader = resized[0]
 	return m
 }
 
@@ -355,7 +346,7 @@ func (m Model) ExportSelected() (Model, tea.Cmd) {
 		}
 	}
 
-	return m, tea.Batch(m.exportLoader.Tick(), m.exportDevices(selected))
+	return m, tea.Batch(m.Loader.Tick(), m.exportDevices(selected))
 }
 
 func (m Model) exportDevices(devices []DeviceBackup) tea.Cmd {
@@ -442,7 +433,7 @@ func (m Model) ImportSelected() (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= len(m.backupFiles) {
 		m.err = fmt.Errorf("no backup file selected")
 		return m, nil
@@ -516,7 +507,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loaders when active
 	if m.exporting {
 		var cmd tea.Cmd
-		m.exportLoader, cmd = m.exportLoader.Update(msg)
+		m.Loader, cmd = m.Loader.Update(msg)
 		switch msg.(type) {
 		case ExportCompleteMsg:
 			// Pass through to main switch below
@@ -591,12 +582,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m = m.selectNone()
 	case "1":
 		m.mode = ModeExport
-		m.scroller.SetItemCount(len(m.devices))
-		m.scroller.CursorToStart()
+		m.Scroller.SetItemCount(len(m.devices))
+		m.Scroller.CursorToStart()
 	case "2":
 		m.mode = ModeImport
 		m = m.LoadBackupFiles()
-		m.scroller.CursorToStart()
+		m.Scroller.CursorToStart()
 	case "enter", "x":
 		if m.mode == ModeExport {
 			return m.ExportSelected()
@@ -613,12 +604,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // handleNavKey handles navigation keys, returns true if handled.
 func (m Model) handleNavKey(key string) bool {
-	return keys.HandleScrollNavigation(key, m.scroller)
+	return keys.HandleScrollNavigation(key, m.Scroller)
 }
 
 func (m Model) toggleSelection() Model {
 	if m.mode == ModeExport {
-		generics.ToggleAtFunc(m.devices, m.scroller.Cursor(), deviceBackupGet, deviceBackupSet)
+		generics.ToggleAtFunc(m.devices, m.Scroller.Cursor(), deviceBackupGet, deviceBackupSet)
 	}
 	return m
 }
@@ -643,7 +634,7 @@ func (m Model) selectedDevices() []DeviceBackup {
 
 // View renders the Backup component.
 func (m Model) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Backup & Restore").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -688,7 +679,7 @@ func (m Model) View() string {
 	// Status indicator with animated loader
 	if m.exporting {
 		content.WriteString("\n")
-		content.WriteString(m.exportLoader.View())
+		content.WriteString(m.Loader.View())
 	} else if m.importing {
 		content.WriteString("\n")
 		content.WriteString(m.importLoader.View())
@@ -735,7 +726,7 @@ func (m Model) renderExportView() string {
 
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[DeviceBackup]{
 		Items:    m.devices,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(device DeviceBackup, _ int, isCursor bool) string {
 			return m.renderExportDeviceLine(device, isCursor)
 		},
@@ -800,7 +791,7 @@ func (m Model) renderImportView() string {
 
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[File]{
 		Items:    m.backupFiles,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(backupFile File, _ int, isCursor bool) string {
 			return m.renderBackupFileLine(backupFile, isCursor)
 		},
@@ -873,7 +864,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // SelectedCount returns the number of selected devices.

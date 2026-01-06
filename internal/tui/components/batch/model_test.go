@@ -108,11 +108,11 @@ func TestModel_SetSize(t *testing.T) {
 
 	updated := m.SetSize(100, 50)
 
-	if updated.width != 100 {
-		t.Errorf("width = %d, want 100", updated.width)
+	if updated.Width != 100 {
+		t.Errorf("width = %d, want 100", updated.Width)
 	}
-	if updated.height != 50 {
-		t.Errorf("height = %d, want 50", updated.height)
+	if updated.Height != 50 {
+		t.Errorf("height = %d, want 50", updated.Height)
 	}
 }
 
@@ -201,7 +201,7 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 		{Name: "device1", Address: "192.168.1.101"},
 		{Name: "device2", Address: "192.168.1.102"},
 	}
-	m.scroller.SetItemCount(len(m.devices))
+	m.Scroller.SetItemCount(len(m.devices))
 
 	// Move down
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
@@ -353,7 +353,7 @@ func TestModel_HandleKey_NotFocused(t *testing.T) {
 	m := newTestModel()
 	m.focused = false
 	m.devices = []DeviceSelection{{Name: "device0"}}
-	m.scroller.SetItemCount(len(m.devices))
+	m.Scroller.SetItemCount(len(m.devices))
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
 
@@ -370,17 +370,17 @@ func TestModel_ScrollerCursorBounds(t *testing.T) {
 		{Name: "device0"},
 		{Name: "device1"},
 	}
-	m.scroller.SetItemCount(len(m.devices))
+	m.Scroller.SetItemCount(len(m.devices))
 
 	// Can't go below 0
-	m.scroller.CursorUp()
+	m.Scroller.CursorUp()
 	if m.Cursor() != 0 {
 		t.Errorf("cursor = %d, want 0 (can't go below)", m.Cursor())
 	}
 
 	// Can't exceed list length
-	m.scroller.SetCursor(1)
-	m.scroller.CursorDown()
+	m.Scroller.SetCursor(1)
+	m.Scroller.CursorDown()
 	if m.Cursor() != 1 {
 		t.Errorf("cursor = %d, want 1 (can't exceed list)", m.Cursor())
 	}
@@ -390,17 +390,17 @@ func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.devices = make([]DeviceSelection, 20)
-	m.scroller.SetItemCount(20)
+	m.Scroller.SetItemCount(20)
 
 	// SetSize configures visible rows (height - 10 overhead)
 	m = m.SetSize(80, 20)
-	if m.scroller.VisibleRows() != 10 {
-		t.Errorf("visibleRows = %d, want 10", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() != 10 {
+		t.Errorf("visibleRows = %d, want 10", m.Scroller.VisibleRows())
 	}
 
 	m = m.SetSize(80, 5)
-	if m.scroller.VisibleRows() < 1 {
-		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.Scroller.VisibleRows())
 	}
 }
 
@@ -487,12 +487,12 @@ func TestModel_Accessors(t *testing.T) {
 		{Name: "device1", Selected: false},
 		{Name: "device2", Selected: false},
 	}
-	m.scroller.SetItemCount(len(m.devices))
+	m.Scroller.SetItemCount(len(m.devices))
 	m.operation = OpReboot
 	m.executing = true
 	m.results = []OperationResult{{Name: "device0", Success: true}}
 	m.err = errors.New("test error")
-	m.scroller.SetCursor(2)
+	m.Scroller.SetCursor(2)
 
 	if len(m.Devices()) != 3 {
 		t.Errorf("Devices() len = %d, want 3", len(m.Devices()))
@@ -540,19 +540,19 @@ func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	for i := range m.devices {
 		m.devices[i] = DeviceSelection{Name: string(rune('a' + i))}
 	}
-	m.scroller.SetItemCount(20)
+	m.Scroller.SetItemCount(20)
 	m = m.SetSize(80, 15) // Sets visibleRows = 15 - 10 = 5
 
 	// Cursor at end should scroll
-	m.scroller.CursorToEnd()
-	start, _ := m.scroller.VisibleRange()
+	m.Scroller.CursorToEnd()
+	start, _ := m.Scroller.VisibleRange()
 	if start == 0 {
 		t.Error("scroll should increase when cursor at end of long list")
 	}
 
 	// Cursor back to start
-	m.scroller.CursorToStart()
-	start, _ = m.scroller.VisibleRange()
+	m.Scroller.CursorToStart()
+	start, _ = m.Scroller.VisibleRange()
 	if start != 0 {
 		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}

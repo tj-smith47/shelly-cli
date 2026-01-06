@@ -84,21 +84,18 @@ type UpdateCompleteMsg struct {
 
 // Model displays firmware management.
 type Model struct {
+	helpers.Sizable
 	ctx          context.Context
 	svc          *shelly.Service
 	fileCache    *cache.FileCache
 	devices      []DeviceFirmware
-	scroller     *panel.Scroller
 	checking     bool
 	updating     bool
 	err          error
-	width        int
-	height       int
 	focused      bool
 	panelIndex   int
 	styles       Styles
-	checkLoader  loading.Model
-	updateLoader loading.Model
+	updateLoader loading.Model // Extra loader for update step
 	cacheStatus  cachestatus.Model
 	lastChecked  time.Time
 }
@@ -158,17 +155,12 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("firmware: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:   helpers.NewSizable(10, panel.NewScroller(0, 10)),
 		ctx:       deps.Ctx,
 		svc:       deps.Svc,
 		fileCache: deps.FileCache,
-		scroller:  panel.NewScroller(0, 10),
 		styles:    DefaultStyles(),
-		checkLoader: loading.New(
-			loading.WithMessage("Checking firmware..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(false, false),
-		),
 		updateLoader: loading.New(
 			loading.WithMessage("Updating devices..."),
 			loading.WithStyle(loading.StyleDot),
@@ -176,6 +168,8 @@ func New(deps Deps) Model {
 		),
 		cacheStatus: cachestatus.New(),
 	}
+	m.Loader = m.Loader.SetMessage("Checking firmware...")
+	return m
 }
 
 // Init returns the initial command.
@@ -220,7 +214,7 @@ func (m Model) LoadDevices() Model {
 		m.cacheStatus = m.cacheStatus.SetUpdatedAt(oldestCache)
 	}
 
-	m.scroller.SetItemCount(len(m.devices))
+	m.Scroller.SetItemCount(len(m.devices))
 	return m
 }
 
@@ -255,11 +249,8 @@ func (m Model) loadCachedFirmware(name string) *cachedFirmwareInfo {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.checkLoader = helpers.SetLoaderSize(m.checkLoader, width, height)
-	m.updateLoader = helpers.SetLoaderSize(m.updateLoader, width, height)
-	helpers.SetScrollerRows(height, 10, m.scroller)
+	resized := m.ApplySizeWithExtraLoaders(width, height, m.updateLoader)
+	m.updateLoader = resized[0]
 	return m
 }
 
@@ -283,7 +274,7 @@ func (m Model) CheckAll() (Model, tea.Cmd) {
 
 	m.checking = true
 	m.err = nil
-	return m, tea.Batch(m.checkLoader.Tick(), m.checkAllDevices())
+	return m, tea.Batch(m.Loader.Tick(), m.checkAllDevices())
 }
 
 func (m Model) checkAllDevices() tea.Cmd {
@@ -419,11 +410,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 // Returns updated model and command if the message was consumed.
 func (m Model) updateLoaders(msg tea.Msg) (Model, tea.Cmd) {
 	if m.checking {
-		result := generics.UpdateLoader(m.checkLoader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			_, ok := msg.(CheckCompleteMsg)
 			return ok
 		})
-		m.checkLoader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -513,7 +504,7 @@ func (m Model) handleBatchComplete() Model {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -535,7 +526,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) toggleSelection() Model {
-	generics.ToggleAtFunc(m.devices, m.scroller.Cursor(), deviceFirmwareGet, deviceFirmwareSet)
+	generics.ToggleAtFunc(m.devices, m.Scroller.Cursor(), deviceFirmwareGet, deviceFirmwareSet)
 	return m
 }
 
@@ -555,7 +546,7 @@ func (m Model) selectedDevices() []DeviceFirmware {
 
 // View renders the Firmware component.
 func (m Model) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Firmware").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -577,7 +568,7 @@ func (m Model) View() string {
 
 	// Status indicator (under actions, above device list)
 	if m.checking {
-		content.WriteString(m.checkLoader.View())
+		content.WriteString(m.Loader.View())
 		content.WriteString("\n")
 	} else if m.updating {
 		content.WriteString(m.updateLoader.View())
@@ -641,7 +632,7 @@ func (m Model) renderDeviceList() string {
 
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[DeviceFirmware]{
 		Items:    m.devices,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(device DeviceFirmware, _ int, isCursor bool) string {
 			return m.renderDeviceLine(device, isCursor)
 		},
@@ -731,7 +722,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // SelectedCount returns the number of selected devices.

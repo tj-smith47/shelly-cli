@@ -14,7 +14,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
@@ -33,18 +32,16 @@ type DataPoint struct {
 
 // Model represents the energy history state.
 type Model struct {
+	helpers.Sizable
 	cache          *cache.Cache
 	mu             *sync.RWMutex
 	history        map[string][]DataPoint // Device name -> history
 	maxItems       int                    // Max data points per device
 	lastCollection time.Time              // Throttle data collection
-	width          int
-	height         int
 	styles         Styles
 	focused        bool
 	panelIndex     int // For Shift+N hint
 	loading        bool
-	loader         loading.Model
 }
 
 // Styles for the energy history component.
@@ -96,25 +93,23 @@ func DefaultStyles() Styles {
 
 // New creates a new energy history component.
 func New(c *cache.Cache) Model {
-	return Model{
+	m := Model{
+		Sizable:  helpers.NewSizableLoaderOnly(),
 		cache:    c,
 		mu:       &sync.RWMutex{},
 		history:  make(map[string][]DataPoint),
 		maxItems: 60, // 5 minutes at 5-second intervals
 		styles:   DefaultStyles(),
 		loading:  true, // Start in loading state until first data point
-		loader: loading.New(
-			loading.WithMessage("Collecting energy history..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Collecting energy history...")
+	return m
 }
 
 // Init initializes the energy history.
 func (m *Model) Init() tea.Cmd {
 	if m.loading {
-		return m.loader.Tick()
+		return m.Loader.Tick()
 	}
 	return nil
 }
@@ -124,14 +119,14 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			switch msg.(type) {
 			case cache.DeviceUpdateMsg, cache.AllDevicesLoadedMsg:
 				return true
 			}
 			return false
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return *m, result.Cmd
 		}
@@ -277,7 +272,7 @@ func (m *Model) View() string {
 	// - Spaces: 2 (after label, after sparkline)
 	// - Value: 10
 	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = 16 + labelWidth
-	sparkWidth := m.width - 16 - labelWidth
+	sparkWidth := m.Width - 16 - labelWidth
 	if sparkWidth < 10 {
 		sparkWidth = 10 // Absolute minimum sparkline width
 	}
@@ -315,7 +310,7 @@ func (m *Model) View() string {
 		m.styles.SparkGradient[7].Render("█") + borderStyle.Render(" high")
 
 	// Use rendering package for consistent embedded title styling
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Energy History").
 		SetBadge(legend).
 		SetFocused(m.focused).
@@ -501,33 +496,33 @@ func scaleUp(history []DataPoint, width int) []DataPoint {
 }
 
 func (m *Model) renderEmpty() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Energy History").
 		SetBadge("5 min").
 		SetFocused(false)
 	centered := lipgloss.NewStyle().
-		Width(m.width-4).
-		Height(m.height-2).
+		Width(m.Width-4).
+		Height(m.Height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No devices online")
 	return r.SetContent(centered).Render()
 }
 
 func (m *Model) renderNoData() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Energy History").
 		SetBadge("5 min").
 		SetFocused(false)
 	centered := lipgloss.NewStyle().
-		Width(m.width-4).
-		Height(m.height-2).
+		Width(m.Width-4).
+		Height(m.Height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("Collecting energy data...\nHistory will appear after a few updates.")
 	return r.SetContent(centered).Render()
 }
 
 func (m *Model) renderLoading() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Energy History").
 		SetBadge("5 min").
 		SetFocused(m.focused).
@@ -540,7 +535,7 @@ func (m *Model) renderLoading() string {
 		r.SetBlurColor(theme.Yellow())
 	}
 
-	return r.SetContent(m.loader.View()).Render()
+	return r.SetContent(m.Loader.View()).Render()
 }
 
 // formatValue formats a power value with appropriate units.
@@ -558,9 +553,7 @@ func formatValue(value float64, unit string) string {
 
 // SetSize sets the component dimensions.
 func (m *Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	m.ApplySize(width, height)
 	return *m
 }
 
@@ -610,7 +603,7 @@ func (m *Model) SetLoading(isLoading bool) Model {
 // StartLoading sets loading to true and returns a tick command.
 func (m *Model) StartLoading() (Model, tea.Cmd) {
 	m.loading = true
-	return *m, m.loader.Tick()
+	return *m, m.Loader.Tick()
 }
 
 // IsLoading returns whether the component is in loading state.

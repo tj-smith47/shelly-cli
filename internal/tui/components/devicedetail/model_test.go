@@ -66,11 +66,11 @@ func TestSetSize(t *testing.T) {
 	m := New(deps)
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("expected width 100, got %d", m.width)
+	if m.Width != 100 {
+		t.Errorf("expected width 100, got %d", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("expected height 50, got %d", m.height)
+	if m.Height != 50 {
+		t.Errorf("expected height 50, got %d", m.Height)
 	}
 }
 

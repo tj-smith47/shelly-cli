@@ -16,7 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -103,20 +102,17 @@ type CompleteMsg struct {
 
 // Model displays batch operations.
 type Model struct {
+	helpers.Sizable
 	ctx        context.Context
 	svc        *shelly.Service
 	devices    []DeviceSelection
-	scroller   *panel.Scroller
 	operation  Operation
 	executing  bool
 	results    []OperationResult
 	err        error
-	width      int
-	height     int
 	focused    bool
 	panelIndex int
 	styles     Styles
-	loader     loading.Model
 }
 
 // Styles holds styles for the Batch component.
@@ -167,18 +163,15 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("batch: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:   helpers.NewSizable(10, panel.NewScroller(0, 10)),
 		ctx:       deps.Ctx,
 		svc:       deps.Svc,
-		scroller:  panel.NewScroller(0, 10),
 		operation: OpToggle,
 		styles:    DefaultStyles(),
-		loader: loading.New(
-			loading.WithMessage("Executing..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(false, false),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Executing...")
+	return m
 }
 
 // Init returns the initial command.
@@ -202,16 +195,13 @@ func (m Model) LoadDevices() Model {
 		})
 	}
 
-	m.scroller.SetItemCount(len(m.devices))
+	m.Scroller.SetItemCount(len(m.devices))
 	return m
 }
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 10, m.scroller) // Reserve space for header, operation selector, and footer
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -255,11 +245,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		_, ok := msg.(CompleteMsg)
 		return ok
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -299,11 +289,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 // handleNavKey handles navigation keys, returns true if handled.
 func (m Model) handleNavKey(key string) bool {
-	return keys.HandleScrollNavigation(key, m.scroller)
+	return keys.HandleScrollNavigation(key, m.Scroller)
 }
 
 func (m Model) toggleSelection() Model {
-	generics.ToggleAtFunc(m.devices, m.scroller.Cursor(), deviceSelectionGet, deviceSelectionSet)
+	generics.ToggleAtFunc(m.devices, m.Scroller.Cursor(), deviceSelectionGet, deviceSelectionSet)
 	return m
 }
 
@@ -336,7 +326,7 @@ func (m Model) execute() (Model, tea.Cmd) {
 	m.results = nil
 	m.err = nil
 
-	return m, tea.Batch(m.loader.Tick(), m.executeOperation(selected))
+	return m, tea.Batch(m.Loader.Tick(), m.executeOperation(selected))
 }
 
 func (m Model) executeOperation(devices []DeviceSelection) tea.Cmd {
@@ -392,7 +382,7 @@ func (m Model) executeOperation(devices []DeviceSelection) tea.Cmd {
 
 // View renders the Batch component.
 func (m Model) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Batch Operations").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -435,7 +425,7 @@ func (m Model) View() string {
 	// Executing indicator
 	if m.executing {
 		content.WriteString("\n")
-		content.WriteString(m.loader.View())
+		content.WriteString(m.Loader.View())
 	}
 
 	r.SetContent(content.String())
@@ -478,7 +468,7 @@ func (m Model) renderDeviceList() string {
 
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[DeviceSelection]{
 		Items:    m.devices,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(device DeviceSelection, _ int, isCursor bool) string {
 			return m.renderDeviceLine(device, isCursor)
 		},
@@ -575,7 +565,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // SelectedCount returns the number of selected devices.

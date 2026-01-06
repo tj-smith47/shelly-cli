@@ -80,6 +80,7 @@ type PollMsg struct{}
 
 // Model is the provisioning wizard model.
 type Model struct {
+	helpers.Sizable
 	ctx          context.Context
 	svc          *shelly.Service
 	step         Step
@@ -88,14 +89,11 @@ type Model struct {
 	password     string
 	inputField   int // 0 = SSID, 1 = password
 	err          error
-	width        int
-	height       int
 	focused      bool
 	panelIndex   int
 	polling      bool
 	styles       Styles
-	scanLoader   loading.Model
-	configLoader loading.Model
+	configLoader loading.Model // Extra loader for config step
 }
 
 // Styles holds styles for the Provisioning component.
@@ -150,22 +148,20 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("provisioning: invalid deps: %v", err))
 	}
 
-	return Model{
-		ctx:    deps.Ctx,
-		svc:    deps.Svc,
-		step:   StepInstructions,
-		styles: DefaultStyles(),
-		scanLoader: loading.New(
-			loading.WithMessage("Scanning..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(false, false),
-		),
+	m := Model{
+		Sizable: helpers.NewSizableLoaderOnly(),
+		ctx:     deps.Ctx,
+		svc:     deps.Svc,
+		step:    StepInstructions,
+		styles:  DefaultStyles(),
 		configLoader: loading.New(
 			loading.WithMessage("Please wait..."),
 			loading.WithStyle(loading.StyleDot),
 			loading.WithCentered(false, false),
 		),
 	}
+	m.Loader = m.Loader.SetMessage("Scanning...")
+	return m
 }
 
 // Init returns the initial command.
@@ -187,10 +183,8 @@ func (m Model) Reset() Model {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.scanLoader = helpers.SetLoaderSize(m.scanLoader, width, height)
-	m.configLoader = helpers.SetLoaderSize(m.configLoader, width, height)
+	resized := m.ApplySizeWithExtraLoaders(width, height, m.configLoader)
+	m.configLoader = resized[0]
 	return m
 }
 
@@ -211,7 +205,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loaders when active
 	if m.step == StepWaiting {
 		var cmd tea.Cmd
-		m.scanLoader, cmd = m.scanLoader.Update(msg)
+		m.Loader, cmd = m.Loader.Update(msg)
 		switch msg.(type) {
 		case DeviceFoundMsg, PollMsg:
 			// Pass through to main switch below
@@ -239,7 +233,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.polling = false
 		if msg.Err != nil {
 			// Keep polling on error
-			return m, tea.Batch(m.scanLoader.Tick(), m.pollAfterDelay())
+			return m, tea.Batch(m.Loader.Tick(), m.pollAfterDelay())
 		}
 		m.deviceInfo = msg.DeviceInfo
 		m.step = StepCredentials
@@ -256,7 +250,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case PollMsg:
 		if m.step == StepWaiting {
-			return m, tea.Batch(m.scanLoader.Tick(), m.checkDevice())
+			return m, tea.Batch(m.Loader.Tick(), m.checkDevice())
 		}
 		return m, nil
 
@@ -293,7 +287,7 @@ func (m Model) handleInstructionsKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case keyEnter:
 		m.step = StepWaiting
 		m.polling = true
-		return m, tea.Batch(m.scanLoader.Tick(), m.checkDevice())
+		return m, tea.Batch(m.Loader.Tick(), m.checkDevice())
 	case keyEsc, keyQ:
 		m = m.Reset()
 	}
@@ -379,7 +373,7 @@ func (m Model) configureDevice() tea.Cmd {
 
 // View renders the Provisioning component.
 func (m Model) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Setup New Device").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -466,7 +460,7 @@ func (m Model) renderWaiting() string {
 	content.WriteString(m.styles.Highlight.Render(DefaultAPAddress))
 	content.WriteString("\n\n")
 
-	content.WriteString(m.scanLoader.View())
+	content.WriteString(m.Loader.View())
 	content.WriteString("\n\n")
 
 	content.WriteString(m.styles.Muted.Render("Make sure you're connected to the device's WiFi network."))

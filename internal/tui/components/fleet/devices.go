@@ -14,7 +14,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
@@ -44,19 +43,16 @@ type DevicesLoadedMsg struct {
 
 // DevicesModel displays cloud devices from the fleet manager.
 type DevicesModel struct {
-	ctx        context.Context
-	fleet      *integrator.FleetManager
-	devices    []integrator.AccountDevice
-	scroller   *panel.Scroller
-	loading    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int
-	styles     DevicesStyles
-	lastFetch  time.Time
-	loader     loading.Model
+	helpers.Sizable // Embeds Width, Height, Loader, Scroller
+	ctx             context.Context
+	fleet           *integrator.FleetManager
+	devices         []integrator.AccountDevice
+	loading         bool
+	err             error
+	focused         bool
+	panelIndex      int
+	styles          DevicesStyles
+	lastFetch       time.Time
 }
 
 // DevicesStyles holds styles for the Devices component.
@@ -112,16 +108,13 @@ func NewDevices(deps DevicesDeps) DevicesModel {
 		panic(fmt.Sprintf("fleet/devices: invalid deps: %v", err))
 	}
 
-	return DevicesModel{
-		ctx:      deps.Ctx,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultDevicesStyles(),
-		loader: loading.New(
-			loading.WithMessage("Loading devices..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
+	m := DevicesModel{
+		Sizable: helpers.NewSizable(6, panel.NewScroller(0, 10)), // 6 accounts for borders, title, stats line
+		ctx:     deps.Ctx,
+		styles:  DefaultDevicesStyles(),
 	}
+	m.Loader = m.Loader.SetMessage("Loading devices...")
+	return m
 }
 
 // Init returns the initial command.
@@ -137,7 +130,7 @@ func (m DevicesModel) SetFleetManager(fm *integrator.FleetManager) (DevicesModel
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.loadDevices())
+	return m, tea.Batch(m.Loader.Tick(), m.loadDevices())
 }
 
 func (m DevicesModel) loadDevices() tea.Cmd {
@@ -152,10 +145,7 @@ func (m DevicesModel) loadDevices() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m DevicesModel) SetSize(width, height int) DevicesModel {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 6, m.scroller) // Account for borders, title, stats line
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -175,11 +165,11 @@ func (m DevicesModel) SetPanelIndex(index int) DevicesModel {
 func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			_, ok := msg.(DevicesLoadedMsg)
 			return ok
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -195,7 +185,7 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 		}
 		m.devices = msg.Devices
 		m.err = nil
-		m.scroller.SetItemCount(len(m.devices))
+		m.Scroller.SetItemCount(len(m.devices))
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -211,21 +201,21 @@ func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
 	switch msg.String() {
 	case "j", keyconst.KeyDown:
-		m.scroller.CursorDown()
+		m.Scroller.CursorDown()
 	case "k", keyconst.KeyUp:
-		m.scroller.CursorUp()
+		m.Scroller.CursorUp()
 	case "g":
-		m.scroller.CursorToStart()
+		m.Scroller.CursorToStart()
 	case "G":
-		m.scroller.CursorToEnd()
+		m.Scroller.CursorToEnd()
 	case "ctrl+d", keyconst.KeyPgDown:
-		m.scroller.PageDown()
+		m.Scroller.PageDown()
 	case "ctrl+u", keyconst.KeyPgUp:
-		m.scroller.PageUp()
+		m.Scroller.PageUp()
 	case "r":
 		if !m.loading {
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.loadDevices())
+			return m, tea.Batch(m.Loader.Tick(), m.loadDevices())
 		}
 	}
 
@@ -234,7 +224,7 @@ func (m DevicesModel) handleKey(msg tea.KeyPressMsg) (DevicesModel, tea.Cmd) {
 
 // View renders the Devices component.
 func (m DevicesModel) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Cloud Devices").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -256,8 +246,8 @@ func (m DevicesModel) View() string {
 
 func (m DevicesModel) getStatusMessage() string {
 	// Calculate content area for centering (accounting for panel borders)
-	contentWidth := m.width - 4
-	contentHeight := m.height - 4
+	contentWidth := m.Width - 4
+	contentHeight := m.Height - 4
 	if contentWidth < 1 {
 		contentWidth = 1
 	}
@@ -270,7 +260,7 @@ func (m DevicesModel) getStatusMessage() string {
 		msg := m.styles.Muted.Render("Not connected to Shelly Cloud")
 		return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg)
 	case m.loading:
-		return m.loader.View()
+		return m.Loader.View()
 	case m.err != nil:
 		msg, hint := tuierrors.FormatError(m.err)
 		errMsg := m.styles.Error.Render(msg) + "\n" +
@@ -297,7 +287,7 @@ func (m DevicesModel) renderDeviceList() string {
 	// Device list with scroll using generic helper
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[integrator.AccountDevice]{
 		Items:    m.devices,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(device integrator.AccountDevice, _ int, isCursor bool) string {
 			return m.renderDeviceLine(device, isCursor)
 		},
@@ -323,7 +313,7 @@ func (m DevicesModel) renderDeviceLine(device integrator.AccountDevice, isSelect
 
 	// Calculate available width for name and type
 	// Fixed: cursor(2) + status(2) + spaces(2) + parens(2) = 8
-	available := output.ContentWidth(m.width, 4+8) // panel border + fixed elements
+	available := output.ContentWidth(m.Width, 4+8) // panel border + fixed elements
 	nameWidth, typeWidth := output.SplitWidth(available, 60, 10, 8)
 
 	// Device name (truncate if needed)
@@ -352,7 +342,7 @@ func (m DevicesModel) renderDeviceLine(device integrator.AccountDevice, isSelect
 
 // SelectedDevice returns the currently selected device.
 func (m DevicesModel) SelectedDevice() *integrator.AccountDevice {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= 0 && cursor < len(m.devices) {
 		return &m.devices[cursor]
 	}
@@ -361,7 +351,7 @@ func (m DevicesModel) SelectedDevice() *integrator.AccountDevice {
 
 // Cursor returns the current cursor position.
 func (m DevicesModel) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // Devices returns all devices.
@@ -401,7 +391,7 @@ func (m DevicesModel) Refresh() (DevicesModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.loadDevices())
+	return m, tea.Batch(m.Loader.Tick(), m.loadDevices())
 }
 
 // FooterText returns keybinding hints for the footer.

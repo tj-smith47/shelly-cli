@@ -16,7 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -82,20 +81,17 @@ type CreateScheduleMsg struct {
 
 // ListModel displays schedules for a device.
 type ListModel struct {
+	helpers.Sizable
 	ctx         context.Context
 	svc         *automation.Service
 	fileCache   *cache.FileCache
 	device      string
 	schedules   []Schedule
-	scroller    *panel.Scroller
 	loading     bool
 	err         error
-	width       int
-	height      int
 	focused     bool
 	panelIndex  int // 1-based panel index for Shift+N hotkey hint
 	styles      ListStyles
-	loader      loading.Model
 	cacheStatus cachestatus.Model
 }
 
@@ -140,20 +136,17 @@ func NewList(deps ListDeps) ListModel {
 		panic(fmt.Sprintf("schedules: invalid deps: %v", err))
 	}
 
-	return ListModel{
+	m := ListModel{
+		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
-		scroller:    panel.NewScroller(0, 10),
 		loading:     false,
 		styles:      DefaultListStyles(),
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading schedules..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Loading schedules...")
+	return m
 }
 
 // Init returns the initial command.
@@ -165,8 +158,8 @@ func (m ListModel) Init() tea.Cmd {
 func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 	m.device = device
 	m.schedules = nil
-	m.scroller.SetItemCount(0)
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(0)
+	m.Scroller.CursorToStart()
 	m.err = nil
 	m.cacheStatus = cachestatus.New()
 
@@ -255,10 +248,7 @@ func (m ListModel) backgroundRefresh() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m ListModel) SetSize(width, height int) ListModel {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 4, m.scroller)
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -317,14 +307,14 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 }
 
 func (m ListModel) updateLoading(msg tea.Msg) (ListModel, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		switch msg.(type) {
 		case LoadedMsg, ActionMsg:
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -336,8 +326,8 @@ func (m ListModel) handleCacheHit(msg panelcache.CacheHitMsg) (ListModel, tea.Cm
 	data, err := panelcache.Unmarshal[CachedSchedulesData](msg.Data)
 	if err == nil {
 		m.schedules = data.Schedules
-		m.scroller.SetItemCount(len(m.schedules))
-		m.scroller.CursorToStart()
+		m.Scroller.SetItemCount(len(m.schedules))
+		m.Scroller.CursorToStart()
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
@@ -356,7 +346,7 @@ func (m ListModel) handleCacheMiss(msg panelcache.CacheMissMsg) (ListModel, tea.
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheSchedules())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheSchedules())
 }
 
 func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (ListModel, tea.Cmd) {
@@ -373,7 +363,7 @@ func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Lis
 	}
 	if data, ok := msg.Data.(CachedSchedulesData); ok {
 		m.schedules = data.Schedules
-		m.scroller.SetItemCount(len(m.schedules))
+		m.Scroller.SetItemCount(len(m.schedules))
 	}
 	// Emit LoadedMsg so sequential loading can advance
 	return m, func() tea.Msg { return LoadedMsg{Schedules: m.schedules} }
@@ -387,8 +377,8 @@ func (m ListModel) handleLoaded(msg LoadedMsg) (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	m.schedules = msg.Schedules
-	m.scroller.SetItemCount(len(m.schedules))
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(len(m.schedules))
+	m.Scroller.CursorToStart()
 	return m, nil
 }
 
@@ -400,7 +390,7 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 	// Invalidate cache and refresh after action
 	m.loading = true
 	return m, tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
 		m.fetchAndCacheSchedules(),
 	)
@@ -408,7 +398,7 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -430,7 +420,7 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
 		return m, tea.Batch(
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
 			m.fetchAndCacheSchedules(),
 		)
@@ -440,7 +430,7 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 }
 
 func (m ListModel) selectSchedule() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
@@ -451,7 +441,7 @@ func (m ListModel) selectSchedule() tea.Cmd {
 }
 
 func (m ListModel) deleteSchedule() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
@@ -467,7 +457,7 @@ func (m ListModel) deleteSchedule() tea.Cmd {
 }
 
 func (m ListModel) toggleSchedule() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
@@ -503,7 +493,7 @@ func (m ListModel) createSchedule() tea.Cmd {
 
 // View renders the schedules list.
 func (m ListModel) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Schedules").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -523,7 +513,7 @@ func (m ListModel) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -546,7 +536,7 @@ func (m ListModel) View() string {
 
 	content := generics.RenderScrollableList(generics.ListRenderConfig[Schedule]{
 		Items:    m.schedules,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(schedule Schedule, _ int, isCursor bool) string {
 			return m.renderScheduleLine(schedule, isCursor)
 		},
@@ -575,7 +565,7 @@ func (m ListModel) renderScheduleLine(schedule Schedule, isSelected bool) string
 
 	// Calculate available width for timespec and method
 	// Fixed: selector(2) + icon(2) + spaces(2) = 6
-	available := output.ContentWidth(m.width, 4+6)
+	available := output.ContentWidth(m.Width, 4+6)
 	timespecWidth, methodWidth := output.SplitWidth(available, 50, 12, 15)
 
 	// Timespec (truncate if too long)
@@ -602,7 +592,7 @@ func (m ListModel) renderScheduleLine(schedule Schedule, isSelected bool) string
 
 // SelectedSchedule returns the currently selected schedule, if any.
 func (m ListModel) SelectedSchedule() *Schedule {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
 		return nil
 	}
@@ -611,7 +601,7 @@ func (m ListModel) SelectedSchedule() *Schedule {
 
 // Cursor returns the current cursor position.
 func (m ListModel) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // ScheduleCount returns the number of schedules.
@@ -640,7 +630,7 @@ func (m ListModel) Refresh() (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchSchedules())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchSchedules())
 }
 
 // FooterText returns keybinding hints for the footer.

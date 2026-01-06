@@ -13,7 +13,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -30,17 +29,15 @@ type Bar struct {
 
 // Model represents the energy bars state.
 type Model struct {
+	helpers.Sizable
 	bars       []Bar
 	cache      *cache.Cache
-	width      int
-	height     int
 	barHeight  int
 	styles     Styles
 	showTotal  bool
 	focused    bool
 	panelIndex int // For Shift+N hint
 	loading    bool
-	loader     loading.Model
 }
 
 // Styles for the energy bars.
@@ -82,24 +79,22 @@ func DefaultStyles() Styles {
 
 // New creates a new energy bars component.
 func New(c *cache.Cache) Model {
-	return Model{
+	m := Model{
+		Sizable:   helpers.NewSizableLoaderOnly(),
 		cache:     c,
 		barHeight: 1,
 		styles:    DefaultStyles(),
 		showTotal: true,
 		loading:   true, // Start in loading state until cache is populated
-		loader: loading.New(
-			loading.WithMessage("Loading power data..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Loading power data...")
+	return m
 }
 
 // Init initializes the energy bars.
 func (m Model) Init() tea.Cmd {
 	if m.loading {
-		return m.loader.Tick()
+		return m.Loader.Tick()
 	}
 	return nil
 }
@@ -112,7 +107,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	var cmd tea.Cmd
-	m.loader, cmd = m.loader.Update(msg)
+	m.Loader, cmd = m.Loader.Update(msg)
 
 	// Auto-detect when cache has PM devices (data is ready)
 	if m.hasPMDevicesInCache() {
@@ -183,7 +178,7 @@ func (m Model) View() string {
 	// - Spaces: 2 (after label, after bar)
 	// - Value: 10
 	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = 16 + labelWidth
-	barWidth := m.width - 16 - labelWidth
+	barWidth := m.Width - 16 - labelWidth
 	if barWidth < 5 {
 		barWidth = 5 // Absolute minimum bar width
 	}
@@ -202,7 +197,7 @@ func (m Model) View() string {
 	badge := borderStyle.Render(fmt.Sprintf("%d devices │ Legend: ", len(m.bars))) +
 		barFillStyle.Render("██") + borderStyle.Render(" high ") +
 		barFillStyle.Render("░░") + borderStyle.Render(" low")
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Power Consumption").
 		SetBadge(badge).
 		SetFocused(m.focused).
@@ -336,31 +331,31 @@ func (m Model) renderBar(bar Bar, maxVal float64, barWidth, labelWidth int) stri
 }
 
 func (m Model) renderEmpty() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Power Consumption").
 		SetFocused(false)
 	centered := lipgloss.NewStyle().
-		Width(m.width-4).
-		Height(m.height-2).
+		Width(m.Width-4).
+		Height(m.Height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No devices online")
 	return r.SetContent(centered).Render()
 }
 
 func (m Model) renderNoData() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Power Consumption").
 		SetFocused(false)
 	centered := lipgloss.NewStyle().
-		Width(m.width-4).
-		Height(m.height-2).
+		Width(m.Width-4).
+		Height(m.Height-2).
 		Align(lipgloss.Center, lipgloss.Center).
 		Render("No power data available")
 	return r.SetContent(centered).Render()
 }
 
 func (m Model) renderLoading() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Power Consumption").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -372,7 +367,7 @@ func (m Model) renderLoading() string {
 		r.SetBlurColor(theme.Yellow())
 	}
 
-	return r.SetContent(m.loader.View()).Render()
+	return r.SetContent(m.Loader.View()).Render()
 }
 
 // formatValue formats a power/energy value with appropriate units.
@@ -393,9 +388,7 @@ func formatValue(value float64, unit string) string {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -437,7 +430,7 @@ func (m Model) SetLoading(isLoading bool) Model {
 // StartLoading sets loading to true and returns a tick command.
 func (m Model) StartLoading() (Model, tea.Cmd) {
 	m.loading = true
-	return m, m.loader.Tick()
+	return m, m.Loader.Tick()
 }
 
 // IsLoading returns whether the component is in loading state.

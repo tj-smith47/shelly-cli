@@ -20,7 +20,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -37,6 +36,7 @@ type FetchedMsg struct {
 
 // Model displays JSON responses with syntax highlighting.
 type Model struct {
+	helpers.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	deviceAddress string
@@ -48,10 +48,7 @@ type Model struct {
 	loading       bool
 	error         error
 	visible       bool
-	width         int
-	height        int
 	styles        Styles
-	loader        loading.Model // Loading spinner
 }
 
 // Styles for the JSON viewer.
@@ -107,17 +104,15 @@ func DefaultStyles() Styles {
 func New(ctx context.Context, svc *shelly.Service) Model {
 	vp := viewport.New(viewport.WithWidth(60), viewport.WithHeight(20))
 
-	return Model{
+	m := Model{
+		Sizable:  helpers.NewSizableLoaderOnly(),
 		ctx:      ctx,
 		svc:      svc,
 		viewport: vp,
 		styles:   DefaultStyles(),
-		loader: loading.New(
-			loading.WithMessage("Loading..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Loading...")
+	return m
 }
 
 // Init initializes the JSON viewer.
@@ -139,7 +134,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Update loader for spinner animation when loading
 	if m.loading {
 		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
+		m.Loader, cmd = m.Loader.Update(msg)
 		return m, cmd
 	}
 
@@ -185,7 +180,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 	case key.Matches(msg, key.NewBinding(key.WithKeys("r"))):
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
+		return m, tea.Batch(m.Loader.Tick(), m.fetchEndpoint())
 	}
 
 	// Forward to viewport for scrolling (handles j/k/up/down/pgup/pgdn)
@@ -200,7 +195,7 @@ func (m Model) prevEndpoint() (Model, tea.Cmd) {
 		m.endpointIdx--
 		m.endpoint = m.endpoints[m.endpointIdx]
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
+		return m, tea.Batch(m.Loader.Tick(), m.fetchEndpoint())
 	}
 	return m, nil
 }
@@ -211,7 +206,7 @@ func (m Model) nextEndpoint() (Model, tea.Cmd) {
 		m.endpointIdx++
 		m.endpoint = m.endpoints[m.endpointIdx]
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
+		return m, tea.Batch(m.Loader.Tick(), m.fetchEndpoint())
 	}
 	return m, nil
 }
@@ -223,7 +218,7 @@ func (m Model) View() string {
 	}
 
 	colors := theme.GetSemanticColors()
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("JSON: " + m.endpoint).
 		SetFocused(true).
 		SetFocusColor(colors.Highlight)
@@ -239,7 +234,7 @@ func (m Model) View() string {
 	// Content
 	switch {
 	case m.loading:
-		content.WriteString(m.loader.View())
+		content.WriteString(m.Loader.View())
 	case m.error != nil:
 		content.WriteString(m.styles.Error.Render("Error: " + m.error.Error()))
 	default:
@@ -415,9 +410,9 @@ func (m Model) Open(deviceAddress, endpoint string, endpoints []string) (Model, 
 
 	// Update viewport size
 	// Subtract: 2 for borders, 2 for horizontal padding
-	contentWidth := m.width - 4
+	contentWidth := m.Width - 4
 	// Subtract: 2 for borders, 3 for footer (\n\n + line), 1 buffer for nav
-	contentHeight := m.height - 6
+	contentHeight := m.Height - 6
 	if contentWidth > 10 {
 		m.viewport.SetWidth(contentWidth)
 	}
@@ -425,7 +420,7 @@ func (m Model) Open(deviceAddress, endpoint string, endpoints []string) (Model, 
 		m.viewport.SetHeight(contentHeight)
 	}
 
-	return m, tea.Batch(m.loader.Tick(), m.fetchEndpoint())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchEndpoint())
 }
 
 // Close closes the JSON viewer.
@@ -443,9 +438,7 @@ func (m Model) Visible() bool {
 
 // SetSize sets the viewer dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	m.ApplySize(width, height)
 
 	// Subtract: 2 for borders, 2 for horizontal padding
 	contentWidth := width - 4

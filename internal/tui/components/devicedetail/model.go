@@ -14,7 +14,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -39,6 +38,7 @@ type ClosedMsg struct{}
 
 // Model holds the device detail state.
 type Model struct {
+	helpers.Sizable
 	ctx      context.Context
 	svc      *shelly.Service
 	device   *model.Device
@@ -48,10 +48,7 @@ type Model struct {
 	visible  bool
 	loading  bool
 	err      error
-	width    int
-	height   int
 	styles   Styles
-	loader   loading.Model
 }
 
 // Styles for the device detail component.
@@ -101,17 +98,15 @@ func DefaultStyles() Styles {
 func New(deps Deps) Model {
 	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
-	return Model{
+	m := Model{
+		Sizable:  helpers.NewSizableLoaderOnly(),
 		ctx:      deps.Ctx,
 		svc:      deps.Svc,
 		viewport: vp,
 		styles:   DefaultStyles(),
-		loader: loading.New(
-			loading.WithMessage("Loading device details..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Loading device details...")
+	return m
 }
 
 // Init initializes the device detail component.
@@ -127,11 +122,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			_, ok := msg.(Msg)
 			return ok
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -176,7 +171,7 @@ func (m Model) View() string {
 
 	switch {
 	case m.loading:
-		content = m.loader.View()
+		content = m.Loader.View()
 	case m.err != nil:
 		content = m.styles.Error.Render("Error: " + m.err.Error())
 	default:
@@ -187,8 +182,8 @@ func (m Model) View() string {
 		m.styles.Label.Render("q/Esc close")
 
 	return m.styles.Container.
-		Width(m.width - 4).
-		Height(m.height - 2).
+		Width(m.Width - 4).
+		Height(m.Height - 2).
 		Render(content + "\n" + footer)
 }
 
@@ -289,9 +284,7 @@ func (m Model) renderPowerMonitoring() string {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	m.ApplySize(width, height)
 	// Account for container borders and padding
 	m.viewport.SetWidth(width - 8)
 	m.viewport.SetHeight(height - 6)
@@ -305,7 +298,7 @@ func (m Model) Show(device model.Device) (Model, tea.Cmd) {
 	m.err = nil
 	m.device = &device
 
-	return m, tea.Batch(m.loader.Tick(), m.fetchDeviceDetails(device))
+	return m, tea.Batch(m.Loader.Tick(), m.fetchDeviceDetails(device))
 }
 
 // Hide hides the device detail overlay.

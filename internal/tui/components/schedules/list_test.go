@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 )
 
 func TestSchedule(t *testing.T) {
@@ -69,11 +69,11 @@ func TestListModel_SetSize(t *testing.T) {
 	m := newTestListModel()
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("height = %d, want 50", m.Height)
 	}
 }
 
@@ -98,13 +98,13 @@ func TestListModel_ScrollerVisibleRows(t *testing.T) {
 
 	// SetSize configures visible rows (height - 4 overhead)
 	m = m.SetSize(80, 20)
-	if m.scroller.VisibleRows() != 16 {
-		t.Errorf("visibleRows = %d, want 16", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() != 16 {
+		t.Errorf("visibleRows = %d, want 16", m.Scroller.VisibleRows())
 	}
 
 	m = m.SetSize(80, 5)
-	if m.scroller.VisibleRows() < 1 {
-		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.Scroller.VisibleRows())
 	}
 }
 
@@ -116,41 +116,41 @@ func TestListModel_ScrollerCursorNavigation(t *testing.T) {
 		{ID: 2, Timespec: "0 0 18 * * *"},
 		{ID: 3, Timespec: "0 30 12 * * *"},
 	}
-	m.scroller.SetItemCount(len(m.schedules))
+	m.Scroller.SetItemCount(len(m.schedules))
 	m = m.SetSize(80, 20)
 
 	// Cursor down
-	m.scroller.CursorDown()
+	m.Scroller.CursorDown()
 	if m.Cursor() != 1 {
 		t.Errorf("after CursorDown: cursor = %d, want 1", m.Cursor())
 	}
 
-	m.scroller.CursorDown()
+	m.Scroller.CursorDown()
 	if m.Cursor() != 2 {
 		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Don't go past end
-	m.scroller.CursorDown()
+	m.Scroller.CursorDown()
 	if m.Cursor() != 2 {
 		t.Errorf("cursor at end: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Cursor up
-	m.scroller.CursorUp()
+	m.Scroller.CursorUp()
 	if m.Cursor() != 1 {
 		t.Errorf("after CursorUp: cursor = %d, want 1", m.Cursor())
 	}
 
 	// Don't go before start
-	m.scroller.CursorToStart()
-	m.scroller.CursorUp()
+	m.Scroller.CursorToStart()
+	m.Scroller.CursorUp()
 	if m.Cursor() != 0 {
 		t.Errorf("cursor at start: cursor = %d, want 0", m.Cursor())
 	}
 
 	// Cursor to end
-	m.scroller.CursorToEnd()
+	m.Scroller.CursorToEnd()
 	if m.Cursor() != 2 {
 		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.Cursor())
 	}
@@ -164,19 +164,19 @@ func TestListModel_ScrollerEnsureVisible(t *testing.T) {
 		schedules[i] = Schedule{ID: i, Timespec: "0 0 * * * *"}
 	}
 	m.schedules = schedules
-	m.scroller.SetItemCount(20)
+	m.Scroller.SetItemCount(20)
 	m = m.SetSize(80, 15) // Sets visibleRows = 15 - 4 = 11
 
 	// Cursor at end should scroll
-	m.scroller.CursorToEnd()
-	start, _ := m.scroller.VisibleRange()
+	m.Scroller.CursorToEnd()
+	start, _ := m.Scroller.VisibleRange()
 	if start == 0 {
 		t.Error("scroll should increase when cursor at end of long list")
 	}
 
 	// Cursor back to start
-	m.scroller.CursorToStart()
-	start, _ = m.scroller.VisibleRange()
+	m.Scroller.CursorToStart()
+	start, _ = m.Scroller.VisibleRange()
 	if start != 0 {
 		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}
@@ -189,8 +189,8 @@ func TestListModel_SelectedSchedule(t *testing.T) {
 		{ID: 1, Timespec: "0 0 9 * * *"},
 		{ID: 2, Timespec: "0 0 18 * * *"},
 	}
-	m.scroller.SetItemCount(len(m.schedules))
-	m.scroller.SetCursor(1)
+	m.Scroller.SetItemCount(len(m.schedules))
+	m.Scroller.SetCursor(1)
 
 	selected := m.SelectedSchedule()
 	if selected == nil {
@@ -202,7 +202,7 @@ func TestListModel_SelectedSchedule(t *testing.T) {
 
 	// Empty list
 	m.schedules = nil
-	m.scroller.SetItemCount(0)
+	m.Scroller.SetItemCount(0)
 	selected = m.SelectedSchedule()
 	if selected != nil {
 		t.Error("SelectedSchedule() on empty list should return nil")
@@ -262,11 +262,11 @@ func TestListModel_Error(t *testing.T) {
 func TestListModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		device: "",
-		width:  40,
-		height: 10,
-		styles: DefaultListStyles(),
+		Sizable: helpers.NewSizableLoaderOnly(),
+		device:  "",
+		styles:  DefaultListStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No device selected") {
@@ -277,13 +277,12 @@ func TestListModel_View_NoDevice(t *testing.T) {
 func TestListModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
+		Sizable: helpers.NewSizableLoaderOnly(),
 		device:  "192.168.1.100",
 		loading: true,
-		width:   40,
-		height:  10,
 		styles:  DefaultListStyles(),
-		loader:  loading.New(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "Loading") {
@@ -294,13 +293,13 @@ func TestListModel_View_Loading(t *testing.T) {
 func TestListModel_View_NoSchedules(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
+		Sizable:   helpers.NewSizableLoaderOnly(),
 		device:    "192.168.1.100",
 		loading:   false,
 		schedules: []Schedule{},
-		width:     40,
-		height:    10,
 		styles:    DefaultListStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No schedules") {
@@ -327,7 +326,7 @@ func TestListModel_View_WithSchedules(t *testing.T) {
 			Calls:    []automation.ScheduleCall{{Method: "Switch.Set"}},
 		},
 	}
-	m.scroller.SetItemCount(len(m.schedules))
+	m.Scroller.SetItemCount(len(m.schedules))
 	m = m.SetSize(60, 15)
 
 	view := m.View()
@@ -444,7 +443,7 @@ func TestListModel_Update_KeyPress_NotFocused(t *testing.T) {
 	m := newTestListModel()
 	m.focused = false
 	m.schedules = []Schedule{{ID: 1}}
-	m.scroller.SetItemCount(len(m.schedules))
+	m.Scroller.SetItemCount(len(m.schedules))
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 106}) // 'j'
 

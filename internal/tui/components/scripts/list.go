@@ -15,7 +15,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -85,20 +84,17 @@ type CreateScriptMsg struct {
 
 // ListModel displays scripts for a device.
 type ListModel struct {
+	helpers.Sizable
 	ctx         context.Context
 	svc         *automation.Service
 	fileCache   *cache.FileCache
 	device      string
 	scripts     []Script
-	scroller    *panel.Scroller
 	loading     bool
 	err         error
-	width       int
-	height      int
 	focused     bool
 	panelIndex  int // 1-based panel index for Shift+N hotkey hint
 	styles      ListStyles
-	loader      loading.Model
 	cacheStatus cachestatus.Model
 }
 
@@ -147,20 +143,17 @@ func NewList(deps ListDeps) ListModel {
 		panic(fmt.Sprintf("scripts: invalid deps: %v", err))
 	}
 
-	return ListModel{
+	m := ListModel{
+		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 1)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
-		scroller:    panel.NewScroller(0, 1),
 		loading:     false,
 		styles:      DefaultListStyles(),
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading scripts..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Loading scripts...")
+	return m
 }
 
 // Init returns the initial command.
@@ -172,7 +165,7 @@ func (m ListModel) Init() tea.Cmd {
 func (m ListModel) SetDevice(device string) (ListModel, tea.Cmd) {
 	m.device = device
 	m.scripts = nil
-	m.scroller.SetItemCount(0)
+	m.Scroller.SetItemCount(0)
 	m.err = nil
 	m.cacheStatus = cachestatus.New()
 
@@ -261,10 +254,7 @@ func (m ListModel) backgroundRefresh() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m ListModel) SetSize(width, height int) ListModel {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 4, m.scroller)
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -323,14 +313,14 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 }
 
 func (m ListModel) updateLoading(msg tea.Msg) (ListModel, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		switch msg.(type) {
 		case LoadedMsg, ActionMsg:
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -342,8 +332,8 @@ func (m ListModel) handleCacheHit(msg panelcache.CacheHitMsg) (ListModel, tea.Cm
 	data, err := panelcache.Unmarshal[CachedScriptsData](msg.Data)
 	if err == nil {
 		m.scripts = data.Scripts
-		m.scroller.SetItemCount(len(m.scripts))
-		m.scroller.CursorToStart()
+		m.Scroller.SetItemCount(len(m.scripts))
+		m.Scroller.CursorToStart()
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
@@ -362,7 +352,7 @@ func (m ListModel) handleCacheMiss(msg panelcache.CacheMissMsg) (ListModel, tea.
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheScripts())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheScripts())
 }
 
 func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (ListModel, tea.Cmd) {
@@ -379,7 +369,7 @@ func (m ListModel) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Lis
 	}
 	if data, ok := msg.Data.(CachedScriptsData); ok {
 		m.scripts = data.Scripts
-		m.scroller.SetItemCount(len(m.scripts))
+		m.Scroller.SetItemCount(len(m.scripts))
 	}
 	// Emit LoadedMsg so sequential loading can advance
 	return m, func() tea.Msg { return LoadedMsg{Scripts: m.scripts} }
@@ -393,8 +383,8 @@ func (m ListModel) handleLoaded(msg LoadedMsg) (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	m.scripts = msg.Scripts
-	m.scroller.SetItemCount(len(m.scripts))
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(len(m.scripts))
+	m.Scroller.CursorToStart()
 	return m, nil
 }
 
@@ -406,7 +396,7 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 	// Invalidate cache and refresh after action
 	m.loading = true
 	return m, tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		panelcache.Invalidate(m.fileCache, m.device, cache.TypeScripts),
 		m.fetchAndCacheScripts(),
 	)
@@ -414,7 +404,7 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -442,7 +432,7 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
 		return m, tea.Batch(
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeScripts),
 			m.fetchAndCacheScripts(),
 		)
@@ -452,7 +442,7 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 }
 
 func (m ListModel) selectScript() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
@@ -463,7 +453,7 @@ func (m ListModel) selectScript() tea.Cmd {
 }
 
 func (m ListModel) editScript() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
@@ -474,7 +464,7 @@ func (m ListModel) editScript() tea.Cmd {
 }
 
 func (m ListModel) startScript() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
@@ -493,7 +483,7 @@ func (m ListModel) startScript() tea.Cmd {
 }
 
 func (m ListModel) stopScript() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
@@ -512,7 +502,7 @@ func (m ListModel) stopScript() tea.Cmd {
 }
 
 func (m ListModel) deleteScript() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
@@ -538,7 +528,7 @@ func (m ListModel) createScript() tea.Cmd {
 
 // View renders the scripts list.
 func (m ListModel) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Scripts").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -562,7 +552,7 @@ func (m ListModel) renderContent() string {
 	}
 
 	if m.loading {
-		return m.loader.View()
+		return m.Loader.View()
 	}
 
 	if m.err != nil {
@@ -589,7 +579,7 @@ func (m ListModel) renderError() string {
 func (m ListModel) renderScriptsList() string {
 	return generics.RenderScrollableList(generics.ListRenderConfig[Script]{
 		Items:    m.scripts,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(script Script, _ int, isCursor bool) string {
 			return m.renderScriptLine(script, isCursor)
 		},
@@ -636,7 +626,7 @@ func (m ListModel) renderScriptLine(script Script, isSelected bool) string {
 
 // SelectedScript returns the currently selected script, if any.
 func (m ListModel) SelectedScript() *Script {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
 		return nil
 	}
@@ -669,7 +659,7 @@ func (m ListModel) Refresh() (ListModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchScripts())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchScripts())
 }
 
 // FooterText returns keybinding hints for the footer.

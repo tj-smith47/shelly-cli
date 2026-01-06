@@ -74,6 +74,7 @@ type EditClosedMsg struct {
 
 // Model displays WiFi settings for a device.
 type Model struct {
+	helpers.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
 	fileCache     *cache.FileCache
@@ -81,18 +82,14 @@ type Model struct {
 	status        *network.WiFiStatusFull
 	config        *network.WiFiConfigFull
 	networks      []network.WiFiNetworkFull
-	scroller      *panel.Scroller
 	loading       bool
 	scanning      bool
 	editing       bool
 	err           error
-	width         int
-	height        int
 	focused       bool
 	panelIndex    int // 1-based panel index for Shift+N hotkey hint
 	styles        Styles
-	loader        loading.Model
-	scannerLoader loading.Model
+	scannerLoader loading.Model // Extra loader for scanning
 	editModal     EditModel
 	cacheStatus   cachestatus.Model
 }
@@ -148,19 +145,14 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("wifi: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:     helpers.NewSizable(12, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
-		scroller:    panel.NewScroller(0, 10),
 		loading:     false,
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading WiFi status..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 		scannerLoader: loading.New(
 			loading.WithMessage("Scanning for networks..."),
 			loading.WithStyle(loading.StyleDot),
@@ -168,6 +160,8 @@ func New(deps Deps) Model {
 		),
 		editModal: NewEditModel(deps.Ctx, deps.Svc),
 	}
+	m.Loader = m.Loader.SetMessage("Loading WiFi status...")
+	return m
 }
 
 // Init returns the initial command.
@@ -181,8 +175,8 @@ func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.status = nil
 	m.config = nil
 	m.networks = nil
-	m.scroller.SetItemCount(0)
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(0)
+	m.Scroller.CursorToStart()
 	m.err = nil
 	m.loading = true
 	m.cacheStatus = cachestatus.New()
@@ -267,12 +261,9 @@ func (m Model) scanNetworks() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	m.scannerLoader = helpers.SetLoaderSize(m.scannerLoader, width, height)
+	resized := m.ApplySizeWithExtraLoaders(width, height, m.scannerLoader)
+	m.scannerLoader = resized[0]
 	m.editModal = m.editModal.SetSize(width, height)
-	helpers.SetScrollerRows(height, 12, m.scroller) // Reserve space for status section
 	return m
 }
 
@@ -341,13 +332,13 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		if _, ok := msg.(StatusLoadedMsg); ok {
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -392,7 +383,7 @@ func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheStatus())
 }
 
 func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
@@ -434,8 +425,8 @@ func (m Model) handleScanResult(msg ScanResultMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.networks = msg.Networks
-	m.scroller.SetItemCount(len(m.networks))
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(len(m.networks))
+	m.Scroller.CursorToStart()
 	return m, nil
 }
 
@@ -450,7 +441,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading = true
 		return m, tea.Batch(
 			cmd,
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeWiFi),
 			m.fetchAndCacheStatus(),
 		)
@@ -464,7 +455,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 			// Invalidate cache and refresh data after successful save
 			m.loading = true
 			return m, tea.Batch(
-				m.loader.Tick(),
+				m.Loader.Tick(),
 				panelcache.Invalidate(m.fileCache, m.device, cache.TypeWiFi),
 				m.fetchAndCacheStatus(),
 				func() tea.Msg { return EditClosedMsg{Saved: true} },
@@ -477,7 +468,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -510,7 +501,7 @@ func (m Model) handleRefreshKey() (Model, tea.Cmd) {
 	m.loading = true
 	// Invalidate cache and fetch fresh data
 	return m, tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		panelcache.Invalidate(m.fileCache, m.device, cache.TypeWiFi),
 		m.fetchAndCacheStatus(),
 	)
@@ -532,7 +523,7 @@ func (m Model) View() string {
 		return m.editModal.View()
 	}
 
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("WiFi").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -543,7 +534,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -701,7 +692,7 @@ func (m Model) renderNetworks() string {
 	// Network list with scroll indicator
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[network.WiFiNetworkFull]{
 		Items:    m.networks,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(netw network.WiFiNetworkFull, _ int, isCursor bool) string {
 			return m.renderNetworkLine(netw, isCursor)
 		},
@@ -729,7 +720,7 @@ func (m Model) renderNetworkLine(netw network.WiFiNetworkFull, isSelected bool) 
 
 	// Calculate available width for SSID
 	// Fixed: selector(2) + signalIcon(2) + space(1) + authIcon(2) = 7
-	ssidWidth := output.ContentWidth(m.width, 4+7)
+	ssidWidth := output.ContentWidth(m.Width, 4+7)
 	if ssidWidth < 10 {
 		ssidWidth = 10
 	}
@@ -786,7 +777,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // Refresh triggers a refresh of the WiFi status.
@@ -795,7 +786,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchStatus())
 }
 
 // FooterText returns keybinding hints for the footer.

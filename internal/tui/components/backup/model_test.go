@@ -33,7 +33,7 @@ func TestNew(t *testing.T) {
 	if m.mode != ModeExport {
 		t.Errorf("mode = %v, want ModeExport", m.mode)
 	}
-	if m.scroller == nil {
+	if m.Scroller == nil {
 		t.Error("scroller should be initialized")
 	}
 }
@@ -135,15 +135,15 @@ func TestModel_SetSize(t *testing.T) {
 
 	updated := m.SetSize(100, 50)
 
-	if updated.width != 100 {
-		t.Errorf("width = %d, want 100", updated.width)
+	if updated.Width != 100 {
+		t.Errorf("width = %d, want 100", updated.Width)
 	}
-	if updated.height != 50 {
-		t.Errorf("height = %d, want 50", updated.height)
+	if updated.Height != 50 {
+		t.Errorf("height = %d, want 50", updated.Height)
 	}
 	// visible rows = height - 10
-	if updated.scroller.VisibleRows() != 40 {
-		t.Errorf("scroller.VisibleRows() = %d, want 40", updated.scroller.VisibleRows())
+	if updated.Scroller.VisibleRows() != 40 {
+		t.Errorf("scroller.VisibleRows() = %d, want 40", updated.Scroller.VisibleRows())
 	}
 }
 
@@ -242,18 +242,18 @@ func TestModel_HandleKey_Navigation(t *testing.T) {
 		{Name: "device1"},
 		{Name: "device2"},
 	}
-	m.scroller.SetItemCount(3)
+	m.Scroller.SetItemCount(3)
 
 	// Move down
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
-	if updated.scroller.Cursor() != 1 {
-		t.Errorf("cursor after j = %d, want 1", updated.scroller.Cursor())
+	if updated.Scroller.Cursor() != 1 {
+		t.Errorf("cursor after j = %d, want 1", updated.Scroller.Cursor())
 	}
 
 	// Move up
 	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'k'})
-	if updated.scroller.Cursor() != 0 {
-		t.Errorf("cursor after k = %d, want 0", updated.scroller.Cursor())
+	if updated.Scroller.Cursor() != 0 {
+		t.Errorf("cursor after k = %d, want 0", updated.Scroller.Cursor())
 	}
 }
 
@@ -266,7 +266,7 @@ func TestModel_HandleKey_Selection(t *testing.T) {
 		{Name: "device0", Selected: false},
 		{Name: "device1", Selected: false},
 	}
-	m.scroller.SetItemCount(2)
+	m.Scroller.SetItemCount(2)
 
 	// Toggle selection with space
 	updated, _ := m.Update(tea.KeyPressMsg{Code: ' '})
@@ -380,11 +380,11 @@ func TestModel_HandleKey_NotFocused(t *testing.T) {
 	m := newTestModel()
 	m.focused = false
 	m.devices = []DeviceBackup{{Name: "device0"}}
-	m.scroller.SetItemCount(1)
+	m.Scroller.SetItemCount(1)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j'})
 
-	if updated.scroller.Cursor() != 0 {
+	if updated.Scroller.Cursor() != 0 {
 		t.Error("cursor should not change when not focused")
 	}
 }
@@ -397,19 +397,19 @@ func TestModel_ScrollerCursorBounds(t *testing.T) {
 		{Name: "device0"},
 		{Name: "device1"},
 	}
-	m.scroller.SetItemCount(2)
+	m.Scroller.SetItemCount(2)
 
 	// Can't go below 0
-	m.scroller.CursorUp()
-	if m.scroller.Cursor() != 0 {
-		t.Errorf("cursor = %d, want 0 (can't go below)", m.scroller.Cursor())
+	m.Scroller.CursorUp()
+	if m.Scroller.Cursor() != 0 {
+		t.Errorf("cursor = %d, want 0 (can't go below)", m.Scroller.Cursor())
 	}
 
 	// Can't exceed list length
-	m.scroller.SetCursor(1)
-	m.scroller.CursorDown()
-	if m.scroller.Cursor() != 1 {
-		t.Errorf("cursor = %d, want 1 (can't exceed list)", m.scroller.Cursor())
+	m.Scroller.SetCursor(1)
+	m.Scroller.CursorDown()
+	if m.Scroller.Cursor() != 1 {
+		t.Errorf("cursor = %d, want 1 (can't exceed list)", m.Scroller.Cursor())
 	}
 }
 
@@ -418,12 +418,12 @@ func TestModel_ScrollerVisibleRows(t *testing.T) {
 	m := newTestModel()
 
 	m = m.SetSize(80, 20)
-	if rows := m.scroller.VisibleRows(); rows != 10 {
+	if rows := m.Scroller.VisibleRows(); rows != 10 {
 		t.Errorf("scroller.VisibleRows() = %d, want 10", rows)
 	}
 
 	m = m.SetSize(80, 5)
-	if rows := m.scroller.VisibleRows(); rows != 1 {
+	if rows := m.Scroller.VisibleRows(); rows != 1 {
 		t.Errorf("scroller.VisibleRows() with small height = %d, want 1", rows)
 	}
 }
@@ -464,7 +464,7 @@ func TestModel_View_ExportMode(t *testing.T) {
 		{Name: "device0", Selected: true},
 		{Name: "device1", Selected: false, Exported: true, FilePath: "/tmp/backup.json"},
 	}
-	m.scroller.SetItemCount(2)
+	m.Scroller.SetItemCount(2)
 	m = m.SetSize(80, 30)
 
 	view := m.View()
@@ -526,8 +526,8 @@ func TestModel_Accessors(t *testing.T) {
 	m.exporting = true
 	m.importing = true
 	m.err = errors.New("test error")
-	m.scroller.SetItemCount(5)
-	m.scroller.SetCursor(2)
+	m.Scroller.SetItemCount(5)
+	m.Scroller.SetCursor(2)
 	m.backupDir = "/custom/backups"
 
 	if len(m.Devices()) != 2 {

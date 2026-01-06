@@ -20,11 +20,11 @@ func TestNew(t *testing.T) {
 func TestModel_SetSize(t *testing.T) {
 	t.Parallel()
 	m := New(nil).SetSize(80, 40)
-	if m.width != 80 {
-		t.Errorf("width = %d, want 80", m.width)
+	if m.Width != 80 {
+		t.Errorf("width = %d, want 80", m.Width)
 	}
-	if m.height != 40 {
-		t.Errorf("height = %d, want 40", m.height)
+	if m.Height != 40 {
+		t.Errorf("height = %d, want 40", m.Height)
 	}
 }
 

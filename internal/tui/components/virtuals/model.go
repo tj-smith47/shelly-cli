@@ -16,7 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -78,22 +77,19 @@ type ActionMsg struct {
 
 // Model displays virtual components for a device.
 type Model struct {
+	helpers.Sizable
 	ctx              context.Context
 	svc              *shelly.Service
 	device           string
 	virtuals         []Virtual
-	scroller         *panel.Scroller
 	loading          bool
 	editing          bool
 	confirmingDelete bool
 	deleteKey        string
 	err              error
-	width            int
-	height           int
 	focused          bool
 	panelIndex       int // 1-based panel index for Shift+N hotkey hint
 	styles           Styles
-	loader           loading.Model
 	editModal        EditModel
 	fileCache        *cache.FileCache
 	cacheStatus      cachestatus.Model
@@ -160,21 +156,18 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("virtuals: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
-		scroller:    panel.NewScroller(0, 10),
 		loading:     false,
 		styles:      DefaultStyles(),
 		fileCache:   deps.FileCache,
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading virtual components..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
-		editModal: NewEditModel(deps.Ctx, deps.Svc),
+		editModal:   NewEditModel(deps.Ctx, deps.Svc),
 	}
+	m.Loader = m.Loader.SetMessage("Loading virtual components...")
+	return m
 }
 
 // Init returns the initial command.
@@ -186,8 +179,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.virtuals = nil
-	m.scroller.SetItemCount(0)
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(0)
+	m.Scroller.CursorToStart()
 	m.err = nil
 	m.cacheStatus = cachestatus.New()
 
@@ -297,10 +290,7 @@ func (m Model) backgroundRefresh() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 4, m.scroller)
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -348,14 +338,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		switch msg.(type) {
 		case LoadedMsg, ActionMsg:
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -388,8 +378,8 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	data, err := panelcache.Unmarshal[CachedVirtualsData](msg.Data)
 	if err == nil {
 		m.virtuals = data.Virtuals
-		m.scroller.SetItemCount(len(m.virtuals))
-		m.scroller.CursorToStart()
+		m.Scroller.SetItemCount(len(m.virtuals))
+		m.Scroller.CursorToStart()
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
@@ -408,7 +398,7 @@ func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheVirtuals())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheVirtuals())
 }
 
 func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
@@ -425,7 +415,7 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	}
 	if data, ok := msg.Data.(CachedVirtualsData); ok {
 		m.virtuals = data.Virtuals
-		m.scroller.SetItemCount(len(m.virtuals))
+		m.Scroller.SetItemCount(len(m.virtuals))
 	}
 	// Emit LoadedMsg so sequential loading can advance
 	return m, func() tea.Msg { return LoadedMsg{Virtuals: m.virtuals} }
@@ -439,8 +429,8 @@ func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.virtuals = msg.Virtuals
-	m.scroller.SetItemCount(len(m.virtuals))
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(len(m.virtuals))
+	m.Scroller.CursorToStart()
 	return m, nil
 }
 
@@ -452,7 +442,7 @@ func (m Model) handleAction(msg ActionMsg) (Model, tea.Cmd) {
 	// Invalidate cache and refresh after action
 	m.loading = true
 	return m, tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
 		m.fetchAndCacheVirtuals(),
 	)
@@ -469,7 +459,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading = true
 		return m, tea.Batch(
 			cmd,
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
 			m.fetchAndCacheVirtuals(),
 		)
@@ -483,7 +473,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 			// Invalidate cache and refresh data after successful save
 			m.loading = true
 			return m, tea.Batch(
-				m.loader.Tick(),
+				m.Loader.Tick(),
 				panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
 				m.fetchAndCacheVirtuals(),
 				func() tea.Msg { return EditClosedMsg{Saved: true} },
@@ -511,7 +501,7 @@ func (m Model) handleDeleteConfirmation(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -533,7 +523,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
 		return m, tea.Batch(
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
 			m.fetchAndCacheVirtuals(),
 		)
@@ -546,7 +536,7 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 	if m.device == "" || m.loading || len(m.virtuals) == 0 {
 		return m, nil
 	}
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= len(m.virtuals) {
 		return m, nil
 	}
@@ -558,7 +548,7 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 	}
 
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.ShowEdit(m.device, &v)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -568,7 +558,7 @@ func (m Model) handleNewKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.ShowNew(m.device)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -577,7 +567,7 @@ func (m Model) handleDeleteKey() (Model, tea.Cmd) {
 	if m.device == "" || m.loading || len(m.virtuals) == 0 {
 		return m, nil
 	}
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= len(m.virtuals) {
 		return m, nil
 	}
@@ -598,7 +588,7 @@ func (m Model) executeDelete(key string) tea.Cmd {
 }
 
 func (m Model) toggleOrTrigger() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.virtuals) == 0 || cursor >= len(m.virtuals) {
 		return nil
 	}
@@ -626,7 +616,7 @@ func (m Model) toggleOrTrigger() tea.Cmd {
 }
 
 func (m Model) adjustValue(delta int) tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.virtuals) == 0 || cursor >= len(m.virtuals) {
 		return nil
 	}
@@ -681,7 +671,7 @@ func (m Model) View() string {
 		return m.editModal.View()
 	}
 
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Virtual Components").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -692,7 +682,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -728,7 +718,7 @@ func (m Model) View() string {
 	// Virtual list with scroll indicator
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[Virtual]{
 		Items:    m.virtuals,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(v Virtual, _ int, isCursor bool) string {
 			return m.renderVirtualLine(v, isCursor)
 		},
@@ -777,7 +767,7 @@ func (m Model) renderVirtualLine(v Virtual, isSelected bool) string {
 
 	// Calculate available width for name and value
 	// Fixed: selector(2) + type(4) + spaces(2) = 8
-	available := output.ContentWidth(m.width, 4+8)
+	available := output.ContentWidth(m.Width, 4+8)
 	nameWidth, valueWidth := output.SplitWidth(available, 40, 10, 15)
 
 	// Name or ID
@@ -839,7 +829,7 @@ func (m Model) formatValueWithWidth(v Virtual, maxWidth int) string {
 
 // SelectedVirtual returns the currently selected virtual component, if any.
 func (m Model) SelectedVirtual() *Virtual {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.virtuals) == 0 || cursor >= len(m.virtuals) {
 		return nil
 	}
@@ -848,7 +838,7 @@ func (m Model) SelectedVirtual() *Virtual {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // VirtualCount returns the number of virtual components.
@@ -877,7 +867,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchVirtuals())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchVirtuals())
 }
 
 // FooterText returns keybinding hints for the footer.

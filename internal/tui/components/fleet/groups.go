@@ -14,7 +14,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
@@ -43,20 +42,17 @@ type GroupsLoadedMsg struct {
 
 // GroupsModel displays and manages device groups.
 type GroupsModel struct {
-	ctx        context.Context
-	fleet      *integrator.FleetManager
-	groups     []*integrator.DeviceGroup
-	scroller   *panel.Scroller
-	loading    bool
-	editing    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int
-	styles     GroupsStyles
-	loader     loading.Model
-	editModal  GroupEditModel
+	helpers.Sizable // Embeds Width, Height, Loader, Scroller
+	ctx             context.Context
+	fleet           *integrator.FleetManager
+	groups          []*integrator.DeviceGroup
+	loading         bool
+	editing         bool
+	err             error
+	focused         bool
+	panelIndex      int
+	styles          GroupsStyles
+	editModal       GroupEditModel
 }
 
 // GroupsStyles holds styles for the Groups component.
@@ -102,17 +98,14 @@ func NewGroups(deps GroupsDeps) GroupsModel {
 		panic(fmt.Sprintf("fleet/groups: invalid deps: %v", err))
 	}
 
-	return GroupsModel{
-		ctx:      deps.Ctx,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultGroupsStyles(),
-		loader: loading.New(
-			loading.WithMessage("Loading groups..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
+	m := GroupsModel{
+		Sizable:   helpers.NewSizable(5, panel.NewScroller(0, 10)), // 5 accounts for borders, title, stats
+		ctx:       deps.Ctx,
+		styles:    DefaultGroupsStyles(),
 		editModal: NewGroupEditModel(),
 	}
+	m.Loader = m.Loader.SetMessage("Loading groups...")
+	return m
 }
 
 // Init returns the initial command.
@@ -128,7 +121,7 @@ func (m GroupsModel) SetFleetManager(fm *integrator.FleetManager) (GroupsModel, 
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.loadGroups())
+	return m, tea.Batch(m.Loader.Tick(), m.loadGroups())
 }
 
 func (m GroupsModel) loadGroups() tea.Cmd {
@@ -143,10 +136,7 @@ func (m GroupsModel) loadGroups() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m GroupsModel) SetSize(width, height int) GroupsModel {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 5, m.scroller) // Account for borders, title, stats
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -171,11 +161,11 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			_, ok := msg.(GroupsLoadedMsg)
 			return ok
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -190,7 +180,7 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 		}
 		m.groups = msg.Groups
 		m.err = nil
-		m.scroller.SetItemCount(len(m.groups))
+		m.Scroller.SetItemCount(len(m.groups))
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -212,7 +202,7 @@ func (m GroupsModel) handleEditModalUpdate(msg tea.Msg) (GroupsModel, tea.Cmd) {
 		m.editing = false
 		// Refresh data after edit
 		m.loading = true
-		return m, tea.Batch(cmd, m.loader.Tick(), m.loadGroups())
+		return m, tea.Batch(cmd, m.Loader.Tick(), m.loadGroups())
 	}
 
 	// Handle save result message
@@ -222,7 +212,7 @@ func (m GroupsModel) handleEditModalUpdate(msg tea.Msg) (GroupsModel, tea.Cmd) {
 			m.editModal = m.editModal.Hide()
 			// Refresh data after successful save
 			m.loading = true
-			return m, tea.Batch(m.loader.Tick(), m.loadGroups(), func() tea.Msg {
+			return m, tea.Batch(m.Loader.Tick(), m.loadGroups(), func() tea.Msg {
 				return GroupEditClosedMsg{Saved: true}
 			})
 		}
@@ -247,22 +237,22 @@ func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 	// Navigation keys
 	switch key {
 	case "j", keyconst.KeyDown:
-		m.scroller.CursorDown()
+		m.Scroller.CursorDown()
 		return m, nil
 	case "k", keyconst.KeyUp:
-		m.scroller.CursorUp()
+		m.Scroller.CursorUp()
 		return m, nil
 	case "g":
-		m.scroller.CursorToStart()
+		m.Scroller.CursorToStart()
 		return m, nil
 	case "G":
-		m.scroller.CursorToEnd()
+		m.Scroller.CursorToEnd()
 		return m, nil
 	case "ctrl+d", keyconst.KeyPgDown:
-		m.scroller.PageDown()
+		m.Scroller.PageDown()
 		return m, nil
 	case "ctrl+u", keyconst.KeyPgUp:
-		m.scroller.PageUp()
+		m.Scroller.PageUp()
 		return m, nil
 	case "r":
 		return m.handleRefresh()
@@ -286,7 +276,7 @@ func (m GroupsModel) handleRefresh() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.loadGroups())
+	return m, tea.Batch(m.Loader.Tick(), m.loadGroups())
 }
 
 func (m GroupsModel) handleCreate() (GroupsModel, tea.Cmd) {
@@ -294,7 +284,7 @@ func (m GroupsModel) handleCreate() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.ShowCreate(m.fleet)
 	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
 }
@@ -308,7 +298,7 @@ func (m GroupsModel) handleEdit() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.ShowEdit(m.fleet, group)
 	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
 }
@@ -322,7 +312,7 @@ func (m GroupsModel) handleDelete() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.ShowDelete(m.fleet, group)
 	return m, func() tea.Msg { return GroupEditOpenedMsg{} }
 }
@@ -386,7 +376,7 @@ func (m GroupsModel) View() string {
 		return m.editModal.View()
 	}
 
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Device Groups").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -397,8 +387,8 @@ func (m GroupsModel) View() string {
 	}
 
 	// Calculate content area for centering (accounting for panel borders)
-	contentWidth := m.width - 4
-	contentHeight := m.height - 4
+	contentWidth := m.Width - 4
+	contentHeight := m.Height - 4
 	if contentWidth < 1 {
 		contentWidth = 1
 	}
@@ -413,7 +403,7 @@ func (m GroupsModel) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -438,7 +428,7 @@ func (m GroupsModel) View() string {
 	// Group list using generic helper
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[*integrator.DeviceGroup]{
 		Items:    m.groups,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(group *integrator.DeviceGroup, _ int, isSelected bool) string {
 			return m.renderGroupLine(group, isSelected)
 		},
@@ -461,7 +451,7 @@ func (m GroupsModel) renderGroupLine(group *integrator.DeviceGroup, isSelected b
 
 	// Calculate available width for name
 	// Fixed: cursor(2) + space(1) + countStr length
-	available := output.ContentWidth(m.width, 4+3+len(countStr))
+	available := output.ContentWidth(m.Width, 4+3+len(countStr))
 	name := output.Truncate(group.Name, max(available, 10))
 
 	line := fmt.Sprintf("%s%s %s",
@@ -479,7 +469,7 @@ func (m GroupsModel) renderGroupLine(group *integrator.DeviceGroup, isSelected b
 
 // SelectedGroup returns the currently selected group.
 func (m GroupsModel) SelectedGroup() *integrator.DeviceGroup {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= 0 && cursor < len(m.groups) {
 		return m.groups[cursor]
 	}
@@ -488,7 +478,7 @@ func (m GroupsModel) SelectedGroup() *integrator.DeviceGroup {
 
 // Cursor returns the current cursor position.
 func (m GroupsModel) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // Groups returns all groups.
@@ -517,7 +507,7 @@ func (m GroupsModel) Refresh() (GroupsModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.loadGroups())
+	return m, tea.Batch(m.Loader.Tick(), m.loadGroups())
 }
 
 // FooterText returns keybinding hints for the footer.

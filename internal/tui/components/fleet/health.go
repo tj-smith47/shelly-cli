@@ -12,7 +12,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -39,18 +38,16 @@ type HealthLoadedMsg struct {
 
 // HealthModel displays fleet health and statistics.
 type HealthModel struct {
-	ctx        context.Context
-	fleet      *integrator.FleetManager
-	stats      *integrator.FleetStats
-	loading    bool
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int
-	styles     HealthStyles
-	lastFetch  time.Time
-	loader     loading.Model
+	helpers.Sizable // Embeds Width, Height, Loader (no scroller needed)
+	ctx             context.Context
+	fleet           *integrator.FleetManager
+	stats           *integrator.FleetStats
+	loading         bool
+	err             error
+	focused         bool
+	panelIndex      int
+	styles          HealthStyles
+	lastFetch       time.Time
 }
 
 // HealthStyles holds styles for the Health component.
@@ -103,15 +100,13 @@ func NewHealth(deps HealthDeps) HealthModel {
 		panic(fmt.Sprintf("fleet/health: invalid deps: %v", err))
 	}
 
-	return HealthModel{
-		ctx:    deps.Ctx,
-		styles: DefaultHealthStyles(),
-		loader: loading.New(
-			loading.WithMessage("Loading health data..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
+	m := HealthModel{
+		Sizable: helpers.NewSizableLoaderOnly(),
+		ctx:     deps.Ctx,
+		styles:  DefaultHealthStyles(),
 	}
+	m.Loader = m.Loader.SetMessage("Loading health data...")
+	return m
 }
 
 // Init returns the initial command.
@@ -127,7 +122,7 @@ func (m HealthModel) SetFleetManager(fm *integrator.FleetManager) (HealthModel, 
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.loadHealth())
+	return m, tea.Batch(m.Loader.Tick(), m.loadHealth())
 }
 
 func (m HealthModel) loadHealth() tea.Cmd {
@@ -142,9 +137,7 @@ func (m HealthModel) loadHealth() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m HealthModel) SetSize(width, height int) HealthModel {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -164,11 +157,11 @@ func (m HealthModel) SetPanelIndex(index int) HealthModel {
 func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			_, ok := msg.(HealthLoadedMsg)
 			return ok
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -199,7 +192,7 @@ func (m HealthModel) Update(msg tea.Msg) (HealthModel, tea.Cmd) {
 func (m HealthModel) handleKey(msg tea.KeyPressMsg) (HealthModel, tea.Cmd) {
 	if msg.String() == "r" && !m.loading && m.fleet != nil {
 		m.loading = true
-		return m, tea.Batch(m.loader.Tick(), m.loadHealth())
+		return m, tea.Batch(m.Loader.Tick(), m.loadHealth())
 	}
 
 	return m, nil
@@ -207,7 +200,7 @@ func (m HealthModel) handleKey(msg tea.KeyPressMsg) (HealthModel, tea.Cmd) {
 
 // View renders the Health component.
 func (m HealthModel) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Fleet Health").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -218,8 +211,8 @@ func (m HealthModel) View() string {
 	}
 
 	// Calculate content area for centering (accounting for panel borders)
-	contentWidth := m.width - 4
-	contentHeight := m.height - 4
+	contentWidth := m.Width - 4
+	contentHeight := m.Height - 4
 	if contentWidth < 1 {
 		contentWidth = 1
 	}
@@ -234,7 +227,7 @@ func (m HealthModel) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -334,5 +327,5 @@ func (m HealthModel) Refresh() (HealthModel, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.loadHealth())
+	return m, tea.Batch(m.Loader.Tick(), m.loadHealth())
 }

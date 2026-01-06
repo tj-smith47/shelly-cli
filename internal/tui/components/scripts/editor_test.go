@@ -8,7 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 )
 
 func TestEditorDeps_Validate(t *testing.T) {
@@ -46,11 +46,11 @@ func TestEditorModel_SetSize(t *testing.T) {
 	m := EditorModel{}
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("height = %d, want 50", m.Height)
 	}
 }
 
@@ -122,7 +122,8 @@ func TestEditorModel_VisibleLines(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := EditorModel{height: tt.height}
+			m := EditorModel{Sizable: helpers.NewSizableLoaderOnly()}
+			m = m.SetSize(80, tt.height)
 			got := m.visibleLines()
 			if got != tt.want {
 				t.Errorf("visibleLines() = %d, want %d", got, tt.want)
@@ -148,7 +149,8 @@ func TestEditorModel_MaxScroll(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			lines := make([]string, tt.codeLines)
-			m := EditorModel{codeLines: lines, height: tt.height}
+			m := EditorModel{Sizable: helpers.NewSizableLoaderOnly(), codeLines: lines}
+			m = m.SetSize(80, tt.height)
 			got := m.maxScroll()
 			if got != tt.want {
 				t.Errorf("maxScroll() = %d, want %d", got, tt.want)
@@ -165,10 +167,11 @@ func TestEditorModel_ScrollNavigation(t *testing.T) {
 	}
 
 	m := EditorModel{
+		Sizable:   helpers.NewSizableLoaderOnly(),
 		codeLines: lines,
-		height:    20,
 		scroll:    0,
 	}
+	m = m.SetSize(80, 20)
 
 	// Scroll down
 	m = m.scrollDown()
@@ -210,10 +213,11 @@ func TestEditorModel_PageNavigation(t *testing.T) {
 	}
 
 	m := EditorModel{
+		Sizable:   helpers.NewSizableLoaderOnly(),
 		codeLines: lines,
-		height:    20,
 		scroll:    50,
 	}
+	m = m.SetSize(80, 20)
 
 	visible := m.visibleLines()
 
@@ -285,11 +289,11 @@ func TestEditorModel_Getters(t *testing.T) {
 func TestEditorModel_View_NoScript(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:  helpers.NewSizableLoaderOnly(),
 		scriptID: 0,
-		width:    50,
-		height:   20,
 		styles:   DefaultEditorStyles(),
 	}
+	m = m.SetSize(50, 20)
 
 	view := m.View()
 	if !strings.Contains(view, "No script selected") {
@@ -300,13 +304,12 @@ func TestEditorModel_View_NoScript(t *testing.T) {
 func TestEditorModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:  helpers.NewSizableLoaderOnly(),
 		scriptID: 1,
 		loading:  true,
-		width:    50,
-		height:   20,
 		styles:   DefaultEditorStyles(),
-		loader:   loading.New(),
 	}
+	m = m.SetSize(50, 20)
 
 	view := m.View()
 	if !strings.Contains(view, "Loading") {
@@ -317,12 +320,12 @@ func TestEditorModel_View_Loading(t *testing.T) {
 func TestEditorModel_View_Error(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:  helpers.NewSizableLoaderOnly(),
 		scriptID: 1,
 		err:      context.DeadlineExceeded,
-		width:    50,
-		height:   20,
 		styles:   DefaultEditorStyles(),
 	}
+	m = m.SetSize(50, 20)
 
 	view := m.View()
 	if !strings.Contains(view, "Error") {
@@ -333,13 +336,13 @@ func TestEditorModel_View_Error(t *testing.T) {
 func TestEditorModel_View_EmptyCode(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:    helpers.NewSizableLoaderOnly(),
 		scriptID:   1,
 		scriptName: "empty_script",
 		codeLines:  []string{},
-		width:      50,
-		height:     20,
 		styles:     DefaultEditorStyles(),
 	}
+	m = m.SetSize(50, 20)
 
 	view := m.View()
 	if !strings.Contains(view, "empty script") {
@@ -350,14 +353,14 @@ func TestEditorModel_View_EmptyCode(t *testing.T) {
 func TestEditorModel_View_WithCode(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:     helpers.NewSizableLoaderOnly(),
 		scriptID:    1,
 		scriptName:  "test_script",
 		codeLines:   []string{"let x = 1;", "let y = 2;", "// comment"},
 		showNumbers: true,
-		width:       60,
-		height:      20,
 		styles:      DefaultEditorStyles(),
 	}
+	m = m.SetSize(60, 20)
 
 	view := m.View()
 	if !strings.Contains(view, "test_script") {
@@ -368,6 +371,7 @@ func TestEditorModel_View_WithCode(t *testing.T) {
 func TestEditorModel_View_WithStatus(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:    helpers.NewSizableLoaderOnly(),
 		scriptID:   1,
 		scriptName: "running_script",
 		codeLines:  []string{"code"},
@@ -376,10 +380,9 @@ func TestEditorModel_View_WithStatus(t *testing.T) {
 			MemUsage: 8192,
 			MemFree:  16384,
 		},
-		width:  60,
-		height: 20,
 		styles: DefaultEditorStyles(),
 	}
+	m = m.SetSize(60, 20)
 
 	view := m.View()
 	if !strings.Contains(view, "running") {
@@ -417,12 +420,13 @@ func TestEditorModel_SyntaxHighlighting(t *testing.T) {
 func TestEditorModel_RenderCodeLines(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:     helpers.NewSizableLoaderOnly(),
 		codeLines:   []string{"line1", "line2", "line3"},
 		showNumbers: true,
-		height:      20,
 		scroll:      0,
 		styles:      DefaultEditorStyles(),
 	}
+	m = m.SetSize(80, 20)
 
 	result := m.renderCodeLines()
 	if result == "" {
@@ -433,10 +437,11 @@ func TestEditorModel_RenderCodeLines(t *testing.T) {
 func TestEditorModel_RenderCodeLines_Empty(t *testing.T) {
 	t.Parallel()
 	m := EditorModel{
+		Sizable:   helpers.NewSizableLoaderOnly(),
 		codeLines: []string{},
-		height:    20,
 		styles:    DefaultEditorStyles(),
 	}
+	m = m.SetSize(80, 20)
 
 	result := m.renderCodeLines()
 	if !strings.Contains(result, "empty") {

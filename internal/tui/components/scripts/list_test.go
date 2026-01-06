@@ -8,7 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -67,18 +67,18 @@ func TestListDeps_Validate(t *testing.T) {
 
 func TestListModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := ListModel{scroller: panel.NewScroller(0, 1)}
+	m := ListModel{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("height = %d, want 50", m.Height)
 	}
 	// Visible rows should be height - 4 (borders + title + footer)
-	if m.scroller.VisibleRows() != 46 {
-		t.Errorf("scroller.VisibleRows() = %d, want 46", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() != 46 {
+		t.Errorf("scroller.VisibleRows() = %d, want 46", m.Scroller.VisibleRows())
 	}
 }
 
@@ -113,9 +113,9 @@ func TestListModel_SetSize_VisibleRows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := ListModel{scroller: panel.NewScroller(0, 1)}
+			m := ListModel{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
 			m = m.SetSize(80, tt.height)
-			got := m.scroller.VisibleRows()
+			got := m.Scroller.VisibleRows()
 			if got != tt.want {
 				t.Errorf("scroller.VisibleRows() = %d, want %d", got, tt.want)
 			}
@@ -132,45 +132,45 @@ func TestListModel_CursorNavigation(t *testing.T) {
 	}
 
 	m := ListModel{
-		scripts:  scripts,
-		scroller: panel.NewScroller(3, 10),
-		height:   20,
+		Sizable: helpers.NewSizable(4, panel.NewScroller(3, 10)),
+		scripts: scripts,
 	}
+	m = m.SetSize(80, 20)
 
 	// Test cursor down
-	m.scroller.CursorDown()
-	if m.scroller.Cursor() != 1 {
-		t.Errorf("after CursorDown: cursor = %d, want 1", m.scroller.Cursor())
+	m.Scroller.CursorDown()
+	if m.Scroller.Cursor() != 1 {
+		t.Errorf("after CursorDown: cursor = %d, want 1", m.Scroller.Cursor())
 	}
 
-	m.scroller.CursorDown()
-	if m.scroller.Cursor() != 2 {
-		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.scroller.Cursor())
+	m.Scroller.CursorDown()
+	if m.Scroller.Cursor() != 2 {
+		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.Scroller.Cursor())
 	}
 
 	// Test cursor doesn't go past end
-	m.scroller.CursorDown()
-	if m.scroller.Cursor() != 2 {
-		t.Errorf("cursor at end: cursor = %d, want 2", m.scroller.Cursor())
+	m.Scroller.CursorDown()
+	if m.Scroller.Cursor() != 2 {
+		t.Errorf("cursor at end: cursor = %d, want 2", m.Scroller.Cursor())
 	}
 
 	// Test cursor up
-	m.scroller.CursorUp()
-	if m.scroller.Cursor() != 1 {
-		t.Errorf("after CursorUp: cursor = %d, want 1", m.scroller.Cursor())
+	m.Scroller.CursorUp()
+	if m.Scroller.Cursor() != 1 {
+		t.Errorf("after CursorUp: cursor = %d, want 1", m.Scroller.Cursor())
 	}
 
 	// Test cursor doesn't go before start
-	m.scroller.SetCursor(0)
-	m.scroller.CursorUp()
-	if m.scroller.Cursor() != 0 {
-		t.Errorf("cursor at start: cursor = %d, want 0", m.scroller.Cursor())
+	m.Scroller.SetCursor(0)
+	m.Scroller.CursorUp()
+	if m.Scroller.Cursor() != 0 {
+		t.Errorf("cursor at start: cursor = %d, want 0", m.Scroller.Cursor())
 	}
 
 	// Test cursor to end
-	m.scroller.CursorToEnd()
-	if m.scroller.Cursor() != 2 {
-		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.scroller.Cursor())
+	m.Scroller.CursorToEnd()
+	if m.Scroller.Cursor() != 2 {
+		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.Scroller.Cursor())
 	}
 }
 
@@ -206,12 +206,11 @@ func TestListModel_SelectedScript(t *testing.T) {
 		{ID: 2, Name: "script2"},
 	}
 
-	scroller := panel.NewScroller(2, 10)
-	scroller.SetCursor(1)
 	m := ListModel{
-		scripts:  scripts,
-		scroller: scroller,
+		Sizable: helpers.NewSizable(4, panel.NewScroller(2, 10)),
+		scripts: scripts,
 	}
+	m.Scroller.SetCursor(1)
 
 	selected := m.SelectedScript()
 	if selected == nil {
@@ -223,7 +222,7 @@ func TestListModel_SelectedScript(t *testing.T) {
 
 	// Test empty list
 	m.scripts = nil
-	m.scroller.SetItemCount(0)
+	m.Scroller.SetItemCount(0)
 	selected = m.SelectedScript()
 	if selected != nil {
 		t.Error("SelectedScript() on empty list should return nil")
@@ -283,12 +282,11 @@ func TestListModel_Error(t *testing.T) {
 func TestListModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		device:   "",
-		scroller: panel.NewScroller(0, 1),
-		width:    40,
-		height:   10,
-		styles:   DefaultListStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		device:  "",
+		styles:  DefaultListStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No device selected") {
@@ -299,14 +297,12 @@ func TestListModel_View_NoDevice(t *testing.T) {
 func TestListModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		device:   "192.168.1.100",
-		loading:  true,
-		scroller: panel.NewScroller(0, 1),
-		width:    40,
-		height:   10,
-		styles:   DefaultListStyles(),
-		loader:   loading.New(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		device:  "192.168.1.100",
+		loading: true,
+		styles:  DefaultListStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "Loading") {
@@ -317,14 +313,13 @@ func TestListModel_View_Loading(t *testing.T) {
 func TestListModel_View_NoScripts(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		device:   "192.168.1.100",
-		loading:  false,
-		scripts:  []Script{},
-		scroller: panel.NewScroller(0, 1),
-		width:    40,
-		height:   10,
-		styles:   DefaultListStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		device:  "192.168.1.100",
+		loading: false,
+		scripts: []Script{},
+		styles:  DefaultListStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No scripts") {
@@ -340,14 +335,13 @@ func TestListModel_View_WithScripts(t *testing.T) {
 		{ID: 3, Name: "disabled_script", Enabled: false, Running: false},
 	}
 	m := ListModel{
-		device:   "192.168.1.100",
-		loading:  false,
-		scripts:  scripts,
-		scroller: panel.NewScroller(len(scripts), 10),
-		width:    50,
-		height:   15,
-		styles:   DefaultListStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(len(scripts), 10)),
+		device:  "192.168.1.100",
+		loading: false,
+		scripts: scripts,
+		styles:  DefaultListStyles(),
 	}
+	m = m.SetSize(50, 15)
 
 	view := m.View()
 	if !strings.Contains(view, "auto_lights") {
@@ -417,9 +411,9 @@ func TestListModel_RenderScriptLine(t *testing.T) {
 func TestListModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		loading:  true,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultListStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		loading: true,
+		styles:  DefaultListStyles(),
 	}
 
 	scripts := []Script{
@@ -435,20 +429,20 @@ func TestListModel_Update_LoadedMsg(t *testing.T) {
 	if len(m.scripts) != 2 {
 		t.Errorf("scripts length = %d, want 2", len(m.scripts))
 	}
-	if m.scroller.Cursor() != 0 {
-		t.Errorf("cursor = %d, want 0", m.scroller.Cursor())
+	if m.Scroller.Cursor() != 0 {
+		t.Errorf("cursor = %d, want 0", m.Scroller.Cursor())
 	}
-	if m.scroller.ItemCount() != 2 {
-		t.Errorf("scroller.ItemCount() = %d, want 2", m.scroller.ItemCount())
+	if m.Scroller.ItemCount() != 2 {
+		t.Errorf("scroller.ItemCount() = %d, want 2", m.Scroller.ItemCount())
 	}
 }
 
 func TestListModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		loading:  true,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultListStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		loading: true,
+		styles:  DefaultListStyles(),
 	}
 
 	m, _ = m.Update(LoadedMsg{Err: context.DeadlineExceeded})
@@ -464,17 +458,17 @@ func TestListModel_Update_LoadedMsg_Error(t *testing.T) {
 func TestListModel_Update_KeyPress_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := ListModel{
-		focused:  false,
-		scripts:  []Script{{ID: 1}},
-		scroller: panel.NewScroller(1, 10),
-		styles:   DefaultListStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(1, 10)),
+		focused: false,
+		scripts: []Script{{ID: 1}},
+		styles:  DefaultListStyles(),
 	}
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 106}) // 'j'
 
 	// Cursor should not change when not focused
-	if m.scroller.Cursor() != 0 {
-		t.Errorf("cursor changed when not focused: %d", m.scroller.Cursor())
+	if m.Scroller.Cursor() != 0 {
+		t.Errorf("cursor changed when not focused: %d", m.Scroller.Cursor())
 	}
 }
 

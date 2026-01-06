@@ -175,11 +175,11 @@ func TestModel_SetSize(t *testing.T) {
 
 	updated := m.SetSize(100, 50)
 
-	if updated.width != 100 {
-		t.Errorf("width = %d, want 100", updated.width)
+	if updated.Width != 100 {
+		t.Errorf("width = %d, want 100", updated.Width)
 	}
-	if updated.height != 50 {
-		t.Errorf("height = %d, want 50", updated.height)
+	if updated.Height != 50 {
+		t.Errorf("height = %d, want 50", updated.Height)
 	}
 }
 

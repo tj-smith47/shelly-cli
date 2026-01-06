@@ -17,7 +17,6 @@ import (
 	shellykvs "github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -76,23 +75,20 @@ type SelectMsg struct {
 
 // Model displays KVS items for a device.
 type Model struct {
+	helpers.Sizable  // Embeds Width, Height, Loader, Scroller
 	ctx              context.Context
 	svc              *shellykvs.Service
 	fileCache        *cache.FileCache
 	device           string
 	items            []Item
-	scroller         *panel.Scroller
 	loading          bool
 	editing          bool
 	confirmingDelete bool
 	deleteKey        string
 	err              error
-	width            int
-	height           int
 	focused          bool
 	panelIndex       int // 1-based panel index for Shift+N hotkey hint
 	styles           Styles
-	loader           loading.Model
 	editModal        EditModel
 	cacheStatus      cachestatus.Model
 }
@@ -155,21 +151,18 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("kvs: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 10)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
-		scroller:    panel.NewScroller(0, 10),
 		loading:     false,
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading KVS..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
-		editModal: NewEditModel(deps.Ctx, deps.Svc),
+		editModal:   NewEditModel(deps.Ctx, deps.Svc),
 	}
+	m.Loader = m.Loader.SetMessage("Loading KVS...")
+	return m
 }
 
 // Init returns the initial command.
@@ -181,8 +174,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.items = nil
-	m.scroller.SetItemCount(0)
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(0)
+	m.Scroller.CursorToStart()
 	m.err = nil
 	m.loading = true
 	m.cacheStatus = cachestatus.New()
@@ -270,10 +263,7 @@ func (m Model) backgroundRefresh() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 4, m.scroller)
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -321,14 +311,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		switch msg.(type) {
 		case LoadedMsg, ActionMsg:
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -361,8 +351,8 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	data, err := panelcache.Unmarshal[CachedKVSData](msg.Data)
 	if err == nil {
 		m.items = data.Items
-		m.scroller.SetItemCount(len(m.items))
-		m.scroller.CursorToStart()
+		m.Scroller.SetItemCount(len(m.items))
+		m.Scroller.CursorToStart()
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
@@ -381,7 +371,7 @@ func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheItems())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheItems())
 }
 
 func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
@@ -398,7 +388,7 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	}
 	if data, ok := msg.Data.(CachedKVSData); ok {
 		m.items = data.Items
-		m.scroller.SetItemCount(len(m.items))
+		m.Scroller.SetItemCount(len(m.items))
 	}
 	// Emit LoadedMsg so sequential loading can advance
 	return m, func() tea.Msg { return LoadedMsg{Items: m.items} }
@@ -412,8 +402,8 @@ func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.items = msg.Items
-	m.scroller.SetItemCount(len(m.items))
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(len(m.items))
+	m.Scroller.CursorToStart()
 	return m, nil
 }
 
@@ -425,7 +415,7 @@ func (m Model) handleAction(msg ActionMsg) (Model, tea.Cmd) {
 	// Invalidate cache and refresh after action
 	m.loading = true
 	return m, tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		panelcache.Invalidate(m.fileCache, m.device, cache.TypeKVS),
 		m.fetchAndCacheItems(),
 		func() tea.Msg { return EditClosedMsg{Saved: true} },
@@ -443,7 +433,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading = true
 		return m, tea.Batch(
 			cmd,
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeKVS),
 			m.fetchAndCacheItems(),
 		)
@@ -457,7 +447,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 			// Invalidate cache and refresh data after successful save
 			m.loading = true
 			return m, tea.Batch(
-				m.loader.Tick(),
+				m.Loader.Tick(),
 				panelcache.Invalidate(m.fileCache, m.device, cache.TypeKVS),
 				m.fetchAndCacheItems(),
 				func() tea.Msg { return EditClosedMsg{Saved: true} },
@@ -485,7 +475,7 @@ func (m Model) handleDeleteConfirmation(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -503,7 +493,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
 		return m, tea.Batch(
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeKVS),
 			m.fetchAndCacheItems(),
 		)
@@ -516,13 +506,13 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 	if m.device == "" || m.loading || len(m.items) == 0 {
 		return m, nil
 	}
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= len(m.items) {
 		return m, nil
 	}
 	item := m.items[cursor]
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.ShowEdit(m.device, &item)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -532,7 +522,7 @@ func (m Model) handleNewKey() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.ShowNew(m.device)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -541,7 +531,7 @@ func (m Model) handleDeleteKey() (Model, tea.Cmd) {
 	if m.device == "" || m.loading || len(m.items) == 0 {
 		return m, nil
 	}
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= len(m.items) {
 		return m, nil
 	}
@@ -562,7 +552,7 @@ func (m Model) executeDelete(key string) tea.Cmd {
 }
 
 func (m Model) selectItem() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.items) == 0 || cursor >= len(m.items) {
 		return nil
 	}
@@ -579,7 +569,7 @@ func (m Model) View() string {
 		return m.editModal.View()
 	}
 
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Key-Value Store").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -590,7 +580,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -626,7 +616,7 @@ func (m Model) View() string {
 	// KVS items with scroll indicator
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[Item]{
 		Items:    m.items,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(item Item, _ int, isCursor bool) string {
 			return m.renderItemLine(item, isCursor)
 		},
@@ -656,7 +646,7 @@ func (m Model) renderItemLine(item Item, isSelected bool) string {
 
 	// Calculate available width for key and value
 	// Fixed: selector(2) + " = "(3) = 5
-	available := output.ContentWidth(m.width, 4+5)
+	available := output.ContentWidth(m.Width, 4+5)
 
 	// Dynamic width allocation based on actual content
 	keyWidth, valueWidth := m.calculateKeyValueWidths(available, item)
@@ -739,7 +729,7 @@ func (m Model) formatValueWithWidth(value any, maxWidth int) string {
 
 // SelectedItem returns the currently selected item, if any.
 func (m Model) SelectedItem() *Item {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.items) == 0 || cursor >= len(m.items) {
 		return nil
 	}
@@ -748,7 +738,7 @@ func (m Model) SelectedItem() *Item {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // ItemCount returns the number of items.
@@ -777,7 +767,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchItems())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchItems())
 }
 
 // FooterText returns keybinding hints for the footer.

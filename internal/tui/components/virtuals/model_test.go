@@ -73,11 +73,11 @@ func TestModel_SetSize(t *testing.T) {
 	m := newTestModel()
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("height = %d, want 50", m.Height)
 	}
 }
 
@@ -100,18 +100,18 @@ func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
 	m := newTestModel()
 	m.virtuals = make([]Virtual, 20)
-	m.scroller.SetItemCount(20)
+	m.Scroller.SetItemCount(20)
 
 	// SetSize configures visible rows (height - 4 overhead)
 	m = m.SetSize(80, 20)
-	if m.scroller.VisibleRows() != 16 {
-		t.Errorf("visibleRows = %d, want 16", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() != 16 {
+		t.Errorf("visibleRows = %d, want 16", m.Scroller.VisibleRows())
 	}
 
 	// Small height
 	m = m.SetSize(80, 5)
-	if m.scroller.VisibleRows() < 1 {
-		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.Scroller.VisibleRows())
 	}
 }
 
@@ -123,41 +123,41 @@ func TestModel_ScrollerCursorNavigation(t *testing.T) {
 		{Key: "number:201", Type: shelly.VirtualNumber},
 		{Key: "text:202", Type: shelly.VirtualText},
 	}
-	m.scroller.SetItemCount(len(m.virtuals))
+	m.Scroller.SetItemCount(len(m.virtuals))
 	m = m.SetSize(80, 20)
 
 	// Cursor down
-	m.scroller.CursorDown()
+	m.Scroller.CursorDown()
 	if m.Cursor() != 1 {
 		t.Errorf("after CursorDown: cursor = %d, want 1", m.Cursor())
 	}
 
-	m.scroller.CursorDown()
+	m.Scroller.CursorDown()
 	if m.Cursor() != 2 {
 		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Don't go past end
-	m.scroller.CursorDown()
+	m.Scroller.CursorDown()
 	if m.Cursor() != 2 {
 		t.Errorf("cursor at end: cursor = %d, want 2", m.Cursor())
 	}
 
 	// Cursor up
-	m.scroller.CursorUp()
+	m.Scroller.CursorUp()
 	if m.Cursor() != 1 {
 		t.Errorf("after CursorUp: cursor = %d, want 1", m.Cursor())
 	}
 
 	// Don't go before start
-	m.scroller.CursorToStart()
-	m.scroller.CursorUp()
+	m.Scroller.CursorToStart()
+	m.Scroller.CursorUp()
 	if m.Cursor() != 0 {
 		t.Errorf("cursor at start: cursor = %d, want 0", m.Cursor())
 	}
 
 	// Cursor to end
-	m.scroller.CursorToEnd()
+	m.Scroller.CursorToEnd()
 	if m.Cursor() != 2 {
 		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.Cursor())
 	}
@@ -170,19 +170,19 @@ func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	for i := range m.virtuals {
 		m.virtuals[i] = Virtual{Key: "boolean:200"}
 	}
-	m.scroller.SetItemCount(20)
+	m.Scroller.SetItemCount(20)
 	m = m.SetSize(80, 10) // Sets visibleRows = 10 - 4 = 6
 
 	// Cursor at end should scroll
-	m.scroller.CursorToEnd()
-	start, _ := m.scroller.VisibleRange()
+	m.Scroller.CursorToEnd()
+	start, _ := m.Scroller.VisibleRange()
 	if start == 0 {
 		t.Error("scroll should increase when cursor at end of long list")
 	}
 
 	// Cursor back to start
-	m.scroller.CursorToStart()
-	start, _ = m.scroller.VisibleRange()
+	m.Scroller.CursorToStart()
+	start, _ = m.Scroller.VisibleRange()
 	if start != 0 {
 		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}
@@ -195,8 +195,8 @@ func TestModel_SelectedVirtual(t *testing.T) {
 		{Key: "boolean:200", ID: 200},
 		{Key: "number:201", ID: 201},
 	}
-	m.scroller.SetItemCount(len(m.virtuals))
-	m.scroller.SetCursor(1)
+	m.Scroller.SetItemCount(len(m.virtuals))
+	m.Scroller.SetCursor(1)
 
 	selected := m.SelectedVirtual()
 	if selected == nil {
@@ -208,7 +208,7 @@ func TestModel_SelectedVirtual(t *testing.T) {
 
 	// Empty list
 	m.virtuals = nil
-	m.scroller.SetItemCount(0)
+	m.Scroller.SetItemCount(0)
 	selected = m.SelectedVirtual()
 	if selected != nil {
 		t.Error("SelectedVirtual() on empty list should return nil")
@@ -329,7 +329,7 @@ func TestModel_View_WithVirtuals(t *testing.T) {
 			NumValue: &numVal,
 		},
 	}
-	m.scroller.SetItemCount(len(m.virtuals))
+	m.Scroller.SetItemCount(len(m.virtuals))
 	m = m.SetSize(60, 15)
 
 	view := m.View()
@@ -559,7 +559,7 @@ func TestModel_Update_KeyPress_NotFocused(t *testing.T) {
 	m := newTestModel()
 	m.focused = false
 	m.virtuals = []Virtual{{Key: "a"}}
-	m.scroller.SetItemCount(len(m.virtuals))
+	m.Scroller.SetItemCount(len(m.virtuals))
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 106}) // 'j'
 

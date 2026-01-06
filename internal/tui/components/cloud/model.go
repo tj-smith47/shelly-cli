@@ -15,7 +15,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -65,6 +64,7 @@ type ToggleResultMsg struct {
 
 // Model displays cloud settings for a device.
 type Model struct {
+	helpers.Sizable
 	ctx         context.Context
 	svc         *shelly.Service
 	fileCache   *cache.FileCache
@@ -75,12 +75,9 @@ type Model struct {
 	loading     bool
 	toggling    bool
 	err         error
-	width       int
-	height      int
 	focused     bool
 	panelIndex  int // 1-based panel index for Shift+N hotkey hint
 	styles      Styles
-	loader      loading.Model
 	cacheStatus cachestatus.Model
 
 	// Edit modal
@@ -133,20 +130,18 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("cloud: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:     helpers.NewSizableLoaderOnly(),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
 		loading:     false,
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading cloud status..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
-		editModel: NewEditModel(deps.Ctx, deps.Svc),
+		editModel:   NewEditModel(deps.Ctx, deps.Svc),
 	}
+	m.Loader = m.Loader.SetMessage("Loading cloud status...")
+	return m
 }
 
 // Init returns the initial command.
@@ -287,9 +282,7 @@ func (m Model) backgroundRefresh() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	m.ApplySize(width, height)
 	m.editModel = m.editModel.SetSize(width, height)
 	return m
 }
@@ -354,14 +347,14 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		switch msg.(type) {
 		case StatusLoadedMsg, ToggleResultMsg:
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -393,7 +386,7 @@ func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheStatus())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheStatus())
 }
 
 func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
@@ -442,7 +435,7 @@ func (m Model) handleToggleResult(msg ToggleResultMsg) (Model, tea.Cmd) {
 	// Invalidate cache and refresh to get updated connection status
 	m.loading = true
 	return m, tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
 		m.fetchAndCacheStatus(),
 	)
@@ -459,7 +452,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	if closedMsg, ok := msg.(EditClosedMsg); ok && closedMsg.Saved && m.device != "" {
 		m.loading = true
 		cmds = append(cmds,
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
 			m.fetchAndCacheStatus(),
 		)
@@ -486,7 +479,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.loading = true
 			// Invalidate cache and fetch fresh data
 			return m, tea.Batch(
-				m.loader.Tick(),
+				m.Loader.Tick(),
 				panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
 				m.fetchAndCacheStatus(),
 			)
@@ -518,7 +511,7 @@ func (m Model) View() string {
 		return m.editModel.View()
 	}
 
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Cloud").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -529,7 +522,7 @@ func (m Model) View() string {
 	}
 
 	if m.loading {
-		r.SetContent(m.loader.View())
+		r.SetContent(m.Loader.View())
 		return r.Render()
 	}
 
@@ -625,7 +618,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchStatus())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchStatus())
 }
 
 // IsEditing returns whether the edit modal is currently visible.

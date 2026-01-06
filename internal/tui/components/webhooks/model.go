@@ -16,7 +16,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -84,21 +83,18 @@ type CreateMsg struct {
 
 // Model displays webhooks for a device.
 type Model struct {
+	helpers.Sizable
 	ctx         context.Context
 	svc         *shelly.Service
 	fileCache   *cache.FileCache
 	device      string
 	webhooks    []Webhook
-	scroller    *panel.Scroller
 	loading     bool
 	editing     bool
 	err         error
-	width       int
-	height      int
 	focused     bool
 	panelIndex  int // 1-based panel index for Shift+N hotkey hint
 	styles      Styles
-	loader      loading.Model
 	editModal   EditModel
 	cacheStatus cachestatus.Model
 }
@@ -148,21 +144,18 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("webhooks: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:     helpers.NewSizable(4, panel.NewScroller(0, 1)),
 		ctx:         deps.Ctx,
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
-		scroller:    panel.NewScroller(0, 1),
 		loading:     false,
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
-		loader: loading.New(
-			loading.WithMessage("Loading webhooks..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
-		editModal: NewEditModel(deps.Ctx, deps.Svc),
+		editModal:   NewEditModel(deps.Ctx, deps.Svc),
 	}
+	m.Loader = m.Loader.SetMessage("Loading webhooks...")
+	return m
 }
 
 // Init returns the initial command.
@@ -174,7 +167,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetDevice(device string) (Model, tea.Cmd) {
 	m.device = device
 	m.webhooks = nil
-	m.scroller.SetItemCount(0)
+	m.Scroller.SetItemCount(0)
 	m.err = nil
 	m.cacheStatus = cachestatus.New()
 
@@ -269,10 +262,7 @@ func (m Model) backgroundRefresh() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 4, m.scroller)
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -336,14 +326,14 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
-	result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+	result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 		switch msg.(type) {
 		case LoadedMsg, ActionMsg:
 			return true
 		}
 		return generics.IsPanelCacheMsg(msg)
 	})
-	m.loader = result.Loader
+	m.Loader = result.Loader
 	return m, result.Cmd, result.Consumed
 }
 
@@ -355,8 +345,8 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	data, err := panelcache.Unmarshal[CachedWebhooksData](msg.Data)
 	if err == nil {
 		m.webhooks = data.Webhooks
-		m.scroller.SetItemCount(len(m.webhooks))
-		m.scroller.CursorToStart()
+		m.Scroller.SetItemCount(len(m.webhooks))
+		m.Scroller.CursorToStart()
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
@@ -375,7 +365,7 @@ func (m Model) handleCacheMiss(msg panelcache.CacheMissMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchAndCacheWebhooks())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchAndCacheWebhooks())
 }
 
 func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, tea.Cmd) {
@@ -392,7 +382,7 @@ func (m Model) handleRefreshComplete(msg panelcache.RefreshCompleteMsg) (Model, 
 	}
 	if data, ok := msg.Data.(CachedWebhooksData); ok {
 		m.webhooks = data.Webhooks
-		m.scroller.SetItemCount(len(m.webhooks))
+		m.Scroller.SetItemCount(len(m.webhooks))
 	}
 	// Emit LoadedMsg so sequential loading can advance
 	return m, func() tea.Msg { return LoadedMsg{Webhooks: m.webhooks} }
@@ -406,8 +396,8 @@ func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.webhooks = msg.Webhooks
-	m.scroller.SetItemCount(len(m.webhooks))
-	m.scroller.CursorToStart()
+	m.Scroller.SetItemCount(len(m.webhooks))
+	m.Scroller.CursorToStart()
 	return m, nil
 }
 
@@ -419,7 +409,7 @@ func (m Model) handleAction(msg ActionMsg) (Model, tea.Cmd) {
 	// Invalidate cache and refresh after action
 	m.loading = true
 	return m, tea.Batch(
-		m.loader.Tick(),
+		m.Loader.Tick(),
 		panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
 		m.fetchAndCacheWebhooks(),
 	)
@@ -436,7 +426,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 		m.loading = true
 		return m, tea.Batch(
 			cmd,
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
 			m.fetchAndCacheWebhooks(),
 		)
@@ -450,7 +440,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 			// Invalidate cache and refresh data after successful save
 			m.loading = true
 			return m, tea.Batch(
-				m.loader.Tick(),
+				m.Loader.Tick(),
 				panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
 				m.fetchAndCacheWebhooks(),
 				func() tea.Msg { return EditClosedMsg{Saved: true} },
@@ -463,7 +453,7 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -483,7 +473,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		// Invalidate cache and fetch fresh data
 		m.loading = true
 		return m, tea.Batch(
-			m.loader.Tick(),
+			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeWebhooks),
 			m.fetchAndCacheWebhooks(),
 		)
@@ -496,13 +486,13 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 	if m.device == "" || m.loading || len(m.webhooks) == 0 {
 		return m, nil
 	}
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if cursor >= len(m.webhooks) {
 		return m, nil
 	}
 	webhook := m.webhooks[cursor]
 	m.editing = true
-	m.editModal = m.editModal.SetSize(m.width, m.height)
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
 	m.editModal = m.editModal.Show(m.device, &webhook)
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
@@ -517,7 +507,7 @@ func (m Model) createWebhook() tea.Cmd {
 }
 
 func (m Model) selectWebhook() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
@@ -528,7 +518,7 @@ func (m Model) selectWebhook() tea.Cmd {
 }
 
 func (m Model) toggleWebhook() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
@@ -555,7 +545,7 @@ func (m Model) toggleWebhook() tea.Cmd {
 }
 
 func (m Model) deleteWebhook() tea.Cmd {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
@@ -577,7 +567,7 @@ func (m Model) View() string {
 		return m.editModal.View()
 	}
 
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Webhooks").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -618,7 +608,7 @@ func (m Model) getStateContent() (string, bool) {
 		return m.styles.Muted.Render("No device selected"), true
 	}
 	if m.loading {
-		return m.loader.View(), true
+		return m.Loader.View(), true
 	}
 	if m.err != nil {
 		return m.getErrorContent(), true
@@ -643,7 +633,7 @@ func (m Model) getErrorContent() string {
 func (m Model) renderWebhookList() string {
 	return generics.RenderScrollableList(generics.ListRenderConfig[Webhook]{
 		Items:    m.webhooks,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(webhook Webhook, _ int, isCursor bool) string {
 			return m.renderWebhookLine(webhook, isCursor)
 		},
@@ -669,7 +659,7 @@ func (m Model) renderWebhookLine(webhook Webhook, isSelected bool) string {
 
 	// Calculate available width for event and URL
 	// Fixed: selector(2) + icon(2) + spaces(2) = 6
-	available := output.ContentWidth(m.width, 4+6)
+	available := output.ContentWidth(m.Width, 4+6)
 	eventWidth, urlWidth := output.SplitWidth(available, 40, 15, 20)
 
 	// Event type (truncate if too long)
@@ -698,7 +688,7 @@ func (m Model) renderWebhookLine(webhook Webhook, isSelected bool) string {
 
 // SelectedWebhook returns the currently selected webhook, if any.
 func (m Model) SelectedWebhook() *Webhook {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.webhooks) == 0 || cursor >= len(m.webhooks) {
 		return nil
 	}
@@ -731,7 +721,7 @@ func (m Model) Refresh() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = true
-	return m, tea.Batch(m.loader.Tick(), m.fetchWebhooks())
+	return m, tea.Batch(m.Loader.Tick(), m.fetchWebhooks())
 }
 
 // FooterText returns keybinding hints for the footer.

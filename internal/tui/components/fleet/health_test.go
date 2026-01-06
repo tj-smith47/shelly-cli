@@ -76,11 +76,11 @@ func TestHealthModel_SetSize(t *testing.T) {
 
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("Width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("Height = %d, want 50", m.Height)
 	}
 }
 

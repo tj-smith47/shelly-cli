@@ -13,7 +13,6 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
@@ -53,19 +52,16 @@ type DeviceAddedMsg struct {
 
 // Model displays device discovery.
 type Model struct {
-	ctx        context.Context
-	svc        *shelly.Service
-	devices    []shelly.DiscoveredDevice
-	scroller   *panel.Scroller
-	scanning   bool
-	method     shelly.DiscoveryMethod
-	err        error
-	width      int
-	height     int
-	focused    bool
-	panelIndex int
-	styles     Styles
-	loader     loading.Model
+	helpers.Sizable // Embeds Width, Height, Loader, Scroller
+	ctx             context.Context
+	svc             *shelly.Service
+	devices         []shelly.DiscoveredDevice
+	scanning        bool
+	method          shelly.DiscoveryMethod
+	err             error
+	focused         bool
+	panelIndex      int
+	styles          Styles
 }
 
 // Styles holds styles for the Discovery component.
@@ -119,19 +115,16 @@ func New(deps Deps) Model {
 		panic(fmt.Sprintf("discovery: invalid deps: %v", err))
 	}
 
-	return Model{
+	m := Model{
+		Sizable:  helpers.NewSizable(8, panel.NewScroller(0, 10)), // 8 accounts for header, method selector, and footer
 		ctx:      deps.Ctx,
 		svc:      deps.Svc,
-		scroller: panel.NewScroller(0, 10),
 		scanning: false,
 		method:   shelly.DiscoveryMDNS,
 		styles:   DefaultStyles(),
-		loader: loading.New(
-			loading.WithMessage("Scanning for devices..."),
-			loading.WithStyle(loading.StyleDot),
-			loading.WithCentered(true, true),
-		),
 	}
+	m.Loader = m.Loader.SetMessage("Scanning for devices...")
+	return m
 }
 
 // Init returns the initial command.
@@ -141,10 +134,7 @@ func (m Model) Init() tea.Cmd {
 
 // SetSize sets the component dimensions.
 func (m Model) SetSize(width, height int) Model {
-	m.width = width
-	m.height = height
-	m.loader = helpers.SetLoaderSize(m.loader, width, height)
-	helpers.SetScrollerRows(height, 8, m.scroller) // Reserve space for header, method selector, and footer
+	m.ApplySize(width, height)
 	return m
 }
 
@@ -168,9 +158,9 @@ func (m Model) StartScan() (Model, tea.Cmd) {
 	m.scanning = true
 	m.err = nil
 	m.devices = nil
-	m.scroller.SetItemCount(0)
-	m.scroller.CursorToStart()
-	return m, tea.Batch(m.loader.Tick(), m.scanDevices())
+	m.Scroller.SetItemCount(0)
+	m.Scroller.CursorToStart()
+	return m, tea.Batch(m.Loader.Tick(), m.scanDevices())
 }
 
 func (m Model) scanDevices() tea.Cmd {
@@ -193,11 +183,11 @@ func (m Model) scanDevices() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loader when scanning
 	if m.scanning {
-		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+		result := generics.UpdateLoader(m.Loader, msg, func(msg tea.Msg) bool {
 			_, ok := msg.(ScanCompleteMsg)
 			return ok
 		})
-		m.loader = result.Loader
+		m.Loader = result.Loader
 		if result.Consumed {
 			return m, result.Cmd
 		}
@@ -211,7 +201,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		m.devices = msg.Devices
-		m.scroller.SetItemCount(len(m.devices))
+		m.Scroller.SetItemCount(len(m.devices))
 		return m, nil
 
 	case DeviceAddedMsg:
@@ -240,7 +230,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.scroller) {
+	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
 		return m, nil
 	}
 
@@ -264,7 +254,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) addSelectedDevice() (Model, tea.Cmd) {
-	cursor := m.scroller.Cursor()
+	cursor := m.Scroller.Cursor()
 	if len(m.devices) == 0 || cursor >= len(m.devices) {
 		return m, nil
 	}
@@ -282,7 +272,7 @@ func (m Model) addSelectedDevice() (Model, tea.Cmd) {
 
 // View renders the Discovery component.
 func (m Model) View() string {
-	r := rendering.New(m.width, m.height).
+	r := rendering.New(m.Width, m.Height).
 		SetTitle("Discovery").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
@@ -300,7 +290,7 @@ func (m Model) View() string {
 
 	// Scan button / status
 	if m.scanning {
-		content.WriteString(m.loader.View())
+		content.WriteString(m.Loader.View())
 		content.WriteString("\n")
 	} else {
 		content.WriteString(m.styles.ScanButton.Render("[s] Scan"))
@@ -340,7 +330,7 @@ func (m Model) renderDeviceList() string {
 
 	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[shelly.DiscoveredDevice]{
 		Items:    m.devices,
-		Scroller: m.scroller,
+		Scroller: m.Scroller,
 		RenderItem: func(device shelly.DiscoveredDevice, _ int, isCursor bool) string {
 			return m.renderDeviceLine(device, isCursor)
 		},
@@ -446,7 +436,7 @@ func (m Model) Error() error {
 
 // Cursor returns the current cursor position.
 func (m Model) Cursor() int {
-	return m.scroller.Cursor()
+	return m.Scroller.Cursor()
 }
 
 // Refresh triggers a new scan.

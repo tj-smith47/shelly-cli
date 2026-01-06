@@ -145,11 +145,11 @@ func TestModel_SetSize(t *testing.T) {
 
 	m = m.SetSize(80, 24)
 
-	if m.width != 80 {
-		t.Errorf("width = %d, want 80", m.width)
+	if m.Width != 80 {
+		t.Errorf("Width = %d, want 80", m.Width)
 	}
-	if m.height != 24 {
-		t.Errorf("height = %d, want 24", m.height)
+	if m.Height != 24 {
+		t.Errorf("Height = %d, want 24", m.Height)
 	}
 }
 
@@ -252,7 +252,7 @@ func TestModel_Update_KeyPressMsg_NotFocused(t *testing.T) {
 	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = false
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}}
-	m.scroller.SetItemCount(len(m.items))
+	m.Scroller.SetItemCount(len(m.items))
 
 	msg := tea.KeyPressMsg{Code: 106} // 'j'
 
@@ -268,7 +268,7 @@ func TestModel_Update_KeyPressMsg_Navigation(t *testing.T) {
 	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.focused = true
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}, {Key: "key3"}}
-	m.scroller.SetItemCount(len(m.items))
+	m.Scroller.SetItemCount(len(m.items))
 	m = m.SetSize(80, 20)
 
 	// Test j/down
@@ -304,18 +304,18 @@ func TestModel_ScrollerCursorBounds(t *testing.T) {
 	t.Parallel()
 	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.items = []Item{{Key: "key1"}, {Key: "key2"}}
-	m.scroller.SetItemCount(len(m.items))
+	m.Scroller.SetItemCount(len(m.items))
 	m = m.SetSize(80, 20)
 
 	// Cursor should not go below 0
-	m.scroller.CursorUp()
+	m.Scroller.CursorUp()
 	if m.Cursor() != 0 {
 		t.Errorf("cursor should stay at 0, got %d", m.Cursor())
 	}
 
 	// Cursor should not exceed items
-	m.scroller.SetCursor(1)
-	m.scroller.CursorDown()
+	m.Scroller.SetCursor(1)
+	m.Scroller.CursorDown()
 	if m.Cursor() != 1 {
 		t.Errorf("cursor should stay at 1, got %d", m.Cursor())
 	}
@@ -438,8 +438,8 @@ func TestModel_SelectedItem(t *testing.T) {
 		{Key: "key1", Value: "value1"},
 		{Key: "key2", Value: "value2"},
 	}
-	m.scroller.SetItemCount(len(m.items))
-	m.scroller.SetCursor(1)
+	m.Scroller.SetItemCount(len(m.items))
+	m.Scroller.SetCursor(1)
 
 	item := m.SelectedItem()
 	if item == nil {
@@ -537,18 +537,18 @@ func TestModel_ScrollerVisibleRows(t *testing.T) {
 	t.Parallel()
 	m := New(Deps{Ctx: context.Background(), Svc: &kvs.Service{}})
 	m.items = make([]Item, 20)
-	m.scroller.SetItemCount(20)
+	m.Scroller.SetItemCount(20)
 
 	// SetSize configures visible rows (height - 4 overhead)
 	m = m.SetSize(80, 20)
-	if m.scroller.VisibleRows() != 16 {
-		t.Errorf("visibleRows = %d, want 16", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() != 16 {
+		t.Errorf("visibleRows = %d, want 16", m.Scroller.VisibleRows())
 	}
 
 	// Small height
 	m = m.SetSize(80, 5)
-	if m.scroller.VisibleRows() < 1 {
-		t.Errorf("visibleRows with small height = %d, want >= 1", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() < 1 {
+		t.Errorf("visibleRows with small height = %d, want >= 1", m.Scroller.VisibleRows())
 	}
 }
 
@@ -559,19 +559,19 @@ func TestModel_ScrollerEnsureVisible(t *testing.T) {
 	for i := range m.items {
 		m.items[i] = Item{Key: string(rune('a' + i))}
 	}
-	m.scroller.SetItemCount(20)
+	m.Scroller.SetItemCount(20)
 	m = m.SetSize(80, 10) // Sets visibleRows = 10 - 4 = 6
 
 	// Cursor at end should scroll
-	m.scroller.CursorToEnd()
-	start, _ := m.scroller.VisibleRange()
+	m.Scroller.CursorToEnd()
+	start, _ := m.Scroller.VisibleRange()
 	if start == 0 {
 		t.Error("scroll should increase when cursor at end of long list")
 	}
 
 	// Cursor back to start
-	m.scroller.CursorToStart()
-	start, _ = m.scroller.VisibleRange()
+	m.Scroller.CursorToStart()
+	start, _ = m.Scroller.VisibleRange()
 	if start != 0 {
 		t.Errorf("scroll = %d, want 0 when cursor at beginning", start)
 	}

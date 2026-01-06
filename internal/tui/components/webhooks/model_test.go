@@ -8,7 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -69,18 +69,18 @@ func TestDeps_Validate(t *testing.T) {
 
 func TestModel_SetSize(t *testing.T) {
 	t.Parallel()
-	m := Model{scroller: panel.NewScroller(0, 1)}
+	m := Model{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
 	m = m.SetSize(100, 50)
 
-	if m.width != 100 {
-		t.Errorf("width = %d, want 100", m.width)
+	if m.Width != 100 {
+		t.Errorf("width = %d, want 100", m.Width)
 	}
-	if m.height != 50 {
-		t.Errorf("height = %d, want 50", m.height)
+	if m.Height != 50 {
+		t.Errorf("height = %d, want 50", m.Height)
 	}
 	// Visible rows should be height - 4 (borders + title + footer)
-	if m.scroller.VisibleRows() != 46 {
-		t.Errorf("scroller.VisibleRows() = %d, want 46", m.scroller.VisibleRows())
+	if m.Scroller.VisibleRows() != 46 {
+		t.Errorf("scroller.VisibleRows() = %d, want 46", m.Scroller.VisibleRows())
 	}
 }
 
@@ -115,9 +115,9 @@ func TestModel_SetSize_VisibleRows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := Model{scroller: panel.NewScroller(0, 1)}
+			m := Model{Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1))}
 			m = m.SetSize(80, tt.height)
-			got := m.scroller.VisibleRows()
+			got := m.Scroller.VisibleRows()
 			if got != tt.want {
 				t.Errorf("scroller.VisibleRows() = %d, want %d", got, tt.want)
 			}
@@ -134,45 +134,45 @@ func TestModel_CursorNavigation(t *testing.T) {
 	}
 
 	m := Model{
+		Sizable:  helpers.NewSizable(4, panel.NewScroller(3, 10)),
 		webhooks: webhooks,
-		scroller: panel.NewScroller(3, 10),
-		height:   20,
 	}
+	m = m.SetSize(80, 20)
 
 	// Cursor down
-	m.scroller.CursorDown()
-	if m.scroller.Cursor() != 1 {
-		t.Errorf("after CursorDown: cursor = %d, want 1", m.scroller.Cursor())
+	m.Scroller.CursorDown()
+	if m.Scroller.Cursor() != 1 {
+		t.Errorf("after CursorDown: cursor = %d, want 1", m.Scroller.Cursor())
 	}
 
-	m.scroller.CursorDown()
-	if m.scroller.Cursor() != 2 {
-		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.scroller.Cursor())
+	m.Scroller.CursorDown()
+	if m.Scroller.Cursor() != 2 {
+		t.Errorf("after 2nd CursorDown: cursor = %d, want 2", m.Scroller.Cursor())
 	}
 
 	// Don't go past end
-	m.scroller.CursorDown()
-	if m.scroller.Cursor() != 2 {
-		t.Errorf("cursor at end: cursor = %d, want 2", m.scroller.Cursor())
+	m.Scroller.CursorDown()
+	if m.Scroller.Cursor() != 2 {
+		t.Errorf("cursor at end: cursor = %d, want 2", m.Scroller.Cursor())
 	}
 
 	// Cursor up
-	m.scroller.CursorUp()
-	if m.scroller.Cursor() != 1 {
-		t.Errorf("after CursorUp: cursor = %d, want 1", m.scroller.Cursor())
+	m.Scroller.CursorUp()
+	if m.Scroller.Cursor() != 1 {
+		t.Errorf("after CursorUp: cursor = %d, want 1", m.Scroller.Cursor())
 	}
 
 	// Don't go before start
-	m.scroller.SetCursor(0)
-	m.scroller.CursorUp()
-	if m.scroller.Cursor() != 0 {
-		t.Errorf("cursor at start: cursor = %d, want 0", m.scroller.Cursor())
+	m.Scroller.SetCursor(0)
+	m.Scroller.CursorUp()
+	if m.Scroller.Cursor() != 0 {
+		t.Errorf("cursor at start: cursor = %d, want 0", m.Scroller.Cursor())
 	}
 
 	// Cursor to end
-	m.scroller.CursorToEnd()
-	if m.scroller.Cursor() != 2 {
-		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.scroller.Cursor())
+	m.Scroller.CursorToEnd()
+	if m.Scroller.Cursor() != 2 {
+		t.Errorf("after CursorToEnd: cursor = %d, want 2", m.Scroller.Cursor())
 	}
 }
 
@@ -208,12 +208,11 @@ func TestModel_SelectedWebhook(t *testing.T) {
 		{ID: 2, Event: "switch.off"},
 	}
 
-	scroller := panel.NewScroller(2, 10)
-	scroller.SetCursor(1)
 	m := Model{
+		Sizable:  helpers.NewSizable(4, panel.NewScroller(2, 10)),
 		webhooks: webhooks,
-		scroller: scroller,
 	}
+	m.Scroller.SetCursor(1)
 
 	selected := m.SelectedWebhook()
 	if selected == nil {
@@ -225,7 +224,7 @@ func TestModel_SelectedWebhook(t *testing.T) {
 
 	// Empty list
 	m.webhooks = nil
-	m.scroller.SetItemCount(0)
+	m.Scroller.SetItemCount(0)
 	selected = m.SelectedWebhook()
 	if selected != nil {
 		t.Error("SelectedWebhook() on empty list should return nil")
@@ -285,12 +284,11 @@ func TestModel_Error(t *testing.T) {
 func TestModel_View_NoDevice(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		device:   "",
-		scroller: panel.NewScroller(0, 1),
-		width:    40,
-		height:   10,
-		styles:   DefaultStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		device:  "",
+		styles:  DefaultStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No device selected") {
@@ -301,14 +299,12 @@ func TestModel_View_NoDevice(t *testing.T) {
 func TestModel_View_Loading(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		device:   "192.168.1.100",
-		loading:  true,
-		scroller: panel.NewScroller(0, 1),
-		width:    40,
-		height:   10,
-		styles:   DefaultStyles(),
-		loader:   loading.New(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 1)),
+		device:  "192.168.1.100",
+		loading: true,
+		styles:  DefaultStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "Loading") {
@@ -319,14 +315,13 @@ func TestModel_View_Loading(t *testing.T) {
 func TestModel_View_NoWebhooks(t *testing.T) {
 	t.Parallel()
 	m := Model{
+		Sizable:  helpers.NewSizable(4, panel.NewScroller(0, 1)),
 		device:   "192.168.1.100",
 		loading:  false,
 		webhooks: []Webhook{},
-		scroller: panel.NewScroller(0, 1),
-		width:    40,
-		height:   10,
 		styles:   DefaultStyles(),
 	}
+	m = m.SetSize(40, 10)
 
 	view := m.View()
 	if !strings.Contains(view, "No webhooks") {
@@ -351,14 +346,13 @@ func TestModel_View_WithWebhooks(t *testing.T) {
 		},
 	}
 	m := Model{
+		Sizable:  helpers.NewSizable(4, panel.NewScroller(len(webhooks), 10)),
 		device:   "192.168.1.100",
 		loading:  false,
 		webhooks: webhooks,
-		scroller: panel.NewScroller(len(webhooks), 10),
-		width:    60,
-		height:   15,
 		styles:   DefaultStyles(),
 	}
+	m = m.SetSize(60, 15)
 
 	view := m.View()
 	if !strings.Contains(view, "switch.on") {
@@ -447,9 +441,9 @@ func TestModel_RenderWebhookLine(t *testing.T) {
 func TestModel_Update_LoadedMsg(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		loading:  true,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		loading: true,
+		styles:  DefaultStyles(),
 	}
 
 	webhooks := []Webhook{
@@ -465,17 +459,17 @@ func TestModel_Update_LoadedMsg(t *testing.T) {
 	if len(m.webhooks) != 2 {
 		t.Errorf("webhooks length = %d, want 2", len(m.webhooks))
 	}
-	if m.scroller.ItemCount() != 2 {
-		t.Errorf("scroller.ItemCount() = %d, want 2", m.scroller.ItemCount())
+	if m.Scroller.ItemCount() != 2 {
+		t.Errorf("scroller.ItemCount() = %d, want 2", m.Scroller.ItemCount())
 	}
 }
 
 func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 	t.Parallel()
 	m := Model{
-		loading:  true,
-		scroller: panel.NewScroller(0, 10),
-		styles:   DefaultStyles(),
+		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
+		loading: true,
+		styles:  DefaultStyles(),
 	}
 
 	m, _ = m.Update(LoadedMsg{Err: context.DeadlineExceeded})
@@ -491,16 +485,16 @@ func TestModel_Update_LoadedMsg_Error(t *testing.T) {
 func TestModel_Update_KeyPress_NotFocused(t *testing.T) {
 	t.Parallel()
 	m := Model{
+		Sizable:  helpers.NewSizable(4, panel.NewScroller(1, 10)),
 		focused:  false,
 		webhooks: []Webhook{{ID: 1}},
-		scroller: panel.NewScroller(1, 10),
 		styles:   DefaultStyles(),
 	}
 
 	m, _ = m.Update(tea.KeyPressMsg{Code: 106}) // 'j'
 
-	if m.scroller.Cursor() != 0 {
-		t.Errorf("cursor changed when not focused: %d", m.scroller.Cursor())
+	if m.Scroller.Cursor() != 0 {
+		t.Errorf("cursor changed when not focused: %d", m.Scroller.Cursor())
 	}
 }
 
