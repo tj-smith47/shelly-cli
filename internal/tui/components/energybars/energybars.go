@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -394,7 +395,7 @@ func formatValue(value float64, unit string) string {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
 	return m
 }
 

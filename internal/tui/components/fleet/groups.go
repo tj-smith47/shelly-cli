@@ -15,6 +15,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -143,13 +145,8 @@ func (m GroupsModel) loadGroups() tea.Cmd {
 func (m GroupsModel) SetSize(width, height int) GroupsModel {
 	m.width = width
 	m.height = height
-	visibleRows := height - 5 // Account for borders, title, stats
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader size for proper centering
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	helpers.SetScrollerRows(height, 5, m.scroller) // Account for borders, title, stats
 	return m
 }
 
@@ -174,13 +171,13 @@ func (m GroupsModel) Update(msg tea.Msg) (GroupsModel, tea.Cmd) {
 
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing GroupsLoadedMsg even during loading
-		if _, ok := msg.(GroupsLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+			_, ok := msg.(GroupsLoadedMsg)
+			return ok
+		})
+		m.loader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 
@@ -438,44 +435,46 @@ func (m GroupsModel) View() string {
 	content.WriteString(m.styles.Muted.Render(fmt.Sprintf("%d groups", len(m.groups))))
 	content.WriteString("\n\n")
 
-	// Group list
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		group := m.groups[i]
-		isSelected := m.scroller.IsCursorAt(i)
-
-		cursor := "  "
-		if isSelected && m.focused {
-			cursor = m.styles.Cursor.Render("> ")
-		}
-
-		deviceCount := len(group.DeviceIDs)
-		countStr := fmt.Sprintf("(%d devices)", deviceCount)
-
-		// Calculate available width for name
-		// Fixed: cursor(2) + space(1) + countStr length
-		available := output.ContentWidth(m.width, 4+3+len(countStr))
-		name := output.Truncate(group.Name, max(available, 10))
-
-		line := fmt.Sprintf("%s%s %s",
-			cursor,
-			m.styles.Name.Render(name),
-			m.styles.Count.Render(countStr),
-		)
-
-		if isSelected && m.focused {
-			line = m.styles.Selected.Render(line)
-		}
-
-		content.WriteString(line)
-		content.WriteString("\n")
-	}
-
-	// Scroll indicator
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	// Group list using generic helper
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[*integrator.DeviceGroup]{
+		Items:    m.groups,
+		Scroller: m.scroller,
+		RenderItem: func(group *integrator.DeviceGroup, _ int, isSelected bool) string {
+			return m.renderGroupLine(group, isSelected)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	r.SetContent(content.String())
 	return r.Render()
+}
+
+func (m GroupsModel) renderGroupLine(group *integrator.DeviceGroup, isSelected bool) string {
+	cursor := "  "
+	if isSelected && m.focused {
+		cursor = m.styles.Cursor.Render("> ")
+	}
+
+	deviceCount := len(group.DeviceIDs)
+	countStr := fmt.Sprintf("(%d devices)", deviceCount)
+
+	// Calculate available width for name
+	// Fixed: cursor(2) + space(1) + countStr length
+	available := output.ContentWidth(m.width, 4+3+len(countStr))
+	name := output.Truncate(group.Name, max(available, 10))
+
+	line := fmt.Sprintf("%s%s %s",
+		cursor,
+		m.styles.Name.Render(name),
+		m.styles.Count.Render(countStr),
+	)
+
+	if isSelected && m.focused {
+		line = m.styles.Selected.Render(line)
+	}
+
+	return line
 }
 
 // SelectedGroup returns the currently selected group.

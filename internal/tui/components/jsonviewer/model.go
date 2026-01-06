@@ -21,6 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	tuistyles "github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -444,7 +445,7 @@ func (m Model) Visible() bool {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
 
 	// Subtract: 2 for borders, 2 for horizontal padding
 	contentWidth := width - 4

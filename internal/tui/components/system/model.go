@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -235,9 +236,7 @@ func (m Model) backgroundRefresh() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	// Update loader size for proper centering
-	m.loader = m.loader.SetSize(width-4, height-4)
-	// Update edit modal size
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
 	m.editModal = m.editModal.SetSize(width, height)
 	return m
 }

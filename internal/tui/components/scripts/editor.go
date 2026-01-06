@@ -16,6 +16,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -226,8 +228,7 @@ func (m EditorModel) fetchStatus() tea.Cmd {
 func (m EditorModel) SetSize(width, height int) EditorModel {
 	m.width = width
 	m.height = height
-	// Update loader size for proper centering
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
 	return m
 }
 
@@ -247,16 +248,16 @@ func (m EditorModel) SetPanelIndex(index int) EditorModel {
 func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing CodeLoadedMsg/StatusLoadedMsg even during loading
-		switch msg.(type) {
-		case CodeLoadedMsg, StatusLoadedMsg:
-			// Pass through to main switch below
-		default:
-			if cmd != nil {
-				return m, cmd
+		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+			switch msg.(type) {
+			case CodeLoadedMsg, StatusLoadedMsg:
+				return true
 			}
+			return false
+		})
+		m.loader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 

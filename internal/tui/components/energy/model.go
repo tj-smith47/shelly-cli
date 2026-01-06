@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -345,13 +346,13 @@ func (m Model) Refresh() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing UpdateMsg even during loading
-		if _, ok := msg.(UpdateMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+			_, ok := msg.(UpdateMsg)
+			return ok
+		})
+		m.loader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 

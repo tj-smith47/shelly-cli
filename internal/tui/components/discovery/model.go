@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -142,14 +143,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	// Reserve space for header, method selector, and footer
-	visibleRows := height - 8
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader size for proper centering
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	helpers.SetScrollerRows(height, 8, m.scroller) // Reserve space for header, method selector, and footer
 	return m
 }
 
@@ -198,16 +193,13 @@ func (m Model) scanDevices() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	// Forward tick messages to loader when scanning
 	if m.scanning {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing ScanCompleteMsg even during scanning
-		switch msg.(type) {
-		case ScanCompleteMsg:
-			// Pass through to main switch below
-		default:
-			if cmd != nil {
-				return m, cmd
-			}
+		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+			_, ok := msg.(ScanCompleteMsg)
+			return ok
+		})
+		m.loader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 

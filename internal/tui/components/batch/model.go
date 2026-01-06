@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -209,14 +210,8 @@ func (m Model) LoadDevices() Model {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	// Reserve space for header, operation selector, and footer
-	visibleRows := height - 10
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader size
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	helpers.SetScrollerRows(height, 10, m.scroller) // Reserve space for header, operation selector, and footer
 	return m
 }
 

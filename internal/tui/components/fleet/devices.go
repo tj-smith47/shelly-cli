@@ -15,6 +15,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -152,13 +154,8 @@ func (m DevicesModel) loadDevices() tea.Cmd {
 func (m DevicesModel) SetSize(width, height int) DevicesModel {
 	m.width = width
 	m.height = height
-	visibleRows := height - 6 // Account for borders, title, stats line
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader size for proper centering
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	helpers.SetScrollerRows(height, 6, m.scroller) // Account for borders, title, stats line
 	return m
 }
 
@@ -178,13 +175,13 @@ func (m DevicesModel) SetPanelIndex(index int) DevicesModel {
 func (m DevicesModel) Update(msg tea.Msg) (DevicesModel, tea.Cmd) {
 	// Forward tick messages to loader when loading
 	if m.loading {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing DevicesLoadedMsg even during loading
-		if _, ok := msg.(DevicesLoadedMsg); !ok {
-			if cmd != nil {
-				return m, cmd
-			}
+		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+			_, ok := msg.(DevicesLoadedMsg)
+			return ok
+		})
+		m.loader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 
@@ -297,23 +294,21 @@ func (m DevicesModel) renderDeviceList() string {
 	content.WriteString(m.styles.Muted.Render(statsLine))
 	content.WriteString("\n\n")
 
-	// Device list with scroll
-	start, end := m.scroller.VisibleRange()
-	for i := start; i < end; i++ {
-		content.WriteString(m.renderDeviceLine(i))
-		content.WriteString("\n")
-	}
-
-	// Scroll indicator
-	content.WriteString(m.styles.Muted.Render(m.scroller.ScrollInfo()))
+	// Device list with scroll using generic helper
+	content.WriteString(generics.RenderScrollableList(generics.ListRenderConfig[integrator.AccountDevice]{
+		Items:    m.devices,
+		Scroller: m.scroller,
+		RenderItem: func(device integrator.AccountDevice, _ int, isCursor bool) string {
+			return m.renderDeviceLine(device, isCursor)
+		},
+		ScrollStyle:    m.styles.Muted,
+		ScrollInfoMode: generics.ScrollInfoAlways,
+	}))
 
 	return content.String()
 }
 
-func (m DevicesModel) renderDeviceLine(idx int) string {
-	device := m.devices[idx]
-	isSelected := m.scroller.IsCursorAt(idx)
-
+func (m DevicesModel) renderDeviceLine(device integrator.AccountDevice, isSelected bool) string {
 	// Online indicator
 	statusIcon := m.styles.Offline.Render("○")
 	if device.Online {

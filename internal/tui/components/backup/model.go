@@ -23,6 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -308,15 +309,9 @@ func (m Model) LoadBackupFiles() Model {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	// Calculate visible rows: height - mode selector - header - borders
-	visibleRows := height - 10
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader sizes
-	m.exportLoader = m.exportLoader.SetSize(width-4, height-4)
-	m.importLoader = m.importLoader.SetSize(width-4, height-4)
+	m.exportLoader = helpers.SetLoaderSize(m.exportLoader, width, height)
+	m.importLoader = helpers.SetLoaderSize(m.importLoader, width, height)
+	helpers.SetScrollerRows(height, 10, m.scroller) // mode selector + header + borders
 	return m
 }
 

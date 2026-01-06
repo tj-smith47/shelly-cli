@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -268,15 +269,10 @@ func (m Model) scanNetworks() tea.Cmd {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	visibleRows := height - 12 // Reserve space for status section
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader sizes for proper centering
-	m.loader = m.loader.SetSize(width-4, height-4)
-	m.scannerLoader = m.scannerLoader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	m.scannerLoader = helpers.SetLoaderSize(m.scannerLoader, width, height)
 	m.editModal = m.editModal.SetSize(width, height)
+	helpers.SetScrollerRows(height, 12, m.scroller) // Reserve space for status section
 	return m
 }
 

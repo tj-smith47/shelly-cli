@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -262,14 +263,8 @@ func (m ListModel) backgroundRefresh() tea.Cmd {
 func (m ListModel) SetSize(width, height int) ListModel {
 	m.width = width
 	m.height = height
-	// Calculate visible rows: height - borders (2) - title (1) - footer (1)
-	visibleRows := height - 4
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader size for proper centering
-	m.loader = m.loader.SetSize(width-4, height-4)
+	m.loader = helpers.SetLoaderSize(m.loader, width, height)
+	helpers.SetScrollerRows(height, 4, m.scroller)
 	return m
 }
 

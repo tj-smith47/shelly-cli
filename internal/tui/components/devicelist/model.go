@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -154,11 +155,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// Update loader for spinner animation when loading (needed for header spinner)
 	if m.cache != nil && m.cache.IsLoading() {
-		var cmd tea.Cmd
-		m.loader, cmd = m.loader.Update(msg)
-		// Continue processing for key events so navigation works during loading
-		if _, ok := msg.(tea.KeyPressMsg); !ok {
-			return m, cmd
+		result := generics.UpdateLoader(m.loader, msg, func(msg tea.Msg) bool {
+			// Continue processing for key events so navigation works during loading
+			_, ok := msg.(tea.KeyPressMsg)
+			return ok
+		})
+		m.loader = result.Loader
+		if result.Consumed {
+			return m, result.Cmd
 		}
 	}
 

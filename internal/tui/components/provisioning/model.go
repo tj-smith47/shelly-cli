@@ -15,6 +15,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -188,9 +189,8 @@ func (m Model) Reset() Model {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	// Update loader sizes
-	m.scanLoader = m.scanLoader.SetSize(width-4, height-4)
-	m.configLoader = m.configLoader.SetSize(width-4, height-4)
+	m.scanLoader = helpers.SetLoaderSize(m.scanLoader, width, height)
+	m.configLoader = helpers.SetLoaderSize(m.configLoader, width, height)
 	return m
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
@@ -558,21 +559,17 @@ func (m GroupEditModel) renderDevicesField() string {
 		return content.String()
 	}
 
-	// Device list with scrolling
-	start, end := m.deviceScroller.VisibleRange()
-	for i := start; i < end; i++ {
-		device := m.allDevices[i]
-		isSelected := m.selectedIDs[device.DeviceID]
-		isCursor := m.deviceScroller.IsCursorAt(i) && m.cursor == GroupEditFieldDevices
+	// Device list with scrolling using generic helper
+	fieldFocused := m.cursor == GroupEditFieldDevices
+	content.WriteString(generics.RenderScrollableItems(m.allDevices, m.deviceScroller,
+		func(device integrator.AccountDevice, _ int, scrollerCursor bool) string {
+			isSelected := m.selectedIDs[device.DeviceID]
+			isCursor := scrollerCursor && fieldFocused
+			return m.renderDeviceLine(device, isSelected, isCursor)
+		}))
 
-		content.WriteString(m.renderDeviceLine(device, isSelected, isCursor))
-		if i < end-1 {
-			content.WriteString("\n")
-		}
-	}
-
-	// Scroll indicator
-	if len(m.allDevices) > m.deviceScroller.VisibleRows() {
+	// Scroll indicator (with custom indentation for modal alignment)
+	if m.deviceScroller.HasMore() || m.deviceScroller.HasPrevious() {
 		content.WriteString("\n    ")
 		content.WriteString(m.styles.Info.Render(m.deviceScroller.ScrollInfo()))
 	}

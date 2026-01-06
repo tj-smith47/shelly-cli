@@ -20,6 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
+	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -256,14 +257,9 @@ func (m Model) loadCachedFirmware(name string) *cachedFirmwareInfo {
 func (m Model) SetSize(width, height int) Model {
 	m.width = width
 	m.height = height
-	visibleRows := height - 10
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
-	m.scroller.SetVisibleRows(visibleRows)
-	// Update loader sizes
-	m.checkLoader = m.checkLoader.SetSize(width-4, height-4)
-	m.updateLoader = m.updateLoader.SetSize(width-4, height-4)
+	m.checkLoader = helpers.SetLoaderSize(m.checkLoader, width, height)
+	m.updateLoader = helpers.SetLoaderSize(m.updateLoader, width, height)
+	helpers.SetScrollerRows(height, 10, m.scroller)
 	return m
 }
 
