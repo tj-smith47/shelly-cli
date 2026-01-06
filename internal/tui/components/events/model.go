@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
+	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 )
 
@@ -940,28 +941,9 @@ func isUserEvent(e Event) bool {
 
 // mergeEventsByTime merges user and system events sorted by timestamp (newest first).
 func mergeEventsByTime(user, system []Event) []Event {
-	result := make([]Event, 0, len(user)+len(system))
-	i, j := 0, 0
-
-	for i < len(user) || j < len(system) {
-		if i >= len(user) {
-			result = append(result, system[j:]...)
-			break
-		}
-		if j >= len(system) {
-			result = append(result, user[i:]...)
-			break
-		}
-		// Both slices are sorted newest-first, so compare timestamps
-		if user[i].Timestamp.After(system[j].Timestamp) {
-			result = append(result, user[i])
-			i++
-		} else {
-			result = append(result, system[j])
-			j++
-		}
-	}
-	return result
+	return generics.Merge(user, system, func(a, b Event) bool {
+		return a.Timestamp.After(b.Timestamp)
+	})
 }
 
 // columnLayout holds width calculations for event columns.
