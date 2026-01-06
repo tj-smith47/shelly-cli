@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
@@ -306,15 +307,22 @@ func (s *Service) AddVirtualComponent(ctx context.Context, identifier string, pa
 		id = result.ID
 		return nil
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeVirtuals)
+	}
 	return id, err
 }
 
 // DeleteVirtualComponent deletes a virtual component by key.
 func (s *Service) DeleteVirtualComponent(ctx context.Context, identifier, key string) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		virtual := components.NewVirtual(conn.RPCClient())
 		return virtual.Delete(ctx, key)
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeVirtuals)
+	}
+	return err
 }
 
 // ValidVirtualTypes is the list of valid virtual component types.

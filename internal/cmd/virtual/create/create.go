@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -105,8 +104,5 @@ func run(ctx context.Context, opts *Options) error {
 	} else {
 		ios.Success("Created virtual component %s", key)
 	}
-
-	// Invalidate cached virtual component list
-	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeVirtuals)
 	return nil
 }

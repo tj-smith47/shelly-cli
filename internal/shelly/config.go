@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/tj-smith47/shelly-go/gen2/components"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -172,7 +173,7 @@ func (s *Service) GetWiFiConfig(ctx context.Context, identifier string) (map[str
 
 // SetWiFiConfig updates the WiFi configuration.
 func (s *Service) SetWiFiConfig(ctx context.Context, identifier, ssid, password string, enable *bool) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		wifi := components.NewWiFi(conn.RPCClient())
 
 		// Build the station config
@@ -191,6 +192,10 @@ func (s *Service) SetWiFiConfig(ctx context.Context, identifier, ssid, password 
 			STA: staConfig,
 		})
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeWiFi)
+	}
+	return err
 }
 
 // WiFiScanResult holds a WiFi scan result.
@@ -306,12 +311,16 @@ func (s *Service) GetCloudConfig(ctx context.Context, identifier string) (map[st
 
 // SetCloudEnabled enables or disables cloud connection.
 func (s *Service) SetCloudEnabled(ctx context.Context, identifier string, enable bool) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		cloud := components.NewCloud(conn.RPCClient())
 		return cloud.SetConfig(ctx, &components.CloudConfig{
 			Enable: &enable,
 		})
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeCloud)
+	}
+	return err
 }
 
 // WebSocketInfo contains WebSocket configuration and status.
@@ -495,16 +504,23 @@ func (s *Service) CreateWebhook(ctx context.Context, identifier string, params C
 		id = resp.ID
 		return nil
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeWebhooks)
+	}
 	return id, err
 }
 
 // DeleteWebhook deletes a webhook by ID.
 func (s *Service) DeleteWebhook(ctx context.Context, identifier string, webhookID int) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		webhook := components.NewWebhook(conn.RPCClient())
 		_, err := webhook.Delete(ctx, webhookID)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeWebhooks)
+	}
+	return err
 }
 
 // UpdateWebhookParams holds parameters for updating a webhook.
@@ -517,7 +533,7 @@ type UpdateWebhookParams struct {
 
 // UpdateWebhook updates an existing webhook.
 func (s *Service) UpdateWebhook(ctx context.Context, identifier string, webhookID int, params UpdateWebhookParams) error {
-	return s.WithConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.WithConnection(ctx, identifier, func(conn *client.Client) error {
 		webhook := components.NewWebhook(conn.RPCClient())
 
 		cfg := &components.WebhookConfig{
@@ -534,6 +550,10 @@ func (s *Service) UpdateWebhook(ctx context.Context, identifier string, webhookI
 		_, err := webhook.Update(ctx, webhookID, cfg)
 		return err
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeWebhooks)
+	}
+	return err
 }
 
 // ListSupportedWebhookEvents returns supported webhook event types.

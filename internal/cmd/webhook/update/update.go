@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -99,11 +98,5 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Success("Webhook %d updated on %s", opts.WebhookID, opts.Device)
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	// Invalidate cached webhook list
-	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeWebhooks)
-	return nil
+	return err
 }

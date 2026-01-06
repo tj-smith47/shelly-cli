@@ -4,7 +4,9 @@ package kvs
 import (
 	"context"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
+	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 )
 
 // ConnectionFunc is a function that executes operations with a device connection.
@@ -13,12 +15,45 @@ type ConnectionFunc func(ctx context.Context, identifier string, fn func(*client
 // Service provides KVS operations for Shelly devices.
 type Service struct {
 	withConnection ConnectionFunc
+	cache          *cache.FileCache
+	ios            *iostreams.IOStreams
+}
+
+// ServiceOption configures a KVS Service.
+type ServiceOption func(*Service)
+
+// WithFileCache configures the service with a file cache for cache invalidation.
+func WithFileCache(fc *cache.FileCache) ServiceOption {
+	return func(s *Service) {
+		s.cache = fc
+	}
+}
+
+// WithIOStreams configures the service with IOStreams for debug logging.
+func WithIOStreams(ios *iostreams.IOStreams) ServiceOption {
+	return func(s *Service) {
+		s.ios = ios
+	}
 }
 
 // NewService creates a new KVS service.
-func NewService(withConnection ConnectionFunc) *Service {
-	return &Service{
+func NewService(withConnection ConnectionFunc, opts ...ServiceOption) *Service {
+	s := &Service{
 		withConnection: withConnection,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// invalidateCache invalidates cached KVS data for a device after mutations.
+func (s *Service) invalidateCache(device string) {
+	if s.cache == nil {
+		return
+	}
+	if err := s.cache.Invalidate(device, cache.TypeKVS); err != nil && s.ios != nil {
+		s.ios.DebugErr("cache invalidate "+device+"/"+cache.TypeKVS, err)
 	}
 }
 
@@ -62,16 +97,24 @@ func (s *Service) GetAll(ctx context.Context, identifier string) ([]Item, error)
 
 // Set stores a value in device KVS.
 func (s *Service) Set(ctx context.Context, identifier, key string, value any) error {
-	return s.withConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.withConnection(ctx, identifier, func(conn *client.Client) error {
 		return Set(ctx, conn, key, value)
 	})
+	if err == nil {
+		s.invalidateCache(identifier)
+	}
+	return err
 }
 
 // Delete removes a key from device KVS.
 func (s *Service) Delete(ctx context.Context, identifier, key string) error {
-	return s.withConnection(ctx, identifier, func(conn *client.Client) error {
+	err := s.withConnection(ctx, identifier, func(conn *client.Client) error {
 		return Delete(ctx, conn, key)
 	})
+	if err == nil {
+		s.invalidateCache(identifier)
+	}
+	return err
 }
 
 // Export exports all KVS data from a device.
@@ -93,5 +136,8 @@ func (s *Service) Import(ctx context.Context, identifier string, data *Export, o
 		imported, skipped, err = Import(ctx, conn, data, overwrite)
 		return err
 	})
+	if err == nil && imported > 0 {
+		s.invalidateCache(identifier)
+	}
 	return imported, skipped, err
 }

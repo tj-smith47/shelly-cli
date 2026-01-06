@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -102,11 +101,5 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Success("Key %q set to %v", opts.Key, output.FormatJSONValue(value))
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	// Invalidate cached KVS list
-	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeKVS)
-	return nil
+	return err
 }

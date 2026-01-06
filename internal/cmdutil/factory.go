@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/plugins"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/kvs"
@@ -90,17 +91,7 @@ func NewFactory() *Factory {
 
 	f.ShellyService = func() *shelly.Service {
 		if f.shellyService == nil {
-			// Use rate limiting and plugin support from config
-			// Rate limiting prevents device overload
-			// Plugin support enables control of non-Shelly devices (Tasmota, ESPHome, etc.)
-			// Only enable plugins if not using a test filesystem (avoids creating real directories)
-			if config.IsTestFs() {
-				// Test mode: simple service without plugin support
-				f.shellyService = shelly.NewService()
-			} else {
-				// Production mode: full service with rate limiting and plugins
-				f.shellyService = shelly.NewServiceWithPluginSupport()
-			}
+			f.shellyService = f.createShellyService()
 		}
 		return f.shellyService
 	}
@@ -211,12 +202,44 @@ func (f *Factory) SetBrowser(b browser.Browser) *Factory {
 	return f
 }
 
+// createShellyService creates the Shelly service with all options.
+// Extracted to reduce nesting complexity in the closure.
+func (f *Factory) createShellyService() *shelly.Service {
+	// Cache and IOStreams enable automatic cache invalidation on mutations
+	opts := []shelly.ServiceOption{
+		shelly.WithFileCache(f.FileCache()),
+		shelly.WithIOStreams(f.IOStreams()),
+	}
+
+	// Test mode: simple service without plugin support
+	// Avoids creating real directories during tests
+	if config.IsTestFs() {
+		return shelly.New(shelly.NewConfigResolver(), opts...)
+	}
+
+	// Production mode: add rate limiting and plugins
+	// Rate limiting prevents device overload
+	// Plugin support enables control of non-Shelly devices (Tasmota, ESPHome, etc.)
+	if cfg := config.Get(); cfg != nil {
+		opts = append(opts, shelly.WithRateLimiterFromAppConfig(cfg.GetRateLimitConfig()))
+	}
+	if registry, err := plugins.NewRegistry(); err == nil {
+		opts = append(opts, shelly.WithPluginRegistry(registry))
+	}
+	return shelly.New(shelly.NewConfigResolver(), opts...)
+}
+
 // KVSService returns the KVS service, lazily initialized.
 // The service is backed by the ShellyService's connection handling.
+// Cache and IOStreams are injected for automatic invalidation on mutations.
 func (f *Factory) KVSService() *kvs.Service {
 	if f.kvsService == nil {
 		svc := f.ShellyService()
-		f.kvsService = kvs.NewService(svc.WithConnection)
+		f.kvsService = kvs.NewService(
+			svc.WithConnection,
+			kvs.WithFileCache(f.FileCache()),
+			kvs.WithIOStreams(f.IOStreams()),
+		)
 	}
 	return f.kvsService
 }

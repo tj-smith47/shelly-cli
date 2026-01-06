@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 )
@@ -56,11 +55,5 @@ func run(ctx context.Context, opts *Options) error {
 		ios.Success("Cloud connection disabled on %s", opts.Device)
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	// Invalidate cached cloud status
-	cmdutil.InvalidateCache(opts.Factory, opts.Device, cache.TypeCloud)
-	return nil
+	return err
 }

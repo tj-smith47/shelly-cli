@@ -7,6 +7,7 @@ import (
 
 	libfirmware "github.com/tj-smith47/shelly-go/firmware"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -34,6 +35,8 @@ type Service struct {
 	connManager       *connection.Manager
 	rateLimiter       *ratelimit.DeviceRateLimiter
 	pluginRegistry    *plugins.Registry
+	cache             *cache.FileCache
+	ios               *iostreams.IOStreams
 	firmwareService   *firmware.Service
 	wirelessService   *wireless.Service
 	networkService    *network.WiFiService
@@ -116,6 +119,33 @@ func WithRateLimiterFromAppConfig(cfg config.RateLimitConfig) ServiceOption {
 func WithPluginRegistry(registry *plugins.Registry) ServiceOption {
 	return func(s *Service) {
 		s.pluginRegistry = registry
+	}
+}
+
+// WithFileCache configures the service with a file cache for caching responses.
+// This enables automatic cache invalidation after mutations.
+func WithFileCache(fc *cache.FileCache) ServiceOption {
+	return func(s *Service) {
+		s.cache = fc
+	}
+}
+
+// WithIOStreams configures the service with IOStreams for debug logging.
+// This enables logging cache invalidation errors in debug mode.
+func WithIOStreams(ios *iostreams.IOStreams) ServiceOption {
+	return func(s *Service) {
+		s.ios = ios
+	}
+}
+
+// invalidateCache invalidates cached data for a device/type after mutations.
+// Errors are logged but not returned (cache invalidation is best-effort).
+func (s *Service) invalidateCache(target, dataType string) {
+	if s.cache == nil {
+		return
+	}
+	if err := s.cache.Invalidate(target, dataType); err != nil && s.ios != nil {
+		s.ios.DebugErr("cache invalidate "+target+"/"+dataType, err)
 	}
 }
 
@@ -634,13 +664,17 @@ func (s *Service) GetMQTTConfig(ctx context.Context, identifier string) (map[str
 
 // SetMQTTConfig delegates to the MQTT service for backward compatibility.
 func (s *Service) SetMQTTConfig(ctx context.Context, identifier string, enable *bool, server, user, password, topicPrefix string) error {
-	return s.mqttService.SetConfig(ctx, identifier, network.SetConfigParams{
+	err := s.mqttService.SetConfig(ctx, identifier, network.SetConfigParams{
 		Enable:      enable,
 		Server:      server,
 		User:        user,
 		Password:    password,
 		TopicPrefix: topicPrefix,
 	})
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeMQTT)
+	}
+	return err
 }
 
 // MQTTSetConfigParams is an alias for network.SetConfigParams.
@@ -648,7 +682,11 @@ type MQTTSetConfigParams = network.SetConfigParams
 
 // SetMQTTConfigFull delegates to the MQTT service with full configuration options.
 func (s *Service) SetMQTTConfigFull(ctx context.Context, identifier string, params MQTTSetConfigParams) error {
-	return s.mqttService.SetConfig(ctx, identifier, params)
+	err := s.mqttService.SetConfig(ctx, identifier, params)
+	if err == nil {
+		s.invalidateCache(identifier, cache.TypeMQTT)
+	}
+	return err
 }
 
 // ----- Ethernet Service accessor and delegations -----
