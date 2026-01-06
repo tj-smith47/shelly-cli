@@ -1406,8 +1406,14 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabAutomation)
 		m.focusedPanel = PanelDeviceList
 		// View starts unfocused (device list has focus)
+		// Propagate current device if one is selected
+		var deviceName string
+		if dev := m.deviceList.SelectedDevice(); dev != nil {
+			deviceName = dev.Device.Name
+		}
 		return m, tea.Batch(
 			m.viewManager.SetActive(views.ViewAutomation),
+			m.viewManager.PropagateDevice(deviceName),
 			func() tea.Msg { return views.ViewFocusChangedMsg{Focused: false} },
 		), true
 
@@ -1415,8 +1421,14 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabConfig)
 		m.focusedPanel = PanelDeviceList
 		// View starts unfocused (device list has focus)
+		// Propagate current device if one is selected
+		var deviceName string
+		if dev := m.deviceList.SelectedDevice(); dev != nil {
+			deviceName = dev.Device.Name
+		}
 		return m, tea.Batch(
 			m.viewManager.SetActive(views.ViewConfig),
+			m.viewManager.PropagateDevice(deviceName),
 			func() tea.Msg { return views.ViewFocusChangedMsg{Focused: false} },
 		), true
 
@@ -2294,16 +2306,10 @@ func (m Model) renderHeader() string {
 	metaLines[0] = titleStyle.Render("Shelly Dashboard")
 
 	// Line 1: Device counts (moved up, no blank line after title)
-	if m.cache.IsLoading() {
-		fetched := m.cache.FetchedCount()
-		spinner := m.deviceList.SpinnerFrame()
-		metaLines[1] = labelStyle.Render("Devices: ") + valueStyle.Render(fmt.Sprintf("%s Loading... %d/%d", spinner, fetched, total))
-	} else {
-		metaLines[1] = labelStyle.Render("Devices: ") +
-			onlineStyle.Render(fmt.Sprintf("%d online", online))
-		if offline > 0 {
-			metaLines[1] += labelStyle.Render(" / ") + offlineStyle.Render(fmt.Sprintf("%d offline", offline))
-		}
+	metaLines[1] = labelStyle.Render("Devices: ") +
+		onlineStyle.Render(fmt.Sprintf("%d online", online))
+	if offline > 0 {
+		metaLines[1] += labelStyle.Render(" / ") + offlineStyle.Render(fmt.Sprintf("%d offline", offline))
 	}
 
 	// Line 2: Power consumption
