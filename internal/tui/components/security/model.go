@@ -292,8 +292,8 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
-	// Emit StatusLoadedMsg so sequential loading in Config view can advance
-	loadedCmd := func() tea.Msg { return StatusLoadedMsg{} }
+	// Emit StatusLoadedMsg with cached data so sequential loading can advance
+	loadedCmd := func() tea.Msg { return StatusLoadedMsg{Status: m.status} }
 
 	if msg.NeedsRefresh {
 		m.cacheStatus, _ = m.cacheStatus.StartRefresh()

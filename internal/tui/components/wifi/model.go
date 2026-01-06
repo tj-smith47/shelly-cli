@@ -379,8 +379,9 @@ func (m Model) handleCacheHit(msg panelcache.CacheHitMsg) (Model, tea.Cmd) {
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
-	// Emit StatusLoadedMsg so sequential loading in Config view can advance
-	loadedCmd := func() tea.Msg { return StatusLoadedMsg{} }
+	// Emit StatusLoadedMsg with cached data so sequential loading can advance
+	// and handleStatusLoaded won't overwrite with nil
+	loadedCmd := func() tea.Msg { return StatusLoadedMsg{Status: m.status, Config: m.config} }
 
 	// Background refresh if stale
 	if msg.NeedsRefresh {

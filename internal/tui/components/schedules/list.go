@@ -345,8 +345,8 @@ func (m ListModel) handleCacheHit(msg panelcache.CacheHitMsg) (ListModel, tea.Cm
 	}
 	m.cacheStatus = m.cacheStatus.SetUpdatedAt(msg.CachedAt)
 
-	// Emit LoadedMsg so sequential loading in Automation view can advance
-	loadedCmd := func() tea.Msg { return LoadedMsg{} }
+	// Emit LoadedMsg with cached data so sequential loading can advance
+	loadedCmd := func() tea.Msg { return LoadedMsg{Schedules: m.schedules} }
 
 	if msg.NeedsRefresh {
 		m.cacheStatus, _ = m.cacheStatus.StartRefresh()
