@@ -660,7 +660,9 @@ func (m Model) renderItemLine(item Item, isSelected bool) string {
 	// Calculate available width for key and value
 	// Fixed: selector(2) + " = "(3) = 5
 	available := output.ContentWidth(m.width, 4+5)
-	keyWidth, valueWidth := output.SplitWidth(available, 40, 10, 15)
+
+	// Dynamic width allocation based on actual content
+	keyWidth, valueWidth := m.calculateKeyValueWidths(available, item)
 
 	// Key (truncate if too long)
 	key := output.Truncate(item.Key, keyWidth)
@@ -677,37 +679,64 @@ func (m Model) renderItemLine(item Item, isSelected bool) string {
 	return line
 }
 
-func (m Model) formatValueWithWidth(value any, maxWidth int) string {
-	if value == nil {
-		return m.styles.Null.Render("null")
+// calculateKeyValueWidths dynamically allocates width between key and value.
+// It examines all items to find the actual max key width, then gives remaining space to values.
+func (m Model) calculateKeyValueWidths(available int, _ Item) (keyW, valueW int) {
+	const minKeyW, minValueW = 10, 15
+
+	// Find the actual max key width from all items
+	maxKeyLen := minKeyW
+	for _, item := range m.items {
+		if len(item.Key) > maxKeyLen {
+			maxKeyLen = len(item.Key)
+		}
 	}
 
-	// Account for quotes in string display
-	strWidth := maxWidth - 2
-	if strWidth < 10 {
-		strWidth = 10
+	// Key gets its actual needed width (plus 1 for spacing), capped by available - minValueW
+	keyW = min(maxKeyLen+1, available-minValueW)
+	if keyW < minKeyW {
+		keyW = minKeyW
+	}
+
+	// Value gets remaining space
+	valueW = available - keyW
+	if valueW < minValueW {
+		valueW = minValueW
+	}
+
+	return keyW, valueW
+}
+
+func (m Model) formatValueWithWidth(value any, maxWidth int) string {
+	if value == nil {
+		return m.styles.Null.Width(maxWidth).Render("null")
 	}
 
 	switch v := value.(type) {
 	case string:
-		display := output.Truncate(v, strWidth)
-		return m.styles.String.Render(fmt.Sprintf("%q", display))
+		// Quote first, then truncate - %q escapes add characters
+		quoted := fmt.Sprintf("%q", v)
+		display := output.Truncate(quoted, maxWidth)
+		return m.styles.String.Width(maxWidth).Render(display)
 	case float64:
+		var numStr string
 		if v == float64(int64(v)) {
-			return m.styles.Number.Render(fmt.Sprintf("%d", int64(v)))
+			numStr = fmt.Sprintf("%d", int64(v))
+		} else {
+			numStr = fmt.Sprintf("%g", v)
 		}
-		return m.styles.Number.Render(fmt.Sprintf("%g", v))
+		return m.styles.Number.Width(maxWidth).Render(numStr)
 	case bool:
-		return m.styles.Bool.Render(fmt.Sprintf("%v", v))
+		return m.styles.Bool.Width(maxWidth).Render(fmt.Sprintf("%v", v))
 	case map[string]any, []any:
 		jsonBytes, err := json.Marshal(v)
 		if err != nil {
-			return m.styles.Object.Render("{...}")
+			return m.styles.Object.Width(maxWidth).Render("{...}")
 		}
 		display := output.Truncate(string(jsonBytes), maxWidth)
-		return m.styles.Object.Render(display)
+		return m.styles.Object.Width(maxWidth).Render(display)
 	default:
-		return m.styles.Value.Render(fmt.Sprintf("%v", v))
+		return m.styles.Value.Width(maxWidth).Render(fmt.Sprintf("%v", v))
 	}
 }
 

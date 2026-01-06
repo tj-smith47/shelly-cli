@@ -11,7 +11,7 @@ import (
 	"charm.land/bubbles/v2/paginator"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/tj-smith47/shelly-go/events"
+	shellyevents "github.com/tj-smith47/shelly-go/events"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/output"
@@ -279,7 +279,7 @@ func (m Model) scheduleRefresh() tea.Cmd {
 
 // handleStreamEvent converts shelly-go events to our internal Event type.
 // It is called by the shared EventStream when events arrive.
-func (m Model) handleStreamEvent(evt events.Event) {
+func (m Model) handleStreamEvent(evt shellyevents.Event) {
 	// Apply device filter if enabled
 	if m.filterByDevice && evt.DeviceID() != m.selectedDevice {
 		return
@@ -290,35 +290,35 @@ func (m Model) handleStreamEvent(evt events.Event) {
 	event.Device = evt.DeviceID()
 
 	switch e := evt.(type) {
-	case *events.StatusChangeEvent:
+	case *shellyevents.StatusChangeEvent:
 		event.Component = e.Component
 		event.Type = levelStatus
 		event.Description = fmt.Sprintf("%s changed", e.Component)
-	case *events.NotifyEvent:
+	case *shellyevents.NotifyEvent:
 		event.Component = e.Component
 		event.Type = categorizeEvent(e.Event)
 		event.Description = fmt.Sprintf("%s: %s", e.Component, e.Event)
-	case *events.FullStatusEvent:
+	case *shellyevents.FullStatusEvent:
 		event.Type = levelFullStatus
 		event.Description = "Full status update"
-	case *events.DeviceOnlineEvent:
+	case *shellyevents.DeviceOnlineEvent:
 		event.Type = levelInfo
 		event.Description = "Device online"
 		// Update connection status
 		m.state.mu.Lock()
 		m.state.connStatus[evt.DeviceID()] = true
 		m.state.mu.Unlock()
-	case *events.DeviceOfflineEvent:
+	case *shellyevents.DeviceOfflineEvent:
 		event.Type = levelWarning
 		event.Description = "Device offline"
 		// Update connection status
 		m.state.mu.Lock()
 		m.state.connStatus[evt.DeviceID()] = false
 		m.state.mu.Unlock()
-	case *events.ScriptEvent:
+	case *shellyevents.ScriptEvent:
 		event.Type = levelScript
 		event.Description = fmt.Sprintf("Script output: %s", e.Output)
-	case *events.ErrorEvent:
+	case *shellyevents.ErrorEvent:
 		event.Type = levelError
 		event.Description = e.Message
 	default:
@@ -948,13 +948,14 @@ func mergeEventsByTime(user, system []Event) []Event {
 
 // columnLayout holds width calculations for event columns.
 type columnLayout struct {
-	colWidth  int // Device events column width
-	sysColW   int // Cache updates column width (TIME + ENTITY only)
-	timeW     int
-	levelW    int
-	userDevW  int
-	userCompW int
-	userDescW int
+	colWidth   int // Device events column width
+	sysColW    int // Cache updates column width (TIME + ENTITY only)
+	sysDeviceW int // Cache updates device column width
+	timeW      int
+	levelW     int
+	userDevW   int
+	userCompW  int
+	userDescW  int
 }
 
 // computeColumnLayout calculates column widths.
@@ -1000,21 +1001,34 @@ func computeColumnLayout(totalWidth int, userEvents, systemEvents []Event) colum
 			maxUserDeviceLen = len(e.Device)
 		}
 	}
-	userCompW := min(maxCompLen+1, 15)         // Cap component at reasonable max
-	userDeviceW := min(maxUserDeviceLen+1, 20) // Cap device at reasonable max
+
+	// Dynamic caps: ensure at least minDescW chars for description
+	// Calculate max possible allocation for device + component
+	maxDevCompBudget := userColWidth - timeW - levelW - spacesUser - minDescW
+	userCompW := min(maxCompLen+1, maxDevCompBudget/3)                 // Component gets up to 1/3 of flexible space
+	userDeviceW := min(maxUserDeviceLen+1, maxDevCompBudget-userCompW) // Device gets remainder
+
+	// Ensure minimums are respected
+	if userCompW < headerCompW+1 {
+		userCompW = headerCompW + 1
+	}
+	if userDeviceW < minDeviceW {
+		userDeviceW = minDeviceW
+	}
 
 	// DESC gets all remaining space
 	fixedWidth := timeW + userDeviceW + userCompW + levelW + spacesUser
 	userDescW := max(minDescW, userColWidth-fixedWidth)
 
 	return columnLayout{
-		colWidth:  userColWidth,
-		timeW:     timeW,
-		levelW:    levelW,
-		userDevW:  userDeviceW,
-		userCompW: userCompW,
-		userDescW: userDescW,
-		sysColW:   sysColWidth,
+		colWidth:   userColWidth,
+		timeW:      timeW,
+		levelW:     levelW,
+		userDevW:   userDeviceW,
+		userCompW:  userCompW,
+		userDescW:  userDescW,
+		sysColW:    sysColWidth,
+		sysDeviceW: sysDeviceW,
 	}
 }
 
@@ -1147,7 +1161,7 @@ func (m Model) renderUserEventRow(userEvt Event, sysPage []Event, userIdx, sysId
 	newSysIdx = sysIdx
 	if newSysIdx < len(sysPage) {
 		isSysSelected := m.focused && m.focusedColumn == ColumnSystem && newSysIdx == rs.sysCursorInPage
-		sysLine = m.renderSystemEvent(sysPage[newSysIdx], rs.layout.timeW, isSysSelected)
+		sysLine = m.renderSystemEvent(sysPage[newSysIdx], rs.layout.timeW, rs.layout.sysDeviceW, isSysSelected)
 		newSysIdx++
 	}
 
@@ -1170,7 +1184,7 @@ func (m Model) renderUserEventRow(userEvt Event, sysPage []Event, userIdx, sysId
 // renderSystemOnlyRow renders a row with only a cache update event (no device event).
 func (m Model) renderSystemOnlyRow(sysEvt Event, sysIdx int, rs dualColumnRenderState) string {
 	isSysSelected := m.focused && m.focusedColumn == ColumnSystem && sysIdx == rs.sysCursorInPage
-	rightCell := output.PadRight(m.renderSystemEvent(sysEvt, rs.layout.timeW, isSysSelected), rs.layout.sysColW)
+	rightCell := output.PadRight(m.renderSystemEvent(sysEvt, rs.layout.timeW, rs.layout.sysDeviceW, isSysSelected), rs.layout.sysColW)
 	return rs.emptyLeft + " " + rs.separator + " " + rightCell
 }
 
@@ -1273,7 +1287,7 @@ func (m Model) renderUserEventWrapped(e Event, timeW, deviceW, compW, levelW, de
 
 // renderSystemEvent renders a cache update event row (TIME and ENTITY only).
 // When selected is true, applies a background highlight to the entire row.
-func (m Model) renderSystemEvent(e Event, timeW int, selected bool) string {
+func (m Model) renderSystemEvent(e Event, timeW, deviceW int, selected bool) string {
 	colors := theme.GetSemanticColors()
 
 	// Base styles - add background when selected
@@ -1286,11 +1300,11 @@ func (m Model) renderSystemEvent(e Event, timeW int, selected bool) string {
 		deviceStyle = deviceStyle.Background(bg).Bold(true)
 	}
 
-	// Time column
+	// Time column - fixed width
 	timeStr := timeStyle.Width(timeW).Render(e.Timestamp.Format("15:04:05"))
 
-	// Device column - never truncate, expand to fit
-	deviceStr := deviceStyle.Render(e.Device)
+	// Device column - pad to fixed width for alignment
+	deviceStr := deviceStyle.Width(deviceW).Render(e.Device)
 
 	return timeStr + " " + deviceStr
 }
