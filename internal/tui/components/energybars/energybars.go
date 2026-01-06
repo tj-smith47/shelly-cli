@@ -329,7 +329,7 @@ func (m Model) renderBar(bar Bar, maxVal float64, barWidth, labelWidth int) stri
 	labelStr := m.styles.Label.Width(labelWidth).Render(bar.Label)
 
 	valueStr := formatValue(bar.Value, bar.Unit)
-	valueRender := m.styles.Value.Render(valueStr)
+	valueRender := m.styles.Value.Width(10).Align(lipgloss.Right).Render(valueStr)
 
 	return labelStr + " " + fill + empty + " " + valueRender
 }

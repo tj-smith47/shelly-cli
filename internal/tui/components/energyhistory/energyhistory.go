@@ -399,25 +399,12 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 		return strings.Repeat(lowestChar, width)
 	}
 
-	// Scale data to fit width - ensures full 5-minute history is always visible
+	// Scale data to fit width exactly - interpolates/compresses to fill full sparkline
 	data := scaleDataToWidth(history, width)
 
 	p := computeSparklineParams(data)
 
 	var spark strings.Builder
-
-	// Pad at the start if we don't have enough data to fill width
-	if padCount := width - len(data); padCount > 0 {
-		padLevel := 0
-		if p.flatLine {
-			padLevel = p.flatLevel
-		}
-		padChar := m.styles.SparkGradient[padLevel].Render(string(sparkChars[padLevel]))
-		for range padCount {
-			spark.WriteString(padChar)
-		}
-	}
-
 	for _, d := range data {
 		idx := normalizeToLevel(d.Value, p)
 		spark.WriteString(m.styles.SparkGradient[idx].Render(string(sparkChars[idx])))
@@ -426,16 +413,27 @@ func (m *Model) generateSparkline(history []DataPoint, width int) string {
 	return spark.String()
 }
 
-// scaleDataToWidth scales the data points to fit the target width.
-// If we have more points than width, we sample/average them.
-// If we have fewer points than width, we return as-is (padding handled elsewhere).
+// scaleDataToWidth scales the data points to fit the target width exactly.
+// If we have more points than width, we compress by averaging groups.
+// If we have fewer points than width, we stretch by interpolating between points.
+// This ensures the sparkline is always fully filled with no dead padding.
 func scaleDataToWidth(history []DataPoint, width int) []DataPoint {
 	histLen := len(history)
-	if histLen <= width {
+	if histLen == 0 {
 		return history
 	}
+	if histLen == width {
+		return history
+	}
+	if histLen > width {
+		return scaleDown(history, width)
+	}
+	return scaleUp(history, width)
+}
 
-	// Scale down: group points and take the average value for each group
+// scaleDown compresses more data points into fewer by averaging groups.
+func scaleDown(history []DataPoint, width int) []DataPoint {
+	histLen := len(history)
 	result := make([]DataPoint, width)
 	ratio := float64(histLen) / float64(width)
 
@@ -459,10 +457,38 @@ func scaleDataToWidth(history []DataPoint, width int) []DataPoint {
 
 		result[i] = DataPoint{
 			Value:     sum / float64(count),
-			Timestamp: history[endIdx-1].Timestamp, // Use last timestamp in bucket
+			Timestamp: history[endIdx-1].Timestamp,
 		}
 	}
+	return result
+}
 
+// scaleUp stretches fewer data points to fill more width by interpolating.
+func scaleUp(history []DataPoint, width int) []DataPoint {
+	histLen := len(history)
+	result := make([]DataPoint, width)
+
+	for i := range width {
+		// Map output position to source position
+		srcPos := float64(i) * float64(histLen-1) / float64(width-1)
+		lowIdx := int(srcPos)
+		highIdx := lowIdx + 1
+
+		if highIdx >= histLen {
+			// At or beyond the last point
+			result[i] = history[histLen-1]
+			continue
+		}
+
+		// Linear interpolation between adjacent points
+		frac := srcPos - float64(lowIdx)
+		value := history[lowIdx].Value*(1-frac) + history[highIdx].Value*frac
+
+		result[i] = DataPoint{
+			Value:     value,
+			Timestamp: history[highIdx].Timestamp,
+		}
+	}
 	return result
 }
 
