@@ -134,5 +134,5 @@ func DefaultFixturePath() string {
 	if path := os.Getenv("SHELLY_DEMO_FIXTURES"); path != "" {
 		return path
 	}
-	return "testdata/demo/fixtures.yaml"
+	return "internal/mock/testdata/demo/fixtures.yaml"
 }

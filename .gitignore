@@ -54,3 +54,6 @@ dist/
 tmp/
 temp/
 docgen
+
+# Hugo
+.hugo_build.lock

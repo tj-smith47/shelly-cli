@@ -15,7 +15,7 @@ import (
 func TestLoadFixtures(t *testing.T) {
 	t.Run("loads valid fixtures", func(t *testing.T) {
 		t.Parallel()
-		fixtures, err := LoadFixtures("../../testdata/demo/fixtures.yaml")
+		fixtures, err := LoadFixtures("testdata/demo/fixtures.yaml")
 		require.NoError(t, err)
 		require.NotNil(t, fixtures)
 
@@ -95,7 +95,7 @@ func TestDefaultFixturePath(t *testing.T) {
 		if err := os.Unsetenv("SHELLY_DEMO_FIXTURES"); err != nil {
 			t.Logf("warning: %v", err)
 		}
-		assert.Equal(t, "testdata/demo/fixtures.yaml", DefaultFixturePath())
+		assert.Equal(t, "internal/mock/testdata/demo/fixtures.yaml", DefaultFixturePath())
 	})
 }
 
