@@ -138,7 +138,7 @@ func TestManage_Update_FocusNext(t *testing.T) {
 		t.Fatal("Update should return *Manage")
 	}
 
-	// Panel order: Discovery -> Firmware -> Backup -> Batch
+	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Batch
 	if manage.focusedPanel != ManagePanelFirmware {
 		t.Errorf("focusedPanel after tab = %v, want ManagePanelFirmware", manage.focusedPanel)
 	}
@@ -156,10 +156,10 @@ func TestManage_Update_FocusPrev(t *testing.T) {
 		t.Fatal("Update should return *Manage")
 	}
 
-	// Panel order: Discovery -> Firmware -> Backup -> Batch
-	// Batch is last, so prev is Backup
-	if manage.focusedPanel != ManagePanelBackup {
-		t.Errorf("focusedPanel after shift+tab = %v, want ManagePanelBackup", manage.focusedPanel)
+	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Batch
+	// Batch is last, so prev is Scenes
+	if manage.focusedPanel != ManagePanelScenes {
+		t.Errorf("focusedPanel after shift+tab = %v, want ManagePanelScenes", manage.focusedPanel)
 	}
 }
 
@@ -172,7 +172,7 @@ func TestManage_FocusCycle(t *testing.T) {
 		t.Fatal("should start at ManagePanelDiscovery")
 	}
 
-	// Panel order: Discovery -> Firmware -> Backup -> Batch
+	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Batch
 	m.focusNext()
 	if m.focusedPanel != ManagePanelFirmware {
 		t.Errorf("after 1 focusNext = %v, want ManagePanelFirmware", m.focusedPanel)
@@ -184,13 +184,18 @@ func TestManage_FocusCycle(t *testing.T) {
 	}
 
 	m.focusNext()
+	if m.focusedPanel != ManagePanelScenes {
+		t.Errorf("after 3 focusNext = %v, want ManagePanelScenes", m.focusedPanel)
+	}
+
+	m.focusNext()
 	if m.focusedPanel != ManagePanelBatch {
-		t.Errorf("after 3 focusNext = %v, want ManagePanelBatch", m.focusedPanel)
+		t.Errorf("after 4 focusNext = %v, want ManagePanelBatch", m.focusedPanel)
 	}
 
 	m.focusNext()
 	if m.focusedPanel != ManagePanelDiscovery {
-		t.Errorf("after 4 focusNext = %v, want ManagePanelDiscovery (wrap)", m.focusedPanel)
+		t.Errorf("after 5 focusNext = %v, want ManagePanelDiscovery (wrap)", m.focusedPanel)
 	}
 }
 
@@ -201,7 +206,7 @@ func TestManage_FocusPrevCycle(t *testing.T) {
 	// Start at discovery
 	m.focusedPanel = ManagePanelDiscovery
 
-	// Panel order: Discovery -> Firmware -> Backup -> Batch
+	// Panel order: Discovery -> Firmware -> Backup -> Scenes -> Batch
 	// Go backwards (wrap from Discovery to Batch)
 	m.focusPrev()
 	if m.focusedPanel != ManagePanelBatch {
@@ -209,8 +214,8 @@ func TestManage_FocusPrevCycle(t *testing.T) {
 	}
 
 	m.focusPrev()
-	if m.focusedPanel != ManagePanelBackup {
-		t.Errorf("after 2 focusPrev = %v, want ManagePanelBackup", m.focusedPanel)
+	if m.focusedPanel != ManagePanelScenes {
+		t.Errorf("after 2 focusPrev = %v, want ManagePanelScenes", m.focusedPanel)
 	}
 }
 
@@ -266,6 +271,7 @@ func TestManage_Accessors(t *testing.T) {
 	_ = m.Batch()
 	_ = m.Firmware()
 	_ = m.Backup()
+	_ = m.Scenes()
 }
 
 func TestManage_StatusSummary(t *testing.T) {

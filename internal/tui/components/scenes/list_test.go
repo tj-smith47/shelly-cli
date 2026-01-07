@@ -6,7 +6,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -66,7 +65,6 @@ func TestListDeps_Validate(t *testing.T) {
 			deps: ListDeps{
 				Ctx: nil,
 				Svc: testDeps().Svc,
-				Cfg: testDeps().Cfg,
 			},
 			wantErr: true,
 		},
@@ -75,16 +73,6 @@ func TestListDeps_Validate(t *testing.T) {
 			deps: ListDeps{
 				Ctx: context.Background(),
 				Svc: nil,
-				Cfg: testDeps().Cfg,
-			},
-			wantErr: true,
-		},
-		{
-			name: "nil cfg",
-			deps: ListDeps{
-				Ctx: context.Background(),
-				Svc: testDeps().Svc,
-				Cfg: nil,
 			},
 			wantErr: true,
 		},
@@ -201,7 +189,6 @@ func testDeps() ListDeps {
 	return ListDeps{
 		Ctx: context.Background(),
 		Svc: &shelly.Service{},
-		Cfg: &config.Config{},
 	}
 }
 

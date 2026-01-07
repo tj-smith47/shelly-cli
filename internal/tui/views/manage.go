@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/discovery"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/provisioning"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/scenes"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -31,6 +32,7 @@ const (
 	ManagePanelBatch
 	ManagePanelFirmware
 	ManagePanelBackup
+	ManagePanelScenes
 	ManagePanelProvisioning
 )
 
@@ -52,7 +54,7 @@ func (d ManageDeps) Validate() error {
 	return nil
 }
 
-// Manage is the manage view that composes Discovery, Batch, Firmware, Backup, and Provisioning.
+// Manage is the manage view that composes Discovery, Batch, Firmware, Backup, Scenes, and Provisioning.
 // This provides local device administration (not Shelly Cloud Fleet).
 type Manage struct {
 	ctx context.Context
@@ -64,6 +66,7 @@ type Manage struct {
 	batch        batch.Model
 	firmware     firmware.Model
 	backup       backup.Model
+	scenes       scenes.ListModel
 	provisioning provisioning.Model
 
 	// State
@@ -110,16 +113,18 @@ func NewManage(deps ManageDeps) *Manage {
 	batchDeps := batch.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	firmwareDeps := firmware.Deps{Ctx: deps.Ctx, Svc: deps.Svc, FileCache: deps.FileCache}
 	backupDeps := backup.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
+	scenesDeps := scenes.ListDeps{Ctx: deps.Ctx, Svc: deps.Svc}
 	provisioningDeps := provisioning.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
 	// Create flexible layout with 40/60 column split (left/right)
 	layoutCalc := layout.NewTwoColumnLayout(0.4, 1)
 
-	// Configure left column panels (Discovery, Firmware, Backup) with expansion on focus
+	// Configure left column panels (Discovery, Firmware, Backup, Scenes) with expansion on focus
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(ManagePanelDiscovery), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(ManagePanelFirmware), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(ManagePanelBackup), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(ManagePanelScenes), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	// Configure right column (Batch takes full height)
@@ -135,6 +140,7 @@ func NewManage(deps ManageDeps) *Manage {
 		batch:        batch.New(batchDeps),
 		firmware:     firmware.New(firmwareDeps),
 		backup:       backup.New(backupDeps),
+		scenes:       scenes.NewList(scenesDeps),
 		provisioning: provisioning.New(provisioningDeps),
 		focusedPanel: ManagePanelDiscovery,
 		styles:       DefaultManageStyles(),
@@ -159,6 +165,7 @@ func (m *Manage) Init() tea.Cmd {
 		m.batch.Init(),
 		m.firmware.Init(),
 		m.backup.Init(),
+		m.scenes.Init(),
 		m.provisioning.Init(),
 	)
 }
@@ -206,6 +213,9 @@ func (m *Manage) SetSize(width, height int) View {
 	if d, ok := dims[layout.PanelID(ManagePanelBackup)]; ok {
 		m.backup = m.backup.SetSize(d.Width, d.Height)
 	}
+	if d, ok := dims[layout.PanelID(ManagePanelScenes)]; ok {
+		m.scenes = m.scenes.SetSize(d.Width, d.Height)
+	}
 
 	// Apply size to right column (Batch)
 	if d, ok := dims[layout.PanelID(ManagePanelBatch)]; ok {
@@ -250,6 +260,9 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 		m.focusedPanel = ManagePanelBackup
 		m.updateFocusStates()
 	case keyconst.Shift5:
+		m.focusedPanel = ManagePanelScenes
+		m.updateFocusStates()
+	case keyconst.Shift6:
 		m.focusedPanel = ManagePanelProvisioning
 		m.showProvisioning = true
 		m.updateFocusStates()
@@ -278,8 +291,8 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 }
 
 func (m *Manage) focusNext() {
-	// Column-by-column: left column (Discovery, Firmware, Backup), then right (Batch)
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelBatch}
+	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes), then right (Batch)
+	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelBatch}
 	for i, p := range panels {
 		if p == m.focusedPanel {
 			m.focusedPanel = panels[(i+1)%len(panels)]
@@ -290,8 +303,8 @@ func (m *Manage) focusNext() {
 }
 
 func (m *Manage) focusPrev() {
-	// Column-by-column: left column (Discovery, Firmware, Backup), then right (Batch)
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelBatch}
+	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes), then right (Batch)
+	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelBatch}
 	for i, p := range panels {
 		if p == m.focusedPanel {
 			prevIdx := (i - 1 + len(panels)) % len(panels)
@@ -303,12 +316,13 @@ func (m *Manage) focusPrev() {
 }
 
 func (m *Manage) updateFocusStates() {
-	// Panel indices match column-by-column cycling order: left (1-3), right (4)
+	// Panel indices match column-by-column cycling order: left (1-4), right (5)
 	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !m.showProvisioning).SetPanelIndex(1)
 	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning).SetPanelIndex(2)
 	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning).SetPanelIndex(3)
-	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(4)
-	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(5)
+	m.scenes = m.scenes.SetFocused(m.focusedPanel == ManagePanelScenes && !m.showProvisioning).SetPanelIndex(4)
+	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(5)
+	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(6)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if m.layoutCalc != nil && m.width > 0 && m.height > 0 {
@@ -337,6 +351,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 			m.firmware, cmd = m.firmware.Update(msg)
 		case ManagePanelBackup:
 			m.backup, cmd = m.backup.Update(msg)
+		case ManagePanelScenes:
+			m.scenes, cmd = m.scenes.Update(msg)
 		case ManagePanelProvisioning:
 			m.provisioning, cmd = m.provisioning.Update(msg)
 		}
@@ -350,6 +366,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 		m.firmware, cmd = m.firmware.Update(msg)
 		cmds = append(cmds, cmd)
 		m.backup, cmd = m.backup.Update(msg)
+		cmds = append(cmds, cmd)
+		m.scenes, cmd = m.scenes.Update(msg)
 		cmds = append(cmds, cmd)
 		m.provisioning, cmd = m.provisioning.Update(msg)
 		cmds = append(cmds, cmd)
@@ -393,6 +411,8 @@ func (m *Manage) renderNarrowLayout() string {
 		return m.firmware.View()
 	case ManagePanelBackup:
 		return m.backup.View()
+	case ManagePanelScenes:
+		return m.scenes.View()
 	case ManagePanelProvisioning:
 		return m.provisioning.View()
 	default:
@@ -406,6 +426,7 @@ func (m *Manage) renderStandardLayout() string {
 		m.discovery.View(),
 		m.firmware.View(),
 		m.backup.View(),
+		m.scenes.View(),
 	)
 
 	// Join left column with right column (batch)
@@ -427,6 +448,9 @@ func (m *Manage) Refresh() tea.Cmd {
 	cmds = append(cmds, cmd)
 
 	m.backup, cmd = m.backup.Refresh()
+	cmds = append(cmds, cmd)
+
+	m.scenes, cmd = m.scenes.Refresh()
 	cmds = append(cmds, cmd)
 
 	return tea.Batch(cmds...)
@@ -455,6 +479,11 @@ func (m *Manage) Firmware() firmware.Model {
 // Backup returns the backup component.
 func (m *Manage) Backup() backup.Model {
 	return m.backup
+}
+
+// Scenes returns the scenes component.
+func (m *Manage) Scenes() scenes.ListModel {
+	return m.scenes
 }
 
 // StatusSummary returns a status summary string.

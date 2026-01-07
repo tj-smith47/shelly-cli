@@ -31,7 +31,6 @@ const footerKeybindings = "a:activate e:edit d:del n:new r:refresh"
 type ListDeps struct {
 	Ctx context.Context
 	Svc *shelly.Service
-	Cfg *config.Config
 }
 
 // Validate ensures all required dependencies are set.
@@ -41,9 +40,6 @@ func (d ListDeps) Validate() error {
 	}
 	if d.Svc == nil {
 		return fmt.Errorf("service is required")
-	}
-	if d.Cfg == nil {
-		return fmt.Errorf("config is required")
 	}
 	return nil
 }
@@ -74,7 +70,6 @@ type ListModel struct {
 	helpers.Sizable
 	ctx           context.Context
 	svc           *shelly.Service
-	cfg           *config.Config
 	scenes        []config.Scene
 	loading       bool
 	activating    bool
@@ -132,7 +127,6 @@ func NewList(deps ListDeps) ListModel {
 		Sizable: helpers.NewSizable(4, panel.NewScroller(0, 10)),
 		ctx:     deps.Ctx,
 		svc:     deps.Svc,
-		cfg:     deps.Cfg,
 		styles:  DefaultListStyles(),
 	}
 	m.Loader = m.Loader.SetMessage("Loading scenes...")
