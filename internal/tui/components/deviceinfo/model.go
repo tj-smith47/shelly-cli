@@ -397,13 +397,24 @@ func (m Model) buildRuntimeLine() string {
 	return strings.Join(parts, " │ ")
 }
 
-// buildComponentsVertical builds a vertical list of components (one per line).
+// buildComponentsVertical builds a vertical list of components or single component detail.
 func (m Model) buildComponentsVertical() string {
 	components := m.getComponents()
 	if len(components) == 0 {
 		return ""
 	}
 
+	// Show single component detail view if one is selected
+	if m.componentCursor >= 0 && m.componentCursor < len(components) {
+		return m.renderSingleComponent(components[m.componentCursor])
+	}
+
+	// Show all components in vertical list
+	return m.renderAllComponents(components)
+}
+
+// renderAllComponents renders all components in a vertical list.
+func (m Model) renderAllComponents(components []ComponentInfo) string {
 	lines := make([]string, 0, len(components))
 	for i, comp := range components {
 		stateStyle := m.styles.OffState
@@ -421,6 +432,33 @@ func (m Model) buildComponentsVertical() string {
 			line += " " + m.styles.Power.Render(formatPowerShort(*comp.Power))
 		}
 		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// renderSingleComponent renders detailed view of a single component.
+func (m Model) renderSingleComponent(comp ComponentInfo) string {
+	header := m.styles.Selected.Render(" " + comp.Name + " ")
+
+	stateStyle := m.styles.OffState
+	if comp.State == "on" || comp.State == "On" || comp.State == "active" {
+		stateStyle = m.styles.OnState
+	}
+
+	lines := []string{
+		header,
+		"",
+		m.kv("Type", comp.Type),
+		m.kv("State", stateStyle.Render(comp.State)),
+	}
+
+	if comp.Power != nil {
+		lines = append(lines, m.kv("Power", m.styles.Power.Render(formatPower(*comp.Power))))
+	}
+
+	if comp.Endpoint != "" {
+		lines = append(lines, "", m.styles.Muted.Render("Endpoint: "+comp.Endpoint))
 	}
 
 	return strings.Join(lines, "\n")

@@ -1014,8 +1014,9 @@ func (c *Cache) applyDeviceUpdate(msg DeviceUpdateMsg, existing *DeviceData) eve
 		return nil
 	}
 
-	// Normal update - preserve snapshot if new one is nil
+	// Normal update - preserve snapshot and extended status if new one is nil
 	preserveSnapshotFromExisting(msg.Data, existing)
+	preserveExtendedStatusFromExisting(msg.Data, existing)
 	c.devices[msg.Name] = msg.Data
 
 	// Update MAC-to-IP mapping when device is online and has a MAC
@@ -1047,6 +1048,20 @@ func preserveSnapshotFromExisting(newData, existing *DeviceData) {
 		if newData.Power == 0 && existing.Power != 0 {
 			newData.Power = existing.Power
 		}
+	}
+}
+
+// preserveExtendedStatusFromExisting copies WiFi and Sys status from existing data.
+// These are lazily fetched on device selection and must be preserved across refresh cycles.
+func preserveExtendedStatusFromExisting(newData, existing *DeviceData) {
+	if existing == nil {
+		return
+	}
+	if newData.WiFi == nil && existing.WiFi != nil {
+		newData.WiFi = existing.WiFi
+	}
+	if newData.Sys == nil && existing.Sys != nil {
+		newData.Sys = existing.Sys
 	}
 }
 
