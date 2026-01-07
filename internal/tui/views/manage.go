@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/firmware"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/provisioning"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/scenes"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/templates"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -33,6 +34,7 @@ const (
 	ManagePanelFirmware
 	ManagePanelBackup
 	ManagePanelScenes
+	ManagePanelTemplates
 	ManagePanelProvisioning
 )
 
@@ -67,6 +69,7 @@ type Manage struct {
 	firmware     firmware.Model
 	backup       backup.Model
 	scenes       scenes.ListModel
+	templates    templates.ListModel
 	provisioning provisioning.Model
 
 	// State
@@ -114,17 +117,19 @@ func NewManage(deps ManageDeps) *Manage {
 	firmwareDeps := firmware.Deps{Ctx: deps.Ctx, Svc: deps.Svc, FileCache: deps.FileCache}
 	backupDeps := backup.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 	scenesDeps := scenes.ListDeps{Ctx: deps.Ctx, Svc: deps.Svc}
+	templatesDeps := templates.ListDeps{Ctx: deps.Ctx, Svc: deps.Svc}
 	provisioningDeps := provisioning.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
 	// Create flexible layout with 40/60 column split (left/right)
 	layoutCalc := layout.NewTwoColumnLayout(0.4, 1)
 
-	// Configure left column panels (Discovery, Firmware, Backup, Scenes) with expansion on focus
+	// Configure left column panels (Discovery, Firmware, Backup, Scenes, Templates) with expansion on focus
 	layoutCalc.LeftColumn.Panels = []layout.PanelConfig{
 		{ID: layout.PanelID(ManagePanelDiscovery), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(ManagePanelFirmware), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(ManagePanelBackup), MinHeight: 5, ExpandOnFocus: true},
 		{ID: layout.PanelID(ManagePanelScenes), MinHeight: 5, ExpandOnFocus: true},
+		{ID: layout.PanelID(ManagePanelTemplates), MinHeight: 5, ExpandOnFocus: true},
 	}
 
 	// Configure right column (Batch takes full height)
@@ -141,6 +146,7 @@ func NewManage(deps ManageDeps) *Manage {
 		firmware:     firmware.New(firmwareDeps),
 		backup:       backup.New(backupDeps),
 		scenes:       scenes.NewList(scenesDeps),
+		templates:    templates.NewList(templatesDeps),
 		provisioning: provisioning.New(provisioningDeps),
 		focusedPanel: ManagePanelDiscovery,
 		styles:       DefaultManageStyles(),
@@ -166,6 +172,7 @@ func (m *Manage) Init() tea.Cmd {
 		m.firmware.Init(),
 		m.backup.Init(),
 		m.scenes.Init(),
+		m.templates.Init(),
 		m.provisioning.Init(),
 	)
 }
@@ -192,6 +199,8 @@ func (m *Manage) SetSize(width, height int) View {
 		m.batch = m.batch.SetSize(contentWidth, contentHeight)
 		m.firmware = m.firmware.SetSize(contentWidth, contentHeight)
 		m.backup = m.backup.SetSize(contentWidth, contentHeight)
+		m.scenes = m.scenes.SetSize(contentWidth, contentHeight)
+		m.templates = m.templates.SetSize(contentWidth, contentHeight)
 		return m
 	}
 
@@ -215,6 +224,9 @@ func (m *Manage) SetSize(width, height int) View {
 	}
 	if d, ok := dims[layout.PanelID(ManagePanelScenes)]; ok {
 		m.scenes = m.scenes.SetSize(d.Width, d.Height)
+	}
+	if d, ok := dims[layout.PanelID(ManagePanelTemplates)]; ok {
+		m.templates = m.templates.SetSize(d.Width, d.Height)
 	}
 
 	// Apply size to right column (Batch)
@@ -263,6 +275,9 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 		m.focusedPanel = ManagePanelScenes
 		m.updateFocusStates()
 	case keyconst.Shift6:
+		m.focusedPanel = ManagePanelTemplates
+		m.updateFocusStates()
+	case keyconst.Shift7:
 		m.focusedPanel = ManagePanelProvisioning
 		m.showProvisioning = true
 		m.updateFocusStates()
@@ -291,8 +306,8 @@ func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
 }
 
 func (m *Manage) focusNext() {
-	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes), then right (Batch)
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelBatch}
+	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes, Templates), then right (Batch)
+	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelTemplates, ManagePanelBatch}
 	for i, p := range panels {
 		if p == m.focusedPanel {
 			m.focusedPanel = panels[(i+1)%len(panels)]
@@ -303,8 +318,8 @@ func (m *Manage) focusNext() {
 }
 
 func (m *Manage) focusPrev() {
-	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes), then right (Batch)
-	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelBatch}
+	// Column-by-column: left column (Discovery, Firmware, Backup, Scenes, Templates), then right (Batch)
+	panels := []ManagePanel{ManagePanelDiscovery, ManagePanelFirmware, ManagePanelBackup, ManagePanelScenes, ManagePanelTemplates, ManagePanelBatch}
 	for i, p := range panels {
 		if p == m.focusedPanel {
 			prevIdx := (i - 1 + len(panels)) % len(panels)
@@ -316,13 +331,14 @@ func (m *Manage) focusPrev() {
 }
 
 func (m *Manage) updateFocusStates() {
-	// Panel indices match column-by-column cycling order: left (1-4), right (5)
+	// Panel indices match column-by-column cycling order: left (1-5), right (6)
 	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !m.showProvisioning).SetPanelIndex(1)
 	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning).SetPanelIndex(2)
 	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning).SetPanelIndex(3)
 	m.scenes = m.scenes.SetFocused(m.focusedPanel == ManagePanelScenes && !m.showProvisioning).SetPanelIndex(4)
-	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(5)
-	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(6)
+	m.templates = m.templates.SetFocused(m.focusedPanel == ManagePanelTemplates && !m.showProvisioning).SetPanelIndex(5)
+	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(6)
+	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(7)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if m.layoutCalc != nil && m.width > 0 && m.height > 0 {
@@ -353,6 +369,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 			m.backup, cmd = m.backup.Update(msg)
 		case ManagePanelScenes:
 			m.scenes, cmd = m.scenes.Update(msg)
+		case ManagePanelTemplates:
+			m.templates, cmd = m.templates.Update(msg)
 		case ManagePanelProvisioning:
 			m.provisioning, cmd = m.provisioning.Update(msg)
 		}
@@ -368,6 +386,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 		m.backup, cmd = m.backup.Update(msg)
 		cmds = append(cmds, cmd)
 		m.scenes, cmd = m.scenes.Update(msg)
+		cmds = append(cmds, cmd)
+		m.templates, cmd = m.templates.Update(msg)
 		cmds = append(cmds, cmd)
 		m.provisioning, cmd = m.provisioning.Update(msg)
 		cmds = append(cmds, cmd)
@@ -413,6 +433,8 @@ func (m *Manage) renderNarrowLayout() string {
 		return m.backup.View()
 	case ManagePanelScenes:
 		return m.scenes.View()
+	case ManagePanelTemplates:
+		return m.templates.View()
 	case ManagePanelProvisioning:
 		return m.provisioning.View()
 	default:
@@ -427,6 +449,7 @@ func (m *Manage) renderStandardLayout() string {
 		m.firmware.View(),
 		m.backup.View(),
 		m.scenes.View(),
+		m.templates.View(),
 	)
 
 	// Join left column with right column (batch)
@@ -451,6 +474,9 @@ func (m *Manage) Refresh() tea.Cmd {
 	cmds = append(cmds, cmd)
 
 	m.scenes, cmd = m.scenes.Refresh()
+	cmds = append(cmds, cmd)
+
+	m.templates, cmd = m.templates.Refresh()
 	cmds = append(cmds, cmd)
 
 	return tea.Batch(cmds...)
@@ -484,6 +510,11 @@ func (m *Manage) Backup() backup.Model {
 // Scenes returns the scenes component.
 func (m *Manage) Scenes() scenes.ListModel {
 	return m.scenes
+}
+
+// Templates returns the templates component.
+func (m *Manage) Templates() templates.ListModel {
+	return m.templates
 }
 
 // StatusSummary returns a status summary string.
