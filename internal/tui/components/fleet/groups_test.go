@@ -152,6 +152,43 @@ func TestDefaultGroupsStyles(t *testing.T) {
 	_ = styles.Muted.Render("test")
 }
 
+func TestGroupCommandAction_Constants(t *testing.T) {
+	t.Parallel()
+
+	if GroupCommandOn != "on" {
+		t.Errorf("GroupCommandOn = %q, want %q", GroupCommandOn, "on")
+	}
+	if GroupCommandOff != "off" {
+		t.Errorf("GroupCommandOff = %q, want %q", GroupCommandOff, "off")
+	}
+	if GroupCommandToggle != "toggle" {
+		t.Errorf("GroupCommandToggle = %q, want %q", GroupCommandToggle, "toggle")
+	}
+}
+
+func TestGroupsModel_handleGroupToggle_NoFleet(t *testing.T) {
+	t.Parallel()
+	m := newTestGroups()
+	m.focused = true
+
+	// Without fleet manager, toggle should be a no-op
+	m, cmd := m.handleKey(tea.KeyPressMsg{Code: 't'})
+	if cmd != nil {
+		t.Error("toggle without fleet should return nil cmd")
+	}
+}
+
+func TestGroupsModel_FooterText(t *testing.T) {
+	t.Parallel()
+	m := newTestGroups()
+
+	footer := m.FooterText()
+	expected := "n:new e:edit d:del o:on f:off t:toggle r:refresh"
+	if footer != expected {
+		t.Errorf("FooterText() = %q, want %q", footer, expected)
+	}
+}
+
 func newTestGroups() GroupsModel {
 	ctx := context.Background()
 	deps := GroupsDeps{Ctx: ctx}

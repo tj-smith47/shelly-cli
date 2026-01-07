@@ -267,6 +267,8 @@ func (m GroupsModel) handleKey(msg tea.KeyPressMsg) (GroupsModel, tea.Cmd) {
 		return m.handleGroupOn()
 	case "f":
 		return m.handleGroupOff()
+	case "t":
+		return m.handleGroupToggle()
 	}
 
 	return m, nil
@@ -340,10 +342,32 @@ func (m GroupsModel) handleGroupOff() (GroupsModel, tea.Cmd) {
 	return m, m.sendGroupCommand(group.ID, false)
 }
 
+func (m GroupsModel) handleGroupToggle() (GroupsModel, tea.Cmd) {
+	if !m.canActOnSelected() {
+		return m, nil
+	}
+	group := m.SelectedGroup()
+	if group == nil {
+		return m, nil
+	}
+	return m, m.sendGroupToggleCommand(group.ID)
+}
+
+// GroupCommandAction represents the action performed on a group.
+type GroupCommandAction string
+
+// Group command action constants.
+const (
+	GroupCommandOn     GroupCommandAction = "on"
+	GroupCommandOff    GroupCommandAction = "off"
+	GroupCommandToggle GroupCommandAction = "toggle"
+)
+
 // GroupCommandResultMsg signals a group command completed.
 type GroupCommandResultMsg struct {
 	GroupID string
-	On      bool
+	Action  GroupCommandAction
+	On      bool // Deprecated: use Action instead
 	Err     error
 }
 
@@ -353,7 +377,9 @@ func (m GroupsModel) sendGroupCommand(groupID string, on bool) tea.Cmd {
 		defer cancel()
 
 		var results []integrator.BatchResult
+		action := GroupCommandOff
 		if on {
+			action = GroupCommandOn
 			results = m.fleet.GroupRelaysOn(ctx, groupID)
 		} else {
 			results = m.fleet.GroupRelaysOff(ctx, groupID)
@@ -362,11 +388,30 @@ func (m GroupsModel) sendGroupCommand(groupID string, on bool) tea.Cmd {
 		// Check for errors
 		for _, r := range results {
 			if !r.Success {
-				return GroupCommandResultMsg{GroupID: groupID, On: on, Err: errors.New(r.Error)}
+				return GroupCommandResultMsg{GroupID: groupID, Action: action, On: on, Err: errors.New(r.Error)}
 			}
 		}
 
-		return GroupCommandResultMsg{GroupID: groupID, On: on}
+		return GroupCommandResultMsg{GroupID: groupID, Action: action, On: on}
+	}
+}
+
+func (m GroupsModel) sendGroupToggleCommand(groupID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		// Use SendGroupCommand with toggle action
+		results := m.fleet.SendGroupCommand(ctx, groupID, "relay", map[string]any{"id": 0, "turn": "toggle"})
+
+		// Check for errors
+		for _, r := range results {
+			if !r.Success {
+				return GroupCommandResultMsg{GroupID: groupID, Action: GroupCommandToggle, Err: errors.New(r.Error)}
+			}
+		}
+
+		return GroupCommandResultMsg{GroupID: groupID, Action: GroupCommandToggle}
 	}
 }
 
@@ -384,7 +429,7 @@ func (m GroupsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("n:new e:edit d:del o:on f:off r:refresh")
+		r.SetFooter("n:new e:edit d:del o:on f:off t:toggle r:refresh")
 	}
 
 	// Calculate content area for centering (accounting for panel borders)
@@ -514,5 +559,5 @@ func (m GroupsModel) Refresh() (GroupsModel, tea.Cmd) {
 
 // FooterText returns keybinding hints for the footer.
 func (m GroupsModel) FooterText() string {
-	return "n:new e:edit d:del o:on f:off r:refresh"
+	return "n:new e:edit d:del o:on f:off t:toggle r:refresh"
 }
