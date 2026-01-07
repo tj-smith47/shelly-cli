@@ -228,8 +228,8 @@ func New(deps Deps) Model {
 		svc:             deps.Svc,
 		ios:             deps.IOS,
 		eventStream:     deps.EventStream,
-		maxItems:        50,       // Per list - each category capped at 50
-		autoScroll:      true,     // Start with auto-scroll enabled (cursor stays at top/newest)
+		maxItems:        50,   // Per list - each category capped at 50
+		autoScroll:      true, // Start with auto-scroll enabled (cursor stays at top/newest)
 		focused:         false,
 		focusedColumn:   ColumnUser, // Start with user column focused
 		userCursor:      0,

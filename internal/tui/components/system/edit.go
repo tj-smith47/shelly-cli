@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/form"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditField represents a field in the edit form.
@@ -638,7 +639,8 @@ func (m EditModel) View() string {
 
 	// Error display
 	if m.err != nil {
-		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg, _ := tuierrors.FormatError(m.err)
+		content.WriteString(m.styles.Error.Render(msg))
 	}
 
 	return r.SetContent(content.String()).Render()

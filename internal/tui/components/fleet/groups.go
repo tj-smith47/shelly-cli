@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // GroupsDeps holds the dependencies for the Groups component.
@@ -408,7 +409,8 @@ func (m GroupsModel) View() string {
 	}
 
 	if m.err != nil {
-		msg := m.styles.Error.Render("Error: " + m.err.Error())
+		errMsg, _ := tuierrors.FormatError(m.err)
+		msg := m.styles.Error.Render(errMsg)
 		r.SetContent(lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, msg))
 		return r.Render()
 	}

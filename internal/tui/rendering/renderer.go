@@ -137,8 +137,8 @@ func (r *Renderer) Render() string {
 	contentLines := r.buildContentLines(contentWidth, borderStyle)
 	lines = append(lines, r.renderContentWithBorders(contentLines, contentWidth, contentHeight, borderStyle)...)
 
-	// Bottom border
-	lines = append(lines, borderStyle.Render(r.buildBottomBorder()))
+	// Bottom border - handle styled footer content properly
+	lines = append(lines, r.buildBottomBorderStyled(borderStyle))
 
 	return strings.Join(lines, "\n")
 }
@@ -162,13 +162,22 @@ func (r *Renderer) buildTopBorder(borderStyle lipgloss.Style) string {
 	return borderStyle.Render(BuildTopBorder(r.width, r.title, r.border))
 }
 
-// buildBottomBorder constructs the bottom border with optional footer and hint.
-func (r *Renderer) buildBottomBorder() string {
+// buildBottomBorderStyled constructs the bottom border with proper handling of styled footer content.
+// If the footer contains ANSI codes (styled text), it renders border parts separately to prevent
+// style leakage from resetting the border color.
+func (r *Renderer) buildBottomBorderStyled(borderStyle lipgloss.Style) string {
 	hint := r.buildPanelHint()
-	if r.footer != "" || r.footerBadge != "" || hint != "" {
-		return BuildBottomBorderWithFooterBadgeAndHint(r.width, r.footer, r.footerBadge, hint, r.border)
+
+	// If footer might contain styled text (ANSI codes), handle it specially
+	if r.footer != "" && strings.Contains(r.footer, "\x1b[") {
+		return BuildBottomBorderWithStyledFooter(r.width, r.footer, hint, r.border, borderStyle)
 	}
-	return BuildBottomBorder(r.width, r.border)
+
+	// No styled content - use simple render
+	if r.footer != "" || r.footerBadge != "" || hint != "" {
+		return borderStyle.Render(BuildBottomBorderWithFooterBadgeAndHint(r.width, r.footer, r.footerBadge, hint, r.border))
+	}
+	return borderStyle.Render(BuildBottomBorder(r.width, r.border))
 }
 
 // buildContentLines assembles the main content and sections.

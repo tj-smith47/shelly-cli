@@ -269,6 +269,7 @@ func TestCategory_Values(t *testing.T) {
 		CategoryTimeout,
 		CategoryAuth,
 		CategoryDevice,
+		CategoryUnsupported,
 	}
 
 	seen := make(map[Category]bool)
@@ -277,5 +278,64 @@ func TestCategory_Values(t *testing.T) {
 			t.Errorf("Category %d is duplicated", c)
 		}
 		seen[c] = true
+	}
+}
+
+func TestIsUnsupportedFeature(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{"nil error", nil, false},
+		{"404 error", errors.New("HTTP 404: not found"), true},
+		{"unknown method error", errors.New("unknown method: Script.List"), true},
+		{"not found error", errors.New("resource not found"), true},
+		{"mixed case 404", errors.New("Error 404 occurred"), true},
+		{"mixed case unknown method", errors.New("Unknown Method in API"), true},
+		{"mixed case not found", errors.New("Component Not Found"), true},
+		{"timeout error", errors.New("connection timeout"), false},
+		{"generic error", errors.New("something went wrong"), false},
+		{"connection refused", errors.New("connection refused"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := IsUnsupportedFeature(tt.err)
+			if result != tt.expected {
+				t.Errorf("IsUnsupportedFeature(%v) = %v, want %v", tt.err, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestUnsupportedMessage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		featureName string
+		expected    string
+	}{
+		{"scripts", "Scripts", "Scripts not supported on this device"},
+		{"webhooks", "Webhooks", "Webhooks not supported on this device"},
+		{"kvs", "KVS", "KVS not supported on this device"},
+		{"virtual components", "Virtual components", "Virtual components not supported on this device"},
+		{"schedules", "Schedules", "Schedules not supported on this device"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := UnsupportedMessage(tt.featureName)
+			if result != tt.expected {
+				t.Errorf("UnsupportedMessage(%q) = %q, want %q", tt.featureName, result, tt.expected)
+			}
+		})
 	}
 }

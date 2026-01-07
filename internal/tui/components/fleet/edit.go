@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // GroupEditMode represents the mode of the group edit modal.
@@ -497,7 +498,8 @@ func (m GroupEditModel) renderDeleteContent() string {
 
 	if m.err != nil {
 		content.WriteString("\n\n")
-		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg, _ := tuierrors.FormatError(m.err)
+		content.WriteString(m.styles.Error.Render(msg))
 	}
 
 	return content.String()
@@ -516,7 +518,8 @@ func (m GroupEditModel) renderEditContent() string {
 	// Error display
 	if m.err != nil {
 		content.WriteString("\n\n")
-		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg, _ := tuierrors.FormatError(m.err)
+		content.WriteString(m.styles.Error.Render(msg))
 	}
 
 	return content.String()

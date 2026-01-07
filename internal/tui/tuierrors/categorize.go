@@ -22,6 +22,8 @@ const (
 	CategoryAuth
 	// CategoryDevice indicates a device-side error.
 	CategoryDevice
+	// CategoryUnsupported indicates a feature not supported on the device.
+	CategoryUnsupported
 )
 
 // CategorizedError wraps an error with a category and user-friendly message.
@@ -142,8 +144,42 @@ func checkDevice(err error, errStr string) *CategorizedError {
 	return nil
 }
 
+// IsUnsupportedFeature checks if an error indicates a feature not supported on the device.
+// This detects Gen1 devices or devices lacking specific capabilities based on common error patterns.
+//
+// Common indicators:
+//   - "404" - HTTP not found
+//   - "unknown method" - Method not implemented
+//   - "not found" - Resource not found
+func IsUnsupportedFeature(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "404") ||
+		strings.Contains(errStr, "unknown method") ||
+		strings.Contains(errStr, "not found")
+}
+
+// UnsupportedMessage returns a standardized message for features not supported on a device.
+//
+// Example:
+//
+//	tuierrors.UnsupportedMessage("Scripts") // "Scripts not supported on this device"
+func UnsupportedMessage(featureName string) string {
+	return featureName + " not supported on this device"
+}
+
 // FormatError returns a formatted error string with category-specific messaging.
 func FormatError(err error) (message, hint string) {
 	cat := Categorize(err)
 	return cat.Message, cat.Hint
+}
+
+// FormatErrorMsg returns just the categorized error message without the hint.
+// Use this when you only need the message and don't want to show additional hints.
+func FormatErrorMsg(err error) string {
+	cat := Categorize(err)
+	return cat.Message
 }

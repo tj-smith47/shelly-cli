@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Deps holds the dependencies for the device detail component.
@@ -173,7 +174,8 @@ func (m Model) View() string {
 	case m.loading:
 		content = m.Loader.View()
 	case m.err != nil:
-		content = m.styles.Error.Render("Error: " + m.err.Error())
+		msg, _ := tuierrors.FormatError(m.err)
+		content = m.styles.Error.Render(msg)
 	default:
 		content = m.viewport.View()
 	}

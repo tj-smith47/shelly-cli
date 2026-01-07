@@ -454,6 +454,85 @@ func BuildBottomBorderWithFooterBadgeAndHint(width int, footer, badge, hint stri
 	return result
 }
 
+// BuildBottomBorderWithStyledFooter creates a bottom border that properly handles styled footer content.
+// When footer contains ANSI codes (styled text), it renders border parts separately to prevent
+// style leakage from resetting the border color.
+// Example output: "╰────├─ styled footer ─┤────├─ ⇧1 ─┤╯".
+func BuildBottomBorderWithStyledFooter(width int, footer, hint string, border lipgloss.Border, borderStyle lipgloss.Style) string {
+	if width < 5 {
+		return ""
+	}
+
+	bottomLeft := border.BottomLeft
+	bottomRight := border.BottomRight
+	bottom := border.Bottom
+	midLeft := border.MiddleLeft
+	midRight := border.MiddleRight
+
+	bottomLeftW := charWidth(bottomLeft)
+	bottomRightW := charWidth(bottomRight)
+	bottomW := charWidth(bottom)
+	midLeftW := charWidth(midLeft)
+	midRightW := charWidth(midRight)
+
+	// Footer section: ├─ footer ─┤
+	// Note: footer may contain ANSI codes, so we use its visual width
+	footerText := " " + footer + " "
+	footerWidth := charWidth(footerText)
+
+	// Hint section: ├─ hint ─┤
+	hintText := ""
+	hintWidth := 0
+	if hint != "" {
+		hintText = " " + hint + " "
+		hintWidth = charWidth(hintText)
+	}
+
+	// Structure: BottomLeft + leftFill + midLeft + ─ + footer + ─ + midRight + rightFill + [hint section] + BottomRight
+	minFooterWidth := midLeftW + bottomW + footerWidth + bottomW + midRightW
+	minHintWidth := 0
+	if hint != "" {
+		minHintWidth = midLeftW + bottomW + hintWidth + bottomW + midRightW
+	}
+	availableForFill := width - bottomLeftW - bottomRightW - minFooterWidth - minHintWidth
+
+	if availableForFill < 2 {
+		// Not enough space, fall back to hint only
+		if hint != "" {
+			return borderStyle.Render(BuildBottomBorderWithHint(width, hint, border))
+		}
+		return borderStyle.Render(BuildBottomBorder(width, border))
+	}
+
+	// Center the footer by distributing fill evenly on both sides
+	totalFill := availableForFill / bottomW
+	leftFillCount := totalFill / 2
+	rightFillCount := totalFill - leftFillCount
+
+	if leftFillCount < 1 {
+		leftFillCount = 1
+		rightFillCount = totalFill - 1
+	}
+	if rightFillCount < 0 {
+		rightFillCount = 0
+	}
+
+	// Build parts separately to handle styled footer
+	beforeFooter := bottomLeft +
+		strings.Repeat(bottom, leftFillCount) +
+		midLeft + bottom
+	afterFooter := bottom + midRight +
+		strings.Repeat(bottom, rightFillCount)
+
+	if hint != "" {
+		afterFooter += midLeft + bottom + hintText + bottom + midRight
+	}
+	afterFooter += bottomRight
+
+	// Render border parts with style, leave styled footer as-is
+	return borderStyle.Render(beforeFooter) + footerText + borderStyle.Render(afterFooter)
+}
+
 // BuildBottomBorderWithFooterAndHint creates a bottom border with centered footer and right-aligned hint.
 // Example output: "╰────├─ footer ─┤────├─ ⇧1 ─┤╯".
 func BuildBottomBorderWithFooterAndHint(width int, footer, hint string, border lipgloss.Border) string {

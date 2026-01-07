@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/editmodal"
 	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // EditMode represents which section is being edited.
@@ -387,7 +388,8 @@ func (m EditModel) View() string {
 	// Error
 	if m.err != nil {
 		content.WriteString("\n\n")
-		content.WriteString(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg, _ := tuierrors.FormatError(m.err)
+		content.WriteString(m.styles.Error.Render(msg))
 	}
 
 	return r.SetContent(content.String()).Render()
