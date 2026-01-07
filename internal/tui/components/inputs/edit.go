@@ -18,6 +18,12 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
+// Input type constants.
+const (
+	inputTypeButton = "button"
+	inputTypeSwitch = "switch"
+)
+
 // EditField represents a field in the input edit form.
 type EditField int
 
@@ -75,7 +81,7 @@ func NewEditModel(ctx context.Context, svc *shelly.Service) EditModel {
 	)
 
 	typeDropdown := form.NewSelect(
-		form.WithSelectOptions([]string{"button", "switch"}),
+		form.WithSelectOptions([]string{inputTypeButton, inputTypeSwitch}),
 		form.WithSelectHelp("Input type (button=momentary, switch=toggle)"),
 	)
 
@@ -207,9 +213,9 @@ func (m EditModel) populateFromConfig(cfg *model.InputConfig) EditModel {
 	// Set type dropdown
 	typeIdx := 0 // Default to button
 	switch cfg.Type {
-	case "button":
+	case inputTypeButton:
 		typeIdx = 0
-	case "switch":
+	case inputTypeSwitch:
 		typeIdx = 1
 	}
 	m.typeDropdown = m.typeDropdown.SetSelected(typeIdx)
@@ -393,7 +399,7 @@ func (m EditModel) save() (EditModel, tea.Cmd) {
 
 	selectedType := m.typeDropdown.SelectedValue()
 	if selectedType == "" {
-		selectedType = "button" // Default
+		selectedType = inputTypeButton // Default
 	}
 
 	cfg := &model.InputConfig{

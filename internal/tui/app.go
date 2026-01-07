@@ -504,28 +504,41 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 // handleViewAndComponentMsgs handles view-related and component messages.
 func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	// Handle device selection messages
+	if model, cmd, handled := m.handleDeviceSelectionMsgs(msg); handled {
+		return model, cmd, true
+	}
+	// Handle component/viewer messages
+	if model, cmd, handled := m.handleComponentMsgs(msg); handled {
+		return model, cmd, true
+	}
+	// Handle tab/view navigation
 	switch msg := msg.(type) {
 	case tabs.TabChangedMsg:
 		return m, m.viewManager.SetActive(msg.Current), true
 	case views.ViewChangedMsg:
 		m.tabBar, _ = m.tabBar.SetActive(msg.Current)
 		return m, nil, true
+	case views.ReturnFocusMsg:
+		m.focusedPanel = PanelDeviceList
+		return m, nil, true
+	}
+	return m, nil, false
+}
+
+func (m Model) handleDeviceSelectionMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
 	case views.DeviceSelectedMsg:
-		// Don't fetch extended status immediately - it's debounced via SetFocusedDevice
 		debug.TraceEvent("DeviceSelectedMsg(views): device=%s (debounced)", msg.Device)
 		return m, m.viewManager.PropagateDevice(msg.Device), true
 	case devicelist.DeviceSelectedMsg:
-		// Sync cursor from deviceList to app.go
 		m.cursor = m.deviceList.Cursor()
-		// Don't fetch extended status immediately - it's debounced via SetFocusedDevice
 		debug.TraceEvent("DeviceSelectedMsg(devicelist): device=%s (debounced)", msg.Name)
 		return m, m.viewManager.PropagateDevice(msg.Name), true
 	case cache.ExtendedStatusDebounceMsg:
-		// Debounced extended status fetch - only triggered after user stops scrolling
 		debug.TraceEvent("ExtendedStatusDebounceMsg: triggering FetchExtendedStatus for %s", msg.Name)
 		return m, m.cache.FetchExtendedStatus(msg.Name), true
 	case cache.FetchExtendedStatusMsg:
-		// Debug: log what we received
 		wifiOK := msg.WiFi != nil
 		sysOK := msg.Sys != nil
 		debug.TraceEvent("FetchExtendedStatusMsg for %s: wifi=%v sys=%v", msg.Name, wifiOK, sysOK)
@@ -539,8 +552,13 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		m = m.syncDeviceInfo()
 		return m, nil, true
 	case devicelist.OpenBrowserMsg:
-		// Open device web UI in browser
 		return m, m.openDeviceBrowser(msg.Address), true
+	}
+	return m, nil, false
+}
+
+func (m Model) handleComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
 	case jsonviewer.CloseMsg:
 		m.focusedPanel = PanelDetail
 		return m, nil, true
@@ -563,10 +581,6 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		var cmd tea.Cmd
 		m.controlPanel, cmd = m.controlPanel.Update(msg)
 		return m, cmd, true
-	case views.ReturnFocusMsg:
-		// View is returning focus to device list (Tab/Shift+Tab past first/last panel)
-		m.focusedPanel = PanelDeviceList
-		return m, nil, true
 	}
 	return m, nil, false
 }

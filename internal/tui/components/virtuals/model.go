@@ -730,7 +730,7 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "e:edit d:delete R:refresh"
+		footer := "t:toggle h/l:adjust e:edit n:new d:del R:refresh"
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}

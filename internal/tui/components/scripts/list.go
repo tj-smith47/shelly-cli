@@ -16,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
@@ -86,17 +87,18 @@ type CreateScriptMsg struct {
 // ListModel displays scripts for a device.
 type ListModel struct {
 	helpers.Sizable
-	ctx         context.Context
-	svc         *automation.Service
-	fileCache   *cache.FileCache
-	device      string
-	scripts     []Script
-	loading     bool
-	err         error
-	focused     bool
-	panelIndex  int // 1-based panel index for Shift+N hotkey hint
-	styles      ListStyles
-	cacheStatus cachestatus.Model
+	ctx           context.Context
+	svc           *automation.Service
+	fileCache     *cache.FileCache
+	device        string
+	scripts       []Script
+	loading       bool
+	err           error
+	focused       bool
+	panelIndex    int // 1-based panel index for Shift+N hotkey hint
+	pendingDelete int // Script ID pending delete confirmation (0 = none)
+	styles        ListStyles
+	cacheStatus   cachestatus.Model
 }
 
 // ListStyles holds styles for the list component.
@@ -424,8 +426,26 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// Stop script
 		return m, m.stopScript()
 	case "d":
-		// Delete script
-		return m, m.deleteScript()
+		// Delete script with confirmation
+		cursor := m.Scroller.Cursor()
+		if len(m.scripts) == 0 || cursor >= len(m.scripts) {
+			return m, nil
+		}
+		script := m.scripts[cursor]
+		if m.pendingDelete == script.ID {
+			// Second press - confirm delete
+			m.pendingDelete = 0
+			return m, m.deleteScript()
+		}
+		// First press - mark as pending
+		m.pendingDelete = script.ID
+		return m, nil
+	case keyconst.KeyEsc:
+		// Cancel pending delete
+		if m.pendingDelete > 0 {
+			m.pendingDelete = 0
+			return m, nil
+		}
 	case "n":
 		// New script - will be handled by parent
 		return m, m.createScript()
@@ -535,16 +555,28 @@ func (m ListModel) View() string {
 		SetPanelIndex(m.panelIndex)
 
 	// Add footer with keybindings and cache status when focused
-	if m.focused && m.device != "" && len(m.scripts) > 0 {
-		footer := "e:edit r:run s:stop d:del n:new"
-		if cs := m.cacheStatus.View(); cs != "" {
-			footer += " | " + cs
-		}
+	if footer := m.buildFooter(); footer != "" {
 		r.SetFooter(footer)
 	}
 
 	r.SetContent(m.renderContent())
 	return r.Render()
+}
+
+func (m ListModel) buildFooter() string {
+	if !m.focused || m.device == "" || len(m.scripts) == 0 {
+		return ""
+	}
+
+	if m.pendingDelete > 0 {
+		return m.styles.Running.Render("Press 'd' again to confirm delete, Esc to cancel")
+	}
+
+	footer := "e:edit r:run s:stop d:del n:new"
+	if cs := m.cacheStatus.View(); cs != "" {
+		footer += " | " + cs
+	}
+	return footer
 }
 
 func (m ListModel) renderContent() string {

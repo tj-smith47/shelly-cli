@@ -49,6 +49,23 @@ type CodeUploadedMsg struct {
 	Err      error
 }
 
+// ScriptDownloadedMsg signals that a script was downloaded to a file.
+type ScriptDownloadedMsg struct {
+	Device   string
+	ScriptID int
+	Path     string
+	Err      error
+}
+
+// ScriptUploadedFromFileMsg signals that a script was uploaded from a file.
+type ScriptUploadedFromFileMsg struct {
+	Device   string
+	ScriptID int
+	Path     string
+	Code     string
+	Err      error
+}
+
 // EditorDeps holds the dependencies for the script editor component.
 type EditorDeps struct {
 	Ctx context.Context
@@ -297,15 +314,18 @@ func (m EditorModel) handleKey(msg tea.KeyPressMsg) (EditorModel, tea.Cmd) {
 		m.scroll = 0
 	case "G":
 		m = m.scrollToEnd()
-	case "ctrl+d", "pgdown":
+	case "pgdown":
 		m = m.pageDown()
-	case "ctrl+u", "pgup":
+	case "pgup":
 		m = m.pageUp()
 	case "n":
 		m.showNumbers = !m.showNumbers
 	case "r":
 		m.loading = true
 		return m, tea.Batch(m.Loader.Tick(), m.fetchCode(), m.fetchStatus())
+	case "d":
+		// Download script to file
+		return m, m.Download()
 	}
 
 	return m, nil
@@ -589,4 +609,59 @@ func (m EditorModel) Edit() tea.Cmd {
 // Device returns the current device address.
 func (m EditorModel) Device() string {
 	return m.device
+}
+
+// Download saves the script code to a file.
+func (m EditorModel) Download() tea.Cmd {
+	if m.device == "" || m.scriptID == 0 || m.code == "" {
+		return nil
+	}
+
+	device := m.device
+	scriptID := m.scriptID
+	code := m.code
+	name := m.scriptName
+	if name == "" {
+		name = fmt.Sprintf("script_%d", scriptID)
+	}
+
+	return func() tea.Msg {
+		// Create scripts directory if it doesn't exist
+		dir := "scripts"
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return ScriptDownloadedMsg{Device: device, ScriptID: scriptID, Err: err}
+		}
+
+		// Generate filename: scripts/<device>_<name>.js
+		safeName := strings.ReplaceAll(name, "/", "_")
+		safeDevice := strings.ReplaceAll(device, ".", "_")
+		filename := fmt.Sprintf("%s/%s_%s.js", dir, safeDevice, safeName)
+
+		// Write file
+		if err := os.WriteFile(filename, []byte(code), 0o600); err != nil {
+			return ScriptDownloadedMsg{Device: device, ScriptID: scriptID, Err: err}
+		}
+
+		return ScriptDownloadedMsg{Device: device, ScriptID: scriptID, Path: filename}
+	}
+}
+
+// Upload reads code from a file and uploads it to the device.
+func (m EditorModel) Upload(path string) tea.Cmd {
+	if m.device == "" || m.scriptID == 0 {
+		return nil
+	}
+
+	device := m.device
+	scriptID := m.scriptID
+
+	return func() tea.Msg {
+		// Read file
+		data, err := os.ReadFile(path) //nolint:gosec // G304: User provides file path intentionally
+		if err != nil {
+			return ScriptUploadedFromFileMsg{Device: device, ScriptID: scriptID, Path: path, Err: err}
+		}
+
+		return ScriptUploadedFromFileMsg{Device: device, ScriptID: scriptID, Path: path, Code: string(data)}
+	}
 }

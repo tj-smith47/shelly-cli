@@ -2,6 +2,7 @@ package views
 
 import (
 	"context"
+	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -325,6 +326,11 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
+	// Handle input trigger result messages with toast feedback
+	if cmd := handleInputTriggerMsg(msg); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
 	// Handle sequential loading messages
 	if loadMsg, ok := msg.(configLoadNextMsg); ok {
 		// Only process if device matches current device (prevents stale messages)
@@ -362,6 +368,17 @@ func (c *Config) handleEditClosedMsg(msg tea.Msg) tea.Cmd {
 		if editMsg.Saved {
 			return toast.Success("Settings saved")
 		}
+	}
+	return nil
+}
+
+// handleInputTriggerMsg processes input trigger result messages and returns toast commands.
+func handleInputTriggerMsg(msg tea.Msg) tea.Cmd {
+	if triggerMsg, ok := msg.(inputs.TriggerResultMsg); ok {
+		if triggerMsg.Err != nil {
+			return toast.Error("Trigger failed: " + triggerMsg.Err.Error())
+		}
+		return toast.Success(fmt.Sprintf("Input %d: %s triggered", triggerMsg.InputID, triggerMsg.EventType))
 	}
 	return nil
 }

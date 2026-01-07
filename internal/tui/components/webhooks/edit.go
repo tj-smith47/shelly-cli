@@ -124,6 +124,35 @@ func (m EditModel) Show(device string, webhook *Webhook) EditModel {
 	return m
 }
 
+// ShowCreate displays the edit modal for creating a new webhook.
+func (m EditModel) ShowCreate(device string) EditModel {
+	m.device = device
+	m.webhookID = 0 // 0 indicates new webhook
+	m.visible = true
+	m.cursor = EditFieldName
+	m.saving = false
+	m.err = nil
+
+	// Set default values for new webhook
+	m.nameInput = m.nameInput.SetValue("")
+	m.eventInput = m.eventInput.SetValue("")
+	m.urlsInput = m.urlsInput.SetValue("")
+	m.enableInput = m.enableInput.SetValue(true)
+
+	// Focus first input
+	m.nameInput, _ = m.nameInput.Focus()
+	m.eventInput = m.eventInput.Blur()
+	m.urlsInput = m.urlsInput.Blur()
+	m.enableInput = m.enableInput.Blur()
+
+	return m
+}
+
+// IsCreating returns true if creating a new webhook (vs editing).
+func (m EditModel) IsCreating() bool {
+	return m.webhookID == 0
+}
+
 // Hide hides the edit modal.
 func (m EditModel) Hide() EditModel {
 	m.visible = false
@@ -309,6 +338,32 @@ func (m EditModel) createSaveCmd(event string, urls []string) tea.Cmd {
 	name := strings.TrimSpace(m.nameInput.Value())
 	enable := m.enableInput.Value()
 
+	// Check if we're creating a new webhook or updating existing
+	if m.webhookID == 0 {
+		return m.createNewWebhookCmd(event, urls, name, enable)
+	}
+	return m.updateWebhookCmd(event, urls, name, enable)
+}
+
+func (m EditModel) createNewWebhookCmd(event string, urls []string, name string, enable bool) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		webhookID, err := m.svc.CreateWebhook(ctx, m.device, shelly.CreateWebhookParams{
+			Event:  event,
+			URLs:   urls,
+			Name:   name,
+			Enable: enable,
+		})
+		if err != nil {
+			return messages.NewSaveError(0, err)
+		}
+		return messages.NewSaveResult(webhookID)
+	}
+}
+
+func (m EditModel) updateWebhookCmd(event string, urls []string, name string, enable bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
 		defer cancel()
@@ -338,8 +393,14 @@ func (m EditModel) View() string {
 		footer = "Saving..."
 	}
 
+	// Use appropriate title based on create/edit mode
+	title := "Edit Webhook"
+	if m.IsCreating() {
+		title = "New Webhook"
+	}
+
 	// Use common modal helper
-	r := rendering.NewModal(m.width, m.height, "Edit Webhook", footer)
+	r := rendering.NewModal(m.width, m.height, title, footer)
 
 	// Build content
 	return r.SetContent(m.renderFormFields()).Render()

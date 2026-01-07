@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -73,6 +74,19 @@ type ActionMsg struct {
 // SelectMsg signals that an item was selected for viewing.
 type SelectMsg struct {
 	Item Item
+}
+
+// ExportedMsg signals that KVS was exported to a file.
+type ExportedMsg struct {
+	Path string
+	Err  error
+}
+
+// ImportedMsg signals that KVS was imported from a file.
+type ImportedMsg struct {
+	Path  string
+	Count int
+	Err   error
 }
 
 // Model displays KVS items for a device.
@@ -336,6 +350,10 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
+	case ExportedMsg:
+		return m.handleExported(msg)
+	case ImportedMsg:
+		return m.handleImported(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -424,6 +442,26 @@ func (m Model) handleAction(msg ActionMsg) (Model, tea.Cmd) {
 	)
 }
 
+func (m Model) handleExported(msg ExportedMsg) (Model, tea.Cmd) {
+	// Re-emit so parent view can show toast
+	return m, func() tea.Msg { return msg }
+}
+
+func (m Model) handleImported(msg ImportedMsg) (Model, tea.Cmd) {
+	// If import was successful, refresh the list
+	if msg.Err == nil {
+		m.loading = true
+		return m, tea.Batch(
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeKVS),
+			m.fetchAndCacheItems(),
+			func() tea.Msg { return msg },
+		)
+	}
+	// Re-emit so parent view can show toast
+	return m, func() tea.Msg { return msg }
+}
+
 func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.editModal, cmd = m.editModal.Update(msg)
@@ -491,6 +529,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handleNewKey()
 	case "d":
 		return m.handleDeleteKey()
+	case "X":
+		return m, m.exportKVS()
+	case "I":
+		return m, m.importKVS()
 	case "R":
 		// Refresh list - invalidate cache and fetch fresh data
 		m.loading = true
@@ -564,6 +606,106 @@ func (m Model) selectItem() tea.Cmd {
 	}
 }
 
+// kvsExportData represents the JSON structure for KVS export.
+type kvsExportData struct {
+	Device string          `json:"device"`
+	Items  []kvsExportItem `json:"items"`
+}
+
+type kvsExportItem struct {
+	Key   string `json:"key"`
+	Value any    `json:"value"`
+}
+
+func (m Model) exportKVS() tea.Cmd {
+	if m.device == "" || len(m.items) == 0 {
+		return nil
+	}
+
+	device := m.device
+	items := m.items
+
+	return func() tea.Msg {
+		// Create kvs directory if it doesn't exist
+		dir := "kvs"
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return ExportedMsg{Err: err}
+		}
+
+		// Generate filename: kvs/<device>_kvs.json
+		safeDevice := strings.ReplaceAll(device, ".", "_")
+		filename := fmt.Sprintf("%s/%s_kvs.json", dir, safeDevice)
+
+		// Build export data
+		exportItems := make([]kvsExportItem, len(items))
+		for i, item := range items {
+			exportItems[i] = kvsExportItem{
+				Key:   item.Key,
+				Value: item.Value,
+			}
+		}
+		data := kvsExportData{
+			Device: device,
+			Items:  exportItems,
+		}
+
+		// Marshal to JSON with indentation
+		jsonData, err := json.MarshalIndent(data, "", "  ")
+		if err != nil {
+			return ExportedMsg{Err: err}
+		}
+
+		// Write file
+		if err := os.WriteFile(filename, jsonData, 0o600); err != nil {
+			return ExportedMsg{Err: err}
+		}
+
+		return ExportedMsg{Path: filename}
+	}
+}
+
+func (m Model) importKVS() tea.Cmd {
+	if m.device == "" {
+		return nil
+	}
+
+	device := m.device
+	svc := m.svc
+	ctx := m.ctx
+
+	return func() tea.Msg {
+		// Generate filename: kvs/<device>_kvs.json
+		safeDevice := strings.ReplaceAll(device, ".", "_")
+		filename := fmt.Sprintf("kvs/%s_kvs.json", safeDevice)
+
+		// Read file
+		data, err := os.ReadFile(filename) //nolint:gosec // G304: User controls filename via device selection
+		if err != nil {
+			return ImportedMsg{Path: filename, Err: err}
+		}
+
+		// Parse JSON
+		var exportData kvsExportData
+		if err := json.Unmarshal(data, &exportData); err != nil {
+			return ImportedMsg{Path: filename, Err: fmt.Errorf("invalid JSON: %w", err)}
+		}
+
+		// Import each item
+		importCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+
+		importedCount := 0
+		for _, item := range exportData.Items {
+			if err := svc.Set(importCtx, device, item.Key, item.Value); err != nil {
+				return ImportedMsg{Path: filename, Count: importedCount, Err: err}
+			}
+			importedCount++
+		}
+
+		return ImportedMsg{Path: filename, Count: importedCount}
+	}
+}
+
 // View renders the KVS browser.
 func (m Model) View() string {
 	// Render edit modal if editing
@@ -628,7 +770,7 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "e:edit d:delete R:refresh"
+		footer := "e:edit d:del n:new X:export I:import R:refresh"
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}

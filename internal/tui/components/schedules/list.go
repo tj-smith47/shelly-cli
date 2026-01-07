@@ -83,17 +83,18 @@ type CreateScheduleMsg struct {
 // ListModel displays schedules for a device.
 type ListModel struct {
 	helpers.Sizable
-	ctx         context.Context
-	svc         *automation.Service
-	fileCache   *cache.FileCache
-	device      string
-	schedules   []Schedule
-	loading     bool
-	err         error
-	focused     bool
-	panelIndex  int // 1-based panel index for Shift+N hotkey hint
-	styles      ListStyles
-	cacheStatus cachestatus.Model
+	ctx           context.Context
+	svc           *automation.Service
+	fileCache     *cache.FileCache
+	device        string
+	schedules     []Schedule
+	loading       bool
+	err           error
+	focused       bool
+	panelIndex    int // 1-based panel index for Shift+N hotkey hint
+	pendingDelete int // Schedule ID pending delete confirmation (0 = none)
+	styles        ListStyles
+	cacheStatus   cachestatus.Model
 }
 
 // ListStyles holds styles for the list component.
@@ -400,6 +401,7 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	// Handle navigation keys first
 	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
+		m.pendingDelete = 0 // Clear pending delete on navigation
 		return m, nil
 	}
 
@@ -407,24 +409,45 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	switch msg.String() {
 	case "enter", "e":
 		// Edit schedule (open in editor)
+		m.pendingDelete = 0
 		return m, m.selectSchedule()
 	case "t":
 		// Toggle enable/disable
+		m.pendingDelete = 0
 		return m, m.toggleSchedule()
 	case "d":
-		// Delete schedule
-		return m, m.deleteSchedule()
+		// Delete schedule - requires double press for confirmation
+		schedule := m.selectedSchedule()
+		if schedule == nil {
+			return m, nil
+		}
+		if m.pendingDelete == schedule.ID {
+			// Second press - confirm delete
+			m.pendingDelete = 0
+			return m, m.deleteSchedule()
+		}
+		// First press - mark pending
+		m.pendingDelete = schedule.ID
+		return m, nil
 	case "n":
 		// New schedule - will be handled by parent
+		m.pendingDelete = 0
 		return m, m.createSchedule()
 	case "R":
 		// Refresh list - invalidate cache and fetch fresh data
+		m.pendingDelete = 0
 		m.loading = true
 		return m, tea.Batch(
 			m.Loader.Tick(),
 			panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
 			m.fetchAndCacheSchedules(),
 		)
+	case "esc":
+		// Cancel pending delete
+		if m.pendingDelete != 0 {
+			m.pendingDelete = 0
+			return m, nil
+		}
 	}
 
 	return m, nil
@@ -439,6 +462,14 @@ func (m ListModel) selectSchedule() tea.Cmd {
 	return func() tea.Msg {
 		return SelectScheduleMsg{Schedule: schedule}
 	}
+}
+
+func (m ListModel) selectedSchedule() *Schedule {
+	cursor := m.Scroller.Cursor()
+	if len(m.schedules) == 0 || cursor >= len(m.schedules) {
+		return nil
+	}
+	return &m.schedules[cursor]
 }
 
 func (m ListModel) deleteSchedule() tea.Cmd {
@@ -501,10 +532,7 @@ func (m ListModel) View() string {
 
 	// Add footer with keybindings and cache status when focused
 	if m.focused && m.device != "" && len(m.schedules) > 0 {
-		footer := "e:edit t:toggle d:del n:new"
-		if cs := m.cacheStatus.View(); cs != "" {
-			footer += " | " + cs
-		}
+		footer := m.buildFooter()
 		r.SetFooter(footer)
 	}
 
@@ -630,6 +658,19 @@ func (m ListModel) Refresh() (ListModel, tea.Cmd) {
 	}
 	m.loading = true
 	return m, tea.Batch(m.Loader.Tick(), m.fetchSchedules())
+}
+
+func (m ListModel) buildFooter() string {
+	// Show delete confirmation message if pending
+	if m.pendingDelete != 0 {
+		return m.styles.Error.Render("Press d again to delete, Esc to cancel")
+	}
+
+	footer := "e:edit t:toggle d:del n:new"
+	if cs := m.cacheStatus.View(); cs != "" {
+		footer += " | " + cs
+	}
+	return footer
 }
 
 // FooterText returns keybinding hints for the footer.

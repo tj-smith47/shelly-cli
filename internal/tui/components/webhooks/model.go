@@ -4,6 +4,7 @@ package webhooks
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -72,6 +73,16 @@ type ActionMsg struct {
 	Err       error
 }
 
+// TestResultMsg signals the result of a webhook URL test.
+type TestResultMsg struct {
+	WebhookID   int
+	URL         string
+	StatusCode  int
+	Err         error
+	TestedCount int // How many URLs were tested
+	TotalURLs   int // Total URLs in the webhook
+}
+
 // SelectMsg signals that a webhook was selected.
 type SelectMsg struct {
 	Webhook Webhook
@@ -92,6 +103,7 @@ type Model struct {
 	webhooks    []Webhook
 	loading     bool
 	editing     bool
+	testing     bool // True when testing a webhook URL
 	err         error
 	focused     bool
 	panelIndex  int // 1-based panel index for Shift+N hotkey hint
@@ -317,6 +329,8 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
+	case TestResultMsg:
+		return m.handleTestResult(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -416,6 +430,12 @@ func (m Model) handleAction(msg ActionMsg) (Model, tea.Cmd) {
 	)
 }
 
+func (m Model) handleTestResult(msg TestResultMsg) (Model, tea.Cmd) {
+	m.testing = false
+	// The TestResultMsg is re-emitted so the parent view can show a toast
+	return m, func() tea.Msg { return msg }
+}
+
 func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.editModal, cmd = m.editModal.Update(msg)
@@ -466,10 +486,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handleEditKey()
 	case "t":
 		return m, m.toggleWebhook()
+	case "T":
+		return m.handleTestKey()
 	case "d":
 		return m, m.deleteWebhook()
 	case "n":
-		return m, m.createWebhook()
+		return m.handleCreateKey()
 	case "r":
 		// Invalidate cache and fetch fresh data
 		m.loading = true
@@ -498,12 +520,73 @@ func (m Model) handleEditKey() (Model, tea.Cmd) {
 	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
 
-func (m Model) createWebhook() tea.Cmd {
+func (m Model) handleCreateKey() (Model, tea.Cmd) {
 	if m.device == "" {
-		return nil
+		return m, nil
 	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	m.editModal = m.editModal.ShowCreate(m.device)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
+func (m Model) handleTestKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.testing || len(m.webhooks) == 0 {
+		return m, nil
+	}
+	cursor := m.Scroller.Cursor()
+	if cursor >= len(m.webhooks) {
+		return m, nil
+	}
+	webhook := m.webhooks[cursor]
+	if len(webhook.URLs) == 0 {
+		return m, nil
+	}
+	m.testing = true
+	return m, m.testWebhook(webhook)
+}
+
+func (m Model) testWebhook(webhook Webhook) tea.Cmd {
 	return func() tea.Msg {
-		return CreateMsg{Device: m.device}
+		// Test the first URL with a GET request
+		testURL := webhook.URLs[0]
+
+		ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, testURL, http.NoBody)
+		if err != nil {
+			return TestResultMsg{
+				WebhookID:   webhook.ID,
+				URL:         testURL,
+				Err:         err,
+				TestedCount: 1,
+				TotalURLs:   len(webhook.URLs),
+			}
+		}
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return TestResultMsg{
+				WebhookID:   webhook.ID,
+				URL:         testURL,
+				Err:         err,
+				TestedCount: 1,
+				TotalURLs:   len(webhook.URLs),
+			}
+		}
+		if err := resp.Body.Close(); err != nil {
+			iostreams.DebugErr("close response body", err)
+		}
+
+		return TestResultMsg{
+			WebhookID:   webhook.ID,
+			URL:         testURL,
+			StatusCode:  resp.StatusCode,
+			TestedCount: 1,
+			TotalURLs:   len(webhook.URLs),
+		}
 	}
 }
 
@@ -593,7 +676,7 @@ func (m Model) setFooter(r *rendering.Renderer) {
 	}
 	var footer string
 	if len(m.webhooks) > 0 {
-		footer = "e:edit t:toggle d:del n:new r:refresh"
+		footer = "e:edit t:toggle T:test d:del n:new r:refresh"
 	} else {
 		footer = "n:new r:refresh"
 	}

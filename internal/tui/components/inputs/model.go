@@ -54,11 +54,24 @@ type LoadedMsg struct {
 	Err    error
 }
 
+// ActionsLoadedMsg signals that input actions (webhooks) were loaded.
+type ActionsLoadedMsg struct {
+	Actions map[int][]InputAction // input ID → linked actions
+	Err     error
+}
+
 // ActionMsg signals an input action completed.
 type ActionMsg struct {
 	Action  string
 	InputID int
 	Err     error
+}
+
+// TriggerResultMsg signals the result of triggering an input event.
+type TriggerResultMsg struct {
+	InputID   int
+	EventType string
+	Err       error
 }
 
 // EditRequestMsg signals that the edit modal should be opened.
@@ -67,22 +80,33 @@ type EditRequestMsg struct {
 	InputID int
 }
 
+// InputAction represents a webhook linked to an input event.
+type InputAction struct {
+	WebhookID int
+	Event     string // e.g., "input.single_push"
+	URLs      []string
+	Enable    bool
+}
+
 // Model displays input settings for a device.
 type Model struct {
 	helpers.Sizable
-	ctx         context.Context
-	svc         *shelly.Service
-	fileCache   *cache.FileCache
-	device      string
-	inputs      []shelly.InputInfo
-	loading     bool
-	editing     bool
-	err         error
-	focused     bool
-	panelIndex  int // 1-based panel index for Shift+N hotkey hint
-	styles      Styles
-	editModal   EditModel
-	cacheStatus cachestatus.Model
+	ctx           context.Context
+	svc           *shelly.Service
+	fileCache     *cache.FileCache
+	device        string
+	inputs        []shelly.InputInfo
+	actions       map[int][]InputAction // input ID → linked actions
+	loading       bool
+	editing       bool
+	configActions bool // True when action modal is visible
+	err           error
+	focused       bool
+	panelIndex    int // 1-based panel index for Shift+N hotkey hint
+	styles        Styles
+	editModal     EditModel
+	actionModal   ActionModal
+	cacheStatus   cachestatus.Model
 }
 
 // Styles holds styles for the Inputs component.
@@ -138,9 +162,11 @@ func New(deps Deps) Model {
 		svc:         deps.Svc,
 		fileCache:   deps.FileCache,
 		loading:     false,
+		actions:     make(map[int][]InputAction),
 		styles:      DefaultStyles(),
 		cacheStatus: cachestatus.New(),
 		editModal:   NewEditModel(deps.Ctx, deps.Svc),
+		actionModal: NewActionModal(deps.Ctx, deps.Svc),
 	}
 	m.Loader = m.Loader.SetMessage("Loading inputs...")
 	return m
@@ -177,6 +203,37 @@ func (m Model) fetchInputs() tea.Cmd {
 
 		inputs, err := m.svc.InputList(ctx, m.device)
 		return LoadedMsg{Inputs: inputs, Err: err}
+	}
+}
+
+// fetchActions fetches webhooks and filters them for input-related events.
+func (m Model) fetchActions() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		hooks, err := m.svc.ListWebhooks(ctx, m.device)
+		if err != nil {
+			return ActionsLoadedMsg{Err: err}
+		}
+
+		// Filter webhooks for input events and group by input ID (Cid)
+		actions := make(map[int][]InputAction)
+		for _, h := range hooks {
+			// Input events start with "input." (e.g., "input.single_push")
+			if !strings.HasPrefix(h.Event, "input.") {
+				continue
+			}
+			action := InputAction{
+				WebhookID: h.ID,
+				Event:     h.Event,
+				URLs:      h.URLs,
+				Enable:    h.Enable,
+			}
+			actions[h.Cid] = append(actions[h.Cid], action)
+		}
+
+		return ActionsLoadedMsg{Actions: actions}
 	}
 }
 
@@ -235,6 +292,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleEditModalUpdate(msg)
 	}
 
+	// Handle action modal if visible
+	if m.configActions {
+		return m.handleActionModalUpdate(msg)
+	}
+
 	// Forward tick messages to loader when loading
 	if m.loading {
 		if model, cmd, done := m.updateLoading(msg); done {
@@ -275,6 +337,11 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleRefreshComplete(msg)
 	case LoadedMsg:
 		return m.handleLoaded(msg)
+	case ActionsLoadedMsg:
+		return m.handleActionsLoaded(msg)
+	case TriggerResultMsg:
+		// Re-emit so parent view can show toast
+		return m, func() tea.Msg { return msg }
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -345,6 +412,17 @@ func (m Model) handleLoaded(msg LoadedMsg) (Model, tea.Cmd) {
 	m.inputs = msg.Inputs
 	m.Scroller.SetItemCount(len(m.inputs))
 	m.Scroller.CursorToStart()
+	// Fetch actions (webhooks linked to inputs) in background
+	return m, m.fetchActions()
+}
+
+func (m Model) handleActionsLoaded(msg ActionsLoadedMsg) (Model, tea.Cmd) {
+	if msg.Err != nil {
+		// Log but don't block - actions are supplementary
+		iostreams.DebugErr("load input actions", msg.Err)
+		return m, nil
+	}
+	m.actions = msg.Actions
 	return m, nil
 }
 
@@ -384,6 +462,26 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) handleActionModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.actionModal, cmd = m.actionModal.Update(msg)
+
+	// Check if modal was closed
+	if !m.actionModal.Visible() {
+		m.configActions = false
+		// Re-emit close message for parent to handle
+		if closeMsg, ok := msg.(ActionModalClosedMsg); ok {
+			if closeMsg.Changed {
+				// Refresh actions if changes were made
+				return m, tea.Batch(cmd, m.fetchActions())
+			}
+		}
+		return m, cmd
+	}
+
+	return m, cmd
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle navigation keys first
 	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
@@ -414,9 +512,73 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 				return EditOpenedMsg{}
 			})
 		}
+	case "a":
+		// Open action configuration modal for selected input
+		return m.openActionModal()
+	case "T":
+		// Trigger single_push event on selected input (button type only)
+		return m, m.triggerInput()
 	}
 
 	return m, nil
+}
+
+func (m Model) triggerInput() tea.Cmd {
+	if m.device == "" || m.loading || len(m.inputs) == 0 {
+		return nil
+	}
+	cursor := m.Scroller.Cursor()
+	if cursor >= len(m.inputs) {
+		return nil
+	}
+	input := m.inputs[cursor]
+	// Trigger only works for button type inputs
+	if input.Type != inputTypeButton {
+		return func() tea.Msg {
+			return TriggerResultMsg{
+				InputID:   input.ID,
+				EventType: "single_push",
+				Err:       fmt.Errorf("trigger only works for button type inputs"),
+			}
+		}
+	}
+
+	device := m.device
+	inputID := input.ID
+	svc := m.svc
+	ctx := m.ctx
+
+	return func() tea.Msg {
+		triggerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		err := svc.InputTrigger(triggerCtx, device, inputID, "single_push")
+		return TriggerResultMsg{
+			InputID:   inputID,
+			EventType: "single_push",
+			Err:       err,
+		}
+	}
+}
+
+func (m Model) openActionModal() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || len(m.inputs) == 0 {
+		return m, nil
+	}
+	cursor := m.Scroller.Cursor()
+	if cursor >= len(m.inputs) {
+		return m, nil
+	}
+	input := m.inputs[cursor]
+
+	// Get actions for this input
+	inputActions := m.actions[input.ID]
+
+	m.configActions = true
+	m.actionModal = m.actionModal.SetSize(m.Width, m.Height)
+	m.actionModal = m.actionModal.Show(m.device, input.ID, inputActions)
+
+	return m, func() tea.Msg { return ActionModalOpenedMsg{} }
 }
 
 // View renders the Inputs component.
@@ -424,6 +586,11 @@ func (m Model) View() string {
 	// Render edit modal if editing
 	if m.editing {
 		return m.editModal.View()
+	}
+
+	// Render action modal if configuring actions
+	if m.configActions {
+		return m.actionModal.View()
 	}
 
 	r := rendering.New(m.Width, m.Height).
@@ -473,7 +640,7 @@ func (m Model) View() string {
 
 	// Footer with keybindings and cache status (shown when focused)
 	if m.focused {
-		footer := "e:edit R:refresh"
+		footer := "e:edit a:actions T:test R:refresh"
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}
@@ -509,7 +676,13 @@ func (m Model) renderInputLine(input shelly.InputInfo, isSelected bool) string {
 	// Type
 	typeStr := m.styles.Type.Render(fmt.Sprintf("[%s]", input.Type))
 
-	line := fmt.Sprintf("%s%s %s %s %s", selector, stateStr, idStr, nameStr, typeStr)
+	// Action count
+	actionStr := ""
+	if actions, ok := m.actions[input.ID]; ok && len(actions) > 0 {
+		actionStr = m.styles.Muted.Render(fmt.Sprintf(" (%d actions)", len(actions)))
+	}
+
+	line := fmt.Sprintf("%s%s %s %s %s%s", selector, stateStr, idStr, nameStr, typeStr, actionStr)
 
 	if isSelected {
 		return m.styles.Selected.Render(line)

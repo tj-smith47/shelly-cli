@@ -4,6 +4,7 @@ package views
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -118,8 +119,10 @@ type Automation struct {
 
 	// Component models
 	scripts        scripts.ListModel
+	scriptCreate   scripts.CreateModel
 	scriptEditor   scripts.EditorModel
 	schedules      schedules.ListModel
+	scheduleCreate schedules.CreateModel
 	scheduleEditor schedules.EditorModel
 	webhooks       webhooks.Model
 	virtuals       virtuals.Model
@@ -206,8 +209,10 @@ func NewAutomation(deps AutomationDeps) *Automation {
 		autoSvc:        deps.AutoSvc,
 		id:             tabs.TabAutomation,
 		scripts:        scripts.NewList(scriptListDeps),
+		scriptCreate:   scripts.NewCreateModel(deps.Ctx, deps.AutoSvc),
 		scriptEditor:   scripts.NewEditor(scriptEditorDeps),
 		schedules:      schedules.NewList(schedulesListDeps),
+		scheduleCreate: schedules.NewCreateModel(deps.Ctx, deps.AutoSvc),
 		scheduleEditor: schedules.NewEditor(),
 		webhooks:       webhooks.New(webhooksDeps),
 		virtuals:       virtuals.New(virtualsDeps),
@@ -231,8 +236,10 @@ func NewAutomation(deps AutomationDeps) *Automation {
 func (a *Automation) Init() tea.Cmd {
 	return tea.Batch(
 		a.scripts.Init(),
+		a.scriptCreate.Init(),
 		a.scriptEditor.Init(),
 		a.schedules.Init(),
+		a.scheduleCreate.Init(),
 		a.scheduleEditor.Init(),
 		a.webhooks.Init(),
 		a.virtuals.Init(),
@@ -346,6 +353,24 @@ func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 	}
 
 	var cmds []tea.Cmd
+
+	// Route messages to script create modal when visible
+	if a.scriptCreate.IsVisible() {
+		var cmd tea.Cmd
+		a.scriptCreate, cmd = a.scriptCreate.Update(msg)
+		// Still handle component messages (for CreatedMsg, EditClosedMsg)
+		cmds = append(cmds, cmd, a.handleComponentMessages(msg))
+		return a, tea.Batch(cmds...)
+	}
+
+	// Route messages to schedule create modal when visible
+	if a.scheduleCreate.IsVisible() {
+		var cmd tea.Cmd
+		a.scheduleCreate, cmd = a.scheduleCreate.Update(msg)
+		// Still handle component messages (for CreatedMsg, EditClosedMsg)
+		cmds = append(cmds, cmd, a.handleComponentMessages(msg))
+		return a, tea.Batch(cmds...)
+	}
 
 	// Check for component completion to advance sequential loading
 	if cmd := a.handleComponentLoaded(msg); cmd != nil {
@@ -537,9 +562,26 @@ func (a *Automation) updateAllComponents(msg tea.Msg) tea.Cmd {
 }
 
 func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
+	// Handle script-related messages
+	if cmd := a.handleScriptMessages(msg); cmd != nil {
+		return cmd
+	}
+	// Handle schedule-related messages
+	if cmd := a.handleScheduleMessages(msg); cmd != nil {
+		return cmd
+	}
+	// Handle action messages
+	return handleActionMessages(msg)
+}
+
+func (a *Automation) handleScriptMessages(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case scripts.SelectScriptMsg:
 		return a.handleScriptSelect(msg)
+	case scripts.CreateScriptMsg:
+		return a.handleScriptCreate(msg)
+	case scripts.CreatedMsg:
+		return a.handleScriptCreated(msg)
 	case scripts.EditScriptMsg:
 		return a.handleScriptEdit(msg)
 	case scripts.CodeLoadedMsg:
@@ -548,17 +590,40 @@ func (a *Automation) handleComponentMessages(msg tea.Msg) tea.Cmd {
 		return a.handleEditorFinished(msg)
 	case scripts.CodeUploadedMsg:
 		return a.handleCodeUploaded(msg)
+	case scripts.ScriptDownloadedMsg:
+		return a.handleScriptDownloaded(msg)
+	}
+	return nil
+}
+
+func (a *Automation) handleScheduleMessages(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
 	case schedules.SelectScheduleMsg:
 		return a.handleScheduleSelect(msg)
+	case schedules.CreateScheduleMsg:
+		return a.handleScheduleCreate(msg)
+	case schedules.CreatedMsg:
+		return a.handleScheduleCreated(msg)
 	case messages.EditClosedMsg:
-		// Handle any component edit close
 		if msg.Saved {
 			return toast.Success("Changes saved")
 		}
+	}
+	return nil
+}
+
+func handleActionMessages(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
 	case kvs.ActionMsg:
 		return handleKVSAction(msg)
+	case kvs.ExportedMsg:
+		return handleKVSExported(msg)
+	case kvs.ImportedMsg:
+		return handleKVSImported(msg)
 	case webhooks.ActionMsg:
 		return handleWebhookAction(msg)
+	case webhooks.TestResultMsg:
+		return handleWebhookTestResult(msg)
 	case virtuals.ActionMsg:
 		return handleVirtualAction(msg)
 	}
@@ -571,6 +636,22 @@ func (a *Automation) handleScriptSelect(msg scripts.SelectScriptMsg) tea.Cmd {
 	a.focusedPanel = PanelScriptEditor
 	a.updateFocusStates()
 	return cmd
+}
+
+func (a *Automation) handleScriptCreate(_ scripts.CreateScriptMsg) tea.Cmd {
+	a.scriptCreate = a.scriptCreate.Show(a.device)
+	a.scriptCreate = a.scriptCreate.SetSize(a.width, a.height)
+	return nil
+}
+
+func (a *Automation) handleScriptCreated(msg scripts.CreatedMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Failed to create script: " + msg.Err.Error())
+	}
+	// Refresh scripts list
+	var cmd tea.Cmd
+	a.scripts, cmd = a.scripts.Refresh()
+	return tea.Batch(cmd, toast.Success("Script '"+msg.Name+"' created"))
 }
 
 func (a *Automation) handleScriptEdit(msg scripts.EditScriptMsg) tea.Cmd {
@@ -609,11 +690,34 @@ func (a *Automation) handleCodeUploaded(msg scripts.CodeUploadedMsg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (a *Automation) handleScriptDownloaded(msg scripts.ScriptDownloadedMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Failed to save script: " + msg.Err.Error())
+	}
+	return toast.Success("Script saved to " + msg.Path)
+}
+
 func (a *Automation) handleScheduleSelect(msg schedules.SelectScheduleMsg) tea.Cmd {
 	a.scheduleEditor = a.scheduleEditor.SetSchedule(&msg.Schedule)
 	a.focusedPanel = PanelScheduleEditor
 	a.updateFocusStates()
 	return nil
+}
+
+func (a *Automation) handleScheduleCreate(_ schedules.CreateScheduleMsg) tea.Cmd {
+	a.scheduleCreate = a.scheduleCreate.Show(a.device)
+	a.scheduleCreate = a.scheduleCreate.SetSize(a.width, a.height)
+	return nil
+}
+
+func (a *Automation) handleScheduleCreated(msg schedules.CreatedMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Failed to create schedule: " + msg.Err.Error())
+	}
+	// Refresh schedules list
+	var cmd tea.Cmd
+	a.schedules, cmd = a.schedules.Refresh()
+	return tea.Batch(cmd, toast.Success("Schedule created"))
 }
 
 func handleKVSAction(msg kvs.ActionMsg) tea.Cmd {
@@ -624,6 +728,20 @@ func handleKVSAction(msg kvs.ActionMsg) tea.Cmd {
 		return toast.Error("Failed to delete: " + msg.Err.Error())
 	}
 	return toast.Success("KVS entry deleted")
+}
+
+func handleKVSExported(msg kvs.ExportedMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Export failed: " + msg.Err.Error())
+	}
+	return toast.Success("KVS exported to " + msg.Path)
+}
+
+func handleKVSImported(msg kvs.ImportedMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Import failed: " + msg.Err.Error())
+	}
+	return toast.Success(fmt.Sprintf("Imported %d KVS entries", msg.Count))
 }
 
 func handleWebhookAction(msg webhooks.ActionMsg) tea.Cmd {
@@ -639,6 +757,16 @@ func handleWebhookAction(msg webhooks.ActionMsg) tea.Cmd {
 		return toast.Success("Webhook deleted")
 	}
 	return nil
+}
+
+func handleWebhookTestResult(msg webhooks.TestResultMsg) tea.Cmd {
+	if msg.Err != nil {
+		return toast.Error("Test failed: " + msg.Err.Error())
+	}
+	if msg.StatusCode >= 200 && msg.StatusCode < 300 {
+		return toast.Success(fmt.Sprintf("Test OK: HTTP %d", msg.StatusCode))
+	}
+	return toast.Warning(fmt.Sprintf("Test returned HTTP %d", msg.StatusCode))
 }
 
 func handleVirtualAction(msg virtuals.ActionMsg) tea.Cmd {
@@ -820,12 +948,19 @@ func (a *Automation) SetViewFocused(focused bool) *Automation {
 // HasActiveModal returns true if any component has a modal overlay visible.
 // Implements ModalProvider interface.
 func (a *Automation) HasActiveModal() bool {
-	return a.webhooks.IsEditing() || a.virtuals.IsEditing() || a.kvs.IsEditing()
+	return a.scriptCreate.IsVisible() || a.scheduleCreate.IsVisible() ||
+		a.webhooks.IsEditing() || a.virtuals.IsEditing() || a.kvs.IsEditing()
 }
 
 // RenderModal returns the active modal content for full-screen rendering.
 // Implements ModalProvider interface.
 func (a *Automation) RenderModal() string {
+	if a.scriptCreate.IsVisible() {
+		return a.scriptCreate.View()
+	}
+	if a.scheduleCreate.IsVisible() {
+		return a.scheduleCreate.View()
+	}
 	if a.webhooks.IsEditing() {
 		return a.webhooks.RenderEditModal()
 	}
