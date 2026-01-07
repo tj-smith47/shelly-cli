@@ -262,34 +262,34 @@ func (m Model) buildContent() string {
 	// Line 1: Device header with status
 	lines := []string{m.buildHeaderLine()}
 
-	// Line 2: Power summary (right after device name)
+	// Power section (right after device name)
 	if powerLine := m.buildPowerLine(); powerLine != "" {
 		lines = append(lines, powerLine)
 	}
 
-	// Line 3: Identity (Model, Gen, Type)
+	// Identity section (Model, Gen, Type)
 	if identLine := m.buildIdentityLine(); identLine != "" {
-		lines = append(lines, identLine)
+		lines = append(lines, m.divider("Identity"), identLine)
 	}
 
-	// Line 4: Network (IP, MAC, Signal)
+	// Network section (IP, MAC, SSID, Signal)
 	if netLine := m.buildNetworkLine(); netLine != "" {
-		lines = append(lines, netLine)
+		lines = append(lines, m.divider("Network"), netLine)
 	}
 
-	// Line 5: Runtime + Firmware info (if available)
+	// Runtime section (Uptime, RAM, FS, Firmware)
 	if runtimeLine := m.buildRuntimeLine(); runtimeLine != "" {
-		lines = append(lines, runtimeLine)
+		lines = append(lines, m.divider("Runtime"), runtimeLine)
 	}
 
-	// Line 6: Last seen
+	// Last seen
 	if !m.device.UpdatedAt.IsZero() {
 		lines = append(lines, m.kv("Last seen", formatRelativeTime(m.device.UpdatedAt)))
 	}
 
-	// Line 7+: Components section (vertical list with space above)
+	// Components section (vertical list)
 	if compLines := m.buildComponentsVertical(); compLines != "" {
-		lines = append(lines, "", m.styles.Section.Render("Components"), compLines)
+		lines = append(lines, m.divider("Components"), compLines)
 	}
 
 	return strings.Join(lines, "\n")
@@ -342,11 +342,21 @@ func (m Model) buildNetworkLine() string {
 		parts = append(parts, m.kv("MAC", mac))
 	}
 
+	// WiFi SSID
+	if m.device.WiFi != nil && m.device.WiFi.SSID != "" {
+		parts = append(parts, m.kv("SSID", m.device.WiFi.SSID))
+	}
+
 	// WiFi signal
 	if m.device.WiFi != nil && m.device.WiFi.RSSI != 0 {
 		rssi := m.device.WiFi.RSSI
 		quality := m.signalQualityShort(rssi)
 		parts = append(parts, m.kv("Signal", fmt.Sprintf("%d dBm %s", rssi, quality)))
+	}
+
+	// AP Mode client count
+	if m.device.WiFi != nil && m.device.WiFi.APCount > 0 {
+		parts = append(parts, m.kv("AP Clients", fmt.Sprintf("%d", m.device.WiFi.APCount)))
 	}
 
 	if len(parts) == 0 {
@@ -494,6 +504,11 @@ func (m Model) buildPowerLine() string {
 // kv formats a key-value pair compactly with space after colon.
 func (m Model) kv(label, value string) string {
 	return m.styles.Label.Render(label+": ") + m.styles.Value.Render(value)
+}
+
+// divider creates a superfile-style section divider.
+func (m Model) divider(section string) string {
+	return m.styles.Divider.Render("├─ ") + m.styles.Section.Render(section) + m.styles.Divider.Render(" ─┤")
 }
 
 func (m Model) renderEmpty() string {
