@@ -898,27 +898,40 @@ type FetchExtendedStatusMsg struct {
 
 // FetchExtendedStatus fetches WiFi and Sys status for a device on-demand.
 // This is called lazily when a device is focused in the device info panel.
+// Requests are made in parallel to avoid timeout issues.
 func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
-		defer cancel()
-
 		msg := FetchExtendedStatusMsg{Name: name}
 
-		// Fetch WiFi status
-		if wifi, err := c.svc.GetWiFiStatus(ctx, name); err == nil {
-			msg.WiFi = wifi
-		} else {
-			c.ios.DebugCat(iostreams.CategoryDevice, "cache: wifi status for %s failed: %v", name, err)
-		}
+		// Fetch WiFi and Sys in parallel with independent timeouts
+		var wg sync.WaitGroup
+		var wifiMu, sysMu sync.Mutex
 
-		// Fetch Sys status
-		if sys, err := c.svc.GetSysStatus(ctx, name); err == nil {
-			msg.Sys = sys
-		} else {
-			c.ios.DebugCat(iostreams.CategoryDevice, "cache: sys status for %s failed: %v", name, err)
-		}
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+			defer cancel()
+			if wifi, err := c.svc.GetWiFiStatus(ctx, name); err == nil {
+				wifiMu.Lock()
+				msg.WiFi = wifi
+				wifiMu.Unlock()
+			} else {
+				c.ios.DebugCat(iostreams.CategoryDevice, "cache: wifi status for %s failed: %v", name, err)
+			}
+		})
 
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+			defer cancel()
+			if sys, err := c.svc.GetSysStatus(ctx, name); err == nil {
+				sysMu.Lock()
+				msg.Sys = sys
+				sysMu.Unlock()
+			} else {
+				c.ios.DebugCat(iostreams.CategoryDevice, "cache: sys status for %s failed: %v", name, err)
+			}
+		})
+
+		wg.Wait()
 		return msg
 	}
 }
