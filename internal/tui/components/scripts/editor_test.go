@@ -328,8 +328,9 @@ func TestEditorModel_View_Error(t *testing.T) {
 	m = m.SetSize(50, 20)
 
 	view := m.View()
-	if !strings.Contains(view, "Error") {
-		t.Errorf("View() should show 'Error', got:\n%s", view)
+	// tuierrors.FormatError categorizes DeadlineExceeded as "Request timed out"
+	if !strings.Contains(view, "Request timed out") {
+		t.Errorf("View() should show 'Request timed out', got:\n%s", view)
 	}
 }
 

@@ -18,6 +18,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // CodeLoadedMsg signals that script code was loaded.
@@ -372,7 +374,7 @@ func (m EditorModel) View() string {
 		SetPanelIndex(m.panelIndex)
 
 	if m.scriptID == 0 {
-		r.SetContent(m.styles.Muted.Render("No script selected"))
+		r.SetContent(styles.EmptyStateWithBorder("No script selected", m.Width, m.Height))
 		return r.Render()
 	}
 
@@ -382,13 +384,11 @@ func (m EditorModel) View() string {
 	}
 
 	if m.err != nil {
-		errMsg := m.err.Error()
-		// Detect Gen1 or unsupported device errors and show a friendly message
-		if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
-			strings.Contains(errMsg, "not found") {
-			r.SetContent(m.styles.Muted.Render("Scripts not supported on this device"))
+		if tuierrors.IsUnsupportedFeature(m.err) {
+			r.SetContent(styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Scripts"), m.Width, m.Height))
 		} else {
-			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
+			msg, _ := tuierrors.FormatError(m.err)
+			r.SetContent(m.styles.Error.Render(msg))
 		}
 		return r.Render()
 	}

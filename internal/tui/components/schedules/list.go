@@ -4,7 +4,6 @@ package schedules
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -22,6 +21,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Schedule represents a schedule job on a device.
@@ -502,13 +503,13 @@ func (m ListModel) View() string {
 	if m.focused && m.device != "" && len(m.schedules) > 0 {
 		footer := "e:edit t:toggle d:del n:new"
 		if cs := m.cacheStatus.View(); cs != "" {
-			footer = cs + " " + footer
+			footer += " | " + cs
 		}
 		r.SetFooter(footer)
 	}
 
 	if m.device == "" {
-		r.SetContent(m.styles.Muted.Render("No device selected"))
+		r.SetContent(styles.NoDeviceSelected(m.Width, m.Height))
 		return r.Render()
 	}
 
@@ -518,19 +519,17 @@ func (m ListModel) View() string {
 	}
 
 	if m.err != nil {
-		errMsg := m.err.Error()
-		// Detect Gen1 or unsupported device errors and show a friendly message
-		if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
-			strings.Contains(errMsg, "not found") {
-			r.SetContent(m.styles.Muted.Render("Schedules not supported on this device"))
+		if tuierrors.IsUnsupportedFeature(m.err) {
+			r.SetContent(styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Schedules"), m.Width, m.Height))
 		} else {
-			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
+			msg, _ := tuierrors.FormatError(m.err)
+			r.SetContent(m.styles.Error.Render(msg))
 		}
 		return r.Render()
 	}
 
 	if len(m.schedules) == 0 {
-		r.SetContent(m.styles.Muted.Render("No schedules on device"))
+		r.SetContent(styles.EmptyStateWithBorder("No schedules on device", m.Width, m.Height))
 		return r.Render()
 	}
 

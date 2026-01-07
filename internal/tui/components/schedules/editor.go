@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
 // EditorModel displays schedule details.
@@ -186,7 +187,7 @@ func (m EditorModel) View() string {
 		SetPanelIndex(m.panelIndex)
 
 	if m.schedule == nil {
-		r.SetContent(m.styles.Muted.Render("No schedule selected"))
+		r.SetContent(styles.EmptyStateWithBorder("No schedule selected", m.width, m.height))
 		return r.Render()
 	}
 

@@ -69,3 +69,37 @@ func TestNoItemsFound(t *testing.T) {
 		})
 	}
 }
+
+func TestNoDeviceSelected(t *testing.T) {
+	t.Parallel()
+
+	result := NoDeviceSelected(44, 12)
+
+	if !strings.Contains(result, "No device selected") {
+		t.Error("expected result to contain 'No device selected'")
+	}
+}
+
+func TestNoItemsConfigured(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		itemType string
+		expected string
+	}{
+		{"webhooks", "No webhooks configured"},
+		{"schedules", "No schedules configured"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.itemType, func(t *testing.T) {
+			t.Parallel()
+
+			result := NoItemsConfigured(tt.itemType, 44, 12)
+
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("expected result to contain %q", tt.expected)
+			}
+		})
+	}
+}

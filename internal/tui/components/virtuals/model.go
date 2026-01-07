@@ -22,6 +22,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Virtual represents a virtual component on a device.
@@ -677,7 +679,7 @@ func (m Model) View() string {
 		SetPanelIndex(m.panelIndex)
 
 	if m.device == "" {
-		r.SetContent(m.styles.Muted.Render("No device selected"))
+		r.SetContent(styles.NoDeviceSelected(m.Width, m.Height))
 		return r.Render()
 	}
 
@@ -687,13 +689,11 @@ func (m Model) View() string {
 	}
 
 	if m.err != nil {
-		errMsg := m.err.Error()
-		// Detect Gen1 or unsupported device errors and show a friendly message
-		if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
-			strings.Contains(errMsg, "not found") {
-			r.SetContent(m.styles.Muted.Render("Virtual components not supported on this device"))
+		if tuierrors.IsUnsupportedFeature(m.err) {
+			r.SetContent(styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Virtual components"), m.Width, m.Height))
 		} else {
-			r.SetContent(m.styles.Error.Render("Error: " + errMsg))
+			msg, _ := tuierrors.FormatError(m.err)
+			r.SetContent(m.styles.Error.Render(msg))
 		}
 		return r.Render()
 	}
@@ -709,7 +709,7 @@ func (m Model) View() string {
 	}
 
 	if len(m.virtuals) == 0 {
-		r.SetContent(m.styles.Muted.Render("No virtual components"))
+		r.SetContent(styles.NoItemsFound("virtual components", m.Width, m.Height))
 		return r.Render()
 	}
 
@@ -732,7 +732,7 @@ func (m Model) View() string {
 	if m.focused {
 		footer := "e:edit d:delete R:refresh"
 		if cs := m.cacheStatus.View(); cs != "" {
-			footer = cs + " " + footer
+			footer += " | " + cs
 		}
 		r.SetFooter(footer)
 	}

@@ -4,7 +4,6 @@ package scripts
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -21,6 +20,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Script represents a script on a device.
@@ -537,7 +538,7 @@ func (m ListModel) View() string {
 	if m.focused && m.device != "" && len(m.scripts) > 0 {
 		footer := "e:edit r:run s:stop d:del n:new"
 		if cs := m.cacheStatus.View(); cs != "" {
-			footer = cs + " " + footer
+			footer += " | " + cs
 		}
 		r.SetFooter(footer)
 	}
@@ -548,7 +549,7 @@ func (m ListModel) View() string {
 
 func (m ListModel) renderContent() string {
 	if m.device == "" {
-		return m.styles.Muted.Render("No device selected")
+		return styles.NoDeviceSelected(m.Width, m.Height)
 	}
 
 	if m.loading {
@@ -560,20 +561,18 @@ func (m ListModel) renderContent() string {
 	}
 
 	if len(m.scripts) == 0 {
-		return m.styles.Muted.Render("No scripts on device")
+		return styles.EmptyStateWithBorder("No scripts on device", m.Width, m.Height)
 	}
 
 	return m.renderScriptsList()
 }
 
 func (m ListModel) renderError() string {
-	errMsg := m.err.Error()
-	// Detect Gen1 or unsupported device errors and show a friendly message
-	if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
-		strings.Contains(errMsg, "not found") {
-		return m.styles.Muted.Render("Scripts not supported on this device")
+	if tuierrors.IsUnsupportedFeature(m.err) {
+		return styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Scripts"), m.Width, m.Height)
 	}
-	return m.styles.Error.Render("Error: " + errMsg)
+	msg, _ := tuierrors.FormatError(m.err)
+	return m.styles.Error.Render(msg)
 }
 
 func (m ListModel) renderScriptsList() string {

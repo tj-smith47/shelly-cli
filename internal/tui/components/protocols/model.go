@@ -20,6 +20,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Deps holds the dependencies for the Protocols component.
@@ -603,7 +605,7 @@ func (m Model) View() string {
 		SetPanelIndex(m.panelIndex)
 
 	if m.device == "" {
-		r.SetContent(m.styles.Muted.Render("No device selected"))
+		r.SetContent(styles.NoDeviceSelected(m.Width, m.Height))
 		return r.Render()
 	}
 
@@ -613,7 +615,8 @@ func (m Model) View() string {
 	}
 
 	if m.err != nil {
-		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg, _ := tuierrors.FormatError(m.err)
+		r.SetContent(m.styles.Error.Render(msg))
 		return r.Render()
 	}
 
@@ -641,7 +644,7 @@ func (m Model) View() string {
 			footer = "1-3:sel j/k:nav r:refresh"
 		}
 		if cs := m.cacheStatus.View(); cs != "" {
-			footer = cs + " " + footer
+			footer += " | " + cs
 		}
 		r.SetFooter(footer)
 	}

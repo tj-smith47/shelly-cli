@@ -21,6 +21,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Deps holds the dependencies for the Inputs component.
@@ -430,7 +432,7 @@ func (m Model) View() string {
 		SetPanelIndex(m.panelIndex)
 
 	if m.device == "" {
-		r.SetContent(m.styles.Muted.Render("No device selected"))
+		r.SetContent(styles.NoDeviceSelected(m.Width, m.Height))
 		return r.Render()
 	}
 
@@ -440,12 +442,13 @@ func (m Model) View() string {
 	}
 
 	if m.err != nil {
-		r.SetContent(m.styles.Error.Render("Error: " + m.err.Error()))
+		msg, _ := tuierrors.FormatError(m.err)
+		r.SetContent(m.styles.Error.Render(msg))
 		return r.Render()
 	}
 
 	if len(m.inputs) == 0 {
-		r.SetContent(m.styles.Muted.Render("No inputs found"))
+		r.SetContent(styles.NoItemsFound("inputs", m.Width, m.Height))
 		return r.Render()
 	}
 
@@ -472,7 +475,7 @@ func (m Model) View() string {
 	if m.focused {
 		footer := "e:edit R:refresh"
 		if cs := m.cacheStatus.View(); cs != "" {
-			footer = cs + " " + footer
+			footer += " | " + cs
 		}
 		r.SetFooter(footer)
 	}

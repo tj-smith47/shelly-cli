@@ -4,7 +4,6 @@ package webhooks
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -22,6 +21,8 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
+	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Webhook represents a webhook configuration on a device.
@@ -597,7 +598,7 @@ func (m Model) setFooter(r *rendering.Renderer) {
 		footer = "n:new r:refresh"
 	}
 	if cs := m.cacheStatus.View(); cs != "" {
-		footer = cs + " " + footer
+		footer += " | " + cs
 	}
 	r.SetFooter(footer)
 }
@@ -605,7 +606,7 @@ func (m Model) setFooter(r *rendering.Renderer) {
 // getStateContent returns content for non-list states and whether to use it.
 func (m Model) getStateContent() (string, bool) {
 	if m.device == "" {
-		return m.styles.Muted.Render("No device selected"), true
+		return styles.NoDeviceSelected(m.Width, m.Height), true
 	}
 	if m.loading {
 		return m.Loader.View(), true
@@ -614,19 +615,18 @@ func (m Model) getStateContent() (string, bool) {
 		return m.getErrorContent(), true
 	}
 	if len(m.webhooks) == 0 {
-		return m.styles.Muted.Render("No webhooks configured"), true
+		return styles.NoItemsConfigured("webhooks", m.Width, m.Height), true
 	}
 	return "", false
 }
 
 // getErrorContent returns the appropriate error message.
 func (m Model) getErrorContent() string {
-	errMsg := m.err.Error()
-	if strings.Contains(errMsg, "404") || strings.Contains(errMsg, "unknown method") ||
-		strings.Contains(errMsg, "not found") {
-		return m.styles.Muted.Render("Webhooks not supported on this device")
+	if tuierrors.IsUnsupportedFeature(m.err) {
+		return styles.EmptyStateWithBorder(tuierrors.UnsupportedMessage("Webhooks"), m.Width, m.Height)
 	}
-	return m.styles.Error.Render("Error: " + errMsg)
+	msg, _ := tuierrors.FormatError(m.err)
+	return m.styles.Error.Render(msg)
 }
 
 // renderWebhookList renders the list of webhooks.
