@@ -96,6 +96,18 @@ type DeviceRefreshMsg struct {
 	Name string
 }
 
+// FocusDebounceMsg triggers a debounced fetch for the focused device.
+// This prevents rapid scrolling from overwhelming devices with HTTP requests.
+type FocusDebounceMsg struct {
+	Name string
+}
+
+// ExtendedStatusDebounceMsg signals that extended status should be fetched after debounce.
+// Handled by app.go to trigger FetchExtendedStatus only after user stops scrolling.
+type ExtendedStatusDebounceMsg struct {
+	Name string
+}
+
 // WaveMsg represents a wave of devices to load.
 type WaveMsg struct {
 	Wave      int
@@ -604,7 +616,12 @@ func (c *Cache) getRefreshInterval(data *DeviceData) time.Duration {
 	return c.refreshConfig.Gen2Offline
 }
 
+// FocusDebounceInterval is the delay before triggering a fetch for a focused device.
+// This prevents rapid scrolling from overwhelming devices with HTTP requests.
+const FocusDebounceInterval = 250 * time.Millisecond
+
 // SetFocusedDevice sets the currently focused device for faster refresh.
+// Uses debouncing to prevent rapid scrolling from triggering many HTTP requests.
 func (c *Cache) SetFocusedDevice(name string) tea.Cmd {
 	c.mu.Lock()
 	old := c.focusedDevice
@@ -612,13 +629,10 @@ func (c *Cache) SetFocusedDevice(name string) tea.Cmd {
 	c.mu.Unlock()
 
 	if name != old && name != "" {
-		// Trigger immediate refresh of newly focused device
-		c.mu.RLock()
-		data := c.devices[name]
-		c.mu.RUnlock()
-		if data != nil {
-			return c.fetchDeviceWithID(name, data.Device)
-		}
+		// Schedule debounced fetch instead of immediate - prevents scroll spam
+		return tea.Tick(FocusDebounceInterval, func(time.Time) tea.Msg {
+			return FocusDebounceMsg{Name: name}
+		})
 	}
 	return nil
 }
@@ -640,13 +654,14 @@ func (c *Cache) loadDevicesWave() tea.Cmd {
 
 		c.mu.Lock()
 		// Initialize all devices with "fetching" state
+		// Use Device.Name as key for consistent lookup (not config key)
 		c.order = make([]string, 0, len(deviceMap))
-		for name, dev := range deviceMap {
-			c.devices[name] = &DeviceData{
+		for _, dev := range deviceMap {
+			c.devices[dev.Name] = &DeviceData{
 				Device:  dev,
 				Fetched: false,
 			}
-			c.order = append(c.order, name)
+			c.order = append(c.order, dev.Name)
 		}
 		// Sort for consistent display
 		sortStrings(c.order)
@@ -678,9 +693,10 @@ func createWaves(devices map[string]model.Device) [][]deviceFetch {
 	}
 
 	// Convert to slice for sorting
+	// Use Device.Name for consistent lookup (not config key)
 	fetches := make([]deviceFetch, 0, len(devices))
-	for name, dev := range devices {
-		fetches = append(fetches, deviceFetch{Name: name, Device: dev})
+	for _, dev := range devices {
+		fetches = append(fetches, deviceFetch{Name: dev.Name, Device: dev})
 	}
 
 	// Sort: Gen2 first (generation > 1 or unknown), then Gen1, then by name
@@ -907,7 +923,7 @@ type FetchExtendedStatusMsg struct {
 // This is called lazily when a device is focused in the device info panel.
 // Requests are made in parallel to avoid timeout issues.
 func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
-	c.ios.DebugCat(iostreams.CategoryDevice, "cache: FetchExtendedStatus called for %s", name)
+	debug.TraceEvent("cache: FetchExtendedStatus called for %s", name)
 	return func() tea.Msg {
 		msg := FetchExtendedStatusMsg{Name: name}
 
@@ -916,33 +932,33 @@ func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
 		var wifiMu, sysMu sync.Mutex
 
 		wg.Go(func() {
-			ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+			ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
 			defer cancel()
 			if wifi, err := c.svc.GetWiFiStatus(ctx, name); err == nil {
 				wifiMu.Lock()
 				msg.WiFi = wifi
 				wifiMu.Unlock()
-				c.ios.DebugCat(iostreams.CategoryDevice, "cache: wifi status for %s succeeded: RSSI=%d", name, wifi.RSSI)
+				debug.TraceEvent("cache: wifi status for %s succeeded: SSID=%s RSSI=%d", name, wifi.SSID, wifi.RSSI)
 			} else {
-				c.ios.DebugCat(iostreams.CategoryDevice, "cache: wifi status for %s failed: %v", name, err)
+				debug.TraceEvent("cache: wifi status for %s failed: %v", name, err)
 			}
 		})
 
 		wg.Go(func() {
-			ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+			ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
 			defer cancel()
 			if sys, err := c.svc.GetSysStatus(ctx, name); err == nil {
 				sysMu.Lock()
 				msg.Sys = sys
 				sysMu.Unlock()
-				c.ios.DebugCat(iostreams.CategoryDevice, "cache: sys status for %s succeeded: uptime=%d", name, sys.Uptime)
+				debug.TraceEvent("cache: sys status for %s succeeded: uptime=%d", name, sys.Uptime)
 			} else {
-				c.ios.DebugCat(iostreams.CategoryDevice, "cache: sys status for %s failed: %v", name, err)
+				debug.TraceEvent("cache: sys status for %s failed: %v", name, err)
 			}
 		})
 
 		wg.Wait()
-		c.ios.DebugCat(iostreams.CategoryDevice, "cache: FetchExtendedStatus for %s complete: wifi=%v sys=%v", name, msg.WiFi != nil, msg.Sys != nil)
+		debug.TraceEvent("cache: FetchExtendedStatus for %s complete: wifi=%v sys=%v", name, msg.WiFi != nil, msg.Sys != nil)
 		return msg
 	}
 }
@@ -954,15 +970,21 @@ func (c *Cache) HandleExtendedStatus(msg FetchExtendedStatusMsg) {
 
 	data, exists := c.devices[msg.Name]
 	if !exists || data == nil {
+		debug.TraceEvent("HandleExtendedStatus: device %s not found in cache (exists=%v)", msg.Name, exists)
 		return
 	}
 
+	debug.TraceEvent("HandleExtendedStatus: updating %s ptr=%p", msg.Name, data)
 	if msg.WiFi != nil {
 		data.WiFi = msg.WiFi
+		debug.TraceEvent("HandleExtendedStatus: stored WiFi for %s (SSID=%s)", msg.Name, msg.WiFi.SSID)
 	}
 	if msg.Sys != nil {
 		data.Sys = msg.Sys
+		debug.TraceEvent("HandleExtendedStatus: stored Sys for %s (uptime=%d)", msg.Name, msg.Sys.Uptime)
 	}
+	// Verify it's stored
+	debug.TraceEvent("HandleExtendedStatus: after store for %s: WiFi=%v Sys=%v", msg.Name, data.WiFi != nil, data.Sys != nil)
 	c.version++
 }
 
@@ -1148,6 +1170,25 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		return c.fetchDeviceWithID(msg.Name, data.Device)
+
+	case FocusDebounceMsg:
+		// Debounced fetch for focused device - only trigger if still focused
+		c.mu.RLock()
+		currentFocus := c.focusedDevice
+		data := c.devices[msg.Name]
+		c.mu.RUnlock()
+
+		// Only fetch if this device is still focused (user stopped scrolling)
+		if msg.Name != currentFocus || data == nil {
+			return nil
+		}
+		debug.TraceEvent("FocusDebounceMsg: triggering fetch for %s", msg.Name)
+		// Return both: device fetch AND signal for extended status fetch
+		deviceName := msg.Name // Capture for closure
+		return tea.Batch(
+			c.fetchDeviceWithID(deviceName, data.Device),
+			func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} },
+		)
 
 	case RefreshTickMsg:
 		// Legacy: batch refresh all devices (kept for compatibility)

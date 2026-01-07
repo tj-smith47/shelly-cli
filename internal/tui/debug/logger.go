@@ -85,6 +85,13 @@ func TraceNetwork(operation, device, method string, err error) {
 	}
 }
 
+// TraceEvent logs a general event message from any component.
+func TraceEvent(format string, args ...any) {
+	if l := getGlobal(); l != nil {
+		l.LogEvent(fmt.Sprintf(format, args...))
+	}
+}
+
 // New creates a new Logger.
 // If SHELLY_TUI_DEBUG=1 is set, creates an active session immediately.
 // Otherwise returns a disabled logger that can be toggled on with Shift+D.

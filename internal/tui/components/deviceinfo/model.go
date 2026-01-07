@@ -51,7 +51,6 @@ type Styles struct {
 	Container   lipgloss.Style
 	Title       lipgloss.Style
 	Section     lipgloss.Style
-	Divider     lipgloss.Style
 	Label       lipgloss.Style
 	Value       lipgloss.Style
 	Online      lipgloss.Style
@@ -82,8 +81,6 @@ func DefaultStyles() Styles {
 		Section: lipgloss.NewStyle().
 			Foreground(colors.Warning).
 			Bold(true),
-		Divider: lipgloss.NewStyle().
-			Foreground(colors.TableBorder),
 		Label: lipgloss.NewStyle().
 			Foreground(colors.Highlight),
 		Value: lipgloss.NewStyle().
@@ -267,29 +264,24 @@ func (m Model) buildContent() string {
 		lines = append(lines, powerLine)
 	}
 
-	// Identity section (Model, Gen, Type)
+	// Identity section - inline header.
 	if identLine := m.buildIdentityLine(); identLine != "" {
-		lines = append(lines, m.divider("Identity"), identLine)
+		lines = append(lines, m.inlineSection("ID", identLine))
 	}
 
-	// Network section (IP, MAC, SSID, Signal)
+	// Network section - inline header.
 	if netLine := m.buildNetworkLine(); netLine != "" {
-		lines = append(lines, m.divider("Network"), netLine)
+		lines = append(lines, m.inlineSection("Net", netLine))
 	}
 
-	// Runtime section (Uptime, RAM, FS, Firmware)
+	// Runtime section - inline header.
 	if runtimeLine := m.buildRuntimeLine(); runtimeLine != "" {
-		lines = append(lines, m.divider("Runtime"), runtimeLine)
+		lines = append(lines, m.inlineSection("Sys", runtimeLine))
 	}
 
-	// Last seen
-	if !m.device.UpdatedAt.IsZero() {
-		lines = append(lines, m.kv("Last seen", formatRelativeTime(m.device.UpdatedAt)))
-	}
-
-	// Components section (vertical list)
-	if compLines := m.buildComponentsVertical(); compLines != "" {
-		lines = append(lines, m.divider("Components"), compLines)
+	// Components - horizontal compact format.
+	if compLine := m.buildComponentsHorizontal(); compLine != "" {
+		lines = append(lines, compLine)
 	}
 
 	return strings.Join(lines, "\n")
@@ -401,50 +393,53 @@ func (m Model) buildRuntimeLine() string {
 		parts = append(parts, m.styles.Warning.Render("⟳ restart"))
 	}
 
+	// Last seen timestamp.
+	if !m.device.UpdatedAt.IsZero() {
+		parts = append(parts, m.kv("Seen", formatRelativeTime(m.device.UpdatedAt)))
+	}
+
 	if len(parts) == 0 {
 		return ""
 	}
 	return strings.Join(parts, " │ ")
 }
 
-// buildComponentsVertical builds a vertical list of components or single component detail.
-func (m Model) buildComponentsVertical() string {
+// buildComponentsHorizontal builds a compact horizontal component summary.
+func (m Model) buildComponentsHorizontal() string {
 	components := m.getComponents()
 	if len(components) == 0 {
 		return ""
 	}
 
-	// Show single component detail view if one is selected
+	// Show single component detail view if one is selected.
 	if m.componentCursor >= 0 && m.componentCursor < len(components) {
 		return m.renderSingleComponent(components[m.componentCursor])
 	}
 
-	// Show all components in vertical list
-	return m.renderAllComponents(components)
-}
-
-// renderAllComponents renders all components in a vertical list.
-func (m Model) renderAllComponents(components []ComponentInfo) string {
-	lines := make([]string, 0, len(components))
+	// Build compact horizontal component list.
+	parts := make([]string, 0, len(components))
 	for i, comp := range components {
 		stateStyle := m.styles.OffState
+		stateChar := "○"
 		if comp.State == "on" || comp.State == "On" || comp.State == "active" {
 			stateStyle = m.styles.OnState
+			stateChar = "●"
 		}
 
-		prefix := "  "
+		// Highlight selected component.
+		name := comp.Name
 		if m.componentCursor == i {
-			prefix = "> "
+			name = m.styles.Selected.Render(name)
 		}
 
-		line := prefix + comp.Name + " " + stateStyle.Render("["+comp.State+"]")
+		part := name + stateStyle.Render(stateChar)
 		if comp.Power != nil && *comp.Power != 0 {
-			line += " " + m.styles.Power.Render(formatPowerShort(*comp.Power))
+			part += m.styles.Power.Render(formatPowerShort(*comp.Power))
 		}
-		lines = append(lines, line)
+		parts = append(parts, part)
 	}
 
-	return strings.Join(lines, "\n")
+	return strings.Join(parts, " ")
 }
 
 // renderSingleComponent renders detailed view of a single component.
@@ -506,9 +501,9 @@ func (m Model) kv(label, value string) string {
 	return m.styles.Label.Render(label+": ") + m.styles.Value.Render(value)
 }
 
-// divider creates a superfile-style section divider.
-func (m Model) divider(section string) string {
-	return m.styles.Divider.Render("├─ ") + m.styles.Section.Render(section) + m.styles.Divider.Render(" ─┤")
+// inlineSection creates a compact inline section header.
+func (m Model) inlineSection(name, content string) string {
+	return m.styles.Section.Render(name+": ") + content
 }
 
 func (m Model) renderEmpty() string {

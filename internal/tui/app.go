@@ -511,16 +511,30 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		m.tabBar, _ = m.tabBar.SetActive(msg.Current)
 		return m, nil, true
 	case views.DeviceSelectedMsg:
-		// Fetch extended status (WiFi, Sys) lazily for device info panel
-		extCmd := m.cache.FetchExtendedStatus(msg.Device)
-		return m, tea.Batch(m.viewManager.PropagateDevice(msg.Device), extCmd), true
+		// Don't fetch extended status immediately - it's debounced via SetFocusedDevice
+		debug.TraceEvent("DeviceSelectedMsg(views): device=%s (debounced)", msg.Device)
+		return m, m.viewManager.PropagateDevice(msg.Device), true
 	case devicelist.DeviceSelectedMsg:
 		// Sync cursor from deviceList to app.go
 		m.cursor = m.deviceList.Cursor()
-		// Fetch extended status (WiFi, Sys) lazily for device info panel
-		extCmd := m.cache.FetchExtendedStatus(msg.Name)
-		return m, tea.Batch(m.viewManager.PropagateDevice(msg.Name), extCmd), true
+		// Don't fetch extended status immediately - it's debounced via SetFocusedDevice
+		debug.TraceEvent("DeviceSelectedMsg(devicelist): device=%s (debounced)", msg.Name)
+		return m, m.viewManager.PropagateDevice(msg.Name), true
+	case cache.ExtendedStatusDebounceMsg:
+		// Debounced extended status fetch - only triggered after user stops scrolling
+		debug.TraceEvent("ExtendedStatusDebounceMsg: triggering FetchExtendedStatus for %s", msg.Name)
+		return m, m.cache.FetchExtendedStatus(msg.Name), true
 	case cache.FetchExtendedStatusMsg:
+		// Debug: log what we received
+		wifiOK := msg.WiFi != nil
+		sysOK := msg.Sys != nil
+		debug.TraceEvent("FetchExtendedStatusMsg for %s: wifi=%v sys=%v", msg.Name, wifiOK, sysOK)
+		if wifiOK {
+			debug.TraceEvent("WiFi data: SSID=%s RSSI=%d", msg.WiFi.SSID, msg.WiFi.RSSI)
+		}
+		if sysOK {
+			debug.TraceEvent("Sys data: Uptime=%d RAM=%d/%d", msg.Sys.Uptime, msg.Sys.RAMFree, msg.Sys.RAMSize)
+		}
 		m.cache.HandleExtendedStatus(msg)
 		m = m.syncDeviceInfo()
 		return m, nil, true
@@ -1429,7 +1443,16 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 	case keys.ActionTab1:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabDashboard)
 		m.focusedPanel = PanelDeviceList
-		return m, m.viewManager.SetActive(views.ViewDashboard), true
+		// Fetch extended status for current device and sync device info
+		var extCmd tea.Cmd
+		if dev := m.deviceList.SelectedDevice(); dev != nil && dev.Online {
+			debug.TraceEvent("Tab1 switch: device=%s online, triggering FetchExtendedStatus", dev.Device.Name)
+			extCmd = m.cache.FetchExtendedStatus(dev.Device.Name)
+		} else {
+			debug.TraceEvent("Tab1 switch: no device selected or offline")
+		}
+		m = m.syncDeviceInfo()
+		return m, tea.Batch(m.viewManager.SetActive(views.ViewDashboard), extCmd), true
 
 	case keys.ActionTab2:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabAutomation)
@@ -1691,7 +1714,15 @@ func (m Model) syncDeviceInfo() Model {
 
 	// Update selected device
 	if len(devices) > 0 && m.cursor < len(devices) {
-		m.deviceInfo = m.deviceInfo.SetDevice(devices[m.cursor])
+		dev := devices[m.cursor]
+		// Debug: log what we're syncing - include pointer address to track identity
+		wifiOK := dev.WiFi != nil
+		sysOK := dev.Sys != nil
+		debug.TraceEvent("syncDeviceInfo: %s wifi=%v sys=%v ptr=%p", dev.Device.Name, wifiOK, sysOK, dev)
+		if wifiOK {
+			debug.TraceEvent("syncDeviceInfo: WiFi SSID=%s RSSI=%d", dev.WiFi.SSID, dev.WiFi.RSSI)
+		}
+		m.deviceInfo = m.deviceInfo.SetDevice(dev)
 	} else {
 		m.deviceInfo = m.deviceInfo.SetDevice(nil)
 	}
