@@ -780,9 +780,13 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 
 		// Get component states (Gen2+ only - Gen1 uses different relay API)
 		if info.Generation > 1 {
+			c.ios.DebugCat(iostreams.CategoryDevice, "cache: fetching component states for %s (gen %d)", name, info.Generation)
 			c.fetchSwitchStates(ctx, name, data)
 			c.fetchLightStates(ctx, name, data)
 			c.fetchCoverStates(ctx, name, data)
+			c.ios.DebugCat(iostreams.CategoryDevice, "cache: %s components: %d switches, %d lights, %d covers", name, len(data.Switches), len(data.Lights), len(data.Covers))
+		} else {
+			c.ios.DebugCat(iostreams.CategoryDevice, "cache: skipping component fetch for %s (gen %d)", name, info.Generation)
 		}
 
 		// Get monitoring snapshot for power metrics
@@ -839,8 +843,10 @@ func (c *Cache) populateDeviceInfo(name string, data *DeviceData, info *shelly.D
 func (c *Cache) fetchSwitchStates(ctx context.Context, name string, data *DeviceData) {
 	switches, err := c.svc.SwitchList(ctx, name)
 	if err != nil {
+		c.ios.DebugCat(iostreams.CategoryDevice, "cache: switch list for %s failed: %v", name, err)
 		return
 	}
+	c.ios.DebugCat(iostreams.CategoryDevice, "cache: switch list for %s returned %d switches", name, len(switches))
 	for _, sw := range switches {
 		data.Switches = append(data.Switches, SwitchState{
 			ID: sw.ID,
@@ -856,6 +862,7 @@ func (c *Cache) fetchLightStates(ctx context.Context, name string, data *DeviceD
 		c.ios.DebugCat(iostreams.CategoryDevice, "cache: light list for %s failed: %v", name, err)
 		return
 	}
+	c.ios.DebugCat(iostreams.CategoryDevice, "cache: light list for %s returned %d lights", name, len(lights))
 	for _, lt := range lights {
 		data.Lights = append(data.Lights, LightState{
 			ID: lt.ID,
@@ -900,6 +907,7 @@ type FetchExtendedStatusMsg struct {
 // This is called lazily when a device is focused in the device info panel.
 // Requests are made in parallel to avoid timeout issues.
 func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
+	c.ios.DebugCat(iostreams.CategoryDevice, "cache: FetchExtendedStatus called for %s", name)
 	return func() tea.Msg {
 		msg := FetchExtendedStatusMsg{Name: name}
 
@@ -914,6 +922,7 @@ func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
 				wifiMu.Lock()
 				msg.WiFi = wifi
 				wifiMu.Unlock()
+				c.ios.DebugCat(iostreams.CategoryDevice, "cache: wifi status for %s succeeded: RSSI=%d", name, wifi.RSSI)
 			} else {
 				c.ios.DebugCat(iostreams.CategoryDevice, "cache: wifi status for %s failed: %v", name, err)
 			}
@@ -926,12 +935,14 @@ func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
 				sysMu.Lock()
 				msg.Sys = sys
 				sysMu.Unlock()
+				c.ios.DebugCat(iostreams.CategoryDevice, "cache: sys status for %s succeeded: uptime=%d", name, sys.Uptime)
 			} else {
 				c.ios.DebugCat(iostreams.CategoryDevice, "cache: sys status for %s failed: %v", name, err)
 			}
 		})
 
 		wg.Wait()
+		c.ios.DebugCat(iostreams.CategoryDevice, "cache: FetchExtendedStatus for %s complete: wifi=%v sys=%v", name, msg.WiFi != nil, msg.Sys != nil)
 		return msg
 	}
 }

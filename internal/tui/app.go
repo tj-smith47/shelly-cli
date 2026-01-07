@@ -23,6 +23,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cmdmode"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/confirm"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/control"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicedetail"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/deviceinfo"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/devicelist"
@@ -145,6 +146,7 @@ type Model struct {
 	deviceInfo    deviceinfo.Model
 	deviceList    devicelist.Model
 	deviceDetail  devicedetail.Model
+	controlPanel  control.Panel
 
 	// Settings
 	refreshInterval time.Duration
@@ -257,6 +259,10 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		Svc: f.ShellyService(),
 	})
 
+	// Create control panel overlay component
+	controlSvc := control.NewServiceAdapter(f.ShellyService())
+	controlPanelModel := control.NewPanel(ctx, controlSvc)
+
 	// Create view manager and register all views
 	vm := views.New()
 
@@ -341,6 +347,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		deviceInfo:      deviceInfoModel,
 		deviceList:      deviceListModel,
 		deviceDetail:    deviceDetailModel,
+		controlPanel:    controlPanelModel,
 		debugLogger:     debug.New(), // nil if SHELLY_TUI_DEBUG not set
 	}
 
@@ -535,6 +542,13 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		var cmd tea.Cmd
 		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
 		return m, cmd, true
+	case control.PanelCloseMsg:
+		m.controlPanel = m.controlPanel.Hide()
+		return m, nil, true
+	case control.ActionMsg:
+		var cmd tea.Cmd
+		m.controlPanel, cmd = m.controlPanel.Update(msg)
+		return m, cmd, true
 	case views.ReturnFocusMsg:
 		// View is returning focus to device list (Tab/Shift+Tab past first/last panel)
 		m.focusedPanel = PanelDeviceList
@@ -696,6 +710,13 @@ func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool)
 	if m.deviceDetail.Visible() {
 		var cmd tea.Cmd
 		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
+		return m, cmd, true
+	}
+
+	// If control panel overlay is visible, forward all keys to it
+	if m.controlPanel.Visible() {
+		var cmd tea.Cmd
+		m.controlPanel, cmd = m.controlPanel.Update(msg)
 		return m, cmd, true
 	}
 
@@ -1688,6 +1709,11 @@ func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		return m.showDeviceDetail()
 	}
 
+	// Handle 'c' to show control panel overlay
+	if msg.String() == "c" {
+		return m.showControlPanel()
+	}
+
 	var action string
 	switch {
 	case key.Matches(msg, m.keys.Toggle):
@@ -1727,6 +1753,65 @@ func (m Model) showDeviceDetail() (tea.Model, tea.Cmd, bool) {
 	var cmd tea.Cmd
 	m.deviceDetail, cmd = m.deviceDetail.Show(selected.Device)
 	return m, cmd, true
+}
+
+// showControlPanel shows the control panel overlay for the selected device's component.
+func (m Model) showControlPanel() (tea.Model, tea.Cmd, bool) {
+	devices := m.getFilteredDevices()
+	if m.cursor >= len(devices) || m.cursor < 0 {
+		return m, nil, false
+	}
+
+	selected := devices[m.cursor]
+	if !selected.Online {
+		return m, nil, false
+	}
+
+	// Get device data from cache to find available components
+	data := m.cache.GetDevice(selected.Device.Name)
+	if data == nil {
+		return m, nil, false
+	}
+
+	// Set size for the overlay
+	m.controlPanel = m.controlPanel.SetSize(m.width*2/3, m.height*2/3)
+
+	// Show control panel for the first available controllable component
+	// Priority: Switch > Light > Cover (thermostats/RGB would need additional cache fields)
+	if len(data.Switches) > 0 {
+		sw := data.Switches[0]
+		state := control.SwitchState{
+			ID:     sw.ID,
+			Output: sw.On,
+			Source: sw.Source,
+		}
+		m.controlPanel = m.controlPanel.ShowSwitch(selected.Device.Address, state)
+		return m, nil, true
+	}
+
+	if len(data.Lights) > 0 {
+		lt := data.Lights[0]
+		state := control.LightState{
+			ID:     lt.ID,
+			Output: lt.On,
+		}
+		m.controlPanel = m.controlPanel.ShowLight(selected.Device.Address, state)
+		return m, nil, true
+	}
+
+	if len(data.Covers) > 0 {
+		cv := data.Covers[0]
+		state := control.CoverState{
+			ID:       cv.ID,
+			State:    cv.State,
+			Position: 50, // Default position since cache doesn't track it
+		}
+		m.controlPanel = m.controlPanel.ShowCover(selected.Device.Address, state)
+		return m, nil, true
+	}
+
+	// No controllable components found
+	return m, nil, false
 }
 
 // executeDeviceAction executes a device action on the selected device.
@@ -1903,7 +1988,7 @@ func (m Model) composeLayout(header, tabBar, inputBar, content string) string {
 	return lipgloss.JoinVertical(lipgloss.Left, header, tabBar, content, footer)
 }
 
-// applyOverlays applies confirm and device detail overlays.
+// applyOverlays applies confirm, device detail, and control panel overlays.
 // Note: Toast is now rendered in the input bar area (renderInputBar), not as an overlay.
 func (m Model) applyOverlays(result string) string {
 	if m.confirm.Visible() {
@@ -1911,6 +1996,9 @@ func (m Model) applyOverlays(result string) string {
 	}
 	if m.deviceDetail.Visible() {
 		result = m.centerOverlay(m.deviceDetail.View())
+	}
+	if m.controlPanel.Visible() {
+		result = m.centerOverlay(m.controlPanel.View())
 	}
 	return result
 }

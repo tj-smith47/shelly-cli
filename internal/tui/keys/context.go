@@ -79,6 +79,7 @@ const (
 	ActionPanel7
 	ActionPanel8
 	ActionPanel9
+	ActionControl
 )
 
 // KeyBinding represents a key and its description.
@@ -169,7 +170,8 @@ func (m *ContextMap) initDefaults() {
 		"o":      ActionOn,
 		"O":      ActionOff,
 		"R":      ActionReboot,
-		"d":      ActionEnter, // Device detail (same as enter)
+		"c":      ActionControl, // Open control panel
+		"d":      ActionEnter,   // Device detail (same as enter)
 		"enter":  ActionEnter,
 		"r":      ActionRefresh,
 		"ctrl+r": ActionRefresh,
@@ -313,7 +315,8 @@ func (m *ContextMap) initDefaults() {
 		"o":      ActionOn,
 		"O":      ActionOff,
 		"R":      ActionReboot,
-		"d":      ActionEnter, // Device detail
+		"c":      ActionControl, // Open control panel
+		"d":      ActionEnter,   // Device detail
 		"enter":  ActionEnter,
 		"r":      ActionRefresh,
 		"ctrl+r": ActionRefresh,
@@ -484,6 +487,7 @@ var actionDescriptions = map[Action]string{
 	ActionPanel7:       "Jump to panel 7",
 	ActionPanel8:       "Jump to panel 8",
 	ActionPanel9:       "Jump to panel 9",
+	ActionControl:      "Control panel",
 }
 
 // contextActionDescriptions overrides action descriptions for specific contexts.
@@ -503,6 +507,7 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionEnter:   "View details",
 		ActionRefresh: "Refresh device",
 		ActionBrowser: "Open web UI",
+		ActionControl: "Open control panel",
 	},
 	ContextInfo: {
 		ActionEnter:  "View JSON",
@@ -526,6 +531,7 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionPause:   "Pause monitoring",
 		ActionRefresh: "Refresh data",
 		ActionBrowser: "Open web UI",
+		ActionControl: "Open control panel",
 	},
 	ContextFleet: {
 		ActionToggle:  "Select device",
