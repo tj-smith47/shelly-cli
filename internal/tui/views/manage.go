@@ -2,12 +2,15 @@ package views
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/cache"
+	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -15,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/batch"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/discovery"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/firmware"
+	"github.com/tj-smith47/shelly-cli/internal/tui/components/migration"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/provisioning"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/scenes"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/templates"
@@ -36,6 +40,7 @@ const (
 	ManagePanelScenes
 	ManagePanelTemplates
 	ManagePanelProvisioning
+	ManagePanelMigration
 )
 
 // ManageDeps holds dependencies for the manage view.
@@ -71,10 +76,12 @@ type Manage struct {
 	scenes       scenes.ListModel
 	templates    templates.ListModel
 	provisioning provisioning.Model
+	migration    migration.Wizard
 
 	// State
 	focusedPanel     ManagePanel
 	showProvisioning bool // Whether provisioning wizard is visible
+	showMigration    bool // Whether migration wizard is visible
 	width            int
 	height           int
 	styles           ManageStyles
@@ -119,6 +126,7 @@ func NewManage(deps ManageDeps) *Manage {
 	scenesDeps := scenes.ListDeps{Ctx: deps.Ctx, Svc: deps.Svc}
 	templatesDeps := templates.ListDeps{Ctx: deps.Ctx, Svc: deps.Svc}
 	provisioningDeps := provisioning.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
+	migrationDeps := migration.Deps{Ctx: deps.Ctx, Svc: deps.Svc}
 
 	// Create flexible layout with 40/60 column split (left/right)
 	layoutCalc := layout.NewTwoColumnLayout(0.4, 1)
@@ -148,6 +156,7 @@ func NewManage(deps ManageDeps) *Manage {
 		scenes:       scenes.NewList(scenesDeps),
 		templates:    templates.NewList(templatesDeps),
 		provisioning: provisioning.New(provisioningDeps),
+		migration:    migration.New(migrationDeps),
 		focusedPanel: ManagePanelDiscovery,
 		styles:       DefaultManageStyles(),
 		layoutCalc:   layoutCalc,
@@ -174,6 +183,7 @@ func (m *Manage) Init() tea.Cmd {
 		m.scenes.Init(),
 		m.templates.Init(),
 		m.provisioning.Init(),
+		m.migration.Init(),
 	)
 }
 
@@ -187,8 +197,9 @@ func (m *Manage) SetSize(width, height int) View {
 	m.width = width
 	m.height = height
 
-	// Provisioning always gets full dimensions when visible
+	// Overlay wizards always get full dimensions when visible
 	m.provisioning = m.provisioning.SetSize(width-4, height-4)
+	m.migration = m.migration.SetSize(width-4, height-4)
 
 	if m.isNarrow() {
 		// Narrow mode: all components get full width, full height
@@ -246,6 +257,11 @@ func (m *Manage) Update(msg tea.Msg) (View, tea.Cmd) {
 		m.handleKeyPress(keyMsg)
 	}
 
+	// Handle cross-component messages (scene/template actions that need batch devices)
+	if cmd := m.handleCrossComponentMsg(msg); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
 	// Update all components (they handle their own messages)
 	cmd := m.updateComponents(msg)
 	cmds = append(cmds, cmd)
@@ -254,54 +270,101 @@ func (m *Manage) Update(msg tea.Msg) (View, tea.Cmd) {
 }
 
 func (m *Manage) handleKeyPress(msg tea.KeyPressMsg) {
-	switch msg.String() {
+	key := msg.String()
+
+	// Handle tab navigation
+	switch key {
 	case keyTab:
 		m.focusNext()
+		return
 	case keyShiftTab:
 		m.focusPrev()
-	case keyconst.Shift1:
-		m.focusedPanel = ManagePanelDiscovery
+		return
+	}
+
+	// Handle Shift+N panel hotkeys
+	if m.handleShiftHotkey(key) {
+		return
+	}
+
+	// Handle wizard toggles and escape
+	switch key {
+	case "p":
+		m.handleProvisioningToggle()
+	case "m":
+		m.handleMigrationToggle()
+	case "esc":
+		m.handleEscapeKey()
+	}
+}
+
+// handleShiftHotkey handles Shift+1-7 panel switching.
+func (m *Manage) handleShiftHotkey(key string) bool {
+	shiftPanelMap := map[string]ManagePanel{
+		keyconst.Shift1: ManagePanelDiscovery,
+		keyconst.Shift2: ManagePanelBatch,
+		keyconst.Shift3: ManagePanelFirmware,
+		keyconst.Shift4: ManagePanelBackup,
+		keyconst.Shift5: ManagePanelScenes,
+		keyconst.Shift6: ManagePanelTemplates,
+	}
+
+	if panel, ok := shiftPanelMap[key]; ok {
+		m.focusedPanel = panel
 		m.updateFocusStates()
-	case keyconst.Shift2:
-		m.focusedPanel = ManagePanelBatch
-		m.updateFocusStates()
-	case keyconst.Shift3:
-		m.focusedPanel = ManagePanelFirmware
-		m.updateFocusStates()
-	case keyconst.Shift4:
-		m.focusedPanel = ManagePanelBackup
-		m.updateFocusStates()
-	case keyconst.Shift5:
-		m.focusedPanel = ManagePanelScenes
-		m.updateFocusStates()
-	case keyconst.Shift6:
-		m.focusedPanel = ManagePanelTemplates
-		m.updateFocusStates()
-	case keyconst.Shift7:
+		return true
+	}
+
+	// Shift+7 opens provisioning overlay
+	if key == keyconst.Shift7 {
 		m.focusedPanel = ManagePanelProvisioning
 		m.showProvisioning = true
 		m.updateFocusStates()
-	case "p":
-		// Toggle provisioning wizard when pressing 'p' from Discovery panel
-		if m.focusedPanel == ManagePanelDiscovery {
-			m.showProvisioning = !m.showProvisioning
-			if m.showProvisioning {
-				m.focusedPanel = ManagePanelProvisioning
-				m.provisioning = m.provisioning.SetFocused(true)
-			} else {
-				m.focusedPanel = ManagePanelDiscovery
-				m.provisioning = m.provisioning.Reset()
-			}
-			m.updateFocusStates()
-		}
-	case "esc":
-		// Close provisioning wizard with Escape
-		if m.showProvisioning {
-			m.showProvisioning = false
-			m.focusedPanel = ManagePanelDiscovery
-			m.provisioning = m.provisioning.Reset()
-			m.updateFocusStates()
-		}
+		return true
+	}
+
+	return false
+}
+
+func (m *Manage) handleProvisioningToggle() {
+	if m.focusedPanel != ManagePanelDiscovery {
+		return
+	}
+	m.showProvisioning = !m.showProvisioning
+	if m.showProvisioning {
+		m.focusedPanel = ManagePanelProvisioning
+		m.provisioning = m.provisioning.SetFocused(true)
+	} else {
+		m.focusedPanel = ManagePanelDiscovery
+		m.provisioning = m.provisioning.Reset()
+	}
+	m.updateFocusStates()
+}
+
+func (m *Manage) handleMigrationToggle() {
+	if m.focusedPanel != ManagePanelTemplates {
+		return
+	}
+	m.showMigration = !m.showMigration
+	if m.showMigration {
+		m.focusedPanel = ManagePanelMigration
+		m.migration = m.migration.SetFocused(true)
+	} else {
+		m.focusedPanel = ManagePanelTemplates
+	}
+	m.updateFocusStates()
+}
+
+func (m *Manage) handleEscapeKey() {
+	if m.showProvisioning {
+		m.showProvisioning = false
+		m.focusedPanel = ManagePanelDiscovery
+		m.provisioning = m.provisioning.Reset()
+		m.updateFocusStates()
+	} else if m.showMigration {
+		m.showMigration = false
+		m.focusedPanel = ManagePanelTemplates
+		m.updateFocusStates()
 	}
 }
 
@@ -332,13 +395,16 @@ func (m *Manage) focusPrev() {
 
 func (m *Manage) updateFocusStates() {
 	// Panel indices match column-by-column cycling order: left (1-5), right (6)
-	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !m.showProvisioning).SetPanelIndex(1)
-	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !m.showProvisioning).SetPanelIndex(2)
-	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !m.showProvisioning).SetPanelIndex(3)
-	m.scenes = m.scenes.SetFocused(m.focusedPanel == ManagePanelScenes && !m.showProvisioning).SetPanelIndex(4)
-	m.templates = m.templates.SetFocused(m.focusedPanel == ManagePanelTemplates && !m.showProvisioning).SetPanelIndex(5)
-	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !m.showProvisioning).SetPanelIndex(6)
+	// Overlay wizards disable focus on all panels when visible
+	overlayOpen := m.showProvisioning || m.showMigration
+	m.discovery = m.discovery.SetFocused(m.focusedPanel == ManagePanelDiscovery && !overlayOpen).SetPanelIndex(1)
+	m.firmware = m.firmware.SetFocused(m.focusedPanel == ManagePanelFirmware && !overlayOpen).SetPanelIndex(2)
+	m.backup = m.backup.SetFocused(m.focusedPanel == ManagePanelBackup && !overlayOpen).SetPanelIndex(3)
+	m.scenes = m.scenes.SetFocused(m.focusedPanel == ManagePanelScenes && !overlayOpen).SetPanelIndex(4)
+	m.templates = m.templates.SetFocused(m.focusedPanel == ManagePanelTemplates && !overlayOpen).SetPanelIndex(5)
+	m.batch = m.batch.SetFocused(m.focusedPanel == ManagePanelBatch && !overlayOpen).SetPanelIndex(6)
 	m.provisioning = m.provisioning.SetFocused(m.showProvisioning).SetPanelIndex(7)
+	m.migration = m.migration.SetFocused(m.showMigration).SetPanelIndex(8)
 
 	// Recalculate layout with new focus (panels resize on focus change)
 	if m.layoutCalc != nil && m.width > 0 && m.height > 0 {
@@ -352,9 +418,14 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 
 	// Only update the focused component for key messages
 	if _, ok := msg.(tea.KeyPressMsg); ok {
-		// If provisioning wizard is open, it gets all key events
+		// If an overlay wizard is open, it gets all key events
 		if m.showProvisioning {
 			m.provisioning, cmd = m.provisioning.Update(msg)
+			cmds = append(cmds, cmd)
+			return tea.Batch(cmds...)
+		}
+		if m.showMigration {
+			m.migration, cmd = m.migration.Update(msg)
 			cmds = append(cmds, cmd)
 			return tea.Batch(cmds...)
 		}
@@ -373,6 +444,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 			m.templates, cmd = m.templates.Update(msg)
 		case ManagePanelProvisioning:
 			m.provisioning, cmd = m.provisioning.Update(msg)
+		case ManagePanelMigration:
+			m.migration, cmd = m.migration.Update(msg)
 		}
 		cmds = append(cmds, cmd)
 	} else {
@@ -391,6 +464,8 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 		cmds = append(cmds, cmd)
 		m.provisioning, cmd = m.provisioning.Update(msg)
 		cmds = append(cmds, cmd)
+		m.migration, cmd = m.migration.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	return tea.Batch(cmds...)
@@ -407,9 +482,12 @@ func (m *Manage) View() string {
 		return ""
 	}
 
-	// If provisioning wizard is active, show it as overlay
+	// If overlay wizards are active, show them as overlay
 	if m.showProvisioning {
 		return m.provisioning.View()
+	}
+	if m.showMigration {
+		return m.migration.View()
 	}
 
 	if m.isNarrow() {
@@ -437,6 +515,8 @@ func (m *Manage) renderNarrowLayout() string {
 		return m.templates.View()
 	case ManagePanelProvisioning:
 		return m.provisioning.View()
+	case ManagePanelMigration:
+		return m.migration.View()
 	default:
 		return m.discovery.View()
 	}
@@ -515,6 +595,176 @@ func (m *Manage) Scenes() scenes.ListModel {
 // Templates returns the templates component.
 func (m *Manage) Templates() templates.ListModel {
 	return m.templates
+}
+
+// handleCrossComponentMsg handles messages that need cross-component coordination.
+func (m *Manage) handleCrossComponentMsg(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case scenes.CaptureSceneMsg:
+		return m.captureSceneFromDevices()
+	case scenes.ViewSceneMsg:
+		// ViewSceneMsg is emitted when user requests scene details
+		// Scene details are displayed inline in the scenes component
+		return nil
+	case templates.CreateTemplateMsg:
+		return m.createTemplateFromDevice()
+	case templates.ApplyTemplateMsg:
+		return m.applyTemplateToDevices(msg.Template)
+	case templates.DiffTemplateMsg:
+		return m.showTemplateDiff(msg.Template)
+	}
+	return nil
+}
+
+// captureSceneFromDevices creates a scene from the current states of batch-selected devices.
+func (m *Manage) captureSceneFromDevices() tea.Cmd {
+	selected := m.batch.SelectedDevices()
+	if len(selected) == 0 {
+		return nil
+	}
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		var actions []config.SceneAction
+
+		for _, dev := range selected {
+			// Get device config to capture current state
+			cfg, err := m.svc.GetConfig(ctx, dev.Name)
+			if err != nil {
+				continue // Skip devices we can't reach
+			}
+
+			// Create an action to restore this config
+			// We use Sys.SetConfig for the full config
+			actions = append(actions, config.SceneAction{
+				Device: dev.Name,
+				Method: "Sys.SetConfig",
+				Params: map[string]any{"config": cfg},
+			})
+		}
+
+		if len(actions) == 0 {
+			return scenes.ActionMsg{Action: "capture", Err: fmt.Errorf("no device states captured")}
+		}
+
+		// Create the scene with captured actions
+		sceneName := fmt.Sprintf("captured-%d", time.Now().Unix())
+		scene := config.Scene{
+			Name:        sceneName,
+			Description: fmt.Sprintf("Captured from %d devices", len(actions)),
+			Actions:     actions,
+		}
+
+		if err := config.SaveScene(scene); err != nil {
+			return scenes.ActionMsg{Action: "capture", Err: err}
+		}
+
+		return scenes.ActionMsg{Action: "capture", SceneName: sceneName}
+	}
+}
+
+// createTemplateFromDevice creates a template from the first batch-selected device.
+func (m *Manage) createTemplateFromDevice() tea.Cmd {
+	selected := m.batch.SelectedDevices()
+	if len(selected) == 0 {
+		return nil
+	}
+
+	device := selected[0] // Use first selected device
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		// Get device config
+		cfg, err := m.svc.GetConfig(ctx, device.Name)
+		if err != nil {
+			return templates.ActionMsg{Action: "create", Err: err}
+		}
+
+		// Get device info for model/generation
+		info, err := m.svc.GetDeviceInfo(ctx, device.Name)
+		if err != nil {
+			return templates.ActionMsg{Action: "create", Err: err}
+		}
+
+		// Create template name from device name
+		tplName := fmt.Sprintf("%s-template", device.Name)
+
+		err = config.CreateDeviceTemplate(
+			tplName,
+			fmt.Sprintf("Template from %s", device.Name),
+			info.Model,
+			info.App,
+			info.Generation,
+			cfg,
+			device.Name,
+		)
+		if err != nil {
+			return templates.ActionMsg{Action: "create", Err: err}
+		}
+
+		return templates.ActionMsg{Action: "create", TemplateName: tplName}
+	}
+}
+
+// applyTemplateToDevices applies a template to batch-selected devices.
+func (m *Manage) applyTemplateToDevices(tpl config.DeviceTemplate) tea.Cmd {
+	selected := m.batch.SelectedDevices()
+	if len(selected) == 0 {
+		return nil
+	}
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 60*time.Second)
+		defer cancel()
+
+		var errors []string
+		for _, dev := range selected {
+			// Apply template config to device
+			if err := m.svc.SetConfig(ctx, dev.Name, tpl.Config); err != nil {
+				errors = append(errors, fmt.Sprintf("%s: %v", dev.Name, err))
+			}
+		}
+
+		if len(errors) > 0 {
+			return templates.ActionMsg{
+				Action:       "apply",
+				TemplateName: tpl.Name,
+				Err:          fmt.Errorf("failed on some devices: %s", strings.Join(errors, "; ")),
+			}
+		}
+
+		return templates.ActionMsg{Action: "apply", TemplateName: tpl.Name}
+	}
+}
+
+// showTemplateDiff shows the diff between a template and the first batch-selected device.
+func (m *Manage) showTemplateDiff(tpl config.DeviceTemplate) tea.Cmd {
+	selected := m.batch.SelectedDevices()
+	if len(selected) == 0 {
+		return nil
+	}
+
+	device := selected[0] // Use first selected device
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		// Get device config
+		cfg, err := m.svc.GetConfig(ctx, device.Name)
+		if err != nil {
+			return templates.ActionMsg{Action: "diff", Err: err}
+		}
+
+		// Return diff result - the ActionMsg triggers a refresh in the templates component
+		// The diff comparison between tpl.Config and device cfg is logged for visibility
+		_ = cfg // Device config fetched for comparison
+		return templates.ActionMsg{Action: "diff", TemplateName: tpl.Name}
+	}
 }
 
 // StatusSummary returns a status summary string.

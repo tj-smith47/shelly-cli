@@ -311,6 +311,11 @@ func (m Model) selectedDevices() []DeviceSelection {
 	return generics.Filter(m.devices, func(d DeviceSelection) bool { return d.Selected })
 }
 
+// SelectedDevices returns all selected devices.
+func (m Model) SelectedDevices() []DeviceSelection {
+	return m.selectedDevices()
+}
+
 func (m Model) execute() (Model, tea.Cmd) {
 	if m.executing {
 		return m, nil

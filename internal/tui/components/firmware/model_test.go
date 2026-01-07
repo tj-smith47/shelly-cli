@@ -608,6 +608,259 @@ func TestModel_UpdateSelected_AlreadyUpdating(t *testing.T) {
 	}
 }
 
+func TestModel_Update_RollbackCompleteMsg_Success(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.updating = true
+	m.devices = []DeviceFirmware{
+		{Name: "device1", RollingBack: true, Current: "1.0.0", Checked: true},
+	}
+	msg := RollbackCompleteMsg{Name: "device1", Success: true}
+
+	updated, _ := m.Update(msg)
+
+	if updated.updating {
+		t.Error("should not be updating after rollback complete")
+	}
+	if updated.devices[0].RollingBack {
+		t.Error("device should not be rolling back after success")
+	}
+	if updated.devices[0].Checked {
+		t.Error("device.Checked should be false after successful rollback (needs recheck)")
+	}
+	if updated.devices[0].Current != "" {
+		t.Error("device.Current should be cleared after successful rollback")
+	}
+}
+
+func TestModel_Update_RollbackCompleteMsg_Error(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.updating = true
+	m.devices = []DeviceFirmware{
+		{Name: "device1", RollingBack: true},
+	}
+	testErr := errors.New("rollback failed")
+	msg := RollbackCompleteMsg{Name: "device1", Success: false, Err: testErr}
+
+	updated, _ := m.Update(msg)
+
+	if updated.updating {
+		t.Error("should not be updating after rollback complete")
+	}
+	if updated.devices[0].RollingBack {
+		t.Error("device should not be rolling back after error")
+	}
+	if updated.devices[0].Err == nil {
+		t.Error("device should have error after failed rollback")
+	}
+}
+
+func TestModel_HandleKey_Rollback(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.Scroller.SetItemCount(len(m.devices))
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'R'})
+
+	if !updated.updating {
+		t.Error("should be updating after 'R' key")
+	}
+	if cmd == nil {
+		t.Error("should return rollback command")
+	}
+	if !updated.devices[0].RollingBack {
+		t.Error("device should have RollingBack=true")
+	}
+}
+
+func TestModel_RollbackCurrent_NoDevices(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+
+	updated, cmd := m.RollbackCurrent()
+
+	if cmd != nil {
+		t.Error("RollbackCurrent with no devices should not return command")
+	}
+	if updated.updating {
+		t.Error("should not be updating with no devices")
+	}
+}
+
+func TestModel_RollbackCurrent_AlreadyUpdating(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.updating = true
+	m.devices = []DeviceFirmware{{Name: "device0"}}
+	m.Scroller.SetItemCount(1)
+
+	updated, cmd := m.RollbackCurrent()
+
+	if cmd != nil {
+		t.Error("RollbackCurrent when already updating should not return command")
+	}
+	if !updated.updating {
+		t.Error("should still be updating")
+	}
+}
+
+func TestModel_FindDeviceIndex(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.devices = []DeviceFirmware{
+		{Name: "device0"},
+		{Name: "device1"},
+		{Name: "device2"},
+	}
+
+	if idx := m.findDeviceIndex("device1"); idx != 1 {
+		t.Errorf("findDeviceIndex(device1) = %d, want 1", idx)
+	}
+	if idx := m.findDeviceIndex("nonexistent"); idx != -1 {
+		t.Errorf("findDeviceIndex(nonexistent) = %d, want -1", idx)
+	}
+}
+
+func TestModel_HandleBatchComplete_WithResults(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.devices = []DeviceFirmware{
+		{Name: "device0", HasUpdate: true, Updating: true},
+		{Name: "device1", HasUpdate: true, Updating: true},
+	}
+	m.updating = true
+
+	msg := updateBatchComplete{
+		Results: []UpdateResult{
+			{Name: "device0", Success: true},
+			{Name: "device1", Success: false, Err: errors.New("failed")},
+		},
+	}
+
+	updated := m.handleBatchComplete(msg)
+
+	if updated.updating {
+		t.Error("should not be updating after batch complete")
+	}
+	if !updated.showSummary {
+		t.Error("should show summary after batch complete")
+	}
+	if len(updated.lastResults) != 2 {
+		t.Errorf("lastResults len = %d, want 2", len(updated.lastResults))
+	}
+	if updated.devices[0].HasUpdate {
+		t.Error("device0 should not have update after successful update")
+	}
+	if !updated.devices[1].HasUpdate {
+		t.Error("device1 should still have update after failed update")
+	}
+	if updated.devices[1].Err == nil {
+		t.Error("device1 should have error set")
+	}
+}
+
+func TestModel_RenderUpdateSummary(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.lastResults = []UpdateResult{
+		{Name: "device0", Success: true},
+		{Name: "device1", Success: true},
+		{Name: "device2", Success: false, Err: errors.New("timeout")},
+	}
+	m.showSummary = true
+	m = m.SetSize(80, 30)
+
+	summary := m.renderUpdateSummary()
+
+	if summary == "" {
+		t.Error("renderUpdateSummary should not return empty string")
+	}
+}
+
+func TestModel_HandleKey_DismissSummary(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.focused = true
+	m.showSummary = true
+	m.lastResults = []UpdateResult{{Name: "device0", Success: true}}
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 's'})
+
+	if updated.showSummary {
+		t.Error("showSummary should be false after pressing 's'")
+	}
+	if updated.lastResults != nil {
+		t.Error("lastResults should be nil after pressing 's'")
+	}
+}
+
+func TestModel_UpdateSelectedStaged_NoDevices(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.devices = []DeviceFirmware{
+		{Name: "device0", HasUpdate: true, Selected: false},
+	}
+
+	updated, cmd := m.UpdateSelectedStaged(25)
+
+	if cmd != nil {
+		t.Error("should not return command when no devices selected")
+	}
+	if updated.err == nil {
+		t.Error("should set error when no devices selected")
+	}
+}
+
+func TestModel_UpdateSelectedStaged_AlreadyUpdating(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.updating = true
+	m.devices = []DeviceFirmware{
+		{Name: "device0", HasUpdate: true, Selected: true},
+	}
+
+	updated, cmd := m.UpdateSelectedStaged(25)
+
+	if cmd != nil {
+		t.Error("should not return command when already updating")
+	}
+	if !updated.updating {
+		t.Error("should still be updating")
+	}
+}
+
+func TestModel_UpdateSelectedStaged_StartsUpdate(t *testing.T) {
+	t.Parallel()
+	m := newTestModel()
+	m.devices = []DeviceFirmware{
+		{Name: "device0", HasUpdate: true, Selected: true},
+		{Name: "device1", HasUpdate: true, Selected: true},
+		{Name: "device2", HasUpdate: true, Selected: true},
+		{Name: "device3", HasUpdate: true, Selected: true},
+	}
+
+	updated, cmd := m.UpdateSelectedStaged(50) // 50% = 2 devices per stage
+
+	if cmd == nil {
+		t.Error("should return command when starting staged update")
+	}
+	if !updated.updating {
+		t.Error("should be updating")
+	}
+	if updated.stagedPercent != 50 {
+		t.Errorf("stagedPercent = %d, want 50", updated.stagedPercent)
+	}
+	if updated.totalStages != 2 {
+		t.Errorf("totalStages = %d, want 2", updated.totalStages)
+	}
+	if updated.currentStage != 1 {
+		t.Errorf("currentStage = %d, want 1", updated.currentStage)
+	}
+}
+
 func newTestModel() Model {
 	ctx := context.Background()
 	svc := &shelly.Service{}

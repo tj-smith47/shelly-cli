@@ -448,3 +448,61 @@ func TestPackageLevelScriptTemplateFunctions(t *testing.T) {
 		t.Error("template still exists after DeleteScriptTemplate()")
 	}
 }
+
+//nolint:paralleltest // Tests modify global state
+func TestExportDeviceTemplateToFile(t *testing.T) {
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+	ResetDefaultManagerForTesting()
+
+	// Create a template to export
+	err := CreateDeviceTemplate("export-test", "Test export", "SHSW-1", "switch", 2, map[string]any{"key": "value"}, "source-dev")
+	if err != nil {
+		t.Fatalf("CreateDeviceTemplate() error: %v", err)
+	}
+
+	// Create export directory
+	if err := Fs().MkdirAll("/export/templates", 0o755); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+
+	// Export to file
+	outputPath := "/export/templates/export-test.json"
+	filePath, err := ExportDeviceTemplateToFile("export-test", outputPath)
+	if err != nil {
+		t.Fatalf("ExportDeviceTemplateToFile() error: %v", err)
+	}
+	if filePath != outputPath {
+		t.Errorf("filePath = %q, want %q", filePath, outputPath)
+	}
+
+	// Verify file was created and is valid JSON
+	data, err := afero.ReadFile(Fs(), outputPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error: %v", err)
+	}
+
+	// Parse exported template
+	exported, err := ParseDeviceTemplateFile(outputPath, data)
+	if err != nil {
+		t.Fatalf("ParseDeviceTemplateFile() error: %v", err)
+	}
+	if exported.Name != "export-test" {
+		t.Errorf("exported.Name = %q, want %q", exported.Name, "export-test")
+	}
+	if exported.Model != "SHSW-1" {
+		t.Errorf("exported.Model = %q, want %q", exported.Model, "SHSW-1")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestExportDeviceTemplateToFile_NotFound(t *testing.T) {
+	SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { SetFs(nil) })
+	ResetDefaultManagerForTesting()
+
+	_, err := ExportDeviceTemplateToFile("nonexistent", "/export/nonexistent.json")
+	if err == nil {
+		t.Error("expected error for nonexistent template")
+	}
+}

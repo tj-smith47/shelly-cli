@@ -131,6 +131,28 @@ func ImportScene(scene *Scene, overwrite bool) error {
 	return nil
 }
 
+// ExportSceneToFile exports a scene to a file in JSON format.
+// Returns the file path or error.
+func ExportSceneToFile(name, outputPath string) (string, error) {
+	scene, exists := GetScene(name)
+	if !exists {
+		return "", fmt.Errorf("scene %q not found", name)
+	}
+
+	// Marshal to JSON with indentation
+	data, err := json.MarshalIndent(scene, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal scene: %w", err)
+	}
+
+	// Write to file
+	if err := afero.WriteFile(Fs(), outputPath, data, 0o644); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return outputPath, nil
+}
+
 // ImportSceneFromFile imports a scene from a file with optional name override.
 // This is the full import workflow: parse, validate, import.
 // Returns a success message or error.

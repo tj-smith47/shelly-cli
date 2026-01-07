@@ -48,15 +48,17 @@ func (d Deps) Validate() error {
 
 // DeviceFirmware represents firmware status for a device.
 type DeviceFirmware struct {
-	Name      string
-	Address   string
-	Current   string
-	Available string
-	HasUpdate bool
-	Updating  bool
-	Selected  bool
-	Checked   bool
-	Err       error
+	Name        string
+	Address     string
+	Current     string
+	Available   string
+	HasUpdate   bool
+	CanRollback bool
+	Updating    bool
+	RollingBack bool
+	Selected    bool
+	Checked     bool
+	Err         error
 }
 
 // IsSelected implements generics.Selectable.
@@ -82,22 +84,34 @@ type UpdateCompleteMsg struct {
 	Err     error
 }
 
+// RollbackCompleteMsg signals that firmware rollback completed.
+type RollbackCompleteMsg struct {
+	Name    string
+	Success bool
+	Err     error
+}
+
 // Model displays firmware management.
 type Model struct {
 	helpers.Sizable
-	ctx          context.Context
-	svc          *shelly.Service
-	fileCache    *cache.FileCache
-	devices      []DeviceFirmware
-	checking     bool
-	updating     bool
-	err          error
-	focused      bool
-	panelIndex   int
-	styles       Styles
-	updateLoader loading.Model // Extra loader for update step
-	cacheStatus  cachestatus.Model
-	lastChecked  time.Time
+	ctx           context.Context
+	svc           *shelly.Service
+	fileCache     *cache.FileCache
+	devices       []DeviceFirmware
+	checking      bool
+	updating      bool
+	err           error
+	focused       bool
+	panelIndex    int
+	styles        Styles
+	updateLoader  loading.Model
+	cacheStatus   cachestatus.Model
+	lastChecked   time.Time
+	lastResults   []UpdateResult
+	showSummary   bool
+	stagedPercent int
+	currentStage  int
+	totalStages   int
 }
 
 // Styles holds styles for the Firmware component.
@@ -356,6 +370,8 @@ func (m Model) updateDevices(devices []DeviceFirmware) tea.Cmd {
 		ctx, cancel := context.WithTimeout(m.ctx, 300*time.Second)
 		defer cancel()
 
+		results := make([]UpdateResult, 0, len(devices))
+
 		// Update devices sequentially to avoid overwhelming the network
 		for _, dev := range devices {
 			if !dev.HasUpdate {
@@ -367,18 +383,83 @@ func (m Model) updateDevices(devices []DeviceFirmware) tea.Cmd {
 			deviceCtx, deviceCancel := context.WithTimeout(ctx, 60*time.Second)
 			err := m.svc.UpdateFirmwareStable(deviceCtx, dev.Name)
 			deviceCancel()
+
+			result := UpdateResult{Name: dev.Name, Success: err == nil, Err: err}
+			results = append(results, result)
+
 			if err != nil {
 				// Log but continue with remaining devices
 				iostreams.DebugErr("firmware update "+dev.Name, err)
 			}
 		}
 
-		// Return a message indicating updates are done
-		return updateBatchComplete{}
+		// Return a message with update results for summary
+		return updateBatchComplete{Results: results}
 	}
 }
 
-type updateBatchComplete struct{}
+// updateBatchComplete contains the batch update results for summary display.
+type updateBatchComplete struct {
+	Results []UpdateResult
+}
+
+// UpdateResult contains the result of a single device update.
+type UpdateResult struct {
+	Name    string
+	Success bool
+	Err     error
+}
+
+// StagedUpdateCompleteMsg signals staged update completion.
+type StagedUpdateCompleteMsg struct {
+	Stage       int
+	TotalStages int
+	Results     []UpdateResult
+}
+
+// RollbackCurrent starts firmware rollback on the device at cursor.
+func (m Model) RollbackCurrent() (Model, tea.Cmd) {
+	if m.updating || m.checking || len(m.devices) == 0 {
+		return m, nil
+	}
+
+	cursor := m.Scroller.Cursor()
+	if cursor >= len(m.devices) {
+		return m, nil
+	}
+
+	device := &m.devices[cursor]
+	device.RollingBack = true
+	m.updating = true
+	m.err = nil
+
+	deviceName := device.Name
+	return m, tea.Batch(m.updateLoader.Tick(), m.rollbackDevice(deviceName))
+}
+
+func (m Model) rollbackDevice(deviceName string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 60*time.Second)
+		defer cancel()
+
+		// First check if rollback is available
+		status, err := m.svc.GetFirmwareStatus(ctx, deviceName)
+		if err != nil {
+			return RollbackCompleteMsg{Name: deviceName, Success: false, Err: fmt.Errorf("failed to check status: %w", err)}
+		}
+		if !status.CanRollback {
+			return RollbackCompleteMsg{Name: deviceName, Success: false, Err: fmt.Errorf("rollback not available")}
+		}
+
+		// Perform rollback
+		err = m.svc.RollbackFirmware(ctx, deviceName)
+		if err != nil {
+			return RollbackCompleteMsg{Name: deviceName, Success: false, Err: err}
+		}
+
+		return RollbackCompleteMsg{Name: deviceName, Success: true}
+	}
+}
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -394,8 +475,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleCheckComplete(msg), nil
 	case UpdateCompleteMsg:
 		return m.handleUpdateComplete(msg), nil
+	case RollbackCompleteMsg:
+		return m.handleRollbackComplete(msg), nil
 	case updateBatchComplete:
-		return m.handleBatchComplete(), nil
+		return m.handleBatchComplete(msg), nil
+	case StagedUpdateCompleteMsg:
+		return m.handleStagedUpdateComplete(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -422,7 +507,7 @@ func (m Model) updateLoaders(msg tea.Msg) (Model, tea.Cmd) {
 	if m.updating {
 		result := generics.UpdateLoader(m.updateLoader, msg, func(msg tea.Msg) bool {
 			switch msg.(type) {
-			case updateBatchComplete, UpdateCompleteMsg:
+			case updateBatchComplete, UpdateCompleteMsg, RollbackCompleteMsg, StagedUpdateCompleteMsg:
 				return true
 			}
 			return false
@@ -486,20 +571,126 @@ func (m Model) handleUpdateComplete(msg UpdateCompleteMsg) Model {
 	return m
 }
 
-func (m Model) handleBatchComplete() Model {
+// updateDeviceFromResult updates a device's status based on update result.
+func (m Model) updateDeviceFromResult(device *DeviceFirmware, resultMap map[string]UpdateResult) {
+	// Invalidate cache for updated devices
+	if m.fileCache != nil {
+		iostreams.DebugErr("invalidate firmware cache "+device.Name,
+			m.fileCache.Invalidate(device.Name, cache.TypeFirmware))
+	}
+	// Update device status based on result
+	if result, ok := resultMap[device.Name]; ok {
+		if result.Success {
+			device.HasUpdate = false
+		} else {
+			device.Err = result.Err
+		}
+	}
+}
+
+func (m Model) handleBatchComplete(msg updateBatchComplete) Model {
 	m.updating = false
+	m.lastResults = msg.Results
+	m.showSummary = len(msg.Results) > 0
+
+	// Build a map for quick lookup of results
+	resultMap := make(map[string]UpdateResult)
+	for _, r := range msg.Results {
+		resultMap[r.Name] = r
+	}
+
 	for i := range m.devices {
 		if m.devices[i].Updating {
-			// Invalidate cache for updated devices
-			if m.fileCache != nil {
-				iostreams.DebugErr("invalidate firmware cache "+m.devices[i].Name,
-					m.fileCache.Invalidate(m.devices[i].Name, cache.TypeFirmware))
-			}
+			m.updateDeviceFromResult(&m.devices[i], resultMap)
 		}
 		m.devices[i].Updating = false
 		m.devices[i].Selected = false
 	}
 	return m
+}
+
+func (m Model) handleStagedUpdateComplete(msg StagedUpdateCompleteMsg) (Model, tea.Cmd) {
+	// Accumulate results
+	m.lastResults = append(m.lastResults, msg.Results...)
+	m.currentStage = msg.Stage + 1
+
+	// Update device status for completed batch
+	resultMap := make(map[string]UpdateResult)
+	for _, r := range msg.Results {
+		resultMap[r.Name] = r
+	}
+	for i := range m.devices {
+		if result, ok := resultMap[m.devices[i].Name]; ok {
+			m.devices[i].Updating = false
+			if result.Success {
+				m.devices[i].HasUpdate = false
+			} else {
+				m.devices[i].Err = result.Err
+			}
+			// Invalidate cache
+			if m.fileCache != nil && result.Success {
+				iostreams.DebugErr("invalidate firmware cache "+m.devices[i].Name,
+					m.fileCache.Invalidate(m.devices[i].Name, cache.TypeFirmware))
+			}
+		}
+	}
+
+	// Continue with next batch
+	selected := m.selectedDevices()
+	devicesPerStage := max(1, len(selected)*m.stagedPercent/100)
+	startIdx := msg.Stage * devicesPerStage
+
+	// Mark next batch as updating
+	endIdx := min(startIdx+devicesPerStage, len(selected))
+	for i := startIdx; i < endIdx; i++ {
+		idx := m.findDeviceIndex(selected[i].Name)
+		if idx >= 0 && m.devices[idx].HasUpdate {
+			m.devices[idx].Updating = true
+		}
+	}
+
+	// Update loader message
+	m.updateLoader = m.updateLoader.SetMessage(
+		fmt.Sprintf("Updating stage %d/%d...", m.currentStage, m.totalStages),
+	)
+
+	return m, tea.Batch(m.updateLoader.Tick(), m.updateDevicesStaged(selected, startIdx, devicesPerStage))
+}
+
+func (m Model) handleRollbackComplete(msg RollbackCompleteMsg) Model {
+	m.updating = false
+	idx := m.findDeviceIndex(msg.Name)
+	if idx < 0 {
+		return m
+	}
+
+	m.devices[idx].RollingBack = false
+	if !msg.Success {
+		m.devices[idx].Err = msg.Err
+		return m
+	}
+
+	// Invalidate cache so next check gets fresh data
+	if m.fileCache != nil {
+		iostreams.DebugErr("invalidate firmware cache "+msg.Name,
+			m.fileCache.Invalidate(msg.Name, cache.TypeFirmware))
+	}
+	// Clear version info - will be refreshed on next check
+	m.devices[idx].Current = ""
+	m.devices[idx].Available = ""
+	m.devices[idx].HasUpdate = false
+	m.devices[idx].Checked = false
+	return m
+}
+
+// findDeviceIndex returns the index of a device by name, or -1 if not found.
+func (m Model) findDeviceIndex(name string) int {
+	for i := range m.devices {
+		if m.devices[i].Name == name {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -516,13 +707,110 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m = m.selectAllWithUpdates()
 	case "n":
 		m = m.selectNone()
-	case "c", "r":
+	case "c":
 		return m.CheckAll()
+	case "r":
+		return m.CheckAll()
+	case "R":
+		return m.RollbackCurrent()
 	case "u", "enter":
 		return m.UpdateSelected()
+	case "U":
+		// Select all with updates and update
+		m = m.selectAllWithUpdates()
+		return m.UpdateSelected()
+	case "s":
+		// Dismiss update summary
+		m.showSummary = false
+		m.lastResults = nil
+	case "S":
+		// Staged rollout (update 25% at a time)
+		return m.UpdateSelectedStaged(25)
 	}
 
 	return m, nil
+}
+
+// UpdateSelectedStaged starts a staged firmware update.
+// percentPerStage determines what percentage of devices to update per stage.
+func (m Model) UpdateSelectedStaged(percentPerStage int) (Model, tea.Cmd) {
+	if m.updating || m.checking {
+		return m, nil
+	}
+
+	selected := m.selectedDevices()
+	if len(selected) == 0 {
+		m.err = fmt.Errorf("no devices selected")
+		return m, nil
+	}
+
+	// Calculate stages
+	devicesPerStage := max(1, len(selected)*percentPerStage/100)
+	m.totalStages = (len(selected) + devicesPerStage - 1) / devicesPerStage
+	m.currentStage = 1
+	m.stagedPercent = percentPerStage
+
+	// Get first batch
+	endIdx := min(devicesPerStage, len(selected))
+	firstBatch := selected[:endIdx]
+
+	m.updating = true
+	m.err = nil
+
+	// Mark first batch as updating
+	batchNames := make(map[string]bool)
+	for _, d := range firstBatch {
+		batchNames[d.Name] = true
+	}
+	for i := range m.devices {
+		if batchNames[m.devices[i].Name] && m.devices[i].HasUpdate {
+			m.devices[i].Updating = true
+		}
+	}
+
+	return m, tea.Batch(m.updateLoader.Tick(), m.updateDevicesStaged(selected, 0, devicesPerStage))
+}
+
+func (m Model) updateDevicesStaged(allDevices []DeviceFirmware, startIdx, batchSize int) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 300*time.Second)
+		defer cancel()
+
+		endIdx := min(startIdx+batchSize, len(allDevices))
+		batch := allDevices[startIdx:endIdx]
+
+		results := make([]UpdateResult, 0, len(batch))
+
+		for _, dev := range batch {
+			if !dev.HasUpdate {
+				continue
+			}
+
+			deviceCtx, deviceCancel := context.WithTimeout(ctx, 60*time.Second)
+			err := m.svc.UpdateFirmwareStable(deviceCtx, dev.Name)
+			deviceCancel()
+
+			result := UpdateResult{Name: dev.Name, Success: err == nil, Err: err}
+			results = append(results, result)
+
+			if err != nil {
+				iostreams.DebugErr("firmware update "+dev.Name, err)
+			}
+		}
+
+		// Check if there are more batches
+		if endIdx >= len(allDevices) {
+			// All done
+			return updateBatchComplete{Results: results}
+		}
+
+		// More batches to go - return staged update message
+		return StagedUpdateCompleteMsg{
+			Stage:       (startIdx / batchSize) + 1,
+			TotalStages: (len(allDevices) + batchSize - 1) / batchSize,
+			Results:     results,
+		}
+	}
 }
 
 func (m Model) toggleSelection() Model {
@@ -553,7 +841,10 @@ func (m Model) View() string {
 
 	// Add footer with keybindings and cache status when focused
 	if m.focused {
-		footer := "c:check u:update spc:sel a:all r:refresh"
+		footer := "c:check u:update U:all S:staged R:rollback spc:sel a:sel-all"
+		if m.showSummary {
+			footer = "s:dismiss " + footer
+		}
 		if cs := m.cacheStatus.View(); cs != "" {
 			footer += " | " + cs
 		}
@@ -584,6 +875,11 @@ func (m Model) View() string {
 		content.WriteString(m.renderDeviceList())
 	}
 
+	// Update summary display
+	if m.showSummary && len(m.lastResults) > 0 {
+		content.WriteString(m.renderUpdateSummary())
+	}
+
 	// Error display with categorized messaging and retry hint
 	if m.err != nil {
 		msg, hint := tuierrors.FormatError(m.err)
@@ -597,6 +893,47 @@ func (m Model) View() string {
 
 	r.SetContent(content.String())
 	return r.Render()
+}
+
+func (m Model) renderUpdateSummary() string {
+	var content strings.Builder
+
+	successCount := 0
+	failCount := 0
+	for _, r := range m.lastResults {
+		if r.Success {
+			successCount++
+		} else {
+			failCount++
+		}
+	}
+
+	content.WriteString("\n")
+	content.WriteString(m.styles.Label.Render("Update Summary:"))
+	content.WriteString("\n")
+
+	if successCount > 0 {
+		content.WriteString(m.styles.UpToDate.Render(fmt.Sprintf("  ✓ %d succeeded", successCount)))
+		content.WriteString("\n")
+	}
+	if failCount > 0 {
+		content.WriteString(m.styles.Error.Render(fmt.Sprintf("  ✗ %d failed", failCount)))
+		content.WriteString("\n")
+		// Show failed devices
+		for _, r := range m.lastResults {
+			if !r.Success {
+				errMsg := "unknown error"
+				if r.Err != nil {
+					errMsg = r.Err.Error()
+				}
+				content.WriteString(m.styles.Muted.Render(fmt.Sprintf("    - %s: %s", r.Name, errMsg)))
+				content.WriteString("\n")
+			}
+		}
+	}
+
+	content.WriteString(m.styles.Muted.Render("  Press 's' to dismiss summary"))
+	return content.String()
 }
 
 func (m Model) renderActions() string {
@@ -662,6 +999,8 @@ func (m Model) renderDeviceLine(device DeviceFirmware, isCursor bool) string {
 	switch {
 	case device.Updating:
 		status = m.styles.Updating.Render("↻")
+	case device.RollingBack:
+		status = m.styles.Updating.Render("↺")
 	case device.Err != nil:
 		status = m.styles.Error.Render("✗")
 	case !device.Checked:

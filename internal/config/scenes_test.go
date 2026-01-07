@@ -575,3 +575,162 @@ func TestParseSceneFile_UnknownExtensionInvalid(t *testing.T) {
 		t.Error("expected error for invalid content in unknown extension")
 	}
 }
+
+//nolint:paralleltest // Tests modify global state
+func TestExportSceneToFile(t *testing.T) {
+	setupScenesTest(t)
+
+	// Create a scene to export
+	scene := Scene{
+		Name:        "export-test",
+		Description: "Test export",
+		Actions: []SceneAction{
+			{Device: "dev1", Method: "Switch.On", Params: map[string]any{"id": 0}},
+		},
+	}
+	if err := SaveScene(scene); err != nil {
+		t.Fatalf("SaveScene() error = %v", err)
+	}
+
+	// Export to file
+	outputPath := "/export/scenes/export-test.json"
+	if err := Fs().MkdirAll("/export/scenes", 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	filePath, err := ExportSceneToFile("export-test", outputPath)
+	if err != nil {
+		t.Fatalf("ExportSceneToFile() error = %v", err)
+	}
+	if filePath != outputPath {
+		t.Errorf("filePath = %q, want %q", filePath, outputPath)
+	}
+
+	// Verify file was created and is valid JSON
+	data, err := afero.ReadFile(Fs(), outputPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	// Parse exported scene
+	exported, err := ParseSceneFile(outputPath)
+	if err != nil {
+		t.Fatalf("ParseSceneFile() error = %v", err)
+	}
+	if exported.Name != "export-test" {
+		t.Errorf("exported.Name = %q, want %q", exported.Name, "export-test")
+	}
+	if exported.Description != "Test export" {
+		t.Errorf("exported.Description = %q, want %q", exported.Description, "Test export")
+	}
+	if len(exported.Actions) != 1 {
+		t.Fatalf("len(exported.Actions) = %d, want 1", len(exported.Actions))
+	}
+
+	// Verify JSON is properly formatted with indentation
+	if len(data) < 50 {
+		t.Errorf("exported JSON seems too short: %s", string(data))
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestExportSceneToFile_NotFound(t *testing.T) {
+	setupScenesTest(t)
+
+	_, err := ExportSceneToFile("nonexistent", "/export/nonexistent.json")
+	if err == nil {
+		t.Error("expected error for nonexistent scene")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestImportSceneFromFile(t *testing.T) {
+	setupScenesTest(t)
+
+	// Create a scene file
+	sceneFile := "/import/test-scene.json"
+	if err := Fs().MkdirAll("/import", 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	content := `{
+		"name": "imported-scene",
+		"description": "Imported from file",
+		"actions": [
+			{"device": "dev1", "method": "Switch.On"}
+		]
+	}`
+	if err := afero.WriteFile(Fs(), sceneFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Import the scene
+	msg, err := ImportSceneFromFile(sceneFile, "", false)
+	if err != nil {
+		t.Fatalf("ImportSceneFromFile() error = %v", err)
+	}
+	if msg == "" {
+		t.Error("expected success message")
+	}
+
+	// Verify scene was imported
+	scene, ok := GetScene("imported-scene")
+	if !ok {
+		t.Fatal("GetScene() should find imported scene")
+	}
+	if scene.Description != "Imported from file" {
+		t.Errorf("scene.Description = %q, want %q", scene.Description, "Imported from file")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestImportSceneFromFile_NameOverride(t *testing.T) {
+	setupScenesTest(t)
+
+	// Create a scene file
+	sceneFile := "/import/original.json"
+	if err := Fs().MkdirAll("/import", 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	content := `{"name": "original-name", "actions": []}`
+	if err := afero.WriteFile(Fs(), sceneFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Import with name override
+	_, err := ImportSceneFromFile(sceneFile, "overridden-name", false)
+	if err != nil {
+		t.Fatalf("ImportSceneFromFile() error = %v", err)
+	}
+
+	// Verify scene was imported with overridden name
+	_, ok := GetScene("original-name")
+	if ok {
+		t.Error("should not find scene with original name")
+	}
+
+	_, ok = GetScene("overridden-name")
+	if !ok {
+		t.Fatal("should find scene with overridden name")
+	}
+}
+
+//nolint:paralleltest // Tests modify global state
+func TestImportSceneFromFile_NoName(t *testing.T) {
+	setupScenesTest(t)
+
+	// Create a scene file with no name
+	sceneFile := "/import/noname.json"
+	if err := Fs().MkdirAll("/import", 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	content := `{"description": "No name", "actions": []}`
+	if err := afero.WriteFile(Fs(), sceneFile, []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Import should fail
+	_, err := ImportSceneFromFile(sceneFile, "", false)
+	if err == nil {
+		t.Error("expected error for scene with no name")
+	}
+}

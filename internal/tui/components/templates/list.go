@@ -4,10 +4,13 @@ package templates
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -23,7 +26,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
-const footerKeybindings = "c:create a:apply d:del r:refresh"
+const footerKeybindings = "c:create a:apply d:diff D:del x:export i:import r:refresh"
 
 // ListDeps holds the dependencies for the templates list component.
 type ListDeps struct {
@@ -70,6 +73,24 @@ type ApplyTemplateMsg struct {
 	Template config.DeviceTemplate
 }
 
+// ExportTemplateMsg signals that a template was exported.
+type ExportTemplateMsg struct {
+	TemplateName string
+	FilePath     string
+	Err          error
+}
+
+// ImportTemplateMsg signals that a template was imported.
+type ImportTemplateMsg struct {
+	TemplateName string
+	Err          error
+}
+
+// DiffTemplateMsg signals that a template diff should be shown.
+type DiffTemplateMsg struct {
+	Template config.DeviceTemplate
+}
+
 // ListModel displays and manages templates.
 type ListModel struct {
 	helpers.Sizable
@@ -82,6 +103,7 @@ type ListModel struct {
 	focused       bool
 	panelIndex    int
 	pendingDelete string // Template name pending delete confirmation
+	statusMsg     string // Temporary status message (export/import success)
 	styles        ListStyles
 }
 
@@ -92,6 +114,7 @@ type ListStyles struct {
 	Model       lipgloss.Style
 	Selected    lipgloss.Style
 	Error       lipgloss.Style
+	Success     lipgloss.Style
 	Muted       lipgloss.Style
 	Cursor      lipgloss.Style
 }
@@ -113,6 +136,8 @@ func DefaultListStyles() ListStyles {
 			Bold(true),
 		Error: lipgloss.NewStyle().
 			Foreground(colors.Error),
+		Success: lipgloss.NewStyle().
+			Foreground(colors.Success),
 		Muted: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		Cursor: lipgloss.NewStyle().
@@ -206,6 +231,10 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
+	case ExportTemplateMsg:
+		return m.handleExport(msg)
+	case ImportTemplateMsg:
+		return m.handleImport(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -236,6 +265,25 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 	return m, m.loadTemplates()
 }
 
+func (m ListModel) handleExport(msg ExportTemplateMsg) (ListModel, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.statusMsg = fmt.Sprintf("Exported %q to %s", msg.TemplateName, msg.FilePath)
+	return m, nil
+}
+
+func (m ListModel) handleImport(msg ImportTemplateMsg) (ListModel, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.statusMsg = fmt.Sprintf("Imported template %q", msg.TemplateName)
+	// Refresh list after import
+	return m, m.loadTemplates()
+}
+
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	// Handle navigation keys first
 	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
@@ -258,6 +306,10 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		m.pendingDelete = ""
 		return m.editTemplate()
 	case "d":
+		// Diff template vs device
+		m.pendingDelete = ""
+		return m.diffTemplate()
+	case "D":
 		// Delete template - requires double press for confirmation
 		tpl := m.selectedTemplate()
 		if tpl == nil {
@@ -271,9 +323,20 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// First press - mark pending
 		m.pendingDelete = tpl.Name
 		return m, nil
+	case "x":
+		// Export template
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.exportTemplate()
+	case "i":
+		// Import template
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.importTemplate()
 	case "r", "R":
 		// Refresh list
 		m.pendingDelete = ""
+		m.statusMsg = ""
 		m.loading = true
 		return m, tea.Batch(m.Loader.Tick(), m.loadTemplates())
 	case "esc":
@@ -327,6 +390,89 @@ func (m ListModel) deleteTemplate() (ListModel, tea.Cmd) {
 	return m, func() tea.Msg {
 		err := config.DeleteDeviceTemplate(tplName)
 		return ActionMsg{Action: "delete", TemplateName: tplName, Err: err}
+	}
+}
+
+func (m ListModel) diffTemplate() (ListModel, tea.Cmd) {
+	tpl := m.selectedTemplate()
+	if tpl == nil {
+		return m, nil
+	}
+	tplCopy := *tpl
+	return m, func() tea.Msg {
+		return DiffTemplateMsg{Template: tplCopy}
+	}
+}
+
+func (m ListModel) exportTemplate() (ListModel, tea.Cmd) {
+	tpl := m.selectedTemplate()
+	if tpl == nil {
+		return m, nil
+	}
+	tplName := tpl.Name
+
+	return m, func() tea.Msg {
+		// Get templates export directory
+		configDir, err := config.Dir()
+		if err != nil {
+			return ExportTemplateMsg{TemplateName: tplName, Err: err}
+		}
+
+		templatesDir := filepath.Join(configDir, "templates")
+		if err := config.Fs().MkdirAll(templatesDir, 0o755); err != nil {
+			return ExportTemplateMsg{TemplateName: tplName, Err: err}
+		}
+
+		// Export to file
+		outputPath := filepath.Join(templatesDir, tplName+".json")
+		filePath, err := config.ExportDeviceTemplateToFile(tplName, outputPath)
+		return ExportTemplateMsg{TemplateName: tplName, FilePath: filePath, Err: err}
+	}
+}
+
+func (m ListModel) importTemplate() (ListModel, tea.Cmd) {
+	return m, func() tea.Msg {
+		// Get templates import directory
+		configDir, err := config.Dir()
+		if err != nil {
+			return ImportTemplateMsg{Err: err}
+		}
+
+		templatesDir := filepath.Join(configDir, "templates")
+
+		// List available template files
+		entries, err := afero.ReadDir(config.Fs(), templatesDir)
+		if err != nil {
+			return ImportTemplateMsg{Err: fmt.Errorf("no templates directory: %s", templatesDir)}
+		}
+
+		// Find first JSON/YAML file that's not already imported
+		existingTemplates := config.ListDeviceTemplates()
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			ext := filepath.Ext(name)
+			if ext != ".json" && ext != ".yaml" && ext != ".yml" {
+				continue
+			}
+			// Check if template already exists
+			baseName := strings.TrimSuffix(name, ext)
+			if _, exists := existingTemplates[baseName]; exists {
+				continue
+			}
+			// Import this template
+			filePath := filepath.Join(templatesDir, name)
+			msg, err := config.ImportTemplateFromFile(filePath, "", false)
+			if err != nil {
+				return ImportTemplateMsg{Err: err}
+			}
+			// Parse template name from message
+			return ImportTemplateMsg{TemplateName: msg}
+		}
+
+		return ImportTemplateMsg{Err: fmt.Errorf("no new template files found in %s", templatesDir)}
 	}
 }
 
@@ -412,7 +558,12 @@ func (m ListModel) renderTemplateLine(tpl config.DeviceTemplate, isSelected bool
 func (m ListModel) buildFooter() string {
 	// Show delete confirmation message if pending
 	if m.pendingDelete != "" {
-		return m.styles.Error.Render("Press d again to delete, Esc to cancel")
+		return m.styles.Error.Render("Press D again to delete, Esc to cancel")
+	}
+
+	// Show status message if set
+	if m.statusMsg != "" {
+		return m.styles.Success.Render(m.statusMsg)
 	}
 
 	return footerKeybindings

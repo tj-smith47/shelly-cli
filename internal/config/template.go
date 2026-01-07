@@ -137,6 +137,28 @@ func ImportTemplateFromFile(file, nameOverride string, overwrite bool) (string, 
 	return fmt.Sprintf("Template %q imported from %s", tpl.Name, file), nil
 }
 
+// ExportDeviceTemplateToFile exports a device template to a file in JSON format.
+// Returns the file path or error.
+func ExportDeviceTemplateToFile(name, outputPath string) (string, error) {
+	tpl, exists := GetDeviceTemplate(name)
+	if !exists {
+		return "", fmt.Errorf("template %q not found", name)
+	}
+
+	// Marshal to JSON with indentation
+	data, err := json.MarshalIndent(tpl, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal template: %w", err)
+	}
+
+	// Write to file
+	if err := afero.WriteFile(Fs(), outputPath, data, 0o644); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return outputPath, nil
+}
+
 // =============================================================================
 // Script Template Functions
 // =============================================================================

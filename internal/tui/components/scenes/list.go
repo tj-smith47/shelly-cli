@@ -4,12 +4,14 @@ package scenes
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -25,7 +27,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
-const footerKeybindings = "a:activate e:edit d:del n:new r:refresh"
+const footerKeybindings = "a:activate v:view e:edit d:del n:new C:capture x:export i:import r:refresh"
 
 // ListDeps holds the dependencies for the scenes list component.
 type ListDeps struct {
@@ -60,9 +62,31 @@ type ActionMsg struct {
 // CreateSceneMsg signals that a new scene should be created.
 type CreateSceneMsg struct{}
 
+// CaptureSceneMsg signals that a scene should be captured from device states.
+// The parent view handles this by collecting states from selected devices.
+type CaptureSceneMsg struct{}
+
 // EditSceneMsg signals that a scene should be edited.
 type EditSceneMsg struct {
 	Scene config.Scene
+}
+
+// ViewSceneMsg signals that a scene's details should be viewed.
+type ViewSceneMsg struct {
+	Scene config.Scene
+}
+
+// ExportSceneMsg signals that a scene was exported.
+type ExportSceneMsg struct {
+	SceneName string
+	FilePath  string
+	Err       error
+}
+
+// ImportSceneMsg signals that a scene was imported.
+type ImportSceneMsg struct {
+	SceneName string
+	Err       error
 }
 
 // ListModel displays and manages scenes.
@@ -77,6 +101,7 @@ type ListModel struct {
 	focused       bool
 	panelIndex    int
 	pendingDelete string // Scene name pending delete confirmation
+	statusMsg     string // Temporary status message (export/import success)
 	styles        ListStyles
 }
 
@@ -87,6 +112,7 @@ type ListStyles struct {
 	ActionCount lipgloss.Style
 	Selected    lipgloss.Style
 	Error       lipgloss.Style
+	Success     lipgloss.Style
 	Muted       lipgloss.Style
 	Cursor      lipgloss.Style
 }
@@ -108,6 +134,8 @@ func DefaultListStyles() ListStyles {
 			Bold(true),
 		Error: lipgloss.NewStyle().
 			Foreground(colors.Error),
+		Success: lipgloss.NewStyle().
+			Foreground(colors.Success),
 		Muted: lipgloss.NewStyle().
 			Foreground(colors.Muted),
 		Cursor: lipgloss.NewStyle().
@@ -201,6 +229,10 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
+	case ExportSceneMsg:
+		return m.handleExport(msg)
+	case ImportSceneMsg:
+		return m.handleImport(msg)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -231,6 +263,25 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 	return m, m.loadScenes()
 }
 
+func (m ListModel) handleExport(msg ExportSceneMsg) (ListModel, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.statusMsg = fmt.Sprintf("Exported %q to %s", msg.SceneName, msg.FilePath)
+	return m, nil
+}
+
+func (m ListModel) handleImport(msg ImportSceneMsg) (ListModel, tea.Cmd) {
+	if msg.Err != nil {
+		m.err = msg.Err
+		return m, nil
+	}
+	m.statusMsg = fmt.Sprintf("Imported scene %q", msg.SceneName)
+	// Refresh list after import
+	return m, m.loadScenes()
+}
+
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	// Handle navigation keys first
 	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
@@ -244,6 +295,10 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// Activate scene
 		m.pendingDelete = ""
 		return m.activateScene()
+	case "v":
+		// View scene details
+		m.pendingDelete = ""
+		return m.viewScene()
 	case "enter", "e":
 		// Edit scene
 		m.pendingDelete = ""
@@ -266,9 +321,24 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		// New scene
 		m.pendingDelete = ""
 		return m, func() tea.Msg { return CreateSceneMsg{} }
+	case "C":
+		// Capture scene from device states
+		m.pendingDelete = ""
+		return m, func() tea.Msg { return CaptureSceneMsg{} }
+	case "x":
+		// Export scene
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.exportScene()
+	case "i":
+		// Import scene
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.importScene()
 	case "r", "R":
 		// Refresh list
 		m.pendingDelete = ""
+		m.statusMsg = ""
 		m.loading = true
 		return m, tea.Batch(m.Loader.Tick(), m.loadScenes())
 	case "esc":
@@ -340,6 +410,17 @@ func (m ListModel) editScene() (ListModel, tea.Cmd) {
 	}
 }
 
+func (m ListModel) viewScene() (ListModel, tea.Cmd) {
+	scene := m.selectedScene()
+	if scene == nil {
+		return m, nil
+	}
+	sceneCopy := *scene
+	return m, func() tea.Msg {
+		return ViewSceneMsg{Scene: sceneCopy}
+	}
+}
+
 func (m ListModel) deleteScene() (ListModel, tea.Cmd) {
 	scene := m.selectedScene()
 	if scene == nil {
@@ -350,6 +431,78 @@ func (m ListModel) deleteScene() (ListModel, tea.Cmd) {
 	return m, func() tea.Msg {
 		err := config.DeleteScene(sceneName)
 		return ActionMsg{Action: "delete", SceneName: sceneName, Err: err}
+	}
+}
+
+func (m ListModel) exportScene() (ListModel, tea.Cmd) {
+	scene := m.selectedScene()
+	if scene == nil {
+		return m, nil
+	}
+	sceneName := scene.Name
+
+	return m, func() tea.Msg {
+		// Get scenes export directory
+		configDir, err := config.Dir()
+		if err != nil {
+			return ExportSceneMsg{SceneName: sceneName, Err: err}
+		}
+
+		scenesDir := filepath.Join(configDir, "scenes")
+		if err := config.Fs().MkdirAll(scenesDir, 0o755); err != nil {
+			return ExportSceneMsg{SceneName: sceneName, Err: err}
+		}
+
+		// Export to file
+		outputPath := filepath.Join(scenesDir, sceneName+".json")
+		filePath, err := config.ExportSceneToFile(sceneName, outputPath)
+		return ExportSceneMsg{SceneName: sceneName, FilePath: filePath, Err: err}
+	}
+}
+
+func (m ListModel) importScene() (ListModel, tea.Cmd) {
+	return m, func() tea.Msg {
+		// Get scenes import directory
+		configDir, err := config.Dir()
+		if err != nil {
+			return ImportSceneMsg{Err: err}
+		}
+
+		scenesDir := filepath.Join(configDir, "scenes")
+
+		// List available scene files
+		entries, err := afero.ReadDir(config.Fs(), scenesDir)
+		if err != nil {
+			return ImportSceneMsg{Err: fmt.Errorf("no scenes directory: %s", scenesDir)}
+		}
+
+		// Find first JSON/YAML file that's not already imported
+		existingScenes := config.ListScenes()
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			ext := filepath.Ext(name)
+			if ext != ".json" && ext != ".yaml" && ext != ".yml" {
+				continue
+			}
+			// Check if scene already exists
+			baseName := strings.TrimSuffix(name, ext)
+			if _, exists := existingScenes[baseName]; exists {
+				continue
+			}
+			// Import this scene
+			filePath := filepath.Join(scenesDir, name)
+			msg, err := config.ImportSceneFromFile(filePath, "", false)
+			if err != nil {
+				return ImportSceneMsg{Err: err}
+			}
+			// Parse scene name from message
+			return ImportSceneMsg{SceneName: msg}
+		}
+
+		return ImportSceneMsg{Err: fmt.Errorf("no new scene files found in %s", scenesDir)}
 	}
 }
 
@@ -436,6 +589,11 @@ func (m ListModel) buildFooter() string {
 	// Show delete confirmation message if pending
 	if m.pendingDelete != "" {
 		return m.styles.Error.Render("Press d again to delete, Esc to cancel")
+	}
+
+	// Show status message if set
+	if m.statusMsg != "" {
+		return m.styles.Success.Render(m.statusMsg)
 	}
 
 	return footerKeybindings
