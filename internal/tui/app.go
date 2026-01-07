@@ -504,11 +504,19 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		m.tabBar, _ = m.tabBar.SetActive(msg.Current)
 		return m, nil, true
 	case views.DeviceSelectedMsg:
-		return m, m.viewManager.PropagateDevice(msg.Device), true
+		// Fetch extended status (WiFi, Sys) lazily for device info panel
+		extCmd := m.cache.FetchExtendedStatus(msg.Device)
+		return m, tea.Batch(m.viewManager.PropagateDevice(msg.Device), extCmd), true
 	case devicelist.DeviceSelectedMsg:
 		// Sync cursor from deviceList to app.go
 		m.cursor = m.deviceList.Cursor()
-		return m, m.viewManager.PropagateDevice(msg.Name), true
+		// Fetch extended status (WiFi, Sys) lazily for device info panel
+		extCmd := m.cache.FetchExtendedStatus(msg.Name)
+		return m, tea.Batch(m.viewManager.PropagateDevice(msg.Name), extCmd), true
+	case cache.FetchExtendedStatusMsg:
+		m.cache.HandleExtendedStatus(msg)
+		m = m.syncDeviceInfo()
+		return m, nil, true
 	case devicelist.OpenBrowserMsg:
 		// Open device web UI in browser
 		return m, m.openDeviceBrowser(msg.Address), true

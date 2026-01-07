@@ -126,4 +126,3 @@ func (s *Sizable) ApplySizeWithExtraLoaders(width, height int, extraLoaders ...l
 	}
 	return result
 }
-

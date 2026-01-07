@@ -36,6 +36,10 @@ type DeviceData struct {
 	Info     *shelly.DeviceInfo
 	Snapshot *model.MonitoringSnapshot
 
+	// Extended status (lazy-loaded on device focus for Gen2+)
+	WiFi *shelly.WiFiStatus // WiFi status (SSID, RSSI, IP, etc.)
+	Sys  *shelly.SysStatus  // System status (uptime, RAM, FS, etc.)
+
 	// Derived metrics (for quick access)
 	Power       float64
 	Voltage     float64
@@ -883,6 +887,59 @@ func (c *Cache) fetchMonitoringSnapshot(ctx context.Context, name string, data *
 	}
 	data.Snapshot = snapshot
 	c.aggregateMetrics(data, snapshot)
+}
+
+// FetchExtendedStatusMsg is sent when extended status fetch completes.
+type FetchExtendedStatusMsg struct {
+	Name string
+	WiFi *shelly.WiFiStatus
+	Sys  *shelly.SysStatus
+}
+
+// FetchExtendedStatus fetches WiFi and Sys status for a device on-demand.
+// This is called lazily when a device is focused in the device info panel.
+func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+		defer cancel()
+
+		msg := FetchExtendedStatusMsg{Name: name}
+
+		// Fetch WiFi status
+		if wifi, err := c.svc.GetWiFiStatus(ctx, name); err == nil {
+			msg.WiFi = wifi
+		} else {
+			c.ios.DebugCat(iostreams.CategoryDevice, "cache: wifi status for %s failed: %v", name, err)
+		}
+
+		// Fetch Sys status
+		if sys, err := c.svc.GetSysStatus(ctx, name); err == nil {
+			msg.Sys = sys
+		} else {
+			c.ios.DebugCat(iostreams.CategoryDevice, "cache: sys status for %s failed: %v", name, err)
+		}
+
+		return msg
+	}
+}
+
+// HandleExtendedStatus updates device data with extended status.
+func (c *Cache) HandleExtendedStatus(msg FetchExtendedStatusMsg) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	data, exists := c.devices[msg.Name]
+	if !exists || data == nil {
+		return
+	}
+
+	if msg.WiFi != nil {
+		data.WiFi = msg.WiFi
+	}
+	if msg.Sys != nil {
+		data.Sys = msg.Sys
+	}
+	c.version++
 }
 
 // handleDeviceUpdate processes a device update message.

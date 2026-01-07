@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -50,6 +51,7 @@ type Styles struct {
 	Container   lipgloss.Style
 	Title       lipgloss.Style
 	Section     lipgloss.Style
+	Divider     lipgloss.Style
 	Label       lipgloss.Style
 	Value       lipgloss.Style
 	Online      lipgloss.Style
@@ -59,6 +61,10 @@ type Styles struct {
 	Selected    lipgloss.Style
 	Muted       lipgloss.Style
 	Power       lipgloss.Style
+	Warning     lipgloss.Style
+	Good        lipgloss.Style
+	Fair        lipgloss.Style
+	Weak        lipgloss.Style
 	Focused     lipgloss.Style
 	FocusBorder lipgloss.Style
 	BlurBorder  lipgloss.Style
@@ -76,9 +82,10 @@ func DefaultStyles() Styles {
 		Section: lipgloss.NewStyle().
 			Foreground(colors.Warning).
 			Bold(true),
+		Divider: lipgloss.NewStyle().
+			Foreground(colors.TableBorder),
 		Label: lipgloss.NewStyle().
-			Foreground(colors.Text).
-			Width(12),
+			Foreground(colors.Highlight),
 		Value: lipgloss.NewStyle().
 			Foreground(colors.Text),
 		Online: lipgloss.NewStyle().
@@ -100,6 +107,15 @@ func DefaultStyles() Styles {
 		Power: lipgloss.NewStyle().
 			Foreground(colors.Warning).
 			Bold(true),
+		Warning: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		Good: lipgloss.NewStyle().
+			Foreground(colors.Online).
+			Bold(true),
+		Fair: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		Weak: lipgloss.NewStyle().
+			Foreground(colors.Offline),
 		Focused: styles.PanelBorderActive(),
 		FocusBorder: lipgloss.NewStyle().
 			Foreground(colors.Highlight),
@@ -241,85 +257,205 @@ func (m Model) View() string {
 		Render()
 }
 
+// buildContent builds a compact horizontal layout for the device info.
 func (m Model) buildContent() string {
-	var content strings.Builder
-	m.writeDeviceHeader(&content)
-	m.writeDeviceInfo(&content)
-	m.writeFirmwareInfo(&content)
+	// Line 1: Device header with status
+	lines := []string{m.buildHeaderLine()}
 
-	components := m.getComponents()
-	m.writeComponentsSection(&content, components)
-	m.writePowerSection(&content)
-	m.writeMetricsSection(&content)
-	m.writeNavigationHint(&content, components)
+	// Line 2: Power summary (right after device name)
+	if powerLine := m.buildPowerLine(); powerLine != "" {
+		lines = append(lines, powerLine)
+	}
 
-	return content.String()
+	// Line 3: Identity (Model, Gen, Type)
+	if identLine := m.buildIdentityLine(); identLine != "" {
+		lines = append(lines, identLine)
+	}
+
+	// Line 4: Network (IP, MAC, Signal)
+	if netLine := m.buildNetworkLine(); netLine != "" {
+		lines = append(lines, netLine)
+	}
+
+	// Line 5: Runtime + Firmware info (if available)
+	if runtimeLine := m.buildRuntimeLine(); runtimeLine != "" {
+		lines = append(lines, runtimeLine)
+	}
+
+	// Line 6: Last seen
+	if !m.device.UpdatedAt.IsZero() {
+		lines = append(lines, m.kv("Last seen", formatRelativeTime(m.device.UpdatedAt)))
+	}
+
+	// Line 7+: Components section (vertical list with space above)
+	if compLines := m.buildComponentsVertical(); compLines != "" {
+		lines = append(lines, "", m.styles.Section.Render("Components"), compLines)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
-func (m Model) writeDeviceHeader(content *strings.Builder) {
-	statusStr := m.styles.Online.Render("Online")
+// buildHeaderLine builds the device header with name and status.
+func (m Model) buildHeaderLine() string {
+	statusStr := m.styles.Online.Render("● Online")
 	if !m.device.Online {
-		statusStr = m.styles.Offline.Render("Offline")
+		statusStr = m.styles.Offline.Render("○ Offline")
 	}
-	content.WriteString(m.styles.Title.Render(m.device.Device.Name) + " " + statusStr + "\n")
+	return m.styles.Title.Render(m.device.Device.Name) + " " + statusStr
 }
 
-func (m Model) writeDeviceInfo(content *strings.Builder) {
+// buildIdentityLine builds a compact line with model and generation info.
+func (m Model) buildIdentityLine() string {
+	var parts []string
+
+	// Model
 	if m.device.Device.Model != "" {
-		content.WriteString(m.renderRow("Model", m.device.Device.Model) + "\n")
+		parts = append(parts, m.kv("Model", m.device.Device.Model))
 	}
+
+	// Generation with chip
+	if m.device.Info != nil && m.device.Info.Generation > 0 {
+		gen := m.device.Info.Generation
+		chip := chipTypeForGeneration(gen)
+		parts = append(parts, m.kv("Gen", fmt.Sprintf("%d (%s)", gen, chip)))
+	}
+
+	// Type
 	if m.device.Device.Type != "" {
-		content.WriteString(m.renderRow("Type", m.device.Device.Type) + "\n")
+		parts = append(parts, m.kv("Type", m.device.Device.Type))
 	}
+
+	return strings.Join(parts, " │ ")
 }
 
-func (m Model) writeFirmwareInfo(content *strings.Builder) {
-	if m.device.Info == nil {
-		return
+// buildNetworkLine builds a compact line with network info.
+func (m Model) buildNetworkLine() string {
+	var parts []string
+
+	// IP Address
+	if m.device.Device.Address != "" {
+		parts = append(parts, m.kv("IP", m.device.Device.Address))
 	}
-	if m.device.Info.Firmware != "" {
-		content.WriteString(m.renderRow("Firmware", m.device.Info.Firmware) + "\n")
+
+	// MAC (full address)
+	if mac := m.getMAC(); mac != "" {
+		parts = append(parts, m.kv("MAC", mac))
 	}
-	// App field is redundant with Model - Type now shows model code/SKU
+
+	// WiFi signal
+	if m.device.WiFi != nil && m.device.WiFi.RSSI != 0 {
+		rssi := m.device.WiFi.RSSI
+		quality := m.signalQualityShort(rssi)
+		parts = append(parts, m.kv("Signal", fmt.Sprintf("%d dBm %s", rssi, quality)))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " │ ")
 }
 
-func (m Model) writeComponentsSection(content *strings.Builder, components []ComponentInfo) {
+// buildRuntimeLine builds a compact line with runtime and firmware info.
+func (m Model) buildRuntimeLine() string {
+	var parts []string
+
+	// Uptime
+	if m.device.Sys != nil && m.device.Sys.Uptime > 0 {
+		parts = append(parts, m.kv("Up", formatUptimeShort(m.device.Sys.Uptime)))
+	}
+
+	// RAM usage
+	if m.device.Sys != nil && m.device.Sys.RAMSize > 0 {
+		ramPct := float64(m.device.Sys.RAMSize-m.device.Sys.RAMFree) / float64(m.device.Sys.RAMSize) * 100
+		parts = append(parts, m.kv("RAM", fmt.Sprintf("%.0f%%", ramPct)))
+	}
+
+	// Flash usage
+	if m.device.Sys != nil && m.device.Sys.FSSize > 0 {
+		fsPct := float64(m.device.Sys.FSSize-m.device.Sys.FSFree) / float64(m.device.Sys.FSSize) * 100
+		parts = append(parts, m.kv("FS", fmt.Sprintf("%.0f%%", fsPct)))
+	}
+
+	// Firmware version
+	if m.device.Info != nil && m.device.Info.Firmware != "" {
+		parts = append(parts, m.kv("FW", m.device.Info.Firmware))
+	}
+
+	// Update available
+	if m.device.Sys != nil && m.device.Sys.UpdateAvailable != "" {
+		parts = append(parts, m.styles.Good.Render("▲ "+m.device.Sys.UpdateAvailable))
+	}
+
+	// Restart required
+	if m.device.Sys != nil && m.device.Sys.RestartRequired {
+		parts = append(parts, m.styles.Warning.Render("⟳ restart"))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " │ ")
+}
+
+// buildComponentsVertical builds a vertical list of components (one per line).
+func (m Model) buildComponentsVertical() string {
+	components := m.getComponents()
 	if len(components) == 0 {
-		return
+		return ""
 	}
-	content.WriteString("\n")
-	content.WriteString(m.styles.Section.Render("Components") + "\n")
-	content.WriteString(m.renderComponents(components))
+
+	lines := make([]string, 0, len(components))
+	for i, comp := range components {
+		stateStyle := m.styles.OffState
+		if comp.State == "on" || comp.State == "On" || comp.State == "active" {
+			stateStyle = m.styles.OnState
+		}
+
+		prefix := "  "
+		if m.componentCursor == i {
+			prefix = "> "
+		}
+
+		line := prefix + comp.Name + " " + stateStyle.Render("["+comp.State+"]")
+		if comp.Power != nil && *comp.Power != 0 {
+			line += " " + m.styles.Power.Render(formatPowerShort(*comp.Power))
+		}
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
-func (m Model) writePowerSection(content *strings.Builder) {
-	if m.device.Power == 0 {
-		return
+// buildPowerLine builds a compact power summary line.
+func (m Model) buildPowerLine() string {
+	if m.device.Power == 0 && m.device.Voltage == 0 && m.device.Current == 0 {
+		return ""
 	}
-	content.WriteString("\n")
-	content.WriteString(m.styles.Section.Render("Power") + "\n")
-	content.WriteString(m.styles.Power.Render(formatPower(m.device.Power)) + "\n")
-}
 
-func (m Model) writeMetricsSection(content *strings.Builder) {
-	if m.device.Voltage == 0 && m.device.Current == 0 {
-		return
+	var parts []string
+
+	if m.device.Power != 0 {
+		parts = append(parts, m.styles.Power.Render(formatPower(m.device.Power)))
 	}
-	content.WriteString("\n")
-	content.WriteString(m.styles.Section.Render("Metrics") + "\n")
 	if m.device.Voltage != 0 {
-		content.WriteString(m.renderRow("Voltage", fmt.Sprintf("%.1f V", m.device.Voltage)) + "\n")
+		parts = append(parts, fmt.Sprintf("%.0fV", m.device.Voltage))
 	}
 	if m.device.Current != 0 {
-		content.WriteString(m.renderRow("Current", fmt.Sprintf("%.3f A", m.device.Current)) + "\n")
+		parts = append(parts, fmt.Sprintf("%.2fA", m.device.Current))
 	}
 	if m.device.TotalEnergy != 0 {
-		content.WriteString(m.renderRow("Energy", fmt.Sprintf("%.2f Wh", m.device.TotalEnergy)) + "\n")
+		parts = append(parts, formatEnergyShort(m.device.TotalEnergy))
 	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return m.styles.Section.Render("Power: ") + strings.Join(parts, " │ ")
 }
 
-func (m Model) writeNavigationHint(content *strings.Builder, components []ComponentInfo) {
-	// Footer is now shown via FooterText() - don't inline it
+// kv formats a key-value pair compactly with space after colon.
+func (m Model) kv(label, value string) string {
+	return m.styles.Label.Render(label+": ") + m.styles.Value.Render(value)
 }
 
 func (m Model) renderEmpty() string {
@@ -333,73 +469,6 @@ func (m Model) renderEmpty() string {
 		SetContent(m.styles.Muted.Render("Select a device to view details"))
 
 	return r.Render()
-}
-
-func (m Model) renderRow(label, value string) string {
-	return m.styles.Label.Render(label+":") + " " + m.styles.Value.Render(value)
-}
-
-func (m Model) renderComponents(components []ComponentInfo) string {
-	if m.componentCursor == -1 {
-		// Show all components in compact format
-		return m.renderAllComponents(components)
-	}
-
-	// Show single component with details
-	if m.componentCursor >= 0 && m.componentCursor < len(components) {
-		return m.renderSingleComponent(components[m.componentCursor])
-	}
-
-	return ""
-}
-
-func (m Model) renderAllComponents(components []ComponentInfo) string {
-	lines := make([]string, 0, len(components))
-	for i, comp := range components {
-		prefix := "  "
-		if i == m.componentCursor {
-			prefix = "> "
-		}
-
-		stateStyle := m.styles.OffState
-		if comp.State == "on" || comp.State == "On" {
-			stateStyle = m.styles.OnState
-		}
-
-		line := prefix + comp.Name + " " + stateStyle.Render("["+comp.State+"]")
-		if comp.Power != nil && *comp.Power != 0 {
-			line += " " + m.styles.Power.Render(formatPower(*comp.Power))
-		}
-		lines = append(lines, line)
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (m Model) renderSingleComponent(comp ComponentInfo) string {
-	// Component header with selection indicator
-	header := m.styles.Selected.Render(" " + comp.Name + " ")
-
-	stateStyle := m.styles.OffState
-	if comp.State == "on" || comp.State == "On" {
-		stateStyle = m.styles.OnState
-	}
-
-	lines := []string{
-		header,
-		"",
-		m.renderRow("Type", comp.Type),
-		m.renderRow("State", stateStyle.Render(comp.State)),
-	}
-
-	if comp.Power != nil {
-		lines = append(lines, m.renderRow("Power", m.styles.Power.Render(formatPower(*comp.Power))))
-	}
-
-	if comp.Endpoint != "" {
-		lines = append(lines, "", m.styles.Muted.Render("Endpoint: "+comp.Endpoint))
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 func (m Model) getComponents() []ComponentInfo {
@@ -421,7 +490,7 @@ func (m Model) getComponents() []ComponentInfo {
 			state = "on"
 		}
 		components = append(components, ComponentInfo{
-			Name:     fmt.Sprintf("Switch:%d", sw.ID),
+			Name:     fmt.Sprintf("Sw%d", sw.ID),
 			Type:     "Switch",
 			State:    state,
 			Endpoint: fmt.Sprintf("Switch.GetStatus?id=%d", sw.ID),
@@ -435,7 +504,7 @@ func (m Model) getComponents() []ComponentInfo {
 			state = "on"
 		}
 		components = append(components, ComponentInfo{
-			Name:     fmt.Sprintf("Light:%d", lt.ID),
+			Name:     fmt.Sprintf("Lt%d", lt.ID),
 			Type:     "Light",
 			State:    state,
 			Endpoint: fmt.Sprintf("Light.GetStatus?id=%d", lt.ID),
@@ -446,10 +515,14 @@ func (m Model) getComponents() []ComponentInfo {
 	for _, cv := range m.device.Covers {
 		state := cv.State
 		if state == "" {
-			state = "stopped"
+			state = "stop"
+		}
+		// Abbreviate state
+		if len(state) > 4 {
+			state = state[:4]
 		}
 		components = append(components, ComponentInfo{
-			Name:     fmt.Sprintf("Cover:%d", cv.ID),
+			Name:     fmt.Sprintf("Cv%d", cv.ID),
 			Type:     "Cover",
 			State:    state,
 			Endpoint: fmt.Sprintf("Cover.GetStatus?id=%d", cv.ID),
@@ -462,9 +535,9 @@ func (m Model) getComponents() []ComponentInfo {
 		for i, pm := range m.device.Snapshot.PM {
 			power := pm.APower
 			components = append(components, ComponentInfo{
-				Name:     fmt.Sprintf("PM:%d", i),
+				Name:     fmt.Sprintf("PM%d", i),
 				Type:     "Power Meter",
-				State:    "active",
+				State:    "on",
 				Power:    &power,
 				Endpoint: fmt.Sprintf("PM.GetStatus?id=%d", i),
 			})
@@ -474,9 +547,9 @@ func (m Model) getComponents() []ComponentInfo {
 		for i, em := range m.device.Snapshot.EM {
 			power := em.TotalActivePower
 			components = append(components, ComponentInfo{
-				Name:     fmt.Sprintf("EM:%d", i),
+				Name:     fmt.Sprintf("EM%d", i),
 				Type:     "Energy Meter",
-				State:    "active",
+				State:    "on",
 				Power:    &power,
 				Endpoint: fmt.Sprintf("EM.GetStatus?id=%d", i),
 			})
@@ -488,7 +561,7 @@ func (m Model) getComponents() []ComponentInfo {
 			components = append(components, ComponentInfo{
 				Name:     fmt.Sprintf("EM1:%d", i),
 				Type:     "Energy Meter 1",
-				State:    "active",
+				State:    "on",
 				Power:    &power,
 				Endpoint: fmt.Sprintf("EM1.GetStatus?id=%d", i),
 			})
@@ -496,6 +569,37 @@ func (m Model) getComponents() []ComponentInfo {
 	}
 
 	return components
+}
+
+// getMAC returns the MAC address from various sources.
+func (m Model) getMAC() string {
+	// Try device info first (populated from DeviceInfo)
+	if m.device.Info != nil && m.device.Info.MAC != "" {
+		return m.device.Info.MAC
+	}
+	// Fall back to device config
+	if m.device.Device.MAC != "" {
+		return m.device.Device.MAC
+	}
+	// Try Sys status
+	if m.device.Sys != nil && m.device.Sys.MAC != "" {
+		return m.device.Sys.MAC
+	}
+	return ""
+}
+
+// signalQualityShort returns a short signal quality indicator.
+func (m Model) signalQualityShort(rssi int) string {
+	switch {
+	case rssi > -50:
+		return m.styles.Good.Render("●●●●")
+	case rssi > -60:
+		return m.styles.Good.Render("●●●○")
+	case rssi > -70:
+		return m.styles.Fair.Render("●●○○")
+	default:
+		return m.styles.Weak.Render("●○○○")
+	}
 }
 
 // SetDevice sets the device to display.
@@ -576,4 +680,70 @@ func formatPower(value float64) string {
 		return fmt.Sprintf("%.2f kW", value/1000)
 	}
 	return fmt.Sprintf("%.1f W", value)
+}
+
+// formatPowerShort formats power value compactly.
+func formatPowerShort(value float64) string {
+	absVal := value
+	if absVal < 0 {
+		absVal = -absVal
+	}
+
+	if absVal >= 1000 {
+		return fmt.Sprintf("%.1fkW", value/1000)
+	}
+	return fmt.Sprintf("%.0fW", value)
+}
+
+// formatEnergyShort formats an energy value compactly.
+func formatEnergyShort(wh float64) string {
+	if wh >= 1000 {
+		return fmt.Sprintf("%.1fkWh", wh/1000)
+	}
+	return fmt.Sprintf("%.0fWh", wh)
+}
+
+// formatUptimeShort formats seconds into compact duration.
+func formatUptimeShort(seconds int) string {
+	d := seconds / 86400
+	h := (seconds % 86400) / 3600
+	m := (seconds % 3600) / 60
+
+	if d > 0 {
+		return fmt.Sprintf("%dd%dh", d, h)
+	}
+	if h > 0 {
+		return fmt.Sprintf("%dh%dm", h, m)
+	}
+	return fmt.Sprintf("%dm", m)
+}
+
+// formatRelativeTime formats a time as relative to now.
+func formatRelativeTime(t time.Time) string {
+	d := time.Since(t)
+
+	if d < time.Minute {
+		return fmt.Sprintf("%ds ago", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	}
+	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+}
+
+// chipTypeForGeneration returns the chip type for a device generation.
+func chipTypeForGeneration(gen int) string {
+	switch gen {
+	case 1:
+		return "ESP8266"
+	case 2, 3:
+		return "ESP32"
+	case 4:
+		return "ESP32-C3"
+	default:
+		return "?"
+	}
 }
