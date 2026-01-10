@@ -97,7 +97,7 @@ func (r *Registry) InstallWithManifest(sourcePath string, manifest *Manifest) er
 	return nil
 }
 
-// Install installs a plugin from a local file (legacy API, uses unknown source).
+// Install installs a plugin from a local file with auto-generated manifest.
 func (r *Registry) Install(sourcePath string) error {
 	filename := filepath.Base(sourcePath)
 	pluginName := strings.TrimPrefix(filename, PluginPrefix)

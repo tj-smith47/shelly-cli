@@ -41,7 +41,7 @@ func (d Device) DisplayName() string {
 }
 
 // IsShelly returns true if device is a native Shelly device.
-// Empty platform defaults to Shelly for backward compatibility with existing configs.
+// Empty platform defaults to Shelly (the default for devices without explicit platform).
 func (d Device) IsShelly() bool {
 	return d.Platform == "" || d.Platform == PlatformShelly
 }

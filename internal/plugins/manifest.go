@@ -67,7 +67,7 @@ type Binary struct {
 }
 
 // Capabilities defines what a plugin can do.
-// All fields are optional for backward compatibility with existing plugins.
+// All fields are optional to allow plugins to declare only what they support.
 type Capabilities struct {
 	// DeviceDetection indicates plugin can detect devices during discovery.
 	DeviceDetection bool `json:"device_detection,omitempty"`

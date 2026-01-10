@@ -178,6 +178,16 @@ else
     success "No incomplete implementation mentions found"
 fi
 
+# Check for legacy/backward compatibility/deprecated patterns (should be cleaned up, not deferred)
+LEGACY=$(search_go "legacy\|backward.*compat\|deprecated\|kept for compat" "internal/" | \
+    grep -vi "IsLegacy\|legacyHost\|legacyDevice" || true)
+if [[ -n "$LEGACY" ]]; then
+    error "Found legacy/deprecated patterns (clean up, don't defer):"
+    show_results "$LEGACY"
+else
+    success "No legacy/deprecated patterns found"
+fi
+
 # Check for panic placeholders
 PANICS=$(search_go 'panic\(".*not implemented' "internal/")
 if [[ -n "$PANICS" ]]; then

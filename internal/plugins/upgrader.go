@@ -88,7 +88,7 @@ func (u *Upgrader) upgradeExtension(ctx context.Context, name, currentVersion st
 		return result
 	}
 
-	// No manifest - fall back to heuristic search (legacy plugins)
+	// No manifest - use heuristic search for plugins without install metadata
 	return u.upgradeWithHeuristics(ctx, name, binaryName, currentVersion)
 }
 
@@ -161,7 +161,7 @@ func (u *Upgrader) upgradeWithHeuristics(ctx context.Context, name, binaryName, 
 		OldVersion: currentVersion,
 	}
 
-	// Check common GitHub sources - heuristic approach for legacy plugins without manifests
+	// Check common GitHub sources - heuristic approach for plugins without manifests
 	possibleSources := []string{
 		fmt.Sprintf("gh:tj-smith47/%s", binaryName), // Official plugins
 		fmt.Sprintf("gh:%s/%s", name, binaryName),   // User repos

@@ -30,7 +30,7 @@ func pluralize(word string) string {
 // BatchComponentOpts configures a batch component command.
 type BatchComponentOpts struct {
 	// Component type: "Switch", "Light", "RGB", "Cover"
-	// If empty, defaults to "Switch" for backward compatibility.
+	// If empty, defaults to "Switch".
 	Component string
 
 	// Action is the operation type: ActionOn, ActionOff, or ActionToggle.
@@ -53,7 +53,7 @@ func NewBatchComponentCommand(f *cmdutil.Factory, opts BatchComponentOpts) *cobr
 		concurrent  int
 	)
 
-	// Default to "Switch" for backward compatibility
+	// Default to "Switch" if not specified
 	component := opts.Component
 	if component == "" {
 		component = "Switch"
@@ -150,7 +150,7 @@ from files or other commands.`, short, componentLower, componentLower, component
 	cmd.Flags().StringVarP(&groupName, "group", "g", "", "Target device group")
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Target all registered devices")
 	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 10*time.Second, "Timeout per device")
-	// Use short flag -s for switch component for backward compatibility
+	// Use short flag -s for switch component (most common use case)
 	if componentLower == "switch" {
 		cmd.Flags().IntVarP(&componentID, componentLower, "s", 0, fmt.Sprintf("%s component ID", component))
 	} else {

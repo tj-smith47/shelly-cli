@@ -430,7 +430,7 @@ func (m Model) View() string {
 	return style.Width(m.width).Render(content)
 }
 
-// ViewAsInputBar is an alias for View for backwards compatibility.
+// ViewAsInputBar renders the toast in input bar style (same as View for toasts).
 func (m Model) ViewAsInputBar() string {
 	return m.View()
 }
