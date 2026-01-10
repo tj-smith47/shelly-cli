@@ -2,19 +2,23 @@
 .TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-debug-methods - List available RPC methods
+shelly-api-methods - List available RPC methods (Gen2+ only)
 
 
 .SH SYNOPSIS
-\fBshelly debug methods  [flags]\fP
+\fBshelly api methods  [flags]\fP
 
 
 .SH DESCRIPTION
 List all RPC methods available on a Shelly device.
 
 .PP
-This shows the methods you can call using 'shelly debug rpc'.
+This shows the methods you can call using 'shelly api  \&'.
 Use --filter to search for specific methods by name.
+
+.PP
+Note: This command only works with Gen2+ devices as Gen1 devices don't
+support RPC method introspection.
 
 
 .SH OPTIONS
@@ -82,15 +86,15 @@ Use --filter to search for specific methods by name.
 .SH EXAMPLE
 .EX
   # List all methods
-  shelly debug methods living-room
+  shelly api methods living-room
 
   # Filter methods containing "Switch"
-  shelly debug methods living-room --filter Switch
+  shelly api methods living-room --filter Switch
 
   # Output as JSON
-  shelly debug methods living-room --json
+  shelly api methods living-room --json
 .EE
 
 
 .SH SEE ALSO
-\fBshelly-debug(1)\fP
+\fBshelly-api(1)\fP

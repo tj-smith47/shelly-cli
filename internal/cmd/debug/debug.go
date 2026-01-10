@@ -6,8 +6,6 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmd/debug/coiot"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/debug/log"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/debug/methods"
-	"github.com/tj-smith47/shelly-cli/internal/cmd/debug/rpc"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/debug/websocket"
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 )
@@ -24,14 +22,10 @@ These commands provide low-level access to device communication protocols
 and diagnostic information. Use them for debugging issues or exploring
 device capabilities.
 
+For direct API calls, use 'shelly api' instead.
+
 WARNING: Some debug commands may affect device behavior. Use with caution.`,
-		Example: `  # Execute a raw RPC call
-  shelly debug rpc living-room Shelly.GetDeviceInfo
-
-  # List available RPC methods
-  shelly debug methods living-room
-
-  # Get Gen1 device debug log
+		Example: `  # Get Gen1 device debug log
   shelly debug log living-room-gen1
 
   # Show CoIoT status
@@ -42,10 +36,8 @@ WARNING: Some debug commands may affect device behavior. Use with caution.`,
 	}
 
 	cmd.AddCommand(log.NewCommand(f))
-	cmd.AddCommand(rpc.NewCommand(f))
 	cmd.AddCommand(coiot.NewCommand(f))
 	cmd.AddCommand(websocket.NewCommand(f))
-	cmd.AddCommand(methods.NewCommand(f))
 
 	return cmd
 }

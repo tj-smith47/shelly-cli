@@ -1,0 +1,114 @@
+.nh
+.TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-api - Execute API calls on Shelly devices
+
+
+.SH SYNOPSIS
+\fBshelly api   [params_json] [flags]\fP
+
+
+.SH DESCRIPTION
+Execute API calls on Shelly devices.
+
+.PP
+This command provides direct access to the device API using either:
+  - RPC methods: "Shelly.GetDeviceInfo", "Switch.Set" (Gen2+ only)
+  - REST paths: "/status", "/relay/0?turn=on", "/rpc/Shelly.GetStatus" (all generations)
+
+.PP
+The command auto-detects the call type based on input format:
+  - Starts with "/" → HTTP GET to that path (works for all generations)
+  - Contains "." → JSON-RPC call via WebSocket (Gen2+ only)
+
+.PP
+For Gen2+ devices, you can use either format:
+  - RPC: Shelly.GetStatus (uses WebSocket JSON-RPC)
+  - Path: /rpc/Shelly.GetStatus (uses HTTP GET)
+
+.PP
+Use 'shelly api methods \&' to list available RPC methods (Gen2+ only).
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for api
+
+.PP
+\fB--raw\fP[=false]
+	Output raw JSON without formatting
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Gen2+ RPC methods (JSON-RPC via WebSocket)
+  shelly api living-room Shelly.GetDeviceInfo
+  shelly api living-room Switch.GetStatus '{"id":0}'
+  shelly api living-room Switch.Set '{"id":0,"on":true}'
+
+  # Path-based HTTP calls (all generations)
+  shelly api backyard /status                      # Gen1 status
+  shelly api backyard /relay/0?turn=on             # Gen1 relay control
+  shelly api living-room /rpc/Shelly.GetStatus     # Gen2+ via HTTP
+  shelly api living-room /rpc/Switch.Set?id=0&on=true  # Gen2+ via HTTP
+
+  # Raw output (no formatting)
+  shelly api living-room Shelly.GetStatus --raw
+
+  # Using 'rpc' alias
+  shelly rpc living-room Shelly.GetDeviceInfo
+.EE
+
+
+.SH SEE ALSO
+\fBshelly(1)\fP, \fBshelly-api-methods(1)\fP

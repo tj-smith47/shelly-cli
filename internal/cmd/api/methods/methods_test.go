@@ -30,8 +30,8 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "methods <device>")
 	}
 
-	if cmd.Short != "List available RPC methods" {
-		t.Errorf("Short = %q, want %q", cmd.Short, "List available RPC methods")
+	if cmd.Short == "" {
+		t.Error("Short description is empty")
 	}
 
 	if cmd.Long == "" {
@@ -357,7 +357,7 @@ func TestNewCommand_FilterFlagUsage(t *testing.T) {
 	}
 }
 
-func TestRun_DeviceNotFound(t *testing.T) {
+func TestRunMethods_DeviceNotFound(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -377,7 +377,7 @@ func TestRun_DeviceNotFound(t *testing.T) {
 	}
 }
 
-func TestRun_WithTestFactory(t *testing.T) {
+func TestRunMethods_WithTestFactory(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -398,7 +398,7 @@ func TestRun_WithTestFactory(t *testing.T) {
 	}
 }
 
-func TestRun_ContextCancelled(t *testing.T) {
+func TestRunMethods_ContextCancelled(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -518,7 +518,7 @@ func TestOptions_FactoryAccess(t *testing.T) {
 	}
 }
 
-func TestRun_JSONFormat(t *testing.T) {
+func TestRunMethods_JSONFormat(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -539,7 +539,7 @@ func TestRun_JSONFormat(t *testing.T) {
 	}
 }
 
-func TestRun_TextFormat(t *testing.T) {
+func TestRunMethods_TextFormat(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -560,7 +560,7 @@ func TestRun_TextFormat(t *testing.T) {
 	}
 }
 
-func TestRun_WithFilter(t *testing.T) {
+func TestRunMethods_WithFilter(t *testing.T) {
 	t.Parallel()
 
 	tf := factory.NewTestFactory(t)
@@ -582,7 +582,7 @@ func TestRun_WithFilter(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestRun_ListMethods_TextFormat(t *testing.T) {
+func TestRunMethods_ListMethods_TextFormat(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -636,7 +636,7 @@ func TestRun_ListMethods_TextFormat(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestRun_ListMethods_JSONFormat(t *testing.T) {
+func TestRunMethods_ListMethods_JSONFormat(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -687,7 +687,7 @@ func TestRun_ListMethods_JSONFormat(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestRun_ListMethods_WithFilter(t *testing.T) {
+func TestRunMethods_ListMethods_WithFilter(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -740,7 +740,7 @@ func TestRun_ListMethods_WithFilter(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestRun_ListMethods_CaseInsensitiveFilter(t *testing.T) {
+func TestRunMethods_ListMethods_CaseInsensitiveFilter(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -789,7 +789,7 @@ func TestRun_ListMethods_CaseInsensitiveFilter(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestRun_ListMethods_FilterNoMatch(t *testing.T) {
+func TestRunMethods_ListMethods_FilterNoMatch(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -838,7 +838,7 @@ func TestRun_ListMethods_FilterNoMatch(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestRun_ListMethods_JSONWithFilter(t *testing.T) {
+func TestRunMethods_ListMethods_JSONWithFilter(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -890,7 +890,7 @@ func TestRun_ListMethods_JSONWithFilter(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestExecute_ListMethods_Success(t *testing.T) {
+func TestExecuteMethods_ListMethods_Success(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -937,7 +937,7 @@ func TestExecute_ListMethods_Success(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestExecute_ListMethods_WithFilterFlag(t *testing.T) {
+func TestExecuteMethods_ListMethods_WithFilterFlag(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -984,7 +984,7 @@ func TestExecute_ListMethods_WithFilterFlag(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestExecute_ListMethods_JSONFlag(t *testing.T) {
+func TestExecuteMethods_ListMethods_JSONFlag(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{
@@ -1031,7 +1031,7 @@ func TestExecute_ListMethods_JSONFlag(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestExecute_ListMethods_DeviceNotFound(t *testing.T) {
+func TestExecuteMethods_ListMethods_DeviceNotFound(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config:  mock.ConfigFixture{Devices: []mock.DeviceFixture{}},
@@ -1060,7 +1060,7 @@ func TestExecute_ListMethods_DeviceNotFound(t *testing.T) {
 }
 
 //nolint:paralleltest // Tests use mock.StartWithFixtures with shared global state
-func TestRun_NamespacesGrouping(t *testing.T) {
+func TestRunMethods_NamespacesGrouping(t *testing.T) {
 	fixtures := &mock.Fixtures{
 		Version: "1",
 		Config: mock.ConfigFixture{

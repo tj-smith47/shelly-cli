@@ -1,45 +1,45 @@
-## shelly debug rpc
+---
+title: "shelly api methods"
+description: "shelly api methods"
+---
 
-Execute a raw RPC call
+## shelly api methods
+
+List available RPC methods (Gen2+ only)
 
 ### Synopsis
 
-Execute a raw RPC call on a Shelly device.
+List all RPC methods available on a Shelly device.
 
-This command allows you to call any RPC method supported by the device.
-Use 'shelly debug methods <device>' to list available methods.
+This shows the methods you can call using 'shelly api <device> <Method>'.
+Use --filter to search for specific methods by name.
 
-Parameters should be provided as a JSON object. If no parameters are
-needed, omit the params argument or use '{}'.
+Note: This command only works with Gen2+ devices as Gen1 devices don't
+support RPC method introspection.
 
 ```
-shelly debug rpc <device> <method> [params_json] [flags]
+shelly api methods <device> [flags]
 ```
 
 ### Examples
 
 ```
-  # Get device info
-  shelly debug rpc living-room Shelly.GetDeviceInfo
+  # List all methods
+  shelly api methods living-room
 
-  # Get switch status with ID parameter
-  shelly debug rpc living-room Switch.GetStatus '{"id":0}'
+  # Filter methods containing "Switch"
+  shelly api methods living-room --filter Switch
 
-  # Set switch state
-  shelly debug rpc living-room Switch.Set '{"id":0,"on":true}'
-
-  # Get all methods
-  shelly debug rpc living-room Shelly.ListMethods
-
-  # Raw output (no formatting)
-  shelly debug rpc living-room Shelly.GetStatus --raw
+  # Output as JSON
+  shelly api methods living-room --json
 ```
 
 ### Options
 
 ```
-  -h, --help   help for rpc
-      --raw    Output raw JSON without formatting
+      --filter string   Filter methods by name (case-insensitive)
+  -f, --format string   Output format: text, json (default "text")
+  -h, --help            help for methods
 ```
 
 ### Options inherited from parent commands
@@ -61,5 +61,5 @@ shelly debug rpc <device> <method> [params_json] [flags]
 
 ### SEE ALSO
 
-* [shelly debug](shelly_debug.md)	 - Debug and diagnostic commands
+* [shelly api](shelly_api.md)	 - Execute API calls on Shelly devices
 

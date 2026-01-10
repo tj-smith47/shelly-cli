@@ -10,17 +10,13 @@ These commands provide low-level access to device communication protocols
 and diagnostic information. Use them for debugging issues or exploring
 device capabilities.
 
+For direct API calls, use 'shelly api' instead.
+
 WARNING: Some debug commands may affect device behavior. Use with caution.
 
 ### Examples
 
 ```
-  # Execute a raw RPC call
-  shelly debug rpc living-room Shelly.GetDeviceInfo
-
-  # List available RPC methods
-  shelly debug methods living-room
-
   # Get Gen1 device debug log
   shelly debug log living-room-gen1
 
@@ -59,7 +55,5 @@ WARNING: Some debug commands may affect device behavior. Use with caution.
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
 * [shelly debug coiot](shelly_debug_coiot.md)	 - Show CoIoT/CoAP status
 * [shelly debug log](shelly_debug_log.md)	 - Get device debug log (Gen1)
-* [shelly debug methods](shelly_debug_methods.md)	 - List available RPC methods
-* [shelly debug rpc](shelly_debug_rpc.md)	 - Execute a raw RPC call
 * [shelly debug websocket](shelly_debug_websocket.md)	 - Debug WebSocket connection and stream events
 

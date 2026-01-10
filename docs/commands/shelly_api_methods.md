@@ -1,34 +1,32 @@
----
-title: "shelly debug methods"
-description: "shelly debug methods"
----
+## shelly api methods
 
-## shelly debug methods
-
-List available RPC methods
+List available RPC methods (Gen2+ only)
 
 ### Synopsis
 
 List all RPC methods available on a Shelly device.
 
-This shows the methods you can call using 'shelly debug rpc'.
+This shows the methods you can call using 'shelly api <device> <Method>'.
 Use --filter to search for specific methods by name.
 
+Note: This command only works with Gen2+ devices as Gen1 devices don't
+support RPC method introspection.
+
 ```
-shelly debug methods <device> [flags]
+shelly api methods <device> [flags]
 ```
 
 ### Examples
 
 ```
   # List all methods
-  shelly debug methods living-room
+  shelly api methods living-room
 
   # Filter methods containing "Switch"
-  shelly debug methods living-room --filter Switch
+  shelly api methods living-room --filter Switch
 
   # Output as JSON
-  shelly debug methods living-room --json
+  shelly api methods living-room --json
 ```
 
 ### Options
@@ -58,5 +56,5 @@ shelly debug methods <device> [flags]
 
 ### SEE ALSO
 
-* [shelly debug](shelly_debug.md)	 - Debug and diagnostic commands
+* [shelly api](shelly_api.md)	 - Execute API calls on Shelly devices
 

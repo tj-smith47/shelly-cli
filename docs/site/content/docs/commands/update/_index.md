@@ -1,7 +1,7 @@
 ---
 title: "shelly update"
 description: "shelly update"
-weight: 670
+weight: 680
 sidebar:
   collapsed: true
 ---

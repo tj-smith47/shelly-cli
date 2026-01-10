@@ -1,4 +1,4 @@
-// Package methods provides the debug methods command.
+// Package methods provides the api methods subcommand.
 package methods
 
 import (
@@ -16,7 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
-// Options holds command options.
+// Options holds options for the methods subcommand.
 type Options struct {
 	flags.OutputFlags
 	Factory *cmdutil.Factory
@@ -24,26 +24,29 @@ type Options struct {
 	Filter  string
 }
 
-// NewCommand creates the debug methods command.
+// NewCommand creates the api methods subcommand.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
 	opts := &Options{Factory: f}
 
 	cmd := &cobra.Command{
 		Use:     "methods <device>",
 		Aliases: []string{"list-methods", "lm"},
-		Short:   "List available RPC methods",
+		Short:   "List available RPC methods (Gen2+ only)",
 		Long: `List all RPC methods available on a Shelly device.
 
-This shows the methods you can call using 'shelly debug rpc'.
-Use --filter to search for specific methods by name.`,
+This shows the methods you can call using 'shelly api <device> <Method>'.
+Use --filter to search for specific methods by name.
+
+Note: This command only works with Gen2+ devices as Gen1 devices don't
+support RPC method introspection.`,
 		Example: `  # List all methods
-  shelly debug methods living-room
+  shelly api methods living-room
 
   # Filter methods containing "Switch"
-  shelly debug methods living-room --filter Switch
+  shelly api methods living-room --filter Switch
 
   # Output as JSON
-  shelly debug methods living-room --json`,
+  shelly api methods living-room --json`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {

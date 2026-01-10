@@ -58,6 +58,7 @@ and controlling Shelly devices on your local network.
 * [shelly action](shelly_action.md)	 - Manage Gen1 device action URLs
 * [shelly alert](shelly_alert.md)	 - Manage monitoring alerts
 * [shelly alias](shelly_alias.md)	 - Manage command aliases
+* [shelly api](shelly_api.md)	 - Execute API calls on Shelly devices
 * [shelly audit](shelly_audit.md)	 - Security audit for devices
 * [shelly auth](shelly_auth.md)	 - Manage device authentication
 * [shelly backup](shelly_backup.md)	 - Backup and restore device configurations

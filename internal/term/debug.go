@@ -115,3 +115,20 @@ func DisplayWebSocketDeviceInfo(ios *iostreams.IOStreams, model, id string, gene
 	ios.Printf("  Generation: %d\n", generation)
 	ios.Println()
 }
+
+// PrintAPIResult prints an API result as JSON.
+// If raw is true, prints compact JSON; otherwise prints indented JSON.
+func PrintAPIResult(ios *iostreams.IOStreams, result any, raw bool) error {
+	var output []byte
+	var err error
+	if raw {
+		output, err = json.Marshal(result)
+	} else {
+		output, err = json.MarshalIndent(result, "", "  ")
+	}
+	if err != nil {
+		return err
+	}
+	ios.Println(string(output))
+	return nil
+}

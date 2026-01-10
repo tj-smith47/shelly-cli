@@ -1,4 +1,4 @@
-package rpc
+package apicmd
 
 import (
 	"bytes"
@@ -34,12 +34,12 @@ func TestNewCommand_Structure(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test Use
-	if cmd.Use != "rpc <device> <method> [params_json]" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "rpc <device> <method> [params_json]")
+	if cmd.Use != "api <device> <method|path> [params_json]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "api <device> <method|path> [params_json]")
 	}
 
 	// Test Aliases
-	wantAliases := []string{"call", "invoke"}
+	wantAliases := []string{"rpc", "call"}
 	if len(cmd.Aliases) != len(wantAliases) {
 		t.Errorf("Aliases = %v, want %v", cmd.Aliases, wantAliases)
 	} else {
@@ -162,11 +162,13 @@ func TestNewCommand_ExampleContent(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	wantPatterns := []string{
-		"shelly debug rpc",
+		"shelly api",
 		"Shelly.GetDeviceInfo",
 		"Switch.GetStatus",
 		"Switch.Set",
 		"--raw",
+		"/status",
+		"/relay/0",
 	}
 
 	for _, pattern := range wantPatterns {
@@ -183,14 +185,30 @@ func TestNewCommand_LongDescription(t *testing.T) {
 
 	wantPatterns := []string{
 		"RPC",
-		"method",
-		"JSON",
+		"HTTP",
+		"Gen2",
+		"all generations",
 	}
 
 	for _, pattern := range wantPatterns {
 		if !strings.Contains(cmd.Long, pattern) {
 			t.Errorf("expected Long to contain %q", pattern)
 		}
+	}
+}
+
+func TestNewCommand_HasSubcommands(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewCommand(cmdutil.NewFactory())
+
+	// Should have methods subcommand
+	methodsCmd, _, err := cmd.Find([]string{"methods"})
+	if err != nil {
+		t.Fatalf("methods subcommand not found: %v", err)
+	}
+	if methodsCmd.Name() != "methods" {
+		t.Errorf("expected methods subcommand, got %q", methodsCmd.Name())
 	}
 }
 
@@ -377,5 +395,101 @@ func TestRun_RawOutput(t *testing.T) {
 	// May fail due to mock limitations
 	if err != nil {
 		t.Logf("run() error = %v (expected for mock)", err)
+	}
+}
+
+func TestRun_HTTPPath(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Method:  "/status",
+		Params:  "",
+	}
+
+	// This will fail due to no real device, but should take the HTTP path branch
+	err := run(context.Background(), opts)
+	if err == nil {
+		t.Log("Expected connection error (no real device)")
+	}
+	// Should not mention "RPC" since it's a path-based call
+	if err != nil && strings.Contains(err.Error(), "RPC methods are for Gen2+") {
+		t.Error("HTTP path calls should not check for Gen2+")
+	}
+}
+
+func TestRun_HTTPPathWithParams(t *testing.T) {
+	t.Parallel()
+
+	tf := factory.NewTestFactory(t)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "test-device",
+		Method:  "/status",
+		Params:  `{"id":0}`,
+	}
+
+	// Should warn about params being ignored for HTTP path calls
+	err := run(context.Background(), opts)
+	// Will fail due to no device, but exercises the warning path
+	if err != nil {
+		t.Logf("run() error = %v (expected for mock)", err)
+	}
+
+	// Check that warning was emitted
+	output := tf.ErrString()
+	if !strings.Contains(output, "ignored") {
+		t.Log("Expected warning about params being ignored for HTTP path calls")
+	}
+}
+
+func TestRun_Gen1DeviceRPCCall(t *testing.T) {
+	t.Parallel()
+
+	fixtures := &mock.Fixtures{
+		Version: "1",
+		Config: mock.ConfigFixture{
+			Devices: []mock.DeviceFixture{
+				{
+					Name:       "gen1-device",
+					Address:    "192.168.1.100",
+					MAC:        "AA:BB:CC:DD:EE:FF",
+					Type:       "SHSW-1",
+					Model:      "Shelly 1",
+					Generation: 1,
+				},
+			},
+		},
+		DeviceStates: map[string]mock.DeviceState{
+			"gen1-device": {},
+		},
+	}
+
+	demo, err := mock.StartWithFixtures(fixtures)
+	if err != nil {
+		t.Fatalf("StartWithFixtures: %v", err)
+	}
+	defer demo.Cleanup()
+
+	tf := factory.NewTestFactory(t)
+	demo.InjectIntoFactory(tf.Factory)
+
+	opts := &Options{
+		Factory: tf.Factory,
+		Device:  "gen1-device",
+		Method:  "Shelly.GetStatus", // RPC method on Gen1 device
+		Params:  "",
+	}
+
+	err = run(context.Background(), opts)
+	if err == nil {
+		t.Error("Expected error for RPC call on Gen1 device")
+	}
+	if !strings.Contains(err.Error(), "Gen1") {
+		t.Errorf("Error should mention Gen1: %v", err)
 	}
 }

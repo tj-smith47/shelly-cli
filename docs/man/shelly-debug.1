@@ -18,6 +18,9 @@ and diagnostic information. Use them for debugging issues or exploring
 device capabilities.
 
 .PP
+For direct API calls, use 'shelly api' instead.
+
+.PP
 WARNING: Some debug commands may affect device behavior. Use with caution.
 
 
@@ -77,12 +80,6 @@ WARNING: Some debug commands may affect device behavior. Use with caution.
 
 .SH EXAMPLE
 .EX
-  # Execute a raw RPC call
-  shelly debug rpc living-room Shelly.GetDeviceInfo
-
-  # List available RPC methods
-  shelly debug methods living-room
-
   # Get Gen1 device debug log
   shelly debug log living-room-gen1
 
@@ -95,4 +92,4 @@ WARNING: Some debug commands may affect device behavior. Use with caution.
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-debug-coiot(1)\fP, \fBshelly-debug-log(1)\fP, \fBshelly-debug-methods(1)\fP, \fBshelly-debug-rpc(1)\fP, \fBshelly-debug-websocket(1)\fP
+\fBshelly(1)\fP, \fBshelly-debug-coiot(1)\fP, \fBshelly-debug-log(1)\fP, \fBshelly-debug-websocket(1)\fP

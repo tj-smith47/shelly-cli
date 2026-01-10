@@ -1,7 +1,7 @@
 ---
 title: "shelly device"
 description: "shelly device"
-weight: 180
+weight: 190
 sidebar:
   collapsed: true
 ---

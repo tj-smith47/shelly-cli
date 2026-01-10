@@ -1,7 +1,7 @@
 ---
 title: "shelly theme"
 description: "shelly theme"
-weight: 640
+weight: 650
 sidebar:
   collapsed: true
 ---

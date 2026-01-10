@@ -1,7 +1,7 @@
 ---
 title: "shelly light"
 description: "shelly light"
-weight: 310
+weight: 320
 sidebar:
   collapsed: true
 ---

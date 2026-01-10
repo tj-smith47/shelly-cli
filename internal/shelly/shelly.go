@@ -3,6 +3,9 @@ package shelly
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"time"
 
 	libfirmware "github.com/tj-smith47/shelly-go/firmware"
@@ -273,6 +276,57 @@ func (s *Service) RawGen1Call(ctx context.Context, identifier, path string) ([]b
 		return nil
 	})
 	return result, err
+}
+
+// RawHTTPCall makes a raw HTTP GET request to a device at the given path.
+// This works for all device generations and returns the raw response body.
+// Use this for generation-agnostic HTTP calls like /status (Gen1) or /rpc/Method (Gen2+).
+func (s *Service) RawHTTPCall(ctx context.Context, identifier, path string) ([]byte, error) {
+	dev, err := s.resolver.Resolve(identifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve device: %w", err)
+	}
+
+	addr := dev.Address
+	if addr == "" {
+		return nil, fmt.Errorf("device %q has no address", identifier)
+	}
+
+	// Build URL - ensure path starts with /
+	if path != "" && path[0] != '/' {
+		path = "/" + path
+	}
+	url := fmt.Sprintf("http://%s%s", addr, path)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add basic auth if device has credentials
+	if dev.HasAuth() {
+		req.SetBasicAuth(dev.Auth.Username, dev.Auth.Password)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil && s.ios != nil {
+			s.ios.DebugErr("close response body", closeErr)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("HTTP %d (failed to read body: %w)", resp.StatusCode, readErr)
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 // ResolveWithGeneration resolves a device identifier with generation auto-detection.

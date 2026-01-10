@@ -20,6 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmd/action"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alert"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/alias"
+	apicmd "github.com/tj-smith47/shelly-cli/internal/cmd/api"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/audit"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/auth"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/backup"
@@ -350,6 +351,7 @@ func init() {
 	// Utility commands - CLI utilities
 	cmdutil.AddCommandsToGroup(rootCmd, groupUtility,
 		alias.NewCommand(factory),
+		apicmd.NewCommand(factory),
 		cache.NewCommand(factory),
 		completioncmd.NewCommand(factory),
 		exportcmd.NewCommand(factory),
