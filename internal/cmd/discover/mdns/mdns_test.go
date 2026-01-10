@@ -293,8 +293,11 @@ func TestExecute_StopError(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global discovererFactory
+//nolint:paralleltest // modifies global discovererFactory and config.SetFs
 func TestExecute_WithRegister(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	mock := &mockDiscoverer{
 		devices: []discovery.DiscoveredDevice{
 			{
@@ -327,8 +330,11 @@ func TestExecute_WithRegister(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global discovererFactory
+//nolint:paralleltest // modifies global discovererFactory and config.SetFs
 func TestExecute_WithRegisterSkipExisting(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	mock := &mockDiscoverer{
 		devices: []discovery.DiscoveredDevice{
 			{
@@ -629,8 +635,11 @@ func TestRun_DirectCall(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global discovererFactory
+//nolint:paralleltest // modifies global discovererFactory and config.SetFs
 func TestRun_WithRegistration(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	mock := &mockDiscoverer{
 		devices: []discovery.DiscoveredDevice{
 			{
@@ -678,8 +687,11 @@ func TestDiscovererInterface(t *testing.T) {
 	var _ Discoverer = (*mockDiscoverer)(nil)
 }
 
-//nolint:paralleltest // modifies global discovererFactory
+//nolint:paralleltest // modifies global discovererFactory and config.SetFs
 func TestExecute_RegisterMultipleDevices(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	mock := &mockDiscoverer{
 		devices: []discovery.DiscoveredDevice{
 			{

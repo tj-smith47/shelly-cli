@@ -600,8 +600,11 @@ func TestRun_WithDevices(t *testing.T) {
 
 // TestRun_WithRegister tests run with the register flag enabled.
 //
-//nolint:paralleltest // Modifies global newDiscoverer
+//nolint:paralleltest // Modifies global newDiscoverer and config.SetFs
 func TestRun_WithRegister(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	devices := []discovery.DiscoveredDevice{
 		{
 			ID:         "shellyswitch-ABC123",
@@ -801,8 +804,11 @@ func TestExecute_ViaCommand(t *testing.T) {
 
 // TestExecute_WithAllFlags tests execution with all flags set.
 //
-//nolint:paralleltest // Modifies global newDiscoverer
+//nolint:paralleltest // Modifies global newDiscoverer and config.SetFs
 func TestExecute_WithAllFlags(t *testing.T) {
+	factory.SetupTestFs(t)
+	config.ResetDefaultManagerForTesting()
+
 	devices := []discovery.DiscoveredDevice{
 		{
 			ID:         "shellyswitch-ABC123",

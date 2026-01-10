@@ -225,7 +225,10 @@ func TestRun_InvalidPrefix(t *testing.T) {
 }
 
 func TestRun_NonExistentLocalFile(t *testing.T) {
-	t.Parallel()
+	fs := afero.NewMemMapFs()
+	config.SetFs(fs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("XDG_CONFIG_HOME", testConfigDir)
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
