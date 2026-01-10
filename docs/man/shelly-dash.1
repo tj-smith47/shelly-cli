@@ -37,10 +37,6 @@ Navigation:
 \fB-h\fP, \fB--help\fP[=false]
 	help for dash
 
-.PP
-\fB--refresh\fP=5
-	Data refresh interval in seconds
-
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -79,6 +75,10 @@ Navigation:
 	Suppress non-essential output
 
 .PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
 \fB--template\fP=""
 	Go template string for output (use with -o template)
 
@@ -91,9 +91,6 @@ Navigation:
 .EX
   # Launch dashboard with default settings
   shelly dash
-
-  # Launch with 10 second refresh interval
-  shelly dash --refresh 10
 
   # Start with a device filter
   shelly dash --filter kitchen

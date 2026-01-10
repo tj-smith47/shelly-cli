@@ -30,9 +30,6 @@ shelly dash [flags]
   # Launch dashboard with default settings
   shelly dash
 
-  # Launch with 10 second refresh interval
-  shelly dash --refresh 10
-
   # Start with a device filter
   shelly dash --filter kitchen
 ```
@@ -42,7 +39,6 @@ shelly dash [flags]
 ```
       --filter string   Filter devices by name pattern
   -h, --help            help for dash
-      --refresh int     Data refresh interval in seconds (default 5)
 ```
 
 ### Options inherited from parent commands
@@ -57,6 +53,7 @@ shelly dash [flags]
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
+      --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
 ```

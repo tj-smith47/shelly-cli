@@ -25,10 +25,6 @@ button presses, state changes, errors, and other notifications.
 \fB-h\fP, \fB--help\fP[=false]
 	help for events
 
-.PP
-\fB--refresh\fP=5
-	Data refresh interval in seconds
-
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -67,6 +63,10 @@ button presses, state changes, errors, and other notifications.
 	Suppress non-essential output
 
 .PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
 \fB--template\fP=""
 	Go template string for output (use with -o template)
 
@@ -82,9 +82,6 @@ button presses, state changes, errors, and other notifications.
 
   # With filter
   shelly dash events --filter switch
-
-  # With custom refresh
-  shelly dash events --refresh 1
 .EE
 
 

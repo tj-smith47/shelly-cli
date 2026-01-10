@@ -26,9 +26,6 @@ shelly dash events [flags]
 
   # With filter
   shelly dash events --filter switch
-
-  # With custom refresh
-  shelly dash events --refresh 1
 ```
 
 ### Options
@@ -36,7 +33,6 @@ shelly dash events [flags]
 ```
       --filter string   Filter devices by name pattern
   -h, --help            help for events
-      --refresh int     Data refresh interval in seconds (default 5)
 ```
 
 ### Options inherited from parent commands
@@ -51,6 +47,7 @@ shelly dash events [flags]
   -o, --output string           Output format (table, json, yaml, template) (default "table")
       --plain                   Disable borders and colors (machine-readable output)
   -q, --quiet                   Suppress non-essential output
+      --refresh                 Bypass cache and fetch fresh data from device
       --template string         Go template string for output (use with -o template)
   -v, --verbose count           Increase verbosity (-v=info, -vv=debug, -vvv=trace)
 ```

@@ -25,10 +25,6 @@ status, power consumption, and quick actions.
 \fB-h\fP, \fB--help\fP[=false]
 	help for devices
 
-.PP
-\fB--refresh\fP=5
-	Data refresh interval in seconds
-
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -67,6 +63,10 @@ status, power consumption, and quick actions.
 	Suppress non-essential output
 
 .PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
 \fB--template\fP=""
 	Go template string for output (use with -o template)
 
@@ -82,9 +82,6 @@ status, power consumption, and quick actions.
 
   # With filter
   shelly dash devices --filter kitchen
-
-  # With custom refresh
-  shelly dash devices --refresh 10
 .EE
 
 
