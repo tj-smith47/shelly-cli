@@ -148,24 +148,18 @@ type Model struct {
 	deviceDetail  devicedetail.Model
 	controlPanel  control.Panel
 
-	// Settings
-	refreshInterval time.Duration
-
 	// Debug logging (enabled by SHELLY_TUI_DEBUG=1)
 	debugLogger *debug.Logger
 }
 
 // Options configures the TUI.
 type Options struct {
-	RefreshInterval time.Duration
-	Filter          string
+	Filter string
 }
 
 // DefaultOptions returns default TUI options.
 func DefaultOptions() Options {
-	return Options{
-		RefreshInterval: 5 * time.Second,
-	}
+	return Options{}
 }
 
 // applyTUITheme loads and applies the TUI-specific theme from configuration.
@@ -206,7 +200,7 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	applyTUITheme(cfg, f.IOStreams())
 
 	// Create shared cache
-	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams(), opts.RefreshInterval)
+	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams())
 
 	// Create shared event stream (WebSocket for Gen2+, polling for Gen1)
 	eventStream := automation.NewEventStream(f.ShellyService())
@@ -331,7 +325,6 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		eventStream:     eventStream,
 		focusManager:    focusMgr,
 		contextMap:      contextKeyMap,
-		refreshInterval: opts.RefreshInterval,
 		filter:          opts.Filter,
 		componentCursor: -1, // -1 means "all components"
 		focusedPanel:    PanelDeviceList,
@@ -1020,8 +1013,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 		}
 	}
 
-	// Fall back to legacy handlers for actions not handled by dispatchAction
-	// Global actions (view switching, quit, help, etc.)
+	// Handle global actions not in dispatchAction (view switching, quit, help, etc.)
 	if newModel, cmd, handled := m.handleGlobalKeys(msg); handled {
 		return newModel, cmd, true
 	}

@@ -4,7 +4,6 @@ package dash
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -17,7 +16,6 @@ import (
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
-	Refresh int
 	Filter  string
 }
 
@@ -47,9 +45,6 @@ Navigation:
 		Example: `  # Launch dashboard with default settings
   shelly dash
 
-  # Launch with 10 second refresh interval
-  shelly dash --refresh 10
-
   # Start with a device filter
   shelly dash --filter kitchen`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -57,7 +52,6 @@ Navigation:
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.Refresh, "refresh", 5, "Data refresh interval in seconds")
 	cmd.Flags().StringVar(&opts.Filter, "filter", "", "Filter devices by name pattern")
 
 	// Add subcommands
@@ -76,8 +70,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	tuiOpts := tui.Options{
-		RefreshInterval: time.Duration(opts.Refresh) * time.Second,
-		Filter:          opts.Filter,
+		Filter: opts.Filter,
 	}
 
 	return tui.Run(ctx, opts.Factory, tuiOpts)

@@ -4,7 +4,6 @@ package devices
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -15,7 +14,6 @@ import (
 // Options holds the command options.
 type Options struct {
 	Factory *cmdutil.Factory
-	Refresh int
 	Filter  string
 }
 
@@ -35,16 +33,12 @@ status, power consumption, and quick actions.`,
   shelly dash devices
 
   # With filter
-  shelly dash devices --filter kitchen
-
-  # With custom refresh
-  shelly dash devices --refresh 10`,
+  shelly dash devices --filter kitchen`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), opts)
 		},
 	}
 
-	cmd.Flags().IntVar(&opts.Refresh, "refresh", 5, "Data refresh interval in seconds")
 	cmd.Flags().StringVar(&opts.Filter, "filter", "", "Filter devices by name pattern")
 
 	return cmd
@@ -58,8 +52,7 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	tuiOpts := tui.Options{
-		RefreshInterval: time.Duration(opts.Refresh) * time.Second,
-		Filter:          opts.Filter,
+		Filter: opts.Filter,
 	}
 
 	return tui.Run(ctx, opts.Factory, tuiOpts)

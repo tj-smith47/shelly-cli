@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/afero"
@@ -61,7 +60,6 @@ func newTestModel(t *testing.T) Model {
 		SetShellyService(testService)
 
 	opts := DefaultOptions()
-	opts.RefreshInterval = 1 * time.Hour // Long interval for testing
 
 	return New(ctx, f, opts)
 }
@@ -509,8 +507,8 @@ func TestDefaultOptions(t *testing.T) {
 	t.Parallel()
 
 	opts := DefaultOptions()
-	if opts.RefreshInterval != 5*time.Second {
-		t.Errorf("RefreshInterval = %v, want 5s", opts.RefreshInterval)
+	if opts.Filter != "" {
+		t.Errorf("Filter = %q, want empty", opts.Filter)
 	}
 }
 

@@ -88,7 +88,9 @@ type DeviceUpdateMsg struct {
 // AllDevicesLoadedMsg is sent when all devices have been fetched at least once.
 type AllDevicesLoadedMsg struct{}
 
-// RefreshTickMsg triggers periodic refresh (deprecated, kept for compatibility).
+// RefreshTickMsg triggers a one-time refresh of all devices (user-initiated only).
+// This is NOT scheduled automatically - automatic refresh uses DeviceRefreshMsg
+// with per-device adaptive intervals and jitter to prevent overwhelming devices.
 type RefreshTickMsg struct{}
 
 // DeviceRefreshMsg triggers refresh for a single device.
@@ -153,11 +155,10 @@ type Cache struct {
 	order   []string // Sorted device names for consistent display
 	version uint64   // Incremented on every device data change for cache invalidation
 
-	ctx             context.Context
-	svc             *shelly.Service
-	ios             *iostreams.IOStreams
-	refreshInterval time.Duration // Base interval (still used for compatibility)
-	refreshConfig   RefreshConfig // Adaptive refresh intervals
+	ctx           context.Context
+	svc           *shelly.Service
+	ios           *iostreams.IOStreams
+	refreshConfig RefreshConfig // Adaptive refresh intervals
 
 	// Track fetch progress
 	pendingCount int
@@ -180,13 +181,12 @@ type Cache struct {
 	macToIP map[string]string
 }
 
-// New creates a new shared cache.
-func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, refreshInterval time.Duration) *Cache {
+// New creates a new shared cache with default refresh configuration.
+func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams) *Cache {
 	return &Cache{
 		ctx:                ctx,
 		svc:                svc,
 		ios:                ios,
-		refreshInterval:    refreshInterval,
 		refreshConfig:      DefaultRefreshConfig(),
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
@@ -201,7 +201,6 @@ func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostrea
 		ctx:                ctx,
 		svc:                svc,
 		ios:                ios,
-		refreshInterval:    cfg.Gen2Online, // Use Gen2 online as base
 		refreshConfig:      cfg,
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
@@ -562,13 +561,6 @@ func (c *Cache) parseSysStatus(data *DeviceData, rawStatus json.RawMessage) {
 	}
 }
 
-// scheduleRefresh schedules the next refresh tick (deprecated - use scheduleDeviceRefresh).
-func (c *Cache) scheduleRefresh() tea.Cmd {
-	return tea.Tick(c.refreshInterval, func(time.Time) tea.Msg {
-		return RefreshTickMsg{}
-	})
-}
-
 // scheduleDeviceRefresh schedules refresh for a single device based on its state.
 // Adds random jitter (0-50% of interval) to prevent all devices refreshing simultaneously.
 func (c *Cache) scheduleDeviceRefresh(name string, data *DeviceData) tea.Cmd {
@@ -758,11 +750,6 @@ func (c *Cache) processWave(msg WaveMsg) tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
-}
-
-// fetchDevice fetches status for a single device (deprecated - use fetchDeviceWithID).
-func (c *Cache) fetchDevice(name string, device model.Device) tea.Cmd {
-	return c.fetchDeviceWithID(name, device)
 }
 
 // fetchDeviceWithID fetches status for a single device with request ID tracking.
@@ -1191,11 +1178,9 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		)
 
 	case RefreshTickMsg:
-		// Legacy: batch refresh all devices (kept for compatibility)
-		return tea.Batch(
-			c.refreshAllDevices(),
-			c.scheduleRefresh(),
-		)
+		// Manual refresh all devices (user-initiated only, no auto-rescheduling)
+		// Per-device adaptive refresh (DeviceRefreshMsg) handles automatic polling.
+		return c.refreshAllDevices()
 	}
 	return nil
 }
@@ -1220,7 +1205,7 @@ func (c *Cache) refreshAllDevices() tea.Cmd {
 
 		cmds := make([]tea.Cmd, 0, len(devicesCopy))
 		for name, dev := range devicesCopy {
-			cmds = append(cmds, c.fetchDevice(name, dev))
+			cmds = append(cmds, c.fetchDeviceWithID(name, dev))
 		}
 		return tea.BatchMsg(cmds)
 	}
