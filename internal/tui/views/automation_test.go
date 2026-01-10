@@ -182,7 +182,7 @@ func TestAutomation_FocusNext(t *testing.T) {
 		t.Fatalf("initial panel = %v, want PanelScripts", a.focusedPanel)
 	}
 
-	// Panel order: Scripts -> Schedules -> Webhooks -> ScriptEditor -> ScheduleEditor -> Virtuals -> KVS
+	// Panel order: Scripts -> Schedules -> Webhooks -> Virtuals -> KVS -> Alerts
 	a.focusNext()
 	if a.focusedPanel != PanelSchedules {
 		t.Errorf("after focusNext = %v, want PanelSchedules", a.focusedPanel)
@@ -199,24 +199,24 @@ func TestAutomation_FocusPrev(t *testing.T) {
 	a := newTestAutomation()
 	a.focusedPanel = PanelSchedules
 
-	// Panel order: Scripts -> Schedules -> Webhooks -> ScriptEditor -> ScheduleEditor -> Virtuals -> KVS
+	// Panel order: Scripts -> Schedules -> Webhooks -> Virtuals -> KVS -> Alerts
 	// Prev from Schedules is Scripts
 	a.focusPrev()
 	if a.focusedPanel != PanelScripts {
 		t.Errorf("after focusPrev = %v, want PanelScripts", a.focusedPanel)
 	}
 
-	// Prev from Scripts wraps to KVS
+	// Prev from Scripts wraps to Alerts (last panel)
 	a.focusPrev()
-	if a.focusedPanel != PanelKVS {
-		t.Errorf("after focusPrev = %v, want PanelKVS (wrap)", a.focusedPanel)
+	if a.focusedPanel != PanelAlerts {
+		t.Errorf("after focusPrev = %v, want PanelAlerts (wrap)", a.focusedPanel)
 	}
 }
 
 func TestAutomation_FocusWrap(t *testing.T) {
 	t.Parallel()
 	a := newTestAutomation()
-	a.focusedPanel = PanelKVS
+	a.focusedPanel = PanelAlerts // Last panel
 
 	// Focus next should wrap to PanelScripts
 	a.focusNext()
@@ -232,7 +232,7 @@ func TestAutomation_HandleKeyPress_Tab(t *testing.T) {
 
 	a.handleKeyPress(msg)
 
-	// Panel order: Scripts -> Schedules -> Webhooks -> ScriptEditor -> ScheduleEditor -> Virtuals -> KVS
+	// Panel order: Scripts -> Schedules -> Webhooks -> Virtuals -> KVS -> Alerts
 	// Tab from Scripts goes to Schedules
 	if a.focusedPanel != PanelSchedules {
 		t.Errorf("focusedPanel = %v, want PanelSchedules", a.focusedPanel)

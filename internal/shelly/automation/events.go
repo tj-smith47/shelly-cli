@@ -257,6 +257,88 @@ func (es *EventStream) ConnectedDevices() []string {
 	return names
 }
 
+// ConnectionType represents how a device is connected to the event stream.
+type ConnectionType int
+
+const (
+	// ConnectionNone means no connection to the device.
+	ConnectionNone ConnectionType = iota
+	// ConnectionWebSocket means the device is connected via WebSocket (Gen2+).
+	ConnectionWebSocket
+	// ConnectionPolling means the device is polled via HTTP (Gen1).
+	ConnectionPolling
+)
+
+// String returns a display string for the connection type.
+func (ct ConnectionType) String() string {
+	switch ct {
+	case ConnectionWebSocket:
+		return "WS"
+	case ConnectionPolling:
+		return "HTTP"
+	default:
+		return "—"
+	}
+}
+
+// Symbol returns a single character symbol for the connection type.
+func (ct ConnectionType) Symbol() string {
+	switch ct {
+	case ConnectionWebSocket:
+		return "⚡"
+	case ConnectionPolling:
+		return "↻"
+	default:
+		return "○"
+	}
+}
+
+// ConnectionInfo holds connection details for a device.
+type ConnectionInfo struct {
+	Type       ConnectionType
+	Generation int
+}
+
+// GetConnectionInfo returns connection info for a device.
+func (es *EventStream) GetConnectionInfo(name string) ConnectionInfo {
+	es.mu.RLock()
+	defer es.mu.RUnlock()
+
+	conn, ok := es.connections[name]
+	if !ok {
+		return ConnectionInfo{Type: ConnectionNone}
+	}
+
+	connType := ConnectionPolling
+	if conn.ws != nil {
+		connType = ConnectionWebSocket
+	}
+
+	return ConnectionInfo{
+		Type:       connType,
+		Generation: conn.generation,
+	}
+}
+
+// GetAllConnectionInfo returns connection info for all connected devices.
+func (es *EventStream) GetAllConnectionInfo() map[string]ConnectionInfo {
+	es.mu.RLock()
+	defer es.mu.RUnlock()
+
+	info := make(map[string]ConnectionInfo, len(es.connections))
+	for name, conn := range es.connections {
+		connType := ConnectionPolling
+		if conn.ws != nil {
+			connType = ConnectionWebSocket
+		}
+		info[name] = ConnectionInfo{
+			Type:       connType,
+			Generation: conn.generation,
+		}
+	}
+	return info
+}
+
 // Publish publishes a synthetic event to the event stream.
 // This is used to emit events not originating from device connections,
 // such as offline events from HTTP polling failures.

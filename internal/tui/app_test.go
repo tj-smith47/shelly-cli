@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -16,9 +17,25 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/views"
 )
 
+// setupTUITest sets up filesystem isolation for TUI tests.
+// This prevents tests from writing to the real config file.
+func setupTUITest(t *testing.T) {
+	t.Helper()
+	config.SetFs(afero.NewMemMapFs())
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
+}
+
 // newTestModel creates a Model for testing with mock dependencies.
 func newTestModel(t *testing.T) Model {
 	t.Helper()
+
+	// Set up filesystem isolation to prevent writes to real config.
+	setupTUITest(t)
+
 	ctx := context.Background()
 
 	in := &bytes.Buffer{}
@@ -28,6 +45,10 @@ func newTestModel(t *testing.T) Model {
 
 	cfg := &config.Config{}
 	mgr := config.NewTestManager(cfg)
+
+	// Set this manager as the global default so package-level config functions
+	// (like config.UpdateDeviceInfo) use the test manager instead of a real one.
+	config.SetDefaultManager(mgr)
 
 	// Create a simple shelly service without plugin support
 	// This prevents the factory from creating the plugins directory
@@ -60,8 +81,8 @@ func applyWindowSize(m Model, width, height int) Model {
 	return model
 }
 
+//nolint:paralleltest // modifies global config state
 func TestNew(t *testing.T) {
-	t.Parallel()
 	m := newTestModel(t)
 
 	// Verify initial state
@@ -79,8 +100,8 @@ func TestNew(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_Init(t *testing.T) {
-	t.Parallel()
 	m := newTestModel(t)
 
 	cmd := m.Init()
@@ -89,8 +110,8 @@ func TestModel_Init(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_WindowResize(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		width  int
@@ -104,7 +125,6 @@ func TestModel_WindowResize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			m := newTestModel(t)
 			msg := tea.WindowSizeMsg{Width: tt.width, Height: tt.height}
 
@@ -127,8 +147,8 @@ func TestModel_WindowResize(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_TabSwitching(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name    string
 		key     string
@@ -144,7 +164,6 @@ func TestModel_TabSwitching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			m := newTestModel(t)
 
 			// Apply window size first to make model ready
@@ -170,9 +189,8 @@ func TestModel_TabSwitching(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_ViewManagerSyncsWithTabs(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -193,9 +211,8 @@ func TestModel_ViewManagerSyncsWithTabs(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_PanelFocusCycling(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -232,9 +249,8 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_ShiftTabReversesFocus(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -267,9 +283,8 @@ func TestModel_ShiftTabReversesFocus(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_QuitKey(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -288,9 +303,8 @@ func TestModel_QuitKey(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_HelpToggle(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -319,9 +333,8 @@ func TestModel_HelpToggle(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_SearchActivation(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -338,9 +351,8 @@ func TestModel_SearchActivation(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_CommandModeActivation(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -357,9 +369,8 @@ func TestModel_CommandModeActivation(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_ViewRendersWithoutPanic(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -377,9 +388,8 @@ func TestModel_ViewRendersWithoutPanic(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_ViewBeforeReady(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	// Don't send window size, so ready = false
 
@@ -390,9 +400,8 @@ func TestModel_ViewBeforeReady(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_ViewNarrowTerminal(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	// Use narrow width (60) to test narrow terminal mode
 	m = applyWindowSize(m, 60, 30)
@@ -403,9 +412,8 @@ func TestModel_ViewNarrowTerminal(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_ViewWhenQuitting(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 	m.quitting = true
@@ -419,9 +427,8 @@ func TestModel_ViewWhenQuitting(t *testing.T) {
 	_ = m.View()
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_FilterMessage(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -433,9 +440,8 @@ func TestModel_FilterMessage(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_Navigation(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -452,9 +458,8 @@ func TestModel_Navigation(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_LayoutMode(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name       string
 		width      int
@@ -471,7 +476,6 @@ func TestModel_LayoutMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			m := newTestModel(t)
 			m = applyWindowSize(m, tt.width, 40)
 
@@ -482,9 +486,8 @@ func TestModel_LayoutMode(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_IsDashboardActive(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -511,9 +514,8 @@ func TestDefaultOptions(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_DeviceActionMsg(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -533,9 +535,8 @@ func TestModel_DeviceActionMsg(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_TabChangedMsg(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -554,9 +555,8 @@ func TestModel_TabChangedMsg(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_ViewChangedMsg(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
@@ -577,9 +577,8 @@ func TestModel_ViewChangedMsg(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_GetFilteredDevices_EmptyFilter(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m.filter = ""
 
@@ -590,9 +589,8 @@ func TestModel_GetFilteredDevices_EmptyFilter(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_GetFilteredDevices_WithFilter(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m.filter = testFilterKitchen
 
@@ -603,9 +601,8 @@ func TestModel_GetFilteredDevices_WithFilter(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_EscapeClearsFilter(t *testing.T) {
-	t.Parallel()
-
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 	m.filter = "test-filter"
@@ -623,9 +620,8 @@ func TestModel_EscapeClearsFilter(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // modifies global config state
 func TestModel_NavigationKeys(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name      string
 		key       string
@@ -639,7 +635,6 @@ func TestModel_NavigationKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			m := newTestModel(t)
 			m = applyWindowSize(m, 100, 40)
 

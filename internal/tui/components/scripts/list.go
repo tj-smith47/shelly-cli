@@ -84,6 +84,16 @@ type CreateScriptMsg struct {
 	Device string
 }
 
+// InsertTemplateMsg signals that the template modal should be opened for a script.
+type InsertTemplateMsg struct {
+	ScriptID int
+}
+
+// OpenEvalMsg signals that the eval modal should be opened for a script.
+type OpenEvalMsg struct {
+	ScriptID int
+}
+
 // ListModel displays scripts for a device.
 type ListModel struct {
 	helpers.Sizable
@@ -412,54 +422,64 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 	}
 
 	// Handle action keys
-	switch msg.String() {
+	return m.handleActionKey(msg.String())
+}
+
+func (m ListModel) handleActionKey(key string) (ListModel, tea.Cmd) {
+	switch key {
 	case "enter":
-		// View script (open in viewer)
 		return m, m.selectScript()
 	case "e":
-		// Edit script (open in external editor)
 		return m, m.editScript()
 	case "r":
-		// Run/start script
 		return m, m.startScript()
 	case "s":
-		// Stop script
 		return m, m.stopScript()
 	case "d":
-		// Delete script with confirmation
-		cursor := m.Scroller.Cursor()
-		if len(m.scripts) == 0 || cursor >= len(m.scripts) {
-			return m, nil
-		}
-		script := m.scripts[cursor]
-		if m.pendingDelete == script.ID {
-			// Second press - confirm delete
-			m.pendingDelete = 0
-			return m, m.deleteScript()
-		}
-		// First press - mark as pending
-		m.pendingDelete = script.ID
-		return m, nil
+		return m.handleDelete()
 	case keyconst.KeyEsc:
-		// Cancel pending delete
-		if m.pendingDelete > 0 {
-			m.pendingDelete = 0
-			return m, nil
-		}
+		return m.handleEscape()
 	case "n":
-		// New script - will be handled by parent
 		return m, m.createScript()
+	case "t":
+		return m, m.insertTemplate()
+	case "x":
+		return m, m.openEval()
 	case "R":
-		// Refresh list - invalidate cache and fetch fresh data
-		m.loading = true
-		return m, tea.Batch(
-			m.Loader.Tick(),
-			panelcache.Invalidate(m.fileCache, m.device, cache.TypeScripts),
-			m.fetchAndCacheScripts(),
-		)
+		return m.handleRefresh()
 	}
-
 	return m, nil
+}
+
+func (m ListModel) handleDelete() (ListModel, tea.Cmd) {
+	cursor := m.Scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
+		return m, nil
+	}
+	script := m.scripts[cursor]
+	if m.pendingDelete == script.ID {
+		m.pendingDelete = 0
+		return m, m.deleteScript()
+	}
+	m.pendingDelete = script.ID
+	return m, nil
+}
+
+func (m ListModel) handleEscape() (ListModel, tea.Cmd) {
+	if m.pendingDelete > 0 {
+		m.pendingDelete = 0
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m ListModel) handleRefresh() (ListModel, tea.Cmd) {
+	m.loading = true
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeScripts),
+		m.fetchAndCacheScripts(),
+	)
 }
 
 func (m ListModel) selectScript() tea.Cmd {
@@ -481,6 +501,31 @@ func (m ListModel) editScript() tea.Cmd {
 	script := m.scripts[cursor]
 	return func() tea.Msg {
 		return EditScriptMsg{Script: script}
+	}
+}
+
+func (m ListModel) insertTemplate() tea.Cmd {
+	cursor := m.Scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
+		return nil
+	}
+	script := m.scripts[cursor]
+	return func() tea.Msg {
+		return InsertTemplateMsg{ScriptID: script.ID}
+	}
+}
+
+func (m ListModel) openEval() tea.Cmd {
+	cursor := m.Scroller.Cursor()
+	if len(m.scripts) == 0 || cursor >= len(m.scripts) {
+		return nil
+	}
+	script := m.scripts[cursor]
+	if !script.Running {
+		return nil // Eval only works on running scripts
+	}
+	return func() tea.Msg {
+		return OpenEvalMsg{ScriptID: script.ID}
 	}
 }
 
@@ -572,7 +617,7 @@ func (m ListModel) buildFooter() string {
 		return m.styles.Running.Render("Press 'd' again to confirm delete, Esc to cancel")
 	}
 
-	footer := "e:edit r:run s:stop d:del n:new"
+	footer := "e:edit r:run s:stop d:del n:new t:tpl x:eval"
 	if cs := m.cacheStatus.View(); cs != "" {
 		footer += " | " + cs
 	}

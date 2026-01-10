@@ -31,7 +31,11 @@ func TestNew_DisabledByDefault(t *testing.T) {
 func TestNew_EnabledWithEnv(t *testing.T) {
 	// Use memory filesystem to avoid real disk operations
 	config.SetFs(afero.NewMemMapFs())
-	t.Cleanup(func() { config.SetFs(nil) })
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
 	t.Setenv(EnvKey, "1")
@@ -59,7 +63,11 @@ func TestNew_EnabledWithEnv(t *testing.T) {
 func TestLogger_Log(t *testing.T) {
 	// Use memory filesystem to avoid real disk operations
 	config.SetFs(afero.NewMemMapFs())
-	t.Cleanup(func() { config.SetFs(nil) })
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 	t.Setenv(EnvKey, "1")
 
@@ -110,7 +118,11 @@ func TestLogger_Log(t *testing.T) {
 
 func TestLogger_SkipDuplicateViews(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
-	t.Cleanup(func() { config.SetFs(nil) })
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 	t.Setenv(EnvKey, "1")
 
@@ -153,7 +165,11 @@ func TestLogger_SkipDuplicateViews(t *testing.T) {
 
 func TestLogger_SessionDir(t *testing.T) {
 	config.SetFs(afero.NewMemMapFs())
-	t.Cleanup(func() { config.SetFs(nil) })
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 	t.Setenv(EnvKey, "1")
 
@@ -229,7 +245,11 @@ func TestCleanupOldSessions(t *testing.T) {
 	// Use memory filesystem to avoid real disk operations
 	fs := afero.NewMemMapFs()
 	config.SetFs(fs)
-	t.Cleanup(func() { config.SetFs(nil) })
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
 
 	// Create debug directory with 30 sessions
 	debugDir := "/test/config/shelly/debug"
@@ -283,7 +303,11 @@ func TestCleanupOldSessions(t *testing.T) {
 func TestLogger_Toggle(t *testing.T) {
 	// Use memory filesystem for config
 	config.SetFs(afero.NewMemMapFs())
-	t.Cleanup(func() { config.SetFs(nil) })
+	config.ResetDefaultManagerForTesting()
+	t.Cleanup(func() {
+		config.SetFs(nil)
+		config.ResetDefaultManagerForTesting()
+	})
 	t.Setenv("XDG_CONFIG_HOME", "/test/config")
 
 	l := New()

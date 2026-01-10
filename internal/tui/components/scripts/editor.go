@@ -386,12 +386,21 @@ func (m EditorModel) maxScroll() int {
 	return maxLines
 }
 
-// View renders the script editor.
+// View renders the script code viewer.
 func (m EditorModel) View() string {
+	// Use script name in title for context
+	title := "Code"
+	if m.scriptName != "" {
+		title = m.scriptName
+	} else if m.scriptID > 0 {
+		title = fmt.Sprintf("script_%d", m.scriptID)
+	}
+
 	r := rendering.New(m.Width, m.Height).
-		SetTitle("Code").
+		SetTitle(title).
 		SetFocused(m.focused).
-		SetPanelIndex(m.panelIndex)
+		SetPanelIndex(m.panelIndex).
+		SetFooter("j/k:scroll g/G:top/end d:download esc:close")
 
 	if m.scriptID == 0 {
 		r.SetContent(styles.EmptyStateWithBorder("No script selected", m.Width, m.Height))
@@ -415,34 +424,7 @@ func (m EditorModel) View() string {
 
 	var content strings.Builder
 
-	// Script header
-	name := m.scriptName
-	if name == "" {
-		name = fmt.Sprintf("script_%d", m.scriptID)
-	}
-	content.WriteString(m.styles.Header.Render(name))
-
-	// Status info
-	if m.status != nil {
-		content.WriteString(" ")
-		if m.status.Running {
-			content.WriteString(m.styles.Running.Render("(running)"))
-		} else {
-			content.WriteString(m.styles.Stopped.Render("(stopped)"))
-		}
-
-		// Memory info
-		if m.status.MemUsage > 0 {
-			memStr := fmt.Sprintf(" [mem: %d/%d KB]",
-				m.status.MemUsage/1024,
-				(m.status.MemUsage+m.status.MemFree)/1024,
-			)
-			content.WriteString(m.styles.Memory.Render(memStr))
-		}
-	}
-	content.WriteString("\n\n")
-
-	// Code with line numbers
+	// Code with line numbers (this is a code viewer, not a status panel)
 	content.WriteString(m.renderCodeLines())
 
 	r.SetContent(content.String())

@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-go/events"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -63,6 +66,15 @@ type DeviceStatus struct {
 	TotalEnergy float64 // Total energy consumption in Wh
 	UpdatedAt   time.Time
 	Error       error
+
+	// Sensor data
+	Temperature *float64 // Temperature in Celsius
+	Humidity    *float64 // Relative humidity percentage
+	Illuminance *float64 // Illuminance in lux
+	Battery     *int     // Battery percentage (if applicable)
+
+	// Connection info
+	ConnectionType string // "ws" for WebSocket, "poll" for HTTP polling
 }
 
 // StatusUpdateMsg is sent when device status is updated.
@@ -77,6 +89,23 @@ type RefreshTickMsg struct{}
 // DeviceEventMsg wraps WebSocket events from devices.
 type DeviceEventMsg struct {
 	Event events.Event
+}
+
+// ExportFormat represents the export file format.
+type ExportFormat int
+
+const (
+	// ExportCSV exports data in CSV format.
+	ExportCSV ExportFormat = iota
+	// ExportJSON exports data in JSON format.
+	ExportJSON
+)
+
+// ExportResultMsg is sent when an export completes.
+type ExportResultMsg struct {
+	Path   string
+	Format ExportFormat
+	Err    error
 }
 
 // Model holds the monitor state.
@@ -96,30 +125,39 @@ type Model struct {
 	err             error
 	styles          Styles
 	refreshInterval time.Duration
+
+	// Energy settings
+	costRate float64 // Cost per kWh
+	currency string  // Currency symbol
 }
 
 // Styles for the monitor component.
 type Styles struct {
-	Container    lipgloss.Style
-	Header       lipgloss.Style
-	Row          lipgloss.Style
-	SelectedRow  lipgloss.Style
-	OnlineIcon   lipgloss.Style
-	OfflineIcon  lipgloss.Style
-	UpdatingIcon lipgloss.Style
-	DeviceName   lipgloss.Style
-	Address      lipgloss.Style
-	Power        lipgloss.Style
-	Voltage      lipgloss.Style
-	Current      lipgloss.Style
-	Label        lipgloss.Style
-	Value        lipgloss.Style
-	LastUpdated  lipgloss.Style
-	Timestamp    lipgloss.Style // Yellow timestamp for device updates
-	Separator    lipgloss.Style
-	SummaryCard  lipgloss.Style
-	SummaryValue lipgloss.Style
-	Energy       lipgloss.Style
+	Container      lipgloss.Style
+	Header         lipgloss.Style
+	Row            lipgloss.Style
+	SelectedRow    lipgloss.Style
+	OnlineIcon     lipgloss.Style
+	OfflineIcon    lipgloss.Style
+	UpdatingIcon   lipgloss.Style
+	DeviceName     lipgloss.Style
+	Address        lipgloss.Style
+	Power          lipgloss.Style
+	Voltage        lipgloss.Style
+	Current        lipgloss.Style
+	Label          lipgloss.Style
+	Value          lipgloss.Style
+	LastUpdated    lipgloss.Style
+	Timestamp      lipgloss.Style // Yellow timestamp for device updates
+	Separator      lipgloss.Style
+	SummaryCard    lipgloss.Style
+	SummaryValue   lipgloss.Style
+	Energy         lipgloss.Style
+	Temperature    lipgloss.Style
+	Humidity       lipgloss.Style
+	Battery        lipgloss.Style
+	ConnectionType lipgloss.Style
+	Cost           lipgloss.Style
 }
 
 // DefaultStyles returns default styles for the monitor.
@@ -179,6 +217,18 @@ func DefaultStyles() Styles {
 			Foreground(colors.Highlight),
 		Energy: lipgloss.NewStyle().
 			Foreground(colors.Success),
+		Temperature: lipgloss.NewStyle().
+			Foreground(colors.Warning),
+		Humidity: lipgloss.NewStyle().
+			Foreground(colors.Primary),
+		Battery: lipgloss.NewStyle().
+			Foreground(colors.Success),
+		ConnectionType: lipgloss.NewStyle().
+			Foreground(colors.Muted).
+			Italic(true),
+		Cost: lipgloss.NewStyle().
+			Foreground(colors.Success).
+			Bold(true),
 	}
 }
 
@@ -214,6 +264,12 @@ func New(deps Deps) Model {
 		}
 	})
 
+	// Load energy config for cost calculation
+	energyCfg := config.DefaultEnergyConfig()
+	if cfg, err := config.Load(); err == nil {
+		energyCfg = cfg.GetEnergyConfig()
+	}
+
 	m := Model{
 		Sizable:         helpers.NewSizable(11, panel.NewScroller(0, 10)),
 		ctx:             deps.Ctx,
@@ -229,6 +285,8 @@ func New(deps Deps) Model {
 		eventChan:       eventChan,
 		styles:          DefaultStyles(),
 		refreshInterval: refreshInterval,
+		costRate:        energyCfg.CostRate,
+		currency:        energyCfg.Currency,
 	}
 	m.Loader = m.Loader.SetMessage("Fetching device statuses...")
 	return m
@@ -336,11 +394,12 @@ func (m Model) fetchStatuses() tea.Cmd {
 // checkDeviceStatus fetches the real-time status of a single device.
 func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) DeviceStatus {
 	status := DeviceStatus{
-		Name:      device.Name,
-		Address:   device.Address,
-		Type:      device.Type,
-		Online:    false,
-		UpdatedAt: time.Now(),
+		Name:           device.Name,
+		Address:        device.Address,
+		Type:           device.Type,
+		Online:         false,
+		UpdatedAt:      time.Now(),
+		ConnectionType: "poll", // Default to polling, updated if WebSocket connected
 	}
 
 	// Per-device timeout to prevent single slow device from blocking others
@@ -358,7 +417,74 @@ func (m Model) checkDeviceStatus(ctx context.Context, device model.Device) Devic
 	aggregateStatusFromEM(&status, snapshot.EM)
 	aggregateStatusFromEM1(&status, snapshot.EM1)
 
+	// Fetch sensor data via full status
+	m.fetchSensorData(ctx, device.Address, &status)
+
+	// Check WebSocket connection status
+	if m.eventStream != nil {
+		if info := m.eventStream.GetConnectionInfo(device.Name); info.Type == automation.ConnectionWebSocket {
+			status.ConnectionType = "ws"
+		}
+	}
+
 	return status
+}
+
+// fetchSensorData fetches sensor readings for a device.
+func (m Model) fetchSensorData(ctx context.Context, address string, status *DeviceStatus) {
+	// Use WithConnection to make a Shelly.GetStatus call
+	err := m.svc.WithConnection(ctx, address, func(conn *client.Client) error {
+		result, err := conn.Call(ctx, "Shelly.GetStatus", nil)
+		if err != nil {
+			return err
+		}
+
+		// Re-marshal the result to JSON bytes for parsing
+		resultBytes, err := json.Marshal(result)
+		if err != nil {
+			return err
+		}
+
+		// Parse result as map
+		var statusMap map[string]json.RawMessage
+		if err := json.Unmarshal(resultBytes, &statusMap); err != nil {
+			return err
+		}
+
+		// Collect sensor data
+		sensorData := shelly.CollectSensorData(statusMap)
+
+		// Extract first temperature reading if available
+		if len(sensorData.Temperature) > 0 && sensorData.Temperature[0].TC != nil {
+			status.Temperature = sensorData.Temperature[0].TC
+		}
+
+		// Extract first humidity reading if available
+		if len(sensorData.Humidity) > 0 && sensorData.Humidity[0].RH != nil {
+			status.Humidity = sensorData.Humidity[0].RH
+		}
+
+		// Extract first illuminance reading if available
+		if len(sensorData.Illuminance) > 0 && sensorData.Illuminance[0].Lux != nil {
+			status.Illuminance = sensorData.Illuminance[0].Lux
+		}
+
+		// Check for devicepower (battery) component
+		for key, raw := range statusMap {
+			if strings.HasPrefix(key, "devicepower:") {
+				var dp model.DevicePowerReading
+				if err := json.Unmarshal(raw, &dp); err == nil {
+					status.Battery = &dp.Battery.Percent
+				}
+				break
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		m.ios.DebugErr("fetch sensor data", err)
+	}
 }
 
 // aggregateStatusFromPM aggregates status data from PM components.
@@ -456,7 +582,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		)
 
 	case tea.KeyPressMsg:
-		m = m.handleKeyPress(msg)
+		return m.handleKeyPress(msg)
 	}
 
 	return m, nil
@@ -556,9 +682,207 @@ func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
 	aggregateStatusFromEM1(status, fullStatus.EM1)
 }
 
-func (m Model) handleKeyPress(msg tea.KeyPressMsg) Model {
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	keys.HandleScrollNavigation(msg.String(), m.Scroller)
-	return m
+
+	switch msg.String() {
+	case "x":
+		// Export to CSV
+		return m, m.exportData(ExportCSV)
+	case "X":
+		// Export to JSON
+		return m, m.exportData(ExportJSON)
+	}
+
+	return m, nil
+}
+
+// exportData exports the current monitoring data to a file.
+func (m Model) exportData(format ExportFormat) tea.Cmd {
+	return func() tea.Msg {
+		if len(m.statuses) == 0 {
+			return ExportResultMsg{Err: fmt.Errorf("no data to export")}
+		}
+
+		// Create export directory
+		configDir, err := config.Dir()
+		if err != nil {
+			return ExportResultMsg{Err: fmt.Errorf("get config dir: %w", err)}
+		}
+		exportDir := filepath.Join(configDir, "exports", "monitor")
+		if err := os.MkdirAll(exportDir, 0o750); err != nil {
+			return ExportResultMsg{Err: fmt.Errorf("create export dir: %w", err)}
+		}
+
+		// Generate filename
+		timestamp := time.Now().Format("2006-01-02_15-04-05")
+		ext := "csv"
+		if format == ExportJSON {
+			ext = "json"
+		}
+		filename := fmt.Sprintf("monitor_%s.%s", timestamp, ext)
+		path := filepath.Join(exportDir, filename)
+
+		// Export based on format
+		switch format {
+		case ExportCSV:
+			err = m.exportCSV(path)
+		case ExportJSON:
+			err = m.exportJSON(path)
+		}
+
+		if err != nil {
+			return ExportResultMsg{Err: err}
+		}
+
+		return ExportResultMsg{Path: path, Format: format}
+	}
+}
+
+func (m Model) exportCSV(path string) (retErr error) {
+	f, err := os.Create(path) // #nosec G304 -- path is constructed from config dir
+	if err != nil {
+		return fmt.Errorf("create file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close file: %w", closeErr)
+		}
+	}()
+
+	// Write header
+	if _, err := fmt.Fprintln(f, "device,address,type,online,power_w,voltage_v,current_a,frequency_hz,energy_wh,temperature_c,humidity_pct,illuminance_lux,battery_pct,connection,updated"); err != nil {
+		return err
+	}
+
+	// Write device data
+	for _, s := range m.statuses {
+		temp := ""
+		if s.Temperature != nil {
+			temp = fmt.Sprintf("%.1f", *s.Temperature)
+		}
+		humidity := ""
+		if s.Humidity != nil {
+			humidity = fmt.Sprintf("%.0f", *s.Humidity)
+		}
+		lux := ""
+		if s.Illuminance != nil {
+			lux = fmt.Sprintf("%.0f", *s.Illuminance)
+		}
+		battery := ""
+		if s.Battery != nil {
+			battery = fmt.Sprintf("%d", *s.Battery)
+		}
+
+		if _, err := fmt.Fprintf(f, "%s,%s,%s,%t,%.2f,%.2f,%.3f,%.1f,%.2f,%s,%s,%s,%s,%s,%s\n",
+			s.Name, s.Address, s.Type, s.Online,
+			s.Power, s.Voltage, s.Current, s.Frequency, s.TotalEnergy,
+			temp, humidity, lux, battery,
+			s.ConnectionType, s.UpdatedAt.Format(time.RFC3339),
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m Model) exportJSON(path string) (retErr error) {
+	// Build export structure
+	type exportDevice struct {
+		Name        string   `json:"name"`
+		Address     string   `json:"address"`
+		Type        string   `json:"type"`
+		Online      bool     `json:"online"`
+		Power       float64  `json:"power_w"`
+		Voltage     float64  `json:"voltage_v"`
+		Current     float64  `json:"current_a"`
+		Frequency   float64  `json:"frequency_hz"`
+		TotalEnergy float64  `json:"energy_wh"`
+		Temperature *float64 `json:"temperature_c,omitempty"`
+		Humidity    *float64 `json:"humidity_pct,omitempty"`
+		Illuminance *float64 `json:"illuminance_lux,omitempty"`
+		Battery     *int     `json:"battery_pct,omitempty"`
+		Connection  string   `json:"connection"`
+		UpdatedAt   string   `json:"updated_at"`
+		Error       string   `json:"error,omitempty"`
+	}
+
+	type exportData struct {
+		ExportTime  string         `json:"export_time"`
+		TotalPower  float64        `json:"total_power_w"`
+		TotalEnergy float64        `json:"total_energy_wh"`
+		TotalCost   *float64       `json:"total_cost,omitempty"`
+		Currency    string         `json:"currency,omitempty"`
+		CostRate    float64        `json:"cost_rate_per_kwh,omitempty"`
+		Devices     []exportDevice `json:"devices"`
+	}
+
+	// Calculate totals
+	var totalPower, totalEnergy float64
+	for _, s := range m.statuses {
+		if s.Online {
+			totalPower += s.Power
+			totalEnergy += s.TotalEnergy
+		}
+	}
+
+	export := exportData{
+		ExportTime:  time.Now().Format(time.RFC3339),
+		TotalPower:  totalPower,
+		TotalEnergy: totalEnergy,
+		CostRate:    m.costRate,
+		Currency:    m.currency,
+		Devices:     make([]exportDevice, 0, len(m.statuses)),
+	}
+
+	if m.costRate > 0 && totalEnergy > 0 {
+		cost := (totalEnergy / 1000) * m.costRate
+		export.TotalCost = &cost
+	}
+
+	for _, s := range m.statuses {
+		d := exportDevice{
+			Name:        s.Name,
+			Address:     s.Address,
+			Type:        s.Type,
+			Online:      s.Online,
+			Power:       s.Power,
+			Voltage:     s.Voltage,
+			Current:     s.Current,
+			Frequency:   s.Frequency,
+			TotalEnergy: s.TotalEnergy,
+			Temperature: s.Temperature,
+			Humidity:    s.Humidity,
+			Illuminance: s.Illuminance,
+			Battery:     s.Battery,
+			Connection:  s.ConnectionType,
+			UpdatedAt:   s.UpdatedAt.Format(time.RFC3339),
+		}
+		if s.Error != nil {
+			d.Error = s.Error.Error()
+		}
+		export.Devices = append(export.Devices, d)
+	}
+
+	// Write JSON
+	f, err := os.Create(path) // #nosec G304 -- path is constructed from config dir
+	if err != nil {
+		return fmt.Errorf("create file: %w", err)
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close file: %w", closeErr)
+		}
+	}()
+
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(export); err != nil {
+		return fmt.Errorf("encode json: %w", err)
+	}
+
+	return nil
 }
 
 // SetSize sets the component size.
@@ -613,12 +937,23 @@ func (m Model) View() string {
 		}
 	}
 
+	// Calculate cost
+	costStr := ""
+	if m.costRate > 0 && totalEnergy > 0 {
+		cost := (totalEnergy / 1000) * m.costRate // Convert Wh to kWh
+		costStr = fmt.Sprintf("%s%.2f", m.currency, cost)
+	}
+
 	// Summary cards row
-	summary := lipgloss.JoinHorizontal(lipgloss.Top,
+	summaryCards := []string{
 		m.renderSummaryCard("Power", m.formatPower(totalPower)),
 		m.renderSummaryCard("Energy", m.formatEnergy(totalEnergy)),
 		m.renderSummaryCard("Devices", fmt.Sprintf("%d/%d online", onlineCount, len(m.statuses))),
-	)
+	}
+	if costStr != "" {
+		summaryCards = append(summaryCards, m.renderSummaryCard("Cost", costStr))
+	}
+	summary := lipgloss.JoinHorizontal(lipgloss.Top, summaryCards...)
 
 	// Get visible range from scroller
 	startIdx, endIdx := m.Scroller.VisibleRange()
@@ -704,14 +1039,21 @@ func (m Model) renderDeviceCard(s DeviceStatus, isSelected bool) string {
 	// Yellow timestamp showing last update time
 	timestamp := m.styles.Timestamp.Render(s.UpdatedAt.Format("15:04:05"))
 
-	// First line: selection indicator, icon, name, address, type, timestamp
-	line1 := fmt.Sprintf("%s%s %s  %s  %s  %s",
+	// Connection type indicator
+	connIndicator := ""
+	if s.ConnectionType == "ws" {
+		connIndicator = m.styles.ConnectionType.Render(" [ws]")
+	}
+
+	// First line: selection indicator, icon, name, address, type, timestamp, connection
+	line1 := fmt.Sprintf("%s%s %s  %s  %s  %s%s",
 		selIndicator,
 		statusIcon,
 		m.styles.DeviceName.Render(s.Name),
 		m.styles.Address.Render(s.Address),
 		m.styles.Address.Render(s.Type),
 		timestamp,
+		connIndicator,
 	)
 
 	if !s.Online {
@@ -766,6 +1108,24 @@ func (m Model) collectMetrics(s DeviceStatus) []string {
 		metrics = append(metrics, m.styles.Energy.Render(m.formatEnergy(s.TotalEnergy)))
 	}
 
+	// Sensor metrics
+	if s.Temperature != nil {
+		metrics = append(metrics, m.styles.Temperature.Render(fmt.Sprintf("%.1f°C", *s.Temperature)))
+	}
+	if s.Humidity != nil {
+		metrics = append(metrics, m.styles.Humidity.Render(fmt.Sprintf("%.0f%%", *s.Humidity)))
+	}
+	if s.Illuminance != nil {
+		metrics = append(metrics, m.styles.Value.Render(fmt.Sprintf("%.0flux", *s.Illuminance)))
+	}
+	if s.Battery != nil {
+		style := m.styles.Battery
+		if *s.Battery < 20 {
+			style = theme.StatusError() // Low battery warning
+		}
+		metrics = append(metrics, style.Render(fmt.Sprintf("🔋%d%%", *s.Battery)))
+	}
+
 	return metrics
 }
 
@@ -807,5 +1167,5 @@ func (m Model) IsLoading() bool {
 
 // FooterText returns keybinding hints for the footer.
 func (m Model) FooterText() string {
-	return "j/k:scroll g/G:top/bottom r:refresh"
+	return "j/k:scroll g/G:top/bottom r:refresh x:csv X:json"
 }

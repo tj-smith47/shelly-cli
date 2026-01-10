@@ -179,12 +179,13 @@ func (m EditorModel) maxScroll() int {
 	return maxLines
 }
 
-// View renders the schedule editor.
+// View renders the schedule details viewer.
 func (m EditorModel) View() string {
 	r := rendering.New(m.width, m.height).
 		SetTitle("Schedule Details").
 		SetFocused(m.focused).
-		SetPanelIndex(m.panelIndex)
+		SetPanelIndex(m.panelIndex).
+		SetFooter("j/k:scroll g/G:top/end esc:close")
 
 	if m.schedule == nil {
 		r.SetContent(styles.EmptyStateWithBorder("No schedule selected", m.width, m.height))

@@ -272,10 +272,11 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 	// Register Automation view
 	automationView := views.NewAutomation(views.AutomationDeps{
-		Ctx:     ctx,
-		Svc:     f.ShellyService(),
-		AutoSvc: f.AutomationService(),
-		KVSSvc:  f.KVSService(),
+		Ctx:         ctx,
+		Svc:         f.ShellyService(),
+		AutoSvc:     f.AutomationService(),
+		KVSSvc:      f.KVSService(),
+		EventStream: eventStream,
 	})
 	vm.Register(automationView)
 
@@ -530,11 +531,19 @@ func (m Model) handleDeviceSelectionMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool)
 	switch msg := msg.(type) {
 	case views.DeviceSelectedMsg:
 		debug.TraceEvent("DeviceSelectedMsg(views): device=%s (debounced)", msg.Device)
-		return m, m.viewManager.PropagateDevice(msg.Device), true
+		// Use debounced cache fetch to prevent overwhelming devices during rapid scrolling
+		return m, tea.Batch(
+			m.viewManager.PropagateDevice(msg.Device),
+			m.cache.SetFocusedDevice(msg.Device),
+		), true
 	case devicelist.DeviceSelectedMsg:
 		m.cursor = m.deviceList.Cursor()
 		debug.TraceEvent("DeviceSelectedMsg(devicelist): device=%s (debounced)", msg.Name)
-		return m, m.viewManager.PropagateDevice(msg.Name), true
+		// Use debounced cache fetch to prevent overwhelming devices during rapid scrolling
+		return m, tea.Batch(
+			m.viewManager.PropagateDevice(msg.Name),
+			m.cache.SetFocusedDevice(msg.Name),
+		), true
 	case cache.ExtendedStatusDebounceMsg:
 		debug.TraceEvent("ExtendedStatusDebounceMsg: triggering FetchExtendedStatus for %s", msg.Name)
 		return m, m.cache.FetchExtendedStatus(msg.Name), true

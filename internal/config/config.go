@@ -77,6 +77,9 @@ type Config struct {
 
 	// TUI settings
 	TUI TUIConfig `mapstructure:"tui" yaml:"tui,omitempty"`
+
+	// Energy monitoring settings
+	Energy EnergyConfig `mapstructure:"energy" yaml:"energy,omitempty"`
 }
 
 // TUIConfig holds TUI dashboard settings.
@@ -85,6 +88,20 @@ type TUIConfig struct {
 	Refresh         TUIRefreshConfig  `mapstructure:"refresh" yaml:"refresh,omitempty"`                   // Adaptive refresh intervals per generation
 	Keybindings     KeybindingsConfig `mapstructure:"keybindings" yaml:"keybindings,omitempty"`
 	Theme           *ThemeConfig      `mapstructure:"theme" yaml:"theme,omitempty"` // Independent TUI theme (replaces main theme when set)
+}
+
+// EnergyConfig holds energy monitoring and cost calculation settings.
+type EnergyConfig struct {
+	CostRate float64 `mapstructure:"cost_rate" yaml:"cost_rate,omitempty"` // Cost per kWh in local currency
+	Currency string  `mapstructure:"currency" yaml:"currency,omitempty"`   // Currency symbol (e.g., "$", "€", "£")
+}
+
+// DefaultEnergyConfig returns sensible defaults for energy configuration.
+func DefaultEnergyConfig() EnergyConfig {
+	return EnergyConfig{
+		CostRate: 0.12, // Default $0.12/kWh (US average)
+		Currency: "$",
+	}
 }
 
 // KeybindingsConfig holds customizable keybindings for the TUI.
@@ -371,6 +388,22 @@ func (c *Config) GetTUIRefreshConfig() TUIRefreshConfig {
 	}
 	if cfg.FocusedBoost == 0 {
 		cfg.FocusedBoost = defaults.FocusedBoost
+	}
+
+	return cfg
+}
+
+// GetEnergyConfig returns the energy config with defaults applied.
+// Zero values in the config are replaced with sensible defaults.
+func (c *Config) GetEnergyConfig() EnergyConfig {
+	defaults := DefaultEnergyConfig()
+	cfg := c.Energy
+
+	if cfg.CostRate == 0 {
+		cfg.CostRate = defaults.CostRate
+	}
+	if cfg.Currency == "" {
+		cfg.Currency = defaults.Currency
 	}
 
 	return cfg
