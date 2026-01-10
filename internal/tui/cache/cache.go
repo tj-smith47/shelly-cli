@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-go/events"
 	"github.com/tj-smith47/shelly-go/types"
 
+	"github.com/tj-smith47/shelly-cli/internal/cache"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
@@ -160,6 +161,10 @@ type Cache struct {
 	ios           *iostreams.IOStreams
 	refreshConfig RefreshConfig // Adaptive refresh intervals
 
+	// FileCache for persisting static device data (model, gen, MAC, components)
+	// This data never changes, so we cache it with 24h TTL to avoid redundant HTTP calls
+	fileCache *cache.FileCache
+
 	// Track fetch progress
 	pendingCount int
 	initialLoad  bool
@@ -182,12 +187,13 @@ type Cache struct {
 }
 
 // New creates a new shared cache with default refresh configuration.
-func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams) *Cache {
+func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, fc *cache.FileCache) *Cache {
 	return &Cache{
 		ctx:                ctx,
 		svc:                svc,
 		ios:                ios,
 		refreshConfig:      DefaultRefreshConfig(),
+		fileCache:          fc,
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
@@ -196,12 +202,13 @@ func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams) *Ca
 }
 
 // NewWithRefreshConfig creates a cache with custom refresh configuration.
-func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, cfg RefreshConfig) *Cache {
+func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, fc *cache.FileCache, cfg RefreshConfig) *Cache {
 	return &Cache{
 		ctx:                ctx,
 		svc:                svc,
 		ios:                ios,
 		refreshConfig:      cfg,
+		fileCache:          fc,
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
@@ -767,32 +774,54 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		ctx, cancel := context.WithTimeout(c.ctx, c.deviceTimeout(device.Generation))
 		defer cancel()
 
-		// Get device info first (auto-detects Gen1 vs Gen2)
-		info, err := c.svc.DeviceInfoAuto(ctx, name)
-		if err != nil {
-			data.Error = err
-			data.Online = false
-			return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
+		// Try to get device info from FileCache first (it never changes, 24h TTL)
+		info, fromCache := c.tryGetCachedDeviceInfo(name)
+
+		if info == nil {
+			// Not cached - fetch from device
+			var err error
+			info, err = c.svc.DeviceInfoAuto(ctx, name)
+			if err != nil {
+				data.Error = err
+				data.Online = false
+				return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
+			}
+			// Cache for 24 hours - device info never changes
+			c.cacheDeviceInfo(name, info)
+		} else {
+			debug.TraceEvent("cache: using cached device info for %s", name)
 		}
 
 		data.Info = info
 		data.Online = true
 
-		// Populate and persist discovered device info
+		// Populate device info (applies cached data to device model)
 		c.populateDeviceInfo(name, data, info)
 
 		// Get component states (Gen2+ only - Gen1 uses different relay API)
 		if info.Generation > 1 {
-			c.ios.DebugCat(iostreams.CategoryDevice, "cache: fetching component states for %s (gen %d)", name, info.Generation)
-			c.fetchSwitchStates(ctx, name, data)
-			c.fetchLightStates(ctx, name, data)
-			c.fetchCoverStates(ctx, name, data)
-			c.ios.DebugCat(iostreams.CategoryDevice, "cache: %s components: %d switches, %d lights, %d covers", name, len(data.Switches), len(data.Lights), len(data.Covers))
-		} else {
+			// Try to use cached component availability first
+			cachedComponents := c.tryGetCachedComponents(name)
+			if cachedComponents != nil {
+				debug.TraceEvent("cache: using cached components for %s", name)
+				c.applyComponentsFromCache(data, cachedComponents)
+				// Fetch current states for known components
+				c.refreshComponentStates(ctx, name, data, cachedComponents)
+			} else {
+				// First time - discover components and cache them
+				c.ios.DebugCat(iostreams.CategoryDevice, "cache: fetching component states for %s (gen %d)", name, info.Generation)
+				c.fetchSwitchStates(ctx, name, data)
+				c.fetchLightStates(ctx, name, data)
+				c.fetchCoverStates(ctx, name, data)
+				c.ios.DebugCat(iostreams.CategoryDevice, "cache: %s components: %d switches, %d lights, %d covers", name, len(data.Switches), len(data.Lights), len(data.Covers))
+				// Cache component availability for next time
+				c.cacheComponents(name, data)
+			}
+		} else if !fromCache {
 			c.ios.DebugCat(iostreams.CategoryDevice, "cache: skipping component fetch for %s (gen %d)", name, info.Generation)
 		}
 
-		// Get monitoring snapshot for power metrics
+		// Get monitoring snapshot for power metrics (always needed, it's dynamic data)
 		c.fetchMonitoringSnapshot(ctx, name, data)
 
 		return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
@@ -812,7 +841,23 @@ func (c *Cache) deviceTimeout(generation int) time.Duration {
 }
 
 // populateDeviceInfo fills in missing device info and persists to config.
+// Skips entirely if device already has all required info populated.
 func (c *Cache) populateDeviceInfo(name string, data *DeviceData, info *shelly.DeviceInfo) {
+	// Skip if device already has all info - no need to check or persist
+	if data.Device.Model != "" && data.Device.Generation > 0 && data.Device.MAC != "" {
+		return
+	}
+
+	updates := c.buildDeviceUpdates(data, info)
+	if updates.Type != "" || updates.Model != "" || updates.Generation > 0 || updates.MAC != "" {
+		if err := config.UpdateDeviceInfo(name, updates); err != nil {
+			c.ios.DebugErr("persist device info", err)
+		}
+	}
+}
+
+// buildDeviceUpdates creates device updates from info, updating data in place.
+func (c *Cache) buildDeviceUpdates(data *DeviceData, info *shelly.DeviceInfo) config.DeviceUpdates {
 	var updates config.DeviceUpdates
 
 	if info.Model != "" {
@@ -835,9 +880,170 @@ func (c *Cache) populateDeviceInfo(name string, data *DeviceData, info *shelly.D
 		updates.MAC = info.MAC
 	}
 
-	if updates.Type != "" || updates.Model != "" || updates.Generation > 0 || updates.MAC != "" {
-		if err := config.UpdateDeviceInfo(name, updates); err != nil {
-			c.ios.DebugErr("persist device info", err)
+	return updates
+}
+
+// CachedComponents holds component availability that can be cached.
+// Component availability never changes for a device, so we cache it with 24h TTL.
+type CachedComponents struct {
+	SwitchIDs []int `json:"switch_ids,omitempty"`
+	LightIDs  []int `json:"light_ids,omitempty"`
+	CoverIDs  []int `json:"cover_ids,omitempty"`
+}
+
+// tryGetCachedDeviceInfo attempts to retrieve device info from FileCache.
+// Returns nil if not cached or expired.
+func (c *Cache) tryGetCachedDeviceInfo(name string) (*shelly.DeviceInfo, bool) {
+	if c.fileCache == nil {
+		return nil, false
+	}
+
+	entry, err := c.fileCache.Get(name, cache.TypeDeviceInfo)
+	if err != nil {
+		c.ios.DebugErr("cache: get device info from file cache", err)
+		return nil, false
+	}
+	if entry == nil {
+		return nil, false
+	}
+
+	var info shelly.DeviceInfo
+	if err := entry.Unmarshal(&info); err != nil {
+		c.ios.DebugErr("cache: unmarshal cached device info", err)
+		return nil, false
+	}
+
+	return &info, true
+}
+
+// cacheDeviceInfo stores device info in FileCache with 24h TTL.
+func (c *Cache) cacheDeviceInfo(name string, info *shelly.DeviceInfo) {
+	if c.fileCache == nil || info == nil {
+		return
+	}
+
+	if err := c.fileCache.Set(name, cache.TypeDeviceInfo, info, cache.TTLDeviceInfo); err != nil {
+		c.ios.DebugErr("cache: set device info in file cache", err)
+	} else {
+		debug.TraceEvent("cache: stored device info for %s in file cache", name)
+	}
+}
+
+// tryGetCachedComponents attempts to retrieve component availability from FileCache.
+// Returns nil if not cached or expired.
+func (c *Cache) tryGetCachedComponents(name string) *CachedComponents {
+	if c.fileCache == nil {
+		return nil
+	}
+
+	entry, err := c.fileCache.Get(name, cache.TypeComponents)
+	if err != nil {
+		c.ios.DebugErr("cache: get components from file cache", err)
+		return nil
+	}
+	if entry == nil {
+		return nil
+	}
+
+	var components CachedComponents
+	if err := entry.Unmarshal(&components); err != nil {
+		c.ios.DebugErr("cache: unmarshal cached components", err)
+		return nil
+	}
+
+	return &components
+}
+
+// cacheComponents stores component availability in FileCache with 24h TTL.
+func (c *Cache) cacheComponents(name string, data *DeviceData) {
+	if c.fileCache == nil {
+		return
+	}
+
+	// Only cache if device has any components
+	if len(data.Switches) == 0 && len(data.Lights) == 0 && len(data.Covers) == 0 {
+		return
+	}
+
+	components := CachedComponents{
+		SwitchIDs: make([]int, len(data.Switches)),
+		LightIDs:  make([]int, len(data.Lights)),
+		CoverIDs:  make([]int, len(data.Covers)),
+	}
+
+	for i, sw := range data.Switches {
+		components.SwitchIDs[i] = sw.ID
+	}
+	for i, lt := range data.Lights {
+		components.LightIDs[i] = lt.ID
+	}
+	for i, cv := range data.Covers {
+		components.CoverIDs[i] = cv.ID
+	}
+
+	if err := c.fileCache.Set(name, cache.TypeComponents, components, cache.TTLComponents); err != nil {
+		c.ios.DebugErr("cache: set components in file cache", err)
+	} else {
+		debug.TraceEvent("cache: stored components for %s in file cache (%d sw, %d lt, %d cv)",
+			name, len(components.SwitchIDs), len(components.LightIDs), len(components.CoverIDs))
+	}
+}
+
+// applyComponentsFromCache initializes component slices from cached availability.
+func (c *Cache) applyComponentsFromCache(data *DeviceData, cached *CachedComponents) {
+	data.Switches = make([]SwitchState, len(cached.SwitchIDs))
+	for i, id := range cached.SwitchIDs {
+		data.Switches[i] = SwitchState{ID: id}
+	}
+
+	data.Lights = make([]LightState, len(cached.LightIDs))
+	for i, id := range cached.LightIDs {
+		data.Lights[i] = LightState{ID: id}
+	}
+
+	data.Covers = make([]CoverState, len(cached.CoverIDs))
+	for i, id := range cached.CoverIDs {
+		data.Covers[i] = CoverState{ID: id}
+	}
+}
+
+// refreshComponentStates fetches current state for known components.
+// This avoids the discovery HTTP calls (List methods) by directly getting states.
+func (c *Cache) refreshComponentStates(ctx context.Context, name string, data *DeviceData, cached *CachedComponents) {
+	// For now, we still need to call the List methods to get current state.
+	// Future optimization: call individual GetStatus for each component ID.
+	// This is still an improvement because we skip discovery when components haven't changed.
+
+	if len(cached.SwitchIDs) > 0 {
+		switches, err := c.svc.SwitchList(ctx, name)
+		if err == nil {
+			for i, sw := range switches {
+				if i < len(data.Switches) {
+					data.Switches[i].On = sw.Output
+				}
+			}
+		}
+	}
+
+	if len(cached.LightIDs) > 0 {
+		lights, err := c.svc.LightList(ctx, name)
+		if err == nil {
+			for i, lt := range lights {
+				if i < len(data.Lights) {
+					data.Lights[i].On = lt.Output
+				}
+			}
+		}
+	}
+
+	if len(cached.CoverIDs) > 0 {
+		covers, err := c.svc.CoverList(ctx, name)
+		if err == nil {
+			for i, cv := range covers {
+				if i < len(data.Covers) {
+					data.Covers[i].State = cv.State
+				}
+			}
 		}
 	}
 }

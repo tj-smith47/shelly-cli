@@ -199,8 +199,8 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 
 	applyTUITheme(cfg, f.IOStreams())
 
-	// Create shared cache
-	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams())
+	// Create shared cache with FileCache for persistent static data caching
+	deviceCache := cache.New(ctx, f.ShellyService(), f.IOStreams(), f.FileCache())
 
 	// Create shared event stream (WebSocket for Gen2+, polling for Gen1)
 	eventStream := automation.NewEventStream(f.ShellyService())
