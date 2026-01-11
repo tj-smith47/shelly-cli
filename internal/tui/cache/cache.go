@@ -997,22 +997,34 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 
-		// Refresh a single device
+		// Refresh a single device - copy Device while holding lock to avoid race
 		c.mu.RLock()
 		data := c.devices[msg.Name]
+		var device model.Device
+		if data != nil {
+			device = data.Device // Copy struct while holding lock
+		}
 		c.mu.RUnlock()
 
 		if data == nil {
 			return nil
 		}
-		return c.fetchDeviceWithID(msg.Name, data.Device)
+		return c.fetchDeviceWithID(msg.Name, device)
 
 	case FocusDebounceMsg:
 		// Debounced fetch for focused device - only trigger if still focused
+		// Copy all needed values while holding lock to avoid race conditions
 		c.mu.RLock()
 		currentFocus := c.focusedDevice
 		data := c.devices[msg.Name]
 		wsConnected := c.wsConnected[msg.Name]
+		var hasWiFi, hasSys bool
+		var device model.Device
+		if data != nil {
+			hasWiFi = data.WiFi != nil
+			hasSys = data.Sys != nil
+			device = data.Device // Copy struct while holding lock
+		}
 		c.mu.RUnlock()
 
 		// Only fetch if this device is still focused (user stopped scrolling)
@@ -1027,7 +1039,7 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		if wsConnected {
 			debug.TraceEvent("FocusDebounceMsg: skipping HTTP for %s (WebSocket connected)", msg.Name)
 			// Only fetch extended status if missing
-			if data.WiFi == nil || data.Sys == nil {
+			if !hasWiFi || !hasSys {
 				return func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} }
 			}
 			return nil
@@ -1036,7 +1048,7 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		debug.TraceEvent("FocusDebounceMsg: triggering fetch for %s", msg.Name)
 		// No WebSocket - need HTTP fetch for device status and extended status
 		return tea.Batch(
-			c.fetchDeviceWithID(deviceName, data.Device),
+			c.fetchDeviceWithID(deviceName, device),
 			func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} },
 		)
 

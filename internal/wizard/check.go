@@ -5,13 +5,17 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
-	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
 
 // RunCheck verifies the current setup without making changes.
 func RunCheck(f *cmdutil.Factory) error {
 	ios := f.IOStreams()
+	cfgMgr, err := f.ConfigManager()
+	if err != nil {
+		ios.DebugErr("get config manager", err)
+		return err
+	}
 
 	ios.Println("")
 	ios.Println(theme.Title().Render("Shelly CLI Setup Check"))
@@ -25,7 +29,7 @@ func RunCheck(f *cmdutil.Factory) error {
 	if configExists {
 		ios.Success("Config file: %s", configPath)
 
-		cfg := config.Get()
+		cfg := cfgMgr.Get()
 		if err := ValidateConfig(cfg); err != nil {
 			ios.Warning("Config validation: %v", err)
 			issues++
@@ -44,7 +48,7 @@ func RunCheck(f *cmdutil.Factory) error {
 
 	ios.Println("")
 
-	devices := config.ListDevices()
+	devices := cfgMgr.ListDevices()
 	if len(devices) > 0 {
 		ios.Success("Registered devices: %d", len(devices))
 		for name, d := range devices {
@@ -73,7 +77,7 @@ func RunCheck(f *cmdutil.Factory) error {
 
 	ios.Println("")
 
-	cfg := config.Get()
+	cfg := cfgMgr.Get()
 	if cfg.Cloud.AccessToken != "" {
 		ios.Success("Cloud auth: configured")
 	} else {
