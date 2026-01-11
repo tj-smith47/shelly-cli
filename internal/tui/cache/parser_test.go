@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
 // --- Test Data: Gen2 Device Responses ---
@@ -775,6 +776,418 @@ func TestApplyIncrementalUpdate_EM1(t *testing.T) {
 	assertFloat(t, "power", 800.0, data.Power)
 	assertFloat(t, "voltage", 232.0, data.Voltage)
 	assertFloat(t, "current", 3.5, data.Current)
+}
+
+// --- Additional Device Type Tests (Phase 7) ---
+
+// mockPlus1PMStatus simulates a Shelly Plus 1PM response (single switch with PM).
+var mockPlus1PMStatus = map[string]json.RawMessage{
+	"switch:0": json.RawMessage(`{
+		"id": 0,
+		"source": "button",
+		"output": true,
+		"apower": 75.5,
+		"voltage": 231.0,
+		"current": 0.327,
+		"aenergy": {"total": 5678.90},
+		"temperature": {"tC": 35.8}
+	}`),
+	"sys": json.RawMessage(`{
+		"mac": "AABB11223344",
+		"uptime": 43200,
+		"ram_free": 40960,
+		"ram_size": 65536,
+		"fs_free": 122880,
+		"fs_size": 204800
+	}`),
+	"wifi": json.RawMessage(`{
+		"sta_ip": "192.168.1.75",
+		"status": "got ip",
+		"ssid": "Plus1PMNetwork",
+		"rssi": -62
+	}`),
+}
+
+func TestParseFullStatus_Plus1PM(t *testing.T) {
+	t.Parallel()
+	parsed, err := ParseFullStatus("plus-1pm", mockPlus1PMStatus)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check single switch
+	if len(parsed.Switches) != 1 {
+		t.Errorf("expected 1 switch, got %d", len(parsed.Switches))
+	}
+	if !parsed.Switches[0].On {
+		t.Error("expected switch to be on")
+	}
+	if parsed.Switches[0].Source != "button" {
+		t.Errorf("expected source 'button', got '%s'", parsed.Switches[0].Source)
+	}
+
+	// Check power metrics
+	assertFloat(t, "power", 75.5, parsed.Power)
+	assertFloat(t, "voltage", 231.0, parsed.Voltage)
+	assertFloat(t, "current", 0.327, parsed.Current)
+	assertFloat(t, "totalEnergy", 5678.90, parsed.TotalEnergy)
+	assertFloat(t, "temperature", 35.8, parsed.Temperature)
+
+	// Check WiFi
+	if parsed.WiFi == nil {
+		t.Fatal("expected WiFi to be parsed")
+	}
+	if parsed.WiFi.SSID != "Plus1PMNetwork" {
+		t.Errorf("expected SSID 'Plus1PMNetwork', got '%s'", parsed.WiFi.SSID)
+	}
+
+	// Check MAC
+	if parsed.MAC != "AABB11223344" {
+		t.Errorf("expected MAC 'AABB11223344', got '%s'", parsed.MAC)
+	}
+}
+
+// mockPro4PMStatus simulates a Shelly Pro 4PM response (4 switches with PM).
+var mockPro4PMStatus = map[string]json.RawMessage{
+	"switch:0": json.RawMessage(`{
+		"id": 0,
+		"output": true,
+		"apower": 100.0,
+		"voltage": 230.5,
+		"current": 0.435
+	}`),
+	"switch:1": json.RawMessage(`{
+		"id": 1,
+		"output": false,
+		"apower": 0.0,
+		"voltage": 230.5,
+		"current": 0.0
+	}`),
+	"switch:2": json.RawMessage(`{
+		"id": 2,
+		"output": true,
+		"apower": 250.0,
+		"voltage": 230.5,
+		"current": 1.087
+	}`),
+	"switch:3": json.RawMessage(`{
+		"id": 3,
+		"output": true,
+		"apower": 50.0,
+		"voltage": 230.5,
+		"current": 0.217
+	}`),
+	"sys": json.RawMessage(`{
+		"mac": "FFEEDD998877",
+		"uptime": 172800,
+		"ram_free": 51200,
+		"ram_size": 131072,
+		"fs_free": 204800,
+		"fs_size": 409600
+	}`),
+}
+
+func TestParseFullStatus_Pro4PM(t *testing.T) {
+	t.Parallel()
+	parsed, err := ParseFullStatus("pro-4pm", mockPro4PMStatus)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check 4 switches
+	if len(parsed.Switches) != 4 {
+		t.Errorf("expected 4 switches, got %d", len(parsed.Switches))
+	}
+
+	// Count on/off states
+	onCount := 0
+	offCount := 0
+	for _, sw := range parsed.Switches {
+		if sw.On {
+			onCount++
+		} else {
+			offCount++
+		}
+	}
+	if onCount != 3 {
+		t.Errorf("expected 3 switches on, got %d", onCount)
+	}
+	if offCount != 1 {
+		t.Errorf("expected 1 switch off, got %d", offCount)
+	}
+
+	// Power should aggregate from all switches (100 + 0 + 250 + 50 = 400)
+	assertFloat(t, "power", 400.0, parsed.Power)
+	assertFloat(t, "voltage", 230.5, parsed.Voltage)
+}
+
+// TestDetectComponents_Plus1PM verifies Plus 1PM detection.
+func TestDetectComponents_Plus1PM(t *testing.T) {
+	t.Parallel()
+
+	// Plus 1PM models - patterns from componentRules: PLUS1, PRO1, SHSW, SNSW
+	models := []string{
+		"SNSW-001P16EU", // Plus 1PM model ID (matches SNSW)
+		"PLUS1PM",       // Plus 1 PM (matches PLUS1)
+	}
+
+	for _, m := range models {
+		caps := DetectComponents(m)
+		if !caps.HasSwitches {
+			t.Errorf("DetectComponents(%q): expected HasSwitches=true", m)
+		}
+		// Note: PM detection depends on "PM" in the model string
+	}
+}
+
+// TestDetectComponents_Pro4PM verifies Pro 4PM detection.
+func TestDetectComponents_Pro4PM(t *testing.T) {
+	t.Parallel()
+
+	// Pro 4PM models - patterns from componentRules: PRO4
+	models := []string{
+		"SPSW-PRO4PM16EU", // Pro 4PM with PRO4 in model
+		"PRO4PM",          // Matches PRO4
+	}
+
+	for _, m := range models {
+		caps := DetectComponents(m)
+		if !caps.HasSwitches {
+			t.Errorf("DetectComponents(%q): expected HasSwitches=true", m)
+		}
+	}
+}
+
+// --- Integration-style Tests (Phase 7) ---
+
+// TestHTTPToWebSocketTransition tests the flow of initial HTTP fetch followed by WebSocket updates.
+func TestHTTPToWebSocketTransition(t *testing.T) {
+	t.Parallel()
+
+	// Start with HTTP response
+	httpStatus := map[string]json.RawMessage{
+		"switch:0": json.RawMessage(`{"id": 0, "output": false, "apower": 0.0}`),
+		"sys":      json.RawMessage(`{"mac": "AABBCCDD0011", "uptime": 100}`),
+	}
+
+	parsed, err := ParseFullStatus("test-device", httpStatus)
+	if err != nil {
+		t.Fatalf("HTTP parse error: %v", err)
+	}
+
+	// Apply to DeviceData (simulating initial HTTP fetch)
+	data := &DeviceData{
+		Device: model.Device{Name: "test-device"},
+	}
+	ApplyParsedStatus(data, parsed)
+
+	// Verify initial state from HTTP
+	if len(data.Switches) != 1 {
+		t.Fatalf("expected 1 switch after HTTP, got %d", len(data.Switches))
+	}
+	if data.Switches[0].On {
+		t.Error("expected switch to be off after HTTP fetch")
+	}
+
+	// Simulate WebSocket update - switch turns on
+	wsStatus := json.RawMessage(`{"output": true, "apower": 50.0}`)
+	ApplyIncrementalUpdate(data, ComponentSwitch, 0, wsStatus)
+
+	// Verify WebSocket update applied correctly
+	if !data.Switches[0].On {
+		t.Error("expected switch to be on after WebSocket update")
+	}
+	assertFloat(t, "power after WS", 50.0, data.Power)
+
+	// Simulate another WebSocket update - switch turns off
+	wsStatus2 := json.RawMessage(`{"output": false, "apower": 0.0}`)
+	ApplyIncrementalUpdate(data, ComponentSwitch, 0, wsStatus2)
+
+	if data.Switches[0].On {
+		t.Error("expected switch to be off after second WebSocket update")
+	}
+	assertFloat(t, "power after WS2", 0.0, data.Power)
+}
+
+// TestMultipleSwitchWebSocketUpdates tests WebSocket updates for multiple switches.
+func TestMultipleSwitchWebSocketUpdates(t *testing.T) {
+	t.Parallel()
+
+	// Start with 2 switches from HTTP
+	data := &DeviceData{
+		Device:   model.Device{Name: "multi-switch"},
+		Switches: []SwitchState{{ID: 0, On: false}, {ID: 1, On: false}},
+	}
+
+	// WebSocket update for switch 1 only
+	wsStatus := json.RawMessage(`{"output": true, "apower": 100.0}`)
+	ApplyIncrementalUpdate(data, ComponentSwitch, 1, wsStatus)
+
+	// Verify only switch 1 changed
+	if data.Switches[0].On {
+		t.Error("switch 0 should still be off")
+	}
+	if !data.Switches[1].On {
+		t.Error("switch 1 should be on")
+	}
+
+	// WebSocket update for switch 0
+	wsStatus2 := json.RawMessage(`{"output": true, "apower": 50.0}`)
+	ApplyIncrementalUpdate(data, ComponentSwitch, 0, wsStatus2)
+
+	// Both should now be on
+	if !data.Switches[0].On {
+		t.Error("switch 0 should now be on")
+	}
+	if !data.Switches[1].On {
+		t.Error("switch 1 should still be on")
+	}
+}
+
+// TestCoverWebSocketUpdates tests WebSocket updates for cover state changes.
+func TestCoverWebSocketUpdates(t *testing.T) {
+	t.Parallel()
+
+	data := &DeviceData{
+		Device: model.Device{Name: "cover-device"},
+		Covers: []CoverState{{ID: 0, State: CoverStateStopped}},
+	}
+
+	// Cover starts opening
+	ApplyIncrementalUpdate(data, ComponentCover, 0, json.RawMessage(`{"state": "opening", "apower": 25.0}`))
+	if data.Covers[0].State != "opening" {
+		t.Errorf("expected state 'opening', got '%s'", data.Covers[0].State)
+	}
+	assertFloat(t, "power during opening", 25.0, data.Power)
+
+	// Cover finishes opening
+	ApplyIncrementalUpdate(data, ComponentCover, 0, json.RawMessage(`{"state": "open", "apower": 0.0}`))
+	if data.Covers[0].State != "open" {
+		t.Errorf("expected state 'open', got '%s'", data.Covers[0].State)
+	}
+	assertFloat(t, "power after open", 0.0, data.Power)
+
+	// Cover starts closing
+	ApplyIncrementalUpdate(data, ComponentCover, 0, json.RawMessage(`{"state": "closing", "apower": 25.0}`))
+	if data.Covers[0].State != "closing" {
+		t.Errorf("expected state 'closing', got '%s'", data.Covers[0].State)
+	}
+
+	// Cover finishes closing
+	ApplyIncrementalUpdate(data, ComponentCover, 0, json.RawMessage(`{"state": "closed", "apower": 0.0}`))
+	if data.Covers[0].State != "closed" {
+		t.Errorf("expected state 'closed', got '%s'", data.Covers[0].State)
+	}
+}
+
+// TestEnergyMeterWebSocketUpdates tests WebSocket updates for Pro 3EM.
+func TestEnergyMeterWebSocketUpdates(t *testing.T) {
+	t.Parallel()
+
+	// Start with EM data from HTTP
+	data := &DeviceData{
+		Device:  model.Device{Name: "pro-3em"},
+		Power:   2000.0,
+		Current: 10.0,
+		Voltage: 230.0,
+	}
+
+	// WebSocket update with new power reading
+	emStatus := json.RawMessage(`{"total_act_power": 2500.0, "total_current": 11.5, "a_voltage": 231.0}`)
+	ApplyIncrementalUpdate(data, ComponentEM, 0, emStatus)
+
+	assertFloat(t, "power after EM update", 2500.0, data.Power)
+	assertFloat(t, "current after EM update", 11.5, data.Current)
+	assertFloat(t, "voltage after EM update", 231.0, data.Voltage)
+}
+
+// TestGen1HTTPParsing tests Gen1 device HTTP response parsing.
+func TestGen1HTTPParsing(t *testing.T) {
+	t.Parallel()
+
+	gen1Status := map[string]json.RawMessage{
+		"relays":   json.RawMessage(`[{"ison": true, "source": "timer"}]`),
+		"meters":   json.RawMessage(`[{"power": 75.0, "total": 500.0}]`),
+		"wifi_sta": json.RawMessage(`{"connected": true, "ssid": "Gen1Net", "ip": "192.168.1.30", "rssi": -55}`),
+		"uptime":   json.RawMessage(`3600`),
+		"mac":      json.RawMessage(`"AABBCC112233"`),
+	}
+
+	parsed, err := ParseGen1Status("gen1-device", gen1Status)
+	if err != nil {
+		t.Fatalf("Gen1 parse error: %v", err)
+	}
+
+	// Apply to DeviceData
+	data := &DeviceData{
+		Device: model.Device{Name: "gen1-device"},
+	}
+	ApplyParsedStatus(data, parsed)
+
+	// Verify Gen1 data applied correctly
+	if data.Device.Generation != 1 {
+		t.Errorf("expected generation 1, got %d", data.Device.Generation)
+	}
+	if len(data.Switches) != 1 {
+		t.Fatalf("expected 1 switch, got %d", len(data.Switches))
+	}
+	if !data.Switches[0].On {
+		t.Error("expected switch to be on")
+	}
+	if data.Switches[0].Source != "timer" {
+		t.Errorf("expected source 'timer', got '%s'", data.Switches[0].Source)
+	}
+	assertFloat(t, "power", 75.0, data.Power)
+	assertFloat(t, "totalEnergy", 500.0, data.TotalEnergy)
+
+	// Verify WiFi
+	if data.WiFi == nil {
+		t.Fatal("expected WiFi to be set")
+	}
+	if data.WiFi.SSID != "Gen1Net" {
+		t.Errorf("expected SSID 'Gen1Net', got '%s'", data.WiFi.SSID)
+	}
+}
+
+// TestPreserveWiFiSysAcrossRefresh tests that WiFi/Sys are preserved across HTTP refresh.
+func TestPreserveWiFiSysAcrossRefresh(t *testing.T) {
+	t.Parallel()
+
+	// Initial data with WiFi and Sys already populated
+	data := &DeviceData{
+		Device: model.Device{Name: "test"},
+		WiFi: &shelly.WiFiStatus{
+			SSID: "InitialNetwork",
+			RSSI: -50,
+		},
+		Sys: &shelly.SysStatus{
+			Uptime: 1000,
+		},
+	}
+
+	// Parse new status that doesn't include WiFi/Sys
+	parsed := &ParsedStatus{
+		DeviceID: "test",
+		Switches: []SwitchState{{ID: 0, On: true}},
+		Power:    100.0,
+		// WiFi and Sys are nil
+	}
+
+	ApplyParsedStatus(data, parsed)
+
+	// WiFi and Sys should be preserved (not overwritten with nil)
+	if data.WiFi == nil {
+		t.Fatal("WiFi should be preserved")
+	}
+	if data.WiFi.SSID != "InitialNetwork" {
+		t.Errorf("expected SSID 'InitialNetwork', got '%s'", data.WiFi.SSID)
+	}
+	if data.Sys == nil {
+		t.Fatal("Sys should be preserved")
+	}
+	if data.Sys.Uptime != 1000 {
+		t.Errorf("expected uptime 1000, got %d", data.Sys.Uptime)
+	}
 }
 
 // --- Helper Functions ---

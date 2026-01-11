@@ -152,7 +152,7 @@ func DefaultRefreshConfig() RefreshConfig {
 // devices in small batches with delays between waves.
 type WaveConfig struct {
 	FirstWaveSize      int           // Devices in first wave (default: 2)
-	SubsequentWaveSize int           // Devices in later waves (default: 1)
+	SubsequentWaveSize int           // Devices in subsequent waves (default: 1)
 	WaveDelay          time.Duration // Delay between waves (default: 500ms)
 	InitialLoadDelay   time.Duration // Longer delay for initial load (default: 750ms)
 }
