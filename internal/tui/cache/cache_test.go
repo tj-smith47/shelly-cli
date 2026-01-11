@@ -403,7 +403,8 @@ func TestCache_FetchedCount(t *testing.T) {
 func TestCreateWaves_Empty(t *testing.T) {
 	t.Parallel()
 
-	waves := createWaves(map[string]model.Device{})
+	c := NewForTesting()
+	waves := c.createWaves(map[string]model.Device{})
 	if waves != nil {
 		t.Errorf("createWaves(empty) = %v, want nil", waves)
 	}
@@ -412,11 +413,12 @@ func TestCreateWaves_Empty(t *testing.T) {
 func TestCreateWaves_SingleDevice(t *testing.T) {
 	t.Parallel()
 
+	c := NewForTesting()
 	devices := map[string]model.Device{
 		"kitchen": {Address: "192.168.1.100", Generation: 2},
 	}
 
-	waves := createWaves(devices)
+	waves := c.createWaves(devices)
 	if len(waves) != 1 {
 		t.Fatalf("createWaves() returned %d waves, want 1", len(waves))
 	}
@@ -425,57 +427,60 @@ func TestCreateWaves_SingleDevice(t *testing.T) {
 	}
 }
 
-func TestCreateWaves_ThreeDevices(t *testing.T) {
+func TestCreateWaves_TwoDevices(t *testing.T) {
 	t.Parallel()
 
-	// Three devices should fit in a single wave (first wave is 3)
+	c := NewForTesting()
+	// Two devices should fit in a single wave (first wave is 2)
 	devices := map[string]model.Device{
 		"a": {Address: "192.168.1.100", Generation: 2},
 		"b": {Address: "192.168.1.101", Generation: 2},
-		"c": {Address: "192.168.1.102", Generation: 2},
 	}
 
-	waves := createWaves(devices)
+	waves := c.createWaves(devices)
 	if len(waves) != 1 {
 		t.Fatalf("createWaves() returned %d waves, want 1", len(waves))
 	}
-	if len(waves[0]) != 3 {
-		t.Errorf("waves[0] has %d devices, want 3", len(waves[0]))
+	if len(waves[0]) != 2 {
+		t.Errorf("waves[0] has %d devices, want 2", len(waves[0]))
 	}
 }
 
 func TestCreateWaves_MultipleWaves(t *testing.T) {
 	t.Parallel()
 
-	// 7 devices: first wave = 3, then 2, then 2
+	c := NewForTesting()
+	// 5 devices: first wave = 2, then 1, then 1, then 1
 	devices := map[string]model.Device{
 		"a": {Address: "192.168.1.100", Generation: 2},
 		"b": {Address: "192.168.1.101", Generation: 2},
 		"c": {Address: "192.168.1.102", Generation: 2},
 		"d": {Address: "192.168.1.103", Generation: 2},
 		"e": {Address: "192.168.1.104", Generation: 2},
-		"f": {Address: "192.168.1.105", Generation: 2},
-		"g": {Address: "192.168.1.106", Generation: 2},
 	}
 
-	waves := createWaves(devices)
-	if len(waves) != 3 {
-		t.Fatalf("createWaves() returned %d waves, want 3", len(waves))
+	waves := c.createWaves(devices)
+	if len(waves) != 4 {
+		t.Fatalf("createWaves() returned %d waves, want 4", len(waves))
 	}
-	if len(waves[0]) != 3 {
-		t.Errorf("waves[0] has %d devices, want 3", len(waves[0]))
+	if len(waves[0]) != 2 {
+		t.Errorf("waves[0] has %d devices, want 2", len(waves[0]))
 	}
-	if len(waves[1]) != 2 {
-		t.Errorf("waves[1] has %d devices, want 2", len(waves[1]))
+	if len(waves[1]) != 1 {
+		t.Errorf("waves[1] has %d devices, want 1", len(waves[1]))
 	}
-	if len(waves[2]) != 2 {
-		t.Errorf("waves[2] has %d devices, want 2", len(waves[2]))
+	if len(waves[2]) != 1 {
+		t.Errorf("waves[2] has %d devices, want 1", len(waves[2]))
+	}
+	if len(waves[3]) != 1 {
+		t.Errorf("waves[3] has %d devices, want 1", len(waves[3]))
 	}
 }
 
 func TestCreateWaves_Gen2First(t *testing.T) {
 	t.Parallel()
 
+	c := NewForTesting()
 	// Gen2 devices should come before Gen1
 	devices := map[string]model.Device{
 		"gen1_a": {Address: "192.168.1.100", Generation: 1},
@@ -484,12 +489,12 @@ func TestCreateWaves_Gen2First(t *testing.T) {
 		"gen2_d": {Address: "192.168.1.103", Generation: 2},
 	}
 
-	waves := createWaves(devices)
+	waves := c.createWaves(devices)
 	if len(waves) < 1 {
 		t.Fatal("createWaves() returned no waves")
 	}
 
-	// First devices in first wave should be Gen2
+	// First wave of 2 should have both Gen2 devices
 	firstWave := waves[0]
 	gen2Count := 0
 	for _, df := range firstWave {
@@ -498,22 +503,23 @@ func TestCreateWaves_Gen2First(t *testing.T) {
 		}
 	}
 
-	// With 4 devices (2 Gen1, 2 Gen2), first wave of 3 should have both Gen2
-	if gen2Count < 2 {
-		t.Errorf("first wave has %d Gen2 devices, want at least 2", gen2Count)
+	// With first wave size of 2 and 2 Gen2 devices, first wave should have both Gen2
+	if gen2Count != 2 {
+		t.Errorf("first wave has %d Gen2 devices, want 2", gen2Count)
 	}
 }
 
 func TestCreateWaves_UnknownGenTreatedAsGen2(t *testing.T) {
 	t.Parallel()
 
+	c := NewForTesting()
 	// Generation 0 (unknown) should be treated as Gen2 (prioritized)
 	devices := map[string]model.Device{
 		"gen1":    {Address: "192.168.1.100", Generation: 1},
 		"unknown": {Address: "192.168.1.101", Generation: 0},
 	}
 
-	waves := createWaves(devices)
+	waves := c.createWaves(devices)
 	if len(waves) < 1 {
 		t.Fatal("createWaves() returned no waves")
 	}
@@ -521,6 +527,25 @@ func TestCreateWaves_UnknownGenTreatedAsGen2(t *testing.T) {
 	// Unknown generation should be first (treated as Gen2)
 	if waves[0][0].Device.Generation == 1 {
 		t.Error("Gen1 device should not be first; unknown generation should be prioritized")
+	}
+}
+
+func TestDefaultWaveConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultWaveConfig()
+
+	if cfg.FirstWaveSize != 2 {
+		t.Errorf("FirstWaveSize = %d, want 2", cfg.FirstWaveSize)
+	}
+	if cfg.SubsequentWaveSize != 1 {
+		t.Errorf("SubsequentWaveSize = %d, want 1", cfg.SubsequentWaveSize)
+	}
+	if cfg.WaveDelay != 500*time.Millisecond {
+		t.Errorf("WaveDelay = %v, want 500ms", cfg.WaveDelay)
+	}
+	if cfg.InitialLoadDelay != 750*time.Millisecond {
+		t.Errorf("InitialLoadDelay = %v, want 750ms", cfg.InitialLoadDelay)
 	}
 }
 
@@ -969,6 +994,11 @@ func TestCache_ScheduleDeviceRefresh_SkipsWebSocketDevices(t *testing.T) {
 	c := NewForTesting()
 	c.SetDeviceForTesting(model.Device{Name: "kitchen", Address: "192.168.1.100", Generation: 2}, true)
 
+	// Mark initial load complete - scheduleDeviceRefresh skips until this is true
+	c.mu.Lock()
+	c.initialLoadComplete = true
+	c.mu.Unlock()
+
 	// Without WebSocket - should return a command
 	cmd := c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
 	if cmd == nil {
@@ -980,6 +1010,30 @@ func TestCache_ScheduleDeviceRefresh_SkipsWebSocketDevices(t *testing.T) {
 	cmd = c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
 	if cmd != nil {
 		t.Error("expected scheduleDeviceRefresh to return nil for WebSocket-connected device")
+	}
+}
+
+func TestCache_ScheduleDeviceRefresh_SkipsDuringInitialLoad(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+	c.SetDeviceForTesting(model.Device{Name: "kitchen", Address: "192.168.1.100", Generation: 2}, true)
+
+	// Initial load not complete - should return nil even for non-WebSocket devices
+	cmd := c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	if cmd != nil {
+		t.Error("expected scheduleDeviceRefresh to return nil during initial load")
+	}
+
+	// Mark initial load complete
+	c.mu.Lock()
+	c.initialLoadComplete = true
+	c.mu.Unlock()
+
+	// Now it should return a command
+	cmd = c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	if cmd == nil {
+		t.Error("expected scheduleDeviceRefresh to return a command after initial load complete")
 	}
 }
 

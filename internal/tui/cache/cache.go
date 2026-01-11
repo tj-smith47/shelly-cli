@@ -147,6 +147,27 @@ func DefaultRefreshConfig() RefreshConfig {
 	}
 }
 
+// WaveConfig holds wave loading configuration for initial device loading.
+// Wave loading prevents overwhelming devices during TUI startup by loading
+// devices in small batches with delays between waves.
+type WaveConfig struct {
+	FirstWaveSize      int           // Devices in first wave (default: 2)
+	SubsequentWaveSize int           // Devices in later waves (default: 1)
+	WaveDelay          time.Duration // Delay between waves (default: 500ms)
+	InitialLoadDelay   time.Duration // Longer delay for initial load (default: 750ms)
+}
+
+// DefaultWaveConfig returns sensible defaults for wave loading.
+// Conservative defaults to avoid overwhelming devices during startup.
+func DefaultWaveConfig() WaveConfig {
+	return WaveConfig{
+		FirstWaveSize:      2,                      // Small first wave for quick UI feedback
+		SubsequentWaveSize: 1,                      // Very conservative - one device at a time
+		WaveDelay:          500 * time.Millisecond, // Standard delay between waves
+		InitialLoadDelay:   750 * time.Millisecond, // Longer delay during initial load
+	}
+}
+
 // Cache holds shared device data for all TUI components.
 type Cache struct {
 	mu      sync.RWMutex
@@ -158,6 +179,7 @@ type Cache struct {
 	svc           *shelly.Service
 	ios           *iostreams.IOStreams
 	refreshConfig RefreshConfig // Adaptive refresh intervals
+	waveConfig    WaveConfig    // Wave loading configuration
 
 	// FileCache for persisting static device data (model, gen, MAC, components)
 	// This data never changes, so we cache it with 24h TTL to avoid redundant HTTP calls
@@ -166,6 +188,13 @@ type Cache struct {
 	// Track fetch progress
 	pendingCount int
 	initialLoad  bool
+
+	// initialLoadComplete tracks when all devices have been fetched at least once.
+	// This is separate from initialLoad - initialLoad tracks whether we're in the initial
+	// loading phase, while initialLoadComplete tracks whether that phase has finished.
+	// Used to determine when to start per-device HTTP polling (only after initial load
+	// AND for devices without WebSocket).
+	initialLoadComplete bool
 
 	// Wave loading state
 	currentWave int
@@ -195,6 +224,7 @@ func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, fc 
 		svc:                svc,
 		ios:                ios,
 		refreshConfig:      DefaultRefreshConfig(),
+		waveConfig:         DefaultWaveConfig(),
 		fileCache:          fc,
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
@@ -211,6 +241,7 @@ func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostrea
 		svc:                svc,
 		ios:                ios,
 		refreshConfig:      cfg,
+		waveConfig:         DefaultWaveConfig(),
 		fileCache:          fc,
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
@@ -331,7 +362,19 @@ func (c *Cache) handleFullStatus(data *DeviceData, evt *events.FullStatusEvent) 
 // scheduleDeviceRefresh schedules refresh for a single device based on its state.
 // Adds random jitter (0-50% of interval) to prevent all devices refreshing simultaneously.
 // Skips scheduling for devices with active WebSocket connections (they receive real-time updates).
+// Also skips scheduling during initial load - let wave loading complete first.
 func (c *Cache) scheduleDeviceRefresh(name string, data *DeviceData) tea.Cmd {
+	// Don't start per-device polling until initial load is complete
+	// This allows wave loading to finish without interference
+	c.mu.RLock()
+	loadComplete := c.initialLoadComplete
+	c.mu.RUnlock()
+
+	if !loadComplete {
+		debug.TraceEvent("scheduleDeviceRefresh: skipping %s (initial load not complete)", name)
+		return nil
+	}
+
 	// Skip scheduling HTTP refresh if device has active WebSocket
 	// WebSocket provides real-time updates, no polling needed
 	if c.IsWebSocketConnected(name) {
@@ -437,7 +480,7 @@ func (c *Cache) loadDevicesWave() tea.Cmd {
 		c.mu.Unlock()
 
 		// Create waves (Gen2 first for resilience)
-		waves := createWaves(deviceMap)
+		waves := c.createWaves(deviceMap)
 		if len(waves) == 0 {
 			return AllDevicesLoadedMsg{}
 		}
@@ -453,8 +496,8 @@ func (c *Cache) loadDevicesWave() tea.Cmd {
 
 // createWaves creates device loading waves with Gen2 devices first.
 // Gen2 devices (ESP32) are more resilient and can handle concurrent requests better.
-// Wave sizing: first wave is 3 devices for quick UI feedback, then 2 per wave.
-func createWaves(devices map[string]model.Device) [][]deviceFetch {
+// Wave sizing uses WaveConfig: default is 2 devices first wave, then 1 per wave.
+func (c *Cache) createWaves(devices map[string]model.Device) [][]deviceFetch {
 	if len(devices) == 0 {
 		return nil
 	}
@@ -479,11 +522,17 @@ func createWaves(devices map[string]model.Device) [][]deviceFetch {
 		return fetches[i].Name < fetches[j].Name
 	})
 
-	// Determine wave sizes
-	// First wave: 3 devices for quick feedback
-	// Subsequent waves: 2 devices to avoid overloading
-	firstWaveSize := 3
-	subsequentWaveSize := 2
+	// Use configurable wave sizes
+	firstWaveSize := c.waveConfig.FirstWaveSize
+	subsequentWaveSize := c.waveConfig.SubsequentWaveSize
+
+	// Handle edge case where config might be 0 or less
+	if firstWaveSize <= 0 {
+		firstWaveSize = 2
+	}
+	if subsequentWaveSize <= 0 {
+		subsequentWaveSize = 1
+	}
 
 	if len(fetches) <= firstWaveSize {
 		return [][]deviceFetch{fetches}
@@ -515,7 +564,17 @@ func (c *Cache) processWave(msg WaveMsg) tea.Cmd {
 
 	// Schedule next wave with delay if there are more
 	if len(msg.Remaining) > 0 {
-		cmds = append(cmds, tea.Tick(300*time.Millisecond, func(time.Time) tea.Msg {
+		// Use longer delay during initial load to be more gentle on devices
+		c.mu.RLock()
+		isInitialLoad := c.initialLoad
+		c.mu.RUnlock()
+
+		delay := c.waveConfig.WaveDelay
+		if isInitialLoad {
+			delay = c.waveConfig.InitialLoadDelay
+		}
+
+		cmds = append(cmds, tea.Tick(delay, func(time.Time) tea.Msg {
 			return WaveMsg{
 				Wave:      msg.Wave + 1,
 				Devices:   msg.Remaining[0],
@@ -815,6 +874,8 @@ func (c *Cache) handleDeviceUpdate(msg DeviceUpdateMsg) tea.Cmd {
 	allDone := c.pendingCount <= 0 && c.initialLoad
 	if allDone {
 		c.initialLoad = false
+		c.initialLoadComplete = true // Mark that initial load phase has finished
+		debug.TraceEvent("cache: initial load complete")
 	}
 	c.mu.Unlock()
 	debug.TraceUnlock("cache", "Lock", "handleDeviceUpdate:"+msg.Name)
@@ -1209,6 +1270,7 @@ func NewForTesting() *Cache {
 		macToIP:            make(map[string]string),
 		wsConnected:        make(map[string]bool),
 		refreshConfig:      DefaultRefreshConfig(),
+		waveConfig:         DefaultWaveConfig(),
 	}
 }
 
