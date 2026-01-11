@@ -53,24 +53,21 @@ func TestNewCommand_Subcommands(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	subcommands := cmd.Commands()
-	if len(subcommands) != 3 {
-		t.Errorf("Subcommand count = %d, want 3", len(subcommands))
+	if len(subcommands) != 5 {
+		t.Errorf("Subcommand count = %d, want 5", len(subcommands))
 	}
 
 	expectedSubcommands := map[string]bool{
+		"disable": false,
+		"enable":  false,
 		"list":    false,
 		"status":  false,
 		"trigger": false,
 	}
 
 	for _, sub := range subcommands {
-		switch sub.Use {
-		case "list", "list <device>":
-			expectedSubcommands["list"] = true
-		case "status", "status <device>":
-			expectedSubcommands["status"] = true
-		case "trigger", "trigger <device>":
-			expectedSubcommands["trigger"] = true
+		if _, ok := expectedSubcommands[sub.Name()]; ok {
+			expectedSubcommands[sub.Name()] = true
 		}
 	}
 

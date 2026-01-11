@@ -27,7 +27,7 @@ func TestNewCommand_HasSubcommands(t *testing.T) {
 	t.Parallel()
 	cmd := NewCommand(cmdutil.NewFactory())
 
-	expected := []string{"coiot", "log", "methods", "rpc", "websocket"}
+	expected := []string{"coiot", "log", "websocket"}
 	subCmds := cmd.Commands()
 
 	if len(subCmds) != len(expected) {

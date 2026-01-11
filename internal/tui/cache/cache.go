@@ -184,6 +184,10 @@ type Cache struct {
 
 	// MAC-to-IP mapping for instant IP remapping (updated on each device fetch)
 	macToIP map[string]string
+
+	// WebSocket connection tracking - devices with active WebSocket don't need HTTP polling
+	// Gen2+ devices connected via WebSocket receive real-time updates, so HTTP polling is redundant
+	wsConnected map[string]bool
 }
 
 // New creates a new shared cache with default refresh configuration.
@@ -197,6 +201,7 @@ func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, fc 
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
+		wsConnected:        make(map[string]bool),
 		initialLoad:        true,
 	}
 }
@@ -212,6 +217,7 @@ func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostrea
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
+		wsConnected:        make(map[string]bool),
 		initialLoad:        true,
 	}
 }
@@ -225,11 +231,32 @@ func (c *Cache) Init() tea.Cmd {
 // This allows the cache to update device status in real-time when events arrive
 // via WebSocket (Gen2+) or polling (Gen1).
 // Also stores the event stream to publish synthetic events (e.g., offline from HTTP failure).
+// Tracks WebSocket connection state to skip HTTP polling for WebSocket-connected devices.
 func (c *Cache) SubscribeToEvents(es *automation.EventStream) {
 	c.eventStream = es
+
+	// Subscribe to events with connection state tracking
 	es.Subscribe(func(evt events.Event) {
+		// Track connection state changes
+		deviceID := evt.DeviceID()
+		switch evt.(type) {
+		case *events.DeviceOnlineEvent:
+			// Check if this device is connected via WebSocket
+			info := es.GetConnectionInfo(deviceID)
+			c.SetWebSocketConnected(deviceID, info.Type == automation.ConnectionWebSocket)
+		case *events.DeviceOfflineEvent:
+			// Device went offline - no longer has WebSocket connection
+			c.SetWebSocketConnected(deviceID, false)
+		}
+
+		// Process the event normally
 		c.handleDeviceEvent(evt)
 	})
+
+	// Initialize connection state for all currently connected devices
+	for name, info := range es.GetAllConnectionInfo() {
+		c.SetWebSocketConnected(name, info.Type == automation.ConnectionWebSocket)
+	}
 }
 
 // handleDeviceEvent processes an event from the shared EventStream.
@@ -570,7 +597,15 @@ func (c *Cache) parseSysStatus(data *DeviceData, rawStatus json.RawMessage) {
 
 // scheduleDeviceRefresh schedules refresh for a single device based on its state.
 // Adds random jitter (0-50% of interval) to prevent all devices refreshing simultaneously.
+// Skips scheduling for devices with active WebSocket connections (they receive real-time updates).
 func (c *Cache) scheduleDeviceRefresh(name string, data *DeviceData) tea.Cmd {
+	// Skip scheduling HTTP refresh if device has active WebSocket
+	// WebSocket provides real-time updates, no polling needed
+	if c.IsWebSocketConnected(name) {
+		debug.TraceEvent("scheduleDeviceRefresh: skipping %s (WebSocket connected)", name)
+		return nil
+	}
+
 	interval := c.getRefreshInterval(data)
 	// Add 0-50% jitter to stagger requests and prevent rate limiter congestion
 	// #nosec G404 - cryptographic randomness not needed for request jittering
@@ -1354,6 +1389,12 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		return c.handleDeviceUpdate(msg)
 
 	case DeviceRefreshMsg:
+		// Skip refresh for devices with active WebSocket (real-time updates)
+		if c.IsWebSocketConnected(msg.Name) {
+			debug.TraceEvent("DeviceRefreshMsg: skipping %s (WebSocket connected)", msg.Name)
+			return nil
+		}
+
 		// Refresh a single device
 		c.mu.RLock()
 		data := c.devices[msg.Name]
@@ -1369,15 +1410,29 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		c.mu.RLock()
 		currentFocus := c.focusedDevice
 		data := c.devices[msg.Name]
+		wsConnected := c.wsConnected[msg.Name]
 		c.mu.RUnlock()
 
 		// Only fetch if this device is still focused (user stopped scrolling)
 		if msg.Name != currentFocus || data == nil {
 			return nil
 		}
-		debug.TraceEvent("FocusDebounceMsg: triggering fetch for %s", msg.Name)
-		// Return both: device fetch AND signal for extended status fetch
+
 		deviceName := msg.Name // Capture for closure
+
+		// WebSocket provides real-time updates - skip HTTP fetch for device status
+		// But still fetch extended status (WiFi/Sys) if not yet loaded
+		if wsConnected {
+			debug.TraceEvent("FocusDebounceMsg: skipping HTTP for %s (WebSocket connected)", msg.Name)
+			// Only fetch extended status if missing
+			if data.WiFi == nil || data.Sys == nil {
+				return func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} }
+			}
+			return nil
+		}
+
+		debug.TraceEvent("FocusDebounceMsg: triggering fetch for %s", msg.Name)
+		// No WebSocket - need HTTP fetch for device status and extended status
 		return tea.Batch(
 			c.fetchDeviceWithID(deviceName, data.Device),
 			func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} },
@@ -1611,6 +1666,7 @@ func NewForTesting() *Cache {
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
+		wsConnected:        make(map[string]bool),
 		refreshConfig:      DefaultRefreshConfig(),
 	}
 }
@@ -1673,4 +1729,27 @@ func (c *Cache) UpdateMACMapping(mac, ip string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.macToIP[normalized] = ip
+}
+
+// SetWebSocketConnected updates the WebSocket connection state for a device.
+// When a device has an active WebSocket connection, HTTP polling is skipped
+// because real-time updates are received via WebSocket.
+func (c *Cache) SetWebSocketConnected(name string, connected bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if connected {
+		c.wsConnected[name] = true
+		debug.TraceEvent("cache: %s WebSocket connected, HTTP polling will be skipped", name)
+	} else {
+		delete(c.wsConnected, name)
+		debug.TraceEvent("cache: %s WebSocket disconnected, HTTP polling resumed", name)
+	}
+}
+
+// IsWebSocketConnected returns whether a device has an active WebSocket connection.
+// Devices with WebSocket connections receive real-time updates and don't need HTTP polling.
+func (c *Cache) IsWebSocketConnected(name string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.wsConnected[name]
 }

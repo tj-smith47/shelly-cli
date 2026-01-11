@@ -907,3 +907,109 @@ func TestWaveCompleteMsg(t *testing.T) {
 		t.Errorf("WaveCompleteMsg.Wave = %d, want 2", msg.Wave)
 	}
 }
+
+// === Tests for Phase 3: Connection-Aware Refresh ===
+
+func TestCache_SetWebSocketConnected(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+
+	// Initially not connected
+	if c.IsWebSocketConnected("kitchen") {
+		t.Error("expected kitchen to not be WebSocket connected initially")
+	}
+
+	// Set connected
+	c.SetWebSocketConnected("kitchen", true)
+	if !c.IsWebSocketConnected("kitchen") {
+		t.Error("expected kitchen to be WebSocket connected after SetWebSocketConnected(true)")
+	}
+
+	// Set disconnected
+	c.SetWebSocketConnected("kitchen", false)
+	if c.IsWebSocketConnected("kitchen") {
+		t.Error("expected kitchen to not be WebSocket connected after SetWebSocketConnected(false)")
+	}
+}
+
+func TestCache_SetWebSocketConnected_MultipleDevices(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+
+	// Connect two devices
+	c.SetWebSocketConnected("kitchen", true)
+	c.SetWebSocketConnected("office", true)
+
+	if !c.IsWebSocketConnected("kitchen") {
+		t.Error("expected kitchen to be WebSocket connected")
+	}
+	if !c.IsWebSocketConnected("office") {
+		t.Error("expected office to be WebSocket connected")
+	}
+	if c.IsWebSocketConnected("bedroom") {
+		t.Error("expected bedroom to not be WebSocket connected")
+	}
+
+	// Disconnect one
+	c.SetWebSocketConnected("kitchen", false)
+
+	if c.IsWebSocketConnected("kitchen") {
+		t.Error("expected kitchen to not be WebSocket connected after disconnect")
+	}
+	if !c.IsWebSocketConnected("office") {
+		t.Error("expected office to still be WebSocket connected")
+	}
+}
+
+func TestCache_ScheduleDeviceRefresh_SkipsWebSocketDevices(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+	c.SetDeviceForTesting(model.Device{Name: "kitchen", Address: "192.168.1.100", Generation: 2}, true)
+
+	// Without WebSocket - should return a command
+	cmd := c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	if cmd == nil {
+		t.Error("expected scheduleDeviceRefresh to return a command for non-WebSocket device")
+	}
+
+	// With WebSocket - should return nil
+	c.SetWebSocketConnected("kitchen", true)
+	cmd = c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
+	if cmd != nil {
+		t.Error("expected scheduleDeviceRefresh to return nil for WebSocket-connected device")
+	}
+}
+
+func TestCache_IsWebSocketConnected_ThreadSafe(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+
+	// Run concurrent reads and writes
+	done := make(chan bool)
+	for i := range 10 {
+		go func(i int) {
+			device := "device" + string(rune('0'+i))
+			c.SetWebSocketConnected(device, true)
+			_ = c.IsWebSocketConnected(device)
+			c.SetWebSocketConnected(device, false)
+			done <- true
+		}(i)
+	}
+
+	// Wait for all goroutines to complete
+	for range 10 {
+		<-done
+	}
+
+	// All devices should be disconnected now
+	for i := range 10 {
+		device := "device" + string(rune('0'+i))
+		if c.IsWebSocketConnected(device) {
+			t.Errorf("expected %s to be disconnected", device)
+		}
+	}
+}
