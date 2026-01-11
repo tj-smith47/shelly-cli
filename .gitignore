@@ -1,59 +1,63 @@
-# Agents & Session Files
-.claude/
-CLAUDE.md
-*.plan.md
-/*.txt
+# Ignore everything
+*
 
-# Binaries
-/shelly
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-bin/
-dist/
+# ==============================================================================
+# Include
+# ==============================================================================
+
+# Root files
+!.dockerignore
+!.gitignore
+!.golangci.yml
+!.goreleaser.yaml
+!CHANGELOG.md
+!CODE_OF_CONDUCT.md
+!CONTRIBUTING.md
+!Dockerfile
+!LICENSE
+!Makefile
+!NOTICE
+!README.md
+!SECURITY.md
+!go.mod
+!go.sum
+
+# Directories
+!.github/
+!.github/**
+!assets/
+!assets/**
+!cfg/
+!cfg/**
+!cmd/
+!cmd/**
+!completions/
+!completions/**
+!docs/
+!docs/**
+!examples/
+!examples/**
+!internal/
+!internal/**
+!scripts/
+!scripts/**
+
+# ==============================================================================
+# Exclude (within included directories)
+# ==============================================================================
+
+# Hugo generated
+docs/site/.hugo_build.lock
+docs/site/hugo_stats.json
+docs/site/node_modules/
+docs/site/public/
+docs/site/resources/
+
+# Plugin build output
 examples/plugins/*/shelly-*
 
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool
-*.out
-coverage.html
-
-# Dependency directories
-vendor/
-
-# Go workspace file
-go.work
-go.work.sum
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+# Editor/OS (can appear anywhere)
+*.sw[op]
 *~
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Local config (user-specific, not for repo)
-.shelly.y*l
-
-# Debug output (root level only, not internal/cmd/debug/)
-/debug
-*.log
-
-# GoReleaser
-dist/
-
-# Temporary files
-tmp/
-temp/
-docgen
-
-# Hugo
-.hugo_build.lock
