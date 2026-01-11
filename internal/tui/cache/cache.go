@@ -795,6 +795,7 @@ func (c *Cache) processWave(msg WaveMsg) tea.Cmd {
 }
 
 // fetchDeviceWithID fetches status for a single device with request ID tracking.
+// Uses a single GetFullStatus call instead of multiple component-specific calls.
 func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 	requestID := atomic.AddUint64(&c.requestCounter, 1)
 
@@ -810,7 +811,7 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		defer cancel()
 
 		// Try to get device info from FileCache first (it never changes, 24h TTL)
-		info, fromCache := c.tryGetCachedDeviceInfo(name)
+		info, _ := c.tryGetCachedDeviceInfo(name)
 
 		if info == nil {
 			// Not cached - fetch from device
@@ -830,34 +831,38 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 		data.Info = info
 		data.Online = true
 
-		// Populate device info (applies cached data to device model)
+		// Populate device info (applies cached data to device model + persists to config)
 		c.populateDeviceInfo(name, data, info)
 
-		// Get component states (Gen2+ only - Gen1 uses different relay API)
-		if info.Generation > 1 {
-			// Try to use cached component availability first
-			cachedComponents := c.tryGetCachedComponents(name)
-			if cachedComponents != nil {
-				debug.TraceEvent("cache: using cached components for %s", name)
-				c.applyComponentsFromCache(data, cachedComponents)
-				// Fetch current states for known components
-				c.refreshComponentStates(ctx, name, data, cachedComponents)
-			} else {
-				// First time - discover components and cache them
-				c.ios.DebugCat(iostreams.CategoryDevice, "cache: fetching component states for %s (gen %d)", name, info.Generation)
-				c.fetchSwitchStates(ctx, name, data)
-				c.fetchLightStates(ctx, name, data)
-				c.fetchCoverStates(ctx, name, data)
-				c.ios.DebugCat(iostreams.CategoryDevice, "cache: %s components: %d switches, %d lights, %d covers", name, len(data.Switches), len(data.Lights), len(data.Covers))
-				// Cache component availability for next time
-				c.cacheComponents(name, data)
-			}
-		} else if !fromCache {
-			c.ios.DebugCat(iostreams.CategoryDevice, "cache: skipping component fetch for %s (gen %d)", name, info.Generation)
+		// Single HTTP call to get all status (switches, lights, covers, power, WiFi, Sys)
+		statusMap, err := c.svc.GetFullStatusAuto(ctx, name)
+		if err != nil {
+			// Status fetch failed but device info succeeded - still mark as online with error
+			data.Error = err
+			c.ios.DebugErr("cache: get full status "+name, err)
+			return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
 		}
 
-		// Get monitoring snapshot for power metrics (always needed, it's dynamic data)
-		c.fetchMonitoringSnapshot(ctx, name, data)
+		// Parse using unified parser based on generation
+		var parsed *ParsedStatus
+		var parseErr error
+		if info.Generation == 1 {
+			parsed, parseErr = ParseGen1Status(name, statusMap)
+		} else {
+			parsed, parseErr = ParseFullStatus(name, statusMap)
+		}
+
+		if parseErr != nil {
+			c.ios.DebugErr("cache: parse full status "+name, parseErr)
+			// Continue with partial data rather than failing
+		}
+
+		if parsed != nil {
+			ApplyParsedStatus(data, parsed)
+
+			debug.TraceEvent("cache: %s parsed: %d switches, %d lights, %d covers, power=%.1fW",
+				name, len(data.Switches), len(data.Lights), len(data.Covers), data.Power)
+		}
 
 		return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}
 	}
@@ -918,14 +923,6 @@ func (c *Cache) buildDeviceUpdates(data *DeviceData, info *shelly.DeviceInfo) co
 	return updates
 }
 
-// CachedComponents holds component availability that can be cached.
-// Component availability never changes for a device, so we cache it with 24h TTL.
-type CachedComponents struct {
-	SwitchIDs []int `json:"switch_ids,omitempty"`
-	LightIDs  []int `json:"light_ids,omitempty"`
-	CoverIDs  []int `json:"cover_ids,omitempty"`
-}
-
 // tryGetCachedDeviceInfo attempts to retrieve device info from FileCache.
 // Returns nil if not cached or expired.
 func (c *Cache) tryGetCachedDeviceInfo(name string) (*shelly.DeviceInfo, bool) {
@@ -964,182 +961,6 @@ func (c *Cache) cacheDeviceInfo(name string, info *shelly.DeviceInfo) {
 	}
 }
 
-// tryGetCachedComponents attempts to retrieve component availability from FileCache.
-// Returns nil if not cached or expired.
-func (c *Cache) tryGetCachedComponents(name string) *CachedComponents {
-	if c.fileCache == nil {
-		return nil
-	}
-
-	entry, err := c.fileCache.Get(name, cache.TypeComponents)
-	if err != nil {
-		c.ios.DebugErr("cache: get components from file cache", err)
-		return nil
-	}
-	if entry == nil {
-		return nil
-	}
-
-	var components CachedComponents
-	if err := entry.Unmarshal(&components); err != nil {
-		c.ios.DebugErr("cache: unmarshal cached components", err)
-		return nil
-	}
-
-	return &components
-}
-
-// cacheComponents stores component availability in FileCache with 24h TTL.
-func (c *Cache) cacheComponents(name string, data *DeviceData) {
-	if c.fileCache == nil {
-		return
-	}
-
-	// Only cache if device has any components
-	if len(data.Switches) == 0 && len(data.Lights) == 0 && len(data.Covers) == 0 {
-		return
-	}
-
-	components := CachedComponents{
-		SwitchIDs: make([]int, len(data.Switches)),
-		LightIDs:  make([]int, len(data.Lights)),
-		CoverIDs:  make([]int, len(data.Covers)),
-	}
-
-	for i, sw := range data.Switches {
-		components.SwitchIDs[i] = sw.ID
-	}
-	for i, lt := range data.Lights {
-		components.LightIDs[i] = lt.ID
-	}
-	for i, cv := range data.Covers {
-		components.CoverIDs[i] = cv.ID
-	}
-
-	if err := c.fileCache.Set(name, cache.TypeComponents, components, cache.TTLComponents); err != nil {
-		c.ios.DebugErr("cache: set components in file cache", err)
-	} else {
-		debug.TraceEvent("cache: stored components for %s in file cache (%d sw, %d lt, %d cv)",
-			name, len(components.SwitchIDs), len(components.LightIDs), len(components.CoverIDs))
-	}
-}
-
-// applyComponentsFromCache initializes component slices from cached availability.
-func (c *Cache) applyComponentsFromCache(data *DeviceData, cached *CachedComponents) {
-	data.Switches = make([]SwitchState, len(cached.SwitchIDs))
-	for i, id := range cached.SwitchIDs {
-		data.Switches[i] = SwitchState{ID: id}
-	}
-
-	data.Lights = make([]LightState, len(cached.LightIDs))
-	for i, id := range cached.LightIDs {
-		data.Lights[i] = LightState{ID: id}
-	}
-
-	data.Covers = make([]CoverState, len(cached.CoverIDs))
-	for i, id := range cached.CoverIDs {
-		data.Covers[i] = CoverState{ID: id}
-	}
-}
-
-// refreshComponentStates fetches current state for known components.
-// This avoids the discovery HTTP calls (List methods) by directly getting states.
-func (c *Cache) refreshComponentStates(ctx context.Context, name string, data *DeviceData, cached *CachedComponents) {
-	// For now, we still need to call the List methods to get current state.
-	// Future optimization: call individual GetStatus for each component ID.
-	// This is still an improvement because we skip discovery when components haven't changed.
-
-	if len(cached.SwitchIDs) > 0 {
-		switches, err := c.svc.SwitchList(ctx, name)
-		if err == nil {
-			for i, sw := range switches {
-				if i < len(data.Switches) {
-					data.Switches[i].On = sw.Output
-				}
-			}
-		}
-	}
-
-	if len(cached.LightIDs) > 0 {
-		lights, err := c.svc.LightList(ctx, name)
-		if err == nil {
-			for i, lt := range lights {
-				if i < len(data.Lights) {
-					data.Lights[i].On = lt.Output
-				}
-			}
-		}
-	}
-
-	if len(cached.CoverIDs) > 0 {
-		covers, err := c.svc.CoverList(ctx, name)
-		if err == nil {
-			for i, cv := range covers {
-				if i < len(data.Covers) {
-					data.Covers[i].State = cv.State
-				}
-			}
-		}
-	}
-}
-
-// fetchSwitchStates fetches switch states for Gen2+ devices.
-func (c *Cache) fetchSwitchStates(ctx context.Context, name string, data *DeviceData) {
-	switches, err := c.svc.SwitchList(ctx, name)
-	if err != nil {
-		c.ios.DebugCat(iostreams.CategoryDevice, "cache: switch list for %s failed: %v", name, err)
-		return
-	}
-	c.ios.DebugCat(iostreams.CategoryDevice, "cache: switch list for %s returned %d switches", name, len(switches))
-	for _, sw := range switches {
-		data.Switches = append(data.Switches, SwitchState{
-			ID: sw.ID,
-			On: sw.Output,
-		})
-	}
-}
-
-// fetchLightStates fetches light states for Gen2+ devices.
-func (c *Cache) fetchLightStates(ctx context.Context, name string, data *DeviceData) {
-	lights, err := c.svc.LightList(ctx, name)
-	if err != nil {
-		c.ios.DebugCat(iostreams.CategoryDevice, "cache: light list for %s failed: %v", name, err)
-		return
-	}
-	c.ios.DebugCat(iostreams.CategoryDevice, "cache: light list for %s returned %d lights", name, len(lights))
-	for _, lt := range lights {
-		data.Lights = append(data.Lights, LightState{
-			ID: lt.ID,
-			On: lt.Output,
-		})
-	}
-}
-
-// fetchCoverStates fetches cover states for Gen2+ devices.
-func (c *Cache) fetchCoverStates(ctx context.Context, name string, data *DeviceData) {
-	covers, err := c.svc.CoverList(ctx, name)
-	if err != nil {
-		return
-	}
-	for _, cv := range covers {
-		data.Covers = append(data.Covers, CoverState{
-			ID:    cv.ID,
-			State: cv.State,
-		})
-	}
-}
-
-// fetchMonitoringSnapshot fetches power metrics snapshot.
-func (c *Cache) fetchMonitoringSnapshot(ctx context.Context, name string, data *DeviceData) {
-	snapshot, err := c.svc.GetMonitoringSnapshotAuto(ctx, name)
-	if err != nil {
-		c.ios.DebugErr("cache snapshot "+name, err)
-		return
-	}
-	data.Snapshot = snapshot
-	c.aggregateMetrics(data, snapshot)
-}
-
 // FetchExtendedStatusMsg is sent when extended status fetch completes.
 type FetchExtendedStatusMsg struct {
 	Name string
@@ -1149,41 +970,65 @@ type FetchExtendedStatusMsg struct {
 
 // FetchExtendedStatus fetches WiFi and Sys status for a device on-demand.
 // This is called lazily when a device is focused in the device info panel.
-// Requests are made in parallel to avoid timeout issues.
+// If data is already present (from GetFullStatus parsing), it returns immediately.
+// Only fetches what's missing, in parallel to avoid timeout issues.
 func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
 	debug.TraceEvent("cache: FetchExtendedStatus called for %s", name)
+
+	// Check if we already have this data from GetFullStatus
+	c.mu.RLock()
+	data := c.devices[name]
+	var hasWiFi, hasSys bool
+	if data != nil {
+		hasWiFi = data.WiFi != nil
+		hasSys = data.Sys != nil
+	}
+	c.mu.RUnlock()
+
+	// If we already have both, return immediately
+	if hasWiFi && hasSys {
+		debug.TraceEvent("cache: FetchExtendedStatus skipping %s (already have WiFi and Sys)", name)
+		return func() tea.Msg {
+			return FetchExtendedStatusMsg{Name: name}
+		}
+	}
+
 	return func() tea.Msg {
 		msg := FetchExtendedStatusMsg{Name: name}
 
-		// Fetch WiFi and Sys in parallel with independent timeouts
+		// Fetch only what's missing, in parallel with independent timeouts
 		var wg sync.WaitGroup
 		var wifiMu, sysMu sync.Mutex
 
-		wg.Go(func() {
-			ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
-			defer cancel()
-			if wifi, err := c.svc.GetWiFiStatus(ctx, name); err == nil {
-				wifiMu.Lock()
-				msg.WiFi = wifi
-				wifiMu.Unlock()
-				debug.TraceEvent("cache: wifi status for %s succeeded: SSID=%s RSSI=%d", name, wifi.SSID, wifi.RSSI)
-			} else {
-				debug.TraceEvent("cache: wifi status for %s failed: %v", name, err)
-			}
-		})
+		if !hasWiFi {
+			wg.Go(func() {
+				ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
+				defer cancel()
+				if wifi, err := c.svc.GetWiFiStatus(ctx, name); err == nil {
+					wifiMu.Lock()
+					msg.WiFi = wifi
+					wifiMu.Unlock()
+					debug.TraceEvent("cache: wifi status for %s succeeded: SSID=%s RSSI=%d", name, wifi.SSID, wifi.RSSI)
+				} else {
+					debug.TraceEvent("cache: wifi status for %s failed: %v", name, err)
+				}
+			})
+		}
 
-		wg.Go(func() {
-			ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
-			defer cancel()
-			if sys, err := c.svc.GetSysStatus(ctx, name); err == nil {
-				sysMu.Lock()
-				msg.Sys = sys
-				sysMu.Unlock()
-				debug.TraceEvent("cache: sys status for %s succeeded: uptime=%d", name, sys.Uptime)
-			} else {
-				debug.TraceEvent("cache: sys status for %s failed: %v", name, err)
-			}
-		})
+		if !hasSys {
+			wg.Go(func() {
+				ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
+				defer cancel()
+				if sys, err := c.svc.GetSysStatus(ctx, name); err == nil {
+					sysMu.Lock()
+					msg.Sys = sys
+					sysMu.Unlock()
+					debug.TraceEvent("cache: sys status for %s succeeded: uptime=%d", name, sys.Uptime)
+				} else {
+					debug.TraceEvent("cache: sys status for %s failed: %v", name, err)
+				}
+			})
+		}
 
 		wg.Wait()
 		debug.TraceEvent("cache: FetchExtendedStatus for %s complete: wifi=%v sys=%v", name, msg.WiFi != nil, msg.Sys != nil)
@@ -1336,43 +1181,6 @@ func preserveExtendedStatusFromExisting(newData, existing *DeviceData) {
 	}
 	if newData.Sys == nil && existing.Sys != nil {
 		newData.Sys = existing.Sys
-	}
-}
-
-// aggregateMetrics extracts metrics from the monitoring snapshot.
-func (c *Cache) aggregateMetrics(data *DeviceData, snapshot *model.MonitoringSnapshot) {
-	// Power meters (PM) - most common for switches with power monitoring
-	for _, pm := range snapshot.PM {
-		data.Power += pm.APower
-		if data.Voltage == 0 && pm.Voltage > 0 {
-			data.Voltage = pm.Voltage
-		}
-		if data.Current == 0 && pm.Current > 0 {
-			data.Current = pm.Current
-		}
-		if pm.AEnergy != nil {
-			data.TotalEnergy += pm.AEnergy.Total
-		}
-	}
-
-	// Energy meters (EM - 3-phase meters like Pro 3EM)
-	for _, em := range snapshot.EM {
-		data.Power += em.TotalActivePower
-		data.Current += em.TotalCurrent
-		if data.Voltage == 0 && em.AVoltage > 0 {
-			data.Voltage = em.AVoltage
-		}
-	}
-
-	// Single-phase energy meters (EM1)
-	for _, em1 := range snapshot.EM1 {
-		data.Power += em1.ActPower
-		if data.Voltage == 0 && em1.Voltage > 0 {
-			data.Voltage = em1.Voltage
-		}
-		if data.Current == 0 && em1.Current > 0 {
-			data.Current = em1.Current
-		}
 	}
 }
 

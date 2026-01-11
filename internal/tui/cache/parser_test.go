@@ -711,6 +711,72 @@ func TestDetectComponents(t *testing.T) {
 	}
 }
 
+// --- Edge Case Tests ---
+
+func TestParseFullStatus_NilMap(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := ParseFullStatus("test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if parsed == nil {
+		t.Fatal("expected non-nil ParsedStatus")
+	}
+	if parsed.DeviceID != "test" {
+		t.Errorf("expected deviceID 'test', got '%s'", parsed.DeviceID)
+	}
+}
+
+func TestParseFullStatus_EmptyMap(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := ParseFullStatus("test", map[string]json.RawMessage{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(parsed.Switches) != 0 {
+		t.Errorf("expected 0 switches, got %d", len(parsed.Switches))
+	}
+	if len(parsed.Lights) != 0 {
+		t.Errorf("expected 0 lights, got %d", len(parsed.Lights))
+	}
+}
+
+func TestParseFullStatus_MalformedJSON(t *testing.T) {
+	t.Parallel()
+
+	// Malformed JSON should not panic - parser is lenient
+	statusMap := map[string]json.RawMessage{
+		"switch:0": json.RawMessage(`{not valid json`),
+		"sys":      json.RawMessage(`{"mac": "AABBCC"}`), // Valid
+	}
+
+	parsed, err := ParseFullStatus("test", statusMap)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Switch should be skipped (malformed), but sys should parse
+	if len(parsed.Switches) != 0 {
+		t.Errorf("expected 0 switches (malformed skipped), got %d", len(parsed.Switches))
+	}
+	if parsed.MAC != "AABBCC" {
+		t.Errorf("expected MAC 'AABBCC', got '%s'", parsed.MAC)
+	}
+}
+
+func TestApplyIncrementalUpdate_EM1(t *testing.T) {
+	t.Parallel()
+	data := &DeviceData{}
+
+	status := json.RawMessage(`{"act_power": 800.0, "voltage": 232.0, "current": 3.5}`)
+	ApplyIncrementalUpdate(data, ComponentEM1, 0, status)
+
+	assertFloat(t, "power", 800.0, data.Power)
+	assertFloat(t, "voltage", 232.0, data.Voltage)
+	assertFloat(t, "current", 3.5, data.Current)
+}
+
 // --- Helper Functions ---
 
 func assertFloat(t *testing.T, name string, expected, actual float64) {
