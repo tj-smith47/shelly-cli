@@ -99,6 +99,7 @@ and controlling Shelly devices on your local network.&lt;/p&gt;
 &lt;li&gt;&lt;a href="shelly_action.md"&gt;shelly action&lt;/a&gt;	 - Manage Gen1 device action URLs&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_alert.md"&gt;shelly alert&lt;/a&gt;	 - Manage monitoring alerts&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_alias.md"&gt;shelly alias&lt;/a&gt;	 - Manage command aliases&lt;/li&gt;
+&lt;li&gt;&lt;a href="shelly_api.md"&gt;shelly api&lt;/a&gt;	 - Execute API calls on Shelly devices&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_audit.md"&gt;shelly audit&lt;/a&gt;	 - Security audit for devices&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_auth.md"&gt;shelly auth&lt;/a&gt;	 - Manage device authentication&lt;/li&gt;
 &lt;li&gt;&lt;a href="shelly_backup.md"&gt;shelly backup&lt;/a&gt;	 - Backup and restore device configurations&lt;/li&gt;
