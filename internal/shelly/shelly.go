@@ -3,6 +3,7 @@ package shelly
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -677,6 +678,32 @@ func (s *Service) SetWiFiAP(ctx context.Context, identifier, ssid, password stri
 // DeviceService returns the device service for direct access.
 func (s *Service) DeviceService() *device.Service {
 	return s.deviceService
+}
+
+// GetFullStatus returns the complete device status from Shelly.GetStatus (Gen2+).
+// Use this for Gen2+ devices only. For auto-detection, use GetFullStatusAuto.
+func (s *Service) GetFullStatus(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	return s.deviceService.GetFullStatus(ctx, identifier)
+}
+
+// GetFullStatusGen1 returns the complete device status from /status endpoint (Gen1).
+// Use this for Gen1 devices only. For auto-detection, use GetFullStatusAuto.
+func (s *Service) GetFullStatusGen1(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	return s.deviceService.GetFullStatusGen1(ctx, identifier)
+}
+
+// GetFullStatusAuto returns the complete device status, auto-detecting the device generation.
+// This calls Shelly.GetStatus for Gen2+ devices or /status for Gen1 devices.
+func (s *Service) GetFullStatusAuto(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if isGen1 {
+		return s.deviceService.GetFullStatusGen1(ctx, identifier)
+	}
+	return s.deviceService.GetFullStatus(ctx, identifier)
 }
 
 // ----- Component Service accessor and delegations -----

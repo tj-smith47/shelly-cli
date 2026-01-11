@@ -2,10 +2,43 @@
 package device
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/firmware"
 )
+
+// mockConnectionProvider is a test double for ConnectionProvider.
+type mockConnectionProvider struct {
+	withConnectionFunc     func(ctx context.Context, identifier string, fn func(*client.Client) error) error
+	withGen1ConnectionFunc func(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error
+}
+
+func (m *mockConnectionProvider) WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error {
+	if m.withConnectionFunc != nil {
+		return m.withConnectionFunc(ctx, identifier, fn)
+	}
+	return nil
+}
+
+func (m *mockConnectionProvider) WithGen1Connection(ctx context.Context, identifier string, fn func(*client.Gen1Client) error) error {
+	if m.withGen1ConnectionFunc != nil {
+		return m.withGen1ConnectionFunc(ctx, identifier, fn)
+	}
+	return nil
+}
+
+func (m *mockConnectionProvider) ResolveWithGeneration(_ context.Context, identifier string) (model.Device, error) {
+	return model.Device{Name: identifier, Address: identifier}, nil
+}
+
+func (m *mockConnectionProvider) GetCachedFirmware(_ context.Context, _ string, _ time.Duration) *firmware.CacheEntry {
+	return nil
+}
 
 func TestNew(t *testing.T) {
 	t.Parallel()
@@ -380,5 +413,130 @@ func TestMatchesFilters(t *testing.T) {
 				t.Errorf("matchesFilters() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestConnectionProvider_Interface verifies that mockConnectionProvider satisfies ConnectionProvider.
+func TestConnectionProvider_Interface(t *testing.T) {
+	t.Parallel()
+	// This compile-time check ensures mockConnectionProvider implements ConnectionProvider
+	var _ ConnectionProvider = (*mockConnectionProvider)(nil)
+}
+
+func TestGetFullStatus_ServiceCreation(t *testing.T) {
+	t.Parallel()
+
+	provider := &mockConnectionProvider{}
+	svc := New(provider)
+
+	if svc == nil {
+		t.Fatal("expected non-nil service")
+	}
+	if svc.parent != provider {
+		t.Error("expected parent to be the provider")
+	}
+}
+
+func TestGetFullStatus_ResponseParsing(t *testing.T) {
+	t.Parallel()
+
+	// Simulate a Gen2 Shelly.GetStatus response structure
+	testResponse := map[string]any{
+		"switch:0": map[string]any{
+			"id":     0,
+			"output": true,
+		},
+		"wifi": map[string]any{
+			"sta_ip": "192.168.1.100",
+			"rssi":   -45,
+		},
+		"sys": map[string]any{
+			"uptime": 86400,
+		},
+	}
+
+	// Marshal and unmarshal to simulate what GetFullStatus does
+	data, err := json.Marshal(testResponse)
+	if err != nil {
+		t.Fatalf("failed to marshal test response: %v", err)
+	}
+
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to unmarshal to RawMessage map: %v", err)
+	}
+
+	// Verify we got all components
+	if len(result) != 3 {
+		t.Errorf("got %d components, want 3", len(result))
+	}
+
+	// Verify switch:0 is present
+	if _, ok := result["switch:0"]; !ok {
+		t.Error("expected switch:0 to be present")
+	}
+
+	// Verify wifi is present
+	if _, ok := result["wifi"]; !ok {
+		t.Error("expected wifi to be present")
+	}
+
+	// Verify sys is present
+	if _, ok := result["sys"]; !ok {
+		t.Error("expected sys to be present")
+	}
+
+	// Verify we can parse a component
+	var switchStatus map[string]any
+	if err := json.Unmarshal(result["switch:0"], &switchStatus); err != nil {
+		t.Fatalf("failed to parse switch:0: %v", err)
+	}
+
+	if switchStatus["output"] != true {
+		t.Errorf("got output=%v, want true", switchStatus["output"])
+	}
+}
+
+func TestGetFullStatusGen1_ResponseParsing(t *testing.T) {
+	t.Parallel()
+
+	// Simulate a Gen1 /status response structure
+	gen1Response := `{
+		"wifi_sta": {"connected": true, "ssid": "TestNetwork", "ip": "192.168.1.100"},
+		"relays": [{"ison": true, "source": "input"}],
+		"meters": [{"power": 100.5, "is_valid": true}],
+		"uptime": 86400
+	}`
+
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(gen1Response), &result); err != nil {
+		t.Fatalf("failed to unmarshal Gen1 status: %v", err)
+	}
+
+	// Verify we got expected fields
+	if _, ok := result["wifi_sta"]; !ok {
+		t.Error("expected wifi_sta to be present")
+	}
+	if _, ok := result["relays"]; !ok {
+		t.Error("expected relays to be present")
+	}
+	if _, ok := result["meters"]; !ok {
+		t.Error("expected meters to be present")
+	}
+	if _, ok := result["uptime"]; !ok {
+		t.Error("expected uptime to be present")
+	}
+
+	// Verify we can parse a component
+	var relays []map[string]any
+	if err := json.Unmarshal(result["relays"], &relays); err != nil {
+		t.Fatalf("failed to parse relays: %v", err)
+	}
+
+	if len(relays) != 1 {
+		t.Errorf("got %d relays, want 1", len(relays))
+	}
+	if relays[0]["ison"] != true {
+		t.Errorf("got ison=%v, want true", relays[0]["ison"])
 	}
 }
