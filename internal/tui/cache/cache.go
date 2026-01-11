@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"math/rand/v2"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -276,12 +274,11 @@ func (c *Cache) handleDeviceEvent(evt events.Event) {
 		return
 	}
 
-	// Update based on event type
 	switch e := evt.(type) {
 	case *events.StatusChangeEvent:
-		c.updateFromStatusChange(data, e)
+		c.handleStatusChange(data, e)
 	case *events.FullStatusEvent:
-		c.updateFromFullStatus(data, e)
+		c.handleFullStatus(data, e)
 	case *events.DeviceOnlineEvent:
 		data.Online = true
 		data.UpdatedAt = evt.Timestamp()
@@ -289,23 +286,13 @@ func (c *Cache) handleDeviceEvent(evt events.Event) {
 		data.Online = false
 		data.UpdatedAt = evt.Timestamp()
 	}
-	c.version++ // Increment version for cache invalidation
+	c.version++
 
 	c.ios.DebugCat(iostreams.CategoryDevice, "cache: event update for %s, type=%s", deviceID, evt.Type())
 }
 
-// statusChangeData holds parsed data from a status change event.
-type statusChangeData struct {
-	Apower  *float64                 `json:"apower"`
-	Voltage *float64                 `json:"voltage"`
-	Current *float64                 `json:"current"`
-	AEnergy *struct{ Total float64 } `json:"aenergy"`
-	Output  *bool                    `json:"output"`
-	Temp    *struct{ TC float64 }    `json:"temperature"`
-}
-
-// updateFromStatusChange updates cache from a status change event.
-func (c *Cache) updateFromStatusChange(data *DeviceData, evt *events.StatusChangeEvent) {
+// handleStatusChange processes incremental status updates from WebSocket.
+func (c *Cache) handleStatusChange(data *DeviceData, evt *events.StatusChangeEvent) {
 	data.Online = true
 	data.UpdatedAt = evt.Timestamp()
 
@@ -313,65 +300,12 @@ func (c *Cache) updateFromStatusChange(data *DeviceData, evt *events.StatusChang
 		return
 	}
 
-	var status statusChangeData
-	if err := json.Unmarshal(evt.Status, &status); err != nil {
-		return
-	}
-
-	// Extract switch ID from component name (e.g., "switch:0" -> 0)
-	switchID := -1
-	if strings.HasPrefix(evt.Component, "switch:") {
-		idStr := strings.TrimPrefix(evt.Component, "switch:")
-		if id, err := strconv.Atoi(idStr); err == nil {
-			switchID = id
-		}
-	}
-
-	c.applyStatusChangeMetrics(data, &status, switchID)
+	componentType, componentID := ParseComponentName(evt.Component)
+	ApplyIncrementalUpdate(data, componentType, componentID, evt.Status)
 }
 
-// applyStatusChangeMetrics applies parsed metrics to device data.
-// switchID is -1 if not a switch component, otherwise the switch ID (0, 1, etc.).
-func (c *Cache) applyStatusChangeMetrics(data *DeviceData, status *statusChangeData, switchID int) {
-	if status.Apower != nil {
-		data.Power = *status.Apower
-	}
-	if status.Voltage != nil {
-		data.Voltage = *status.Voltage
-	}
-	if status.Current != nil {
-		data.Current = *status.Current
-	}
-	if status.AEnergy != nil {
-		data.TotalEnergy = status.AEnergy.Total
-	}
-	if status.Temp != nil {
-		data.Temperature = status.Temp.TC
-	}
-	// Update switch states if this is a switch component
-	if status.Output != nil && switchID >= 0 {
-		// Find and update the correct switch by ID
-		for i := range data.Switches {
-			if data.Switches[i].ID == switchID {
-				data.Switches[i].On = *status.Output
-				return
-			}
-		}
-		// Switch not found - add it (shouldn't normally happen, but handles edge cases)
-		data.Switches = append(data.Switches, SwitchState{ID: switchID, On: *status.Output})
-	}
-}
-
-// parsedComponents holds parsed power component data from a full status event.
-type parsedComponents struct {
-	pm  []model.PMStatus
-	em  []model.EMStatus
-	em1 []model.EM1Status
-}
-
-// updateFromFullStatus updates cache from a full status event.
-// Parses the complete device status and extracts all power/energy metrics.
-func (c *Cache) updateFromFullStatus(data *DeviceData, evt *events.FullStatusEvent) {
+// handleFullStatus processes full status events from WebSocket.
+func (c *Cache) handleFullStatus(data *DeviceData, evt *events.FullStatusEvent) {
 	data.Online = true
 	data.UpdatedAt = evt.Timestamp()
 
@@ -381,218 +315,17 @@ func (c *Cache) updateFromFullStatus(data *DeviceData, evt *events.FullStatusEve
 
 	var statusMap map[string]json.RawMessage
 	if err := json.Unmarshal(evt.Status, &statusMap); err != nil {
+		c.ios.DebugErr("cache: parse full status event", err)
+		return
+	}
+
+	parsed, err := ParseFullStatus(data.Device.Name, statusMap)
+	if err != nil {
 		c.ios.DebugErr("cache: parse full status", err)
 		return
 	}
 
-	c.resetDeviceMetrics(data)
-	components := c.parseComponentsFromStatus(data, statusMap)
-	c.aggregateComponentMetrics(data, components)
-	c.updateDeviceSnapshot(data, components)
-}
-
-// resetDeviceMetrics clears aggregated values before re-calculating.
-func (c *Cache) resetDeviceMetrics(data *DeviceData) {
-	data.Power = 0
-	data.Voltage = 0
-	data.Current = 0
-	data.TotalEnergy = 0
-	data.Temperature = 0
-}
-
-// parseComponentsFromStatus parses component statuses from the status map.
-func (c *Cache) parseComponentsFromStatus(data *DeviceData, statusMap map[string]json.RawMessage) parsedComponents {
-	var components parsedComponents
-
-	for key, rawStatus := range statusMap {
-		c.parseComponentByType(data, key, rawStatus, &components)
-	}
-	return components
-}
-
-// parseComponentByType routes parsing to the appropriate handler based on component type.
-func (c *Cache) parseComponentByType(data *DeviceData, key string, rawStatus json.RawMessage, components *parsedComponents) {
-	switch {
-	case strings.HasPrefix(key, "switch:"):
-		c.parseSwitchStatus(data, rawStatus)
-	case strings.HasPrefix(key, "pm:"), strings.HasPrefix(key, "pm1:"):
-		if pm := c.parsePMStatus(rawStatus); pm != nil {
-			components.pm = append(components.pm, *pm)
-		}
-	case strings.HasPrefix(key, "em:"):
-		if em := c.parseEMStatus(rawStatus); em != nil {
-			components.em = append(components.em, *em)
-		}
-	case strings.HasPrefix(key, "em1:"):
-		if em1 := c.parseEM1Status(rawStatus); em1 != nil {
-			components.em1 = append(components.em1, *em1)
-		}
-	case strings.HasPrefix(key, "temperature:"):
-		c.parseTemperatureStatus(data, rawStatus)
-	case key == "sys":
-		c.parseSysStatus(data, rawStatus)
-	}
-}
-
-// parsePMStatus parses a PM component status.
-func (c *Cache) parsePMStatus(rawStatus json.RawMessage) *model.PMStatus {
-	var pm model.PMStatus
-	if err := json.Unmarshal(rawStatus, &pm); err != nil {
-		return nil
-	}
-	return &pm
-}
-
-// parseEMStatus parses an EM component status.
-func (c *Cache) parseEMStatus(rawStatus json.RawMessage) *model.EMStatus {
-	var em model.EMStatus
-	if err := json.Unmarshal(rawStatus, &em); err != nil {
-		return nil
-	}
-	return &em
-}
-
-// parseEM1Status parses an EM1 component status.
-func (c *Cache) parseEM1Status(rawStatus json.RawMessage) *model.EM1Status {
-	var em1 model.EM1Status
-	if err := json.Unmarshal(rawStatus, &em1); err != nil {
-		return nil
-	}
-	return &em1
-}
-
-// aggregateComponentMetrics aggregates metrics from parsed components into device data.
-func (c *Cache) aggregateComponentMetrics(data *DeviceData, components parsedComponents) {
-	c.aggregatePMMetrics(data, components.pm)
-	c.aggregateEMMetrics(data, components.em)
-	c.aggregateEM1Metrics(data, components.em1)
-}
-
-// aggregatePMMetrics aggregates PM component metrics.
-func (c *Cache) aggregatePMMetrics(data *DeviceData, pms []model.PMStatus) {
-	for _, pm := range pms {
-		data.Power += pm.APower
-		if data.Voltage == 0 && pm.Voltage > 0 {
-			data.Voltage = pm.Voltage
-		}
-		if data.Current == 0 && pm.Current > 0 {
-			data.Current = pm.Current
-		}
-		if pm.AEnergy != nil {
-			data.TotalEnergy += pm.AEnergy.Total
-		}
-	}
-}
-
-// aggregateEMMetrics aggregates EM component metrics.
-func (c *Cache) aggregateEMMetrics(data *DeviceData, ems []model.EMStatus) {
-	for _, em := range ems {
-		data.Power += em.TotalActivePower
-		data.Current += em.TotalCurrent
-		if data.Voltage == 0 && em.AVoltage > 0 {
-			data.Voltage = em.AVoltage
-		}
-	}
-}
-
-// aggregateEM1Metrics aggregates EM1 component metrics.
-func (c *Cache) aggregateEM1Metrics(data *DeviceData, em1s []model.EM1Status) {
-	for _, em1 := range em1s {
-		data.Power += em1.ActPower
-		if data.Voltage == 0 && em1.Voltage > 0 {
-			data.Voltage = em1.Voltage
-		}
-		if data.Current == 0 && em1.Current > 0 {
-			data.Current = em1.Current
-		}
-	}
-}
-
-// updateDeviceSnapshot updates the device snapshot with parsed component data.
-func (c *Cache) updateDeviceSnapshot(data *DeviceData, components parsedComponents) {
-	if len(components.pm) == 0 && len(components.em) == 0 && len(components.em1) == 0 {
-		return
-	}
-	if data.Snapshot == nil {
-		data.Snapshot = &model.MonitoringSnapshot{}
-	}
-	data.Snapshot.PM = components.pm
-	data.Snapshot.EM = components.em
-	data.Snapshot.EM1 = components.em1
-	data.Snapshot.Online = true
-}
-
-// parseSwitchStatus extracts power metrics from a switch component status.
-func (c *Cache) parseSwitchStatus(data *DeviceData, rawStatus json.RawMessage) {
-	var sw struct {
-		ID      int      `json:"id"`
-		Output  bool     `json:"output"`
-		APower  *float64 `json:"apower"`
-		Voltage *float64 `json:"voltage"`
-		Current *float64 `json:"current"`
-		AEnergy *struct {
-			Total float64 `json:"total"`
-		} `json:"aenergy"`
-		Temperature *struct {
-			TC float64 `json:"tC"`
-		} `json:"temperature"`
-	}
-	if err := json.Unmarshal(rawStatus, &sw); err != nil {
-		return
-	}
-
-	// Update switch states
-	found := false
-	for i := range data.Switches {
-		if data.Switches[i].ID == sw.ID {
-			data.Switches[i].On = sw.Output
-			found = true
-			break
-		}
-	}
-	if !found {
-		data.Switches = append(data.Switches, SwitchState{ID: sw.ID, On: sw.Output})
-	}
-
-	// Accumulate power metrics (switches without PM components report these directly)
-	if sw.APower != nil {
-		data.Power += *sw.APower
-	}
-	if sw.Voltage != nil && data.Voltage == 0 {
-		data.Voltage = *sw.Voltage
-	}
-	if sw.Current != nil && data.Current == 0 {
-		data.Current = *sw.Current
-	}
-	if sw.AEnergy != nil {
-		data.TotalEnergy += sw.AEnergy.Total
-	}
-	if sw.Temperature != nil && data.Temperature == 0 {
-		data.Temperature = sw.Temperature.TC
-	}
-}
-
-// parseTemperatureStatus extracts temperature from a temperature component.
-func (c *Cache) parseTemperatureStatus(data *DeviceData, rawStatus json.RawMessage) {
-	var temp struct {
-		TC float64 `json:"tC"`
-		TF float64 `json:"tF"`
-	}
-	if err := json.Unmarshal(rawStatus, &temp); err == nil && data.Temperature == 0 {
-		data.Temperature = temp.TC
-	}
-}
-
-// parseSysStatus extracts system info like uptime and temperature.
-func (c *Cache) parseSysStatus(data *DeviceData, rawStatus json.RawMessage) {
-	var sys struct {
-		DeviceTemp *struct {
-			TC float64 `json:"tC"`
-		} `json:"device_temp"`
-	}
-	if err := json.Unmarshal(rawStatus, &sys); err == nil && sys.DeviceTemp != nil && data.Temperature == 0 {
-		data.Temperature = sys.DeviceTemp.TC
-	}
+	ApplyParsedStatus(data, parsed)
 }
 
 // scheduleDeviceRefresh schedules refresh for a single device based on its state.

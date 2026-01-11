@@ -44,7 +44,7 @@ type Manager struct {
 type Option func(*Manager)
 
 // WithRateLimiter configures the manager to use rate limiting.
-// If not provided, no rate limiting is applied (backward compatible).
+// If not provided, no rate limiting is applied.
 func WithRateLimiter(rl *ratelimit.DeviceRateLimiter) Option {
 	return func(m *Manager) {
 		m.rateLimiter = rl
@@ -84,7 +84,7 @@ func (m *Manager) WithConnection(ctx context.Context, identifier string, fn func
 		return err
 	}
 
-	// If no rate limiter, execute directly (backward compatible)
+	// No rate limiter configured - execute directly
 	if m.rateLimiter == nil {
 		return m.ExecuteGen2(ctx, dev, fn)
 	}
@@ -118,7 +118,7 @@ func (m *Manager) WithGen1Connection(ctx context.Context, identifier string, fn 
 		return err
 	}
 
-	// If no rate limiter, execute directly (backward compatible)
+	// No rate limiter configured - execute directly
 	if m.rateLimiter == nil {
 		return m.ExecuteGen1(ctx, dev, fn)
 	}

@@ -1,28 +1,36 @@
-## shelly input
+## shelly input enable
 
-Manage input components
+Enable input component
 
 ### Synopsis
 
-Manage input components on Shelly devices.
+Enable an input component on a Shelly device.
+
+When enabled, the input will respond to physical button presses or switch
+state changes and trigger associated actions.
+
+```
+shelly input enable <device> [flags]
+```
 
 ### Examples
 
 ```
-  # List input components on a device
-  shelly input list kitchen
+  # Enable input on a device
+  shelly input enable kitchen
 
-  # Check input status
-  shelly in status kitchen
+  # Enable specific input by ID
+  shelly input enable living-room --id 1
 
-  # Trigger an input action
-  shelly input trigger kitchen --id 0
+  # Using alias
+  shelly input on bedroom
 ```
 
 ### Options
 
 ```
-  -h, --help   help for input
+  -h, --help     help for enable
+  -i, --id int   Input component ID (default 0)
 ```
 
 ### Options inherited from parent commands
@@ -44,10 +52,5 @@ Manage input components on Shelly devices.
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly input disable](shelly_input_disable.md)	 - Disable input component
-* [shelly input enable](shelly_input_enable.md)	 - Enable input component
-* [shelly input list](shelly_input_list.md)	 - List input components
-* [shelly input status](shelly_input_status.md)	 - Show input status
-* [shelly input trigger](shelly_input_trigger.md)	 - Trigger input event
+* [shelly input](shelly_input.md)	 - Manage input components
 

@@ -69,7 +69,7 @@ type GenerationAwareResolver interface {
 type ServiceOption func(*Service)
 
 // WithRateLimiter configures the service to use rate limiting.
-// If not provided, no rate limiting is applied (backward compatible).
+// If not provided, no rate limiting is applied.
 func WithRateLimiter(rl *ratelimit.DeviceRateLimiter) ServiceOption {
 	return func(s *Service) {
 		s.rateLimiter = rl
@@ -231,7 +231,7 @@ func (a *resolverAdapter) ResolveWithGeneration(ctx context.Context, identifier 
 	return a.Service.ResolveWithGeneration(ctx, identifier)
 }
 
-// DeviceClient is a type alias to connection.DeviceClient for backward compatibility.
+// DeviceClient is a type alias to connection.DeviceClient for convenience.
 type DeviceClient = connection.DeviceClient
 
 // Connect establishes a connection to a device by identifier (name or address).
@@ -410,7 +410,7 @@ func (s *Service) WithDevices(ctx context.Context, devices []string, concurrency
 //
 // Returns ErrCircuitOpen if the device's circuit breaker is open.
 func (s *Service) WithRateLimitedCall(ctx context.Context, address string, generation int, fn func() error) error {
-	// No rate limiter configured - execute directly (backward compatible)
+	// No rate limiter configured - execute directly
 	if s.rateLimiter == nil {
 		return fn()
 	}
@@ -475,41 +475,41 @@ func (s *Service) Wireless() *wireless.Service {
 	return s.wirelessService
 }
 
-// ----- Firmware type aliases for backward compatibility -----
+// ----- Firmware type aliases for convenience -----
 
-// FirmwareInfo is an alias to firmware.Info for backward compatibility.
+// FirmwareInfo is an alias to firmware.Info for convenience.
 type FirmwareInfo = firmware.Info
 
-// FirmwareStatus is an alias to firmware.Status for backward compatibility.
+// FirmwareStatus is an alias to firmware.Status for convenience.
 type FirmwareStatus = firmware.Status
 
-// FirmwareCheckResult is an alias to firmware.CheckResult for backward compatibility.
+// FirmwareCheckResult is an alias to firmware.CheckResult for convenience.
 type FirmwareCheckResult = firmware.CheckResult
 
-// DeviceUpdateStatus is an alias to firmware.DeviceUpdateStatus for backward compatibility.
+// DeviceUpdateStatus is an alias to firmware.DeviceUpdateStatus for convenience.
 type DeviceUpdateStatus = firmware.DeviceUpdateStatus
 
-// UpdateOpts is an alias to firmware.UpdateOpts for backward compatibility.
+// UpdateOpts is an alias to firmware.UpdateOpts for convenience.
 type UpdateOpts = firmware.UpdateOpts
 
-// UpdateResult is an alias to firmware.UpdateResult for backward compatibility.
+// UpdateResult is an alias to firmware.UpdateResult for convenience.
 type UpdateResult = firmware.UpdateResult
 
-// FirmwareUpdateEntry is an alias to firmware.UpdateEntry for backward compatibility.
+// FirmwareUpdateEntry is an alias to firmware.UpdateEntry for convenience.
 type FirmwareUpdateEntry = firmware.UpdateEntry
 
-// FirmwareCache is an alias to firmware.Cache for backward compatibility.
+// FirmwareCache is an alias to firmware.Cache for convenience.
 type FirmwareCache = firmware.Cache
 
-// FirmwareCacheEntry is an alias to firmware.CacheEntry for backward compatibility.
+// FirmwareCacheEntry is an alias to firmware.CacheEntry for convenience.
 type FirmwareCacheEntry = firmware.CacheEntry
 
-// NewFirmwareCache creates a new firmware cache (delegated for backward compatibility).
+// NewFirmwareCache creates a new firmware cache (delegated for convenience).
 func NewFirmwareCache() *FirmwareCache {
 	return firmware.NewCache()
 }
 
-// ----- Firmware helper functions for backward compatibility -----
+// ----- Firmware helper functions for convenience -----
 
 // BuildFirmwareUpdateList delegates to firmware.BuildUpdateList.
 func BuildFirmwareUpdateList(results []FirmwareCheckResult, devices map[string]model.Device) []FirmwareUpdateEntry {
@@ -546,7 +546,7 @@ func ToDeviceUpdateStatuses(entries []FirmwareUpdateEntry) []DeviceUpdateStatus 
 	return firmware.ToDeviceUpdateStatuses(entries)
 }
 
-// ----- Firmware Service method delegations for backward compatibility -----
+// ----- Firmware Service method delegations for convenience -----
 
 // CheckFirmware delegates to the firmware service.
 func (s *Service) CheckFirmware(ctx context.Context, identifier string) (*FirmwareInfo, error) {
@@ -720,12 +720,12 @@ func (s *Service) MQTTService() *network.MQTTService {
 	return s.mqttService
 }
 
-// GetMQTTStatus delegates to the MQTT service for backward compatibility.
+// GetMQTTStatus delegates to the MQTT service for convenience.
 func (s *Service) GetMQTTStatus(ctx context.Context, identifier string) (*network.MQTTStatus, error) {
 	return s.mqttService.GetStatus(ctx, identifier)
 }
 
-// GetMQTTConfig delegates to the MQTT service for backward compatibility.
+// GetMQTTConfig delegates to the MQTT service for convenience.
 func (s *Service) GetMQTTConfig(ctx context.Context, identifier string) (map[string]any, error) {
 	cfg, err := s.mqttService.GetConfig(ctx, identifier)
 	if err != nil {
@@ -743,7 +743,7 @@ func (s *Service) GetMQTTConfig(ctx context.Context, identifier string) (map[str
 	}, nil
 }
 
-// SetMQTTConfig delegates to the MQTT service for backward compatibility.
+// SetMQTTConfig delegates to the MQTT service for convenience.
 func (s *Service) SetMQTTConfig(ctx context.Context, identifier string, enable *bool, server, user, password, topicPrefix string) error {
 	err := s.mqttService.SetConfig(ctx, identifier, network.SetConfigParams{
 		Enable:      enable,
@@ -777,12 +777,12 @@ func (s *Service) EthernetService() *network.EthernetService {
 	return s.ethernetService
 }
 
-// GetEthernetStatus delegates to the Ethernet service for backward compatibility.
+// GetEthernetStatus delegates to the Ethernet service for convenience.
 func (s *Service) GetEthernetStatus(ctx context.Context, identifier string) (*network.EthernetStatus, error) {
 	return s.ethernetService.GetStatus(ctx, identifier)
 }
 
-// GetEthernetConfig delegates to the Ethernet service for backward compatibility.
+// GetEthernetConfig delegates to the Ethernet service for convenience.
 func (s *Service) GetEthernetConfig(ctx context.Context, identifier string) (map[string]any, error) {
 	cfg, err := s.ethernetService.GetConfig(ctx, identifier)
 	if err != nil {
@@ -798,7 +798,7 @@ func (s *Service) GetEthernetConfig(ctx context.Context, identifier string) (map
 	}, nil
 }
 
-// SetEthernetConfig delegates to the Ethernet service for backward compatibility.
+// SetEthernetConfig delegates to the Ethernet service for convenience.
 func (s *Service) SetEthernetConfig(ctx context.Context, identifier string, enable *bool, ipv4Mode, ip, netmask, gw, nameserver string) error {
 	return s.ethernetService.SetConfig(ctx, identifier, network.EthernetSetConfigParams{
 		Enable:     enable,
@@ -817,17 +817,17 @@ func (s *Service) AuthService() *auth.Service {
 	return s.authService
 }
 
-// GetAuthStatus delegates to the Auth service for backward compatibility.
+// GetAuthStatus delegates to the Auth service for convenience.
 func (s *Service) GetAuthStatus(ctx context.Context, identifier string) (*auth.Status, error) {
 	return s.authService.GetStatus(ctx, identifier)
 }
 
-// SetAuth delegates to the Auth service for backward compatibility.
+// SetAuth delegates to the Auth service for convenience.
 func (s *Service) SetAuth(ctx context.Context, identifier, user, realm, password string) error {
 	return s.authService.Set(ctx, identifier, user, realm, password)
 }
 
-// DisableAuth delegates to the Auth service for backward compatibility.
+// DisableAuth delegates to the Auth service for convenience.
 func (s *Service) DisableAuth(ctx context.Context, identifier string) error {
 	return s.authService.Disable(ctx, identifier)
 }
@@ -839,12 +839,12 @@ func (s *Service) ModbusService() *modbus.Service {
 	return s.modbusService
 }
 
-// GetModbusStatus delegates to the Modbus service for backward compatibility.
+// GetModbusStatus delegates to the Modbus service for convenience.
 func (s *Service) GetModbusStatus(ctx context.Context, identifier string) (*modbus.Status, error) {
 	return s.modbusService.GetStatus(ctx, identifier)
 }
 
-// GetModbusConfig delegates to the Modbus service for backward compatibility.
+// GetModbusConfig delegates to the Modbus service for convenience.
 func (s *Service) GetModbusConfig(ctx context.Context, identifier string) (map[string]any, error) {
 	cfg, err := s.modbusService.GetConfig(ctx, identifier)
 	if err != nil {
@@ -855,7 +855,7 @@ func (s *Service) GetModbusConfig(ctx context.Context, identifier string) (map[s
 	}, nil
 }
 
-// SetModbusConfig delegates to the Modbus service for backward compatibility.
+// SetModbusConfig delegates to the Modbus service for convenience.
 func (s *Service) SetModbusConfig(ctx context.Context, identifier string, enable bool) error {
 	return s.modbusService.SetConfig(ctx, identifier, enable)
 }
@@ -867,27 +867,27 @@ func (s *Service) ProvisionService() *provision.Service {
 	return s.provisionService
 }
 
-// GetDeviceInfoByAddress delegates to the Provision service for backward compatibility.
+// GetDeviceInfoByAddress delegates to the Provision service for convenience.
 func (s *Service) GetDeviceInfoByAddress(ctx context.Context, address string) (*provision.DeviceInfo, error) {
 	return s.provisionService.GetDeviceInfoByAddress(ctx, address)
 }
 
-// ConfigureWiFi delegates to the Provision service for backward compatibility.
+// ConfigureWiFi delegates to the Provision service for convenience.
 func (s *Service) ConfigureWiFi(ctx context.Context, address, ssid, password string) error {
 	return s.provisionService.ConfigureWiFi(ctx, address, ssid, password)
 }
 
-// GetBTHomeStatus delegates to the Provision service for backward compatibility.
+// GetBTHomeStatus delegates to the Provision service for convenience.
 func (s *Service) GetBTHomeStatus(ctx context.Context, identifier string) (*provision.BTHomeDiscovery, error) {
 	return s.provisionService.GetBTHomeStatus(ctx, identifier)
 }
 
-// StartBTHomeDiscovery delegates to the Provision service for backward compatibility.
+// StartBTHomeDiscovery delegates to the Provision service for convenience.
 func (s *Service) StartBTHomeDiscovery(ctx context.Context, identifier string, duration int) error {
 	return s.provisionService.StartBTHomeDiscovery(ctx, identifier, duration)
 }
 
-// ----- Type aliases for backward compatibility -----
+// ----- Type aliases for convenience -----
 
 // MQTTStatus is an alias for network.MQTTStatus.
 type MQTTStatus = network.MQTTStatus
@@ -908,7 +908,7 @@ type BTHomeDiscovery = provision.BTHomeDiscovery
 type ProvisioningDeviceInfo = provision.DeviceInfo
 
 // ExtractWiFiSSID extracts the station SSID from a raw WiFi.GetConfig result.
-// Re-exported from provision package for backward compatibility.
+// Re-exported from provision package for convenience.
 func ExtractWiFiSSID(rawResult any) string {
 	return provision.ExtractWiFiSSID(rawResult)
 }

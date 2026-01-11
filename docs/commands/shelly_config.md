@@ -23,6 +23,9 @@ For device configuration, use: shelly device config <subcommand>
   # Set a value
   shelly config set defaults.output=json
 
+  # Delete a setting
+  shelly config delete defaults.timeout
+
   # Open config in editor
   shelly config edit
 
@@ -56,6 +59,7 @@ For device configuration, use: shelly device config <subcommand>
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly config delete](shelly_config_delete.md)	 - Delete CLI configuration values
 * [shelly config edit](shelly_config_edit.md)	 - Open CLI config in editor
 * [shelly config get](shelly_config_get.md)	 - Get a CLI configuration value
 * [shelly config path](shelly_config_path.md)	 - Show configuration file path

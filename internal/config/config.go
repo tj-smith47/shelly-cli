@@ -84,10 +84,9 @@ type Config struct {
 
 // TUIConfig holds TUI dashboard settings.
 type TUIConfig struct {
-	RefreshInterval int               `mapstructure:"refresh_interval" yaml:"refresh_interval,omitempty"` // Legacy: global refresh interval in seconds (deprecated, use Refresh)
-	Refresh         TUIRefreshConfig  `mapstructure:"refresh" yaml:"refresh,omitempty"`                   // Adaptive refresh intervals per generation
-	Keybindings     KeybindingsConfig `mapstructure:"keybindings" yaml:"keybindings,omitempty"`
-	Theme           *ThemeConfig      `mapstructure:"theme" yaml:"theme,omitempty"` // Independent TUI theme (replaces main theme when set)
+	Refresh     TUIRefreshConfig  `mapstructure:"refresh" yaml:"refresh,omitempty"`
+	Keybindings KeybindingsConfig `mapstructure:"keybindings" yaml:"keybindings,omitempty"`
+	Theme       *ThemeConfig      `mapstructure:"theme" yaml:"theme,omitempty"`
 }
 
 // EnergyConfig holds energy monitoring and cost calculation settings.
@@ -477,7 +476,7 @@ func SetDefaultManager(mgr *Manager) {
 }
 
 // getDefaultManager returns the package-level default manager.
-// This is used for backward compatibility with package-level functions.
+// Used by package-level convenience functions (Load, Get, etc.).
 func getDefaultManager() *Manager {
 	defaultManagerMu.Lock()
 	defer defaultManagerMu.Unlock()
@@ -619,8 +618,7 @@ var DefaultAliases = map[string]Alias{
 	},
 }
 
-// Load reads configuration from file and environment.
-// This uses the default manager for backward compatibility.
+// Load reads configuration from file and environment using the default manager.
 func Load() (*Config, error) {
 	mgr := getDefaultManager()
 	// Manager.Load() is safe to call multiple times

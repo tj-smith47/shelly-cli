@@ -2,27 +2,28 @@
 .TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-config - Manage CLI configuration
+shelly-input-enable - Enable input component
 
 
 .SH SYNOPSIS
-\fBshelly config [flags]\fP
+\fBshelly input enable  [flags]\fP
 
 
 .SH DESCRIPTION
-Manage Shelly CLI configuration settings.
+Enable an input component on a Shelly device.
 
 .PP
-Get, set, and edit CLI preferences like default timeout, output format,
-and theme settings.
-
-.PP
-For device configuration, use: shelly device config 
+When enabled, the input will respond to physical button presses or switch
+state changes and trigger associated actions.
 
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
-	help for config
+	help for enable
+
+.PP
+\fB-i\fP, \fB--id\fP=0
+	Input component ID (default 0)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -76,25 +77,16 @@ For device configuration, use: shelly device config
 
 .SH EXAMPLE
 .EX
-  # View all CLI settings
-  shelly config get
+  # Enable input on a device
+  shelly input enable kitchen
 
-  # Get specific setting
-  shelly config get defaults.timeout
+  # Enable specific input by ID
+  shelly input enable living-room --id 1
 
-  # Set a value
-  shelly config set defaults.output=json
-
-  # Delete a setting
-  shelly config delete defaults.timeout
-
-  # Open config in editor
-  shelly config edit
-
-  # Reset to defaults
-  shelly config reset
+  # Using alias
+  shelly input on bedroom
 .EE
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-config-delete(1)\fP, \fBshelly-config-edit(1)\fP, \fBshelly-config-get(1)\fP, \fBshelly-config-path(1)\fP, \fBshelly-config-reset(1)\fP, \fBshelly-config-set(1)\fP, \fBshelly-config-show(1)\fP
+\fBshelly-input(1)\fP

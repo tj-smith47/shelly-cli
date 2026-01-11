@@ -1,28 +1,37 @@
-## shelly input
+## shelly input disable
 
-Manage input components
+Disable input component
 
 ### Synopsis
 
-Manage input components on Shelly devices.
+Disable an input component on a Shelly device.
+
+When disabled, the input will not respond to physical button presses or
+switch state changes. This can be useful for maintenance or to prevent
+accidental triggers.
+
+```
+shelly input disable <device> [flags]
+```
 
 ### Examples
 
 ```
-  # List input components on a device
-  shelly input list kitchen
+  # Disable input on a device
+  shelly input disable kitchen
 
-  # Check input status
-  shelly in status kitchen
+  # Disable specific input by ID
+  shelly input disable living-room --id 1
 
-  # Trigger an input action
-  shelly input trigger kitchen --id 0
+  # Using alias
+  shelly input off bedroom
 ```
 
 ### Options
 
 ```
-  -h, --help   help for input
+  -h, --help     help for disable
+  -i, --id int   Input component ID (default 0)
 ```
 
 ### Options inherited from parent commands
@@ -44,10 +53,5 @@ Manage input components on Shelly devices.
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly input disable](shelly_input_disable.md)	 - Disable input component
-* [shelly input enable](shelly_input_enable.md)	 - Enable input component
-* [shelly input list](shelly_input_list.md)	 - List input components
-* [shelly input status](shelly_input_status.md)	 - Show input status
-* [shelly input trigger](shelly_input_trigger.md)	 - Trigger input event
+* [shelly input](shelly_input.md)	 - Manage input components
 

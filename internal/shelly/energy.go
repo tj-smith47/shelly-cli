@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tj-smith47/shelly-go/gen2/components"
-
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
-	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 )
 
 // Energy component type constants for auto-detection.
@@ -145,16 +142,4 @@ func ParseTime(s string) (time.Time, error) {
 		}
 	}
 	return time.Time{}, fmt.Errorf("unable to parse time (use RFC3339, YYYY-MM-DD, or 'YYYY-MM-DD HH:MM:SS')")
-}
-
-// CalculateEMMetrics calculates energy metrics from EM data history.
-// This is a convenience wrapper for backward compatibility.
-func CalculateEMMetrics(data *components.EMDataGetDataResult) (energy, avgPower, peakPower float64, dataPoints int) {
-	return monitoring.CalculateEMMetrics(data)
-}
-
-// CalculateEM1Metrics calculates energy metrics from EM1 data history.
-// This is a convenience wrapper for backward compatibility.
-func CalculateEM1Metrics(data *components.EM1DataGetDataResult) (energy, avgPower, peakPower float64, dataPoints int) {
-	return monitoring.CalculateEM1Metrics(data)
 }

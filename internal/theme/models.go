@@ -8,15 +8,9 @@ type Export struct {
 }
 
 // Import represents an imported theme configuration.
-// Supports both the old format (id only) and new format (name + colors).
 type Import struct {
-	// New format fields
 	Name   string            `yaml:"name" json:"name,omitempty"`
 	Colors map[string]string `yaml:"colors" json:"colors,omitempty"`
-
-	// Old format fields (backwards compatible)
-	ID          string `yaml:"id" json:"id,omitempty"`
-	DisplayName string `yaml:"display_name,omitempty" json:"display_name,omitempty"`
 }
 
 // RenderedColors represents the actual color values being used (base + overrides).

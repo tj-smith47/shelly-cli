@@ -184,7 +184,7 @@ func CountTo(w io.Writer, noun string, count int) {
 }
 
 // Package-level convenience functions that write to stdout/stderr.
-// These provide backwards-compatible APIs for code migrating from ui/output packages.
+// Use these when an IOStreams instance is not available (e.g., startup notifications).
 
 // Info prints an informational message to stdout.
 // Messages are suppressed in quiet mode.

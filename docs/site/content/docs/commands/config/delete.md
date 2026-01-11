@@ -1,28 +1,49 @@
-## shelly input
+---
+title: "shelly config delete"
+description: "shelly config delete"
+---
 
-Manage input components
+## shelly config delete
+
+Delete CLI configuration values
 
 ### Synopsis
 
-Manage input components on Shelly devices.
+Delete configuration values from the Shelly CLI config file.
+
+Use dot notation for nested values (e.g., "defaults.timeout").
+Multiple keys can be deleted at once.
+
+If a key has nested child values, confirmation is required unless --yes is provided.
+
+```
+shelly config delete <key>... [flags]
+```
 
 ### Examples
 
 ```
-  # List input components on a device
-  shelly input list kitchen
+  # Delete a single setting
+  shelly config delete defaults.timeout
 
-  # Check input status
-  shelly in status kitchen
+  # Delete multiple settings
+  shelly config delete defaults.timeout defaults.output
 
-  # Trigger an input action
-  shelly input trigger kitchen --id 0
+  # Delete a parent key with all children (with confirmation)
+  shelly config delete defaults
+
+  # Skip confirmation prompt
+  shelly config delete defaults --yes
+
+  # Using alias
+  shelly config rm editor
 ```
 
 ### Options
 
 ```
-  -h, --help   help for input
+  -h, --help   help for delete
+  -y, --yes    Skip confirmation prompt
 ```
 
 ### Options inherited from parent commands
@@ -44,10 +65,5 @@ Manage input components on Shelly devices.
 
 ### SEE ALSO
 
-* [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly input disable](shelly_input_disable.md)	 - Disable input component
-* [shelly input enable](shelly_input_enable.md)	 - Enable input component
-* [shelly input list](shelly_input_list.md)	 - List input components
-* [shelly input status](shelly_input_status.md)	 - Show input status
-* [shelly input trigger](shelly_input_trigger.md)	 - Trigger input event
+* [shelly config](shelly_config.md)	 - Manage CLI configuration
 

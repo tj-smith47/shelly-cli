@@ -225,9 +225,7 @@ func TestGetTUIThemeConfig(t *testing.T) {
 		{
 			name: "no TUI theme set",
 			config: &Config{
-				TUI: TUIConfig{
-					RefreshInterval: 5,
-				},
+				TUI: TUIConfig{},
 			},
 			expected: nil,
 		},
@@ -235,7 +233,6 @@ func TestGetTUIThemeConfig(t *testing.T) {
 			name: "TUI theme set",
 			config: &Config{
 				TUI: TUIConfig{
-					RefreshInterval: 5,
 					Theme: &ThemeConfig{
 						Name: "nord",
 						Colors: map[string]string{

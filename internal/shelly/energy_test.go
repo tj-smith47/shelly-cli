@@ -3,8 +3,6 @@ package shelly
 import (
 	"testing"
 	"time"
-
-	"github.com/tj-smith47/shelly-go/gen2/components"
 )
 
 func TestCalculateTimeRange_Periods(t *testing.T) {
@@ -236,107 +234,6 @@ func TestComponentTypeConstants(t *testing.T) {
 	if ComponentTypeEM1 != "em1" {
 		t.Errorf("ComponentTypeEM1 = %q, want %q", ComponentTypeEM1, "em1")
 	}
-}
-
-func TestCalculateEMMetrics(t *testing.T) {
-	t.Parallel()
-
-	t.Run("calculates from EM data", func(t *testing.T) {
-		t.Parallel()
-
-		data := &components.EMDataGetDataResult{
-			Data: []components.EMDataBlock{
-				{
-					Period: 60,
-					Values: []components.EMDataValues{
-						{TotalActivePower: 100.0},
-						{TotalActivePower: 200.0},
-						{TotalActivePower: 150.0},
-					},
-				},
-			},
-		}
-
-		energy, avgPower, peakPower, dataPoints := CalculateEMMetrics(data)
-
-		if dataPoints != 3 {
-			t.Errorf("dataPoints = %d, want 3", dataPoints)
-		}
-		if peakPower != 200.0 {
-			t.Errorf("peakPower = %f, want 200.0", peakPower)
-		}
-		if avgPower != 150.0 {
-			t.Errorf("avgPower = %f, want 150.0", avgPower)
-		}
-		if energy < 0.007 || energy > 0.008 {
-			t.Errorf("energy = %f, expected ~0.0075 kWh", energy)
-		}
-	})
-
-	t.Run("handles empty data", func(t *testing.T) {
-		t.Parallel()
-
-		data := &components.EMDataGetDataResult{
-			Data: []components.EMDataBlock{},
-		}
-
-		energy, avgPower, peakPower, dataPoints := CalculateEMMetrics(data)
-
-		if dataPoints != 0 || energy != 0 || avgPower != 0 || peakPower != 0 {
-			t.Error("expected all zeros for empty data")
-		}
-	})
-}
-
-func TestCalculateEM1Metrics(t *testing.T) {
-	t.Parallel()
-
-	t.Run("calculates from EM1 data", func(t *testing.T) {
-		t.Parallel()
-
-		data := &components.EM1DataGetDataResult{
-			Data: []components.EM1DataBlock{
-				{
-					Period: 60,
-					Values: []components.EM1DataValues{
-						{ActivePower: 50.0},
-						{ActivePower: 100.0},
-						{ActivePower: 75.0},
-					},
-				},
-			},
-		}
-
-		energy, avgPower, peakPower, dataPoints := CalculateEM1Metrics(data)
-
-		if dataPoints != 3 {
-			t.Errorf("dataPoints = %d, want 3", dataPoints)
-		}
-		if peakPower != 100.0 {
-			t.Errorf("peakPower = %f, want 100.0", peakPower)
-		}
-		if avgPower != 75.0 {
-			t.Errorf("avgPower = %f, want 75.0", avgPower)
-		}
-		// energy should be small positive value
-		if energy <= 0 {
-			t.Errorf("energy = %f, expected positive value", energy)
-		}
-	})
-
-	t.Run("handles empty data", func(t *testing.T) {
-		t.Parallel()
-
-		data := &components.EM1DataGetDataResult{
-			Data: []components.EM1DataBlock{},
-		}
-
-		energy, avgPower, peakPower, dataPoints := CalculateEM1Metrics(data)
-
-		if dataPoints != 0 || energy != 0 || avgPower != 0 || peakPower != 0 {
-			t.Error("expected all zeros for empty data")
-		}
-	})
 }
 
 // containsString checks if s contains substr.

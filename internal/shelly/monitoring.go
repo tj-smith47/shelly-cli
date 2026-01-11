@@ -37,7 +37,6 @@ type MonitoringResolvedDevice = monitoring.ResolvedDevice
 type MonitoringDeviceStatus = monitoring.DeviceStatusResult
 
 // Delegation methods - these delegate to the monitoring subpackage.
-// This maintains backward compatibility for existing callers.
 
 // GetEMStatus returns the status of an Energy Monitor (EM) component.
 func (s *Service) GetEMStatus(ctx context.Context, device string, id int) (*model.EMStatus, error) {
@@ -205,7 +204,6 @@ func (s *Service) CollectComparisonData(ctx context.Context, ios *iostreams.IOSt
 }
 
 // NewPrometheusCollector creates a new Prometheus metrics collector.
-// This is a package-level factory function for backward compatibility.
 func NewPrometheusCollector(svc *Service, devices []string) *monitoring.PrometheusCollector {
 	return monitoring.NewPrometheusCollector(svc.Monitoring(), devices)
 }

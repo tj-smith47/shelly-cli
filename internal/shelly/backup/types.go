@@ -7,13 +7,12 @@ import (
 	shellybackup "github.com/tj-smith47/shelly-go/backup"
 )
 
-// DeviceBackup wraps the shelly-go backup.Backup for backward compatibility.
+// DeviceBackup wraps the shelly-go backup.Backup with CLI-specific methods.
 type DeviceBackup struct {
-	// Backup is the underlying shelly-go backup
 	*shellybackup.Backup
 }
 
-// Device returns device info for backward compatibility with existing commands.
+// Device returns device info from the backup.
 func (b *DeviceBackup) Device() DeviceInfo {
 	if b.DeviceInfo == nil {
 		return DeviceInfo{}
@@ -33,7 +32,7 @@ func (b *DeviceBackup) Encrypted() bool {
 	return false
 }
 
-// DeviceInfo contains device identification for backward compatibility.
+// DeviceInfo contains device identification from a backup.
 type DeviceInfo struct {
 	ID         string
 	Name       string

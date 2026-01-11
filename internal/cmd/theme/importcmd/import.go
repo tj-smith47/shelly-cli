@@ -64,11 +64,7 @@ func run(opts *Options) error {
 		return fmt.Errorf("failed to parse theme file: %w", err)
 	}
 
-	// Determine theme name (new format: name, old format: id)
 	themeName := imported.Name
-	if themeName == "" {
-		themeName = imported.ID
-	}
 
 	// Validate: need either a theme name or custom colors
 	if themeName == "" && len(imported.Colors) == 0 {

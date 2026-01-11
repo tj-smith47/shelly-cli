@@ -841,7 +841,7 @@ func TestZeroRequestIDAlwaysAccepted(t *testing.T) {
 		lastRequestID: 100,
 	}
 
-	// Update with zero request ID (should be accepted for backwards compatibility)
+	// Update with zero request ID (always accepted to support initial fetches)
 	zeroMsg := DeviceUpdateMsg{
 		Name: "kitchen",
 		Data: &DeviceData{

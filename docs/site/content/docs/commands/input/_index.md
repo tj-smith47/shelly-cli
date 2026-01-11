@@ -53,6 +53,8 @@ Manage input components on Shelly devices.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
+* [shelly input disable](shelly_input_disable.md)	 - Disable input component
+* [shelly input enable](shelly_input_enable.md)	 - Enable input component
 * [shelly input list](shelly_input_list.md)	 - List input components
 * [shelly input status](shelly_input_status.md)	 - Show input status
 * [shelly input trigger](shelly_input_trigger.md)	 - Trigger input event

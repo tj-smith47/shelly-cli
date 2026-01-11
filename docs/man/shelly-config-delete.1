@@ -2,27 +2,31 @@
 .TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-config - Manage CLI configuration
+shelly-config-delete - Delete CLI configuration values
 
 
 .SH SYNOPSIS
-\fBshelly config [flags]\fP
+\fBshelly config delete \&... [flags]\fP
 
 
 .SH DESCRIPTION
-Manage Shelly CLI configuration settings.
+Delete configuration values from the Shelly CLI config file.
 
 .PP
-Get, set, and edit CLI preferences like default timeout, output format,
-and theme settings.
+Use dot notation for nested values (e.g., "defaults.timeout").
+Multiple keys can be deleted at once.
 
 .PP
-For device configuration, use: shelly device config 
+If a key has nested child values, confirmation is required unless --yes is provided.
 
 
 .SH OPTIONS
 \fB-h\fP, \fB--help\fP[=false]
-	help for config
+	help for delete
+
+.PP
+\fB-y\fP, \fB--yes\fP[=false]
+	Skip confirmation prompt
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -76,25 +80,22 @@ For device configuration, use: shelly device config
 
 .SH EXAMPLE
 .EX
-  # View all CLI settings
-  shelly config get
-
-  # Get specific setting
-  shelly config get defaults.timeout
-
-  # Set a value
-  shelly config set defaults.output=json
-
-  # Delete a setting
+  # Delete a single setting
   shelly config delete defaults.timeout
 
-  # Open config in editor
-  shelly config edit
+  # Delete multiple settings
+  shelly config delete defaults.timeout defaults.output
 
-  # Reset to defaults
-  shelly config reset
+  # Delete a parent key with all children (with confirmation)
+  shelly config delete defaults
+
+  # Skip confirmation prompt
+  shelly config delete defaults --yes
+
+  # Using alias
+  shelly config rm editor
 .EE
 
 
 .SH SEE ALSO
-\fBshelly(1)\fP, \fBshelly-config-delete(1)\fP, \fBshelly-config-edit(1)\fP, \fBshelly-config-get(1)\fP, \fBshelly-config-path(1)\fP, \fBshelly-config-reset(1)\fP, \fBshelly-config-set(1)\fP, \fBshelly-config-show(1)\fP
+\fBshelly-config(1)\fP
