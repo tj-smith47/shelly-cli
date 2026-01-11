@@ -525,13 +525,22 @@ func (m Model) getComponents() []ComponentInfo {
 	}
 
 	// Estimate capacity based on known components
-	capacity := len(m.device.Switches) + len(m.device.Lights) + len(m.device.Covers)
+	capacity := len(m.device.Switches) + len(m.device.Lights) + len(m.device.Covers) + len(m.device.Inputs)
 	if m.device.Snapshot != nil {
 		capacity += len(m.device.Snapshot.PM) + len(m.device.Snapshot.EM) + len(m.device.Snapshot.EM1)
 	}
 	components := make([]ComponentInfo, 0, capacity)
 
-	// Add switch components from cache
+	components = m.appendSwitchComponents(components)
+	components = m.appendLightComponents(components)
+	components = m.appendCoverComponents(components)
+	components = m.appendInputComponents(components)
+	components = m.appendPowerMonitoringComponents(components)
+
+	return components
+}
+
+func (m Model) appendSwitchComponents(components []ComponentInfo) []ComponentInfo {
 	for _, sw := range m.device.Switches {
 		state := "off"
 		if sw.On {
@@ -544,8 +553,10 @@ func (m Model) getComponents() []ComponentInfo {
 			Endpoint: fmt.Sprintf("Switch.GetStatus?id=%d", sw.ID),
 		})
 	}
+	return components
+}
 
-	// Add light components from cache (includes dimmers)
+func (m Model) appendLightComponents(components []ComponentInfo) []ComponentInfo {
 	for _, lt := range m.device.Lights {
 		state := "off"
 		if lt.On {
@@ -558,14 +569,15 @@ func (m Model) getComponents() []ComponentInfo {
 			Endpoint: fmt.Sprintf("Light.GetStatus?id=%d", lt.ID),
 		})
 	}
+	return components
+}
 
-	// Add cover components from cache
+func (m Model) appendCoverComponents(components []ComponentInfo) []ComponentInfo {
 	for _, cv := range m.device.Covers {
 		state := cv.State
 		if state == "" {
 			state = "stop"
 		}
-		// Abbreviate state
 		if len(state) > 4 {
 			state = state[:4]
 		}
@@ -576,44 +588,65 @@ func (m Model) getComponents() []ComponentInfo {
 			Endpoint: fmt.Sprintf("Cover.GetStatus?id=%d", cv.ID),
 		})
 	}
+	return components
+}
 
-	// Check if there's power monitoring data
-	if m.device.Snapshot != nil {
-		// Add PM (Power Meter) components
-		for i, pm := range m.device.Snapshot.PM {
-			power := pm.APower
-			components = append(components, ComponentInfo{
-				Name:     fmt.Sprintf("PM%d", i),
-				Type:     "Power Meter",
-				State:    "on",
-				Power:    &power,
-				Endpoint: fmt.Sprintf("PM.GetStatus?id=%d", i),
-			})
+func (m Model) appendInputComponents(components []ComponentInfo) []ComponentInfo {
+	for _, inp := range m.device.Inputs {
+		state := "low"
+		if inp.State {
+			state = "high"
 		}
+		inputType := inp.Type
+		if inputType == "" {
+			inputType = "Input"
+		}
+		components = append(components, ComponentInfo{
+			Name:     fmt.Sprintf("In%d", inp.ID),
+			Type:     inputType,
+			State:    state,
+			Endpoint: fmt.Sprintf("Input.GetStatus?id=%d", inp.ID),
+		})
+	}
+	return components
+}
 
-		// Add EM (Energy Meter) components
-		for i, em := range m.device.Snapshot.EM {
-			power := em.TotalActivePower
-			components = append(components, ComponentInfo{
-				Name:     fmt.Sprintf("EM%d", i),
-				Type:     "Energy Meter",
-				State:    "on",
-				Power:    &power,
-				Endpoint: fmt.Sprintf("EM.GetStatus?id=%d", i),
-			})
-		}
+func (m Model) appendPowerMonitoringComponents(components []ComponentInfo) []ComponentInfo {
+	if m.device.Snapshot == nil {
+		return components
+	}
 
-		// Add EM1 (Single-phase Energy Meter) components
-		for i, em1 := range m.device.Snapshot.EM1 {
-			power := em1.ActPower
-			components = append(components, ComponentInfo{
-				Name:     fmt.Sprintf("EM1:%d", i),
-				Type:     "Energy Meter 1",
-				State:    "on",
-				Power:    &power,
-				Endpoint: fmt.Sprintf("EM1.GetStatus?id=%d", i),
-			})
-		}
+	for i, pm := range m.device.Snapshot.PM {
+		power := pm.APower
+		components = append(components, ComponentInfo{
+			Name:     fmt.Sprintf("PM%d", i),
+			Type:     "Power Meter",
+			State:    "on",
+			Power:    &power,
+			Endpoint: fmt.Sprintf("PM.GetStatus?id=%d", i),
+		})
+	}
+
+	for i, em := range m.device.Snapshot.EM {
+		power := em.TotalActivePower
+		components = append(components, ComponentInfo{
+			Name:     fmt.Sprintf("EM%d", i),
+			Type:     "Energy Meter",
+			State:    "on",
+			Power:    &power,
+			Endpoint: fmt.Sprintf("EM.GetStatus?id=%d", i),
+		})
+	}
+
+	for i, em1 := range m.device.Snapshot.EM1 {
+		power := em1.ActPower
+		components = append(components, ComponentInfo{
+			Name:     fmt.Sprintf("EM1:%d", i),
+			Type:     "Energy Meter 1",
+			State:    "on",
+			Power:    &power,
+			Endpoint: fmt.Sprintf("EM1.GetStatus?id=%d", i),
+		})
 	}
 
 	return components

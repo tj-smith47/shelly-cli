@@ -50,6 +50,11 @@ type DeviceData struct {
 	Switches []SwitchState
 	Lights   []LightState
 	Covers   []CoverState
+	Inputs   []InputState
+
+	// Per-component power tracking for accurate aggregation
+	SwitchPowers map[int]float64
+	CoverPowers  map[int]float64
 
 	UpdatedAt time.Time
 
@@ -75,6 +80,15 @@ type LightState struct {
 type CoverState struct {
 	ID    int
 	State string // "open", "closed", "opening", "closing", "stopped"
+}
+
+// InputState holds the state of an input component.
+// Input components are physical button/toggle terminals that sense HIGH/LOW states.
+type InputState struct {
+	ID    int
+	State bool   // HIGH (true) / LOW (false)
+	Type  string // "button", "switch", "analog"
+	Name  string // User-configured name
 }
 
 // DeviceUpdateMsg is sent when a single device's data is updated.

@@ -16,6 +16,7 @@ const (
 	ComponentSwitch      = "switch"
 	ComponentLight       = "light"
 	ComponentCover       = "cover"
+	ComponentInput       = "input"
 	ComponentPM          = "pm"
 	ComponentPM1         = "pm1"
 	ComponentEM          = "em"
@@ -32,6 +33,7 @@ const (
 	Gen1EMeters        = "emeters"
 	Gen1Lights         = "lights"
 	Gen1Rollers        = "rollers"
+	Gen1Inputs         = "inputs"
 	Gen1Temperature    = "temperature"
 	Gen1ExtTemperature = "ext_temperature"
 	Gen1WiFiSta        = "wifi_sta"
@@ -57,6 +59,11 @@ type ParsedStatus struct {
 	Switches []SwitchState
 	Lights   []LightState
 	Covers   []CoverState
+	Inputs   []InputState
+
+	// Per-component power tracking for accurate WebSocket aggregation
+	SwitchPowers map[int]float64
+	CoverPowers  map[int]float64
 
 	// Power/energy metrics
 	Power       float64
@@ -125,8 +132,10 @@ func unmarshalJSON[T any](raw json.RawMessage) (*T, error) {
 // and their status as json.RawMessage for flexible parsing.
 func ParseFullStatus(deviceID string, statusMap map[string]json.RawMessage) (*ParsedStatus, error) {
 	result := &ParsedStatus{
-		DeviceID:   deviceID,
-		Components: statusMap,
+		DeviceID:     deviceID,
+		Components:   statusMap,
+		SwitchPowers: make(map[int]float64),
+		CoverPowers:  make(map[int]float64),
 	}
 
 	// Parse each component by type
@@ -147,6 +156,8 @@ func parseGen2Component(result *ParsedStatus, key string, rawStatus json.RawMess
 		parseLightComponent(result, rawStatus)
 	case ComponentCover:
 		parseCoverComponent(result, rawStatus)
+	case ComponentInput:
+		parseInputComponent(result, rawStatus)
 	case ComponentPM, ComponentPM1:
 		parsePMComponent(result, rawStatus)
 	case ComponentEM:
@@ -199,6 +210,9 @@ func parseSwitchComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 func accumulateSwitchMetrics(result *ParsedStatus, sw *switchStatusData) {
 	if sw.APower != nil {
 		result.Power += *sw.APower
+		if result.SwitchPowers != nil {
+			result.SwitchPowers[sw.ID] = *sw.APower
+		}
 	}
 	if sw.Voltage != nil && result.Voltage == 0 {
 		result.Voltage = *sw.Voltage
@@ -253,6 +267,9 @@ func parseCoverComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 func accumulateCoverMetrics(result *ParsedStatus, cv *coverStatusData) {
 	if cv.APower > 0 {
 		result.Power += cv.APower
+		if result.CoverPowers != nil {
+			result.CoverPowers[cv.ID] = cv.APower
+		}
 	}
 	if cv.Voltage > 0 && result.Voltage == 0 {
 		result.Voltage = cv.Voltage
@@ -260,6 +277,32 @@ func accumulateCoverMetrics(result *ParsedStatus, cv *coverStatusData) {
 	if cv.Current > 0 && result.Current == 0 {
 		result.Current = cv.Current
 	}
+}
+
+// inputStatusData holds parsed input status fields.
+type inputStatusData struct {
+	ID      int      `json:"id"`
+	State   *bool    `json:"state,omitempty"`
+	Percent *float64 `json:"percent,omitempty"`
+}
+
+// parseInputComponent parses an input component status.
+func parseInputComponent(result *ParsedStatus, rawStatus json.RawMessage) {
+	inp, err := unmarshalJSON[inputStatusData](rawStatus)
+	if err != nil {
+		return
+	}
+
+	state := false
+	if inp.State != nil {
+		state = *inp.State
+	}
+
+	// Type and Name are only available in config, not status
+	result.Inputs = append(result.Inputs, InputState{
+		ID:    inp.ID,
+		State: state,
+	})
 }
 
 // parsePMComponent parses a PM/PM1 (power meter) component status.
@@ -388,6 +431,9 @@ func ParseGen1Status(deviceID string, statusMap map[string]json.RawMessage) (*Pa
 	if raw, ok := statusMap[Gen1Rollers]; ok {
 		parseGen1Rollers(result, raw)
 	}
+	if raw, ok := statusMap[Gen1Inputs]; ok {
+		parseGen1Inputs(result, raw)
+	}
 	if raw, ok := statusMap[Gen1Temperature]; ok {
 		parseGen1Temperature(result, raw)
 	}
@@ -509,6 +555,28 @@ func normalizeGen1CoverState(state string) string {
 	}
 }
 
+// gen1InputStatus holds Gen1 input fields.
+type gen1InputStatus struct {
+	Input    int    `json:"input"`
+	Event    string `json:"event,omitempty"`
+	EventCnt int    `json:"event_cnt,omitempty"`
+}
+
+// parseGen1Inputs parses Gen1 inputs array.
+func parseGen1Inputs(result *ParsedStatus, raw json.RawMessage) {
+	inputs, err := unmarshalJSON[[]gen1InputStatus](raw)
+	if err != nil {
+		return
+	}
+	for i, inp := range *inputs {
+		// Gen1 input field is 0/1 representing LOW/HIGH state
+		result.Inputs = append(result.Inputs, InputState{
+			ID:    i,
+			State: inp.Input != 0,
+		})
+	}
+}
+
 // parseGen1Temperature parses Gen1 temperature field (single value).
 func parseGen1Temperature(result *ParsedStatus, raw json.RawMessage) {
 	var temp float64
@@ -615,6 +683,17 @@ func ApplyParsedStatus(data *DeviceData, parsed *ParsedStatus) {
 	if len(parsed.Covers) > 0 {
 		data.Covers = parsed.Covers
 	}
+	if len(parsed.Inputs) > 0 {
+		data.Inputs = parsed.Inputs
+	}
+
+	// Update per-component power maps for accurate WebSocket aggregation
+	if len(parsed.SwitchPowers) > 0 {
+		data.SwitchPowers = parsed.SwitchPowers
+	}
+	if len(parsed.CoverPowers) > 0 {
+		data.CoverPowers = parsed.CoverPowers
+	}
 
 	// Update metrics
 	data.Power = parsed.Power
@@ -694,6 +773,8 @@ func ApplyIncrementalUpdate(data *DeviceData, componentType string, componentID 
 		applyIncrementalLight(data, componentID, status)
 	case ComponentCover:
 		applyIncrementalCover(data, componentID, status)
+	case ComponentInput:
+		applyIncrementalInput(data, componentID, status)
 	case ComponentPM, ComponentPM1:
 		applyIncrementalPM(data, status)
 	case ComponentEM:
@@ -805,6 +886,31 @@ func updateOrAppendCover(covers *[]CoverState, id int, state string) {
 		}
 	}
 	*covers = append(*covers, CoverState{ID: id, State: state})
+}
+
+// incrementalInputStatus holds incremental input update fields.
+type incrementalInputStatus struct {
+	State *bool `json:"state,omitempty"`
+}
+
+// applyIncrementalInput applies an input status change.
+func applyIncrementalInput(data *DeviceData, id int, raw json.RawMessage) {
+	status, err := unmarshalJSON[incrementalInputStatus](raw)
+	if err != nil || status.State == nil {
+		return
+	}
+	updateOrAppendInput(&data.Inputs, id, *status.State)
+}
+
+// updateOrAppendInput updates an existing input or appends a new one.
+func updateOrAppendInput(inputs *[]InputState, id int, state bool) {
+	for i := range *inputs {
+		if (*inputs)[i].ID == id {
+			(*inputs)[i].State = state
+			return
+		}
+	}
+	*inputs = append(*inputs, InputState{ID: id, State: state})
 }
 
 // applyIncrementalPM applies a PM/PM1 status change.
