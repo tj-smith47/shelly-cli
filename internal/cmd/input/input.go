@@ -4,6 +4,8 @@ package input
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/input/disable"
+	"github.com/tj-smith47/shelly-cli/internal/cmd/input/enable"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input/list"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input/status"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/input/trigger"
@@ -27,6 +29,8 @@ func NewCommand(f *cmdutil.Factory) *cobra.Command {
   shelly input trigger kitchen --id 0`,
 	}
 
+	cmd.AddCommand(disable.NewCommand(f))
+	cmd.AddCommand(enable.NewCommand(f))
 	cmd.AddCommand(list.NewCommand(f))
 	cmd.AddCommand(status.NewCommand(f))
 	cmd.AddCommand(trigger.NewCommand(f))

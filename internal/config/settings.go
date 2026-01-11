@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // GetSetting retrieves a CLI configuration value by key.
@@ -28,6 +29,101 @@ func GetAllSettings() map[string]any {
 func SetSetting(key string, value any) error {
 	viper.Set(key, value)
 	return viper.WriteConfig()
+}
+
+// DeleteSetting removes a CLI configuration value by key.
+// The key is removed from the config file, not just set to nil.
+// Returns an error if the key does not exist.
+func DeleteSetting(key string) error {
+	if !viper.IsSet(key) {
+		return fmt.Errorf("key %q is not set", key)
+	}
+
+	// Get the config file path
+	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		return fmt.Errorf("no config file found")
+	}
+
+	// Read the config file as a map
+	fs := Fs()
+	data, err := afero.ReadFile(fs, configFile)
+	if err != nil {
+		return fmt.Errorf("read config: %w", err)
+	}
+
+	var configMap map[string]any
+	if err := yaml.Unmarshal(data, &configMap); err != nil {
+		return fmt.Errorf("parse config: %w", err)
+	}
+
+	// Delete the key from the map (handling dot notation)
+	if !deleteNestedKey(configMap, key) {
+		return fmt.Errorf("key %q not found in config file", key)
+	}
+
+	// Write the updated config back
+	updatedData, err := yaml.Marshal(configMap)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	if err := afero.WriteFile(fs, configFile, updatedData, 0o600); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+
+	// Clear the key from viper's in-memory state
+	viper.Set(key, nil)
+
+	return nil
+}
+
+// deleteNestedKey removes a key from a nested map using dot notation.
+// Returns true if the key was found and deleted.
+func deleteNestedKey(m map[string]any, key string) bool {
+	parts := strings.Split(key, ".")
+	if len(parts) == 1 {
+		if _, exists := m[key]; exists {
+			delete(m, key)
+			return true
+		}
+		return false
+	}
+
+	// Navigate to the parent map
+	current := m
+	for i := range len(parts) - 1 {
+		next, ok := current[parts[i]]
+		if !ok {
+			return false
+		}
+		nextMap, ok := next.(map[string]any)
+		if !ok {
+			return false
+		}
+		current = nextMap
+	}
+
+	// Delete the final key
+	finalKey := parts[len(parts)-1]
+	if _, exists := current[finalKey]; exists {
+		delete(current, finalKey)
+		return true
+	}
+	return false
+}
+
+// IsParentSetting checks if a setting key has nested child values.
+// Returns the list of child keys if any exist.
+func IsParentSetting(key string) ([]string, bool) {
+	prefix := key + "."
+	var children []string
+	for _, k := range viper.AllKeys() {
+		if strings.HasPrefix(k, prefix) {
+			children = append(children, k)
+		}
+	}
+	return children, len(children) > 0
 }
 
 // ResetSettings resets CLI configuration to defaults.

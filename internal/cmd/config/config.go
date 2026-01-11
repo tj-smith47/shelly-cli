@@ -4,6 +4,7 @@ package config
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/tj-smith47/shelly-cli/internal/cmd/config/deletecmd"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/edit"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/get"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/config/path"
@@ -34,6 +35,9 @@ For device configuration, use: shelly device config <subcommand>`,
   # Set a value
   shelly config set defaults.output=json
 
+  # Delete a setting
+  shelly config delete defaults.timeout
+
   # Open config in editor
   shelly config edit
 
@@ -41,6 +45,7 @@ For device configuration, use: shelly device config <subcommand>`,
   shelly config reset`,
 	}
 
+	cmd.AddCommand(deletecmd.NewCommand(f))
 	cmd.AddCommand(edit.NewCommand(f))
 	cmd.AddCommand(get.NewCommand(f))
 	cmd.AddCommand(path.NewCommand(f))
