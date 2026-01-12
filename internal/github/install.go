@@ -70,27 +70,36 @@ func (c *Client) InstallRelease(ctx context.Context, ios *iostreams.IOStreams, r
 		return fmt.Errorf("no binary available for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 
-	// Download and extract
-	binaryPath, cleanup, err := c.DownloadAndExtract(ctx, asset, "shelly")
+	// Download the asset (but don't extract yet)
+	downloadResult, err := c.DownloadAssetToTemp(ctx, asset)
 	if err != nil {
 		ios.StopProgress()
 		return fmt.Errorf("failed to download: %w", err)
 	}
-	defer cleanup()
+	defer downloadResult.Cleanup()
 
 	ios.StopProgress()
 
-	// Verify checksum if available
+	// Verify checksum of the archive before extraction
 	checksumAsset := release.FindChecksumAsset(asset.Name)
 	if checksumAsset != nil {
 		ios.StartProgress("Verifying checksum...")
-		if err := c.VerifyChecksum(ctx, ios, binaryPath, asset.Name, checksumAsset); err != nil {
+		if err := c.VerifyChecksum(ctx, ios, downloadResult.ArchivePath, asset.Name, checksumAsset); err != nil {
 			ios.StopProgress()
 			return fmt.Errorf("checksum verification failed: %w", err)
 		}
 		ios.StopProgress()
 		ios.Success("Checksum verified")
 	}
+
+	// Extract the binary
+	ios.StartProgress("Extracting...")
+	binaryPath, err := c.ExtractBinary(downloadResult.ArchivePath, downloadResult.TmpDir, "shelly")
+	if err != nil {
+		ios.StopProgress()
+		return fmt.Errorf("failed to extract: %w", err)
+	}
+	ios.StopProgress()
 
 	// Get current executable path
 	execPath, err := osExecutable()
@@ -225,6 +234,81 @@ func GetExecutablePath() (string, error) {
 	}
 
 	return execPath, nil
+}
+
+// InstallMethod represents how the CLI was installed.
+type InstallMethod int
+
+const (
+	// InstallMethodUnknown is the default/unknown installation method.
+	InstallMethodUnknown InstallMethod = iota
+	// InstallMethodHomebrew indicates installation via Homebrew.
+	InstallMethodHomebrew
+	// InstallMethodDirect indicates direct download or go install (supports self-update).
+	InstallMethodDirect
+)
+
+// InstallInfo contains information about how the CLI was installed.
+type InstallInfo struct {
+	Method        InstallMethod
+	Path          string
+	UpdateCommand string // Command to show user if self-update isn't supported
+}
+
+// DetectInstallMethod detects how the CLI was installed based on the executable path.
+func DetectInstallMethod() InstallInfo {
+	execPath, err := GetExecutablePath()
+	if err != nil {
+		return InstallInfo{Method: InstallMethodDirect, Path: ""}
+	}
+
+	return DetectInstallMethodFromPath(execPath)
+}
+
+// DetectInstallMethodFromPath determines installation method from a path.
+func DetectInstallMethodFromPath(execPath string) InstallInfo {
+	info := InstallInfo{
+		Method: InstallMethodDirect,
+		Path:   execPath,
+	}
+
+	// Check for Homebrew installation
+	// macOS ARM: /opt/homebrew/Cellar/shelly/...
+	// macOS Intel: /usr/local/Cellar/shelly/...
+	// Linux: /home/linuxbrew/.linuxbrew/Cellar/shelly/...
+	homebrewPaths := []string{
+		"/opt/homebrew/",
+		"/usr/local/Cellar/",
+		"/home/linuxbrew/.linuxbrew/",
+	}
+
+	for _, prefix := range homebrewPaths {
+		if len(execPath) >= len(prefix) && execPath[:len(prefix)] == prefix {
+			info.Method = InstallMethodHomebrew
+			info.UpdateCommand = "brew upgrade shelly"
+			return info
+		}
+	}
+
+	// Also check HOMEBREW_CELLAR environment variable
+	if cellar := getEnv("HOMEBREW_CELLAR"); cellar != "" {
+		if len(execPath) >= len(cellar) && execPath[:len(cellar)] == cellar {
+			info.Method = InstallMethodHomebrew
+			info.UpdateCommand = "brew upgrade shelly"
+			return info
+		}
+	}
+
+	// Everything else (go install, direct download, dev build) supports self-update
+	return info
+}
+
+// getEnv is a variable for testing.
+var getEnv = os.Getenv
+
+// CanSelfUpdate returns true if the installation method supports self-update.
+func (i InstallInfo) CanSelfUpdate() bool {
+	return i.Method != InstallMethodHomebrew
 }
 
 // RestartCLI spawns a new process to replace the current one.

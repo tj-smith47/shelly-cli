@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
 const (
@@ -303,18 +304,29 @@ func (c *Client) DownloadAsset(ctx context.Context, asset *Asset, destPath strin
 	return nil
 }
 
-// DownloadAndExtract downloads a release binary and extracts it if needed.
-// Returns the path to the extracted binary.
-func (c *Client) DownloadAndExtract(ctx context.Context, asset *Asset, binaryName string) (binaryPath string, cleanup func(), err error) {
+// DownloadResult holds the result of downloading an asset.
+type DownloadResult struct {
+	// ArchivePath is the path to the downloaded archive/binary file.
+	ArchivePath string
+	// TmpDir is the temporary directory containing the download.
+	TmpDir string
+	// Cleanup removes the temporary directory.
+	Cleanup func()
+}
+
+// DownloadAssetToTemp downloads an asset to a temporary directory.
+// Returns the download result with the archive path and cleanup function.
+// The caller is responsible for calling Cleanup when done.
+func (c *Client) DownloadAssetToTemp(ctx context.Context, asset *Asset) (*DownloadResult, error) {
 	fs := getFs()
 
 	// Create temp directory for download
 	tmpDir, err := afero.TempDir(fs, "", "shelly-download-*")
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to create temp directory: %w", err)
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	cleanup = func() {
+	cleanup := func() {
 		if rerr := fs.RemoveAll(tmpDir); rerr != nil {
 			c.ios.DebugErr("removing temp directory", rerr)
 		}
@@ -325,32 +337,61 @@ func (c *Client) DownloadAndExtract(ctx context.Context, asset *Asset, binaryNam
 	// Download the asset
 	if err := c.DownloadAsset(ctx, asset, downloadPath); err != nil {
 		cleanup()
-		return "", nil, err
+		return nil, err
 	}
+
+	return &DownloadResult{
+		ArchivePath: downloadPath,
+		TmpDir:      tmpDir,
+		Cleanup:     cleanup,
+	}, nil
+}
+
+// ExtractBinary extracts a binary from an archive in the given directory.
+// Returns the path to the extracted binary.
+func (c *Client) ExtractBinary(archivePath, tmpDir, binaryName string) (string, error) {
+	fs := getFs()
+	var binaryPath string
+	var err error
 
 	// Check if it needs extraction
 	switch {
-	case strings.HasSuffix(asset.Name, ".tar.gz") || strings.HasSuffix(asset.Name, ".tgz"):
-		binaryPath, err = c.extractTarGz(downloadPath, tmpDir, binaryName)
-	case strings.HasSuffix(asset.Name, ".zip"):
-		binaryPath, err = c.extractZip(downloadPath, tmpDir, binaryName)
+	case strings.HasSuffix(archivePath, ".tar.gz") || strings.HasSuffix(archivePath, ".tgz"):
+		binaryPath, err = c.extractTarGz(archivePath, tmpDir, binaryName)
+	case strings.HasSuffix(archivePath, ".zip"):
+		binaryPath, err = c.extractZip(archivePath, tmpDir, binaryName)
 	default:
 		// Assume it's already the binary
-		binaryPath = downloadPath
+		binaryPath = archivePath
 	}
 
 	if err != nil {
-		cleanup()
-		return "", nil, err
+		return "", err
 	}
 
 	// Make it executable - downloaded binaries must be executable
 	if err := fs.Chmod(binaryPath, 0o755); err != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("failed to make executable: %w", err)
+		return "", fmt.Errorf("failed to make executable: %w", err)
 	}
 
-	return binaryPath, cleanup, nil
+	return binaryPath, nil
+}
+
+// DownloadAndExtract downloads a release binary and extracts it if needed.
+// Returns the path to the extracted binary.
+func (c *Client) DownloadAndExtract(ctx context.Context, asset *Asset, binaryName string) (binaryPath string, cleanup func(), err error) {
+	result, err := c.DownloadAssetToTemp(ctx, asset)
+	if err != nil {
+		return "", nil, err
+	}
+
+	binaryPath, err = c.ExtractBinary(result.ArchivePath, result.TmpDir, binaryName)
+	if err != nil {
+		result.Cleanup()
+		return "", nil, err
+	}
+
+	return binaryPath, result.Cleanup, nil
 }
 
 // maxExtractSize is the maximum size for extracted files (100MB).
@@ -622,73 +663,10 @@ func (r *Release) FindChecksumAsset(assetName string) *Asset {
 	return nil
 }
 
-// CompareVersions compares two semantic versions.
-// Returns -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2.
-func CompareVersions(v1, v2 string) int {
-	v1 = strings.TrimPrefix(v1, "v")
-	v2 = strings.TrimPrefix(v2, "v")
-
-	// Split into parts
-	parts1 := parseVersion(v1)
-	parts2 := parseVersion(v2)
-
-	// Compare each part
-	maxLen := len(parts1)
-	if len(parts2) > maxLen {
-		maxLen = len(parts2)
-	}
-
-	for i := range maxLen {
-		var p1, p2 int
-		if i < len(parts1) {
-			p1 = parts1[i]
-		}
-		if i < len(parts2) {
-			p2 = parts2[i]
-		}
-
-		if p1 < p2 {
-			return -1
-		}
-		if p1 > p2 {
-			return 1
-		}
-	}
-
-	return 0
-}
-
-// parseVersion parses a version string into numeric parts.
-func parseVersion(v string) []int {
-	// Remove prerelease suffix (e.g., -beta.1)
-	if idx := strings.IndexAny(v, "-+"); idx != -1 {
-		v = v[:idx]
-	}
-
-	parts := strings.Split(v, ".")
-	result := make([]int, 0, len(parts))
-
-	for _, p := range parts {
-		var num int
-		_, err := fmt.Sscanf(p, "%d", &num)
-		if err != nil {
-			num = 0
-		}
-		result = append(result, num)
-	}
-
-	return result
-}
-
-// IsNewerVersion returns true if available is newer than current.
-func IsNewerVersion(current, available string) bool {
-	return CompareVersions(available, current) > 0
-}
-
 // SortReleasesByVersion sorts releases by version in descending order.
 func SortReleasesByVersion(releases []Release) {
 	sort.Slice(releases, func(i, j int) bool {
-		return CompareVersions(releases[i].TagName, releases[j].TagName) > 0
+		return version.CompareVersions(releases[i].TagName, releases[j].TagName) > 0
 	})
 }
 

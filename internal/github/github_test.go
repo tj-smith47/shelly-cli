@@ -25,6 +25,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/github"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
 // Test version constants to avoid magic strings.
@@ -135,7 +136,7 @@ func TestCompareVersions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.v1+"_vs_"+tt.v2, func(t *testing.T) {
 			t.Parallel()
-			got := github.CompareVersions(tt.v1, tt.v2)
+			got := version.CompareVersions(tt.v1, tt.v2)
 			if got != tt.want {
 				t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.v1, tt.v2, got, tt.want)
 			}
@@ -160,7 +161,7 @@ func TestIsNewerVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.current+"_vs_"+tt.available, func(t *testing.T) {
 			t.Parallel()
-			got := github.IsNewerVersion(tt.current, tt.available)
+			got := version.IsNewerVersion(tt.current, tt.available)
 			if got != tt.want {
 				t.Errorf("IsNewerVersion(%q, %q) = %v, want %v", tt.current, tt.available, got, tt.want)
 			}
@@ -1619,7 +1620,7 @@ func TestCompareVersions_EdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.v1+"_vs_"+tt.v2, func(t *testing.T) {
 			t.Parallel()
-			got := github.CompareVersions(tt.v1, tt.v2)
+			got := version.CompareVersions(tt.v1, tt.v2)
 			if got != tt.want {
 				t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.v1, tt.v2, got, tt.want)
 			}
@@ -2599,12 +2600,12 @@ func TestReleaseFetcher(t *testing.T) {
 	ios := iostreams.Test(&bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
 	fetcher := github.ReleaseFetcher(ios)
 
-	version, err := fetcher(context.Background())
+	ver, err := fetcher(context.Background())
 	if err != nil {
 		t.Fatalf("ReleaseFetcher() error = %v", err)
 	}
-	if version != "2.5.0" {
-		t.Errorf("version = %q, want %q", version, "2.5.0")
+	if ver != "2.5.0" {
+		t.Errorf("version = %q, want %q", ver, "2.5.0")
 	}
 }
 
@@ -4256,7 +4257,7 @@ func TestCompareVersions_VariousFormats(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.v1+"_vs_"+tt.v2, func(t *testing.T) {
 			t.Parallel()
-			got := github.CompareVersions(tt.v1, tt.v2)
+			got := version.CompareVersions(tt.v1, tt.v2)
 			if got != tt.want {
 				t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.v1, tt.v2, got, tt.want)
 			}
@@ -4682,7 +4683,7 @@ func TestParseVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.v1+"_vs_"+tt.v2, func(t *testing.T) {
 			t.Parallel()
-			got := github.CompareVersions(tt.v1, tt.v2)
+			got := version.CompareVersions(tt.v1, tt.v2)
 			if got != tt.want {
 				t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.v1, tt.v2, got, tt.want)
 			}
@@ -5771,5 +5772,89 @@ func TestExtractZip_OpenError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to read zip") {
 		t.Errorf("error should mention read zip, got: %v", err)
+	}
+}
+
+func TestDetectInstallMethod_Homebrew(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		want github.InstallMethod
+	}{
+		{
+			name: "macOS ARM homebrew",
+			path: "/opt/homebrew/Cellar/shelly/1.0.0/bin/shelly",
+			want: github.InstallMethodHomebrew,
+		},
+		{
+			name: "macOS Intel homebrew",
+			path: "/usr/local/Cellar/shelly/1.0.0/bin/shelly",
+			want: github.InstallMethodHomebrew,
+		},
+		{
+			name: "Linux homebrew",
+			path: "/home/linuxbrew/.linuxbrew/Cellar/shelly/1.0.0/bin/shelly",
+			want: github.InstallMethodHomebrew,
+		},
+		{
+			name: "direct download",
+			path: "/usr/local/bin/shelly",
+			want: github.InstallMethodDirect,
+		},
+		{
+			name: "go install GOPATH",
+			path: "/home/user/go/bin/shelly",
+			want: github.InstallMethodDirect,
+		},
+		{
+			name: "tmp directory",
+			path: "/tmp/shelly-test",
+			want: github.InstallMethodDirect,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			info := github.DetectInstallMethodFromPath(tt.path)
+			if info.Method != tt.want {
+				t.Errorf("DetectInstallMethodFromPath(%q) = %v, want %v", tt.path, info.Method, tt.want)
+			}
+		})
+	}
+}
+
+func TestInstallInfo_CanSelfUpdate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		method github.InstallMethod
+		want   bool
+	}{
+		{"homebrew cannot self-update", github.InstallMethodHomebrew, false},
+		{"direct can self-update", github.InstallMethodDirect, true},
+		{"unknown can self-update", github.InstallMethodUnknown, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			info := github.InstallInfo{Method: tt.method}
+			if got := info.CanSelfUpdate(); got != tt.want {
+				t.Errorf("InstallInfo{Method: %v}.CanSelfUpdate() = %v, want %v", tt.method, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectInstallMethod_HomebrewUpdateCommand(t *testing.T) {
+	t.Parallel()
+
+	info := github.DetectInstallMethodFromPath("/opt/homebrew/Cellar/shelly/1.0.0/bin/shelly")
+	if info.UpdateCommand != "brew upgrade shelly" {
+		t.Errorf("UpdateCommand = %q, want %q", info.UpdateCommand, "brew upgrade shelly")
 	}
 }

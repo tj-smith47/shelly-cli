@@ -39,8 +39,8 @@ func ShowUpdateNotification() {
 		return
 	}
 
-	// Simple semver comparison - if latest is different and "newer"
-	if latestVersion > currentVersion {
-		iostreams.Warning("\nUpdate available: %s -> %s (run 'shelly update' to install)\n", Version, cachedVersion)
+	// Use proper semver comparison
+	if IsNewerVersion(currentVersion, latestVersion) {
+		iostreams.UpdateNotification(currentVersion, latestVersion)
 	}
 }

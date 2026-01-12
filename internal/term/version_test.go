@@ -211,18 +211,23 @@ func TestRunUpdateCheck_DevBuild(t *testing.T) {
 func TestDisplayUpdateStatus_HasUpdate(t *testing.T) {
 	t.Parallel()
 
-	ios, out, _ := testIOStreams()
+	ios, out, errOut := testIOStreams()
 	DisplayUpdateStatus(ios, "1.0.0", "2.0.0", true, "https://github.com/releases/v2.0.0")
 
-	output := out.String()
-	if output == "" {
+	// Warning goes to stderr, other output to stdout
+	errOutput := errOut.String()
+	stdOutput := out.String()
+
+	if errOutput == "" && stdOutput == "" {
 		t.Error("DisplayUpdateStatus should produce output")
 	}
-	if !strings.Contains(output, "Update available") {
-		t.Error("output should mention update available")
+	// Warning message is on stderr
+	if !strings.Contains(errOutput, "Update available") {
+		t.Errorf("stderr should mention update available, got: %q", errOutput)
 	}
-	if !strings.Contains(output, "github.com") {
-		t.Error("output should contain release URL")
+	// Release URL is on stdout
+	if !strings.Contains(stdOutput, "github.com") {
+		t.Errorf("stdout should contain release URL, got: %q", stdOutput)
 	}
 }
 

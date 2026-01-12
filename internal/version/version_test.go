@@ -120,3 +120,83 @@ func TestInfoFields(t *testing.T) {
 		t.Error("Arch should not be empty")
 	}
 }
+
+func TestCompareVersions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		v1   string
+		v2   string
+		want int
+	}{
+		{"1.0.0", "1.0.0", 0},
+		{"1.0.0", "2.0.0", -1},
+		{"2.0.0", "1.0.0", 1},
+		{"1.0.0", "1.0.1", -1},
+		{"1.0.1", "1.0.0", 1},
+		{"1.1.0", "1.0.0", 1},
+		{"v1.0.0", "1.0.0", 0},
+		{"1.0.0", "v1.0.0", 0},
+		{"v1.0.0", "v2.0.0", -1},
+		{"0.5.11", "0.6.1", -1},
+		{"0.6.1", "0.5.11", 1},
+		{"0.10.0", "0.9.0", 1},
+		{"0.9.0", "0.10.0", -1},
+		{"1.0.0-beta", "1.0.0", 0},  // Pre-release suffix ignored
+		{"1.0.0", "1.0.0-beta", 0},  // Pre-release suffix ignored
+		{"1.0.0+build", "1.0.0", 0}, // Build metadata ignored
+	}
+
+	for _, tt := range tests {
+		got := CompareVersions(tt.v1, tt.v2)
+		if got != tt.want {
+			t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.v1, tt.v2, got, tt.want)
+		}
+	}
+}
+
+func TestIsNewerVersion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		current   string
+		available string
+		want      bool
+	}{
+		{"1.0.0", "2.0.0", true},
+		{"2.0.0", "1.0.0", false},
+		{"1.0.0", "1.0.0", false},
+		{"0.5.11", "0.6.1", true},
+		{"0.6.1", "0.5.11", false},
+		{"v0.5.11", "v0.6.1", true},
+	}
+
+	for _, tt := range tests {
+		got := IsNewerVersion(tt.current, tt.available)
+		if got != tt.want {
+			t.Errorf("IsNewerVersion(%q, %q) = %v, want %v", tt.current, tt.available, got, tt.want)
+		}
+	}
+}
+
+func TestCompareVersions_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		v1   string
+		v2   string
+		want int
+	}{
+		{"", "", 0},
+		{"1.0", "1.0.0", 0},
+		{"1", "1.0.0", 0},
+		{"1.0.0.0", "1.0.0", 0},
+	}
+
+	for _, tt := range tests {
+		got := CompareVersions(tt.v1, tt.v2)
+		if got != tt.want {
+			t.Errorf("CompareVersions(%q, %q) = %d, want %d", tt.v1, tt.v2, got, tt.want)
+		}
+	}
+}

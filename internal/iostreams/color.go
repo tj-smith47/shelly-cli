@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	"charm.land/lipgloss/v2"
 	"github.com/spf13/viper"
 
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -39,7 +40,9 @@ func (s *IOStreams) Success(format string, args ...any) {
 // Warnings go to stderr.
 func (s *IOStreams) Warning(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.ErrOut, theme.StatusWarn().Render("⚠")+" "+msg)
+	symbol := theme.SemanticWarning().Render("⚠")
+	text := lipgloss.NewStyle().Foreground(theme.Yellow()).Render(msg)
+	writelnQuietly(s.ErrOut, symbol+" "+text)
 }
 
 // Error prints an error message with theme styling.
@@ -181,6 +184,17 @@ func CountTo(w io.Writer, noun string, count int) {
 		suffix = ""
 	}
 	writeQuietly(w, "Found %d %s%s\n", count, noun, suffix)
+}
+
+// UpdateNotification prints an update notification with orange symbol and yellow text.
+// Used for non-blocking update notifications during command execution.
+func UpdateNotification(currentVersion, latestVersion string) {
+	symbol := theme.SemanticWarning().Render("⚠")
+	yellowStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
+	text := yellowStyle.Render(
+		fmt.Sprintf("Update available: %s -> %s (run 'shelly update' to install)", currentVersion, latestVersion),
+	)
+	writelnQuietly(os.Stderr, symbol+" "+text)
 }
 
 // Package-level convenience functions that write to stdout/stderr.

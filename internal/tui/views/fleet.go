@@ -284,12 +284,6 @@ func (f *Fleet) handleGroupEditMsg(msg tea.Msg) tea.Cmd {
 			return toast.Success("Group relays turned off")
 		case fleet.GroupCommandToggle:
 			return toast.Success("Group relays toggled")
-		default:
-			// Fallback for old messages using On field
-			if editMsg.On {
-				return toast.Success("Group relays turned on")
-			}
-			return toast.Success("Group relays turned off")
 		}
 	}
 	return nil

@@ -72,7 +72,7 @@ func run(ctx context.Context, opts *Options) error {
 		return nil
 	}
 	if opts.JSON {
-		if err := version.WriteJSONOutput(ctx, ios.Out, info, opts.CheckUpdate, github.ReleaseFetcher(ios), github.IsNewerVersion); err != nil {
+		if err := version.WriteJSONOutput(ctx, ios.Out, info, opts.CheckUpdate, github.ReleaseFetcher(ios), version.IsNewerVersion); err != nil {
 			ios.DebugErr("encoding JSON", err)
 		}
 		return nil
@@ -98,8 +98,10 @@ func run(ctx context.Context, opts *Options) error {
 
 	if opts.CheckUpdate {
 		term.RunUpdateCheck(ctx, ios, checker)
-	} else if cached := version.ReadCachedVersion(); cached != "" && github.IsNewerVersion(info.Version, cached) {
-		term.DisplayUpdateAvailable(ios, info.Version, cached)
+	} else if !version.IsDevelopment() {
+		if cached := version.ReadCachedVersion(); cached != "" && version.IsNewerVersion(info.Version, cached) {
+			term.DisplayUpdateAvailable(ios, info.Version, cached)
+		}
 	}
 	return nil
 }

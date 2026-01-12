@@ -17,7 +17,7 @@ import (
 // CheckForUpdates checks GitHub releases for available updates.
 // Returns an UpdateResult with version comparison and caches the latest version.
 func CheckForUpdates(ctx context.Context, ios *iostreams.IOStreams, currentVersion string) (*version.UpdateResult, error) {
-	return version.CheckForUpdates(ctx, currentVersion, ReleaseFetcher(ios), IsNewerVersion)
+	return version.CheckForUpdates(ctx, currentVersion, ReleaseFetcher(ios), version.IsNewerVersion)
 }
 
 // FetchSpecificVersion fetches a specific release by version tag.
@@ -103,7 +103,7 @@ func CheckForUpdatesCached(ctx context.Context, ios *iostreams.IOStreams, cacheP
 		data, err := afero.ReadFile(fs, cachePath)
 		if err == nil {
 			cachedVersion := strings.TrimSpace(string(data))
-			if cachedVersion != "" && IsNewerVersion(currentVersion, cachedVersion) {
+			if cachedVersion != "" && version.IsNewerVersion(currentVersion, cachedVersion) {
 				// Return a minimal release with just the version
 				return &Release{TagName: "v" + cachedVersion}
 			}
@@ -129,7 +129,7 @@ func CheckForUpdatesCached(ctx context.Context, ios *iostreams.IOStreams, cacheP
 		ios.DebugErr("writing update cache", werr)
 	}
 
-	if IsNewerVersion(currentVersion, release.Version()) {
+	if version.IsNewerVersion(currentVersion, release.Version()) {
 		return release
 	}
 

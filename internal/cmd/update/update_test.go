@@ -183,38 +183,15 @@ func TestRun_DevelopmentVersion_Check(t *testing.T) {
 	cmd.SetArgs([]string{"--check"})
 
 	err := cmd.Execute()
-	// In development mode with --check, it warns but doesn't error
+	// Dev builds can check for updates without error
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	// Should show warning about development version
+	// Should show update available (dev is older than any release)
 	errOutput := tf.ErrString()
-	if !strings.Contains(errOutput, "Development version") {
-		t.Errorf("ErrOutput = %q, want to contain 'Development version'", errOutput)
-	}
-}
-
-func TestRun_DevelopmentVersion_Update(t *testing.T) {
-	t.Parallel()
-
-	// In test environment, version.Version is "dev" by default
-	if !version.IsDevelopment() {
-		t.Skip("Test requires development version")
-	}
-
-	tf := factory.NewTestFactory(t)
-	cmd := NewCommand(tf.Factory)
-	cmd.SetArgs([]string{})
-
-	err := cmd.Execute()
-	// Without --check, should error for development version
-	if err == nil {
-		t.Fatal("Expected error for development version update")
-	}
-
-	if !strings.Contains(err.Error(), "cannot update development version") {
-		t.Errorf("Error = %q, want to contain 'cannot update development version'", err.Error())
+	if !strings.Contains(errOutput, "Update available") {
+		t.Errorf("ErrOutput = %q, want to contain 'Update available'", errOutput)
 	}
 }
 

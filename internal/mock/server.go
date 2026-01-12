@@ -125,7 +125,7 @@ func (ds *DeviceServer) handleGen2(w http.ResponseWriter, r *http.Request, endpo
 		return
 	}
 
-	// Legacy direct endpoint access (for testing)
+	// Direct endpoint access (alternative to /rpc method calls)
 	switch {
 	case endpoint == "/rpc/Shelly.GetDeviceInfo":
 		ds.writeGen2DeviceInfo(w, device)

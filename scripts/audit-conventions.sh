@@ -47,10 +47,17 @@ section() {
 }
 
 # Search Go files, excluding tests and vendor
+# Usage: search_go [-i] <pattern> [path]
+#   -i: case-insensitive matching
 search_go() {
+    local case_flag=""
+    if [[ "$1" == "-i" ]]; then
+        case_flag="-i"
+        shift
+    fi
     local pattern="$1"
     local path="${2:-internal/}"
-    grep -rn "$pattern" "$path" 2>/dev/null | grep "\.go:" | grep -v "_test\.go" | grep -v "vendor/" || true
+    grep -rn $case_flag "$pattern" "$path" 2>/dev/null | grep "\.go:" | grep -v "_test\.go" | grep -v "vendor/" || true
 }
 
 # Search only cmd/ Go files, excluding tests
@@ -179,7 +186,7 @@ else
 fi
 
 # Check for legacy/backward compatibility/deprecated patterns (should be cleaned up, not deferred)
-LEGACY=$(search_go "legacy\|backward.*compat\|deprecated\|kept for compat" "internal/" | \
+LEGACY=$(search_go -i "legacy\|backward.*compat\|deprecated\|kept for compat" "internal/" | \
     grep -vi "IsLegacy\|legacyHost\|legacyDevice" || true)
 if [[ -n "$LEGACY" ]]; then
     error "Found legacy/deprecated patterns (clean up, don't defer):"

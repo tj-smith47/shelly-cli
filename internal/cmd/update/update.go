@@ -74,11 +74,14 @@ func run(ctx context.Context, opts *Options) error {
 	ghClient := github.NewClient(ios)
 	currentVersion := version.Version
 
-	if version.IsDevelopment() {
-		ios.Warning("Development version detected, cannot determine update status")
-		if !opts.Check {
-			return fmt.Errorf("cannot update development version")
-		}
+	// Detect installation method
+	installInfo := github.DetectInstallMethod()
+
+	// For non-check operations, verify self-update is supported
+	if !opts.Check && !installInfo.CanSelfUpdate() {
+		ios.Warning("Homebrew installation detected")
+		ios.Printf("  Update using: %s\n", installInfo.UpdateCommand)
+		return fmt.Errorf("self-update not supported for Homebrew installations")
 	}
 
 	if opts.Rollback {
@@ -95,15 +98,20 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	availableVersion := release.Version()
-	hasUpdate := github.IsNewerVersion(currentVersion, availableVersion)
+	hasUpdate := version.IsNewerVersion(currentVersion, availableVersion)
 
 	if opts.Check {
 		term.DisplayUpdateStatus(ios, currentVersion, availableVersion, hasUpdate, release.HTMLURL)
+		// If Homebrew, also show the update command
+		if !installInfo.CanSelfUpdate() {
+			ios.Printf("\n")
+			ios.Info("Homebrew installation detected. Update using: %s", installInfo.UpdateCommand)
+		}
 		return nil
 	}
 
 	if !hasUpdate && opts.Version == "" {
-		ios.Printf("Already at latest version (%s)\n", currentVersion)
+		ios.Success("Already at latest version (%s)", currentVersion)
 		return nil
 	}
 

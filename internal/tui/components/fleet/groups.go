@@ -367,7 +367,6 @@ const (
 type GroupCommandResultMsg struct {
 	GroupID string
 	Action  GroupCommandAction
-	On      bool // Deprecated: use Action instead
 	Err     error
 }
 
@@ -388,11 +387,11 @@ func (m GroupsModel) sendGroupCommand(groupID string, on bool) tea.Cmd {
 		// Check for errors
 		for _, r := range results {
 			if !r.Success {
-				return GroupCommandResultMsg{GroupID: groupID, Action: action, On: on, Err: errors.New(r.Error)}
+				return GroupCommandResultMsg{GroupID: groupID, Action: action, Err: errors.New(r.Error)}
 			}
 		}
 
-		return GroupCommandResultMsg{GroupID: groupID, Action: action, On: on}
+		return GroupCommandResultMsg{GroupID: groupID, Action: action}
 	}
 }
 
