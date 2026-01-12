@@ -6,6 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"github.com/spf13/afero"
+
+	"github.com/tj-smith47/shelly-cli/internal/config"
 )
 
 func TestNewOutput(t *testing.T) {
@@ -172,7 +176,10 @@ func TestWriteJSONOutput_NoUpdateCheck(t *testing.T) {
 }
 
 func TestWriteJSONOutput_WithUpdateCheck(t *testing.T) {
-	t.Parallel()
+	// Use memory filesystem to prevent writes to real cache
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
 
 	info := Info{
 		Version:   "1.0.0",

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/version"
 )
 
 // defaultFs is the package-level filesystem used for install operations.
@@ -122,6 +123,11 @@ func (c *Client) InstallRelease(ctx context.Context, ios *iostreams.IOStreams, r
 
 	ios.Success("Successfully updated to shelly %s", release.Version())
 	ios.Info("Restart shelly to use the new version")
+
+	// Update the version cache so notifications show the correct version
+	if err := version.WriteCache(release.Version()); err != nil {
+		ios.DebugErr("updating version cache", err)
+	}
 
 	return nil
 }

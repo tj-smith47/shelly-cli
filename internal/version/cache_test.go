@@ -250,6 +250,10 @@ func TestUpdateResult_Struct(t *testing.T) {
 }
 
 func TestWriteCache_EmptyCachePath(t *testing.T) {
+	// Use memory filesystem to prevent writes to real filesystem
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Set HOME to invalid path to make CachePath return empty
 	t.Setenv("HOME", "")
 
@@ -261,6 +265,10 @@ func TestWriteCache_EmptyCachePath(t *testing.T) {
 }
 
 func TestReadCachedVersion_EmptyCachePath(t *testing.T) {
+	// Use memory filesystem to prevent reads from real filesystem
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Set HOME to invalid path to make CachePath return empty
 	t.Setenv("HOME", "")
 
@@ -272,6 +280,10 @@ func TestReadCachedVersion_EmptyCachePath(t *testing.T) {
 }
 
 func TestCachePath_NoHomeDir(t *testing.T) {
+	// Use memory filesystem for consistency
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+
 	// Set HOME to empty to trigger the error path
 	t.Setenv("HOME", "")
 

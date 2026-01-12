@@ -68,7 +68,7 @@ func DisplaySceneList(ios *iostreams.IOStreams, scenes []config.Scene) {
 }
 
 // DisplayAliasList prints a table of aliases.
-func DisplayAliasList(ios *iostreams.IOStreams, aliases []config.Alias) {
+func DisplayAliasList(ios *iostreams.IOStreams, aliases []config.NamedAlias) {
 	builder := table.NewBuilder("Name", "Command", "Type")
 
 	for _, alias := range aliases {

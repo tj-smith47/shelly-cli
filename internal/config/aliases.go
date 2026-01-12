@@ -14,6 +14,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// NamedAlias combines an alias name with its definition for listing/display.
+type NamedAlias struct {
+	Name string
+	Alias
+}
+
 // ReservedCommands are built-in commands that cannot be aliased.
 var ReservedCommands = map[string]bool{
 	"help":       true,
@@ -130,7 +136,7 @@ func ListAliases() map[string]Alias {
 }
 
 // ListAliasesSorted returns all aliases sorted by name.
-func ListAliasesSorted() []Alias {
+func ListAliasesSorted() []NamedAlias {
 	return getDefaultManager().ListAliases()
 }
 
@@ -223,7 +229,6 @@ func (m *Manager) AddAlias(name, command string, shell bool) error {
 	}
 
 	m.config.Aliases[name] = Alias{
-		Name:    name,
 		Command: command,
 		Shell:   shell,
 	}
@@ -251,13 +256,13 @@ func (m *Manager) GetAlias(name string) (Alias, bool) {
 }
 
 // ListAliases returns all aliases sorted by name.
-func (m *Manager) ListAliases() []Alias {
+func (m *Manager) ListAliases() []NamedAlias {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	result := make([]Alias, 0, len(m.config.Aliases))
-	for _, v := range m.config.Aliases {
-		result = append(result, v)
+	result := make([]NamedAlias, 0, len(m.config.Aliases))
+	for name, alias := range m.config.Aliases {
+		result = append(result, NamedAlias{Name: name, Alias: alias})
 	}
 
 	sort.Slice(result, func(i, j int) bool {
@@ -328,7 +333,6 @@ func (m *Manager) ImportAliases(filename string, merge bool) (imported, skipped 
 		}
 
 		m.config.Aliases[name] = Alias{
-			Name:    name,
 			Command: command,
 			Shell:   shell,
 		}

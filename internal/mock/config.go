@@ -43,7 +43,6 @@ func FixturesToConfig(fixtures *Fixtures) *config.Config {
 
 	for _, g := range fixtures.Config.Groups {
 		cfg.Groups[g.Name] = config.Group{
-			Name:    g.Name,
 			Devices: g.Devices,
 		}
 	}
@@ -66,7 +65,6 @@ func FixturesToConfig(fixtures *Fixtures) *config.Config {
 
 	for _, a := range fixtures.Config.Aliases {
 		cfg.Aliases[a.Name] = config.Alias{
-			Name:    a.Name,
 			Command: a.Command,
 			Shell:   a.Shell,
 		}
@@ -106,7 +104,6 @@ func FixturesToConfigWithMockURLs(fixtures *Fixtures, server *DeviceServer) *con
 
 	for _, g := range fixtures.Config.Groups {
 		cfg.Groups[g.Name] = config.Group{
-			Name:    g.Name,
 			Devices: g.Devices,
 		}
 	}
@@ -129,7 +126,6 @@ func FixturesToConfigWithMockURLs(fixtures *Fixtures, server *DeviceServer) *con
 
 	for _, a := range fixtures.Config.Aliases {
 		cfg.Aliases[a.Name] = config.Alias{
-			Name:    a.Name,
 			Command: a.Command,
 			Shell:   a.Shell,
 		}

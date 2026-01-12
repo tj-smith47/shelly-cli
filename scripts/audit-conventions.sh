@@ -459,6 +459,33 @@ else
     success "No os.WriteFile usage (using afero for test isolation)"
 fi
 
+# Check for cache functions without afero setup in tests
+# Tests that call WriteCache, ReadCachedVersion, or other cache functions MUST set up memory filesystem
+check_cache_test_isolation() {
+    local test_files
+    test_files=$(grep -rl "WriteCache\|ReadCachedVersion\|CachePath" internal/ 2>/dev/null | grep "_test\.go" || true)
+
+    local violations=""
+    for f in $test_files; do
+        # For each test file that uses cache functions, verify it sets up afero
+        if ! grep -q "config\.SetFs(afero" "$f"; then
+            violations="${violations}${f}\n"
+        fi
+    done
+
+    if [[ -n "$violations" ]]; then
+        echo -e "$violations"
+    fi
+}
+
+CACHE_VIOLATIONS=$(check_cache_test_isolation)
+if [[ -n "$CACHE_VIOLATIONS" ]]; then
+    error "Tests using cache functions without config.SetFs(afero) setup:"
+    echo -e "$CACHE_VIOLATIONS" | head -10
+else
+    success "All cache-using tests properly set up memory filesystem"
+fi
+
 # ==============================================================================
 # SECTION 9: Build, Lint, Test, Docs
 # ==============================================================================

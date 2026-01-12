@@ -21,6 +21,7 @@ type Options struct {
 	flags.ConfirmFlags
 	Factory    *cmdutil.Factory
 	Check      bool
+	Force      bool
 	Version    string
 	Channel    string
 	Rollback   bool
@@ -43,6 +44,9 @@ Use --version to install a specific version.`,
 		Example: `  # Check for updates
   shelly update --check
 
+  # Check for updates and refresh the cache
+  shelly update --check --force
+
   # Update to latest version
   shelly update
 
@@ -60,6 +64,7 @@ Use --version to install a specific version.`,
 	}
 
 	cmd.Flags().BoolVarP(&opts.Check, "check", "c", false, "Check for updates without installing")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force refresh and update the version cache")
 	cmd.Flags().StringVar(&opts.Version, "version", "", "Install a specific version")
 	cmd.Flags().StringVar(&opts.Channel, "channel", "stable", "Release channel (stable, beta)")
 	cmd.Flags().BoolVar(&opts.Rollback, "rollback", false, "Rollback to previous version")
@@ -106,6 +111,12 @@ func run(ctx context.Context, opts *Options) error {
 		if !installInfo.CanSelfUpdate() {
 			ios.Printf("\n")
 			ios.Info("Homebrew installation detected. Update using: %s", installInfo.UpdateCommand)
+		}
+		// Update cache when --force is used
+		if opts.Force {
+			if err := version.WriteCache(availableVersion); err != nil {
+				ios.DebugErr("updating version cache", err)
+			}
 		}
 		return nil
 	}

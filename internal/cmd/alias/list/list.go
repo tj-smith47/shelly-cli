@@ -12,7 +12,7 @@ import (
 
 // NewCommand creates the alias list command.
 func NewCommand(f *cmdutil.Factory) *cobra.Command {
-	return factories.NewConfigListCommand(f, factories.ConfigListOpts[config.Alias]{
+	return factories.NewConfigListCommand(f, factories.ConfigListOpts[config.NamedAlias]{
 		Resource:    "alias",
 		FetchFunc:   config.ListAliasesSorted,
 		DisplayFunc: term.DisplayAliasList,

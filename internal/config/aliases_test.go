@@ -736,7 +736,7 @@ func TestManager_ExportAliases_WriteError(t *testing.T) {
 
 	// Create config directly with alias (read-only fs can't save)
 	cfg := &Config{
-		Aliases: map[string]Alias{"test": {Name: "test", Command: "echo"}},
+		Aliases: map[string]Alias{"test": {Command: "echo"}},
 	}
 	m := NewTestManager(cfg)
 

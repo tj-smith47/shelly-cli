@@ -2856,8 +2856,13 @@ func TestCheckForUpdatesCached_FetchError(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global base URL
+//nolint:paralleltest // modifies global base URL and filesystem
 func TestCheckForUpdates(t *testing.T) {
+	// Use memory filesystem to prevent writes to real cache
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/releases/latest") {
 			w.Header().Set("Content-Type", "application/json")
@@ -4504,8 +4509,13 @@ func (f *removeFailOnlyFs) Remove(name string) error {
 	return errors.New("remove not allowed")
 }
 
-//nolint:paralleltest // modifies global base URL
+//nolint:paralleltest // modifies global base URL and filesystem
 func TestCheckForUpdates_NoUpdate(t *testing.T) {
+	// Use memory filesystem to prevent writes to real cache
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if _, err := w.Write([]byte(`{"tag_name": "v1.0.0"}`)); err != nil {
@@ -4527,8 +4537,13 @@ func TestCheckForUpdates_NoUpdate(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global base URL
+//nolint:paralleltest // modifies global base URL and filesystem
 func TestCheckForUpdates_Error(t *testing.T) {
+	// Use memory filesystem to prevent writes to real cache
+	config.SetFs(afero.NewMemMapFs())
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "server error", http.StatusInternalServerError)
 	}))
@@ -5354,6 +5369,11 @@ func TestInstallRelease_Success(t *testing.T) {
 	memFs := afero.NewMemMapFs()
 	github.SetFs(memFs)
 	defer github.SetFs(nil)
+
+	// Also set config.Fs for version.WriteCache
+	config.SetFs(memFs)
+	t.Cleanup(func() { config.SetFs(nil) })
+	t.Setenv("HOME", "/test/home")
 
 	// Mock osExecutable to return a path that exists in memFs
 	execPath := "/usr/local/bin/shelly"
