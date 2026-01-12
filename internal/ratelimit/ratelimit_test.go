@@ -601,8 +601,8 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	// Verify global defaults
-	if config.Global.MaxConcurrent != 5 {
-		t.Errorf("Global.MaxConcurrent: expected 5, got %d", config.Global.MaxConcurrent)
+	if config.Global.MaxConcurrent != 20 {
+		t.Errorf("Global.MaxConcurrent: expected 20, got %d", config.Global.MaxConcurrent)
 	}
 }
 

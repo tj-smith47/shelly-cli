@@ -28,6 +28,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/network"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/provision"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/wireless"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
 // DefaultTimeout is the default timeout for device operations.
@@ -426,8 +427,15 @@ func (s *Service) WithRateLimitedCall(ctx context.Context, address string, gener
 	err = fn()
 
 	// Record success/failure for circuit breaker
+	// Only count actual connectivity failures, not expected API responses
 	if err != nil {
-		s.rateLimiter.RecordFailure(address)
+		if ratelimit.IsConnectivityFailure(err) {
+			debug.TraceEvent("circuit: RecordFailure for %s: %v", address, err)
+			s.rateLimiter.RecordFailure(address)
+		} else {
+			debug.TraceEvent("circuit: Ignoring non-connectivity error for %s: %v", address, err)
+			s.rateLimiter.RecordSuccess(address)
+		}
 	} else {
 		s.rateLimiter.RecordSuccess(address)
 	}

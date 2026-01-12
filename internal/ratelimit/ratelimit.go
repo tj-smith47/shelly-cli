@@ -3,11 +3,15 @@ package ratelimit
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/tj-smith47/shelly-go/types"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
 // ErrCircuitOpen is returned when a device's circuit breaker is open.
@@ -189,6 +193,7 @@ func (rl *DeviceRateLimiter) RecordFailure(address string) {
 	rl.mu.RUnlock()
 
 	if exists {
+		debug.TraceEvent("circuit: RecordFailure for %s", address)
 		state.circuit.RecordFailure()
 	}
 }
@@ -345,4 +350,61 @@ func (rl *DeviceRateLimiter) enforceInterval(ctx context.Context, state *deviceS
 			return
 		}
 	}
+}
+
+// IsConnectivityFailure determines if an error represents an actual connectivity
+// failure vs an expected API response (like "component not found").
+//
+// Returns true for errors that indicate the device is unreachable or unresponsive:
+//   - Timeouts (context deadline exceeded)
+//   - Device offline
+//   - Connection refused/reset
+//
+// Returns false for errors where the device responded correctly:
+//   - Component/resource not found (404)
+//   - Method not supported
+//   - Authentication errors
+//   - Invalid parameters
+func IsConnectivityFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// These errors mean the device IS responding, just not with what we wanted.
+	// They should NOT count as circuit breaker failures.
+	if errors.Is(err, types.ErrNotFound) ||
+		errors.Is(err, types.ErrNotSupported) ||
+		errors.Is(err, types.ErrAuth) ||
+		errors.Is(err, types.ErrInvalidParam) ||
+		errors.Is(err, types.ErrInvalidResponse) {
+		return false
+	}
+
+	// These errors indicate actual connectivity problems
+	if errors.Is(err, types.ErrDeviceOffline) ||
+		errors.Is(err, types.ErrTimeout) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, context.Canceled) {
+		return true
+	}
+
+	// For other errors, check if they contain connectivity-related keywords
+	errStr := strings.ToLower(err.Error())
+	connectivityKeywords := []string{
+		"connection refused",
+		"connection reset",
+		"no route to host",
+		"network is unreachable",
+		"i/o timeout",
+		"deadline exceeded",
+	}
+	for _, kw := range connectivityKeywords {
+		if strings.Contains(errStr, kw) {
+			return true
+		}
+	}
+
+	// Default: treat unknown errors as NOT connectivity failures
+	// This prevents false circuit breaker trips from unexpected error types
+	return false
 }

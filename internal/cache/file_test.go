@@ -1536,16 +1536,14 @@ func TestFileCache_WalkEntries_SkipTempFile(t *testing.T) {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
-	// Stats will count both files since the temp file check in walkEntries uses
-	// incorrect slice length (8 instead of 9 for ".tmp.json")
+	// Stats should skip temp files (.tmp.json)
 	stats, err := cache.Stats()
 	if err != nil {
 		t.Fatalf("Stats() error: %v", err)
 	}
-	// The temp file detection check currently doesn't work as intended due to off-by-one
-	// so we expect 2 entries here
-	if stats.TotalEntries != 2 {
-		t.Errorf("TotalEntries = %d, want 2", stats.TotalEntries)
+	// Only the normal entry should be counted, temp file is skipped
+	if stats.TotalEntries != 1 {
+		t.Errorf("TotalEntries = %d, want 1", stats.TotalEntries)
 	}
 }
 
@@ -2707,22 +2705,19 @@ func TestFileCache_WalkEntries_TempFilePattern(t *testing.T) {
 
 	// Add various files that should be skipped by walkEntries
 	// The temp file pattern is: ends with ".tmp.json" with len > 4
-	// Actually, looking at the code: base[len(base)-8:] == ".tmp.json"
-	// That checks the last 8 chars, but ".tmp.json" is 9 chars
-	// So this check is actually buggy and won't match anything
-	// Let's create files that would match if the code were correct
+	// Create a temp file which should be skipped by Stats
 	if err := afero.WriteFile(fs, "/cache/firmware/x.tmp.json", []byte("{}"), 0o644); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
 
-	// Stats will count both files since the temp pattern check is buggy
+	// Stats should skip temp files (.tmp.json)
 	stats, err := cache.Stats()
 	if err != nil {
 		t.Fatalf("Stats() error: %v", err)
 	}
-	// We expect 2 entries since the temp check doesn't work
-	if stats.TotalEntries != 2 {
-		t.Errorf("TotalEntries = %d, want 2", stats.TotalEntries)
+	// Only the normal entry should be counted, temp file is skipped
+	if stats.TotalEntries != 1 {
+		t.Errorf("TotalEntries = %d, want 1", stats.TotalEntries)
 	}
 }
 

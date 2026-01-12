@@ -117,7 +117,6 @@ func TestExecute_EmptyGroup(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"empty-group": {
-				Name:    "empty-group",
 				Devices: []string{},
 			},
 		},
@@ -153,7 +152,6 @@ func TestExecute_GroupWithMembers(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"living-room": {
-				Name:    "living-room",
 				Devices: []string{"light-1", "light-2", "switch-1"},
 			},
 		},
@@ -201,7 +199,6 @@ func TestExecute_JSONOutput(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"office": {
-				Name:    "office",
 				Devices: []string{"desk-lamp", "ceiling-light"},
 			},
 		},
@@ -248,7 +245,6 @@ func TestExecute_YAMLOutput(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"bedroom": {
-				Name:    "bedroom",
 				Devices: []string{"nightstand-lamp"},
 			},
 		},
@@ -293,7 +289,6 @@ func TestExecute_SingleMember(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"solo-group": {
-				Name:    "solo-group",
 				Devices: []string{"only-device"},
 			},
 		},
@@ -337,7 +332,6 @@ func TestExecute_ManyMembers(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"large-group": {
-				Name:    "large-group",
 				Devices: devices,
 			},
 		},
@@ -458,7 +452,6 @@ func TestExecute_GroupWithSpecialChars(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"living-room-2nd-floor": {
-				Name:    "living-room-2nd-floor",
 				Devices: []string{"smart-plug-1"},
 			},
 		},
@@ -493,7 +486,6 @@ func TestRun_TableOutput(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"kitchen": {
-				Name:    "kitchen",
 				Devices: []string{"oven-outlet", "fridge-monitor"},
 			},
 		},

@@ -589,6 +589,66 @@ func TestApplyIncrementalUpdate_Light(t *testing.T) {
 	}
 }
 
+func TestApplyIncrementalUpdate_LightWithPower(t *testing.T) {
+	t.Parallel()
+	data := &DeviceData{
+		Lights: []LightState{{ID: 0, On: false}},
+	}
+
+	// Update light with power data
+	status := json.RawMessage(`{"output": true, "apower": 8.5}`)
+	ApplyIncrementalUpdate(data, ComponentLight, 0, status)
+
+	if !data.Lights[0].On {
+		t.Error("expected light 0 to be on")
+	}
+	if data.Power != 8.5 {
+		t.Errorf("expected power 8.5, got %f", data.Power)
+	}
+	if data.LightPowers == nil || data.LightPowers[0] != 8.5 {
+		t.Error("expected LightPowers[0] = 8.5")
+	}
+	if data.NeedsRefresh {
+		t.Error("NeedsRefresh should be false when power data is present")
+	}
+}
+
+func TestApplyIncrementalUpdate_LightStateChangeWithoutPower(t *testing.T) {
+	t.Parallel()
+	data := &DeviceData{
+		Lights: []LightState{{ID: 0, On: false}},
+	}
+
+	// Update light state without power data - should trigger NeedsRefresh
+	status := json.RawMessage(`{"output": true}`)
+	ApplyIncrementalUpdate(data, ComponentLight, 0, status)
+
+	if !data.Lights[0].On {
+		t.Error("expected light 0 to be on")
+	}
+	if !data.NeedsRefresh {
+		t.Error("NeedsRefresh should be true when state changed without power data")
+	}
+}
+
+func TestApplyIncrementalUpdate_SwitchStateChangeWithoutPower(t *testing.T) {
+	t.Parallel()
+	data := &DeviceData{
+		Switches: []SwitchState{{ID: 0, On: false}},
+	}
+
+	// Update switch state without power data - should trigger NeedsRefresh
+	status := json.RawMessage(`{"output": true}`)
+	ApplyIncrementalUpdate(data, ComponentSwitch, 0, status)
+
+	if !data.Switches[0].On {
+		t.Error("expected switch 0 to be on")
+	}
+	if !data.NeedsRefresh {
+		t.Error("NeedsRefresh should be true when state changed without power data")
+	}
+}
+
 func TestApplyIncrementalUpdate_Cover(t *testing.T) {
 	t.Parallel()
 	data := &DeviceData{

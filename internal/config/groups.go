@@ -63,7 +63,6 @@ func (m *Manager) CreateGroup(name string) error {
 	}
 
 	m.config.Groups[name] = Group{
-		Name:    name,
 		Devices: []string{},
 	}
 	return m.saveWithoutLock()

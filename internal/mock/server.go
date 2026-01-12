@@ -885,8 +885,16 @@ func (ds *DeviceServer) handleGen1(w http.ResponseWriter, r *http.Request, endpo
 
 	case endpoint == "/settings":
 		ds.writeJSON(w, map[string]any{
-			"device": map[string]any{"type": device.Type},
-			"name":   device.Name,
+			"device": map[string]any{
+				"type": device.Type,
+				"mac":  strings.ReplaceAll(device.MAC, ":", ""),
+			},
+			"name": device.Name,
+			"coiot": map[string]any{
+				"enabled":       true,
+				"peer":          "",
+				"update_period": 15,
+			},
 		})
 
 	case strings.HasPrefix(endpoint, "/relay/"):

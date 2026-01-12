@@ -3,6 +3,8 @@ package ratelimit
 import (
 	"sync"
 	"time"
+
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
 // State represents the circuit breaker state.
@@ -127,6 +129,8 @@ func (cb *CircuitBreaker) RecordFailure() {
 	cb.failCount++
 	cb.successCount = 0 // Reset consecutive successes
 
+	debug.TraceEvent("circuit: RecordFailure state=%s failCount=%d threshold=%d", cb.state, cb.failCount, cb.failThreshold)
+
 	switch cb.state {
 	case StateClosed:
 		if cb.failCount >= cb.failThreshold {
@@ -186,10 +190,12 @@ func (cb *CircuitBreaker) Reset() {
 
 // transitionTo changes state (must be called with lock held).
 func (cb *CircuitBreaker) transitionTo(newState State) {
+	oldState := cb.state
 	cb.state = newState
 	cb.lastStateChange = time.Now()
 	cb.successCount = 0
 	if newState == StateClosed {
 		cb.failCount = 0
 	}
+	debug.TraceEvent("circuit: transition %s -> %s", oldState, newState)
 }

@@ -100,9 +100,9 @@ func TestDisplayAliasList(t *testing.T) {
 	t.Run("with aliases", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		aliases := []config.Alias{
-			{Name: "ls", Command: "device list", Shell: false},
-			{Name: "reboot-all", Command: "for d in $(shelly device list -q); do shelly device reboot $d; done", Shell: true},
+		aliases := []config.NamedAlias{
+			{Name: "ls", Alias: config.Alias{Command: "device list", Shell: false}},
+			{Name: "reboot-all", Alias: config.Alias{Command: "for d in $(shelly device list -q); do shelly device reboot $d; done", Shell: true}},
 		}
 
 		DisplayAliasList(ios, aliases)
@@ -120,7 +120,7 @@ func TestDisplayAliasList(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 
-		DisplayAliasList(ios, []config.Alias{})
+		DisplayAliasList(ios, []config.NamedAlias{})
 
 		output := out.String()
 		if output == "" {

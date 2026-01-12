@@ -178,11 +178,9 @@ func TestRun_WithGroups(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"living-room": {
-				Name:    "living-room",
 				Devices: []string{"light-1", "light-2"},
 			},
 			"bedroom": {
-				Name:    "bedroom",
 				Devices: []string{"lamp-1"},
 			},
 		},
@@ -212,7 +210,6 @@ func TestRun_SingleGroup(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"office": {
-				Name:    "office",
 				Devices: []string{"desk-lamp", "monitor-light"},
 			},
 		},
@@ -242,7 +239,6 @@ func TestRun_GroupWithNoDevices(t *testing.T) {
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
 			"empty-group": {
-				Name:    "empty-group",
 				Devices: []string{},
 			},
 		},
@@ -271,11 +267,10 @@ func TestRun_ManyGroups(t *testing.T) {
 
 	cfg := &config.Config{
 		Groups: map[string]config.Group{
-			"group-1": {Name: "group-1", Devices: []string{"d1"}},
-			"group-2": {Name: "group-2", Devices: []string{"d2", "d3"}},
-			"group-3": {Name: "group-3", Devices: []string{}},
-			"group-4": {Name: "group-4", Devices: []string{"d4", "d5", "d6"}},
-			"group-5": {Name: "group-5", Devices: []string{"d7"}},
+			"group-2": {Devices: []string{"d2", "d3"}},
+			"group-3": {Devices: []string{}},
+			"group-4": {Devices: []string{"d4", "d5", "d6"}},
+			"group-5": {Devices: []string{"d7"}},
 		},
 	}
 	mgr := config.NewTestManager(cfg)

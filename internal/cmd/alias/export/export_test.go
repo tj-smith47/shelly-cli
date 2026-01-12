@@ -217,12 +217,10 @@ func TestRun_WithAliasesToStdout(t *testing.T) {
 	// Add aliases to the config
 	tf.Config.Aliases = map[string]config.Alias{
 		"st": {
-			Name:    "st",
 			Command: "status kitchen",
 			Shell:   false,
 		},
 		"reboot": {
-			Name:    "reboot",
 			Command: "device reboot",
 			Shell:   false,
 		},
@@ -252,7 +250,6 @@ func TestRun_WithAliasesToFile(t *testing.T) {
 	// Add aliases to the config
 	tf.Config.Aliases = map[string]config.Alias{
 		"on": {
-			Name:    "on",
 			Command: "switch on kitchen",
 			Shell:   false,
 		},
@@ -287,7 +284,6 @@ func TestRun_ShellAlias(t *testing.T) {
 	// Add a shell alias
 	tf.Config.Aliases = map[string]config.Alias{
 		"list": {
-			Name:    "list",
 			Command: "ls -la",
 			Shell:   true,
 		},
@@ -314,7 +310,6 @@ func TestRun_InvalidFilePath(t *testing.T) {
 	// Add aliases to the config
 	tf.Config.Aliases = map[string]config.Alias{
 		"test": {
-			Name:    "test",
 			Command: "status",
 			Shell:   false,
 		},
@@ -338,17 +333,14 @@ func TestRun_MultipleAliases(t *testing.T) {
 	// Add multiple aliases
 	tf.Config.Aliases = map[string]config.Alias{
 		"st": {
-			Name:    "st",
 			Command: "status",
 			Shell:   false,
 		},
 		"rb": {
-			Name:    "rb",
 			Command: "device reboot",
 			Shell:   false,
 		},
 		"ls": {
-			Name:    "ls",
 			Command: "device list",
 			Shell:   false,
 		},
@@ -402,7 +394,6 @@ func TestNewCommand_RunE_WithFilename(t *testing.T) {
 	// Add an alias so export has something to export
 	tf.Config.Aliases = map[string]config.Alias{
 		"test": {
-			Name:    "test",
 			Command: "status",
 			Shell:   false,
 		},

@@ -8,6 +8,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
 // Action constants for device control.
@@ -179,7 +180,10 @@ func (s *Service) QuickToggle(ctx context.Context, identifier string, componentI
 			return fmt.Errorf("component ID %d not found on device", *componentID)
 		}
 
+		debug.TraceEvent("QuickToggle: found %d controllable, toggling %d components", len(controllable), len(toControl))
+
 		for _, comp := range toControl {
+			debug.TraceEvent("QuickToggle: toggling %s:%d", comp.Type, comp.ID)
 			var opErr error
 			switch comp.Type {
 			case model.ComponentSwitch:
@@ -194,8 +198,10 @@ func (s *Service) QuickToggle(ctx context.Context, identifier string, componentI
 				continue
 			}
 			if opErr != nil {
+				debug.TraceEvent("QuickToggle: error toggling %s:%d: %v", comp.Type, comp.ID, opErr)
 				return fmt.Errorf("failed to toggle %s:%d: %w", comp.Type, comp.ID, opErr)
 			}
+			debug.TraceEvent("QuickToggle: toggled %s:%d successfully", comp.Type, comp.ID)
 			result.Count++
 		}
 
@@ -220,7 +226,7 @@ func findControllable(ctx context.Context, conn *client.Client) ([]model.Compone
 	}
 
 	if len(controllable) == 0 {
-		return nil, fmt.Errorf("no controllable components found on device")
+		return nil, fmt.Errorf("no controllable components found on device (total components: %d)", len(components))
 	}
 
 	return controllable, nil

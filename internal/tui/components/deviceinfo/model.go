@@ -4,6 +4,7 @@ package deviceinfo
 import (
 	"fmt"
 	"image/color"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,13 @@ import (
 type RequestJSONMsg struct {
 	DeviceName string
 	Endpoint   string
+}
+
+// RequestToggleMsg is sent when user requests to toggle a component.
+type RequestToggleMsg struct {
+	DeviceName    string
+	ComponentType string // "switch", "light", "cover"
+	ComponentID   int
 }
 
 // Model represents the device info component state.
@@ -171,6 +179,9 @@ func (m Model) handleKeyPress(keyMsg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if key.Matches(keyMsg, key.NewBinding(key.WithKeys("a"))) {
 		return m.handleToggleAll(), nil
 	}
+	if key.Matches(keyMsg, key.NewBinding(key.WithKeys(" ", "t"))) {
+		return m.handleToggle(components)
+	}
 	return m, nil
 }
 
@@ -225,6 +236,63 @@ func (m Model) handleToggleAll() Model {
 		m.componentCursor = -1
 	}
 	return m
+}
+
+func (m Model) handleToggle(components []ComponentInfo) (Model, tea.Cmd) {
+	if m.device == nil {
+		return m, nil
+	}
+
+	// If showing all components, toggle the first controllable one
+	idx := m.componentCursor
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(components) {
+		return m, nil
+	}
+
+	comp := components[idx]
+
+	// Only allow toggling switches, lights, and covers
+	var compType string
+	var compID int
+
+	switch comp.Type {
+	case "Switch":
+		compType = "switch"
+		// Extract ID from name like "Sw0" -> 0
+		if len(comp.Name) > 2 {
+			if id, err := strconv.Atoi(comp.Name[2:]); err == nil {
+				compID = id
+			}
+		}
+	case "Light":
+		compType = "light"
+		if len(comp.Name) > 2 {
+			if id, err := strconv.Atoi(comp.Name[2:]); err == nil {
+				compID = id
+			}
+		}
+	case "Cover":
+		compType = "cover"
+		if len(comp.Name) > 2 {
+			if id, err := strconv.Atoi(comp.Name[2:]); err == nil {
+				compID = id
+			}
+		}
+	default:
+		// Not a controllable component
+		return m, nil
+	}
+
+	return m, func() tea.Msg {
+		return RequestToggleMsg{
+			DeviceName:    m.device.Device.Name,
+			ComponentType: compType,
+			ComponentID:   compID,
+		}
+	}
 }
 
 // View renders the device info panel.

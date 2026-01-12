@@ -1023,7 +1023,7 @@ func TestCapConcurrency_WithinLimit(t *testing.T) {
 	// Request concurrency within the limit should not be capped
 	result := cmdutil.CapConcurrency(ios, 3)
 
-	// Default global max concurrent is 10 (from config package)
+	// Default global max concurrent is 20 (from config package)
 	if result != 3 {
 		t.Errorf("CapConcurrency(3) = %d, want 3", result)
 	}
@@ -1041,10 +1041,10 @@ func TestCapConcurrency_ExceedsLimit(t *testing.T) {
 	ios := iostreams.Test(in, out, errOut)
 
 	// Request concurrency exceeding the limit should be capped
-	// Default global max concurrent is 10, so requesting 100 should be capped
+	// Default global max concurrent is 20, so requesting 100 should be capped
 	result := cmdutil.CapConcurrency(ios, 100)
 
-	// Should be capped to global max (10 by default)
+	// Should be capped to global max (20 by default)
 	if result == 100 {
 		t.Errorf("CapConcurrency(100) should be capped, got %d", result)
 	}

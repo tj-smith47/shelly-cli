@@ -54,9 +54,17 @@ type DeviceData struct {
 
 	// Per-component power tracking for accurate aggregation
 	SwitchPowers map[int]float64
+	LightPowers  map[int]float64 // Light component powers
 	CoverPowers  map[int]float64
+	PMPowers     map[int]float64 // Dedicated PM component powers
+	EMPowers     map[int]float64 // Energy meter powers
+	EM1Powers    map[int]float64 // Single-phase EM powers
 
 	UpdatedAt time.Time
+
+	// NeedsRefresh is set when WebSocket reports a state change without power data.
+	// The cache handler should trigger an HTTP refresh to get accurate power readings.
+	NeedsRefresh bool
 
 	// lastRequestID tracks the most recent request for stale response handling.
 	// Responses with older request IDs are discarded.
@@ -226,9 +234,15 @@ type Cache struct {
 	// MAC-to-IP mapping for instant IP remapping (updated on each device fetch)
 	macToIP map[string]string
 
-	// WebSocket connection tracking - devices with active WebSocket don't need HTTP polling
-	// Gen2+ devices connected via WebSocket receive real-time updates, so HTTP polling is redundant
-	wsConnected map[string]bool
+	// EventStream connection tracking - devices managed by EventStream don't need cache HTTP polling
+	// Gen2+ devices receive real-time updates via WebSocket
+	// Gen1 devices are polled by EventStream (10s interval), so cache polling is redundant
+	esManaged map[string]bool
+
+	// pendingRefreshes tracks devices needing HTTP refresh after WebSocket state change without power data.
+	// This handles BUG-009 (WebSocket may not include power) and BUG-014 (no refresh after state change).
+	// The timestamp is used for debouncing - we wait 500ms before triggering refresh.
+	pendingRefreshes map[string]time.Time
 }
 
 // New creates a new shared cache with default refresh configuration.
@@ -243,7 +257,8 @@ func New(ctx context.Context, svc *shelly.Service, ios *iostreams.IOStreams, fc 
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
-		wsConnected:        make(map[string]bool),
+		esManaged:          make(map[string]bool),
+		pendingRefreshes:   make(map[string]time.Time),
 		initialLoad:        true,
 	}
 }
@@ -260,7 +275,8 @@ func NewWithRefreshConfig(ctx context.Context, svc *shelly.Service, ios *iostrea
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
-		wsConnected:        make(map[string]bool),
+		esManaged:          make(map[string]bool),
+		pendingRefreshes:   make(map[string]time.Time),
 		initialLoad:        true,
 	}
 }
@@ -274,7 +290,8 @@ func (c *Cache) Init() tea.Cmd {
 // This allows the cache to update device status in real-time when events arrive
 // via WebSocket (Gen2+) or polling (Gen1).
 // Also stores the event stream to publish synthetic events (e.g., offline from HTTP failure).
-// Tracks WebSocket connection state to skip HTTP polling for WebSocket-connected devices.
+// Tracks EventStream connection state to skip cache HTTP polling for managed devices.
+// Devices managed by EventStream (WebSocket OR polling) don't need cache polling.
 func (c *Cache) SubscribeToEvents(es *automation.EventStream) {
 	c.eventStream = es
 
@@ -284,12 +301,13 @@ func (c *Cache) SubscribeToEvents(es *automation.EventStream) {
 		deviceID := evt.DeviceID()
 		switch evt.(type) {
 		case *events.DeviceOnlineEvent:
-			// Check if this device is connected via WebSocket
+			// Check if this device is managed by EventStream (WebSocket or polling)
 			info := es.GetConnectionInfo(deviceID)
-			c.SetWebSocketConnected(deviceID, info.Type == automation.ConnectionWebSocket)
+			isManaged := info.Type == automation.ConnectionWebSocket || info.Type == automation.ConnectionPolling
+			c.SetEventStreamManaged(deviceID, isManaged)
 		case *events.DeviceOfflineEvent:
-			// Device went offline - no longer has WebSocket connection
-			c.SetWebSocketConnected(deviceID, false)
+			// Device went offline - no longer managed by EventStream
+			c.SetEventStreamManaged(deviceID, false)
 		}
 
 		// Process the event normally
@@ -298,7 +316,8 @@ func (c *Cache) SubscribeToEvents(es *automation.EventStream) {
 
 	// Initialize connection state for all currently connected devices
 	for name, info := range es.GetAllConnectionInfo() {
-		c.SetWebSocketConnected(name, info.Type == automation.ConnectionWebSocket)
+		isManaged := info.Type == automation.ConnectionWebSocket || info.Type == automation.ConnectionPolling
+		c.SetEventStreamManaged(name, isManaged)
 	}
 }
 
@@ -331,6 +350,18 @@ func (c *Cache) handleDeviceEvent(evt events.Event) {
 		data.Online = false
 		data.UpdatedAt = evt.Timestamp()
 	}
+
+	// Check if WebSocket update needs HTTP refresh (BUG-009/014)
+	// This handles cases where state changed but power data wasn't included
+	// Only for NON-WebSocket devices - WebSocket devices will get power data via WebSocket
+	if data.NeedsRefresh {
+		data.NeedsRefresh = false
+		if !c.esManaged[deviceID] {
+			c.pendingRefreshes[deviceID] = time.Now()
+			debug.TraceEvent("cache: %s needs HTTP refresh (state change without power)", deviceID)
+		}
+	}
+
 	c.version++
 
 	c.ios.DebugCat(iostreams.CategoryDevice, "cache: event update for %s, type=%s", deviceID, evt.Type())
@@ -338,6 +369,7 @@ func (c *Cache) handleDeviceEvent(evt events.Event) {
 
 // handleStatusChange processes incremental status updates from WebSocket.
 func (c *Cache) handleStatusChange(data *DeviceData, evt *events.StatusChangeEvent) {
+	debug.TraceEvent("cache: StatusChangeEvent for %s, component=%s", data.Device.Name, evt.Component)
 	data.Online = true
 	data.UpdatedAt = evt.Timestamp()
 
@@ -375,7 +407,7 @@ func (c *Cache) handleFullStatus(data *DeviceData, evt *events.FullStatusEvent) 
 
 // scheduleDeviceRefresh schedules refresh for a single device based on its state.
 // Adds random jitter (0-50% of interval) to prevent all devices refreshing simultaneously.
-// Skips scheduling for devices with active WebSocket connections (they receive real-time updates).
+// Skips scheduling for devices managed by EventStream (WebSocket for Gen2+, polling for Gen1).
 // Also skips scheduling during initial load - let wave loading complete first.
 func (c *Cache) scheduleDeviceRefresh(name string, data *DeviceData) tea.Cmd {
 	// Don't start per-device polling until initial load is complete
@@ -389,10 +421,10 @@ func (c *Cache) scheduleDeviceRefresh(name string, data *DeviceData) tea.Cmd {
 		return nil
 	}
 
-	// Skip scheduling HTTP refresh if device has active WebSocket
-	// WebSocket provides real-time updates, no polling needed
-	if c.IsWebSocketConnected(name) {
-		debug.TraceEvent("scheduleDeviceRefresh: skipping %s (WebSocket connected)", name)
+	// Skip scheduling HTTP refresh if device is managed by EventStream
+	// EventStream provides updates via WebSocket (Gen2+) or its own polling (Gen1)
+	if c.IsEventStreamManaged(name) {
+		debug.TraceEvent("scheduleDeviceRefresh: skipping %s (EventStream managed)", name)
 		return nil
 	}
 
@@ -639,6 +671,25 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 
 		// Populate device info (applies cached data to device model + persists to config)
 		c.populateDeviceInfo(name, data, info)
+
+		// Skip HTTP status fetch if WebSocket already provided status (Gen2+ only).
+		// WebSocket connections fetch Shelly.GetStatus on connect and publish FullStatusEvent.
+		c.mu.RLock()
+		existingData := c.devices[name]
+		esManaged := c.esManaged[name]
+		hasRecentStatus := existingData != nil && existingData.Fetched &&
+			time.Since(existingData.UpdatedAt) < 5*time.Second
+		c.mu.RUnlock()
+
+		if esManaged && hasRecentStatus {
+			debug.TraceEvent("cache: skipping HTTP status fetch for %s (WebSocket provided status)", name)
+			// Use existing data from WebSocket, just update device info
+			c.mu.Lock()
+			existingData.Info = info
+			existingData.Device = device
+			c.mu.Unlock()
+			return DeviceUpdateMsg{Name: name, Data: existingData, RequestID: requestID}
+		}
 
 		// Single HTTP call to get all status (switches, lights, covers, power, WiFi, Sys)
 		statusMap, err := c.svc.GetFullStatusAuto(ctx, name)
@@ -992,23 +1043,143 @@ func preserveExtendedStatusFromExisting(newData, existing *DeviceData) {
 	}
 }
 
+// RefreshDebounceInterval is the delay before triggering HTTP refresh for devices
+// that had state changes without power data in WebSocket updates.
+const RefreshDebounceInterval = 500 * time.Millisecond
+
+// processPendingRefreshes checks for devices needing HTTP refresh and returns commands.
+// This handles BUG-009/014 where WebSocket state changes don't include power data.
+func (c *Cache) processPendingRefreshes() tea.Cmd {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(c.pendingRefreshes) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	cmds := make([]tea.Cmd, 0, len(c.pendingRefreshes))
+
+	for name, requestTime := range c.pendingRefreshes {
+		// Wait for debounce interval before triggering refresh
+		if now.Sub(requestTime) < RefreshDebounceInterval {
+			continue
+		}
+
+		delete(c.pendingRefreshes, name)
+
+		// Skip HTTP refresh for EventStream-managed devices - they get updates via EventStream
+		if c.esManaged[name] {
+			debug.TraceEvent("cache: skipping HTTP refresh for %s (EventStream managed)", name)
+			continue
+		}
+
+		// Get device data for the refresh command
+		data := c.devices[name]
+		if data == nil {
+			continue
+		}
+
+		device := data.Device // Copy while holding lock
+		debug.TraceEvent("cache: triggering HTTP refresh for %s (debounced)", name)
+		cmds = append(cmds, c.fetchDeviceWithIDUnlocked(name, device))
+	}
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+// fetchDeviceWithIDUnlocked is like fetchDeviceWithID but assumes the lock is NOT held.
+// Used by processPendingRefreshes which needs to release the lock before returning.
+func (c *Cache) fetchDeviceWithIDUnlocked(name string, device model.Device) tea.Cmd {
+	return c.fetchDeviceWithID(name, device)
+}
+
+// handleFocusDebounce processes a debounced focus request for a device.
+// Returns a command to fetch the device if still focused and not WebSocket-connected.
+func (c *Cache) handleFocusDebounce(msg FocusDebounceMsg) tea.Cmd {
+	// Debounced fetch for focused device - only trigger if still focused
+	// Copy all needed values while holding lock to avoid race conditions
+	c.mu.RLock()
+	currentFocus := c.focusedDevice
+	loadComplete := c.initialLoadComplete
+	data := c.devices[msg.Name]
+	esManaged := c.esManaged[msg.Name]
+	var hasWiFi, hasSys bool
+	var device model.Device
+	if data != nil {
+		hasWiFi = data.WiFi != nil
+		hasSys = data.Sys != nil
+		device = data.Device // Copy struct while holding lock
+	}
+	c.mu.RUnlock()
+
+	// Skip during initial load - wave loading will fetch all device data
+	// This prevents overwhelming devices with concurrent HTTP requests
+	if !loadComplete {
+		debug.TraceEvent("FocusDebounceMsg: skipping %s (initial load not complete)", msg.Name)
+		return nil
+	}
+
+	// Only fetch if this device is still focused (user stopped scrolling)
+	if msg.Name != currentFocus || data == nil {
+		return nil
+	}
+
+	deviceName := msg.Name // Capture for closure
+
+	// EventStream provides updates - skip HTTP fetch for device status
+	// But still fetch extended status (WiFi/Sys) if not yet loaded
+	if esManaged {
+		debug.TraceEvent("FocusDebounceMsg: skipping HTTP for %s (EventStream managed)", msg.Name)
+		// Only fetch extended status if missing
+		if !hasWiFi || !hasSys {
+			return func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} }
+		}
+		return nil
+	}
+
+	debug.TraceEvent("FocusDebounceMsg: triggering fetch for %s", msg.Name)
+	// Not EventStream-managed - need HTTP fetch for device status and extended status
+	return tea.Batch(
+		c.fetchDeviceWithID(deviceName, device),
+		func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} },
+	)
+}
+
 // Update handles cache-related messages.
 func (c *Cache) Update(msg tea.Msg) tea.Cmd {
+	// Process any pending HTTP refreshes for devices with state changes without power data
+	pendingCmd := c.processPendingRefreshes()
+
+	// Helper to combine pending refresh commands with message command
+	combineWithPending := func(cmd tea.Cmd) tea.Cmd {
+		if pendingCmd == nil {
+			return cmd
+		}
+		if cmd == nil {
+			return pendingCmd
+		}
+		return tea.Batch(pendingCmd, cmd)
+	}
+
 	switch msg := msg.(type) {
 	case WaveMsg:
 		c.mu.Lock()
 		c.currentWave = msg.Wave
 		c.mu.Unlock()
-		return c.processWave(msg)
+		return combineWithPending(c.processWave(msg))
 
 	case DeviceUpdateMsg:
-		return c.handleDeviceUpdate(msg)
+		return combineWithPending(c.handleDeviceUpdate(msg))
 
 	case DeviceRefreshMsg:
-		// Skip refresh for devices with active WebSocket (real-time updates)
-		if c.IsWebSocketConnected(msg.Name) {
-			debug.TraceEvent("DeviceRefreshMsg: skipping %s (WebSocket connected)", msg.Name)
-			return nil
+		// Skip refresh for devices managed by EventStream (real-time updates)
+		if c.IsEventStreamManaged(msg.Name) {
+			debug.TraceEvent("DeviceRefreshMsg: skipping %s (EventStream managed)", msg.Name)
+			return combineWithPending(nil)
 		}
 
 		// Refresh a single device - copy Device while holding lock to avoid race
@@ -1021,65 +1192,32 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		c.mu.RUnlock()
 
 		if data == nil {
-			return nil
+			return combineWithPending(nil)
 		}
-		return c.fetchDeviceWithID(msg.Name, device)
+		return combineWithPending(c.fetchDeviceWithID(msg.Name, device))
 
 	case FocusDebounceMsg:
-		// Debounced fetch for focused device - only trigger if still focused
-		// Copy all needed values while holding lock to avoid race conditions
-		c.mu.RLock()
-		currentFocus := c.focusedDevice
-		data := c.devices[msg.Name]
-		wsConnected := c.wsConnected[msg.Name]
-		var hasWiFi, hasSys bool
-		var device model.Device
-		if data != nil {
-			hasWiFi = data.WiFi != nil
-			hasSys = data.Sys != nil
-			device = data.Device // Copy struct while holding lock
-		}
-		c.mu.RUnlock()
-
-		// Only fetch if this device is still focused (user stopped scrolling)
-		if msg.Name != currentFocus || data == nil {
-			return nil
-		}
-
-		deviceName := msg.Name // Capture for closure
-
-		// WebSocket provides real-time updates - skip HTTP fetch for device status
-		// But still fetch extended status (WiFi/Sys) if not yet loaded
-		if wsConnected {
-			debug.TraceEvent("FocusDebounceMsg: skipping HTTP for %s (WebSocket connected)", msg.Name)
-			// Only fetch extended status if missing
-			if !hasWiFi || !hasSys {
-				return func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} }
-			}
-			return nil
-		}
-
-		debug.TraceEvent("FocusDebounceMsg: triggering fetch for %s", msg.Name)
-		// No WebSocket - need HTTP fetch for device status and extended status
-		return tea.Batch(
-			c.fetchDeviceWithID(deviceName, device),
-			func() tea.Msg { return ExtendedStatusDebounceMsg{Name: deviceName} },
-		)
+		return combineWithPending(c.handleFocusDebounce(msg))
 
 	case RefreshTickMsg:
 		// Manual refresh all devices (user-initiated only, no auto-rescheduling)
 		// Per-device adaptive refresh (DeviceRefreshMsg) handles automatic polling.
-		return c.refreshAllDevices()
+		return combineWithPending(c.refreshAllDevices())
 	}
-	return nil
+	return combineWithPending(nil)
 }
 
 // refreshAllDevices refreshes status for all devices.
+// Skips EventStream-managed devices since they receive updates via EventStream.
 func (c *Cache) refreshAllDevices() tea.Cmd {
 	return func() tea.Msg {
 		c.mu.RLock()
 		devicesCopy := make(map[string]model.Device, len(c.devices))
 		for name, data := range c.devices {
+			// Skip EventStream-managed devices - they get updates via EventStream
+			if c.esManaged[name] {
+				continue
+			}
 			devicesCopy[name] = data.Device
 		}
 		c.mu.RUnlock()
@@ -1277,6 +1415,55 @@ func (c *Cache) FetchedCount() int {
 	return count
 }
 
+// SumPowers calculates the total power from all per-component power maps.
+// This is used after WebSocket incremental updates to recalculate the aggregate power
+// instead of overwriting it with a single component's value.
+func (d *DeviceData) SumPowers() float64 {
+	var total float64
+	for _, v := range d.SwitchPowers {
+		total += v
+	}
+	for _, v := range d.LightPowers {
+		total += v
+	}
+	for _, v := range d.CoverPowers {
+		total += v
+	}
+	for _, v := range d.PMPowers {
+		total += v
+	}
+	for _, v := range d.EMPowers {
+		total += v
+	}
+	for _, v := range d.EM1Powers {
+		total += v
+	}
+	return total
+}
+
+// EnsurePowerMaps initializes all power maps if they are nil.
+// This is needed for WebSocket incremental updates which may arrive before HTTP fetch.
+func (d *DeviceData) EnsurePowerMaps() {
+	if d.SwitchPowers == nil {
+		d.SwitchPowers = make(map[int]float64)
+	}
+	if d.LightPowers == nil {
+		d.LightPowers = make(map[int]float64)
+	}
+	if d.CoverPowers == nil {
+		d.CoverPowers = make(map[int]float64)
+	}
+	if d.PMPowers == nil {
+		d.PMPowers = make(map[int]float64)
+	}
+	if d.EMPowers == nil {
+		d.EMPowers = make(map[int]float64)
+	}
+	if d.EM1Powers == nil {
+		d.EM1Powers = make(map[int]float64)
+	}
+}
+
 // sortStrings sorts a slice of strings in place.
 func sortStrings(s []string) {
 	for i := range len(s) - 1 {
@@ -1294,7 +1481,8 @@ func NewForTesting() *Cache {
 		devices:            make(map[string]*DeviceData),
 		deviceRefreshTimes: make(map[string]time.Time),
 		macToIP:            make(map[string]string),
-		wsConnected:        make(map[string]bool),
+		esManaged:          make(map[string]bool),
+		pendingRefreshes:   make(map[string]time.Time),
 		refreshConfig:      DefaultRefreshConfig(),
 		waveConfig:         DefaultWaveConfig(),
 	}
@@ -1360,25 +1548,26 @@ func (c *Cache) UpdateMACMapping(mac, ip string) {
 	c.macToIP[normalized] = ip
 }
 
-// SetWebSocketConnected updates the WebSocket connection state for a device.
-// When a device has an active WebSocket connection, HTTP polling is skipped
-// because real-time updates are received via WebSocket.
-func (c *Cache) SetWebSocketConnected(name string, connected bool) {
+// SetEventStreamManaged updates the EventStream connection state for a device.
+// When a device is managed by EventStream (WebSocket for Gen2+ or polling for Gen1),
+// cache HTTP polling is skipped because updates are already being pushed/polled.
+func (c *Cache) SetEventStreamManaged(name string, managed bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if connected {
-		c.wsConnected[name] = true
-		debug.TraceEvent("cache: %s WebSocket connected, HTTP polling will be skipped", name)
+	if managed {
+		c.esManaged[name] = true
+		debug.TraceEvent("cache: %s EventStream managed, cache HTTP polling skipped", name)
 	} else {
-		delete(c.wsConnected, name)
-		debug.TraceEvent("cache: %s WebSocket disconnected, HTTP polling resumed", name)
+		delete(c.esManaged, name)
+		debug.TraceEvent("cache: %s EventStream disconnected, cache HTTP polling resumed", name)
 	}
 }
 
-// IsWebSocketConnected returns whether a device has an active WebSocket connection.
-// Devices with WebSocket connections receive real-time updates and don't need HTTP polling.
-func (c *Cache) IsWebSocketConnected(name string) bool {
+// IsEventStreamManaged returns whether a device is managed by EventStream.
+// Managed devices receive updates via WebSocket (Gen2+) or are polled by EventStream (Gen1),
+// so cache HTTP polling is unnecessary and skipped.
+func (c *Cache) IsEventStreamManaged(name string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.wsConnected[name]
+	return c.esManaged[name]
 }

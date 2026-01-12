@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tj-smith47/shelly-go/rpc"
 	"github.com/tj-smith47/shelly-go/transport"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
@@ -129,6 +130,17 @@ func run(ctx context.Context, opts *Options) error {
 		}
 	}); err != nil {
 		ios.DebugErr("subscribe to websocket events", err)
+	}
+
+	// Make an initial RPC call to enable notifications.
+	// Per Shelly docs: "To start receiving notifications over websocket,
+	// you have to send at least one request frame with a valid source (src)."
+	rb := rpc.NewRequestBuilder()
+	req, err := rb.Build("Shelly.GetStatus", nil)
+	if err == nil {
+		if _, err := ws.Call(ctx, req); err != nil {
+			ios.DebugErr("initial GetStatus for notifications", err)
+		}
 	}
 
 	// Wait for completion

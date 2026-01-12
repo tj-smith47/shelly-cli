@@ -63,7 +63,11 @@ type ParsedStatus struct {
 
 	// Per-component power tracking for accurate WebSocket aggregation
 	SwitchPowers map[int]float64
+	LightPowers  map[int]float64
 	CoverPowers  map[int]float64
+	PMPowers     map[int]float64
+	EMPowers     map[int]float64
+	EM1Powers    map[int]float64
 
 	// Power/energy metrics
 	Power       float64
@@ -135,7 +139,11 @@ func ParseFullStatus(deviceID string, statusMap map[string]json.RawMessage) (*Pa
 		DeviceID:     deviceID,
 		Components:   statusMap,
 		SwitchPowers: make(map[int]float64),
+		LightPowers:  make(map[int]float64),
 		CoverPowers:  make(map[int]float64),
+		PMPowers:     make(map[int]float64),
+		EMPowers:     make(map[int]float64),
+		EM1Powers:    make(map[int]float64),
 	}
 
 	// Parse each component by type
@@ -230,8 +238,14 @@ func accumulateSwitchMetrics(result *ParsedStatus, sw *switchStatusData) {
 
 // lightStatusData holds parsed light status fields.
 type lightStatusData struct {
-	ID     int  `json:"id"`
-	Output bool `json:"output"`
+	ID      int      `json:"id"`
+	Output  bool     `json:"output"`
+	APower  *float64 `json:"apower,omitempty"`
+	Voltage *float64 `json:"voltage,omitempty"`
+	Current *float64 `json:"current,omitempty"`
+	AEnergy *struct {
+		Total float64 `json:"total"`
+	} `json:"aenergy,omitempty"`
 }
 
 // parseLightComponent parses a light component status.
@@ -241,6 +255,26 @@ func parseLightComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 		return
 	}
 	result.Lights = append(result.Lights, LightState{ID: lt.ID, On: lt.Output})
+	accumulateLightMetrics(result, lt)
+}
+
+// accumulateLightMetrics adds light power metrics to the result.
+func accumulateLightMetrics(result *ParsedStatus, lt *lightStatusData) {
+	if lt.APower != nil {
+		if result.LightPowers != nil {
+			result.LightPowers[lt.ID] = *lt.APower
+		}
+		result.Power += *lt.APower
+	}
+	if lt.Voltage != nil && *lt.Voltage > 0 {
+		result.Voltage = *lt.Voltage
+	}
+	if lt.Current != nil {
+		result.Current += *lt.Current
+	}
+	if lt.AEnergy != nil {
+		result.TotalEnergy += lt.AEnergy.Total
+	}
 }
 
 // coverStatusData holds parsed cover status fields.
@@ -318,6 +352,9 @@ func parsePMComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 // accumulatePMMetrics adds PM power metrics to the result.
 func accumulatePMMetrics(result *ParsedStatus, pm *model.PMStatus) {
 	result.Power += pm.APower
+	if result.PMPowers != nil {
+		result.PMPowers[pm.ID] = pm.APower
+	}
 	if result.Voltage == 0 && pm.Voltage > 0 {
 		result.Voltage = pm.Voltage
 	}
@@ -337,6 +374,9 @@ func parseEMComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 	}
 	result.EM = append(result.EM, *em)
 	result.Power += em.TotalActivePower
+	if result.EMPowers != nil {
+		result.EMPowers[em.ID] = em.TotalActivePower
+	}
 	result.Current += em.TotalCurrent
 	if result.Voltage == 0 && em.AVoltage > 0 {
 		result.Voltage = em.AVoltage
@@ -351,6 +391,9 @@ func parseEM1Component(result *ParsedStatus, rawStatus json.RawMessage) {
 	}
 	result.EM1 = append(result.EM1, *em1)
 	result.Power += em1.ActPower
+	if result.EM1Powers != nil {
+		result.EM1Powers[em1.ID] = em1.ActPower
+	}
 	if result.Voltage == 0 && em1.Voltage > 0 {
 		result.Voltage = em1.Voltage
 	}
@@ -673,7 +716,17 @@ func ApplyParsedStatus(data *DeviceData, parsed *ParsedStatus) {
 		return
 	}
 
-	// Update component states (replace if present, keep existing if empty)
+	applyParsedComponentStates(data, parsed)
+	applyParsedPowerMaps(data, parsed)
+	applyParsedMetrics(data, parsed)
+	applyParsedSnapshot(data, parsed)
+	applyParsedWiFi(data, parsed.WiFi)
+	applyParsedSys(data, parsed.Sys)
+	applyParsedDeviceID(data, parsed)
+}
+
+// applyParsedComponentStates updates component states (replace if present, keep existing if empty).
+func applyParsedComponentStates(data *DeviceData, parsed *ParsedStatus) {
 	if len(parsed.Switches) > 0 {
 		data.Switches = parsed.Switches
 	}
@@ -686,16 +739,32 @@ func ApplyParsedStatus(data *DeviceData, parsed *ParsedStatus) {
 	if len(parsed.Inputs) > 0 {
 		data.Inputs = parsed.Inputs
 	}
+}
 
-	// Update per-component power maps for accurate WebSocket aggregation
+// applyParsedPowerMaps updates per-component power maps for accurate WebSocket aggregation.
+func applyParsedPowerMaps(data *DeviceData, parsed *ParsedStatus) {
 	if len(parsed.SwitchPowers) > 0 {
 		data.SwitchPowers = parsed.SwitchPowers
+	}
+	if len(parsed.LightPowers) > 0 {
+		data.LightPowers = parsed.LightPowers
 	}
 	if len(parsed.CoverPowers) > 0 {
 		data.CoverPowers = parsed.CoverPowers
 	}
+	if len(parsed.PMPowers) > 0 {
+		data.PMPowers = parsed.PMPowers
+	}
+	if len(parsed.EMPowers) > 0 {
+		data.EMPowers = parsed.EMPowers
+	}
+	if len(parsed.EM1Powers) > 0 {
+		data.EM1Powers = parsed.EM1Powers
+	}
+}
 
-	// Update metrics
+// applyParsedMetrics updates power/energy metrics.
+func applyParsedMetrics(data *DeviceData, parsed *ParsedStatus) {
 	data.Power = parsed.Power
 	data.Voltage = parsed.Voltage
 	data.Current = parsed.Current
@@ -703,21 +772,20 @@ func ApplyParsedStatus(data *DeviceData, parsed *ParsedStatus) {
 	if parsed.Temperature > 0 {
 		data.Temperature = parsed.Temperature
 	}
+}
 
-	// Update snapshot if we have PM/EM data
-	if len(parsed.PM) > 0 || len(parsed.EM) > 0 || len(parsed.EM1) > 0 {
-		if data.Snapshot == nil {
-			data.Snapshot = &model.MonitoringSnapshot{}
-		}
-		data.Snapshot.PM = parsed.PM
-		data.Snapshot.EM = parsed.EM
-		data.Snapshot.EM1 = parsed.EM1
-		data.Snapshot.Online = true
+// applyParsedSnapshot updates monitoring snapshot if we have PM/EM data.
+func applyParsedSnapshot(data *DeviceData, parsed *ParsedStatus) {
+	if len(parsed.PM) == 0 && len(parsed.EM) == 0 && len(parsed.EM1) == 0 {
+		return
 	}
-
-	applyParsedWiFi(data, parsed.WiFi)
-	applyParsedSys(data, parsed.Sys)
-	applyParsedDeviceID(data, parsed)
+	if data.Snapshot == nil {
+		data.Snapshot = &model.MonitoringSnapshot{}
+	}
+	data.Snapshot.PM = parsed.PM
+	data.Snapshot.EM = parsed.EM
+	data.Snapshot.EM1 = parsed.EM1
+	data.Snapshot.Online = true
 }
 
 // applyParsedWiFi applies WiFi info if present.
@@ -776,11 +844,11 @@ func ApplyIncrementalUpdate(data *DeviceData, componentType string, componentID 
 	case ComponentInput:
 		applyIncrementalInput(data, componentID, status)
 	case ComponentPM, ComponentPM1:
-		applyIncrementalPM(data, status)
+		applyIncrementalPM(data, componentID, status)
 	case ComponentEM:
-		applyIncrementalEM(data, status)
+		applyIncrementalEM(data, componentID, status)
 	case ComponentEM1:
-		applyIncrementalEM1(data, status)
+		applyIncrementalEM1(data, componentID, status)
 	}
 }
 
@@ -802,13 +870,22 @@ func applyIncrementalSwitch(data *DeviceData, id int, raw json.RawMessage) {
 		return
 	}
 
+	stateChanged := false
 	if status.Output != nil {
-		updateOrAppendSwitch(&data.Switches, id, *status.Output)
+		stateChanged = updateOrAppendSwitch(&data.Switches, id, *status.Output)
 	}
 
 	if status.APower != nil {
-		data.Power = *status.APower
+		// Update per-component power and recalculate total
+		data.EnsurePowerMaps()
+		data.SwitchPowers[id] = *status.APower
+		data.Power = data.SumPowers()
+	} else if stateChanged {
+		// State changed but no power data - mark for HTTP refresh
+		// This handles the case where WebSocket only sends output state without apower
+		data.NeedsRefresh = true
 	}
+
 	if status.Voltage != nil {
 		data.Voltage = *status.Voltage
 	}
@@ -821,39 +898,80 @@ func applyIncrementalSwitch(data *DeviceData, id int, raw json.RawMessage) {
 }
 
 // updateOrAppendSwitch updates an existing switch or appends a new one.
-func updateOrAppendSwitch(switches *[]SwitchState, id int, on bool) {
+// Returns true if the state actually changed (or new switch was added).
+func updateOrAppendSwitch(switches *[]SwitchState, id int, on bool) bool {
 	for i := range *switches {
 		if (*switches)[i].ID == id {
+			if (*switches)[i].On == on {
+				return false // No change
+			}
 			(*switches)[i].On = on
-			return
+			return true // State changed
 		}
 	}
 	*switches = append(*switches, SwitchState{ID: id, On: on})
+	return true // New switch added, treat as change
 }
 
 // incrementalLightStatus holds incremental light update fields.
 type incrementalLightStatus struct {
-	Output *bool `json:"output,omitempty"`
+	Output  *bool    `json:"output,omitempty"`
+	APower  *float64 `json:"apower,omitempty"`
+	Voltage *float64 `json:"voltage,omitempty"`
+	Current *float64 `json:"current,omitempty"`
+	AEnergy *struct {
+		Total float64 `json:"total"`
+	} `json:"aenergy,omitempty"`
 }
 
 // applyIncrementalLight applies a light status change.
 func applyIncrementalLight(data *DeviceData, id int, raw json.RawMessage) {
 	status, err := unmarshalJSON[incrementalLightStatus](raw)
-	if err != nil || status.Output == nil {
+	if err != nil {
 		return
 	}
-	updateOrAppendLight(&data.Lights, id, *status.Output)
+
+	stateChanged := false
+	if status.Output != nil {
+		stateChanged = updateOrAppendLight(&data.Lights, id, *status.Output)
+	}
+
+	if status.APower != nil {
+		// Update per-component power and recalculate total
+		data.EnsurePowerMaps()
+		data.LightPowers[id] = *status.APower
+		data.Power = data.SumPowers()
+	} else if stateChanged {
+		// State changed but no power data - mark for HTTP refresh
+		// This handles the case where WebSocket only sends output state without apower
+		data.NeedsRefresh = true
+	}
+
+	if status.Voltage != nil {
+		data.Voltage = *status.Voltage
+	}
+	if status.Current != nil {
+		data.Current = *status.Current
+	}
+	if status.AEnergy != nil {
+		data.TotalEnergy = status.AEnergy.Total
+	}
 }
 
 // updateOrAppendLight updates an existing light or appends a new one.
-func updateOrAppendLight(lights *[]LightState, id int, on bool) {
+// Returns true if the state actually changed (or new light was added).
+func updateOrAppendLight(lights *[]LightState, id int, on bool) bool {
 	for i := range *lights {
 		if (*lights)[i].ID == id {
+			if (*lights)[i].On == on {
+				return false // No change
+			}
 			(*lights)[i].On = on
-			return
+			return true // State changed
 		}
 	}
 	*lights = append(*lights, LightState{ID: id, On: on})
+	return true // New light added, treat as change
 }
 
 // incrementalCoverStatus holds incremental cover update fields.
@@ -869,23 +987,36 @@ func applyIncrementalCover(data *DeviceData, id int, raw json.RawMessage) {
 		return
 	}
 
+	stateChanged := false
 	if status.State != nil {
-		updateOrAppendCover(&data.Covers, id, *status.State)
+		stateChanged = updateOrAppendCover(&data.Covers, id, *status.State)
 	}
+
 	if status.APower != nil {
-		data.Power = *status.APower
+		// Update per-component power and recalculate total
+		data.EnsurePowerMaps()
+		data.CoverPowers[id] = *status.APower
+		data.Power = data.SumPowers()
+	} else if stateChanged {
+		// State changed but no power data - mark for HTTP refresh
+		data.NeedsRefresh = true
 	}
 }
 
 // updateOrAppendCover updates an existing cover or appends a new one.
-func updateOrAppendCover(covers *[]CoverState, id int, state string) {
+// Returns true if the state actually changed (or new cover was added).
+func updateOrAppendCover(covers *[]CoverState, id int, state string) bool {
 	for i := range *covers {
 		if (*covers)[i].ID == id {
+			if (*covers)[i].State == state {
+				return false // No change
+			}
 			(*covers)[i].State = state
-			return
+			return true // State changed
 		}
 	}
 	*covers = append(*covers, CoverState{ID: id, State: state})
+	return true // New cover added, treat as change
 }
 
 // incrementalInputStatus holds incremental input update fields.
@@ -914,12 +1045,17 @@ func updateOrAppendInput(inputs *[]InputState, id int, state bool) {
 }
 
 // applyIncrementalPM applies a PM/PM1 status change.
-func applyIncrementalPM(data *DeviceData, raw json.RawMessage) {
+func applyIncrementalPM(data *DeviceData, id int, raw json.RawMessage) {
 	pm, err := unmarshalJSON[model.PMStatus](raw)
 	if err != nil {
 		return
 	}
-	data.Power = pm.APower
+
+	// Update per-component power and recalculate total
+	data.EnsurePowerMaps()
+	data.PMPowers[id] = pm.APower
+	data.Power = data.SumPowers()
+
 	if pm.Voltage > 0 {
 		data.Voltage = pm.Voltage
 	}
@@ -932,12 +1068,17 @@ func applyIncrementalPM(data *DeviceData, raw json.RawMessage) {
 }
 
 // applyIncrementalEM applies an EM status change.
-func applyIncrementalEM(data *DeviceData, raw json.RawMessage) {
+func applyIncrementalEM(data *DeviceData, id int, raw json.RawMessage) {
 	em, err := unmarshalJSON[model.EMStatus](raw)
 	if err != nil {
 		return
 	}
-	data.Power = em.TotalActivePower
+
+	// Update per-component power and recalculate total
+	data.EnsurePowerMaps()
+	data.EMPowers[id] = em.TotalActivePower
+	data.Power = data.SumPowers()
+
 	data.Current = em.TotalCurrent
 	if em.AVoltage > 0 {
 		data.Voltage = em.AVoltage
@@ -945,12 +1086,17 @@ func applyIncrementalEM(data *DeviceData, raw json.RawMessage) {
 }
 
 // applyIncrementalEM1 applies an EM1 status change.
-func applyIncrementalEM1(data *DeviceData, raw json.RawMessage) {
+func applyIncrementalEM1(data *DeviceData, id int, raw json.RawMessage) {
 	em1, err := unmarshalJSON[model.EM1Status](raw)
 	if err != nil {
 		return
 	}
-	data.Power = em1.ActPower
+
+	// Update per-component power and recalculate total
+	data.EnsurePowerMaps()
+	data.EM1Powers[id] = em1.ActPower
+	data.Power = data.SumPowers()
+
 	if em1.Voltage > 0 {
 		data.Voltage = em1.Voltage
 	}

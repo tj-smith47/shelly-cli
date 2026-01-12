@@ -2,6 +2,9 @@ package term
 
 import (
 	"encoding/json"
+	"fmt"
+
+	"github.com/tj-smith47/shelly-go/gen1"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -131,4 +134,36 @@ func PrintAPIResult(ios *iostreams.IOStreams, result any, raw bool) error {
 	}
 	ios.Println(string(output))
 	return nil
+}
+
+// DisplayCoIoTEvent displays a CoIoT status update from a Gen1 device.
+func DisplayCoIoTEvent(ios *iostreams.IOStreams, timestamp, deviceID string, status *gen1.CoIoTStatus) {
+	deviceStyle := theme.Highlight().Render(deviceID)
+	ios.Printf("[%s] %s", timestamp, deviceStyle)
+
+	if status.DeviceType != "" {
+		ios.Printf(" (%s)", status.DeviceType)
+	}
+	ios.Println()
+
+	// Display sensors if present
+	if len(status.Sensors) > 0 {
+		ios.Println("  " + theme.Dim().Render("Sensors:"))
+		for key, value := range status.Sensors {
+			ios.Printf("    %s: %v\n", key, value)
+		}
+	}
+
+	// Display actuators if present
+	if len(status.Actuators) > 0 {
+		ios.Println("  " + theme.Dim().Render("Actuators:"))
+		for key, value := range status.Actuators {
+			ios.Printf("    %s: %v\n", key, value)
+		}
+	}
+
+	// If no sensors or actuators, show raw data length
+	if len(status.Sensors) == 0 && len(status.Actuators) == 0 {
+		ios.Printf("  %s\n", theme.Dim().Render(fmt.Sprintf("(%d bytes raw data)", len(status.Raw))))
+	}
 }

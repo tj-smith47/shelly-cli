@@ -137,7 +137,7 @@ func TestExecute_GroupNotFound(t *testing.T) {
 func TestExecute_Success_EmptyGroup(t *testing.T) {
 	// Setup manager with an empty group
 	mgr := setupTestManagerWithGroups(t, map[string]config.Group{
-		"empty-group": {Name: "empty-group", Devices: []string{}},
+		"empty-group": {Devices: []string{}},
 	})
 	config.SetDefaultManager(mgr)
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -172,7 +172,7 @@ func TestExecute_Success_EmptyGroup(t *testing.T) {
 func TestExecute_Success_GroupWithDevices(t *testing.T) {
 	// Setup manager with a group containing devices
 	mgr := setupTestManagerWithGroups(t, map[string]config.Group{
-		"downstairs": {Name: "downstairs", Devices: []string{"living-room", "kitchen"}},
+		"downstairs": {Devices: []string{"light-1", "light-2"}},
 	})
 	config.SetDefaultManager(mgr)
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -207,7 +207,7 @@ func TestExecute_Success_GroupWithDevices(t *testing.T) {
 func TestExecute_CancelConfirmation(t *testing.T) {
 	// Setup manager with a group
 	mgr := setupTestManagerWithGroups(t, map[string]config.Group{
-		"my-group": {Name: "my-group", Devices: []string{"test-device"}},
+		"my-group": {Devices: []string{"device-1"}},
 	})
 	config.SetDefaultManager(mgr)
 	t.Cleanup(config.ResetDefaultManagerForTesting)
@@ -252,8 +252,8 @@ func TestExecute_ValidArgsFunction(t *testing.T) {
 func TestExecute_MultipleGroups_DeleteOne(t *testing.T) {
 	// Setup manager with multiple groups
 	mgr := setupTestManagerWithGroups(t, map[string]config.Group{
-		"group-one": {Name: "group-one", Devices: []string{"device-a"}},
-		"group-two": {Name: "group-two", Devices: []string{"device-b"}},
+		"group-one": {Devices: []string{"device-a"}},
+		"group-two": {Devices: []string{"device-b"}},
 	})
 	config.SetDefaultManager(mgr)
 	t.Cleanup(config.ResetDefaultManagerForTesting)

@@ -142,9 +142,6 @@ func TestNewCommand_Execute_Success(t *testing.T) {
 	if !ok {
 		t.Fatal("group should have been created")
 	}
-	if group.Name != "test-group" {
-		t.Errorf("group name = %q, want %q", group.Name, "test-group")
-	}
 	if len(group.Devices) != 0 {
 		t.Errorf("group devices = %d, want 0", len(group.Devices))
 	}
@@ -279,12 +276,9 @@ func TestRun_Success(t *testing.T) {
 	}
 
 	// Verify group was created
-	group, ok := mgr.GetGroup("kitchen")
+	_, ok := mgr.GetGroup("kitchen")
 	if !ok {
 		t.Fatal("group should have been created")
-	}
-	if group.Name != "kitchen" {
-		t.Errorf("group name = %q, want %q", group.Name, "kitchen")
 	}
 }
 

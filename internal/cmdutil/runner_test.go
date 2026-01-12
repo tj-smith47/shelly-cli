@@ -883,10 +883,10 @@ func TestCapConcurrency(t *testing.T) {
 		t.Parallel()
 		ios, _, errOut := testIOStreams()
 
-		// Request exactly global limit (default is 5) - should return same value, no warning
-		result := cmdutil.CapConcurrency(ios, 5)
-		if result != 5 {
-			t.Errorf("CapConcurrency(5) = %d, want 5", result)
+		// Request exactly global limit (default is 20) - should return same value, no warning
+		result := cmdutil.CapConcurrency(ios, 20)
+		if result != 20 {
+			t.Errorf("CapConcurrency(20) = %d, want 20", result)
 		}
 		// Should not have warning
 		if contains(errOut.String(), "exceeds") {
@@ -898,10 +898,10 @@ func TestCapConcurrency(t *testing.T) {
 		t.Parallel()
 		ios, _, errOut := testIOStreams()
 
-		// Request more than global limit (default is 5) - should cap and warn
+		// Request more than global limit (default is 20) - should cap and warn
 		result := cmdutil.CapConcurrency(ios, 100)
-		if result > 5 {
-			t.Errorf("CapConcurrency(100) = %d, want <= 5", result)
+		if result > 20 {
+			t.Errorf("CapConcurrency(100) = %d, want <= 20", result)
 		}
 		// Should have warning
 		if !contains(errOut.String(), "exceeds") {

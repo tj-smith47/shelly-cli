@@ -102,7 +102,6 @@ func TestFixturesToConfig(t *testing.T) {
 		assert.Len(t, cfg.Groups, 1)
 		g, ok := cfg.Groups["test-group"]
 		require.True(t, ok)
-		assert.Equal(t, "test-group", g.Name)
 		assert.Equal(t, []string{"device1", "device2"}, g.Devices)
 	})
 
@@ -161,7 +160,6 @@ func TestFixturesToConfig(t *testing.T) {
 
 		a1, ok := cfg.Aliases["test-alias"]
 		require.True(t, ok)
-		assert.Equal(t, "test-alias", a1.Name)
 		assert.Equal(t, "switch on device", a1.Command)
 		assert.True(t, a1.Shell)
 

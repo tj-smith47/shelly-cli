@@ -75,7 +75,7 @@ func DefaultConfig() Config {
 			CircuitThreshold: 5,                      // Gen2 is more resilient
 		},
 		Global: GlobalConfig{
-			MaxConcurrent:           5,                // Total across all devices
+			MaxConcurrent:           20,               // Total across all devices
 			CircuitOpenDuration:     60 * time.Second, // Standard backoff
 			CircuitSuccessThreshold: 2,                // Successes to close circuit
 		},

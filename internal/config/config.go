@@ -190,14 +190,12 @@ func (c *Config) GetIntegratorCredentials() (tag, token string, err error) {
 
 // Alias represents a command alias.
 type Alias struct {
-	Name    string `mapstructure:"name" yaml:"name,omitempty"`
 	Command string `mapstructure:"command" yaml:"command,omitempty"`
 	Shell   bool   `mapstructure:"shell" yaml:"shell,omitempty"` // If true, execute via shell
 }
 
 // Group represents a device group.
 type Group struct {
-	Name    string   `mapstructure:"name" yaml:"name,omitempty"`
 	Devices []string `mapstructure:"devices" yaml:"devices,omitempty"`
 }
 
@@ -300,7 +298,7 @@ func DefaultRateLimitConfig() RateLimitConfig {
 			CircuitThreshold: 5,                      // Gen2 is more resilient
 		},
 		Global: GlobalRateLimitConfig{
-			MaxConcurrent:           5,                // Total across all devices
+			MaxConcurrent:           20,               // Total across all devices
 			CircuitOpenDuration:     60 * time.Second, // Standard backoff
 			CircuitSuccessThreshold: 2,                // Successes to close circuit
 		},
@@ -576,46 +574,13 @@ func (c *Config) GetEditor() string {
 // DefaultAliases are built-in aliases provided out of the box.
 // These provide shortcuts for common operations.
 var DefaultAliases = map[string]Alias{
-	"api": {
-		Name:    "api",
-		Command: "debug rpc $@",
-		Shell:   false,
-	},
-	"cron": {
-		Name:    "cron",
-		Command: "schedule create --timespec \"$1\" $2",
-		Shell:   false,
-	},
-	"diff": {
-		Name:    "diff",
-		Command: "device config diff $@",
-		Shell:   false,
-	},
-	"export-json": {
-		Name:    "export-json",
-		Command: "device config export $1 $2 --format json",
-		Shell:   false,
-	},
-	"export-yaml": {
-		Name:    "export-yaml",
-		Command: "device config export $1 $2 --format yaml",
-		Shell:   false,
-	},
-	"ping": {
-		Name:    "ping",
-		Command: "device ping $@",
-		Shell:   false,
-	},
-	"reboot": {
-		Name:    "reboot",
-		Command: "device reboot $@",
-		Shell:   false,
-	},
-	"reset": {
-		Name:    "reset",
-		Command: "device factory-reset $@",
-		Shell:   false,
-	},
+	"cron":        {Command: "schedule create --timespec \"$1\" $2"},
+	"diff":        {Command: "device config diff $@"},
+	"export-json": {Command: "device config export $1 $2 --format json"},
+	"export-yaml": {Command: "device config export $1 $2 --format yaml"},
+	"ping":        {Command: "device ping $@"},
+	"reboot":      {Command: "device reboot $@"},
+	"reset":       {Command: "device factory-reset $@"},
 }
 
 // Load reads configuration from file and environment using the default manager.

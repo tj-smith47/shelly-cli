@@ -65,6 +65,14 @@ const (
 	PanelEndpoints
 )
 
+// Device action constants.
+const (
+	actionToggle = "toggle"
+	actionOn     = "on"
+	actionOff    = "off"
+	actionReboot = "reboot"
+)
+
 // LayoutMode represents the terminal layout mode based on width.
 type LayoutMode int
 
@@ -414,10 +422,11 @@ func (m Model) calculateOptimalWidths() PanelWidths {
 }
 
 // Init initializes the TUI and returns the first command to run.
+// Note: EventStream is started AFTER initial wave loading completes (in handleAllDevicesLoaded)
+// to avoid concurrent HTTP requests during startup which trip the circuit breaker.
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.cache.Init(),
-		m.startEventStream(),
 		m.statusBar.Init(),
 		m.toast.Init(),
 		m.events.Init(),
@@ -472,7 +481,7 @@ func (m Model) handleSpecificMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case EventStreamErrorMsg:
 		m.factory.IOStreams().DebugErr("event stream start", msg.Err)
 		return m, toast.Error("Event stream failed: " + msg.Err.Error()), true
-	case events.EventMsg, events.SubscriptionStatusMsg:
+	case events.EventMsg, events.SubscriptionStatusMsg, events.RefreshTickMsg:
 		var cmd tea.Cmd
 		m.events, cmd = m.events.Update(msg)
 		return m, cmd, true
@@ -524,6 +533,8 @@ func (m Model) handleDeviceSelectionMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool)
 	switch msg := msg.(type) {
 	case views.DeviceSelectedMsg:
 		debug.TraceEvent("DeviceSelectedMsg(views): device=%s (debounced)", msg.Device)
+		// Sync device info panel with new selection
+		m = m.syncDeviceInfo()
 		// Use debounced cache fetch to prevent overwhelming devices during rapid scrolling
 		return m, tea.Batch(
 			m.viewManager.PropagateDevice(msg.Device),
@@ -532,6 +543,8 @@ func (m Model) handleDeviceSelectionMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool)
 	case devicelist.DeviceSelectedMsg:
 		m.cursor = m.deviceList.Cursor()
 		debug.TraceEvent("DeviceSelectedMsg(devicelist): device=%s (debounced)", msg.Name)
+		// Sync device info panel with new selection
+		m = m.syncDeviceInfo()
 		// Use debounced cache fetch to prevent overwhelming devices during rapid scrolling
 		return m, tea.Batch(
 			m.viewManager.PropagateDevice(msg.Name),
@@ -572,6 +585,8 @@ func (m Model) handleComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, toast.Success("Action confirmed: " + msg.Operation), true
 	case deviceinfo.RequestJSONMsg:
 		return m.handleRequestJSON(msg)
+	case deviceinfo.RequestToggleMsg:
+		return m.handleRequestToggle(msg)
 	case devicedetail.Msg, devicedetail.ClosedMsg:
 		var cmd tea.Cmd
 		m.deviceDetail, cmd = m.deviceDetail.Update(msg)
@@ -628,20 +643,60 @@ func (m Model) emitInitialSelection() (tea.Cmd, bool) {
 }
 
 // handleAllDevicesLoaded handles the AllDevicesLoadedMsg and emits initial selection.
+// Also starts the EventStream now that wave loading is complete - this prevents
+// concurrent HTTP requests during startup which trip the circuit breaker.
 func (m Model) handleAllDevicesLoaded(msg cache.AllDevicesLoadedMsg) (tea.Model, tea.Cmd, bool) {
 	cmd := m.cache.Update(msg)
 	m = m.updateStatusBarContext()
+
+	// Start EventStream now that initial load is complete
+	// This avoids concurrent HTTP requests with wave loading
+	eventStreamCmd := m.startEventStream()
+
 	devices := m.getFilteredDevices()
 	if len(devices) == 0 || m.cursor >= len(devices) {
-		return m, cmd, true
+		return m, tea.Batch(cmd, eventStreamCmd), true
 	}
 	d := devices[m.cursor]
-	return m, tea.Batch(cmd, func() tea.Msg {
+	return m, tea.Batch(cmd, eventStreamCmd, func() tea.Msg {
 		return views.DeviceSelectedMsg{
 			Device:  d.Device.Name,
 			Address: d.Device.Address,
 		}
 	}), true
+}
+
+// handleRequestToggle toggles a specific component from the deviceinfo panel.
+func (m Model) handleRequestToggle(msg deviceinfo.RequestToggleMsg) (tea.Model, tea.Cmd, bool) {
+	// Find the device
+	data := m.cache.GetDevice(msg.DeviceName)
+	if data == nil || !data.Online {
+		return m, nil, true
+	}
+
+	svc := m.factory.ShellyService()
+	compID := msg.ComponentID
+
+	return m, func() tea.Msg {
+		var err error
+		ctx := m.ctx
+
+		switch msg.ComponentType {
+		case "switch":
+			_, err = svc.SwitchToggle(ctx, data.Device.Address, compID)
+		case "light":
+			_, err = svc.LightToggle(ctx, data.Device.Address, compID)
+		case "cover":
+			// Cover toggle uses stop/open logic
+			_, err = svc.QuickToggle(ctx, data.Device.Address, &compID)
+		}
+
+		return DeviceActionMsg{
+			Device: msg.DeviceName,
+			Action: fmt.Sprintf("toggle %s:%d", msg.ComponentType, compID),
+			Err:    err,
+		}
+	}, true
 }
 
 // handleRequestJSON opens the JSON viewer for a requested endpoint.
@@ -688,9 +743,6 @@ func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
 		viewCmd := m.viewManager.UpdateAll(msg)
 		cmds = append(cmds, viewCmd)
 	}
-
-	// Update deviceInfo with current device selection
-	m = m.syncDeviceInfo()
 
 	return m, cmds
 }
@@ -851,7 +903,27 @@ func (m Model) handleDeviceAction(msg DeviceActionMsg) (tea.Model, tea.Cmd) {
 	var evtCmd tea.Cmd
 	m.events, evtCmd = m.events.Update(events.EventMsg{Events: []events.Event{evt}})
 
-	return m, tea.Batch(toastCmd, evtCmd)
+	cmds := []tea.Cmd{toastCmd, evtCmd}
+
+	// On successful state-changing actions, trigger a cache refresh to update UI
+	// This ensures the UI reflects the new state even if WebSocket notification is delayed
+	if msg.Err == nil && isStateChangingAction(msg.Action) {
+		cmds = append(cmds, func() tea.Msg {
+			return cache.DeviceRefreshMsg{Name: msg.Device}
+		})
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+// isStateChangingAction returns true for actions that change device state.
+func isStateChangingAction(action string) bool {
+	switch action {
+	case actionToggle, actionOn, actionOff:
+		return true
+	default:
+		return false
+	}
 }
 
 // updateStatusBarContext updates the status bar with context-specific items.
@@ -950,7 +1022,7 @@ func (m Model) handleCommand(msg cmdmode.CommandMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case cmdmode.CmdToggle:
-		if cmd := m.executeDeviceAction("toggle"); cmd != nil {
+		if cmd := m.executeDeviceAction(actionToggle); cmd != nil {
 			return m, cmd
 		}
 		return m, toast.Error("No device selected or device offline")
@@ -1164,26 +1236,26 @@ func (m Model) handleDeviceListFocusedKeys(msg tea.KeyPressMsg) (Model, tea.Cmd,
 func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "tab":
-		m.focusedPanel = m.nextPanel()
+		m = m.setFocusedPanel(m.nextPanel())
 		return m, nil, true
 	case "shift+tab":
-		m.focusedPanel = m.prevPanel()
+		m = m.setFocusedPanel(m.prevPanel())
 		return m, nil, true
 	case keyconst.Shift1:
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocusedPanel(PanelDeviceList)
 		return m, nil, true
 	case keyconst.Shift2:
-		m.focusedPanel = PanelDetail
+		m = m.setFocusedPanel(PanelDetail)
 		return m, nil, true
 	case keyconst.Shift3:
-		m.focusedPanel = PanelEvents
+		m = m.setFocusedPanel(PanelEvents)
 		return m, nil, true
 	case "enter":
 		return m.openJSONViewer()
 	case "esc":
 		if m.jsonViewer.Visible() {
 			m.jsonViewer = m.jsonViewer.Close()
-			m.focusedPanel = PanelDetail
+			m = m.setFocusedPanel(PanelDetail)
 			return m, nil, true
 		}
 	}
@@ -1212,6 +1284,17 @@ func (m Model) prevPanel() PanelFocus {
 	default:
 		return PanelEvents
 	}
+}
+
+// setFocusedPanel sets the focused panel and updates component focus states.
+// This ensures components like deviceInfo have correct focus state before handling keys.
+func (m Model) setFocusedPanel(panel PanelFocus) Model {
+	m.focusedPanel = panel
+	// Update component focus states immediately so they can handle keys correctly
+	m.deviceInfo = m.deviceInfo.SetFocused(panel == PanelDetail)
+	m.deviceList = m.deviceList.SetFocused(panel == PanelDeviceList)
+	m.events = m.events.SetFocused(panel == PanelEvents)
+	return m
 }
 
 // openJSONViewer opens the JSON viewer for the selected device if on Detail panel.
@@ -1391,7 +1474,7 @@ func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
 	case keys.ActionNextPanel:
 		// Only handle panel cycling for Dashboard - other tabs handle it in their views
 		if m.isDashboardActive() {
-			m.focusedPanel = m.nextPanel()
+			m = m.setFocusedPanel(m.nextPanel())
 			return m, nil, true
 		}
 		return m, nil, false // Let views handle Tab for their internal panels
@@ -1399,7 +1482,7 @@ func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
 	case keys.ActionPrevPanel:
 		// Only handle panel cycling for Dashboard - other tabs handle it in their views
 		if m.isDashboardActive() {
-			m.focusedPanel = m.prevPanel()
+			m = m.setFocusedPanel(m.prevPanel())
 			return m, nil, true
 		}
 		return m, nil, false // Let views handle Shift+Tab for their internal panels
@@ -1531,13 +1614,13 @@ func (m Model) dispatchPanelAction(action keys.Action) (Model, tea.Cmd, bool) {
 
 	switch action {
 	case keys.ActionPanel1:
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocusedPanel(PanelDeviceList)
 		return m, nil, true
 	case keys.ActionPanel2:
-		m.focusedPanel = PanelDetail
+		m = m.setFocusedPanel(PanelDetail)
 		return m, nil, true
 	case keys.ActionPanel3:
-		m.focusedPanel = PanelEvents
+		m = m.setFocusedPanel(PanelEvents)
 		return m, nil, true
 	case keys.ActionPanel4, keys.ActionPanel5, keys.ActionPanel6,
 		keys.ActionPanel7, keys.ActionPanel8, keys.ActionPanel9:
@@ -1552,13 +1635,17 @@ func (m Model) dispatchPanelAction(action keys.Action) (Model, tea.Cmd, bool) {
 func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool) {
 	switch action {
 	case keys.ActionToggle:
-		return m.dispatchDeviceAction("toggle")
+		// When focused on deviceInfo panel, let it handle toggle for individual component control
+		if m.focusedPanel == PanelDetail {
+			return m, nil, false // Fall through to handleNavigation -> deviceInfo.Update
+		}
+		return m.dispatchDeviceAction(actionToggle)
 	case keys.ActionOn:
-		return m.dispatchDeviceAction("on")
+		return m.dispatchDeviceAction(actionOn)
 	case keys.ActionOff:
-		return m.dispatchDeviceAction("off")
+		return m.dispatchDeviceAction(actionOff)
 	case keys.ActionReboot:
-		return m.dispatchDeviceAction("reboot")
+		return m.dispatchDeviceAction(actionReboot)
 	case keys.ActionEnter:
 		return m.dispatchEnterAction()
 	case keys.ActionBrowser:
@@ -1763,13 +1850,18 @@ func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 	var action string
 	switch {
 	case key.Matches(msg, m.keys.Toggle):
-		action = "toggle"
+		// When focused on deviceInfo panel, let it handle toggle for individual component control
+		// This allows space/t to toggle the selected component instead of all components
+		if m.focusedPanel == PanelDetail {
+			return m, nil, false // Fall through to handleNavigation -> deviceInfo.Update
+		}
+		action = actionToggle
 	case key.Matches(msg, m.keys.TurnOn):
-		action = "on"
+		action = actionOn
 	case key.Matches(msg, m.keys.TurnOff):
-		action = "off"
+		action = actionOff
 	case key.Matches(msg, m.keys.Reboot):
-		action = "reboot"
+		action = actionReboot
 	default:
 		return m, nil, false
 	}
@@ -1822,8 +1914,57 @@ func (m Model) showControlPanel() (tea.Model, tea.Cmd, bool) {
 	// Set size for the overlay
 	m.controlPanel = m.controlPanel.SetSize(m.width*2/3, m.height*2/3)
 
-	// Show control panel for the first available controllable component
-	// Priority: Switch > Light > Cover (thermostats/RGB would need additional cache fields)
+	// Get the selected component from deviceInfo panel
+	// componentCursor maps to components in order: switches, lights, covers, inputs, PM...
+	selectedIdx := m.deviceInfo.SelectedComponent()
+
+	// Find which component is selected based on the cursor position
+	// Components are ordered: switches, lights, covers, inputs, power monitoring
+	idx := 0
+
+	// Check switches
+	for _, sw := range data.Switches {
+		if selectedIdx == -1 || selectedIdx == idx {
+			state := control.SwitchState{
+				ID:     sw.ID,
+				Output: sw.On,
+				Source: sw.Source,
+			}
+			m.controlPanel = m.controlPanel.ShowSwitch(selected.Device.Address, state)
+			return m, nil, true
+		}
+		idx++
+	}
+
+	// Check lights
+	for _, lt := range data.Lights {
+		if selectedIdx == idx {
+			state := control.LightState{
+				ID:     lt.ID,
+				Output: lt.On,
+			}
+			m.controlPanel = m.controlPanel.ShowLight(selected.Device.Address, state)
+			return m, nil, true
+		}
+		idx++
+	}
+
+	// Check covers
+	for _, cv := range data.Covers {
+		if selectedIdx == idx {
+			state := control.CoverState{
+				ID:       cv.ID,
+				State:    cv.State,
+				Position: 50, // Default position since cache doesn't track it
+			}
+			m.controlPanel = m.controlPanel.ShowCover(selected.Device.Address, state)
+			return m, nil, true
+		}
+		idx++
+	}
+
+	// No controllable component found at selected index
+	// Fall back to first available controllable component
 	if len(data.Switches) > 0 {
 		sw := data.Switches[0]
 		state := control.SwitchState{
@@ -1850,17 +1991,18 @@ func (m Model) showControlPanel() (tea.Model, tea.Cmd, bool) {
 		state := control.CoverState{
 			ID:       cv.ID,
 			State:    cv.State,
-			Position: 50, // Default position since cache doesn't track it
+			Position: 50,
 		}
 		m.controlPanel = m.controlPanel.ShowCover(selected.Device.Address, state)
 		return m, nil, true
 	}
 
-	// No controllable components found
 	return m, nil, false
 }
 
 // executeDeviceAction executes a device action on the selected device.
+// When called from the device list, this toggles ALL controllable components (componentID=nil).
+// For individual component control, use the deviceInfo panel which routes through handleRequestToggle.
 func (m Model) executeDeviceAction(action string) tea.Cmd {
 	devices := m.getFilteredDevices()
 	if m.cursor >= len(devices) {
@@ -1874,36 +2016,25 @@ func (m Model) executeDeviceAction(action string) tea.Cmd {
 
 	device := selected.Device
 	svc := m.factory.ShellyService()
-	componentID := m.componentCursor // -1 means all, >=0 means specific component
 
 	return func() tea.Msg {
 		var err error
-		var compIDPtr *int
-		if componentID >= 0 {
-			compIDPtr = &componentID
-		}
 
 		switch action {
-		case "toggle":
-			// QuickToggle handles all controllable components (switch, light, rgb, cover)
-			_, err = svc.QuickToggle(m.ctx, device.Address, compIDPtr)
-		case "on":
-			_, err = svc.QuickOn(m.ctx, device.Address, compIDPtr)
-		case "off":
-			_, err = svc.QuickOff(m.ctx, device.Address, compIDPtr)
-		case "reboot":
+		case actionToggle:
+			// QuickToggle with nil toggles all controllable components (switch, light, rgb, cover)
+			_, err = svc.QuickToggle(m.ctx, device.Address, nil)
+		case actionOn:
+			_, err = svc.QuickOn(m.ctx, device.Address, nil)
+		case actionOff:
+			_, err = svc.QuickOff(m.ctx, device.Address, nil)
+		case actionReboot:
 			err = svc.DeviceReboot(m.ctx, device.Address, 0)
-		}
-
-		// Build action description
-		actionDesc := action
-		if componentID >= 0 {
-			actionDesc = fmt.Sprintf("%s (component %d)", action, componentID)
 		}
 
 		return DeviceActionMsg{
 			Device: device.Name,
-			Action: actionDesc,
+			Action: action,
 			Err:    err,
 		}
 	}

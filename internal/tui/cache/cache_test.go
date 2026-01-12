@@ -935,55 +935,55 @@ func TestWaveCompleteMsg(t *testing.T) {
 
 // === Tests for Phase 3: Connection-Aware Refresh ===
 
-func TestCache_SetWebSocketConnected(t *testing.T) {
+func TestCache_SetEventStreamManaged(t *testing.T) {
 	t.Parallel()
 
 	c := NewForTesting()
 
 	// Initially not connected
-	if c.IsWebSocketConnected("kitchen") {
+	if c.IsEventStreamManaged("kitchen") {
 		t.Error("expected kitchen to not be WebSocket connected initially")
 	}
 
 	// Set connected
-	c.SetWebSocketConnected("kitchen", true)
-	if !c.IsWebSocketConnected("kitchen") {
-		t.Error("expected kitchen to be WebSocket connected after SetWebSocketConnected(true)")
+	c.SetEventStreamManaged("kitchen", true)
+	if !c.IsEventStreamManaged("kitchen") {
+		t.Error("expected kitchen to be WebSocket connected after SetEventStreamManaged(true)")
 	}
 
 	// Set disconnected
-	c.SetWebSocketConnected("kitchen", false)
-	if c.IsWebSocketConnected("kitchen") {
-		t.Error("expected kitchen to not be WebSocket connected after SetWebSocketConnected(false)")
+	c.SetEventStreamManaged("kitchen", false)
+	if c.IsEventStreamManaged("kitchen") {
+		t.Error("expected kitchen to not be WebSocket connected after SetEventStreamManaged(false)")
 	}
 }
 
-func TestCache_SetWebSocketConnected_MultipleDevices(t *testing.T) {
+func TestCache_SetEventStreamManaged_MultipleDevices(t *testing.T) {
 	t.Parallel()
 
 	c := NewForTesting()
 
 	// Connect two devices
-	c.SetWebSocketConnected("kitchen", true)
-	c.SetWebSocketConnected("office", true)
+	c.SetEventStreamManaged("kitchen", true)
+	c.SetEventStreamManaged("office", true)
 
-	if !c.IsWebSocketConnected("kitchen") {
+	if !c.IsEventStreamManaged("kitchen") {
 		t.Error("expected kitchen to be WebSocket connected")
 	}
-	if !c.IsWebSocketConnected("office") {
+	if !c.IsEventStreamManaged("office") {
 		t.Error("expected office to be WebSocket connected")
 	}
-	if c.IsWebSocketConnected("bedroom") {
+	if c.IsEventStreamManaged("bedroom") {
 		t.Error("expected bedroom to not be WebSocket connected")
 	}
 
 	// Disconnect one
-	c.SetWebSocketConnected("kitchen", false)
+	c.SetEventStreamManaged("kitchen", false)
 
-	if c.IsWebSocketConnected("kitchen") {
+	if c.IsEventStreamManaged("kitchen") {
 		t.Error("expected kitchen to not be WebSocket connected after disconnect")
 	}
-	if !c.IsWebSocketConnected("office") {
+	if !c.IsEventStreamManaged("office") {
 		t.Error("expected office to still be WebSocket connected")
 	}
 }
@@ -1006,7 +1006,7 @@ func TestCache_ScheduleDeviceRefresh_SkipsWebSocketDevices(t *testing.T) {
 	}
 
 	// With WebSocket - should return nil
-	c.SetWebSocketConnected("kitchen", true)
+	c.SetEventStreamManaged("kitchen", true)
 	cmd = c.scheduleDeviceRefresh("kitchen", c.GetDevice("kitchen"))
 	if cmd != nil {
 		t.Error("expected scheduleDeviceRefresh to return nil for WebSocket-connected device")
@@ -1037,7 +1037,7 @@ func TestCache_ScheduleDeviceRefresh_SkipsDuringInitialLoad(t *testing.T) {
 	}
 }
 
-func TestCache_IsWebSocketConnected_ThreadSafe(t *testing.T) {
+func TestCache_IsEventStreamManaged_ThreadSafe(t *testing.T) {
 	t.Parallel()
 
 	c := NewForTesting()
@@ -1047,9 +1047,9 @@ func TestCache_IsWebSocketConnected_ThreadSafe(t *testing.T) {
 	for i := range 10 {
 		go func(i int) {
 			device := "device" + string(rune('0'+i))
-			c.SetWebSocketConnected(device, true)
-			_ = c.IsWebSocketConnected(device)
-			c.SetWebSocketConnected(device, false)
+			c.SetEventStreamManaged(device, true)
+			_ = c.IsEventStreamManaged(device)
+			c.SetEventStreamManaged(device, false)
 			done <- true
 		}(i)
 	}
@@ -1062,7 +1062,7 @@ func TestCache_IsWebSocketConnected_ThreadSafe(t *testing.T) {
 	// All devices should be disconnected now
 	for i := range 10 {
 		device := "device" + string(rune('0'+i))
-		if c.IsWebSocketConnected(device) {
+		if c.IsEventStreamManaged(device) {
 			t.Errorf("expected %s to be disconnected", device)
 		}
 	}

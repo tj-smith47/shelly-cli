@@ -670,8 +670,8 @@ func TestDefaultRateLimitConfig(t *testing.T) {
 	}
 
 	// Check Global defaults
-	if cfg.Global.MaxConcurrent != 5 {
-		t.Errorf("Global.MaxConcurrent = %d, want 5", cfg.Global.MaxConcurrent)
+	if cfg.Global.MaxConcurrent != 20 {
+		t.Errorf("Global.MaxConcurrent = %d, want 20", cfg.Global.MaxConcurrent)
 	}
 	if cfg.Global.CircuitOpenDuration != 60*time.Second {
 		t.Errorf("Global.CircuitOpenDuration = %v, want 60s", cfg.Global.CircuitOpenDuration)
@@ -807,7 +807,7 @@ func TestConfig_GlobalMaxConcurrentViaGetRateLimitConfig(t *testing.T) {
 		{
 			name: "empty config uses default",
 			cfg:  Config{},
-			want: 5, // Default from DefaultRateLimitConfig().Global.MaxConcurrent
+			want: 20, // Default from DefaultRateLimitConfig().Global.MaxConcurrent
 		},
 		{
 			name: "configured value",

@@ -106,12 +106,14 @@ func run(ctx context.Context, opts *Options) error {
 	hasUpdate := version.IsNewerVersion(currentVersion, availableVersion)
 
 	if opts.Check {
-		term.DisplayUpdateStatus(ios, currentVersion, availableVersion, hasUpdate, release.HTMLURL)
-		// If Homebrew, also show the update command
-		if !installInfo.CanSelfUpdate() {
-			ios.Printf("\n")
-			ios.Info("Homebrew installation detected. Update using: %s", installInfo.UpdateCommand)
-		}
+		term.DisplayUpdateCheckInfo(ios, term.UpdateCheckInfo{
+			CurrentVersion:   currentVersion,
+			AvailableVersion: availableVersion,
+			HasUpdate:        hasUpdate,
+			ReleaseURL:       release.HTMLURL,
+			CanSelfUpdate:    installInfo.CanSelfUpdate(),
+			UpdateCommand:    installInfo.UpdateCommand,
+		})
 		// Update cache when --force is used
 		if opts.Force {
 			if err := version.WriteCache(availableVersion); err != nil {

@@ -80,6 +80,25 @@ func DisplayUpdateStatus(ios *iostreams.IOStreams, currentVersion, availableVers
 	}
 }
 
+// UpdateCheckInfo holds all info needed to display update check results.
+type UpdateCheckInfo struct {
+	CurrentVersion   string
+	AvailableVersion string
+	HasUpdate        bool
+	ReleaseURL       string
+	CanSelfUpdate    bool
+	UpdateCommand    string
+}
+
+// DisplayUpdateCheckInfo shows complete update check information including homebrew hint.
+func DisplayUpdateCheckInfo(ios *iostreams.IOStreams, info UpdateCheckInfo) {
+	DisplayUpdateStatus(ios, info.CurrentVersion, info.AvailableVersion, info.HasUpdate, info.ReleaseURL)
+	if !info.CanSelfUpdate {
+		ios.Printf("\n")
+		ios.Info("Homebrew installation detected. Update using: %s", info.UpdateCommand)
+	}
+}
+
 // CacheInfo holds cache statistics for display.
 type CacheInfo struct {
 	Location    string

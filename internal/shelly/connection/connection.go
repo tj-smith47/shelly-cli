@@ -9,6 +9,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
 // Provider abstracts connection execution for services.
@@ -100,8 +101,15 @@ func (m *Manager) WithConnection(ctx context.Context, identifier string, fn func
 	err = m.ExecuteGen2(ctx, dev, fn)
 
 	// Record success/failure for circuit breaker
+	// Only count actual connectivity failures, not expected API responses
 	if err != nil {
-		m.rateLimiter.RecordFailure(dev.Address)
+		if ratelimit.IsConnectivityFailure(err) {
+			debug.TraceEvent("circuit: RecordFailure for %s (%s): %v", dev.Name, dev.Address, err)
+			m.rateLimiter.RecordFailure(dev.Address)
+		} else {
+			debug.TraceEvent("circuit: Ignoring non-connectivity error for %s (%s): %v", dev.Name, dev.Address, err)
+			m.rateLimiter.RecordSuccess(dev.Address)
+		}
 	} else {
 		m.rateLimiter.RecordSuccess(dev.Address)
 	}
@@ -134,8 +142,15 @@ func (m *Manager) WithGen1Connection(ctx context.Context, identifier string, fn 
 	err = m.ExecuteGen1(ctx, dev, fn)
 
 	// Record success/failure for circuit breaker
+	// Only count actual connectivity failures, not expected API responses
 	if err != nil {
-		m.rateLimiter.RecordFailure(dev.Address)
+		if ratelimit.IsConnectivityFailure(err) {
+			debug.TraceEvent("circuit: RecordFailure for Gen1 %s (%s): %v", dev.Name, dev.Address, err)
+			m.rateLimiter.RecordFailure(dev.Address)
+		} else {
+			debug.TraceEvent("circuit: Ignoring non-connectivity error for Gen1 %s (%s): %v", dev.Name, dev.Address, err)
+			m.rateLimiter.RecordSuccess(dev.Address)
+		}
 	} else {
 		m.rateLimiter.RecordSuccess(dev.Address)
 	}

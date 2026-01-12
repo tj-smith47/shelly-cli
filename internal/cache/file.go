@@ -412,8 +412,8 @@ func (c *FileCache) walkEntries(fn func(path string, entry *Entry) error) error 
 		if base == "meta.json" {
 			return nil
 		}
-		// Skip temp files
-		if len(base) > 4 && base[len(base)-8:] == ".tmp.json" {
+		// Skip temp files (*.tmp.json)
+		if len(base) >= 9 && base[len(base)-9:] == ".tmp.json" {
 			return nil
 		}
 
