@@ -29,8 +29,14 @@ Use &ndash;version to install a specific version.</p><div class=expressive-code>
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-fallback data-lang=fallback><span style=display:flex><span>  # Check for updates
 </span></span><span style=display:flex><span>  shelly update --check
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>  # Check for updates and refresh the cache
+</span></span><span style=display:flex><span>  shelly update --check --force
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  # Update to latest version
 </span></span><span style=display:flex><span>  shelly update
@@ -49,8 +55,10 @@ Use &ndash;version to install a specific version.</p><div class=expressive-code>
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">5
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">6
 </span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">7
+</span><span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">8
 </span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-fallback data-lang=fallback><span style=display:flex><span>      --channel string   Release channel (stable, beta) (default &#34;stable&#34;)
 </span></span><span style=display:flex><span>  -c, --check            Check for updates without installing
+</span></span><span style=display:flex><span>  -f, --force            Force refresh and update the version cache
 </span></span><span style=display:flex><span>  -h, --help             help for update
 </span></span><span style=display:flex><span>      --include-pre      Include pre-release versions
 </span></span><span style=display:flex><span>      --rollback         Rollback to previous version
