@@ -27,6 +27,10 @@ Use --version to install a specific version.
 	Check for updates without installing
 
 .PP
+\fB-f\fP, \fB--force\fP[=false]
+	Force refresh and update the version cache
+
+.PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for update
 
@@ -100,6 +104,9 @@ Use --version to install a specific version.
 .EX
   # Check for updates
   shelly update --check
+
+  # Check for updates and refresh the cache
+  shelly update --check --force
 
   # Update to latest version
   shelly update

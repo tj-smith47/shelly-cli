@@ -2856,7 +2856,6 @@ func TestCheckForUpdatesCached_FetchError(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global base URL and filesystem
 func TestCheckForUpdates(t *testing.T) {
 	// Use memory filesystem to prevent writes to real cache
 	config.SetFs(afero.NewMemMapFs())
@@ -4509,7 +4508,6 @@ func (f *removeFailOnlyFs) Remove(name string) error {
 	return errors.New("remove not allowed")
 }
 
-//nolint:paralleltest // modifies global base URL and filesystem
 func TestCheckForUpdates_NoUpdate(t *testing.T) {
 	// Use memory filesystem to prevent writes to real cache
 	config.SetFs(afero.NewMemMapFs())
@@ -4537,7 +4535,6 @@ func TestCheckForUpdates_NoUpdate(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global base URL and filesystem
 func TestCheckForUpdates_Error(t *testing.T) {
 	// Use memory filesystem to prevent writes to real cache
 	config.SetFs(afero.NewMemMapFs())
@@ -5364,7 +5361,6 @@ func TestInstallRelease_ReplaceBinaryError(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // modifies global filesystem and function variables
 func TestInstallRelease_Success(t *testing.T) {
 	memFs := afero.NewMemMapFs()
 	github.SetFs(memFs)

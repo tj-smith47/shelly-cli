@@ -2,35 +2,56 @@
 .TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
 
 .SH NAME
-shelly-debug-coiot - Show CoIoT/CoAP status
+shelly-debug-coiot - Show CoIoT/CoAP status or listen for multicast updates
 
 
 .SH SYNOPSIS
-\fBshelly debug coiot  [flags]\fP
+\fBshelly debug coiot [device] [flags]\fP
 
 
 .SH DESCRIPTION
-Show CoIoT (CoAP over Internet of Things) status for a device.
+Show CoIoT (CoAP over Internet of Things) status for a device, or listen
+for multicast updates from all Gen1 devices on the network.
 
 .PP
-CoIoT is used by Gen1 and some Gen2 devices for local discovery and
-real-time status updates via multicast UDP.
+CoIoT is used by Gen1 devices for local discovery and real-time status
+updates via multicast UDP on 224.0.1.187:5683.
 
 .PP
-This command shows:
+Without --listen, this command shows the CoIoT configuration for a specific device:
 - CoIoT enabled/disabled status
 - Multicast settings
 - Peer configuration (for unicast mode)
 - Update period settings
 
+.PP
+With --listen, it starts a multicast listener that receives and displays
+CoIoT status broadcasts from all Gen1 devices on the network.
+
 
 .SH OPTIONS
+\fB--duration\fP=30s
+	Listen duration (ignored if --stream)
+
+.PP
 \fB-f\fP, \fB--format\fP="text"
 	Output format: text, json
 
 .PP
 \fB-h\fP, \fB--help\fP[=false]
 	help for coiot
+
+.PP
+\fB-l\fP, \fB--listen\fP[=false]
+	Listen for CoIoT multicast updates from all Gen1 devices
+
+.PP
+\fB--raw\fP[=false]
+	Output raw JSON events
+
+.PP
+\fB-s\fP, \fB--stream\fP[=false]
+	Stream indefinitely (until Ctrl+C)
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -84,11 +105,23 @@ This command shows:
 
 .SH EXAMPLE
 .EX
-  # Show CoIoT status
+  # Show CoIoT status for a device
   shelly debug coiot living-room
 
   # Output as JSON
-  shelly debug coiot living-room --json
+  shelly debug coiot living-room -f json
+
+  # Listen for CoIoT multicast updates for 30 seconds (default)
+  shelly debug coiot --listen
+
+  # Listen for 2 minutes
+  shelly debug coiot --listen --duration 2m
+
+  # Stream indefinitely (until Ctrl+C)
+  shelly debug coiot --listen --stream
+
+  # Stream with raw JSON output
+  shelly debug coiot --listen --stream --raw
 .EE
 
 

@@ -28,6 +28,9 @@ shelly update [flags]
   # Check for updates
   shelly update --check
 
+  # Check for updates and refresh the cache
+  shelly update --check --force
+
   # Update to latest version
   shelly update
 
@@ -46,6 +49,7 @@ shelly update [flags]
 ```
       --channel string   Release channel (stable, beta) (default "stable")
   -c, --check            Check for updates without installing
+  -f, --force            Force refresh and update the version cache
   -h, --help             help for update
       --include-pre      Include pre-release versions
       --rollback         Rollback to previous version

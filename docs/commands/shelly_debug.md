@@ -53,7 +53,7 @@ WARNING: Some debug commands may affect device behavior. Use with caution.
 ### SEE ALSO
 
 * [shelly](shelly.md)	 - CLI for controlling Shelly smart home devices
-* [shelly debug coiot](shelly_debug_coiot.md)	 - Show CoIoT/CoAP status
+* [shelly debug coiot](shelly_debug_coiot.md)	 - Show CoIoT/CoAP status or listen for multicast updates
 * [shelly debug log](shelly_debug_log.md)	 - Get device debug log (Gen1)
 * [shelly debug websocket](shelly_debug_websocket.md)	 - Debug WebSocket connection and stream events
 
