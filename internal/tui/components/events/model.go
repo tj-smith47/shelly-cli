@@ -285,50 +285,40 @@ func (m Model) handleStreamEvent(evt shellyevents.Event) {
 		return
 	}
 
-	var event Event
-	event.Timestamp = evt.Timestamp()
-	event.Device = evt.DeviceID()
+	event, ok := m.convertEvent(evt)
+	if !ok {
+		return // Event was filtered out
+	}
+
+	m.addEvent(event)
+	m.ios.DebugCat(iostreams.CategoryNetwork, "events: received %s event from %s",
+		event.Type, event.Device)
+}
+
+// convertEvent converts a shelly-go event to our internal Event type.
+// Returns false if the event should be filtered out.
+func (m Model) convertEvent(evt shellyevents.Event) (Event, bool) {
+	event := Event{
+		Timestamp: evt.Timestamp(),
+		Device:    evt.DeviceID(),
+	}
 
 	switch e := evt.(type) {
 	case *shellyevents.StatusChangeEvent:
-		// Filter out high-frequency status changes that don't indicate real state changes
-		// These include sys (system status), wifi, cloud, and timestamp-only updates
-		compPrefix := strings.Split(e.Component, ":")[0]
-		if compPrefix == "sys" || compPrefix == "wifi" || compPrefix == "cloud" {
-			return
-		}
-		// Filter input changes that only contain timestamp or state that hasn't changed
-		if compPrefix == "input" && !isInputStateChange(e.Status) {
-			return
-		}
-		event.Component = e.Component
-		event.Type = levelStatus
-		event.Description = fmt.Sprintf("%s changed", e.Component)
+		return m.convertStatusChange(e, event)
 	case *shellyevents.NotifyEvent:
-		// Filter out high-frequency BLE scan results from HA BLE proxy integration
-		if e.Event == "ble.scan_result" {
-			return
-		}
-		event.Component = e.Component
-		event.Type = categorizeEvent(e.Event)
-		event.Description = fmt.Sprintf("%s: %s", e.Component, e.Event)
+		return m.convertNotifyEvent(e, event)
 	case *shellyevents.FullStatusEvent:
 		event.Type = levelFullStatus
 		event.Description = "Full status update"
 	case *shellyevents.DeviceOnlineEvent:
 		event.Type = levelInfo
 		event.Description = "Device online"
-		// Update connection status
-		m.state.mu.Lock()
-		m.state.connStatus[evt.DeviceID()] = true
-		m.state.mu.Unlock()
+		m.updateConnStatus(evt.DeviceID(), true)
 	case *shellyevents.DeviceOfflineEvent:
 		event.Type = levelWarning
 		event.Description = "Device offline"
-		// Update connection status
-		m.state.mu.Lock()
-		m.state.connStatus[evt.DeviceID()] = false
-		m.state.mu.Unlock()
+		m.updateConnStatus(evt.DeviceID(), false)
 	case *shellyevents.ScriptEvent:
 		event.Type = levelScript
 		event.Description = fmt.Sprintf("Script output: %s", e.Output)
@@ -339,10 +329,42 @@ func (m Model) handleStreamEvent(evt shellyevents.Event) {
 		event.Type = string(evt.Type())
 		event.Description = fmt.Sprintf("Event: %s", evt.Type())
 	}
+	return event, true
+}
 
-	m.addEvent(event)
-	m.ios.DebugCat(iostreams.CategoryNetwork, "events: received %s event from %s",
-		event.Type, event.Device)
+// convertStatusChange converts a StatusChangeEvent, filtering out high-frequency updates.
+func (m Model) convertStatusChange(e *shellyevents.StatusChangeEvent, event Event) (Event, bool) {
+	compPrefix := strings.Split(e.Component, ":")[0]
+	// Filter out sys, wifi, cloud status changes
+	if compPrefix == "sys" || compPrefix == "wifi" || compPrefix == "cloud" {
+		return Event{}, false
+	}
+	// Filter input changes that only contain timestamp
+	if compPrefix == "input" && !isInputStateChange(e.Status) {
+		return Event{}, false
+	}
+	event.Component = e.Component
+	event.Type = levelStatus
+	event.Description = fmt.Sprintf("%s changed", e.Component)
+	return event, true
+}
+
+// convertNotifyEvent converts a NotifyEvent, filtering out BLE scan results.
+func (m Model) convertNotifyEvent(e *shellyevents.NotifyEvent, event Event) (Event, bool) {
+	if e.Event == "ble.scan_result" {
+		return Event{}, false
+	}
+	event.Component = e.Component
+	event.Type = categorizeEvent(e.Event)
+	event.Description = fmt.Sprintf("%s: %s", e.Component, e.Event)
+	return event, true
+}
+
+// updateConnStatus updates the connection status for a device.
+func (m Model) updateConnStatus(deviceID string, online bool) {
+	m.state.mu.Lock()
+	m.state.connStatus[deviceID] = online
+	m.state.mu.Unlock()
 }
 
 // SetSelectedDevice sets the device to filter events by.
@@ -911,7 +933,7 @@ func (m Model) MaxDescriptionLen() int {
 
 // FooterText returns the keybindings for the wrapper to display.
 func (m Model) FooterText() string {
-	return "n/N:page g/G:first/last p:pause c:clear"
+	return theme.StyledKeybindings("n/N:page g/G:first/last p:pause c:clear")
 }
 
 // StatusBadge returns status indicators for the wrapper to display.

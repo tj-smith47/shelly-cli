@@ -530,18 +530,61 @@ func (m Model) renderDetailPanel(devices []*cache.DeviceData, width int) string 
 
 // renderDeviceStatus renders the device status line.
 func (m Model) renderDeviceStatus(d *cache.DeviceData) string {
+	var status string
 	switch {
 	case !d.Fetched:
 		return m.styles.Checking.Render("◐ Checking...")
 	case d.Online:
-		return m.styles.Online.Render("● Online")
+		status = m.styles.Online.Render("● Online")
 	default:
-		status := m.styles.Offline.Render("○ Offline")
+		status = m.styles.Offline.Render("○ Offline")
 		if d.Error != nil {
 			errMsg := output.Truncate(d.Error.Error(), 40)
 			status += " - " + m.styles.StatusError.Render(errMsg)
 		}
-		return status
+	}
+
+	// Append component type
+	compType := componentTypeLabel(d)
+	if compType != "" {
+		colors := theme.GetSemanticColors()
+		muted := lipgloss.NewStyle().Foreground(colors.Muted)
+		status += " " + muted.Render(compType)
+	}
+	return status
+}
+
+// componentTypeLabel returns a label like "(⚡️ Switch)" for the device's primary component type.
+func componentTypeLabel(d *cache.DeviceData) string {
+	// Check fetched component data first
+	hasLights := len(d.Lights) > 0
+	hasSwitches := len(d.Switches) > 0
+	hasCovers := len(d.Covers) > 0
+
+	// If no components found, try to infer from model/type
+	if !hasLights && !hasSwitches && !hasCovers {
+		modelStr := d.Device.Type
+		if modelStr == "" {
+			modelStr = d.Device.Model
+		}
+		if modelStr != "" {
+			caps := cache.DetectComponents(modelStr)
+			hasLights = caps.HasLights
+			hasSwitches = caps.HasSwitches
+			hasCovers = caps.HasCovers
+		}
+	}
+
+	// Prioritize: lights > covers > switches
+	switch {
+	case hasLights:
+		return "(💡 Light)"
+	case hasCovers:
+		return "(🪟 Cover)"
+	case hasSwitches:
+		return "(⚡️ Switch)"
+	default:
+		return ""
 	}
 }
 

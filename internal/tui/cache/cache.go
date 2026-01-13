@@ -406,6 +406,7 @@ func (c *Cache) handleFullStatus(data *DeviceData, evt *events.FullStatusEvent) 
 	}
 
 	ApplyParsedStatus(data, parsed)
+	data.Fetched = true
 }
 
 // scheduleDeviceRefresh schedules refresh for a single device based on its state.
@@ -1417,7 +1418,8 @@ type ComponentCountsResult struct {
 }
 
 // ComponentCounts returns all component counts in a single lock acquisition.
-// This is more efficient than calling SwitchCounts, LightCounts, CoverCounts separately.
+// Counts components from ALL devices - offline devices' components are counted as "off".
+// For devices without parsed components, infers counts from device model.
 func (c *Cache) ComponentCounts() ComponentCountsResult {
 	debug.TraceLock("cache", "RLock", "ComponentCounts")
 	c.mu.RLock()
@@ -1428,35 +1430,77 @@ func (c *Cache) ComponentCounts() ComponentCountsResult {
 
 	var result ComponentCountsResult
 	for _, data := range c.devices {
-		if !data.Online {
-			continue
-		}
-		for _, sw := range data.Switches {
-			if sw.On {
-				result.SwitchesOn++
-			} else {
-				result.SwitchesOff++
-			}
-		}
-		for _, lt := range data.Lights {
-			if lt.On {
-				result.LightsOn++
-			} else {
-				result.LightsOff++
-			}
-		}
-		for _, cv := range data.Covers {
-			switch cv.State {
-			case "open":
-				result.CoversOpen++
-			case "closed":
-				result.CoversClosed++
-			default: // opening, closing, stopped
-				result.CoversMoving++
-			}
-		}
+		countDeviceComponents(data, &result)
 	}
 	return result
+}
+
+// countDeviceComponents adds the component counts for a single device to the result.
+func countDeviceComponents(data *DeviceData, result *ComponentCountsResult) {
+	hasParsedComponents := len(data.Switches) > 0 || len(data.Lights) > 0 || len(data.Covers) > 0
+
+	if hasParsedComponents {
+		countParsedComponents(data, result)
+		return
+	}
+	// No parsed components - infer from device model/type
+	countInferredComponents(data, result)
+}
+
+// countParsedComponents counts components from parsed device data.
+func countParsedComponents(data *DeviceData, result *ComponentCountsResult) {
+	// Count switches - offline devices' switches count as off
+	for _, sw := range data.Switches {
+		if data.Online && sw.On {
+			result.SwitchesOn++
+		} else {
+			result.SwitchesOff++
+		}
+	}
+	// Count lights - offline devices' lights count as off
+	for _, lt := range data.Lights {
+		if data.Online && lt.On {
+			result.LightsOn++
+		} else {
+			result.LightsOff++
+		}
+	}
+	// Count covers - offline devices' covers count as closed
+	for _, cv := range data.Covers {
+		countCover(data.Online, cv.State, result)
+	}
+}
+
+// countCover counts a single cover based on online status and state.
+func countCover(online bool, state string, result *ComponentCountsResult) {
+	if !online {
+		result.CoversClosed++
+		return
+	}
+	switch state {
+	case "open":
+		result.CoversOpen++
+	case "closed":
+		result.CoversClosed++
+	default:
+		result.CoversMoving++
+	}
+}
+
+// countInferredComponents infers component counts from device model/type.
+func countInferredComponents(data *DeviceData, result *ComponentCountsResult) {
+	modelStr := data.Device.Type
+	if modelStr == "" {
+		modelStr = data.Device.Model
+	}
+	if modelStr == "" {
+		return
+	}
+	caps := DetectComponents(modelStr)
+	// Inferred components are always "off" since we don't know actual state
+	result.SwitchesOff += caps.NumSwitches
+	result.LightsOff += caps.NumLights
+	result.CoversClosed += caps.NumCovers
 }
 
 // SwitchCounts returns the count of switches that are on and off across all online devices.

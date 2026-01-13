@@ -165,7 +165,7 @@ func DefaultStyles() Styles {
 		CountOn: lipgloss.NewStyle().
 			Foreground(colors.Online),
 		CountOff: lipgloss.NewStyle().
-			Foreground(colors.Muted),
+			Foreground(colors.Error),
 		CountLabel: lipgloss.NewStyle().
 			Foreground(colors.Text),
 	}
@@ -560,8 +560,8 @@ func (m Model) renderComponentCounts(tier Tier) string {
 }
 
 // formatComponentCount formats a component count for display (switches/lights).
+// Format: on(green)/off(red) for all tiers.
 func (m Model) formatComponentCount(tier Tier, icon, fullLabel, shortLabel string, on, off int) string {
-	total := on + off
 	onStr := m.styles.CountOn.Render(fmt.Sprintf("%d", on))
 	offStr := m.styles.CountOff.Render(fmt.Sprintf("%d", off))
 
@@ -569,27 +569,26 @@ func (m Model) formatComponentCount(tier Tier, icon, fullLabel, shortLabel strin
 	case TierFull:
 		return icon + " " + m.styles.CountLabel.Render(fullLabel+": ") + onStr + "/" + offStr
 	case TierCompact:
-		return icon + " " + m.styles.CountLabel.Render(shortLabel+": ") + onStr + "/" + fmt.Sprintf("%d", total)
+		return icon + " " + m.styles.CountLabel.Render(shortLabel+": ") + onStr + "/" + offStr
 	default: // TierMinimal
 		return icon + fmt.Sprintf("%d", on)
 	}
 }
 
 // formatCoverCount formats cover counts for display.
+// Format: open(green)/closed(red) for all tiers.
 func (m Model) formatCoverCount(tier Tier, icon string, open, closed, moving int) string {
 	openStr := m.styles.CountOn.Render(fmt.Sprintf("%d", open))
-	closedStr := m.styles.CountOff.Render(fmt.Sprintf("%d", closed))
+	closedMovingStr := m.styles.CountOff.Render(fmt.Sprintf("%d", closed+moving))
 
 	switch tier {
 	case TierFull:
 		if moving > 0 {
-			return icon + " " + m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓ " +
-				m.styles.Warning.Render(fmt.Sprintf("%d", moving)) + "~"
+			return icon + " " + m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedMovingStr + "↓"
 		}
-		return icon + " " + m.styles.CountLabel.Render("Covers: ") + openStr + "↑ " + closedStr + "↓"
+		return icon + " " + m.styles.CountLabel.Render("Covers: ") + openStr + "/" + closedMovingStr
 	case TierCompact:
-		total := open + closed + moving
-		return icon + " " + m.styles.CountLabel.Render("Cv: ") + openStr + "/" + fmt.Sprintf("%d", total)
+		return icon + " " + m.styles.CountLabel.Render("Cv: ") + openStr + "/" + closedMovingStr
 	default: // TierMinimal
 		return icon + fmt.Sprintf("%d", open)
 	}

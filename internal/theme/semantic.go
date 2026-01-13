@@ -281,7 +281,7 @@ func SemanticTableBorder() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(GetSemanticColors().TableBorder)
 }
 
-// StyledKeybindings applies Warning color to keybinding text (e.g., "j/k:nav").
+// StyledKeybindings applies Yellow color to keybinding text (e.g., "j/k:nav").
 func StyledKeybindings(text string) string {
-	return SemanticWarning().Render(text)
+	return lipgloss.NewStyle().Foreground(Yellow()).Render(text)
 }

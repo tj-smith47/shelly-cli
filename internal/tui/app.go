@@ -135,6 +135,7 @@ type Model struct {
 	focusedPanel            PanelFocus // Which panel is currently focused
 	endpointCursor          int        // Selected endpoint in JSON panel
 	initialSelectionEmitted bool       // Whether initial device selection has been emitted
+	lastCacheVersion        uint64     // Last observed cache version for detecting WebSocket updates
 
 	// Dimensions
 	width  int
@@ -456,12 +457,26 @@ func (m Model) startEventStream() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle specific message types first
 	if newModel, cmd, handled := m.handleSpecificMsg(msg); handled {
+		if model, ok := newModel.(Model); ok {
+			return model.syncCacheVersion(), cmd
+		}
 		return newModel, cmd
 	}
 
 	// Forward and update components
 	newModel, cmds := m.updateComponents(msg)
-	return newModel, tea.Batch(cmds...)
+	return newModel.syncCacheVersion(), tea.Batch(cmds...)
+}
+
+// syncCacheVersion checks if cache version changed and updates status bar if needed.
+// This ensures WebSocket updates (which modify cache directly) refresh the status bar.
+func (m Model) syncCacheVersion() Model {
+	currentVersion := m.cache.Version()
+	if currentVersion != m.lastCacheVersion {
+		m.lastCacheVersion = currentVersion
+		m = m.updateStatusBarContext()
+	}
+	return m
 }
 
 // handleSpecificMsg handles specific message types that return early.
@@ -2522,42 +2537,40 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 }
 
 // buildDeviceListFooter builds a footer with emoji-only component counts.
+// Format: on(green)/off(red) for each component type.
 func (m Model) buildDeviceListFooter() string {
 	counts := m.cache.ComponentCounts()
 	var parts []string
 
 	colors := theme.GetSemanticColors()
 	onStyle := lipgloss.NewStyle().Foreground(colors.Online)
-	totalStyle := lipgloss.NewStyle().Foreground(colors.Muted)
+	offStyle := lipgloss.NewStyle().Foreground(colors.Error)
 
-	// Switches: ⚡️ on/total
-	totalSwitches := counts.SwitchesOn + counts.SwitchesOff
-	if totalSwitches > 0 {
+	// Switches: ⚡️ on/off
+	if counts.SwitchesOn > 0 || counts.SwitchesOff > 0 {
 		parts = append(parts, fmt.Sprintf("⚡️%s/%s",
 			onStyle.Render(fmt.Sprintf("%d", counts.SwitchesOn)),
-			totalStyle.Render(fmt.Sprintf("%d", totalSwitches))))
+			offStyle.Render(fmt.Sprintf("%d", counts.SwitchesOff))))
 	}
 
-	// Lights: 💡 on/total
-	totalLights := counts.LightsOn + counts.LightsOff
-	if totalLights > 0 {
+	// Lights: 💡 on/off
+	if counts.LightsOn > 0 || counts.LightsOff > 0 {
 		parts = append(parts, fmt.Sprintf("💡%s/%s",
 			onStyle.Render(fmt.Sprintf("%d", counts.LightsOn)),
-			totalStyle.Render(fmt.Sprintf("%d", totalLights))))
+			offStyle.Render(fmt.Sprintf("%d", counts.LightsOff))))
 	}
 
-	// Covers: 🪟 open/total
-	totalCovers := counts.CoversOpen + counts.CoversClosed + counts.CoversMoving
-	if totalCovers > 0 {
+	// Covers: 🪟 open/closed
+	if counts.CoversOpen > 0 || counts.CoversClosed > 0 || counts.CoversMoving > 0 {
 		parts = append(parts, fmt.Sprintf("🪟%s/%s",
 			onStyle.Render(fmt.Sprintf("%d", counts.CoversOpen)),
-			totalStyle.Render(fmt.Sprintf("%d", totalCovers))))
+			offStyle.Render(fmt.Sprintf("%d", counts.CoversClosed+counts.CoversMoving))))
 	}
 
 	if len(parts) == 0 {
 		return ""
 	}
-	return strings.Join(parts, " ")
+	return strings.Join(parts, " │ ")
 }
 
 // renderEventsColumn renders the events column with embedded title.

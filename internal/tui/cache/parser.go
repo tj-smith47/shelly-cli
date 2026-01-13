@@ -1134,8 +1134,10 @@ var componentRules = []componentRule{
 	{patterns: []string{"3EM", "SPEM"}, caps: ComponentCapabilities{HasEM: true}},
 	// Plugs (SHPLG for Gen1, SNPL for Plus Plug)
 	{patterns: []string{"SHPLG", "SNPL"}, caps: ComponentCapabilities{HasSwitches: true, HasPM: true, NumSwitches: 1}},
-	// Dimmers and RGBW (lights)
-	{patterns: []string{"RGBW", "SHDM"}, caps: ComponentCapabilities{HasLights: true, NumLights: 1}},
+	// Bulbs (Gen1 Bulb Duo, Vintage, etc.)
+	{patterns: []string{"SHBDUO", "SHBLB", "SHVIN"}, caps: ComponentCapabilities{HasLights: true, NumLights: 1}},
+	// Dimmers and RGBW (lights) - includes Plus Wall Dimmer (SNDM)
+	{patterns: []string{"RGBW", "SHDM", "SNDM"}, caps: ComponentCapabilities{HasLights: true, NumLights: 1}},
 	// Shelly 2.5 can be cover or switch mode
 	{patterns: []string{"SHSW-25", "2.5"}, caps: ComponentCapabilities{HasCovers: true, HasSwitches: true, NumCovers: 1, NumSwitches: 2}},
 	// Cover-specific devices
