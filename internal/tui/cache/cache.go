@@ -5,8 +5,10 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand/v2"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1426,7 +1428,16 @@ func (c *Cache) ComponentCounts() ComponentCountsResult {
 	var result ComponentCountsResult
 	for _, data := range c.devices {
 		if !data.Online {
+			debug.TraceEvent("ComponentCounts: %s skipped (offline)", data.Device.Name)
 			continue
+		}
+		// Log devices with no components for debugging count discrepancies
+		if len(data.Switches) == 0 && len(data.Lights) == 0 && len(data.Covers) == 0 {
+			devModel := "unknown"
+			if data.Info != nil {
+				devModel = data.Info.Model
+			}
+			debug.TraceEvent("ComponentCounts: %s [%s] has no switches/lights/covers", data.Device.Name, devModel)
 		}
 		for _, sw := range data.Switches {
 			if sw.On {
@@ -1473,6 +1484,39 @@ func (c *Cache) LightCounts() (on, off int) {
 func (c *Cache) CoverCounts() (open, closed, moving int) {
 	counts := c.ComponentCounts()
 	return counts.CoversOpen, counts.CoversClosed, counts.CoversMoving
+}
+
+// DebugComponentBreakdown returns a detailed breakdown of components per device.
+// Used for debugging component count discrepancies.
+func (c *Cache) DebugComponentBreakdown() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var sb strings.Builder
+	sb.WriteString("Component Breakdown:\n")
+
+	for _, name := range c.order {
+		data := c.devices[name]
+		if data == nil {
+			continue
+		}
+
+		status := "offline"
+		if data.Online {
+			status = "online"
+		}
+
+		devModel := "unknown"
+		if data.Info != nil {
+			devModel = data.Info.Model
+		}
+
+		sb.WriteString(fmt.Sprintf("  %s [%s] %s: sw=%d lt=%d cv=%d\n",
+			name, status, devModel,
+			len(data.Switches), len(data.Lights), len(data.Covers)))
+	}
+
+	return sb.String()
 }
 
 // IsLoading returns true if initial load is in progress.
