@@ -356,6 +356,11 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Set global debug logger for trace logging from components
 	debug.SetGlobal(m.debugLogger)
 
+	// Initialize statusbar debug indicator based on logger state
+	if m.debugLogger.Enabled() {
+		m.statusBar = m.statusBar.SetDebugActive(true)
+	}
+
 	return m
 }
 
@@ -2507,7 +2512,52 @@ func (m Model) renderDeviceListColumn(width, height int) string {
 		SetFocused(focused).
 		SetPanelIndex(1)
 
+	// Add component counts footer with emojis
+	footer := m.buildDeviceListFooter()
+	if footer != "" {
+		r.SetFooter(footer)
+	}
+
 	return r.SetContent(m.deviceList.View()).Render()
+}
+
+// buildDeviceListFooter builds a footer with emoji-only component counts.
+func (m Model) buildDeviceListFooter() string {
+	counts := m.cache.ComponentCounts()
+	var parts []string
+
+	colors := theme.GetSemanticColors()
+	onStyle := lipgloss.NewStyle().Foreground(colors.Online)
+	totalStyle := lipgloss.NewStyle().Foreground(colors.Muted)
+
+	// Switches: ⚡️ on/total
+	totalSwitches := counts.SwitchesOn + counts.SwitchesOff
+	if totalSwitches > 0 {
+		parts = append(parts, fmt.Sprintf("⚡️%s/%s",
+			onStyle.Render(fmt.Sprintf("%d", counts.SwitchesOn)),
+			totalStyle.Render(fmt.Sprintf("%d", totalSwitches))))
+	}
+
+	// Lights: 💡 on/total
+	totalLights := counts.LightsOn + counts.LightsOff
+	if totalLights > 0 {
+		parts = append(parts, fmt.Sprintf("💡%s/%s",
+			onStyle.Render(fmt.Sprintf("%d", counts.LightsOn)),
+			totalStyle.Render(fmt.Sprintf("%d", totalLights))))
+	}
+
+	// Covers: 🪟 open/total
+	totalCovers := counts.CoversOpen + counts.CoversClosed + counts.CoversMoving
+	if totalCovers > 0 {
+		parts = append(parts, fmt.Sprintf("🪟%s/%s",
+			onStyle.Render(fmt.Sprintf("%d", counts.CoversOpen)),
+			totalStyle.Render(fmt.Sprintf("%d", totalCovers))))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " ")
 }
 
 // renderEventsColumn renders the events column with embedded title.

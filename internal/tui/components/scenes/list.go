@@ -596,7 +596,7 @@ func (m ListModel) buildFooter() string {
 		return m.styles.Success.Render(m.statusMsg)
 	}
 
-	return footerKeybindings
+	return theme.StyledKeybindings(footerKeybindings)
 }
 
 // SelectedScene returns the currently selected scene, if any.

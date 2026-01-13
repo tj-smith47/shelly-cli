@@ -208,7 +208,7 @@ func (m HealthModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("r:refresh")
+		r.SetFooter(theme.StyledKeybindings("r:refresh"))
 	}
 
 	// Calculate content area for centering (accounting for panel borders)

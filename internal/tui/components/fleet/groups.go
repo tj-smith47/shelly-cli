@@ -428,7 +428,7 @@ func (m GroupsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("n:new e:edit d:del o:on f:off t:toggle r:refresh")
+		r.SetFooter(theme.StyledKeybindings("n:new e:edit d:del o:on f:off t:toggle r:refresh"))
 	}
 
 	// Calculate content area for centering (accounting for panel borders)

@@ -247,7 +247,7 @@ func (m OperationsModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("1-2:op h/l:sel enter:exec")
+		r.SetFooter(theme.StyledKeybindings("1-2:op h/l:sel enter:exec"))
 	}
 
 	if m.fleet == nil {

@@ -231,7 +231,7 @@ func (m DevicesModel) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("j/k:nav g/G:top/btm r:refresh")
+		r.SetFooter(theme.StyledKeybindings("j/k:nav g/G:top/btm r:refresh"))
 	}
 
 	// Handle early return cases

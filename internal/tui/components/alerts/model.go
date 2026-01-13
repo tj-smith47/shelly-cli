@@ -381,7 +381,7 @@ func (m *Model) View() string {
 
 	// Only show footer when focused
 	if m.focused {
-		r.SetFooter("e:toggle n:new d:del s/S:snooze t:test")
+		r.SetFooter(theme.StyledKeybindings("e:toggle n:new d:del s/S:snooze t:test"))
 	}
 
 	return r.SetContent(content).Render()

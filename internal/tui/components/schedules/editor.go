@@ -185,7 +185,7 @@ func (m EditorModel) View() string {
 		SetTitle("Schedule Details").
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
-		SetFooter("j/k:scroll g/G:top/end esc:close")
+		SetFooter(theme.StyledKeybindings("j/k:scroll g/G:top/end esc:close"))
 
 	if m.schedule == nil {
 		r.SetContent(styles.EmptyStateWithBorder("No schedule selected", m.width, m.height))

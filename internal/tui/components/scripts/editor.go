@@ -400,7 +400,7 @@ func (m EditorModel) View() string {
 		SetTitle(title).
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex).
-		SetFooter("j/k:scroll g/G:top/end d:download esc:close")
+		SetFooter(theme.StyledKeybindings("j/k:scroll g/G:top/end d:download esc:close"))
 
 	if m.scriptID == 0 {
 		r.SetContent(styles.EmptyStateWithBorder("No script selected", m.Width, m.Height))

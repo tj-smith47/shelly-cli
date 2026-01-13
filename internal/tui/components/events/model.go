@@ -3,6 +3,7 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -290,6 +291,16 @@ func (m Model) handleStreamEvent(evt shellyevents.Event) {
 
 	switch e := evt.(type) {
 	case *shellyevents.StatusChangeEvent:
+		// Filter out high-frequency status changes that don't indicate real state changes
+		// These include sys (system status), wifi, cloud, and timestamp-only updates
+		compPrefix := strings.Split(e.Component, ":")[0]
+		if compPrefix == "sys" || compPrefix == "wifi" || compPrefix == "cloud" {
+			return
+		}
+		// Filter input changes that only contain timestamp or state that hasn't changed
+		if compPrefix == "input" && !isInputStateChange(e.Status) {
+			return
+		}
 		event.Component = e.Component
 		event.Type = levelStatus
 		event.Description = fmt.Sprintf("%s changed", e.Component)
@@ -395,6 +406,21 @@ func categorizeEvent(eventName string) string {
 		}
 		return levelInfo
 	}
+}
+
+// isInputStateChange checks if an input status change contains an actual state change.
+// Filters out timestamp-only updates that flood the event stream.
+func isInputStateChange(status json.RawMessage) bool {
+	if status == nil {
+		return false
+	}
+	var data map[string]any
+	if err := json.Unmarshal(status, &data); err != nil {
+		return false
+	}
+	// Only show if "state" field is present (actual state toggle)
+	_, hasState := data["state"]
+	return hasState
 }
 
 // Update handles messages for events.

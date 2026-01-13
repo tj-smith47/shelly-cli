@@ -279,7 +279,7 @@ func (m Model) View() string {
 
 	// Add footer with keybindings when focused
 	if m.focused {
-		r.SetFooter("s:scan a:add p:provision m/h/c/b:method")
+		r.SetFooter(theme.StyledKeybindings("s:scan a:add p:provision m/h/c/b:method"))
 	}
 
 	var content strings.Builder

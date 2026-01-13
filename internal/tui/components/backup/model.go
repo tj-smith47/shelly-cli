@@ -642,9 +642,9 @@ func (m Model) View() string {
 	// Add footer with keybindings when focused
 	if m.focused {
 		if m.mode == ModeExport {
-			r.SetFooter("spc:sel a:all x:export 2:import")
+			r.SetFooter(theme.StyledKeybindings("spc:sel a:all x:export 2:import"))
 		} else {
-			r.SetFooter("enter:import r:refresh 1:export")
+			r.SetFooter(theme.StyledKeybindings("enter:import r:refresh 1:export"))
 		}
 	}
 

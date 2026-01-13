@@ -812,9 +812,9 @@ func (m Model) FooterText() string {
 		return ""
 	}
 	if len(components) == 1 {
-		return "space:toggle enter:json"
+		return theme.StyledKeybindings("space:toggle enter:json")
 	}
-	return "h/l:select a:all space:toggle enter:json"
+	return theme.StyledKeybindings("h/l:select a:all space:toggle enter:json")
 }
 
 // formatPower formats a power value with appropriate units.

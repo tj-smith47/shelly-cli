@@ -666,7 +666,7 @@ func (m ListModel) buildFooter() string {
 		return m.styles.Error.Render("Press d again to delete, Esc to cancel")
 	}
 
-	footer := "e:edit t:toggle d:del n:new"
+	footer := theme.StyledKeybindings("e:edit t:toggle d:del n:new")
 	if cs := m.cacheStatus.View(); cs != "" {
 		footer += " | " + cs
 	}

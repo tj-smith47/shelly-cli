@@ -566,7 +566,7 @@ func (m ListModel) buildFooter() string {
 		return m.styles.Success.Render(m.statusMsg)
 	}
 
-	return footerKeybindings
+	return theme.StyledKeybindings(footerKeybindings)
 }
 
 // SelectedTemplate returns the currently selected template, if any.
