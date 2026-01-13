@@ -57,3 +57,33 @@ func (s *Service) GetFullStatusGen1(ctx context.Context, identifier string) (map
 	})
 	return result, err
 }
+
+// GetFullConfig returns the complete device config from Shelly.GetConfig (Gen2+).
+func (s *Service) GetFullConfig(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	var result map[string]json.RawMessage
+	err := s.parent.WithConnection(ctx, identifier, func(conn *client.Client) error {
+		resp, err := conn.Call(ctx, "Shelly.GetConfig", nil)
+		if err != nil {
+			return err
+		}
+		data, err := json.Marshal(resp)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(data, &result)
+	})
+	return result, err
+}
+
+// GetFullConfigGen1 returns the complete device config from /settings endpoint (Gen1).
+func (s *Service) GetFullConfigGen1(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	var result map[string]json.RawMessage
+	err := s.parent.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		data, err := conn.Call(ctx, "/settings")
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(data, &result)
+	})
+	return result, err
+}

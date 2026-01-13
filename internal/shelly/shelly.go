@@ -714,6 +714,29 @@ func (s *Service) GetFullStatusAuto(ctx context.Context, identifier string) (map
 	return s.deviceService.GetFullStatus(ctx, identifier)
 }
 
+// GetFullConfig returns the complete device config from Shelly.GetConfig (Gen2+).
+func (s *Service) GetFullConfig(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	return s.deviceService.GetFullConfig(ctx, identifier)
+}
+
+// GetFullConfigGen1 returns the complete device config from /settings endpoint (Gen1).
+func (s *Service) GetFullConfigGen1(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	return s.deviceService.GetFullConfigGen1(ctx, identifier)
+}
+
+// GetFullConfigAuto returns the complete device config, auto-detecting the device generation.
+func (s *Service) GetFullConfigAuto(ctx context.Context, identifier string) (map[string]json.RawMessage, error) {
+	isGen1, _, err := s.IsGen1Device(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if isGen1 {
+		return s.deviceService.GetFullConfigGen1(ctx, identifier)
+	}
+	return s.deviceService.GetFullConfig(ctx, identifier)
+}
+
 // ----- Component Service accessor and delegations -----
 
 // ComponentService returns the component service for direct access.

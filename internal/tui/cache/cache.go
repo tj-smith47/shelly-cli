@@ -74,19 +74,22 @@ type DeviceData struct {
 // SwitchState holds the state of a switch component.
 type SwitchState struct {
 	ID     int
+	Name   string
 	On     bool
 	Source string
 }
 
 // LightState holds the state of a light component.
 type LightState struct {
-	ID int
-	On bool
+	ID   int
+	Name string
+	On   bool
 }
 
 // CoverState holds the state of a cover component.
 type CoverState struct {
 	ID    int
+	Name  string
 	State string // "open", "closed", "opening", "closing", "stopped"
 }
 
@@ -719,6 +722,20 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 
 			debug.TraceEvent("cache: %s parsed: %d switches, %d lights, %d covers, power=%.1fW",
 				name, len(data.Switches), len(data.Lights), len(data.Covers), data.Power)
+		}
+
+		// Fetch config to get component names (separate call, non-blocking failure)
+		configMap, err := c.svc.GetFullConfigAuto(ctx, name)
+		if err != nil {
+			c.ios.DebugErr("cache: get full config "+name, err)
+		} else {
+			var names *ComponentNames
+			if info.Generation == 1 {
+				names = ParseGen1Config(configMap)
+			} else {
+				names = ParseFullConfig(configMap)
+			}
+			ApplyConfigNames(data, names)
 		}
 
 		return DeviceUpdateMsg{Name: name, Data: data, RequestID: requestID}

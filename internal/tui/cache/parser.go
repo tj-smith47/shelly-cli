@@ -1175,3 +1175,131 @@ func matchesAny(s string, patterns []string) bool {
 	}
 	return false
 }
+
+// ComponentNames maps component IDs to their user-configured names.
+type ComponentNames struct {
+	Switches map[int]string
+	Lights   map[int]string
+	Covers   map[int]string
+	Inputs   map[int]string
+}
+
+// componentConfigData holds common config fields we care about.
+type componentConfigData struct {
+	ID   int     `json:"id"`
+	Name *string `json:"name,omitempty"`
+	Type string  `json:"type,omitempty"` // For inputs
+}
+
+// ParseFullConfig parses a Gen2+ Shelly.GetConfig response to extract component names.
+func ParseFullConfig(configMap map[string]json.RawMessage) *ComponentNames {
+	names := &ComponentNames{
+		Switches: make(map[int]string),
+		Lights:   make(map[int]string),
+		Covers:   make(map[int]string),
+		Inputs:   make(map[int]string),
+	}
+
+	for key, raw := range configMap {
+		prefix, _ := ParseComponentName(key)
+		cfg, err := unmarshalJSON[componentConfigData](raw)
+		if err != nil || cfg.Name == nil || *cfg.Name == "" {
+			continue
+		}
+
+		switch prefix {
+		case ComponentSwitch:
+			names.Switches[cfg.ID] = *cfg.Name
+		case ComponentLight:
+			names.Lights[cfg.ID] = *cfg.Name
+		case ComponentCover:
+			names.Covers[cfg.ID] = *cfg.Name
+		case ComponentInput:
+			names.Inputs[cfg.ID] = *cfg.Name
+		}
+	}
+
+	return names
+}
+
+// ParseGen1Config parses a Gen1 /settings response to extract component names.
+func ParseGen1Config(configMap map[string]json.RawMessage) *ComponentNames {
+	names := &ComponentNames{
+		Switches: make(map[int]string),
+		Lights:   make(map[int]string),
+		Covers:   make(map[int]string),
+		Inputs:   make(map[int]string),
+	}
+
+	// Gen1 relays have name field
+	if raw, ok := configMap[Gen1Relays]; ok {
+		var relays []struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(raw, &relays); err == nil {
+			for i, r := range relays {
+				if r.Name != "" {
+					names.Switches[i] = r.Name
+				}
+			}
+		}
+	}
+
+	// Gen1 lights have name field
+	if raw, ok := configMap[Gen1Lights]; ok {
+		var lights []struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(raw, &lights); err == nil {
+			for i, l := range lights {
+				if l.Name != "" {
+					names.Lights[i] = l.Name
+				}
+			}
+		}
+	}
+
+	// Gen1 rollers have name field
+	if raw, ok := configMap[Gen1Rollers]; ok {
+		var rollers []struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(raw, &rollers); err == nil {
+			for i, r := range rollers {
+				if r.Name != "" {
+					names.Covers[i] = r.Name
+				}
+			}
+		}
+	}
+
+	return names
+}
+
+// ApplyConfigNames applies component names from config to DeviceData.
+func ApplyConfigNames(data *DeviceData, names *ComponentNames) {
+	if names == nil {
+		return
+	}
+
+	for i := range data.Switches {
+		if name, ok := names.Switches[data.Switches[i].ID]; ok {
+			data.Switches[i].Name = name
+		}
+	}
+	for i := range data.Lights {
+		if name, ok := names.Lights[data.Lights[i].ID]; ok {
+			data.Lights[i].Name = name
+		}
+	}
+	for i := range data.Covers {
+		if name, ok := names.Covers[data.Covers[i].ID]; ok {
+			data.Covers[i].Name = name
+		}
+	}
+	for i := range data.Inputs {
+		if name, ok := names.Inputs[data.Inputs[i].ID]; ok {
+			data.Inputs[i].Name = name
+		}
+	}
+}

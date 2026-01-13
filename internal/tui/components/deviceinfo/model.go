@@ -4,7 +4,6 @@ package deviceinfo
 import (
 	"fmt"
 	"image/color"
-	"strconv"
 	"strings"
 	"time"
 
@@ -46,12 +45,13 @@ type Model struct {
 
 // ComponentInfo holds information about a device component.
 type ComponentInfo struct {
+	ID         int
 	Name       string
 	Type       string
 	State      string
 	StateColor color.Color
-	Power      *float64 // nil if not applicable
-	Endpoint   string   // API endpoint for JSON viewing
+	Power      *float64
+	Endpoint   string
 }
 
 // Styles for the device info component.
@@ -243,7 +243,6 @@ func (m Model) handleToggle(components []ComponentInfo) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// If showing all components, toggle the first controllable one
 	idx := m.componentCursor
 	if idx < 0 {
 		idx = 0
@@ -254,35 +253,15 @@ func (m Model) handleToggle(components []ComponentInfo) (Model, tea.Cmd) {
 
 	comp := components[idx]
 
-	// Only allow toggling switches, lights, and covers
 	var compType string
-	var compID int
-
 	switch comp.Type {
 	case "Switch":
 		compType = "switch"
-		// Extract ID from name like "Sw0" -> 0
-		if len(comp.Name) > 2 {
-			if id, err := strconv.Atoi(comp.Name[2:]); err == nil {
-				compID = id
-			}
-		}
 	case "Light":
 		compType = "light"
-		if len(comp.Name) > 2 {
-			if id, err := strconv.Atoi(comp.Name[2:]); err == nil {
-				compID = id
-			}
-		}
 	case "Cover":
 		compType = "cover"
-		if len(comp.Name) > 2 {
-			if id, err := strconv.Atoi(comp.Name[2:]); err == nil {
-				compID = id
-			}
-		}
 	default:
-		// Not a controllable component
 		return m, nil
 	}
 
@@ -290,7 +269,7 @@ func (m Model) handleToggle(components []ComponentInfo) (Model, tea.Cmd) {
 		return RequestToggleMsg{
 			DeviceName:    m.device.Device.Name,
 			ComponentType: compType,
-			ComponentID:   compID,
+			ComponentID:   comp.ID,
 		}
 	}
 }
@@ -614,8 +593,13 @@ func (m Model) appendSwitchComponents(components []ComponentInfo) []ComponentInf
 		if sw.On {
 			state = "on"
 		}
+		name := sw.Name
+		if name == "" {
+			name = fmt.Sprintf("Sw%d", sw.ID)
+		}
 		components = append(components, ComponentInfo{
-			Name:     fmt.Sprintf("Sw%d", sw.ID),
+			ID:       sw.ID,
+			Name:     name,
 			Type:     "Switch",
 			State:    state,
 			Endpoint: fmt.Sprintf("Switch.GetStatus?id=%d", sw.ID),
@@ -630,8 +614,13 @@ func (m Model) appendLightComponents(components []ComponentInfo) []ComponentInfo
 		if lt.On {
 			state = "on"
 		}
+		name := lt.Name
+		if name == "" {
+			name = fmt.Sprintf("Lt%d", lt.ID)
+		}
 		components = append(components, ComponentInfo{
-			Name:     fmt.Sprintf("Lt%d", lt.ID),
+			ID:       lt.ID,
+			Name:     name,
 			Type:     "Light",
 			State:    state,
 			Endpoint: fmt.Sprintf("Light.GetStatus?id=%d", lt.ID),
@@ -649,8 +638,13 @@ func (m Model) appendCoverComponents(components []ComponentInfo) []ComponentInfo
 		if len(state) > 4 {
 			state = state[:4]
 		}
+		name := cv.Name
+		if name == "" {
+			name = fmt.Sprintf("Cv%d", cv.ID)
+		}
 		components = append(components, ComponentInfo{
-			Name:     fmt.Sprintf("Cv%d", cv.ID),
+			ID:       cv.ID,
+			Name:     name,
 			Type:     "Cover",
 			State:    state,
 			Endpoint: fmt.Sprintf("Cover.GetStatus?id=%d", cv.ID),
@@ -669,8 +663,13 @@ func (m Model) appendInputComponents(components []ComponentInfo) []ComponentInfo
 		if inputType == "" {
 			inputType = "Input"
 		}
+		name := inp.Name
+		if name == "" {
+			name = fmt.Sprintf("In%d", inp.ID)
+		}
 		components = append(components, ComponentInfo{
-			Name:     fmt.Sprintf("In%d", inp.ID),
+			ID:       inp.ID,
+			Name:     name,
 			Type:     inputType,
 			State:    state,
 			Endpoint: fmt.Sprintf("Input.GetStatus?id=%d", inp.ID),
