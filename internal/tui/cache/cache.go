@@ -737,15 +737,11 @@ func (c *Cache) deviceTimeout(generation int) time.Duration {
 	}
 }
 
-// populateDeviceInfo fills in missing device info and persists to config.
-// Skips entirely if device already has all required info populated.
+// populateDeviceInfo reconciles device info between live data and stored config.
+// Uses MAC as the source of truth for device identity. Updates config if data is
+// missing or incorrect.
 func (c *Cache) populateDeviceInfo(name string, data *DeviceData, info *shelly.DeviceInfo) {
-	// Skip if device already has all info - no need to check or persist
-	if data.Device.Model != "" && data.Device.Generation > 0 && data.Device.MAC != "" {
-		return
-	}
-
-	updates := c.buildDeviceUpdates(data, info)
+	updates := c.reconcileDeviceInfo(data, info)
 	if updates.Type != "" || updates.Model != "" || updates.Generation > 0 || updates.MAC != "" {
 		if err := config.UpdateDeviceInfo(name, updates); err != nil {
 			c.ios.DebugErr("persist device info", err)
@@ -753,31 +749,102 @@ func (c *Cache) populateDeviceInfo(name string, data *DeviceData, info *shelly.D
 	}
 }
 
-// buildDeviceUpdates creates device updates from info, updating data in place.
-func (c *Cache) buildDeviceUpdates(data *DeviceData, info *shelly.DeviceInfo) config.DeviceUpdates {
+// reconcileDeviceInfo compares live device info against stored config and returns updates.
+// Uses MAC as the source of truth for device identity.
+func (c *Cache) reconcileDeviceInfo(data *DeviceData, info *shelly.DeviceInfo) config.DeviceUpdates {
 	var updates config.DeviceUpdates
 
-	if info.Model != "" {
-		displayName := types.ModelDisplayName(info.Model)
-		if data.Device.Model == "" || data.Device.Model == data.Device.Type {
-			data.Device.Model = displayName
-			updates.Model = displayName
-		}
-		if data.Device.Type == "" {
-			data.Device.Type = info.Model
-			updates.Type = info.Model
-		}
+	c.reconcileMAC(data, info, &updates)
+	c.reconcileType(data, info, &updates)
+	c.reconcileModel(data, info, &updates)
+	c.reconcileGeneration(data, info, &updates)
+
+	return updates
+}
+
+// reconcileMAC handles MAC address reconciliation and device replacement detection.
+func (c *Cache) reconcileMAC(data *DeviceData, info *shelly.DeviceInfo, updates *config.DeviceUpdates) {
+	if info.MAC == "" {
+		return
 	}
-	if data.Device.Generation == 0 && info.Generation > 0 {
+
+	liveMAC := model.NormalizeMAC(info.MAC)
+	storedMAC := data.Device.NormalizedMAC()
+
+	if storedMAC == "" {
+		// MAC was missing, fill it in
+		data.Device.MAC = liveMAC
+		updates.MAC = info.MAC
+		debug.TraceEvent("cache: reconcile %s - added missing MAC: %s", data.Device.Name, info.MAC)
+		return
+	}
+
+	if liveMAC != storedMAC {
+		// Device was replaced - warn user but continue with update
+		c.ios.DebugCat(iostreams.CategoryDevice,
+			"WARNING: Device %q appears to have been replaced (stored MAC: %s, live MAC: %s)",
+			data.Device.Name, storedMAC, liveMAC)
+		debug.TraceEvent("cache: device %s replaced - MAC changed from %s to %s",
+			data.Device.Name, storedMAC, liveMAC)
+		data.Device.MAC = liveMAC
+		updates.MAC = info.MAC
+	}
+}
+
+// reconcileType handles device type/SKU reconciliation.
+func (c *Cache) reconcileType(data *DeviceData, info *shelly.DeviceInfo, updates *config.DeviceUpdates) {
+	if info.Model == "" {
+		return
+	}
+
+	if data.Device.Type == "" {
+		data.Device.Type = info.Model
+		updates.Type = info.Model
+		debug.TraceEvent("cache: reconcile %s - added missing Type: %s", data.Device.Name, info.Model)
+	} else if data.Device.Type != info.Model {
+		debug.TraceEvent("cache: reconcile %s - corrected Type: %s -> %s",
+			data.Device.Name, data.Device.Type, info.Model)
+		data.Device.Type = info.Model
+		updates.Type = info.Model
+	}
+}
+
+// reconcileModel handles display name reconciliation.
+func (c *Cache) reconcileModel(data *DeviceData, info *shelly.DeviceInfo, updates *config.DeviceUpdates) {
+	if info.Model == "" {
+		return
+	}
+
+	displayName := types.ModelDisplayName(info.Model)
+
+	if data.Device.Model == "" || data.Device.Model == data.Device.Type {
+		data.Device.Model = displayName
+		updates.Model = displayName
+		debug.TraceEvent("cache: reconcile %s - added missing Model: %s", data.Device.Name, displayName)
+	} else if data.Device.Model != displayName {
+		debug.TraceEvent("cache: reconcile %s - corrected Model: %s -> %s",
+			data.Device.Name, data.Device.Model, displayName)
+		data.Device.Model = displayName
+		updates.Model = displayName
+	}
+}
+
+// reconcileGeneration handles generation reconciliation.
+func (c *Cache) reconcileGeneration(data *DeviceData, info *shelly.DeviceInfo, updates *config.DeviceUpdates) {
+	if info.Generation <= 0 {
+		return
+	}
+
+	if data.Device.Generation == 0 {
+		data.Device.Generation = info.Generation
+		updates.Generation = info.Generation
+		debug.TraceEvent("cache: reconcile %s - added missing Generation: %d", data.Device.Name, info.Generation)
+	} else if data.Device.Generation != info.Generation {
+		debug.TraceEvent("cache: reconcile %s - corrected Generation: %d -> %d",
+			data.Device.Name, data.Device.Generation, info.Generation)
 		data.Device.Generation = info.Generation
 		updates.Generation = info.Generation
 	}
-	if data.Device.MAC == "" && info.MAC != "" {
-		data.Device.MAC = model.NormalizeMAC(info.MAC)
-		updates.MAC = info.MAC
-	}
-
-	return updates
 }
 
 // tryGetCachedDeviceInfo attempts to retrieve device info from FileCache.
