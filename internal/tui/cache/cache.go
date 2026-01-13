@@ -353,7 +353,7 @@ func (c *Cache) handleDeviceEvent(evt events.Event) {
 
 	// Check if WebSocket update needs HTTP refresh (BUG-009/014)
 	// This handles cases where state changed but power data wasn't included
-	// Only for NON-WebSocket devices - WebSocket devices will get power data via WebSocket
+	// Only for NON-EventStream devices - EventStream devices get updates via WebSocket/polling
 	if data.NeedsRefresh {
 		data.NeedsRefresh = false
 		if !c.esManaged[deviceID] {
@@ -1176,12 +1176,8 @@ func (c *Cache) Update(msg tea.Msg) tea.Cmd {
 		return combineWithPending(c.handleDeviceUpdate(msg))
 
 	case DeviceRefreshMsg:
-		// Skip refresh for devices managed by EventStream (real-time updates)
-		if c.IsEventStreamManaged(msg.Name) {
-			debug.TraceEvent("DeviceRefreshMsg: skipping %s (EventStream managed)", msg.Name)
-			return combineWithPending(nil)
-		}
-
+		// DeviceRefreshMsg is an explicit refresh request (from user action, keybinding, etc.)
+		// Always honor it - esManaged only blocks automatic/scheduled polling, not explicit requests
 		// Refresh a single device - copy Device while holding lock to avoid race
 		c.mu.RLock()
 		data := c.devices[msg.Name]

@@ -294,6 +294,10 @@ func (m Model) handleStreamEvent(evt shellyevents.Event) {
 		event.Type = levelStatus
 		event.Description = fmt.Sprintf("%s changed", e.Component)
 	case *shellyevents.NotifyEvent:
+		// Filter out high-frequency BLE scan results from HA BLE proxy integration
+		if e.Event == "ble.scan_result" {
+			return
+		}
 		event.Component = e.Component
 		event.Type = categorizeEvent(e.Event)
 		event.Description = fmt.Sprintf("%s: %s", e.Component, e.Event)
