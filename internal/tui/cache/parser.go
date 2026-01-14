@@ -9,6 +9,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 )
 
 // Component type constants for parsing and matching.
@@ -878,12 +879,16 @@ func applyIncrementalSwitch(data *DeviceData, id int, raw json.RawMessage) {
 	if status.APower != nil {
 		// Update per-component power and recalculate total
 		data.EnsurePowerMaps()
+		oldPower := data.Power
 		data.SwitchPowers[id] = *status.APower
 		data.Power = data.SumPowers()
+		debug.TraceEvent("ws: switch:%d power=%.1fW, total %.1f→%.1fW (switches=%v)",
+			id, *status.APower, oldPower, data.Power, data.SwitchPowers)
 	} else if stateChanged {
 		// State changed but no power data - mark for HTTP refresh
 		// This handles the case where WebSocket only sends output state without apower
 		data.NeedsRefresh = true
+		debug.TraceEvent("ws: switch:%d state changed, no power - marked for refresh", id)
 	}
 
 	if status.Voltage != nil {
@@ -939,12 +944,16 @@ func applyIncrementalLight(data *DeviceData, id int, raw json.RawMessage) {
 	if status.APower != nil {
 		// Update per-component power and recalculate total
 		data.EnsurePowerMaps()
+		oldPower := data.Power
 		data.LightPowers[id] = *status.APower
 		data.Power = data.SumPowers()
+		debug.TraceEvent("ws: light:%d power=%.1fW, total %.1f→%.1fW (lights=%v)",
+			id, *status.APower, oldPower, data.Power, data.LightPowers)
 	} else if stateChanged {
 		// State changed but no power data - mark for HTTP refresh
 		// This handles the case where WebSocket only sends output state without apower
 		data.NeedsRefresh = true
+		debug.TraceEvent("ws: light:%d state changed, no power - marked for refresh", id)
 	}
 
 	if status.Voltage != nil {
@@ -995,11 +1004,15 @@ func applyIncrementalCover(data *DeviceData, id int, raw json.RawMessage) {
 	if status.APower != nil {
 		// Update per-component power and recalculate total
 		data.EnsurePowerMaps()
+		oldPower := data.Power
 		data.CoverPowers[id] = *status.APower
 		data.Power = data.SumPowers()
+		debug.TraceEvent("ws: cover:%d power=%.1fW, total %.1f→%.1fW (covers=%v)",
+			id, *status.APower, oldPower, data.Power, data.CoverPowers)
 	} else if stateChanged {
 		// State changed but no power data - mark for HTTP refresh
 		data.NeedsRefresh = true
+		debug.TraceEvent("ws: cover:%d state changed, no power - marked for refresh", id)
 	}
 }
 
@@ -1053,8 +1066,11 @@ func applyIncrementalPM(data *DeviceData, id int, raw json.RawMessage) {
 
 	// Update per-component power and recalculate total
 	data.EnsurePowerMaps()
+	oldPower := data.Power
 	data.PMPowers[id] = pm.APower
 	data.Power = data.SumPowers()
+	debug.TraceEvent("ws: pm:%d power=%.1fW, total %.1f→%.1fW (pm=%v)",
+		id, pm.APower, oldPower, data.Power, data.PMPowers)
 
 	if pm.Voltage > 0 {
 		data.Voltage = pm.Voltage
@@ -1076,8 +1092,11 @@ func applyIncrementalEM(data *DeviceData, id int, raw json.RawMessage) {
 
 	// Update per-component power and recalculate total
 	data.EnsurePowerMaps()
+	oldPower := data.Power
 	data.EMPowers[id] = em.TotalActivePower
 	data.Power = data.SumPowers()
+	debug.TraceEvent("ws: em:%d power=%.1fW, total %.1f→%.1fW (em=%v)",
+		id, em.TotalActivePower, oldPower, data.Power, data.EMPowers)
 
 	data.Current = em.TotalCurrent
 	if em.AVoltage > 0 {
@@ -1094,8 +1113,11 @@ func applyIncrementalEM1(data *DeviceData, id int, raw json.RawMessage) {
 
 	// Update per-component power and recalculate total
 	data.EnsurePowerMaps()
+	oldPower := data.Power
 	data.EM1Powers[id] = em1.ActPower
 	data.Power = data.SumPowers()
+	debug.TraceEvent("ws: em1:%d power=%.1fW, total %.1f→%.1fW (em1=%v)",
+		id, em1.ActPower, oldPower, data.Power, data.EM1Powers)
 
 	if em1.Voltage > 0 {
 		data.Voltage = em1.Voltage

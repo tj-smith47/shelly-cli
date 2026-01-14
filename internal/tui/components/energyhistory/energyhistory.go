@@ -172,8 +172,11 @@ func (m *Model) handleDeviceUpdate() {
 
 // hasPMCapability checks if a device has power monitoring capability.
 func hasPMCapability(d *cache.DeviceData) bool {
+	name := d.Device.Name
+
 	// Check snapshot for dedicated PM/EM components
 	if d.Snapshot != nil && (len(d.Snapshot.PM) > 0 || len(d.Snapshot.EM) > 0 || len(d.Snapshot.EM1) > 0) {
+		debug.TraceEvent("energy: %s has PM (snapshot PM/EM components)", name)
 		return true
 	}
 
@@ -181,11 +184,13 @@ func hasPMCapability(d *cache.DeviceData) bool {
 	// Devices like Plus 2PM have PM in the switch component (apower field),
 	// not dedicated PM components. SwitchPowers is populated when switches report power.
 	if len(d.SwitchPowers) > 0 {
+		debug.TraceEvent("energy: %s has PM (switch-integrated, %d switches with power)", name, len(d.SwitchPowers))
 		return true
 	}
 
 	// Also check cover-integrated power monitoring
 	if len(d.CoverPowers) > 0 {
+		debug.TraceEvent("energy: %s has PM (cover-integrated, %d covers with power)", name, len(d.CoverPowers))
 		return true
 	}
 
@@ -195,7 +200,11 @@ func hasPMCapability(d *cache.DeviceData) bool {
 		model = d.Device.Model
 	}
 
-	return modelHasPM(model)
+	hasPM := modelHasPM(model)
+	if hasPM {
+		debug.TraceEvent("energy: %s has PM (model pattern: %s)", name, model)
+	}
+	return hasPM
 }
 
 // modelHasPM checks if a device model code or display name indicates power monitoring capability.
@@ -369,6 +378,7 @@ func (m *Model) collectCurrentPower(devices []*cache.DeviceData) {
 		if !hasInitial {
 			// First data point for this device - capture immediately to prevent
 			// false ramp-up from 0 when device was already ON before TUI started
+			debug.TraceEvent("energy: %s initial capture: %.1fW (bypassing throttle)", deviceName, d.Power)
 			m.addDataPoint(deviceName, d.Power)
 			m.mu.Lock()
 			m.hasInitialData[deviceName] = true
