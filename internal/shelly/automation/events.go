@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,6 +113,19 @@ func (es *EventStream) connectDevice(name, address string) {
 	// Gen1 devices don't support WebSocket - use polling fallback
 	if resolvedDevice.Generation == 1 {
 		iostreams.DebugCat(iostreams.CategoryNetwork, "Device %s is Gen1, using polling", name)
+
+		// Fetch Gen1 device info to get Type and MAC for CoIoT registration
+		var coiotID string
+		devInfo, err := es.svc.GetGen1DeviceInfo(ctx, name)
+		if err != nil {
+			iostreams.DebugErrCat(iostreams.CategoryNetwork, fmt.Sprintf("get gen1 device info %s", name), err)
+		} else if devInfo != nil {
+			// Build CoIoT ID: "devicetype-mac" lowercase (e.g., "shsw-pm-c45bbe6c2d3a")
+			coiotID = strings.ToLower(devInfo.Type) + "-" + strings.ToLower(devInfo.MAC)
+			es.RegisterCoIoTDevice(name, coiotID)
+			iostreams.DebugCat(iostreams.CategoryNetwork, "Registered CoIoT device %s -> %s", name, coiotID)
+		}
+
 		es.pollerWg.Go(func() { es.pollGen1Device(ctx, name, address) })
 
 		es.mu.Lock()
@@ -120,6 +134,7 @@ func (es *EventStream) connectDevice(name, address string) {
 			address:    address,
 			cancel:     cancel,
 			generation: 1,
+			coiotID:    coiotID,
 		}
 		es.mu.Unlock()
 		return

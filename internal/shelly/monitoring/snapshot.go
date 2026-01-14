@@ -143,6 +143,29 @@ func (s *Service) GetGen1StatusJSON(ctx context.Context, identifier string) (jso
 	return json.Marshal(snapshot)
 }
 
+// Gen1DeviceInfo holds Gen1 device identification for CoIoT registration.
+type Gen1DeviceInfo struct {
+	Type string // Device type (e.g., "SHSW-PM")
+	MAC  string // MAC address (e.g., "C45BBE6C2D3A")
+}
+
+// GetGen1DeviceInfo returns the Gen1 device type and MAC for CoIoT registration.
+func (s *Service) GetGen1DeviceInfo(ctx context.Context, identifier string) (*Gen1DeviceInfo, error) {
+	var info *Gen1DeviceInfo
+	err := s.connector.WithGen1Connection(ctx, identifier, func(conn *client.Gen1Client) error {
+		devInfo := conn.Info()
+		if devInfo == nil {
+			return fmt.Errorf("device info not available")
+		}
+		info = &Gen1DeviceInfo{
+			Type: devInfo.Model, // Model holds the Gen1 Type (e.g., "SHSW-PM")
+			MAC:  devInfo.MAC,
+		}
+		return nil
+	})
+	return info, err
+}
+
 // FetchAllSnapshots fetches device info and monitoring snapshots for all devices concurrently.
 func (s *Service) FetchAllSnapshots(ctx context.Context, devices map[string]string, snapshots map[string]*DeviceSnapshot, mu *sync.Mutex) {
 	var wg sync.WaitGroup

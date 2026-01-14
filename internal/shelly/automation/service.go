@@ -20,6 +20,12 @@ type ConnectionProvider interface {
 	ResolveWithGeneration(ctx context.Context, identifier string) (model.Device, error)
 }
 
+// Gen1DeviceInfo holds Gen1 device identification for CoIoT registration.
+type Gen1DeviceInfo struct {
+	Type string // Device type (e.g., "SHSW-PM")
+	MAC  string // MAC address (e.g., "C45BBE6C2D3A")
+}
+
 // EventStreamProvider extends ConnectionProvider with Gen1 monitoring support for EventStream.
 // This interface is implemented by shelly.Service.
 type EventStreamProvider interface {
@@ -27,6 +33,8 @@ type EventStreamProvider interface {
 	// GetGen1StatusJSON returns the Gen1 device status as JSON for event streaming.
 	// This is used by EventStream to poll Gen1 devices.
 	GetGen1StatusJSON(ctx context.Context, identifier string) (json.RawMessage, error)
+	// GetGen1DeviceInfo returns the Gen1 device type and MAC for CoIoT registration.
+	GetGen1DeviceInfo(ctx context.Context, identifier string) (*Gen1DeviceInfo, error)
 }
 
 // Service provides automation operations for Shelly devices.

@@ -15,6 +15,7 @@ type mockConnectionProvider struct {
 	withConnectionFn        func(ctx context.Context, identifier string, fn func(*client.Client) error) error
 	resolveWithGenerationFn func(ctx context.Context, identifier string) (model.Device, error)
 	getGen1StatusJSONFn     func(ctx context.Context, identifier string) (json.RawMessage, error)
+	getGen1DeviceInfoFn     func(ctx context.Context, identifier string) (*Gen1DeviceInfo, error)
 }
 
 func (m *mockConnectionProvider) WithConnection(ctx context.Context, identifier string, fn func(*client.Client) error) error {
@@ -36,6 +37,14 @@ func (m *mockConnectionProvider) GetGen1StatusJSON(ctx context.Context, identifi
 		return m.getGen1StatusJSONFn(ctx, identifier)
 	}
 	return nil, nil
+}
+
+func (m *mockConnectionProvider) GetGen1DeviceInfo(ctx context.Context, identifier string) (*Gen1DeviceInfo, error) {
+	if m.getGen1DeviceInfoFn != nil {
+		return m.getGen1DeviceInfoFn(ctx, identifier)
+	}
+	// Return empty struct instead of nil to avoid nilnil linter warning
+	return &Gen1DeviceInfo{}, nil
 }
 
 func TestNew(t *testing.T) {

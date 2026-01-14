@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/export"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/monitoring"
 )
@@ -111,6 +112,21 @@ func (s *Service) GetMonitoringSnapshotAuto(ctx context.Context, device string) 
 // GetGen1StatusJSON returns Gen1 device status as JSON for event streaming.
 func (s *Service) GetGen1StatusJSON(ctx context.Context, identifier string) (json.RawMessage, error) {
 	return s.Monitoring().GetGen1StatusJSON(ctx, identifier)
+}
+
+// Gen1DeviceInfo is an alias for automation.Gen1DeviceInfo.
+type Gen1DeviceInfo = automation.Gen1DeviceInfo
+
+// GetGen1DeviceInfo returns the Gen1 device type and MAC for CoIoT registration.
+func (s *Service) GetGen1DeviceInfo(ctx context.Context, identifier string) (*Gen1DeviceInfo, error) {
+	info, err := s.Monitoring().GetGen1DeviceInfo(ctx, identifier)
+	if err != nil || info == nil {
+		return nil, err
+	}
+	return &Gen1DeviceInfo{
+		Type: info.Type,
+		MAC:  info.MAC,
+	}, nil
 }
 
 // FetchAllSnapshots fetches device info and monitoring snapshots for all devices concurrently.
