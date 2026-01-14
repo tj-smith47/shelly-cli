@@ -427,20 +427,35 @@ func (s *Service) WithRateLimitedCall(ctx context.Context, address string, gener
 	err = fn()
 
 	// Record success/failure for circuit breaker
-	// Only count actual connectivity failures, not expected API responses
-	if err != nil {
-		if ratelimit.IsConnectivityFailure(err) {
-			debug.TraceEvent("circuit: RecordFailure for %s: %v", address, err)
-			s.rateLimiter.RecordFailure(address)
-		} else {
-			debug.TraceEvent("circuit: Ignoring non-connectivity error for %s: %v", address, err)
-			s.rateLimiter.RecordSuccess(address)
-		}
-	} else {
-		s.rateLimiter.RecordSuccess(address)
-	}
+	s.recordCircuitResult(ctx, address, err)
 
 	return err
+}
+
+// recordCircuitResult records success/failure for the circuit breaker.
+// Only counts actual connectivity failures, not expected API responses.
+// Skips failure recording for polling requests (BUG-015) - polling failures
+// shouldn't block user-initiated actions like toggles.
+func (s *Service) recordCircuitResult(ctx context.Context, address string, err error) {
+	if err == nil {
+		s.rateLimiter.RecordSuccess(address)
+		return
+	}
+
+	if !ratelimit.IsConnectivityFailure(err) {
+		debug.TraceEvent("circuit: Ignoring non-connectivity error for %s: %v", address, err)
+		s.rateLimiter.RecordSuccess(address)
+		return
+	}
+
+	// Connectivity failure - skip for polling, record for user actions
+	if ratelimit.IsPolling(ctx) {
+		debug.TraceEvent("circuit: Skipping RecordFailure for polling request %s: %v", address, err)
+		return
+	}
+
+	debug.TraceEvent("circuit: RecordFailure for %s: %v", address, err)
+	s.rateLimiter.RecordFailure(address)
 }
 
 // RateLimiter returns the service's rate limiter, if configured.

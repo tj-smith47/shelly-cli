@@ -352,6 +352,22 @@ func (rl *DeviceRateLimiter) enforceInterval(ctx context.Context, state *deviceS
 	}
 }
 
+// pollingContextKey is the context key for marking requests as polling.
+type pollingContextKey struct{}
+
+// MarkAsPolling marks a context as a polling request.
+// Polling requests don't count toward circuit breaker thresholds.
+// This prevents background HTTP polling from blocking user-initiated actions.
+func MarkAsPolling(ctx context.Context) context.Context {
+	return context.WithValue(ctx, pollingContextKey{}, true)
+}
+
+// IsPolling returns true if the context is marked as a polling request.
+func IsPolling(ctx context.Context) bool {
+	v, ok := ctx.Value(pollingContextKey{}).(bool)
+	return ok && v
+}
+
 // IsConnectivityFailure determines if an error represents an actual connectivity
 // failure vs an expected API response (like "component not found").
 //

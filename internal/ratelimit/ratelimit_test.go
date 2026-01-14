@@ -1278,3 +1278,82 @@ func TestDeviceRateLimiter_GetOrCreateState_DoubleCheck(t *testing.T) {
 		}
 	}
 }
+
+func TestMarkAsPolling(t *testing.T) {
+	t.Parallel()
+
+	// Background context should not be polling
+	ctx := context.Background()
+	if IsPolling(ctx) {
+		t.Error("expected background context to not be marked as polling")
+	}
+
+	// Marked context should be polling
+	pollingCtx := MarkAsPolling(ctx)
+	if !IsPolling(pollingCtx) {
+		t.Error("expected marked context to be polling")
+	}
+
+	// Original context should still not be polling
+	if IsPolling(ctx) {
+		t.Error("expected original context to remain unmarked")
+	}
+}
+
+func TestIsPolling_WithTimeout(t *testing.T) {
+	t.Parallel()
+
+	// Mark as polling, then add timeout
+	ctx := MarkAsPolling(context.Background())
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+
+	// Should still be polling after adding timeout
+	if !IsPolling(ctx) {
+		t.Error("expected polling flag to be preserved through WithTimeout")
+	}
+}
+
+func TestIsPolling_WithCancel(t *testing.T) {
+	t.Parallel()
+
+	// Mark as polling, then add cancel
+	ctx := MarkAsPolling(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Should still be polling after adding cancel
+	if !IsPolling(ctx) {
+		t.Error("expected polling flag to be preserved through WithCancel")
+	}
+}
+
+func TestIsPolling_NestedValues(t *testing.T) {
+	t.Parallel()
+
+	// Add another value, then mark as polling
+	type otherKey struct{}
+	ctx := context.WithValue(context.Background(), otherKey{}, "test")
+	ctx = MarkAsPolling(ctx)
+
+	// Both values should be accessible
+	if !IsPolling(ctx) {
+		t.Error("expected context to be polling")
+	}
+	if ctx.Value(otherKey{}) != "test" {
+		t.Error("expected other value to be preserved")
+	}
+}
+
+func TestIsPolling_WrongType(t *testing.T) {
+	t.Parallel()
+
+	// Simulate a context where pollingContextKey exists but with wrong type
+	type pollingContextKey struct{}
+	ctx := context.WithValue(context.Background(), pollingContextKey{}, "not-a-bool")
+
+	// IsPolling should return false because the type assertion fails
+	if IsPolling(ctx) {
+		t.Error("expected context with wrong value type to not be polling")
+	}
+}

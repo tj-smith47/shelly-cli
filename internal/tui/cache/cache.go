@@ -19,6 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/ratelimit"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
@@ -649,7 +650,8 @@ func (c *Cache) fetchDeviceWithID(name string, device model.Device) tea.Cmd {
 			lastRequestID: requestID,
 		}
 
-		ctx, cancel := context.WithTimeout(c.ctx, c.deviceTimeout(device.Generation))
+		// Mark context as polling - polling failures shouldn't trip circuit breaker (BUG-015)
+		ctx, cancel := context.WithTimeout(ratelimit.MarkAsPolling(c.ctx), c.deviceTimeout(device.Generation))
 		defer cancel()
 
 		// Try to get device info from FileCache first (it never changes, 24h TTL)
@@ -942,12 +944,13 @@ func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
 		msg := FetchExtendedStatusMsg{Name: name}
 
 		// Fetch only what's missing, in parallel with independent timeouts
+		// Mark as polling - these are background requests that shouldn't trip circuit breaker (BUG-015)
 		var wg sync.WaitGroup
 		var wifiMu, sysMu sync.Mutex
 
 		if !hasWiFi {
 			wg.Go(func() {
-				ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
+				ctx, cancel := context.WithTimeout(ratelimit.MarkAsPolling(c.ctx), 15*time.Second)
 				defer cancel()
 				if wifi, err := c.svc.GetWiFiStatus(ctx, name); err == nil {
 					wifiMu.Lock()
@@ -962,7 +965,7 @@ func (c *Cache) FetchExtendedStatus(name string) tea.Cmd {
 
 		if !hasSys {
 			wg.Go(func() {
-				ctx, cancel := context.WithTimeout(c.ctx, 15*time.Second)
+				ctx, cancel := context.WithTimeout(ratelimit.MarkAsPolling(c.ctx), 15*time.Second)
 				defer cancel()
 				if sys, err := c.svc.GetSysStatus(ctx, name); err == nil {
 					sysMu.Lock()

@@ -101,18 +101,7 @@ func (m *Manager) WithConnection(ctx context.Context, identifier string, fn func
 	err = m.ExecuteGen2(ctx, dev, fn)
 
 	// Record success/failure for circuit breaker
-	// Only count actual connectivity failures, not expected API responses
-	if err != nil {
-		if ratelimit.IsConnectivityFailure(err) {
-			debug.TraceEvent("circuit: RecordFailure for %s (%s): %v", dev.Name, dev.Address, err)
-			m.rateLimiter.RecordFailure(dev.Address)
-		} else {
-			debug.TraceEvent("circuit: Ignoring non-connectivity error for %s (%s): %v", dev.Name, dev.Address, err)
-			m.rateLimiter.RecordSuccess(dev.Address)
-		}
-	} else {
-		m.rateLimiter.RecordSuccess(dev.Address)
-	}
+	m.recordCircuitResult(ctx, dev, err)
 
 	return err
 }
@@ -142,18 +131,7 @@ func (m *Manager) WithGen1Connection(ctx context.Context, identifier string, fn 
 	err = m.ExecuteGen1(ctx, dev, fn)
 
 	// Record success/failure for circuit breaker
-	// Only count actual connectivity failures, not expected API responses
-	if err != nil {
-		if ratelimit.IsConnectivityFailure(err) {
-			debug.TraceEvent("circuit: RecordFailure for Gen1 %s (%s): %v", dev.Name, dev.Address, err)
-			m.rateLimiter.RecordFailure(dev.Address)
-		} else {
-			debug.TraceEvent("circuit: Ignoring non-connectivity error for Gen1 %s (%s): %v", dev.Name, dev.Address, err)
-			m.rateLimiter.RecordSuccess(dev.Address)
-		}
-	} else {
-		m.rateLimiter.RecordSuccess(dev.Address)
-	}
+	m.recordCircuitResult(ctx, dev, err)
 
 	return err
 }
@@ -165,4 +143,30 @@ func (m *Manager) IsGen1Device(ctx context.Context, identifier string) (bool, mo
 		return false, model.Device{}, err
 	}
 	return dev.Generation == 1, dev, nil
+}
+
+// recordCircuitResult records success/failure for the circuit breaker.
+// Only counts actual connectivity failures, not expected API responses.
+// Skips failure recording for polling requests (BUG-015) - polling failures
+// shouldn't block user-initiated actions like toggles.
+func (m *Manager) recordCircuitResult(ctx context.Context, dev model.Device, err error) {
+	if err == nil {
+		m.rateLimiter.RecordSuccess(dev.Address)
+		return
+	}
+
+	if !ratelimit.IsConnectivityFailure(err) {
+		debug.TraceEvent("circuit: Ignoring non-connectivity error for %s (%s): %v", dev.Name, dev.Address, err)
+		m.rateLimiter.RecordSuccess(dev.Address)
+		return
+	}
+
+	// Connectivity failure - skip for polling, record for user actions
+	if ratelimit.IsPolling(ctx) {
+		debug.TraceEvent("circuit: Skipping RecordFailure for polling %s (%s): %v", dev.Name, dev.Address, err)
+		return
+	}
+
+	debug.TraceEvent("circuit: RecordFailure for %s (%s): %v", dev.Name, dev.Address, err)
+	m.rateLimiter.RecordFailure(dev.Address)
 }
