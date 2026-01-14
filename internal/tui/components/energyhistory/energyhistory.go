@@ -36,6 +36,7 @@ type Model struct {
 	cache          *cache.Cache
 	mu             *sync.RWMutex
 	history        map[string][]DataPoint // Device name -> history
+	hasInitialData map[string]bool        // Tracks devices that have initial data point
 	maxItems       int                    // Max data points per device
 	lastCollection time.Time              // Throttle data collection
 	styles         Styles
@@ -94,13 +95,14 @@ func DefaultStyles() Styles {
 // New creates a new energy history component.
 func New(c *cache.Cache) Model {
 	m := Model{
-		Sizable:  helpers.NewSizableLoaderOnly(),
-		cache:    c,
-		mu:       &sync.RWMutex{},
-		history:  make(map[string][]DataPoint),
-		maxItems: 60, // 5 minutes at 5-second intervals
-		styles:   DefaultStyles(),
-		loading:  true, // Start in loading state until first data point
+		Sizable:        helpers.NewSizableLoaderOnly(),
+		cache:          c,
+		mu:             &sync.RWMutex{},
+		history:        make(map[string][]DataPoint),
+		hasInitialData: make(map[string]bool),
+		maxItems:       60, // 5 minutes at 5-second intervals
+		styles:         DefaultStyles(),
+		loading:        true, // Start in loading state until first data point
 	}
 	m.Loader = m.Loader.SetMessage("Collecting energy history...")
 	return m
@@ -170,8 +172,20 @@ func (m *Model) handleDeviceUpdate() {
 
 // hasPMCapability checks if a device has power monitoring capability.
 func hasPMCapability(d *cache.DeviceData) bool {
-	// Check snapshot for actual PM components
+	// Check snapshot for dedicated PM/EM components
 	if d.Snapshot != nil && (len(d.Snapshot.PM) > 0 || len(d.Snapshot.EM) > 0 || len(d.Snapshot.EM1) > 0) {
+		return true
+	}
+
+	// Check for switch-integrated power monitoring (e.g., Plus 2PM)
+	// Devices like Plus 2PM have PM in the switch component (apower field),
+	// not dedicated PM components. SwitchPowers is populated when switches report power.
+	if len(d.SwitchPowers) > 0 {
+		return true
+	}
+
+	// Also check cover-integrated power monitoring
+	if len(d.CoverPowers) > 0 {
 		return true
 	}
 
@@ -184,10 +198,16 @@ func hasPMCapability(d *cache.DeviceData) bool {
 	return modelHasPM(model)
 }
 
-// modelHasPM checks if a device model code indicates power monitoring capability.
+// modelHasPM checks if a device model code or display name indicates power monitoring capability.
 func modelHasPM(model string) bool {
-	// Gen1 PM devices: SHSW-PM
+	// Gen1 PM devices: SHSW-PM (type code format)
 	if strings.Contains(model, "-PM") {
+		return true
+	}
+
+	// Display names like "Shelly Plus 1PM", "Shelly Plus 2PM", "Shelly 1PM Gen3"
+	// These have "PM" suffix or " PM" pattern (space before PM)
+	if strings.HasSuffix(model, "PM") || strings.Contains(model, " PM") {
 		return true
 	}
 
@@ -329,18 +349,39 @@ func (m *Model) View() string {
 
 // collectCurrentPower records power data from online devices with PM capability.
 // Called during View() to ensure data is always collected on each render.
-// Throttled to collect at most once every 5 seconds.
+// Throttled to collect at most once every 5 seconds, except for initial data capture
+// which happens immediately to prevent false ramp-up from 0.
 func (m *Model) collectCurrentPower(devices []*cache.DeviceData) {
-	// Throttle: only collect every 5 seconds
-	if time.Since(m.lastCollection) < 5*time.Second {
-		return
-	}
-	m.lastCollection = time.Now()
+	throttleActive := time.Since(m.lastCollection) < 5*time.Second
 
 	for _, d := range devices {
-		if d.Online && hasPMCapability(d) {
-			m.addDataPoint(d.Device.Name, d.Power)
+		if !d.Online || !hasPMCapability(d) {
+			continue
 		}
+
+		deviceName := d.Device.Name
+
+		// Check if this device needs initial data capture (bypass throttle)
+		m.mu.RLock()
+		hasInitial := m.hasInitialData[deviceName]
+		m.mu.RUnlock()
+
+		if !hasInitial {
+			// First data point for this device - capture immediately to prevent
+			// false ramp-up from 0 when device was already ON before TUI started
+			m.addDataPoint(deviceName, d.Power)
+			m.mu.Lock()
+			m.hasInitialData[deviceName] = true
+			m.mu.Unlock()
+		} else if !throttleActive {
+			// Subsequent data points respect the throttle
+			m.addDataPoint(deviceName, d.Power)
+		}
+	}
+
+	// Update throttle timestamp when not throttled
+	if !throttleActive {
+		m.lastCollection = time.Now()
 	}
 }
 
@@ -562,6 +603,7 @@ func (m *Model) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	clear(m.history)
+	clear(m.hasInitialData)
 }
 
 // DeviceCount returns the number of devices with history.
