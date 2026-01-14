@@ -16,15 +16,19 @@ shelly switch toggle <device> [flags]
   # Toggle switch
   shelly switch toggle <device>
 
-  # Toggle specific switch ID
+  # Toggle specific switch by ID
   shelly switch flip <device> --id 1
+
+  # Toggle switch by name
+  shelly switch toggle <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for toggle
-  -i, --id int   Switch component ID (default 0)
+  -h, --help          help for toggle
+  -i, --id int        Switch component ID (default 0)
+  -n, --name string   Switch name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

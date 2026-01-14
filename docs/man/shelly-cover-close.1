@@ -25,6 +25,10 @@ Close a cover/roller component on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	Cover component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	Cover name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -82,6 +86,9 @@ Close a cover/roller component on the specified device.
 
   # Close cover for 5 seconds
   shelly cover down bedroom --duration 5
+
+  # Close cover by name
+  shelly cover close bedroom --name "Living Room Blinds"
 .EE
 
 

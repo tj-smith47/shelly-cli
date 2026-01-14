@@ -16,15 +16,19 @@ shelly rgbw off <device> [flags]
   # Turn off rgbw
   shelly rgbw off <device>
 
-  # Turn off specific rgbw ID
+  # Turn off specific rgbw by ID
   shelly rgbw off <device> --id 1
+
+  # Turn off rgbw by name
+  shelly rgbw off <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for off
-  -i, --id int   RGBW component ID (default 0)
+  -h, --help          help for off
+  -i, --id int        RGBW component ID (default 0)
+  -n, --name string   RGBW name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

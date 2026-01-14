@@ -21,6 +21,10 @@ Turn off a rgb component on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	RGB component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	RGB name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -76,8 +80,11 @@ Turn off a rgb component on the specified device.
   # Turn off rgb
   shelly rgb off <device>
 
-  # Turn off specific rgb ID
+  # Turn off specific rgb by ID
   shelly rgb off <device> --id 1
+
+  # Turn off rgb by name
+  shelly rgb off <device> --name "Kitchen Light"
 .EE
 
 

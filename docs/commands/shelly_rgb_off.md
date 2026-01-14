@@ -16,15 +16,19 @@ shelly rgb off <device> [flags]
   # Turn off rgb
   shelly rgb off <device>
 
-  # Turn off specific rgb ID
+  # Turn off specific rgb by ID
   shelly rgb off <device> --id 1
+
+  # Turn off rgb by name
+  shelly rgb off <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for off
-  -i, --id int   RGB component ID (default 0)
+  -h, --help          help for off
+  -i, --id int        RGB component ID (default 0)
+  -n, --name string   RGB name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

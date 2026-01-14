@@ -16,15 +16,19 @@ shelly rgb toggle <device> [flags]
   # Toggle rgb
   shelly rgb toggle <device>
 
-  # Toggle specific rgb ID
+  # Toggle specific rgb by ID
   shelly rgb flip <device> --id 1
+
+  # Toggle rgb by name
+  shelly rgb toggle <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for toggle
-  -i, --id int   RGB component ID (default 0)
+  -h, --help          help for toggle
+  -i, --id int        RGB component ID (default 0)
+  -n, --name string   RGB name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

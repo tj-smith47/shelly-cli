@@ -19,6 +19,11 @@ type Device struct {
 	Type       string   `mapstructure:"type" json:"type,omitempty" yaml:"type,omitempty"`
 	Model      string   `mapstructure:"model" json:"model,omitempty" yaml:"model,omitempty"`
 	Auth       *Auth    `mapstructure:"auth,omitempty" json:"auth,omitempty" yaml:"auth,omitempty"`
+
+	// Components caches component names for offline reference.
+	// Map structure: component type ("switch", "light", etc.) -> map of ID -> name.
+	// Example: {"switch": {0: "Kitchen Light", 1: "Living Room"}}
+	Components map[string]map[int]string `mapstructure:"components,omitempty" json:"components,omitempty" yaml:"components,omitempty"`
 }
 
 // Auth holds device authentication credentials.

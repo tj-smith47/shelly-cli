@@ -16,15 +16,19 @@ shelly rgb on <device> [flags]
   # Turn on rgb
   shelly rgb on <device>
 
-  # Turn on specific rgb ID
+  # Turn on specific rgb by ID
   shelly rgb on <device> --id 1
+
+  # Turn on rgb by name
+  shelly rgb on <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for on
-  -i, --id int   RGB component ID (default 0)
+  -h, --help          help for on
+  -i, --id int        RGB component ID (default 0)
+  -n, --name string   RGB name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

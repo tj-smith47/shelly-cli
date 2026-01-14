@@ -21,6 +21,10 @@ Toggle a light component on or off on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	Light component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	Light name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -76,8 +80,11 @@ Toggle a light component on or off on the specified device.
   # Toggle light
   shelly light toggle <device>
 
-  # Toggle specific light ID
+  # Toggle specific light by ID
   shelly light flip <device> --id 1
+
+  # Toggle light by name
+  shelly light toggle <device> --name "Kitchen Light"
 .EE
 
 

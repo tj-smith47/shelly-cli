@@ -21,6 +21,10 @@ Toggle a switch component on or off on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	Switch component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	Switch name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -76,8 +80,11 @@ Toggle a switch component on or off on the specified device.
   # Toggle switch
   shelly switch toggle <device>
 
-  # Toggle specific switch ID
+  # Toggle specific switch by ID
   shelly switch flip <device> --id 1
+
+  # Toggle switch by name
+  shelly switch toggle <device> --name "Kitchen Light"
 .EE
 
 

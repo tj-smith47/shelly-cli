@@ -21,15 +21,19 @@ shelly cover stop <device> [flags]
   # Stop cover movement
   shelly cover stop bedroom
 
-  # Stop specific cover ID
+  # Stop specific cover by ID
   shelly cover halt bedroom --id 1
+
+  # Stop cover by name
+  shelly cover stop bedroom --name "Living Room Blinds"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for stop
-  -i, --id int   Cover component ID (default 0)
+  -h, --help          help for stop
+  -i, --id int        Cover component ID (default 0)
+  -n, --name string   Cover name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

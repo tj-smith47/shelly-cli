@@ -21,6 +21,10 @@ Turn on a rgbw component on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	RGBW component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	RGBW name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -76,8 +80,11 @@ Turn on a rgbw component on the specified device.
   # Turn on rgbw
   shelly rgbw on <device>
 
-  # Turn on specific rgbw ID
+  # Turn on specific rgbw by ID
   shelly rgbw on <device> --id 1
+
+  # Turn on rgbw by name
+  shelly rgbw on <device> --name "Kitchen Light"
 .EE
 
 

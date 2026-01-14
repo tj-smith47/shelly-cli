@@ -16,15 +16,19 @@ shelly rgbw on <device> [flags]
   # Turn on rgbw
   shelly rgbw on <device>
 
-  # Turn on specific rgbw ID
+  # Turn on specific rgbw by ID
   shelly rgbw on <device> --id 1
+
+  # Turn on rgbw by name
+  shelly rgbw on <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for on
-  -i, --id int   RGBW component ID (default 0)
+  -h, --help          help for on
+  -i, --id int        RGBW component ID (default 0)
+  -n, --name string   RGBW name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

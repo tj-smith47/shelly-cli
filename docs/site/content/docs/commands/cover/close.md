@@ -23,6 +23,9 @@ shelly cover close <device> [flags]
 
   # Close cover for 5 seconds
   shelly cover down bedroom --duration 5
+
+  # Close cover by name
+  shelly cover close bedroom --name "Living Room Blinds"
 ```
 
 ### Options
@@ -31,6 +34,7 @@ shelly cover close <device> [flags]
   -d, --duration int   Duration in seconds (0 = full close)
   -h, --help           help for close
   -i, --id int         Cover component ID (default 0)
+  -n, --name string    Cover name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

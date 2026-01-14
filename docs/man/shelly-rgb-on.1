@@ -21,6 +21,10 @@ Turn on a rgb component on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	RGB component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	RGB name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -76,8 +80,11 @@ Turn on a rgb component on the specified device.
   # Turn on rgb
   shelly rgb on <device>
 
-  # Turn on specific rgb ID
+  # Turn on specific rgb by ID
   shelly rgb on <device> --id 1
+
+  # Turn on rgb by name
+  shelly rgb on <device> --name "Kitchen Light"
 .EE
 
 

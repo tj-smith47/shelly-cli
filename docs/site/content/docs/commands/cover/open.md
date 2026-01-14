@@ -23,6 +23,9 @@ shelly cover open <device> [flags]
 
   # Open cover for 5 seconds
   shelly cover up bedroom --duration 5
+
+  # Open cover by name
+  shelly cover open bedroom --name "Living Room Blinds"
 ```
 
 ### Options
@@ -31,6 +34,7 @@ shelly cover open <device> [flags]
   -d, --duration int   Duration in seconds (0 = full open)
   -h, --help           help for open
   -i, --id int         Cover component ID (default 0)
+  -n, --name string    Cover name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

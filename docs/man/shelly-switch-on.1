@@ -21,6 +21,10 @@ Turn on a switch component on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	Switch component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	Switch name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -76,8 +80,11 @@ Turn on a switch component on the specified device.
   # Turn on switch
   shelly switch on <device>
 
-  # Turn on specific switch ID
+  # Turn on specific switch by ID
   shelly switch on <device> --id 1
+
+  # Turn on switch by name
+  shelly switch on <device> --name "Kitchen Light"
 .EE
 
 

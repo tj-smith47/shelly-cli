@@ -3,6 +3,7 @@ package factories
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/component"
 )
 
 // Action represents the type of component action.
@@ -48,7 +50,7 @@ type ComponentOpts struct {
 // NewComponentCommand creates a component on/off/toggle command.
 // This factory consolidates the common pattern across Light, RGB, Switch, etc.
 func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command {
-	var componentID int
+	var componentFlags flags.ComponentNameFlags
 
 	componentLower := strings.ToLower(opts.Component)
 	actionStr := string(opts.Action)
@@ -71,8 +73,11 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		examples = fmt.Sprintf(`  # Turn on %s
   shelly %s on <device>
 
-  # Turn on specific %s ID
-  shelly %s on <device> --id 1`, componentLower, componentLower, componentLower, componentLower)
+  # Turn on specific %s by ID
+  shelly %s on <device> --id 1
+
+  # Turn on %s by name
+  shelly %s on <device> --name "Kitchen Light"`, componentLower, componentLower, componentLower, componentLower, componentLower, componentLower)
 
 	case ActionOff:
 		use = "off <device>"
@@ -82,8 +87,11 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		examples = fmt.Sprintf(`  # Turn off %s
   shelly %s off <device>
 
-  # Turn off specific %s ID
-  shelly %s off <device> --id 1`, componentLower, componentLower, componentLower, componentLower)
+  # Turn off specific %s by ID
+  shelly %s off <device> --id 1
+
+  # Turn off %s by name
+  shelly %s off <device> --name "Kitchen Light"`, componentLower, componentLower, componentLower, componentLower, componentLower, componentLower)
 
 	case ActionToggle:
 		use = "toggle <device>"
@@ -93,8 +101,11 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		examples = fmt.Sprintf(`  # Toggle %s
   shelly %s toggle <device>
 
-  # Toggle specific %s ID
-  shelly %s flip <device> --id 1`, componentLower, componentLower, componentLower, componentLower)
+  # Toggle specific %s by ID
+  shelly %s flip <device> --id 1
+
+  # Toggle %s by name
+  shelly %s toggle <device> --name "Kitchen Light"`, componentLower, componentLower, componentLower, componentLower, componentLower, componentLower)
 	}
 
 	cmd := &cobra.Command{
@@ -106,16 +117,16 @@ func NewComponentCommand(f *cmdutil.Factory, opts ComponentOpts) *cobra.Command 
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runComponent(cmd.Context(), f, opts, args[0], componentID, actionStr)
+			return runComponent(cmd.Context(), f, opts, args[0], &componentFlags, actionStr)
 		},
 	}
 
-	flags.AddComponentIDFlag(cmd, &componentID, opts.Component)
+	flags.AddComponentNameFlags(cmd, &componentFlags, opts.Component)
 
 	return cmd
 }
 
-func runComponent(ctx context.Context, f *cmdutil.Factory, opts ComponentOpts, device string, componentID int, actionStr string) error {
+func runComponent(ctx context.Context, f *cmdutil.Factory, opts ComponentOpts, device string, compFlags *flags.ComponentNameFlags, actionStr string) error {
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
@@ -123,10 +134,26 @@ func runComponent(ctx context.Context, f *cmdutil.Factory, opts ComponentOpts, d
 	svc := f.ShellyService()
 	componentLower := strings.ToLower(opts.Component)
 
+	// Resolve component name to ID if provided
+	componentID := compFlags.ID
+	if compFlags.HasName() {
+		compType, ok := component.GetType(componentLower)
+		if !ok {
+			return fmt.Errorf("unknown component type: %s", componentLower)
+		}
+
+		configFetcher := makeConfigFetcher(svc)
+		resolvedID, err := component.ResolveIDWithGen(ctx, configFetcher, device, compType, compFlags.ID, compFlags.Name)
+		if err != nil {
+			return fmt.Errorf("failed to resolve %s name %q: %w", componentLower, compFlags.Name, err)
+		}
+		componentID = resolvedID
+	}
+
 	switch opts.Action {
 	case ActionOn, ActionOff:
 		spinnerMsg := fmt.Sprintf("Turning %s %s...", componentLower, actionStr)
-		successMsg := fmt.Sprintf("%s %d turned %s", opts.Component, componentID, actionStr)
+		successMsg := formatComponentSuccessMsg(opts.Component, componentID, compFlags.Name, actionStr)
 
 		return cmdutil.RunSimple(ctx, ios, svc, device, componentID, spinnerMsg, successMsg, opts.SimpleFunc)
 
@@ -143,13 +170,50 @@ func runComponent(ctx context.Context, f *cmdutil.Factory, opts ComponentOpts, d
 			if outputOn {
 				state = "on"
 			}
-			ios.Success("%s %d toggled %s", opts.Component, componentID, state)
+			ios.Success("%s toggled %s", formatComponentDisplayName(opts.Component, componentID, compFlags.Name), state)
 			return nil
 		})
 
 	default:
 		return fmt.Errorf("unknown action: %s", opts.Action)
 	}
+}
+
+// makeConfigFetcher creates a config fetcher function for component name resolution.
+func makeConfigFetcher(svc *shelly.Service) func(ctx context.Context, device string) (map[string]json.RawMessage, error) {
+	return func(ctx context.Context, device string) (map[string]json.RawMessage, error) {
+		cfg, err := svc.GetConfig(ctx, device)
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert map[string]any to map[string]json.RawMessage
+		result := make(map[string]json.RawMessage)
+		for k, v := range cfg {
+			raw, err := json.Marshal(v)
+			if err != nil {
+				continue
+			}
+			result[k] = raw
+		}
+		return result, nil
+	}
+}
+
+// formatComponentSuccessMsg formats the success message with name if provided.
+func formatComponentSuccessMsg(componentType string, id int, name, actionStr string) string {
+	if name != "" {
+		return fmt.Sprintf("%s %q turned %s", componentType, name, actionStr)
+	}
+	return fmt.Sprintf("%s %d turned %s", componentType, id, actionStr)
+}
+
+// formatComponentDisplayName formats a component display name with name or ID.
+func formatComponentDisplayName(componentType string, id int, name string) string {
+	if name != "" {
+		return fmt.Sprintf("%s %q", componentType, name)
+	}
+	return fmt.Sprintf("%s %d", componentType, id)
 }
 
 // ListOpts configures a component list command.

@@ -16,15 +16,19 @@ shelly switch off <device> [flags]
   # Turn off switch
   shelly switch off <device>
 
-  # Turn off specific switch ID
+  # Turn off specific switch by ID
   shelly switch off <device> --id 1
+
+  # Turn off switch by name
+  shelly switch off <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for off
-  -i, --id int   Switch component ID (default 0)
+  -h, --help          help for off
+  -i, --id int        Switch component ID (default 0)
+  -n, --name string   Switch name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

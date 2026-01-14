@@ -21,15 +21,19 @@ shelly light off <device> [flags]
   # Turn off light
   shelly light off <device>
 
-  # Turn off specific light ID
+  # Turn off specific light by ID
   shelly light off <device> --id 1
+
+  # Turn off light by name
+  shelly light off <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for off
-  -i, --id int   Light component ID (default 0)
+  -h, --help          help for off
+  -i, --id int        Light component ID (default 0)
+  -n, --name string   Light name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

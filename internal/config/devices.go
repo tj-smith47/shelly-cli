@@ -619,3 +619,100 @@ func (m *Manager) GetAllDeviceCredentials() map[string]struct{ Username, Passwor
 	}
 	return creds
 }
+
+// UpdateDeviceComponents updates the cached component names for a device.
+// The components map structure is: component type ("switch", "light", etc.) -> map of ID -> name.
+func UpdateDeviceComponents(deviceName string, components map[string]map[int]string) error {
+	return getDefaultManager().UpdateDeviceComponents(deviceName, components)
+}
+
+// UpdateDeviceComponents updates the cached component names for a device.
+// The components map structure is: component type ("switch", "light", etc.) -> map of ID -> name.
+// Example: {"switch": {0: "Kitchen Light", 1: "Living Room"}}.
+func (m *Manager) UpdateDeviceComponents(deviceName string, components map[string]map[int]string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Find the device (try exact match first, then normalized)
+	key := deviceName
+	dev, ok := m.config.Devices[key]
+	if !ok {
+		key = NormalizeDeviceName(deviceName)
+		dev, ok = m.config.Devices[key]
+		if !ok {
+			return fmt.Errorf("device %q not found", deviceName)
+		}
+	}
+
+	// Check if components changed to avoid unnecessary disk writes
+	if componentsEqual(dev.Components, components) {
+		return nil
+	}
+
+	// Deep copy the components map
+	dev.Components = make(map[string]map[int]string)
+	for typeKey, idMap := range components {
+		dev.Components[typeKey] = make(map[int]string)
+		for id, name := range idMap {
+			dev.Components[typeKey][id] = name
+		}
+	}
+
+	m.config.Devices[key] = dev
+	return m.saveWithoutLock()
+}
+
+// componentsEqual compares two component name maps for equality.
+func componentsEqual(a, b map[string]map[int]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for typeKey, aIDMap := range a {
+		bIDMap, ok := b[typeKey]
+		if !ok || len(aIDMap) != len(bIDMap) {
+			return false
+		}
+		for id, name := range aIDMap {
+			if bIDMap[id] != name {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// GetDeviceComponents returns the cached component names for a device.
+// Returns nil if no components are cached.
+func GetDeviceComponents(deviceName string) map[string]map[int]string {
+	return getDefaultManager().GetDeviceComponents(deviceName)
+}
+
+// GetDeviceComponents returns the cached component names for a device.
+// Returns nil if no components are cached.
+func (m *Manager) GetDeviceComponents(deviceName string) map[string]map[int]string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Find the device
+	dev, ok := m.config.Devices[deviceName]
+	if !ok {
+		dev, ok = m.config.Devices[NormalizeDeviceName(deviceName)]
+		if !ok {
+			return nil
+		}
+	}
+
+	if dev.Components == nil {
+		return nil
+	}
+
+	// Deep copy to prevent mutation
+	result := make(map[string]map[int]string)
+	for typeKey, idMap := range dev.Components {
+		result[typeKey] = make(map[int]string)
+		for id, name := range idMap {
+			result[typeKey][id] = name
+		}
+	}
+	return result
+}

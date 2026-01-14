@@ -11,6 +11,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil/flags"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/shelly/component"
 )
 
 // CoverAction represents a cover operation type.
@@ -39,8 +40,8 @@ type CoverOpts struct {
 // NewCoverCommand creates a cover open/close/stop command.
 func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
 	var (
-		coverID  int
-		duration int
+		coverFlags flags.ComponentNameFlags
+		duration   int
 	)
 
 	actionStr := string(opts.Action)
@@ -65,7 +66,10 @@ func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
   shelly cover open bedroom
 
   # Open cover for 5 seconds
-  shelly cover up bedroom --duration 5`
+  shelly cover up bedroom --duration 5
+
+  # Open cover by name
+  shelly cover open bedroom --name "Living Room Blinds"`
 
 	case CoverActionClose:
 		use = "close <device>"
@@ -76,7 +80,10 @@ func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
   shelly cover close bedroom
 
   # Close cover for 5 seconds
-  shelly cover down bedroom --duration 5`
+  shelly cover down bedroom --duration 5
+
+  # Close cover by name
+  shelly cover close bedroom --name "Living Room Blinds"`
 
 	case CoverActionStop:
 		use = "stop <device>"
@@ -86,8 +93,11 @@ func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
 		examples = `  # Stop cover movement
   shelly cover stop bedroom
 
-  # Stop specific cover ID
-  shelly cover halt bedroom --id 1`
+  # Stop specific cover by ID
+  shelly cover halt bedroom --id 1
+
+  # Stop cover by name
+  shelly cover stop bedroom --name "Living Room Blinds"`
 	}
 
 	cmd := &cobra.Command{
@@ -99,11 +109,11 @@ func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: completion.DeviceNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCover(cmd.Context(), f, opts, args[0], coverID, duration, hasDuration)
+			return runCover(cmd.Context(), f, opts, args[0], &coverFlags, duration, hasDuration)
 		},
 	}
 
-	flags.AddComponentIDFlag(cmd, &coverID, "Cover")
+	flags.AddComponentNameFlags(cmd, &coverFlags, "Cover")
 	if hasDuration {
 		cmd.Flags().IntVarP(&duration, "duration", "d", 0, fmt.Sprintf("Duration in seconds (0 = full %s)", actionStr))
 	}
@@ -111,12 +121,23 @@ func NewCoverCommand(f *cmdutil.Factory, opts CoverOpts) *cobra.Command {
 	return cmd
 }
 
-func runCover(ctx context.Context, f *cmdutil.Factory, opts CoverOpts, device string, coverID, duration int, hasDuration bool) error {
+func runCover(ctx context.Context, f *cmdutil.Factory, opts CoverOpts, device string, coverFlags *flags.ComponentNameFlags, duration int, hasDuration bool) error {
 	ctx, cancel := f.WithDefaultTimeout(ctx)
 	defer cancel()
 
 	ios := f.IOStreams()
 	svc := f.ShellyService()
+
+	// Resolve cover name to ID if provided
+	coverID := coverFlags.ID
+	if coverFlags.HasName() {
+		configFetcher := makeConfigFetcher(svc)
+		resolvedID, err := component.ResolveIDWithGen(ctx, configFetcher, device, component.TypeCover, coverFlags.ID, coverFlags.Name)
+		if err != nil {
+			return fmt.Errorf("failed to resolve cover name %q: %w", coverFlags.Name, err)
+		}
+		coverID = resolvedID
+	}
 
 	actionStr := string(opts.Action)
 	var spinnerMsg string
@@ -139,11 +160,12 @@ func runCover(ctx context.Context, f *cmdutil.Factory, opts CoverOpts, device st
 			return fmt.Errorf("failed to %s cover: %w", actionStr, err)
 		}
 
+		coverDisplayName := formatComponentDisplayName("Cover", coverID, coverFlags.Name)
 		switch opts.Action {
 		case CoverActionStop:
-			ios.Success("Cover %d stopped", coverID)
+			ios.Success("%s stopped", coverDisplayName)
 		default:
-			ios.Success("Cover %d %sing", coverID, actionStr)
+			ios.Success("%s %sing", coverDisplayName, actionStr)
 		}
 		return nil
 	})

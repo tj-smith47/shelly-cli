@@ -16,15 +16,19 @@ shelly rgbw toggle <device> [flags]
   # Toggle rgbw
   shelly rgbw toggle <device>
 
-  # Toggle specific rgbw ID
+  # Toggle specific rgbw by ID
   shelly rgbw flip <device> --id 1
+
+  # Toggle rgbw by name
+  shelly rgbw toggle <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for toggle
-  -i, --id int   RGBW component ID (default 0)
+  -h, --help          help for toggle
+  -i, --id int        RGBW component ID (default 0)
+  -n, --name string   RGBW name (alternative to --id)
 ```
 
 ### Options inherited from parent commands

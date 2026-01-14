@@ -21,6 +21,10 @@ Toggle a rgbw component on or off on the specified device.
 \fB-i\fP, \fB--id\fP=0
 	RGBW component ID (default 0)
 
+.PP
+\fB-n\fP, \fB--name\fP=""
+	RGBW name (alternative to --id)
+
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 \fB--config\fP=""
@@ -76,8 +80,11 @@ Toggle a rgbw component on or off on the specified device.
   # Toggle rgbw
   shelly rgbw toggle <device>
 
-  # Toggle specific rgbw ID
+  # Toggle specific rgbw by ID
   shelly rgbw flip <device> --id 1
+
+  # Toggle rgbw by name
+  shelly rgbw toggle <device> --name "Kitchen Light"
 .EE
 
 

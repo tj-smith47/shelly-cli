@@ -16,15 +16,19 @@ shelly light on <device> [flags]
   # Turn on light
   shelly light on <device>
 
-  # Turn on specific light ID
+  # Turn on specific light by ID
   shelly light on <device> --id 1
+
+  # Turn on light by name
+  shelly light on <device> --name "Kitchen Light"
 ```
 
 ### Options
 
 ```
-  -h, --help     help for on
-  -i, --id int   Light component ID (default 0)
+  -h, --help          help for on
+  -i, --id int        Light component ID (default 0)
+  -n, --name string   Light name (alternative to --id)
 ```
 
 ### Options inherited from parent commands
