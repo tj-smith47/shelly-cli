@@ -132,9 +132,31 @@ func (es *EventStream) connectDevice(name, address string) {
 		transport.WithPingInterval(30*time.Second),
 	)
 
+	// Pre-register connection so state callback can find it
+	es.mu.Lock()
+	es.connections[name] = &deviceConnection{
+		name:       name,
+		address:    address,
+		ws:         ws,
+		cancel:     cancel,
+		generation: resolvedDevice.Generation,
+		online:     false, // Will be set true on successful connect
+	}
+	es.mu.Unlock()
+
+	// Register state change callback to handle reconnection events
+	// This ensures DeviceOnlineEvent is published on both initial connect AND reconnections
+	ws.OnStateChange(func(state transport.ConnectionState) {
+		es.handleWebSocketStateChange(name, address, state)
+	})
+
 	if err := ws.Connect(ctx); err != nil {
 		iostreams.DebugErrCat(iostreams.CategoryNetwork, fmt.Sprintf("connect websocket %s", name), err)
 		es.bus.Publish(events.NewDeviceOfflineEvent(name).WithReason(err.Error()))
+		// Clean up pre-registered connection
+		es.mu.Lock()
+		delete(es.connections, name)
+		es.mu.Unlock()
 		cancel()
 		return
 	}
@@ -164,6 +186,10 @@ func (es *EventStream) connectDevice(name, address string) {
 	if err := ws.Subscribe(notifyHandler); err != nil {
 		iostreams.DebugErrCat(iostreams.CategoryNetwork, fmt.Sprintf("subscribe %s", name), err)
 		closeWS(ws)
+		// Clean up pre-registered connection
+		es.mu.Lock()
+		delete(es.connections, name)
+		es.mu.Unlock()
 		cancel()
 		return
 	}
@@ -186,21 +212,67 @@ func (es *EventStream) connectDevice(name, address string) {
 		}
 	}
 
-	// Store connection
-	es.mu.Lock()
-	es.connections[name] = &deviceConnection{
-		name:       name,
-		address:    address,
-		ws:         ws,
-		cancel:     cancel,
-		generation: resolvedDevice.Generation,
+	// Connection was pre-registered before Connect() to enable state callback
+	// DeviceOnlineEvent is published by handleWebSocketStateChange on StateConnected
+	iostreams.DebugCat(iostreams.CategoryNetwork, "WebSocket connected for %s, waiting for state callback", name)
+}
+
+// handleWebSocketStateChange handles WebSocket connection state changes.
+// This ensures DeviceOnlineEvent is published on both initial connect AND reconnections,
+// and DeviceOfflineEvent is published when the connection is lost.
+func (es *EventStream) handleWebSocketStateChange(name, address string, state transport.ConnectionState) {
+	debug.TraceEvent("ws: %s state changed to %s", name, state)
+
+	switch state {
+	case transport.StateConnected:
+		es.mu.Lock()
+		conn := es.connections[name]
+		if conn == nil {
+			// Connection was removed (e.g., during cleanup)
+			es.mu.Unlock()
+			return
+		}
+		wasOnline := conn.online
+		conn.online = true
+		es.mu.Unlock()
+
+		// Publish online event for both initial connection and reconnection
+		es.bus.Publish(events.NewDeviceOnlineEvent(name).WithAddress(address))
+		if wasOnline {
+			// This is a reconnection
+			iostreams.DebugCat(iostreams.CategoryNetwork, "Reconnected to %s via WebSocket", name)
+		} else {
+			// Initial connection
+			iostreams.DebugCat(iostreams.CategoryNetwork, "Connected to %s via WebSocket", name)
+		}
+
+	case transport.StateDisconnected:
+		es.mu.Lock()
+		conn := es.connections[name]
+		if conn == nil {
+			es.mu.Unlock()
+			return
+		}
+		wasOnline := conn.online
+		conn.online = false
+		es.mu.Unlock()
+
+		// Only publish offline event if device was previously online
+		// This avoids spurious offline events during initial connection failures
+		if wasOnline {
+			es.bus.Publish(events.NewDeviceOfflineEvent(name).WithReason("websocket disconnected"))
+			iostreams.DebugCat(iostreams.CategoryNetwork, "Disconnected from %s", name)
+		}
+
+	case transport.StateReconnecting:
+		debug.TraceEvent("ws: %s attempting reconnection", name)
+
+	case transport.StateConnecting:
+		debug.TraceEvent("ws: %s connecting", name)
+
+	case transport.StateClosed:
+		debug.TraceEvent("ws: %s closed", name)
 	}
-	es.mu.Unlock()
-
-	// Publish online event
-	es.bus.Publish(events.NewDeviceOnlineEvent(name).WithAddress(address))
-
-	iostreams.DebugCat(iostreams.CategoryNetwork, "Connected to %s via WebSocket", name)
 }
 
 // pollGen1Device polls a Gen1 device for status updates.
