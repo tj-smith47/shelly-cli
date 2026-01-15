@@ -382,3 +382,34 @@ func TestNewStyled_WithHiddenHeaders(t *testing.T) {
 		t.Error("expected hideHeaders to be true")
 	}
 }
+
+func TestTable_TrailingNewline(t *testing.T) {
+	t.Parallel()
+
+	t.Run("styled table ends with newline", func(t *testing.T) {
+		t.Parallel()
+		tbl := New("Name", "Value")
+		tbl.AddRow("test", "123")
+		output := tbl.Render()
+		if output == "" {
+			t.Fatal("expected non-empty output")
+		}
+		if output[len(output)-1] != '\n' {
+			t.Errorf("styled table output should end with newline, got %q at end", output[len(output)-1])
+		}
+	})
+
+	t.Run("plain table ends with newline", func(t *testing.T) {
+		t.Parallel()
+		tbl := New("Name", "Value")
+		tbl.SetStyle(PlainStyle())
+		tbl.AddRow("test", "123")
+		output := tbl.Render()
+		if output == "" {
+			t.Fatal("expected non-empty output")
+		}
+		if output[len(output)-1] != '\n' {
+			t.Errorf("plain table output should end with newline, got %q at end", output[len(output)-1])
+		}
+	})
+}

@@ -139,7 +139,12 @@ func (t *Table) Render() string {
 
 	tbl = tbl.Rows(t.rows...)
 
-	return tbl.Render()
+	// Ensure output ends with newline (lipgloss doesn't add one)
+	rendered := tbl.Render()
+	if rendered != "" && rendered[len(rendered)-1] != '\n' {
+		rendered += "\n"
+	}
+	return rendered
 }
 
 // prepareHeaders returns headers, uppercased if configured.
