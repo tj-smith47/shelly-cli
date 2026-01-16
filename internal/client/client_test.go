@@ -2674,6 +2674,121 @@ func TestClient_ListComponents_Success(t *testing.T) {
 	}
 }
 
+func TestClient_ListComponents_Pagination(t *testing.T) {
+	t.Parallel()
+
+	// Track which offsets were requested
+	var requestedOffsets []int
+
+	mock := newMockRPCServer().
+		handle("Shelly.GetDeviceInfo", func(_ map[string]any) (any, error) {
+			return standardDeviceInfo(), nil
+		}).
+		handle("Shelly.GetComponents", func(params map[string]any) (any, error) {
+			offset := 0
+			if off, ok := params["offset"].(float64); ok {
+				offset = int(off)
+			}
+			requestedOffsets = append(requestedOffsets, offset)
+			return paginatedComponents(offset), nil
+		})
+
+	server := mock.start(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	device := model.Device{Address: server.URL}
+	client, err := Connect(ctx, device)
+	if err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() {
+		if cerr := client.Close(); cerr != nil {
+			t.Logf("warning: close error: %v", cerr)
+		}
+	}()
+
+	comps, err := client.ListComponents(ctx)
+	if err != nil {
+		t.Fatalf("ListComponents() error = %v", err)
+	}
+
+	// Should have fetched all 12 components via 2 requests
+	if len(comps) != 12 {
+		t.Errorf("len(comps) = %d, want 12", len(comps))
+	}
+
+	// Verify pagination requests
+	verifyPaginationOffsets(t, requestedOffsets)
+
+	// Verify component type counts
+	verifyComponentTypeCounts(t, comps)
+}
+
+// paginatedComponents returns a page of components for pagination testing.
+func paginatedComponents(offset int) map[string]any {
+	allComps := []string{
+		"switch:0", "switch:1", "input:0", "input:1",
+		"cover:0", "light:0", "rgb:0", "rgbw:0",
+		"switch:2", "switch:3", "input:2", "input:3",
+	}
+	total := len(allComps)
+	pageSize := 8
+
+	end := offset + pageSize
+	if end > total {
+		end = total
+	}
+
+	var comps []any
+	for i := offset; i < end; i++ {
+		comps = append(comps, map[string]any{"key": allComps[i]})
+	}
+
+	return map[string]any{
+		"components": comps,
+		"offset":     offset,
+		"total":      total,
+	}
+}
+
+// verifyPaginationOffsets checks that pagination made the expected requests.
+func verifyPaginationOffsets(t *testing.T, offsets []int) {
+	t.Helper()
+	if len(offsets) != 2 {
+		t.Errorf("number of requests = %d, want 2", len(offsets))
+		return
+	}
+	if offsets[0] != 0 {
+		t.Errorf("first offset = %d, want 0", offsets[0])
+	}
+	if offsets[1] != 8 {
+		t.Errorf("second offset = %d, want 8", offsets[1])
+	}
+}
+
+// verifyComponentTypeCounts checks component type distribution.
+func verifyComponentTypeCounts(t *testing.T, comps []model.Component) {
+	t.Helper()
+	switchCount := 0
+	inputCount := 0
+	for _, c := range comps {
+		if c.Type == model.ComponentSwitch {
+			switchCount++
+		}
+		if c.Type == model.ComponentInput {
+			inputCount++
+		}
+	}
+	if switchCount != 4 {
+		t.Errorf("switch count = %d, want 4", switchCount)
+	}
+	if inputCount != 4 {
+		t.Errorf("input count = %d, want 4", inputCount)
+	}
+}
+
 func TestClient_FilterComponents_Success(t *testing.T) {
 	t.Parallel()
 

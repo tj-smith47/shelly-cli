@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
 
@@ -110,7 +111,7 @@ func run(ctx context.Context, opts *Options) error {
 
 		ios.Printf("Device: %s\n", opts.Device)
 		ios.Printf("ID: %s\n", result.ID)
-		ios.Printf("MAC: %s\n", result.MAC)
+		ios.Printf("MAC: %s\n", model.NormalizeMAC(result.MAC))
 
 		if result.Auth {
 			ios.Info("Authentication is enabled on this device")

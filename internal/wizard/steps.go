@@ -92,7 +92,11 @@ func runCloudStep(ctx context.Context, ios *iostreams.IOStreams, opts *Options) 
 		err = stepCloud(ctx, ios)
 	}
 	if err != nil {
-		ios.Warning("Cloud setup failed: %v", err)
+		msg, hint := formatCloudError(err)
+		ios.Warning("%s", msg)
+		if hint != "" {
+			ios.Info("%s", hint)
+		}
 	}
 }
 

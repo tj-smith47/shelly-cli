@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
@@ -83,7 +84,7 @@ func run(_ context.Context, opts *Options) error {
 	ios.Success("Created mock device: %s", opts.Name)
 	ios.Printf("  Model: %s\n", opts.Model)
 	ios.Printf("  Firmware: %s\n", opts.Firmware)
-	ios.Printf("  MAC: %s\n", dev.MAC)
+	ios.Printf("  MAC: %s\n", model.NormalizeMAC(dev.MAC))
 	ios.Println("")
 	ios.Info("Add to config with: shelly config device add %s --address mock://%s", opts.Name, opts.Name)
 

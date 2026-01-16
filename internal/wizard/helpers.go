@@ -1,12 +1,14 @@
 package wizard
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/afero"
+	"github.com/tj-smith47/shelly-go/cloud"
 
 	"github.com/tj-smith47/shelly-cli/internal/completion"
 	"github.com/tj-smith47/shelly-cli/internal/config"
@@ -136,4 +138,143 @@ func ValidateConfig(cfg *config.Config) error {
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+// formatCloudError translates cloud errors into user-friendly messages.
+// Returns (message, hint) where hint may be empty.
+func formatCloudError(err error) (message, hint string) {
+	if err == nil {
+		return "", ""
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	if isInvalidCredentialsError(err, errStr) {
+		return "Cloud login failed: invalid email or password",
+			"Double-check your Shelly Cloud credentials at my.shelly.cloud"
+	}
+
+	if isRateLimitError(err, errStr) {
+		return "Cloud login failed: rate limited",
+			"Wait a few minutes before trying again"
+	}
+
+	if isNetworkError(errStr) {
+		return "Cloud login failed: cannot reach Shelly Cloud",
+			"Check your internet connection"
+	}
+
+	if isTimeoutError(errStr) {
+		return "Cloud login failed: request timed out",
+			"Check your internet connection and try again"
+	}
+
+	if isServerError(errStr) {
+		return "Cloud login failed: Shelly Cloud server error",
+			"The server may be temporarily unavailable"
+	}
+
+	// Fallback: show the error but clean it up
+	return "Cloud setup failed: " + cleanErrorMessage(err),
+		"You can set up cloud access later with: shelly cloud login"
+}
+
+func isInvalidCredentialsError(err error, errStr string) bool {
+	return errors.Is(err, cloud.ErrInvalidCredentials) ||
+		strings.Contains(errStr, "invalid credentials") ||
+		strings.Contains(errStr, "invalid email") ||
+		strings.Contains(errStr, "wrong password")
+}
+
+func isRateLimitError(err error, errStr string) bool {
+	return errors.Is(err, cloud.ErrRateLimited) ||
+		strings.Contains(errStr, "rate limit") ||
+		strings.Contains(errStr, "too many requests")
+}
+
+func isNetworkError(errStr string) bool {
+	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "no such host") ||
+		strings.Contains(errStr, "network unreachable") ||
+		strings.Contains(errStr, "dial tcp")
+}
+
+func isTimeoutError(errStr string) bool {
+	return strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "deadline exceeded")
+}
+
+func isServerError(errStr string) bool {
+	return strings.Contains(errStr, "500") ||
+		strings.Contains(errStr, "503") ||
+		strings.Contains(errStr, "server error")
+}
+
+// cleanErrorMessage removes technical prefixes from error messages.
+func cleanErrorMessage(err error) string {
+	msg := err.Error()
+	// Remove common prefixes that aren't useful to end users
+	prefixes := []string{
+		"authentication failed: ",
+		"failed to parse response: ",
+		"json: ",
+	}
+	for _, prefix := range prefixes {
+		msg = strings.TrimPrefix(msg, prefix)
+	}
+	return msg
+}
+
+// FormatDeviceError translates device connectivity errors into user-friendly messages.
+// Returns (message, hint) where hint may be empty.
+func FormatDeviceError(err error, deviceName string) (message, hint string) {
+	if err == nil {
+		return "", ""
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	if isDeviceTimeoutError(errStr) {
+		return fmt.Sprintf("Device %q is not responding", deviceName),
+			"Ensure the device is powered on and connected to your network"
+	}
+
+	if isDeviceNetworkError(errStr) {
+		return fmt.Sprintf("Cannot reach device %q", deviceName),
+			"Check that the device address is correct and you're on the same network"
+	}
+
+	if isDeviceAuthError(errStr) {
+		return fmt.Sprintf("Authentication failed for %q", deviceName),
+			"Check device credentials with: shelly device auth <device>"
+	}
+
+	// Fallback: show clean error
+	return fmt.Sprintf("Error connecting to %q: %s", deviceName, cleanErrorMessage(err)),
+		"Try: shelly device ping " + deviceName
+}
+
+func isDeviceTimeoutError(errStr string) bool {
+	return strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "deadline exceeded") ||
+		strings.Contains(errStr, "timed out") ||
+		strings.Contains(errStr, "i/o timeout")
+}
+
+func isDeviceNetworkError(errStr string) bool {
+	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "no route to host") ||
+		strings.Contains(errStr, "network unreachable") ||
+		strings.Contains(errStr, "host unreachable") ||
+		strings.Contains(errStr, "no such host") ||
+		strings.Contains(errStr, "dial tcp")
+}
+
+func isDeviceAuthError(errStr string) bool {
+	return strings.Contains(errStr, "401") ||
+		strings.Contains(errStr, "403") ||
+		strings.Contains(errStr, "unauthorized") ||
+		strings.Contains(errStr, "authentication") ||
+		strings.Contains(errStr, "invalid password") ||
+		strings.Contains(errStr, "access denied")
 }

@@ -217,40 +217,22 @@ func TestNewCommand_MaximumOneArg(t *testing.T) {
 	}
 }
 
-// TestTermQuickDeviceInfo verifies the term types used by status command.
-func TestTermQuickDeviceInfo(t *testing.T) {
-	t.Parallel()
-
-	info := &term.QuickDeviceInfo{
-		Model:      "SHSW-1",
-		Generation: 2,
-		Firmware:   "1.0.0",
-	}
-
-	if info.Model != "SHSW-1" {
-		t.Errorf("Model = %q, want %q", info.Model, "SHSW-1")
-	}
-
-	if info.Generation != 2 {
-		t.Errorf("Generation = %d, want %d", info.Generation, 2)
-	}
-
-	if info.Firmware != "1.0.0" {
-		t.Errorf("Firmware = %q, want %q", info.Firmware, "1.0.0")
-	}
-}
-
 // TestTermComponentState verifies the component state type.
 func TestTermComponentState(t *testing.T) {
 	t.Parallel()
 
 	state := term.ComponentState{
-		Name:  "Switch 0",
+		Type:  "Switch 0",
+		Name:  "Kitchen",
 		State: "on",
 	}
 
-	if state.Name != "Switch 0" {
-		t.Errorf("Name = %q, want %q", state.Name, "Switch 0")
+	if state.Type != "Switch 0" {
+		t.Errorf("Type = %q, want %q", state.Type, "Switch 0")
+	}
+
+	if state.Name != "Kitchen" {
+		t.Errorf("Name = %q, want %q", state.Name, "Kitchen")
 	}
 
 	if state.State != "on" {
@@ -288,18 +270,12 @@ func TestTermDisplayQuickDeviceStatus(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 
-	info := &term.QuickDeviceInfo{
-		Model:      "SHSW-1",
-		Generation: 2,
-		Firmware:   "1.0.0",
-	}
-
 	states := []term.ComponentState{
-		{Name: "Switch 0", State: "on"},
+		{Type: "Switch 0", Name: "Kitchen", State: "on"},
 	}
 
 	// Should not panic
-	term.DisplayQuickDeviceStatus(ios, "living-room", info, states)
+	term.DisplayQuickDeviceStatus(ios, states)
 
 	// Verify some output was produced
 	if stdout.Len() == 0 {
@@ -314,14 +290,8 @@ func TestTermDisplayQuickDeviceStatus_EmptyStates(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	ios := iostreams.Test(nil, &stdout, &stderr)
 
-	info := &term.QuickDeviceInfo{
-		Model:      "SHSW-1",
-		Generation: 2,
-		Firmware:   "1.0.0",
-	}
-
 	// Should not panic with empty states
-	term.DisplayQuickDeviceStatus(ios, "living-room", info, []term.ComponentState{})
+	term.DisplayQuickDeviceStatus(ios, []term.ComponentState{})
 
 	// Verify some output was produced
 	if stdout.Len() == 0 {

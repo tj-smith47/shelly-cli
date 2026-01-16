@@ -147,27 +147,16 @@ func TestDisplayQuickDeviceStatus(t *testing.T) {
 	t.Run("with components", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		info := &QuickDeviceInfo{
-			Model:      "Shelly Pro 1PM",
-			Generation: 2,
-			Firmware:   "1.0.0",
-		}
 		states := []ComponentState{
-			{Name: "switch:0", State: "ON"},
-			{Name: "input:0", State: "inactive"},
+			{Type: "Switch 0", Name: "Main", State: "ON"},
+			{Type: "Input 0", Name: "", State: "inactive"},
 		}
 
-		DisplayQuickDeviceStatus(ios, "device1", info, states)
+		DisplayQuickDeviceStatus(ios, states)
 
 		output := out.String()
-		if !strings.Contains(output, "device1") {
-			t.Error("output should contain device name")
-		}
-		if !strings.Contains(output, "Shelly Pro 1PM") {
-			t.Error("output should contain model")
-		}
-		if !strings.Contains(output, "switch:0") {
-			t.Error("output should contain component name")
+		if !strings.Contains(output, "Switch 0") {
+			t.Error("output should contain component type")
 		}
 		if !strings.Contains(output, "ON") {
 			t.Error("output should contain component state")
@@ -177,13 +166,8 @@ func TestDisplayQuickDeviceStatus(t *testing.T) {
 	t.Run("no components", func(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
-		info := &QuickDeviceInfo{
-			Model:      "Shelly Button",
-			Generation: 2,
-			Firmware:   "1.0.0",
-		}
 
-		DisplayQuickDeviceStatus(ios, "button1", info, []ComponentState{})
+		DisplayQuickDeviceStatus(ios, []ComponentState{})
 
 		output := out.String()
 		if !strings.Contains(output, "No controllable components") {

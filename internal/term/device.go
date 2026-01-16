@@ -206,7 +206,7 @@ func DisplayDeviceInfo(ios *iostreams.IOStreams, info *shelly.DeviceInfo) {
 	builder := table.NewBuilder("Property", "Value")
 
 	builder.AddRow("ID", info.ID)
-	builder.AddRow("MAC", info.MAC)
+	builder.AddRow("MAC", model.NormalizeMAC(info.MAC))
 	builder.AddRow("Model", info.Model)
 	builder.AddRow("Generation", output.RenderGeneration(info.Generation))
 	builder.AddRow("Firmware", info.Firmware)

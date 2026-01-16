@@ -10,6 +10,8 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/completion"
+	"github.com/tj-smith47/shelly-cli/internal/model"
+	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
 )
 
 // Options holds command options.
@@ -81,7 +83,7 @@ func run(ctx context.Context, opts *Options) error {
 		cancel()
 
 		if err != nil {
-			ios.Printf("Request %d: timeout or error - %v\n", i+1, err)
+			ios.Warning("Request %d: %s", i+1, tuierrors.FormatErrorMsg(err))
 		} else {
 			successCount++
 			totalTime += elapsed
@@ -91,7 +93,7 @@ func run(ctx context.Context, opts *Options) error {
 				ios.Info("  Model: %s (Gen%d)", info.Model, info.Generation)
 				ios.Info("  App: %s", info.App)
 				ios.Info("  Firmware: %s", info.Firmware)
-				ios.Info("  MAC: %s", info.MAC)
+				ios.Info("  MAC: %s", model.NormalizeMAC(info.MAC))
 			} else {
 				// Multiple pings - show sequence number
 				ios.Success("Reply from %s: seq=%d time=%v", opts.Device, i+1, elapsed.Round(time.Millisecond))
@@ -117,6 +119,9 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	if successCount == 0 {
+		ios.Println("")
+		ios.Error("Device %q is not responding", opts.Device)
+		ios.Info("Ensure the device is powered on and connected to your network")
 		return fmt.Errorf("device %s is unreachable", opts.Device)
 	}
 

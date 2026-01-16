@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
@@ -605,7 +606,7 @@ func (m Model) renderDeviceInfo(content *strings.Builder, d *cache.DeviceData) {
 	content.WriteString("\n")
 	content.WriteString(m.styles.Separator.Render("─────────────────────────────") + "\n\n")
 	content.WriteString(m.renderDetailRow("Firmware", d.Info.Firmware))
-	content.WriteString(m.renderDetailRow("MAC", d.Info.MAC))
+	content.WriteString(m.renderDetailRow("MAC", model.NormalizeMAC(d.Info.MAC)))
 	if d.Info.App != "" {
 		content.WriteString(m.renderDetailRow("App", d.Info.App))
 	}

@@ -12,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
@@ -481,7 +482,7 @@ func (m Model) renderCredentials() string {
 		content.WriteString(m.styles.Text.Render(m.deviceInfo.Model))
 		content.WriteString("\n")
 		content.WriteString(m.styles.Label.Render("MAC:   "))
-		content.WriteString(m.styles.Text.Render(m.deviceInfo.MAC))
+		content.WriteString(m.styles.Text.Render(model.NormalizeMAC(m.deviceInfo.MAC)))
 		content.WriteString("\n\n")
 	}
 

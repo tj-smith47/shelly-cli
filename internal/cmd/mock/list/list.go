@@ -11,6 +11,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/config"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/testutil/mock"
 )
 
@@ -78,7 +79,7 @@ func run(_ context.Context, opts *Options) error {
 
 		ios.Printf("  %s\n", device.Name)
 		ios.Printf("    Model: %s, Firmware: %s\n", device.Model, device.Firmware)
-		ios.Printf("    MAC: %s\n", device.MAC)
+		ios.Printf("    MAC: %s\n", model.NormalizeMAC(device.MAC))
 	}
 
 	return nil

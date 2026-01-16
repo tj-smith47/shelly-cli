@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
@@ -113,7 +114,7 @@ func DisplayREPLDeviceInfo(ios *iostreams.IOStreams, svc *shelly.Service, ctx co
 		ios.Println(theme.Bold().Render("Device Info:"))
 		ios.Println("  ID:       " + info.ID)
 		ios.Println("  Model:    " + info.Model)
-		ios.Println("  MAC:      " + info.MAC)
+		ios.Println("  MAC:      " + model.NormalizeMAC(info.MAC))
 		ios.Println("  App:      " + info.App)
 		ios.Println("  Firmware: " + info.Firmware)
 		ios.Printf("  Gen:      %d\n", info.Generation)

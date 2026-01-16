@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/output/table"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
@@ -131,7 +132,7 @@ func DisplayCloudDevice(ios *iostreams.IOStreams, device *network.CloudDevice, s
 	}
 
 	if device.MAC != "" {
-		ios.Printf("  MAC:    %s\n", device.MAC)
+		ios.Printf("  MAC:    %s\n", model.NormalizeMAC(device.MAC))
 	}
 
 	if device.FirmwareVersion != "" {

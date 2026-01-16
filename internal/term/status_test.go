@@ -7,27 +7,14 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/model"
 )
 
-func TestQuickDeviceInfo_ZeroValues(t *testing.T) {
-	t.Parallel()
-
-	var info QuickDeviceInfo
-
-	if info.Model != "" {
-		t.Errorf("Model = %q, want empty", info.Model)
-	}
-	if info.Generation != 0 {
-		t.Errorf("Generation = %d, want 0", info.Generation)
-	}
-	if info.Firmware != "" {
-		t.Errorf("Firmware = %q, want empty", info.Firmware)
-	}
-}
-
 func TestComponentState_ZeroValues(t *testing.T) {
 	t.Parallel()
 
 	var state ComponentState
 
+	if state.Type != "" {
+		t.Errorf("Type = %q, want empty", state.Type)
+	}
 	if state.Name != "" {
 		t.Errorf("Name = %q, want empty", state.Name)
 	}
@@ -56,13 +43,8 @@ func TestDisplayQuickDeviceStatus_Empty(t *testing.T) {
 	t.Parallel()
 
 	ios, out, _ := testIOStreams()
-	info := &QuickDeviceInfo{
-		Model:      "Shelly Pro 1PM",
-		Generation: 2,
-		Firmware:   "1.0.0",
-	}
 
-	DisplayQuickDeviceStatus(ios, "device1", info, nil)
+	DisplayQuickDeviceStatus(ios, nil)
 
 	output := out.String()
 	if !strings.Contains(output, "No controllable components") {
@@ -113,15 +95,37 @@ func TestDisplayAllDevicesQuickStatus_MixedStatus(t *testing.T) {
 	}
 }
 
+func TestFormatComponentType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		compType model.ComponentType
+		id       int
+		want     string
+	}{
+		{model.ComponentSwitch, 0, "Switch 0"},
+		{model.ComponentSwitch, 1, "Switch 1"},
+		{model.ComponentInput, 0, "Input 0"},
+		{model.ComponentLight, 2, "Light 2"},
+		{model.ComponentCover, 0, "Cover 0"},
+		{model.ComponentRGB, 0, "Rgb 0"},
+	}
+
+	for _, tt := range tests {
+		got := formatComponentType(tt.compType, tt.id)
+		if got != tt.want {
+			t.Errorf("formatComponentType(%q, %d) = %q, want %q", tt.compType, tt.id, got, tt.want)
+		}
+	}
+}
+
 func TestGetComponentState_DefaultCase(t *testing.T) {
 	t.Parallel()
 
-	// Test with unknown component type
+	// Test with unknown component type - GetComponentState returns nil for unknown types
 	comp := model.Component{
 		Type: "unknown",
 		ID:   0,
 	}
-
-	// GetComponentState returns nil for unknown types
 	_ = comp // We can't easily test GetComponentState without mocking the client
 }

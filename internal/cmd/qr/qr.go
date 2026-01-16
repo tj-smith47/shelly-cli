@@ -143,7 +143,7 @@ func run(ctx context.Context, device string, opts *Options) error {
 	ios.Println()
 
 	if info.MAC != "" {
-		ios.Printf("MAC: %s\n", info.MAC)
+		ios.Printf("MAC: %s\n", model.NormalizeMAC(info.MAC))
 	}
 	if info.Model != "" {
 		ios.Printf("Model: %s\n", info.Model)

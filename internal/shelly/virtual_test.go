@@ -3,6 +3,8 @@ package shelly
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/tj-smith47/shelly-cli/internal/client"
 )
 
 func TestVirtualComponentType_Constants(t *testing.T) {
@@ -60,7 +62,7 @@ func TestIsVirtualType(t *testing.T) {
 
 func TestParseVirtualComponent_ValidBoolean(t *testing.T) {
 	t.Parallel()
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key:    "boolean:200",
 		Config: json.RawMessage(`{"name":"Test Bool"}`),
 		Status: json.RawMessage(`{"value":true}`),
@@ -91,7 +93,7 @@ func TestParseVirtualComponent_ValidNumber(t *testing.T) {
 	t.Parallel()
 	minVal := 0.0
 	maxVal := 100.0
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key:    "number:201",
 		Config: json.RawMessage(`{"name":"Temperature","min":0,"max":100,"unit":"°C"}`),
 		Status: json.RawMessage(`{"value":22.5}`),
@@ -120,7 +122,7 @@ func TestParseVirtualComponent_ValidNumber(t *testing.T) {
 
 func TestParseVirtualComponent_ValidText(t *testing.T) {
 	t.Parallel()
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key:    "text:202",
 		Config: json.RawMessage(`{"name":"Note"}`),
 		Status: json.RawMessage(`{"value":"Hello"}`),
@@ -140,7 +142,7 @@ func TestParseVirtualComponent_ValidText(t *testing.T) {
 
 func TestParseVirtualComponent_ValidEnum(t *testing.T) {
 	t.Parallel()
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key:    "enum:203",
 		Config: json.RawMessage(`{"name":"Mode","options":["off","low","high"]}`),
 		Status: json.RawMessage(`{"value":"low"}`),
@@ -161,7 +163,7 @@ func TestParseVirtualComponent_ValidEnum(t *testing.T) {
 func TestParseVirtualComponent_NonVirtualID(t *testing.T) {
 	t.Parallel()
 	// ID < 200 should not be recognized as virtual
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key: "boolean:0",
 	}
 
@@ -171,7 +173,7 @@ func TestParseVirtualComponent_NonVirtualID(t *testing.T) {
 	}
 
 	// ID > 299 should not be recognized as virtual
-	comp = componentInfo{
+	comp = client.ComponentResponse{
 		Key: "boolean:300",
 	}
 
@@ -183,7 +185,7 @@ func TestParseVirtualComponent_NonVirtualID(t *testing.T) {
 
 func TestParseVirtualComponent_NonVirtualType(t *testing.T) {
 	t.Parallel()
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key: "switch:200",
 	}
 
@@ -208,7 +210,7 @@ func TestParseVirtualComponent_InvalidKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			comp := componentInfo{Key: tt.key}
+			comp := client.ComponentResponse{Key: tt.key}
 			_, ok := parseVirtualComponent(comp)
 			if ok {
 				t.Errorf("parseVirtualComponent(%q) returned true, want false", tt.key)
@@ -373,7 +375,7 @@ func TestParseVirtualKey(t *testing.T) {
 func TestParseVirtualComponent_EmptyConfig(t *testing.T) {
 	t.Parallel()
 
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key:    "boolean:200",
 		Config: json.RawMessage(`{}`),
 		Status: json.RawMessage(`{"value":false}`),
@@ -394,7 +396,7 @@ func TestParseVirtualComponent_EmptyConfig(t *testing.T) {
 func TestParseVirtualComponent_NoStatus(t *testing.T) {
 	t.Parallel()
 
-	comp := componentInfo{
+	comp := client.ComponentResponse{
 		Key:    "text:205",
 		Config: json.RawMessage(`{"name":"No Value"}`),
 	}

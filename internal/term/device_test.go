@@ -192,39 +192,23 @@ func TestDisplayPluginDeviceStatus(t *testing.T) {
 	})
 }
 
-func TestQuickDeviceInfo_Fields(t *testing.T) {
-	t.Parallel()
-
-	info := QuickDeviceInfo{
-		Model:      "Shelly Pro 1PM",
-		Generation: 2,
-		Firmware:   "1.0.0",
-	}
-
-	if info.Model != "Shelly Pro 1PM" {
-		t.Errorf("Model = %q, want 'Shelly Pro 1PM'", info.Model)
-	}
-	if info.Generation != 2 {
-		t.Errorf("Generation = %d, want 2", info.Generation)
-	}
-	if info.Firmware != "1.0.0" {
-		t.Errorf("Firmware = %q, want '1.0.0'", info.Firmware)
-	}
-}
-
 func TestComponentState_Fields(t *testing.T) {
 	t.Parallel()
 
 	state := ComponentState{
-		Name:  "switch:0",
-		State: "ON",
+		Type:  "Switch 0",
+		Name:  "Kitchen Light",
+		State: "ON (45W)",
 	}
 
-	if state.Name != "switch:0" {
-		t.Errorf("Name = %q, want 'switch:0'", state.Name)
+	if state.Type != "Switch 0" {
+		t.Errorf("Type = %q, want 'Switch 0'", state.Type)
 	}
-	if state.State != "ON" {
-		t.Errorf("State = %q, want 'ON'", state.State)
+	if state.Name != "Kitchen Light" {
+		t.Errorf("Name = %q, want 'Kitchen Light'", state.Name)
+	}
+	if state.State != "ON (45W)" {
+		t.Errorf("State = %q, want 'ON (45W)'", state.State)
 	}
 }
 

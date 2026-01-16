@@ -163,31 +163,21 @@ func (c *Client) Thermostat(id int) *ThermostatComponent {
 }
 
 // ListComponents returns all components on the device.
+// Handles pagination automatically to fetch all components.
 func (c *Client) ListComponents(ctx context.Context) ([]model.Component, error) {
-	rpcResult, err := c.rpcClient.Call(ctx, "Shelly.GetComponents", map[string]any{})
+	rawComps, err := c.GetComponentsAll(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get components: %w", err)
+		return nil, err
 	}
 
-	var resp struct {
-		Components []struct {
-			Key string `json:"key"`
-		} `json:"components"`
-	}
-
-	if err := unmarshalResponse(rpcResult, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse components: %w", err)
-	}
-
-	comps := make([]model.Component, 0, len(resp.Components))
-	for _, rc := range resp.Components {
-		parsed, ok := parseComponentKey(rc.Key)
-		if ok {
-			comps = append(comps, parsed)
+	var allComps []model.Component
+	for _, rc := range rawComps {
+		if parsed, ok := parseComponentKey(rc.Key); ok {
+			allComps = append(allComps, parsed)
 		}
 	}
 
-	return comps, nil
+	return allComps, nil
 }
 
 // FilterComponents returns components matching the given type.

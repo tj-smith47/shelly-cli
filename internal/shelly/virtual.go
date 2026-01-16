@@ -42,19 +42,8 @@ type VirtualComponent struct {
 	Unit      *string              `json:"unit,omitempty"`
 }
 
-// componentInfo contains information about a component from GetComponents.
-type componentInfo struct {
-	Key    string          `json:"key"`
-	Status json.RawMessage `json:"status,omitempty"`
-	Config json.RawMessage `json:"config,omitempty"`
-}
-
-// componentListResponse is the response from Shelly.GetComponents.
-type componentListResponse struct {
-	Components []componentInfo `json:"components"`
-}
-
 // ListVirtualComponents returns all virtual components on a device.
+// Handles pagination automatically to fetch all components.
 func (s *Service) ListVirtualComponents(ctx context.Context, identifier string) ([]VirtualComponent, error) {
 	var results []VirtualComponent
 
@@ -64,22 +53,13 @@ func (s *Service) ListVirtualComponents(ctx context.Context, identifier string) 
 			"include_status": true,
 			"include_config": true,
 		}
-		rawResult, err := conn.Call(ctx, "Shelly.GetComponents", params)
+
+		comps, err := conn.GetComponentsAll(ctx, params)
 		if err != nil {
 			return err
 		}
 
-		jsonBytes, err := json.Marshal(rawResult)
-		if err != nil {
-			return fmt.Errorf("marshal components: %w", err)
-		}
-
-		var compList componentListResponse
-		if err := json.Unmarshal(jsonBytes, &compList); err != nil {
-			return fmt.Errorf("unmarshal components: %w", err)
-		}
-
-		for _, comp := range compList.Components {
+		for _, comp := range comps {
 			vc, ok := parseVirtualComponent(comp)
 			if ok {
 				results = append(results, vc)
@@ -91,8 +71,8 @@ func (s *Service) ListVirtualComponents(ctx context.Context, identifier string) 
 	return results, err
 }
 
-// parseVirtualComponent attempts to parse a componentInfo as a virtual component.
-func parseVirtualComponent(comp componentInfo) (VirtualComponent, bool) {
+// parseVirtualComponent attempts to parse a ComponentResponse as a virtual component.
+func parseVirtualComponent(comp client.ComponentResponse) (VirtualComponent, bool) {
 	parts := strings.Split(comp.Key, ":")
 	if len(parts) != 2 {
 		return VirtualComponent{}, false

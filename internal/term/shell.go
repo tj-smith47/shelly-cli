@@ -14,6 +14,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/client"
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
+	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/output"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 )
@@ -110,7 +111,7 @@ func (s *ShellSession) showInfo() {
 	s.IOS.Println(theme.Bold().Render("Device Information:"))
 	s.IOS.Println("  ID:         " + info.ID)
 	s.IOS.Println("  Model:      " + info.Model)
-	s.IOS.Println("  MAC:        " + info.MAC)
+	s.IOS.Println("  MAC:        " + model.NormalizeMAC(info.MAC))
 	s.IOS.Println("  App:        " + info.App)
 	s.IOS.Println("  Firmware:   " + info.Firmware)
 	s.IOS.Printf("  Generation: %d\n", info.Generation)

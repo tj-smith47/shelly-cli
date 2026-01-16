@@ -59,13 +59,12 @@ func run(ctx context.Context, opts *Options) error {
 
 	// Single device status
 	if opts.Device != "" {
-		var info *term.QuickDeviceInfo
 		var componentStates []term.ComponentState
 
 		err := cmdutil.RunWithSpinner(ctx, ios, "Getting status...", func(ctx context.Context) error {
 			return svc.WithDevice(ctx, opts.Device, func(dev *shelly.DeviceClient) error {
 				var fetchErr error
-				info, componentStates, fetchErr = term.GetSingleDeviceStatus(ctx, ios, dev)
+				componentStates, fetchErr = term.GetSingleDeviceStatus(ctx, ios, dev)
 				return fetchErr
 			})
 		})
@@ -73,7 +72,7 @@ func run(ctx context.Context, opts *Options) error {
 			return err
 		}
 
-		term.DisplayQuickDeviceStatus(ios, opts.Device, info, componentStates)
+		term.DisplayQuickDeviceStatus(ios, componentStates)
 		return nil
 	}
 

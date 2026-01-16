@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -139,7 +141,7 @@ func (ds *DeviceServer) handleGen2(w http.ResponseWriter, r *http.Request, endpo
 		})
 
 	case endpoint == "/rpc/Shelly.GetComponents":
-		ds.writeComponents(w, state)
+		ds.writeComponents(w, r, state)
 
 	case strings.HasPrefix(endpoint, "/rpc/Switch."):
 		ds.handleSwitchRPC(w, r, endpoint, state, device)
@@ -183,7 +185,7 @@ func (ds *DeviceServer) handleGen2RPC(w http.ResponseWriter, r *http.Request, st
 		result = ds.getSysStatus(state, device)
 
 	case "Shelly.GetComponents":
-		result = ds.getComponents(state)
+		result = ds.getComponents(state, req.Params)
 
 	case "Switch.GetStatus":
 		id := ds.getIDFromParams(req.Params)
@@ -828,14 +830,54 @@ func (ds *DeviceServer) gen2DeviceInfo(device *DeviceFixture) map[string]any {
 	}
 }
 
-func (ds *DeviceServer) getComponents(state DeviceState) map[string]any {
-	var comps []map[string]string
+func (ds *DeviceServer) getComponents(state DeviceState, params map[string]any) map[string]any {
+	// Collect all component keys
+	var allKeys []string
 	for key := range state {
 		if strings.Contains(key, ":") {
-			comps = append(comps, map[string]string{"key": key})
+			allKeys = append(allKeys, key)
 		}
 	}
-	return map[string]any{"components": comps}
+
+	// Sort for consistent ordering
+	sort.Strings(allKeys)
+
+	total := len(allKeys)
+
+	// Handle pagination
+	offset := 0
+	if off, ok := params["offset"].(float64); ok {
+		offset = int(off)
+	}
+
+	// Default page size of 8 (matching real Shelly API behavior)
+	pageSize := 8
+
+	// Apply offset
+	if offset >= total {
+		return map[string]any{
+			"components": []map[string]string{},
+			"offset":     offset,
+			"total":      total,
+		}
+	}
+
+	end := offset + pageSize
+	if end > total {
+		end = total
+	}
+
+	// Build component list for this page
+	comps := make([]map[string]string, 0, end-offset)
+	for i := offset; i < end; i++ {
+		comps = append(comps, map[string]string{"key": allKeys[i]})
+	}
+
+	return map[string]any{
+		"components": comps,
+		"offset":     offset,
+		"total":      total,
+	}
 }
 
 func (ds *DeviceServer) getComponentState(state DeviceState, key string) any {
@@ -925,14 +967,18 @@ func (ds *DeviceServer) writeGen2DeviceInfo(w http.ResponseWriter, device *Devic
 	})
 }
 
-func (ds *DeviceServer) writeComponents(w http.ResponseWriter, state DeviceState) {
-	var comps []map[string]string
-	for key := range state {
-		if strings.Contains(key, ":") {
-			comps = append(comps, map[string]string{"key": key})
+func (ds *DeviceServer) writeComponents(w http.ResponseWriter, r *http.Request, state DeviceState) {
+	// Parse offset from query params or request body
+	offset := 0
+	if offStr := r.URL.Query().Get("offset"); offStr != "" {
+		if off, err := strconv.Atoi(offStr); err == nil {
+			offset = off
 		}
 	}
-	ds.writeJSON(w, map[string]any{"components": comps})
+
+	// Use the centralized pagination logic
+	result := ds.getComponents(state, map[string]any{"offset": float64(offset)})
+	ds.writeJSON(w, result)
 }
 
 func (ds *DeviceServer) handleSwitchRPC(w http.ResponseWriter, r *http.Request, endpoint string, state DeviceState, device *DeviceFixture) {
