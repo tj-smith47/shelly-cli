@@ -1,0 +1,123 @@
+.nh
+.TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-mcp-configure - Configure AI assistant MCP integration
+
+
+.SH SYNOPSIS
+\fBshelly mcp configure [flags]\fP
+
+
+.SH DESCRIPTION
+Configure AI assistant MCP integration.
+
+.PP
+This command writes the necessary configuration to enable AI assistants to
+use the Shelly CLI via MCP (Model Context Protocol).
+
+.PP
+Supported AI assistants:
+  --claude-desktop  Configure Claude Desktop app
+  --claude-code     Configure Claude Code (VS Code extension / CLI)
+  --gemini          Configure Gemini CLI
+
+.PP
+You can specify multiple flags to configure all at once.
+
+
+.SH OPTIONS
+\fB--claude-code\fP[=false]
+	Configure Claude Code
+
+.PP
+\fB--claude-desktop\fP[=false]
+	Configure Claude Desktop
+
+.PP
+\fB-n\fP, \fB--dry-run\fP[=false]
+	Preview changes without writing files
+
+.PP
+\fB--gemini\fP[=false]
+	Configure Gemini CLI
+
+.PP
+\fB-h\fP, \fB--help\fP[=false]
+	help for configure
+
+.PP
+\fB--shelly-path\fP=""
+	Path to shelly binary (auto-detected if not specified)
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Configure Claude Desktop
+  shelly mcp configure --claude-desktop
+
+  # Configure Claude Code
+  shelly mcp configure --claude-code
+
+  # Configure all supported assistants
+  shelly mcp configure --claude-desktop --claude-code --gemini
+
+  # Preview changes without writing (dry run)
+  shelly mcp configure --claude-desktop --dry-run
+
+  # Use custom shelly binary path
+  shelly mcp configure --claude-code --shelly-path /usr/local/bin/shelly
+.EE
+
+
+.SH SEE ALSO
+\fBshelly-mcp(1)\fP

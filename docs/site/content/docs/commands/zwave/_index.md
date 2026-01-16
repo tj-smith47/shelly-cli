@@ -1,7 +1,7 @@
 ---
 title: "shelly zwave"
 description: "shelly zwave"
-weight: 760
+weight: 770
 sidebar:
   collapsed: true
 ---

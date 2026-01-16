@@ -1,0 +1,99 @@
+.nh
+.TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-mcp - MCP server for AI assistant integration
+
+
+.SH SYNOPSIS
+\fBshelly mcp [flags]\fP
+
+
+.SH DESCRIPTION
+MCP (Model Context Protocol) server for AI assistant integration.
+
+.PP
+This command allows AI assistants like Claude, Gemini, and others to interact
+with your Shelly devices through the CLI. The MCP server exposes CLI commands
+as tools that AI assistants can invoke.
+
+.PP
+Use 'mcp start' to run the MCP server, or 'mcp configure' to set up AI
+assistant configuration files automatically.
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for mcp
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH EXAMPLE
+.EX
+  # Start the MCP server
+  shelly mcp start
+
+  # Enable in Claude Desktop
+  shelly mcp claude enable
+
+  # Enable in VS Code
+  shelly mcp vscode enable
+
+  # Configure Gemini CLI (or other assistants)
+  shelly mcp configure --gemini
+
+  # List available MCP tools
+  shelly mcp tools
+.EE
+
+
+.SH SEE ALSO
+\fBshelly(1)\fP, \fBshelly-mcp-claude(1)\fP, \fBshelly-mcp-configure(1)\fP, \fBshelly-mcp-cursor(1)\fP, \fBshelly-mcp-start(1)\fP, \fBshelly-mcp-stream(1)\fP, \fBshelly-mcp-tools(1)\fP, \fBshelly-mcp-vscode(1)\fP

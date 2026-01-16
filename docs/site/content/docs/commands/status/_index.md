@@ -1,7 +1,7 @@
 ---
 title: "shelly status"
 description: "shelly status"
-weight: 610
+weight: 620
 sidebar:
   collapsed: true
 ---

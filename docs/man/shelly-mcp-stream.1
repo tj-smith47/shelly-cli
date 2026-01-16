@@ -1,0 +1,83 @@
+.nh
+.TH "SHELLY" "1" "Jan 2026" "Shelly CLI" "User Commands"
+
+.SH NAME
+shelly-mcp-stream - Stream the MCP server over HTTP
+
+
+.SH SYNOPSIS
+\fBshelly mcp stream [flags]\fP
+
+
+.SH DESCRIPTION
+Start HTTP server to expose CLI commands to AI assistants
+
+
+.SH OPTIONS
+\fB-h\fP, \fB--help\fP[=false]
+	help for stream
+
+.PP
+\fB--host\fP=""
+	host to listen on
+
+.PP
+\fB--log-level\fP=""
+	Log level (debug, info, warn, error)
+
+.PP
+\fB--port\fP=8080
+	port number to listen on
+
+
+.SH OPTIONS INHERITED FROM PARENT COMMANDS
+\fB--config\fP=""
+	Config file (default $HOME/.config/shelly/config.yaml)
+
+.PP
+\fB--log-categories\fP=""
+	Filter logs by category (comma-separated: network,api,device,config,auth,plugin)
+
+.PP
+\fB--log-json\fP[=false]
+	Output logs in JSON format
+
+.PP
+\fB--no-color\fP[=false]
+	Disable colored output
+
+.PP
+\fB--no-headers\fP[=false]
+	Hide table headers in output
+
+.PP
+\fB--offline\fP[=false]
+	Only read from cache, error on cache miss
+
+.PP
+\fB-o\fP, \fB--output\fP="table"
+	Output format (table, json, yaml, template)
+
+.PP
+\fB--plain\fP[=false]
+	Disable borders and colors (machine-readable output)
+
+.PP
+\fB-q\fP, \fB--quiet\fP[=false]
+	Suppress non-essential output
+
+.PP
+\fB--refresh\fP[=false]
+	Bypass cache and fetch fresh data from device
+
+.PP
+\fB--template\fP=""
+	Go template string for output (use with -o template)
+
+.PP
+\fB-v\fP, \fB--verbose\fP[=0]
+	Increase verbosity (-v=info, -vv=debug, -vvv=trace)
+
+
+.SH SEE ALSO
+\fBshelly-mcp(1)\fP

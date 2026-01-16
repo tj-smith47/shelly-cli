@@ -90,6 +90,7 @@ and controlling Shelly devices on your local network.
 * [shelly log](shelly_log.md)	 - Manage CLI logs
 * [shelly lora](shelly_lora.md)	 - Manage LoRa add-on
 * [shelly matter](shelly_matter.md)	 - Manage Matter connectivity
+* [shelly mcp](shelly_mcp.md)	 - MCP server for AI assistant integration
 * [shelly metrics](shelly_metrics.md)	 - Export device metrics
 * [shelly migrate](shelly_migrate.md)	 - Migrate configuration between devices
 * [shelly mock](shelly_mock.md)	 - Mock device mode for testing

@@ -52,6 +52,7 @@ import (
 	logcmd "github.com/tj-smith47/shelly-cli/internal/cmd/log"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/lora"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/matter"
+	mcpcmd "github.com/tj-smith47/shelly-cli/internal/cmd/mcp"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/metrics"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/migrate"
 	"github.com/tj-smith47/shelly-cli/internal/cmd/mock"
@@ -359,6 +360,7 @@ func init() {
 		firmware.NewCommand(factory),
 		initcmd.NewCommand(factory),
 		logcmd.NewCommand(factory),
+		mcpcmd.NewCommand(factory),
 		plugin.NewCommand(factory),
 		profile.NewCommand(factory),
 		themecmd.NewCommand(factory),

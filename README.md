@@ -505,6 +505,78 @@ shelly completion fish > ~/.config/fish/completions/shelly.fish
 shelly completion powershell > shelly.ps1
 ```
 
+## MCP Server (AI Assistant Integration)
+
+Shelly CLI includes an MCP (Model Context Protocol) server that allows AI assistants like Claude, Gemini, and others to control your Shelly devices.
+
+### Quick Setup
+
+```bash
+# Enable in Claude Desktop
+shelly mcp claude enable
+
+# Enable in VS Code / Cursor
+shelly mcp vscode enable
+shelly mcp cursor enable
+
+# Configure Gemini CLI (or other assistants)
+shelly mcp configure --gemini
+```
+
+### Manual Configuration
+
+For **Claude Desktop**, add to `~/.config/claude-desktop/claude_desktop_config.json` (Linux) or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "shelly": {
+      "command": "/path/to/shelly",
+      "args": ["mcp", "start"]
+    }
+  }
+}
+```
+
+For **Claude Code**, add to `~/.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "shelly": {
+      "command": "shelly",
+      "args": ["mcp", "start"]
+    }
+  }
+}
+```
+
+For **Gemini CLI**, add to `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "shelly": {
+      "command": "shelly",
+      "args": ["mcp", "start"]
+    }
+  }
+}
+```
+
+### Available Commands
+
+```bash
+# Start the MCP server (for manual testing)
+shelly mcp start
+
+# List available MCP tools
+shelly mcp tools
+
+# Dry run configuration
+shelly mcp configure --claude-desktop --dry-run
+```
+
 ## Aliases
 
 Create shortcuts for common commands:

@@ -1,7 +1,7 @@
 ---
 title: "shelly shell"
 description: "shelly shell"
-weight: 590
+weight: 600
 sidebar:
   collapsed: true
 ---

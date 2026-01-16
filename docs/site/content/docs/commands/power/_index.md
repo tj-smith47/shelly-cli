@@ -1,7 +1,7 @@
 ---
 title: "shelly power"
 description: "shelly power"
-weight: 460
+weight: 470
 sidebar:
   collapsed: true
 ---
