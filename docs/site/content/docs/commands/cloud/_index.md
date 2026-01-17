@@ -19,11 +19,13 @@ Device cloud commands:
   enable    Enable cloud connection on a device
   disable   Disable cloud connection on a device
 
-Cloud API commands (requires login):
-  login       Authenticate with Shelly Cloud
+Cloud API authentication:
+  login       Authenticate (email/password, --browser, or --key)
   logout      Clear cloud credentials
   auth-status Show authentication status
   token       Show/manage access token
+
+Cloud API device management (requires authentication):
   devices     List cloud-registered devices
   device      Show cloud device details
   control     Control devices via cloud
@@ -37,8 +39,10 @@ Cloud API commands (requires login):
   shelly cloud enable living-room
   shelly cloud disable living-room
 
-  # Cloud API authentication
-  shelly cloud login
+  # Cloud API authentication (3 methods via login command)
+  shelly cloud login                     # Interactive email/password
+  shelly cloud login --browser           # OAuth browser flow (recommended)
+  shelly cloud login --key <key> --server <url>  # Auth key from Shelly App
   shelly cloud auth-status
   shelly cloud logout
 

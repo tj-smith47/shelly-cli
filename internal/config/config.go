@@ -157,6 +157,7 @@ type CloudConfig struct {
 	Email        string `mapstructure:"email" yaml:"email,omitempty"`
 	AccessToken  string `mapstructure:"access_token" yaml:"access_token,omitempty"`
 	RefreshToken string `mapstructure:"refresh_token" yaml:"refresh_token,omitempty"`
+	AuthKey      string `mapstructure:"auth_key" yaml:"auth_key,omitempty"`
 	ServerURL    string `mapstructure:"server_url" yaml:"server_url,omitempty"`
 }
 

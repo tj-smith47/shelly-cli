@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tj-smith47/shelly-cli/internal/cmdutil"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
@@ -315,10 +316,11 @@ func TestRun_MissingEmail_NonInteractive(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
+	// Password flag triggers email/password mode, but email is missing
 	opts := &Options{
 		Factory:  f,
 		Email:    "",
-		Password: "",
+		Password: "somepassword",
 	}
 
 	ctx := context.Background()
@@ -535,7 +537,7 @@ func TestNewCommand_VerifyReturnType(t *testing.T) {
 	}
 }
 
-func TestRun_BothCredentialsEmpty(t *testing.T) {
+func TestRun_DefaultIsBrowserMode(t *testing.T) {
 	t.Parallel()
 
 	in := &bytes.Buffer{}
@@ -545,17 +547,24 @@ func TestRun_BothCredentialsEmpty(t *testing.T) {
 
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
+	// No flags = browser mode (default), which will try to start a callback server
 	opts := &Options{
-		Factory:  f,
-		Email:    "",
-		Password: "",
+		Factory: f,
+		Timeout: 100 * time.Millisecond, // Short timeout for test
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
 	err := run(ctx, opts)
 
+	// Should timeout or fail trying browser login (not ask for email/password)
 	if err == nil {
-		t.Error("expected error when both credentials are empty")
+		t.Error("expected error from browser login attempt")
+	}
+	// Should NOT be asking for email - that would mean it's not using browser mode
+	if strings.Contains(err.Error(), "email required") {
+		t.Error("should use browser mode by default, not email/password mode")
 	}
 }
 
@@ -819,13 +828,14 @@ func TestExecute_MissingCredentials(t *testing.T) {
 	f := cmdutil.NewFactory().SetIOStreams(ios)
 
 	cmd := NewCommand(f)
-	cmd.SetArgs([]string{})
+	// Use --password flag to trigger email/password mode, but email is missing
+	cmd.SetArgs([]string{"--password", "testpass"})
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 
 	err := cmd.Execute()
 	if err == nil {
-		t.Error("expected error for missing credentials")
+		t.Error("expected error for missing email")
 	}
 }
 

@@ -13,14 +13,24 @@ shelly-cloud-login - Authenticate with Shelly Cloud
 Authenticate with the Shelly Cloud API.
 
 .PP
-This command authenticates you with the Shelly Cloud service using your
-email and password. The access token is stored locally for future use.
+The access token is stored locally for future use.
 
 .PP
-You can provide credentials via:
-  1. Command flags (--email, --password)
-  2. Interactive prompts (if TTY available)
-  3. Environment variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD)
+Three authentication methods are available:
+.IP "  1." 5
+Browser OAuth (default):
+Opens your web browser to the Shelly Cloud login page. After you log in,
+the authorization code is automatically captured. This is the most secure
+method as your password is never stored locally.
+.IP "  2." 5
+Auth Key (--key, --server):
+Use the authorization key from the Shelly mobile app. Find it in:
+User Settings → Authorization cloud key. You must also provide the
+server URL shown with the key.
+.IP "  3." 5
+Email/Password (--email, --password):
+Provide your Shelly Cloud email and password via flags or environment
+variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
 
 
 .SH OPTIONS
@@ -32,8 +42,28 @@ You can provide credentials via:
 	help for login
 
 .PP
+\fB--key\fP=""
+	Authorization key from Shelly App
+
+.PP
+\fB--no-browser\fP[=false]
+	Don't auto-open browser, just print the URL
+
+.PP
 \fB--password\fP=""
 	Shelly Cloud password
+
+.PP
+\fB--port\fP=0
+	Port for OAuth callback server (default: auto-select)
+
+.PP
+\fB--server\fP=""
+	Server URL for auth key (e.g., shelly-59-eu.shelly.cloud)
+
+.PP
+\fB--timeout\fP=5m0s
+	Timeout waiting for OAuth callback
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -87,14 +117,17 @@ You can provide credentials via:
 
 .SH EXAMPLE
 .EX
-  # Interactive login
+  # OAuth browser flow (default, most secure)
   shelly cloud login
 
-  # Login with flags
-  shelly cloud login --email user@example.com --password mypassword
+  # Browser flow without auto-opening browser
+  shelly cloud login --no-browser
 
-  # Login with environment variables
-  SHELLY_CLOUD_EMAIL=user@example.com SHELLY_CLOUD_PASSWORD=mypassword shelly cloud login
+  # Auth key from Shelly App
+  shelly cloud login --key MTZkZGM3dWlk... --server shelly-59-eu.shelly.cloud
+
+  # Email/password login
+  shelly cloud login --email user@example.com --password mypassword
 .EE
 
 

@@ -11,13 +11,23 @@ Authenticate with Shelly Cloud
 
 Authenticate with the Shelly Cloud API.
 
-This command authenticates you with the Shelly Cloud service using your
-email and password. The access token is stored locally for future use.
+The access token is stored locally for future use.
 
-You can provide credentials via:
-  1. Command flags (--email, --password)
-  2. Interactive prompts (if TTY available)
-  3. Environment variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD)
+Three authentication methods are available:
+
+1. Browser OAuth (default):
+   Opens your web browser to the Shelly Cloud login page. After you log in,
+   the authorization code is automatically captured. This is the most secure
+   method as your password is never stored locally.
+
+2. Auth Key (--key, --server):
+   Use the authorization key from the Shelly mobile app. Find it in:
+   User Settings → Authorization cloud key. You must also provide the
+   server URL shown with the key.
+
+3. Email/Password (--email, --password):
+   Provide your Shelly Cloud email and password via flags or environment
+   variables (SHELLY_CLOUD_EMAIL, SHELLY_CLOUD_PASSWORD).
 
 ```
 shelly cloud login [flags]
@@ -26,22 +36,30 @@ shelly cloud login [flags]
 ### Examples
 
 ```
-  # Interactive login
+  # OAuth browser flow (default, most secure)
   shelly cloud login
 
-  # Login with flags
-  shelly cloud login --email user@example.com --password mypassword
+  # Browser flow without auto-opening browser
+  shelly cloud login --no-browser
 
-  # Login with environment variables
-  SHELLY_CLOUD_EMAIL=user@example.com SHELLY_CLOUD_PASSWORD=mypassword shelly cloud login
+  # Auth key from Shelly App
+  shelly cloud login --key MTZkZGM3dWlk... --server shelly-59-eu.shelly.cloud
+
+  # Email/password login
+  shelly cloud login --email user@example.com --password mypassword
 ```
 
 ### Options
 
 ```
-      --email string      Shelly Cloud email
-  -h, --help              help for login
-      --password string   Shelly Cloud password
+      --email string       Shelly Cloud email
+  -h, --help               help for login
+      --key string         Authorization key from Shelly App
+      --no-browser         Don't auto-open browser, just print the URL
+      --password string    Shelly Cloud password
+      --port int           Port for OAuth callback server (default: auto-select)
+      --server string      Server URL for auth key (e.g., shelly-59-eu.shelly.cloud)
+      --timeout duration   Timeout waiting for OAuth callback (default 5m0s)
 ```
 
 ### Options inherited from parent commands

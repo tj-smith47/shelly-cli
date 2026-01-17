@@ -237,6 +237,66 @@ func HashPassword(password string) string {
 	return cloud.HashPassword(password)
 }
 
+// NewCloudClientWithAuthKey creates a new cloud client using an auth key.
+// The auth key can be found in the Shelly App under User Settings → Authorization cloud key.
+// The server URL is shown alongside the auth key in the app.
+func NewCloudClientWithAuthKey(authKey, serverURL string) *CloudClient {
+	client := cloud.NewClient(
+		cloud.WithAuthKey(authKey),
+		cloud.WithBaseURL(serverURL),
+	)
+	return &CloudClient{client: client}
+}
+
+// BrowserLoginOptions configures the browser login flow.
+type BrowserLoginOptions struct {
+	ClientID     string        // OAuth client ID (default: shelly-diy)
+	CallbackPort int           // Port for local callback server (default: auto-select)
+	Timeout      time.Duration // Timeout waiting for callback (default: 5 minutes)
+}
+
+// BrowserLoginResult contains the result of a browser-based OAuth login.
+type BrowserLoginResult struct {
+	AuthorizeURL string // URL the user should open in browser
+	Token        string
+	UserAPIURL   string
+	Expiry       time.Time
+}
+
+// StartBrowserLogin initiates an OAuth browser login flow.
+// It returns the URL that the user should open in their browser.
+// The function blocks until the callback is received or the context is canceled.
+func StartBrowserLogin(ctx context.Context, opts *BrowserLoginOptions) (*BrowserLoginResult, error) {
+	cloudOpts := &cloud.BrowserLoginOptions{}
+	if opts != nil {
+		cloudOpts.ClientID = opts.ClientID
+		cloudOpts.CallbackPort = opts.CallbackPort
+		cloudOpts.Timeout = opts.Timeout
+	}
+
+	result, err := cloud.BrowserLogin(ctx, cloudOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	loginResult := &BrowserLoginResult{
+		AuthorizeURL: result.AuthorizeURL,
+	}
+
+	if result.Token != nil {
+		loginResult.Token = result.Token.AccessToken
+		loginResult.UserAPIURL = result.Token.UserAPIURL
+		loginResult.Expiry = result.Token.Expiry
+	}
+
+	return loginResult, nil
+}
+
+// AuthorizeURL returns the OAuth authorization URL for the given client ID and redirect URI.
+func AuthorizeURL(clientID, redirectURI string) string {
+	return cloud.AuthorizeURL(clientID, redirectURI)
+}
+
 // BuildCloudWebSocketURL builds the WebSocket URL for cloud events.
 func BuildCloudWebSocketURL(serverURL, token string) (string, error) {
 	if serverURL == "" {
