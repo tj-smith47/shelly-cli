@@ -478,7 +478,7 @@ func (f *Fleet) Refresh() tea.Cmd {
 		return nil
 	}
 
-	var cmds []tea.Cmd
+	cmds := make([]tea.Cmd, 0, 3)
 	var cmd tea.Cmd
 
 	f.devices, cmd = f.devices.Refresh()

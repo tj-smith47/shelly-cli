@@ -538,7 +538,7 @@ func (m *Manage) renderStandardLayout() string {
 
 // Refresh reloads all components.
 func (m *Manage) Refresh() tea.Cmd {
-	var cmds []tea.Cmd
+	cmds := make([]tea.Cmd, 0, 6)
 
 	var cmd tea.Cmd
 	m.discovery, cmd = m.discovery.Refresh()

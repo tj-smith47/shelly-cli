@@ -579,7 +579,7 @@ func (c *Config) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 }
 
 func (c *Config) updateAllComponents(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
+	cmds := make([]tea.Cmd, 0, 8)
 
 	var wifiCmd, systemCmd, cloudCmd, inputsCmd, bleCmd, protocolsCmd, securityCmd, smarthomeCmd tea.Cmd
 	c.wifi, wifiCmd = c.wifi.Update(msg)

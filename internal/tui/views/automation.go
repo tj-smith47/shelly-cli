@@ -625,7 +625,7 @@ func (a *Automation) updateFocusedComponent(msg tea.Msg) tea.Cmd {
 }
 
 func (a *Automation) updateAllComponents(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
+	cmds := make([]tea.Cmd, 0, 9)
 
 	var scriptsCmd, scriptEditorCmd, scriptConsoleCmd, schedulesCmd, scheduleEditorCmd tea.Cmd
 	var webhooksCmd, virtualsCmd, kvsCmd, alertsCmd tea.Cmd
@@ -1031,7 +1031,7 @@ func (a *Automation) handleCodeUploaded(msg scripts.CodeUploadedMsg) tea.Cmd {
 	if msg.Err != nil {
 		return toast.Error("Failed to save script: " + msg.Err.Error())
 	}
-	var cmds []tea.Cmd
+	cmds := make([]tea.Cmd, 0, 3)
 	var scriptsCmd tea.Cmd
 	a.scripts, scriptsCmd = a.scripts.Refresh()
 	cmds = append(cmds, scriptsCmd, toast.Success("Script saved to device"))

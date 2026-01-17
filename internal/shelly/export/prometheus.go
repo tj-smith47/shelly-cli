@@ -202,7 +202,7 @@ func ExtractSwitchPrometheusMetrics(device string, status map[string]any) []Prom
 
 // CollectSystemPrometheusMetrics collects system-level Prometheus metrics from device status.
 func CollectSystemPrometheusMetrics(device string, status map[string]any) []PrometheusMetric {
-	var metrics []PrometheusMetric
+	metrics := make([]PrometheusMetric, 0, 16)
 	deviceLabels := map[string]string{"device": device}
 
 	// WiFi RSSI

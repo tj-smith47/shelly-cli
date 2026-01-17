@@ -440,7 +440,7 @@ func TestExecute_NameNormalization(t *testing.T) {
 				if readErr != nil {
 					t.Logf("warning: failed to read directory: %v", readErr)
 				}
-				var names []string
+				names := make([]string, 0, len(entries))
 				for _, e := range entries {
 					names = append(names, e.Name())
 				}

@@ -292,7 +292,7 @@ func ConfigureLogger() {
 
 	if catStr := viper.GetString("log.categories"); catStr != "" {
 		cats := strings.Split(catStr, ",")
-		var categories []LogCategory
+		categories := make([]LogCategory, 0, len(cats))
 		for _, c := range cats {
 			categories = append(categories, LogCategory(strings.TrimSpace(c)))
 		}
