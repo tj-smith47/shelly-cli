@@ -137,6 +137,11 @@ func GetComponentState(ctx context.Context, ios *iostreams.IOStreams, conn *clie
 			output.RenderRGBState,
 			func(c *model.RGBConfig) *string { return c.Name })
 
+	case model.ComponentRGBW:
+		state, name, err = fetchComponentState(ctx, conn.RGBW(comp.ID),
+			output.RenderRGBWState,
+			func(c *model.RGBWConfig) *string { return c.Name })
+
 	case model.ComponentCover:
 		state, name, err = fetchComponentState(ctx, conn.Cover(comp.ID),
 			output.RenderCoverStatusState,

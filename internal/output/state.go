@@ -419,6 +419,11 @@ func RenderRGBState(status *model.RGBStatus) string {
 	return RenderOnOffStateWithBrightness(status.Output, status.Brightness)
 }
 
+// RenderRGBWState returns the state string for an RGBW component.
+func RenderRGBWState(status *model.RGBWStatus) string {
+	return RenderOnOffStateWithBrightness(status.Output, status.Brightness)
+}
+
 // RenderCoverStatusState returns the state string for a cover component.
 // Note: This is different from RenderCoverState which takes a state string.
 func RenderCoverStatusState(status *model.CoverStatus) string {
