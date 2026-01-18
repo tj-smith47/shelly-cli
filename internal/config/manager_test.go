@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	testConfigPath = "/test/config/config.yaml"
 	testModelSHSW1 = "SHSW-1"
 	testScriptName = "my-script"
 	testScriptCode = "console.log('hello');"
@@ -20,7 +21,7 @@ func setupTestManager(t *testing.T) *Manager {
 	t.Helper()
 	SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { SetFs(nil) })
-	m := NewManager("/test/config/config.yaml")
+	m := NewManager(testConfigPath)
 	if err := m.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
@@ -31,7 +32,7 @@ func setupTestManager(t *testing.T) *Manager {
 func TestManager_Path(t *testing.T) {
 	SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { SetFs(nil) })
-	path := "/test/config/config.yaml"
+	path := testConfigPath
 	m := NewManager(path)
 
 	if m.Path() != path {
@@ -46,7 +47,7 @@ func TestManager_Reload(t *testing.T) {
 	SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { SetFs(nil) })
 
-	m := NewManager("/test/config/config.yaml")
+	m := NewManager(testConfigPath)
 	if err := m.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestManager_Reload(t *testing.T) {
 func TestManager_SaveWithoutLoad(t *testing.T) {
 	SetFs(afero.NewMemMapFs())
 	t.Cleanup(func() { SetFs(nil) })
-	m := NewManager("/test/config/config.yaml")
+	m := NewManager(testConfigPath)
 
 	// Try to save without loading first (don't call Load())
 	err := m.Save()
@@ -86,7 +87,7 @@ func TestManager_Save_AddsSchemaHeader(t *testing.T) {
 	SetFs(fs)
 	t.Cleanup(func() { SetFs(nil) })
 
-	path := "/test/config/config.yaml"
+	path := testConfigPath
 	m := NewManager(path)
 	if err := m.Load(); err != nil {
 		t.Fatalf("Load() error: %v", err)
@@ -629,7 +630,7 @@ func TestManager_Load_InvalidYAML(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	SetFs(fs)
 	t.Cleanup(func() { SetFs(nil) })
-	configPath := "/test/config/config.yaml"
+	configPath := testConfigPath
 
 	// Write invalid YAML
 	if err := afero.WriteFile(fs, configPath, []byte(":\ninvalid yaml content"), 0o600); err != nil {
