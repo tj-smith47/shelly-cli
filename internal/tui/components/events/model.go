@@ -54,6 +54,11 @@ type Deps struct {
 	Svc         *shelly.Service
 	IOS         *iostreams.IOStreams
 	EventStream *automation.EventStream // Shared event stream (WebSocket for Gen2+, polling for Gen1)
+
+	// Config is the event filtering configuration. If nil, defaults are used.
+	FilteredEvents     []string // Event names to filter (e.g., "ble.scan_result")
+	FilteredComponents []string // Component types to filter (e.g., "sys", "wifi")
+	MaxItems           int      // Max events per list (default: 100)
 }
 
 // validate ensures all required dependencies are set.
@@ -134,8 +139,10 @@ type Model struct {
 	perPage         int // Events per page (calculated from height)
 
 	// Filtering
-	filterByDevice bool   // When true, only show events for selectedDevice
-	selectedDevice string // Device name to filter by (when filterByDevice is true)
+	filterByDevice     bool     // When true, only show events for selectedDevice
+	selectedDevice     string   // Device name to filter by (when filterByDevice is true)
+	filteredEvents     []string // Event names to filter out (from config)
+	filteredComponents []string // Component types to filter out (from config)
 }
 
 // Styles for the events component.
@@ -223,22 +230,41 @@ func New(deps Deps) Model {
 	sysPag.ActiveDot = lipgloss.NewStyle().Foreground(theme.Red()).Bold(true).Render("●")
 	sysPag.InactiveDot = lipgloss.NewStyle().Foreground(theme.Red()).Render("○")
 
+	// Apply config values with defaults
+	maxItems := deps.MaxItems
+	if maxItems == 0 {
+		maxItems = 100 // Default max items per list
+	}
+
+	// Use provided filters or defaults
+	filteredEvents := deps.FilteredEvents
+	if len(filteredEvents) == 0 {
+		filteredEvents = []string{"ble.scan_result"} // Default filtered events
+	}
+
+	filteredComponents := deps.FilteredComponents
+	if len(filteredComponents) == 0 {
+		filteredComponents = []string{"sys", "wifi", "cloud", "ts"} // Default filtered components
+	}
+
 	return Model{
-		Sizable:         helpers.NewSizable(1, panel.NewScroller(0, 10)), // overhead: 1 row for header
-		ctx:             deps.Ctx,
-		svc:             deps.Svc,
-		ios:             deps.IOS,
-		eventStream:     deps.EventStream,
-		maxItems:        50,   // Per list - each category capped at 50
-		autoScroll:      true, // Start with auto-scroll enabled (cursor stays at top/newest)
-		focused:         false,
-		focusedColumn:   ColumnUser, // Start with user column focused
-		userCursor:      0,
-		systemCursor:    0,
-		perPage:         10, // Will be updated by SetSize
-		userPaginator:   userPag,
-		systemPaginator: sysPag,
-		styles:          DefaultStyles(),
+		Sizable:            helpers.NewSizable(1, panel.NewScroller(0, 10)), // overhead: 1 row for header
+		ctx:                deps.Ctx,
+		svc:                deps.Svc,
+		ios:                deps.IOS,
+		eventStream:        deps.EventStream,
+		maxItems:           maxItems,
+		autoScroll:         true, // Start with auto-scroll enabled (cursor stays at top/newest)
+		focused:            false,
+		focusedColumn:      ColumnUser, // Start with user column focused
+		userCursor:         0,
+		systemCursor:       0,
+		perPage:            10, // Will be updated by SetSize
+		userPaginator:      userPag,
+		systemPaginator:    sysPag,
+		filteredEvents:     filteredEvents,
+		filteredComponents: filteredComponents,
+		styles:             DefaultStyles(),
 		state: &sharedState{
 			userEvents:    []Event{},
 			systemEvents:  []Event{},
@@ -335,12 +361,16 @@ func (m Model) convertEvent(evt shellyevents.Event) (Event, bool) {
 // convertStatusChange converts a StatusChangeEvent, filtering out high-frequency updates.
 func (m Model) convertStatusChange(e *shellyevents.StatusChangeEvent, event Event) (Event, bool) {
 	compPrefix := strings.Split(e.Component, ":")[0]
-	// Filter out sys, wifi, cloud status changes
-	if compPrefix == "sys" || compPrefix == "wifi" || compPrefix == "cloud" {
+	// Filter out configured component types (e.g., sys, wifi, cloud, ts)
+	if m.isFilteredComponent(compPrefix) {
 		return Event{}, false
 	}
 	// Filter input changes that only contain timestamp
 	if compPrefix == "input" && !isInputStateChange(e.Status) {
+		return Event{}, false
+	}
+	// Filter switch changes that only contain energy/power data (no actual state toggle)
+	if compPrefix == "switch" && !isSwitchStateChange(e.Status) {
 		return Event{}, false
 	}
 	event.Component = e.Component
@@ -349,15 +379,52 @@ func (m Model) convertStatusChange(e *shellyevents.StatusChangeEvent, event Even
 	return event, true
 }
 
-// convertNotifyEvent converts a NotifyEvent, filtering out BLE scan results.
+// convertNotifyEvent converts a NotifyEvent, filtering out configured events.
 func (m Model) convertNotifyEvent(e *shellyevents.NotifyEvent, event Event) (Event, bool) {
-	if e.Event == "ble.scan_result" {
+	// Filter out configured events (e.g., ble.scan_result)
+	if m.isFilteredEvent(e.Event) {
 		return Event{}, false
 	}
 	event.Component = e.Component
 	event.Type = categorizeEvent(e.Event)
 	event.Description = fmt.Sprintf("%s: %s", e.Component, e.Event)
 	return event, true
+}
+
+// isFilteredComponent checks if a component type should be filtered out.
+func (m Model) isFilteredComponent(compPrefix string) bool {
+	for _, filtered := range m.filteredComponents {
+		if filtered == compPrefix {
+			return true
+		}
+	}
+	return false
+}
+
+// isFilteredEvent checks if an event name should be filtered out.
+// Supports glob-style patterns with * wildcard.
+func (m Model) isFilteredEvent(eventName string) bool {
+	for _, pattern := range m.filteredEvents {
+		if matchEventPattern(pattern, eventName) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchEventPattern matches an event name against a pattern.
+// Supports simple glob patterns: "ble.*" matches "ble.scan_result", "ble.connected", etc.
+func matchEventPattern(pattern, eventName string) bool {
+	// Exact match
+	if pattern == eventName {
+		return true
+	}
+	// Glob pattern with trailing *
+	if strings.HasSuffix(pattern, "*") {
+		prefix := pattern[:len(pattern)-1]
+		return strings.HasPrefix(eventName, prefix)
+	}
+	return false
 }
 
 // updateConnStatus updates the connection status for a device.
@@ -443,6 +510,22 @@ func isInputStateChange(status json.RawMessage) bool {
 	// Only show if "state" field is present (actual state toggle)
 	_, hasState := data["state"]
 	return hasState
+}
+
+// isSwitchStateChange checks if a switch status change contains an actual state change.
+// Filters out energy-only updates (apower, aenergy, current, voltage) that flood the event stream.
+// Real state changes include the "output" field (on/off toggle).
+func isSwitchStateChange(status json.RawMessage) bool {
+	if status == nil {
+		return false
+	}
+	var data map[string]any
+	if err := json.Unmarshal(status, &data); err != nil {
+		return false
+	}
+	// Only show if "output" field is present (actual switch toggle)
+	_, hasOutput := data["output"]
+	return hasOutput
 }
 
 // Update handles messages for events.
@@ -1010,66 +1093,64 @@ type columnLayout struct {
 }
 
 // computeColumnLayout calculates column widths.
-// Cache updates column is compact (TIME + ENTITY only), device events get remaining space.
-// Only DESC truncates on the device events side; all other columns expand to fit content.
+// All columns dynamically size based on content up to sensible maximums.
 func computeColumnLayout(totalWidth int, userEvents, systemEvents []Event) columnLayout {
 	const timeW = 8
 	const levelW = 12
-	const minDeviceW, minDescW = 10, 8
-	const headerCompW = 6 // "system" is 6 chars
-	const spacesUser = 4  // spaces between user columns
-	const separatorW = 3  // " │ "
+	const minDeviceW, minDescW = 10, 20
+	const maxDescW = 80 // Cap DESC to prevent excessive padding
+	const headerCompW = 6
+	const spacesUser = 4
+	const separatorW = 3
 
-	// Cache updates column: TIME + space + ENTITY (no LEVEL, no DESC)
-	sysMaxDevLen := 10 // minimum
-	for _, e := range systemEvents {
-		if len(e.Device) > sysMaxDevLen {
-			sysMaxDevLen = len(e.Device)
-		}
-	}
-	sysDeviceW := sysMaxDevLen + 1
-	sysColWidth := timeW + 1 + sysDeviceW // TIME + space + ENTITY
-
-	// Device events get the rest
-	userColWidth := totalWidth - separatorW - sysColWidth
-	userColWidth = max(60, userColWidth) // Minimum for device events
-
-	// Calculate device events column widths - expand to fit, only DESC truncates
-	maxCompLen := headerCompW
+	// Measure actual content widths from events
 	maxUserDeviceLen := minDeviceW
+	maxCompLen := headerCompW
+	maxDescLen := minDescW
 	for _, e := range userEvents {
+		if len(e.Device) > maxUserDeviceLen {
+			maxUserDeviceLen = len(e.Device)
+		}
 		compLen := len(e.Component)
 		if compLen == 0 {
 			compLen = 6 // "system"
 		}
 		if e.ComponentID > 0 {
-			compLen += 2 // ":N" suffix
+			compLen += 2
 		}
 		if compLen > maxCompLen {
 			maxCompLen = compLen
 		}
-		if len(e.Device) > maxUserDeviceLen {
-			maxUserDeviceLen = len(e.Device)
+		if len(e.Description) > maxDescLen {
+			maxDescLen = len(e.Description)
 		}
 	}
 
-	// Dynamic caps: ensure at least minDescW chars for description
-	// Calculate max possible allocation for device + component
-	maxDevCompBudget := userColWidth - timeW - levelW - spacesUser - minDescW
-	userCompW := min(maxCompLen+1, maxDevCompBudget/3)                 // Component gets up to 1/3 of flexible space
-	userDeviceW := min(maxUserDeviceLen+1, maxDevCompBudget-userCompW) // Device gets remainder
-
-	// Ensure minimums are respected
-	if userCompW < headerCompW+1 {
-		userCompW = headerCompW + 1
-	}
-	if userDeviceW < minDeviceW {
-		userDeviceW = minDeviceW
+	sysMaxDevLen := minDeviceW
+	for _, e := range systemEvents {
+		if len(e.Device) > sysMaxDevLen {
+			sysMaxDevLen = len(e.Device)
+		}
 	}
 
-	// DESC gets all remaining space
-	fixedWidth := timeW + userDeviceW + userCompW + levelW + spacesUser
-	userDescW := max(minDescW, userColWidth-fixedWidth)
+	// Apply sensible caps to prevent any column from dominating
+	userDeviceW := min(maxUserDeviceLen+1, 18) // Cap entity at 18
+	userCompW := min(maxCompLen+1, 12)         // Cap component at 12
+	userDescW := min(maxDescLen+2, maxDescW)   // Cap description at maxDescW
+	sysDeviceW := min(sysMaxDevLen+1, 18)      // Cap cache entity at 18
+
+	// Calculate actual column widths based on content
+	userColWidth := timeW + userDeviceW + userCompW + levelW + userDescW + spacesUser
+	sysColWidth := timeW + 1 + sysDeviceW
+
+	// If we have more space than needed, expand DESC up to maxDescW
+	neededWidth := userColWidth + separatorW + sysColWidth
+	if neededWidth < totalWidth {
+		extra := totalWidth - neededWidth
+		expandDesc := min(extra, maxDescW-userDescW)
+		userDescW += expandDesc
+		userColWidth += expandDesc
+	}
 
 	return columnLayout{
 		colWidth:   userColWidth,

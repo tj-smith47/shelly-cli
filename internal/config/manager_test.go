@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -76,6 +77,38 @@ func TestManager_SaveWithoutLoad(t *testing.T) {
 	err := m.Save()
 	if err == nil {
 		t.Error("Save() should fail when config is not loaded")
+	}
+}
+
+//nolint:paralleltest // Test modifies global state via SetFs
+func TestManager_Save_AddsSchemaHeader(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	SetFs(fs)
+	t.Cleanup(func() { SetFs(nil) })
+
+	path := "/test/config/config.yaml"
+	m := NewManager(path)
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Save the config
+	if err := m.Save(); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	// Read the saved file and check for schema header
+	data, err := afero.ReadFile(fs, path)
+	if err != nil {
+		t.Fatalf("ReadFile() error: %v", err)
+	}
+
+	content := string(data)
+	if !strings.HasPrefix(content, "# yaml-language-server: $schema=") {
+		t.Errorf("config file should start with YAML schema header, got: %q", content[:min(100, len(content))])
+	}
+	if !strings.Contains(content, "config.schema.json") {
+		t.Error("config file should reference config.schema.json")
 	}
 }
 

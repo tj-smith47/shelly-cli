@@ -188,6 +188,10 @@ func (m *Manager) Save() error {
 	return m.saveWithoutLock()
 }
 
+// yamlSchemaHeader is prepended to the config file for YAML language server support.
+// This provides autocomplete and validation in editors like VS Code.
+const yamlSchemaHeader = "# yaml-language-server: $schema=https://raw.githubusercontent.com/tj-smith47/shelly-cli/main/cfg/config.schema.json\n"
+
 // saveWithoutLock writes config to file. Caller must hold m.mu.Lock().
 // For test managers (path is empty), this is a no-op.
 func (m *Manager) saveWithoutLock() error {
@@ -210,7 +214,10 @@ func (m *Manager) saveWithoutLock() error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 
-	if err := afero.WriteFile(fs, m.path, data, 0o600); err != nil {
+	// Prepend YAML schema header for editor support (autocomplete, validation)
+	fullData := append([]byte(yamlSchemaHeader), data...)
+
+	if err := afero.WriteFile(fs, m.path, fullData, 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	return nil

@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/debug"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -30,15 +31,36 @@ type DataPoint struct {
 	Timestamp time.Time
 }
 
+// SwitchKey uniquely identifies a switch across devices.
+type SwitchKey struct {
+	DeviceName  string
+	SwitchID    int
+	SwitchName  string // For display label (user-configured name)
+	SwitchCount int    // Total number of switches on device (for label formatting)
+}
+
+// String returns the display label for this switch.
+// Shows "(Sw0)" format when switch name is empty but device has multiple switches.
+func (k SwitchKey) String() string {
+	if k.SwitchCount <= 1 {
+		return k.DeviceName
+	}
+	if k.SwitchName == "" {
+		return fmt.Sprintf("%s (Sw%d)", k.DeviceName, k.SwitchID)
+	}
+	return k.DeviceName + " " + k.SwitchName
+}
+
 // Model represents the energy history state.
 type Model struct {
 	helpers.Sizable
 	cache          *cache.Cache
 	mu             *sync.RWMutex
-	history        map[string][]DataPoint // Device name -> history
-	hasInitialData map[string]bool        // Tracks devices that have initial data point
-	maxItems       int                    // Max data points per device
-	lastCollection time.Time              // Throttle data collection
+	history        map[SwitchKey][]DataPoint // Per-switch history (not per-device)
+	hasInitialData map[SwitchKey]bool        // Tracks switches that have initial data point
+	maxItems       int                       // Max data points per switch
+	lastCollection time.Time                 // Throttle data collection
+	scroller       *panel.Scroller           // For scrolling when many switches
 	styles         Styles
 	focused        bool
 	panelIndex     int // For Shift+N hint
@@ -98,9 +120,10 @@ func New(c *cache.Cache) Model {
 		Sizable:        helpers.NewSizableLoaderOnly(),
 		cache:          c,
 		mu:             &sync.RWMutex{},
-		history:        make(map[string][]DataPoint),
-		hasInitialData: make(map[string]bool),
-		maxItems:       60, // 5 minutes at 5-second intervals
+		history:        make(map[SwitchKey][]DataPoint),
+		hasInitialData: make(map[SwitchKey]bool),
+		maxItems:       60,                       // 5 minutes at 5-second intervals
+		scroller:       panel.NewScroller(0, 10), // Will be updated with actual counts
 		styles:         DefaultStyles(),
 		loading:        true, // Start in loading state until first data point
 	}
@@ -243,12 +266,12 @@ func modelHasPM(model string) bool {
 	return false
 }
 
-func (m *Model) addDataPoint(deviceName string, power float64) {
-	debug.TraceLock("energyhistory", "Lock", "addDataPoint:"+deviceName)
+func (m *Model) addDataPoint(key SwitchKey, power float64) {
+	debug.TraceLock("energyhistory", "Lock", "addDataPoint:"+key.String())
 	m.mu.Lock()
 	defer func() {
 		m.mu.Unlock()
-		debug.TraceUnlock("energyhistory", "Lock", "addDataPoint:"+deviceName)
+		debug.TraceUnlock("energyhistory", "Lock", "addDataPoint:"+key.String())
 	}()
 
 	point := DataPoint{
@@ -256,7 +279,7 @@ func (m *Model) addDataPoint(deviceName string, power float64) {
 		Timestamp: time.Now(),
 	}
 
-	history := m.history[deviceName]
+	history := m.history[key]
 	history = append(history, point)
 
 	// Trim to max items
@@ -264,81 +287,116 @@ func (m *Model) addDataPoint(deviceName string, power float64) {
 		history = history[len(history)-m.maxItems:]
 	}
 
-	m.history[deviceName] = history
+	m.history[key] = history
+}
+
+// historyEntry holds a switch key and its history for sorting/rendering.
+type historyEntry struct {
+	key     SwitchKey
+	history []DataPoint
+	power   float64 // Current power (latest value) for sorting
 }
 
 // View renders the energy history.
 func (m *Model) View() string {
-	// Show loading indicator during initial data collection
-	if m.loading {
-		return m.renderLoading()
+	// Handle special states first
+	if result, handled := m.handleSpecialStates(); handled {
+		return result
 	}
 
-	if m.cache == nil {
-		return m.renderEmpty()
-	}
-
-	devices := m.cache.GetOnlineDevices()
-	if len(devices) == 0 {
-		return m.renderEmpty()
-	}
-
-	var content strings.Builder
-
-	// Calculate max label width from actual device names - never truncate
-	maxLabelLen := 0
-	for _, d := range devices {
-		if len(d.Device.Name) > maxLabelLen {
-			maxLabelLen = len(d.Device.Name)
-		}
-	}
-	labelWidth := max(10, maxLabelLen+1) // +1 for spacing
-
-	// Sparkline width calculation (shrinks to accommodate full names):
-	// - Borders: 2 (left + right)
-	// - Horizontal padding: 2 (1 each side inside border)
-	// - Label: labelWidth (dynamic)
-	// - Spaces: 2 (after label, after sparkline)
-	// - Value: 10
-	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = 16 + labelWidth
-	sparkWidth := m.Width - 16 - labelWidth
-	if sparkWidth < 10 {
-		sparkWidth = 10 // Absolute minimum sparkline width
-	}
-
-	debug.TraceLock("energyhistory", "RLock", "View")
-	m.mu.RLock()
-	defer func() {
-		m.mu.RUnlock()
-		debug.TraceUnlock("energyhistory", "RLock", "View")
-	}()
-
-	// Sort devices by power (highest first) to match power consumption order
-	slices.SortFunc(devices, func(a, b *cache.DeviceData) int {
-		return cmp.Compare(b.Power, a.Power) // Descending
-	})
-
-	hasData := false
-	for _, d := range devices {
-		history := m.history[d.Device.Name]
-		if len(history) > 0 {
-			hasData = true
-			content.WriteString(m.renderDeviceSparkline(d.Device.Name, history, sparkWidth, labelWidth) + "\n")
-		}
-	}
-
-	if !hasData {
+	// Get sorted entries
+	entries := m.getSortedEntries()
+	if len(entries) == 0 {
 		return m.renderNoData()
 	}
 
-	// Build legend: text in border color (yellow), Unicode chars in gradient colors
+	// Setup scroller
+	visibleRows := max(1, m.Height-4)
+	m.scroller.SetItemCount(len(entries))
+	m.scroller.SetVisibleRows(visibleRows)
+
+	// Calculate layout and render
+	labelWidth, sparkWidth := m.calculateLayout(entries)
+	content := m.renderVisibleEntries(entries, labelWidth, sparkWidth)
+
+	return m.buildPanel(content, len(entries))
+}
+
+// handleSpecialStates checks for loading or empty states.
+func (m *Model) handleSpecialStates() (string, bool) {
+	if m.loading {
+		return m.renderLoading(), true
+	}
+	if m.cache == nil {
+		return m.renderEmpty(), true
+	}
+	if len(m.cache.GetOnlineDevices()) == 0 {
+		return m.renderEmpty(), true
+	}
+	return "", false
+}
+
+// getSortedEntries returns history entries sorted by power descending.
+func (m *Model) getSortedEntries() []historyEntry {
+	debug.TraceLock("energyhistory", "RLock", "View")
+	m.mu.RLock()
+	var entries []historyEntry
+	for key, history := range m.history {
+		if len(history) > 0 {
+			entries = append(entries, historyEntry{
+				key:     key,
+				history: history,
+				power:   history[len(history)-1].Value,
+			})
+		}
+	}
+	m.mu.RUnlock()
+	debug.TraceUnlock("energyhistory", "RLock", "View")
+
+	// Sort by power descending, then by key label for stable ordering when power values are equal
+	slices.SortFunc(entries, func(a, b historyEntry) int {
+		if c := cmp.Compare(b.power, a.power); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.key.String(), b.key.String()) // Alphabetical for stability
+	})
+	return entries
+}
+
+// calculateLayout computes label and sparkline widths.
+func (m *Model) calculateLayout(entries []historyEntry) (labelWidth, sparkWidth int) {
+	maxLabelLen := 0
+	for _, e := range entries {
+		maxLabelLen = max(maxLabelLen, len(e.key.String()))
+	}
+	labelWidth = max(10, maxLabelLen+1)
+	sparkWidth = max(10, m.Width-16-labelWidth)
+	return labelWidth, sparkWidth
+}
+
+// renderVisibleEntries renders only the visible portion of entries.
+func (m *Model) renderVisibleEntries(entries []historyEntry, labelWidth, sparkWidth int) string {
+	var content strings.Builder
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end && i < len(entries); i++ {
+		e := entries[i]
+		content.WriteString(m.renderDeviceSparkline(e.key.String(), e.history, sparkWidth, labelWidth) + "\n")
+	}
+	return content.String()
+}
+
+// buildPanel creates the final rendered panel with badge.
+func (m *Model) buildPanel(content string, entryCount int) string {
 	borderStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
-	legend := borderStyle.Render("Legend:") + " " +
+	countInfo := fmt.Sprintf("%d switches", entryCount)
+	if m.scroller.HasMore() || m.scroller.HasPrevious() {
+		countInfo = m.scroller.ScrollInfoRange()
+	}
+	legend := borderStyle.Render(countInfo+" │ ") +
 		m.styles.SparkGradient[0].Render("▁") + borderStyle.Render(" low ") +
 		m.styles.SparkGradient[3].Render("▄") + borderStyle.Render(" mid ") +
 		m.styles.SparkGradient[7].Render("█") + borderStyle.Render(" high")
 
-	// Use rendering package for consistent embedded title styling
 	r := rendering.New(m.Width, m.Height).
 		SetTitle("Energy History").
 		SetBadge(legend).
@@ -346,17 +404,17 @@ func (m *Model) View() string {
 		SetPanelIndex(m.panelIndex).
 		SetFooter("5m·····now")
 
-	// Use yellow borders for energy panels
-	if m.focused {
-		r.SetFocusColor(theme.Yellow())
-	} else {
-		r.SetBlurColor(theme.Yellow())
-	}
-
-	return r.SetContent(content.String()).Render()
+	m.applyBorderColor(r)
+	return r.SetContent(content).Render()
 }
 
-// collectCurrentPower records power data from online devices with PM capability.
+// applyBorderColor sets the appropriate border color for the panel.
+// Uses the default blue focus color (from renderer) and yellow blur color.
+func (m *Model) applyBorderColor(r *rendering.Renderer) {
+	r.SetBlurColor(theme.Yellow())
+}
+
+// collectCurrentPower records power data per-switch from online devices with PM capability.
 // Called during View() to ensure data is always collected on each render.
 // Throttled to collect at most once every 5 seconds, except for initial data capture
 // which happens immediately to prevent false ramp-up from 0.
@@ -370,28 +428,91 @@ func (m *Model) collectCurrentPower(devices []*cache.DeviceData) {
 
 		deviceName := d.Device.Name
 
-		// Check if this device needs initial data capture (bypass throttle)
-		m.mu.RLock()
-		hasInitial := m.hasInitialData[deviceName]
-		m.mu.RUnlock()
+		// Build switch name lookup
+		switchNames := make(map[int]string)
+		for _, sw := range d.Switches {
+			switchNames[sw.ID] = sw.Name
+		}
 
-		if !hasInitial {
-			// First data point for this device - capture immediately to prevent
-			// false ramp-up from 0 when device was already ON before TUI started
-			debug.TraceEvent("energy: %s initial capture: %.1fW (bypassing throttle)", deviceName, d.Power)
-			m.addDataPoint(deviceName, d.Power)
-			m.mu.Lock()
-			m.hasInitialData[deviceName] = true
-			m.mu.Unlock()
-		} else if !throttleActive {
-			// Subsequent data points respect the throttle
-			m.addDataPoint(deviceName, d.Power)
+		// Collect per-switch power data using switch for clarity
+		switch {
+		case len(d.SwitchPowers) > 0:
+			switchCount := len(d.SwitchPowers)
+			for switchID, power := range d.SwitchPowers {
+				key := SwitchKey{
+					DeviceName:  deviceName,
+					SwitchID:    switchID,
+					SwitchName:  switchNames[switchID],
+					SwitchCount: switchCount,
+				}
+				m.collectDataForKey(key, power, throttleActive)
+			}
+		case len(d.PMPowers) > 0:
+			pmCount := len(d.PMPowers)
+			for pmID, power := range d.PMPowers {
+				key := SwitchKey{
+					DeviceName:  deviceName,
+					SwitchID:    pmID,
+					SwitchName:  fmt.Sprintf("PM%d", pmID),
+					SwitchCount: pmCount,
+				}
+				m.collectDataForKey(key, power, throttleActive)
+			}
+		case len(d.EMPowers) > 0 || len(d.EM1Powers) > 0:
+			emCount := len(d.EMPowers) + len(d.EM1Powers)
+			for emID, power := range d.EMPowers {
+				key := SwitchKey{
+					DeviceName:  deviceName,
+					SwitchID:    emID,
+					SwitchName:  fmt.Sprintf("EM%d", emID),
+					SwitchCount: emCount,
+				}
+				m.collectDataForKey(key, power, throttleActive)
+			}
+			for em1ID, power := range d.EM1Powers {
+				key := SwitchKey{
+					DeviceName:  deviceName,
+					SwitchID:    em1ID,
+					SwitchName:  fmt.Sprintf("EM1:%d", em1ID),
+					SwitchCount: emCount,
+				}
+				m.collectDataForKey(key, power, throttleActive)
+			}
+		default:
+			// Fallback: single aggregated power value
+			key := SwitchKey{
+				DeviceName:  deviceName,
+				SwitchID:    0,
+				SwitchName:  "",
+				SwitchCount: 1,
+			}
+			m.collectDataForKey(key, d.Power, throttleActive)
 		}
 	}
 
 	// Update throttle timestamp when not throttled
 	if !throttleActive {
 		m.lastCollection = time.Now()
+	}
+}
+
+// collectDataForKey adds a data point for a switch key, respecting throttle and initial capture.
+func (m *Model) collectDataForKey(key SwitchKey, power float64, throttleActive bool) {
+	m.mu.RLock()
+	hasInitial := m.hasInitialData[key]
+	m.mu.RUnlock()
+
+	if !hasInitial {
+		// First data point for this switch - capture immediately to prevent
+		// false ramp-up from 0 when device was already ON before TUI started
+		debug.TraceEvent("energy: %s initial capture: %.1fW (bypassing throttle)", key.String(), power)
+		m.addDataPoint(key, power)
+		m.mu.Lock()
+		m.hasInitialData[key] = true
+		m.mu.Unlock()
+	} else if !throttleActive {
+		// Subsequent data points respect the throttle
+		m.addDataPoint(key, power)
 	}
 }
 
@@ -579,12 +700,8 @@ func (m *Model) renderLoading() string {
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
 
-	// Use yellow borders for energy panels
-	if m.focused {
-		r.SetFocusColor(theme.Yellow())
-	} else {
-		r.SetBlurColor(theme.Yellow())
-	}
+	// Use yellow blur border for energy panels (focus uses default blue)
+	r.SetBlurColor(theme.Yellow())
 
 	return r.SetContent(m.Loader.View()).Render()
 }
@@ -616,11 +733,16 @@ func (m *Model) Clear() {
 	clear(m.hasInitialData)
 }
 
-// DeviceCount returns the number of devices with history.
+// DeviceCount returns the number of switches with history (renamed from devices).
 func (m *Model) DeviceCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.history)
+}
+
+// SwitchCount returns the number of switches with history.
+func (m *Model) SwitchCount() int {
+	return m.DeviceCount()
 }
 
 // HistoryCount returns the total number of data points across all devices.
@@ -661,4 +783,33 @@ func (m *Model) StartLoading() (Model, tea.Cmd) {
 // IsLoading returns whether the component is in loading state.
 func (m *Model) IsLoading() bool {
 	return m.loading
+}
+
+// ScrollUp scrolls the list up by one item.
+func (m *Model) ScrollUp() Model {
+	m.scroller.CursorUp()
+	return *m
+}
+
+// ScrollDown scrolls the list down by one item.
+func (m *Model) ScrollDown() Model {
+	m.scroller.CursorDown()
+	return *m
+}
+
+// PageUp scrolls up by one page.
+func (m *Model) PageUp() Model {
+	m.scroller.PageUp()
+	return *m
+}
+
+// PageDown scrolls down by one page.
+func (m *Model) PageDown() Model {
+	m.scroller.PageDown()
+	return *m
+}
+
+// CanScroll returns true if there are more items than visible rows.
+func (m *Model) CanScroll() bool {
+	return m.scroller.HasMore() || m.scroller.HasPrevious()
 }

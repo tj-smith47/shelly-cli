@@ -14,17 +14,20 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/cache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
 
-// Bar represents a single energy bar.
+// Bar represents a single energy bar (per-switch, not per-device).
 type Bar struct {
-	Label  string
-	Value  float64
-	MaxVal float64
-	Unit   string
-	Color  color.Color
+	DeviceName string      // Device name for grouping
+	SwitchName string      // Switch/input name (may be empty)
+	Label      string      // Combined display label: "[Device] [Switch]"
+	Value      float64     // Power value
+	MaxVal     float64     // Max value for scaling (0 = auto)
+	Unit       string      // Unit (W)
+	Color      color.Color // Bar color
 }
 
 // Model represents the energy bars state.
@@ -32,6 +35,7 @@ type Model struct {
 	helpers.Sizable
 	bars       []Bar
 	cache      *cache.Cache
+	scroller   *panel.Scroller
 	barHeight  int
 	styles     Styles
 	showTotal  bool
@@ -82,6 +86,7 @@ func New(c *cache.Cache) Model {
 	m := Model{
 		Sizable:   helpers.NewSizableLoaderOnly(),
 		cache:     c,
+		scroller:  panel.NewScroller(0, 10), // Will be updated with actual counts
 		barHeight: 1,
 		styles:    DefaultStyles(),
 		showTotal: true,
@@ -133,121 +138,263 @@ func (m Model) hasPMDevicesInCache() bool {
 
 // View renders the energy bars.
 func (m Model) View() string {
-	// Show loading indicator during initial load
-	if m.loading {
-		return m.renderLoading()
+	// Handle special states first
+	if result, handled := m.checkSpecialStates(); handled {
+		return result
 	}
 
-	if m.cache == nil {
-		return m.renderEmpty()
-	}
-
+	// Collect bars from devices
 	devices := m.cache.GetOnlineDevices()
-	if len(devices) == 0 {
-		return m.renderEmpty()
-	}
-
-	// Collect power data from devices
 	m.bars = m.collectBars(devices)
-
 	if len(m.bars) == 0 {
 		return m.renderNoData()
 	}
 
-	var content strings.Builder
+	// Setup scroller with visible rows
+	visibleRows := max(1, m.Height-4) // borders (2) + title/footer (2)
+	m.scroller.SetItemCount(len(m.bars))
+	m.scroller.SetVisibleRows(visibleRows)
 
-	// Find max value for scaling
-	maxVal := m.findMaxValue()
-	if maxVal < 100 {
-		maxVal = 100 // Minimum scale for visibility
+	// Calculate layout dimensions
+	labelWidth, barWidth := m.calculateLayout()
+
+	// Render visible bars and calculate total
+	content, totalPower := m.renderVisibleBars(labelWidth, barWidth)
+
+	// Build panel with badge and content
+	return m.buildPanel(content, totalPower)
+}
+
+// checkSpecialStates checks for loading or empty states (no data modification).
+func (m Model) checkSpecialStates() (string, bool) {
+	if m.loading {
+		return m.renderLoading(), true
 	}
+	if m.cache == nil {
+		return m.renderEmpty(), true
+	}
+	if len(m.cache.GetOnlineDevices()) == 0 {
+		return m.renderEmpty(), true
+	}
+	return "", false
+}
 
-	// Calculate max label width - never truncate names, shrink bars instead
+// calculateLayout computes label and bar widths based on content.
+func (m Model) calculateLayout() (labelWidth, barWidth int) {
 	maxLabelLen := 0
 	for _, bar := range m.bars {
-		if len(bar.Label) > maxLabelLen {
-			maxLabelLen = len(bar.Label)
-		}
+		maxLabelLen = max(maxLabelLen, len(bar.Label))
 	}
-	labelWidth := max(10, maxLabelLen+1) // +1 for spacing
+	labelWidth = max(10, maxLabelLen+1)
+	barWidth = max(5, m.Width-16-labelWidth)
+	return labelWidth, barWidth
+}
 
-	// Bar width calculation (shrinks to accommodate full names):
-	// - Borders: 2 (left + right)
-	// - Horizontal padding: 2 (1 each side inside border)
-	// - Label: labelWidth (dynamic)
-	// - Spaces: 2 (after label, after bar)
-	// - Value: 10
-	// Total overhead = 2 + 2 + labelWidth + 2 + 10 = 16 + labelWidth
-	barWidth := m.Width - 16 - labelWidth
-	if barWidth < 5 {
-		barWidth = 5 // Absolute minimum bar width
+// renderVisibleBars renders only the visible portion and returns content and total.
+func (m Model) renderVisibleBars(labelWidth, barWidth int) (renderedContent string, totalPower float64) {
+	maxVal := max(100.0, m.findMaxValue())
+
+	var sb strings.Builder
+	start, end := m.scroller.VisibleRange()
+	for i := start; i < end && i < len(m.bars); i++ {
+		sb.WriteString(m.renderBar(m.bars[i], maxVal, barWidth, labelWidth) + "\n")
 	}
 
-	var totalPower float64
 	for _, bar := range m.bars {
-		content.WriteString(m.renderBar(bar, maxVal, barWidth, labelWidth) + "\n")
 		totalPower += bar.Value
 	}
+	return sb.String(), totalPower
+}
 
-	// Use rendering package for consistent embedded title styling
-	// Show PM device count and legend in badge
-	// Text in border color (yellow), Unicode chars in actual bar colors
+// buildPanel creates the final rendered panel with badge and footer.
+func (m Model) buildPanel(content string, totalPower float64) string {
 	borderStyle := lipgloss.NewStyle().Foreground(theme.Yellow())
 	barFillStyle := lipgloss.NewStyle().Foreground(theme.Orange())
-	badge := borderStyle.Render(fmt.Sprintf("%d devices │ Legend: ", len(m.bars))) +
+	countInfo := fmt.Sprintf("%d switches", len(m.bars))
+	if m.scroller.HasMore() || m.scroller.HasPrevious() {
+		countInfo = m.scroller.ScrollInfoRange()
+	}
+	badge := borderStyle.Render(countInfo+" │ ") +
 		barFillStyle.Render("██") + borderStyle.Render(" high ") +
 		barFillStyle.Render("░░") + borderStyle.Render(" low")
+
 	r := rendering.New(m.Width, m.Height).
 		SetTitle("Power Consumption").
 		SetBadge(badge).
 		SetFocused(m.focused).
 		SetPanelIndex(m.panelIndex)
 
-	// Use yellow borders for energy panels
-	if m.focused {
-		r.SetFocusColor(theme.Yellow())
-	} else {
-		r.SetBlurColor(theme.Yellow())
-	}
+	m.applyBorderColor(r)
 
-	// Show total in footer when enabled and multiple devices
 	if m.showTotal && len(m.bars) > 1 {
 		r.SetFooter(fmt.Sprintf("Total: %s", formatValue(totalPower, "W")))
 	}
+	return r.SetContent(content).Render()
+}
 
-	return r.SetContent(content.String()).Render()
+// applyBorderColor sets the appropriate border color for the panel.
+// Uses the default blue focus color (from renderer) and yellow blur color.
+func (m Model) applyBorderColor(r *rendering.Renderer) {
+	r.SetBlurColor(theme.Yellow())
 }
 
 func (m Model) collectBars(devices []*cache.DeviceData) []Bar {
 	var bars []Bar
 	for _, d := range devices {
-		// Show all devices with power monitoring capability, even if power is 0
-		// Check snapshot for PM/EM/EM1 components, or check model for PM capability
-		hasPM := hasPMCapability(d)
-		if hasPM {
-			bars = append(bars, Bar{
-				Label:  d.Device.Name,
-				Value:  d.Power,
-				MaxVal: 0, // Will be auto-calculated
-				Unit:   "W",
-				Color:  theme.Orange(),
-			})
+		if !hasPMCapability(d) {
+			continue
 		}
+		bars = append(bars, collectDeviceBars(d)...)
 	}
 
 	// Sort by power value descending (highest power first)
+	// Use Label as secondary sort key for stable ordering when power values are equal
 	slices.SortFunc(bars, func(a, b Bar) int {
-		return cmp.Compare(b.Value, a.Value) // Reversed for descending
+		if c := cmp.Compare(b.Value, a.Value); c != 0 {
+			return c // Reversed for descending
+		}
+		return cmp.Compare(a.Label, b.Label) // Alphabetical for stability
 	})
 
 	return bars
 }
 
+// collectDeviceBars extracts bars for a single device based on its power source type.
+func collectDeviceBars(d *cache.DeviceData) []Bar {
+	deviceName := d.Device.Name
+
+	switch {
+	case len(d.SwitchPowers) > 0:
+		return collectSwitchBars(deviceName, d)
+	case len(d.PMPowers) > 0:
+		return collectPMBars(deviceName, d.PMPowers)
+	case len(d.EMPowers) > 0 || len(d.EM1Powers) > 0:
+		return collectEMBars(deviceName, d.EMPowers, d.EM1Powers)
+	default:
+		return []Bar{{
+			DeviceName: deviceName,
+			SwitchName: "",
+			Label:      deviceName,
+			Value:      d.Power,
+			MaxVal:     0,
+			Unit:       "W",
+			Color:      theme.Orange(),
+		}}
+	}
+}
+
+// collectSwitchBars creates bars for switch-integrated power monitoring (e.g., Plus 2PM).
+func collectSwitchBars(deviceName string, d *cache.DeviceData) []Bar {
+	// Build name lookup from Switches slice
+	switchNames := make(map[int]string)
+	for _, sw := range d.Switches {
+		switchNames[sw.ID] = sw.Name
+	}
+
+	bars := make([]Bar, 0, len(d.SwitchPowers))
+	for switchID, power := range d.SwitchPowers {
+		switchName := switchNames[switchID]
+		bars = append(bars, Bar{
+			DeviceName: deviceName,
+			SwitchName: switchName,
+			Label:      formatSwitchLabel(deviceName, switchName, switchID, len(d.SwitchPowers)),
+			Value:      power,
+			MaxVal:     0,
+			Unit:       "W",
+			Color:      theme.Orange(),
+		})
+	}
+	return bars
+}
+
+// collectPMBars creates bars for dedicated PM components.
+func collectPMBars(deviceName string, pmPowers map[int]float64) []Bar {
+	bars := make([]Bar, 0, len(pmPowers))
+	for pmID, power := range pmPowers {
+		label := deviceName
+		if len(pmPowers) > 1 {
+			label = fmt.Sprintf("%s PM%d", deviceName, pmID)
+		}
+		bars = append(bars, Bar{
+			DeviceName: deviceName,
+			SwitchName: fmt.Sprintf("PM%d", pmID),
+			Label:      label,
+			Value:      power,
+			MaxVal:     0,
+			Unit:       "W",
+			Color:      theme.Orange(),
+		})
+	}
+	return bars
+}
+
+// collectEMBars creates bars for energy meter components (EM and EM1).
+func collectEMBars(deviceName string, emPowers, em1Powers map[int]float64) []Bar {
+	bars := make([]Bar, 0, len(emPowers)+len(em1Powers))
+	for emID, power := range emPowers {
+		label := deviceName
+		if len(emPowers) > 1 {
+			label = fmt.Sprintf("%s EM%d", deviceName, emID)
+		}
+		bars = append(bars, Bar{
+			DeviceName: deviceName,
+			SwitchName: fmt.Sprintf("EM%d", emID),
+			Label:      label,
+			Value:      power,
+			MaxVal:     0,
+			Unit:       "W",
+			Color:      theme.Orange(),
+		})
+	}
+	for em1ID, power := range em1Powers {
+		label := deviceName
+		if len(em1Powers) > 1 {
+			label = fmt.Sprintf("%s EM1:%d", deviceName, em1ID)
+		}
+		bars = append(bars, Bar{
+			DeviceName: deviceName,
+			SwitchName: fmt.Sprintf("EM1:%d", em1ID),
+			Label:      label,
+			Value:      power,
+			MaxVal:     0,
+			Unit:       "W",
+			Color:      theme.Orange(),
+		})
+	}
+	return bars
+}
+
+// formatSwitchLabel creates a display label for a switch.
+// Format: "[Device Name] [Switch Name]" when there are multiple switches.
+// If switch name is empty, shows "(Sw0)" format to identify the switch.
+// If only one switch, just show device name.
+func formatSwitchLabel(deviceName, switchName string, switchID, switchCount int) string {
+	if switchCount <= 1 {
+		return deviceName
+	}
+	if switchName == "" {
+		return fmt.Sprintf("%s (Sw%d)", deviceName, switchID)
+	}
+	return deviceName + " " + switchName
+}
+
 // hasPMCapability checks if a device has power monitoring capability.
 // This checks both the snapshot (if PM/EM/EM1 components exist) and the model code.
 func hasPMCapability(d *cache.DeviceData) bool {
-	// Check snapshot for actual PM components
+	// Check snapshot for dedicated PM/EM components
 	if d.Snapshot != nil && (len(d.Snapshot.PM) > 0 || len(d.Snapshot.EM) > 0 || len(d.Snapshot.EM1) > 0) {
+		return true
+	}
+
+	// Check for switch-integrated power monitoring (e.g., Plus 2PM)
+	// Devices like Plus 2PM have PM in the switch component (apower field),
+	// not dedicated PM components. SwitchPowers is populated when switches report power.
+	if len(d.SwitchPowers) > 0 {
+		return true
+	}
+
+	// Also check cover-integrated power monitoring
+	if len(d.CoverPowers) > 0 {
 		return true
 	}
 
@@ -436,4 +583,33 @@ func (m Model) StartLoading() (Model, tea.Cmd) {
 // IsLoading returns whether the component is in loading state.
 func (m Model) IsLoading() bool {
 	return m.loading
+}
+
+// ScrollUp scrolls the list up by one item.
+func (m Model) ScrollUp() Model {
+	m.scroller.CursorUp()
+	return m
+}
+
+// ScrollDown scrolls the list down by one item.
+func (m Model) ScrollDown() Model {
+	m.scroller.CursorDown()
+	return m
+}
+
+// PageUp scrolls up by one page.
+func (m Model) PageUp() Model {
+	m.scroller.PageUp()
+	return m
+}
+
+// PageDown scrolls down by one page.
+func (m Model) PageDown() Model {
+	m.scroller.PageDown()
+	return m
+}
+
+// CanScroll returns true if there are more items than visible rows.
+func (m Model) CanScroll() bool {
+	return m.scroller.HasMore() || m.scroller.HasPrevious()
 }

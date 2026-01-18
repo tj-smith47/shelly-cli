@@ -51,20 +51,6 @@ type DeviceActionMsg struct {
 	Err    error
 }
 
-// PanelFocus tracks which panel is focused.
-type PanelFocus int
-
-const (
-	// PanelDeviceList is the device list column.
-	PanelDeviceList PanelFocus = iota
-	// PanelDetail is the device info column.
-	PanelDetail
-	// PanelEvents is the events panel.
-	PanelEvents
-	// PanelEndpoints means endpoint is selected, JSON overlay visible.
-	PanelEndpoints
-)
-
 // Device action constants.
 const (
 	actionToggle = "toggle"
@@ -129,13 +115,12 @@ type Model struct {
 	// State
 	ready                   bool
 	quitting                bool
-	cursor                  int        // Selected device index
-	componentCursor         int        // Selected component within device (-1 = all)
-	filter                  string     // Device name filter
-	focusedPanel            PanelFocus // Which panel is currently focused
-	endpointCursor          int        // Selected endpoint in JSON panel
-	initialSelectionEmitted bool       // Whether initial device selection has been emitted
-	lastCacheVersion        uint64     // Last observed cache version for detecting WebSocket updates
+	cursor                  int    // Selected device index
+	componentCursor         int    // Selected component within device (-1 = all)
+	filter                  string // Device name filter
+	endpointCursor          int    // Selected endpoint in JSON panel
+	initialSelectionEmitted bool   // Whether initial device selection has been emitted
+	lastCacheVersion        uint64 // Last observed cache version for detecting WebSocket updates
 
 	// Dimensions
 	width  int
@@ -199,6 +184,14 @@ func applyTUITheme(cfg *config.Config, ios *iostreams.IOStreams) {
 	}
 }
 
+// getEventsConfig returns the TUI events config with defaults applied.
+func getEventsConfig(cfg *config.Config) config.TUIEventsConfig {
+	if cfg == nil {
+		return config.DefaultTUIEventsConfig()
+	}
+	return cfg.GetTUIEventsConfig()
+}
+
 // New creates a new TUI application.
 func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	cfg, err := f.Config()
@@ -217,11 +210,11 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Subscribe cache to event stream for real-time updates
 	deviceCache.SubscribeToEvents(eventStream)
 
-	// Create focus manager for Dashboard panels
+	// Create focus manager for Dashboard panels (DeviceList is primary focus)
 	focusMgr := focus.New(
-		focus.PanelEvents,
 		focus.PanelDeviceList,
 		focus.PanelDeviceInfo,
+		focus.PanelEvents,
 		focus.PanelEnergyBars,
 		focus.PanelEnergyHistory,
 	)
@@ -232,12 +225,16 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Create search component with initial filter
 	searchModel := search.NewWithFilter(opts.Filter)
 
-	// Create events component for real-time event stream
+	// Create events component for real-time event stream with config
+	eventsConfig := getEventsConfig(cfg)
 	eventsModel := events.New(events.Deps{
-		Ctx:         ctx,
-		Svc:         f.ShellyService(),
-		IOS:         f.IOStreams(),
-		EventStream: eventStream,
+		Ctx:                ctx,
+		Svc:                f.ShellyService(),
+		IOS:                f.IOStreams(),
+		EventStream:        eventStream,
+		FilteredEvents:     eventsConfig.FilteredEvents,
+		FilteredComponents: eventsConfig.FilteredComponents,
+		MaxItems:           eventsConfig.MaxItems,
 	})
 
 	// Create energy bars component
@@ -336,7 +333,6 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 		contextMap:      contextKeyMap,
 		filter:          opts.Filter,
 		componentCursor: -1, // -1 means "all components"
-		focusedPanel:    PanelDeviceList,
 		statusBar:       statusbar.New(),
 		search:          searchModel,
 		cmdMode:         cmdmode.New(),
@@ -543,7 +539,7 @@ func (m Model) handleViewAndComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool
 		m.tabBar, _ = m.tabBar.SetActive(msg.Current)
 		return m, nil, true
 	case views.ReturnFocusMsg:
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		return m, nil, true
 	}
 	return m, nil, false
@@ -595,7 +591,7 @@ func (m Model) handleDeviceSelectionMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool)
 func (m Model) handleComponentMsgs(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case jsonviewer.CloseMsg:
-		m.focusedPanel = PanelDetail
+		m = m.setFocus(focus.PanelDeviceInfo)
 		return m, nil, true
 	case jsonviewer.FetchedMsg:
 		var cmd tea.Cmd
@@ -669,6 +665,11 @@ func (m Model) handleAllDevicesLoaded(msg cache.AllDevicesLoadedMsg) (tea.Model,
 	cmd := m.cache.Update(msg)
 	m = m.updateStatusBarContext()
 
+	// Forward to energyHistory to trigger initial data collection
+	var historyCmd tea.Cmd
+	*m.energyHistory, historyCmd = m.energyHistory.Update(msg)
+	cmd = tea.Batch(cmd, historyCmd)
+
 	// Start EventStream now that initial load is complete
 	// This avoids concurrent HTTP requests with wave loading
 	eventStreamCmd := m.startEventStream()
@@ -726,7 +727,7 @@ func (m Model) handleRequestJSON(msg deviceinfo.RequestJSONMsg) (tea.Model, tea.
 		if d.Device.Name != msg.DeviceName {
 			continue
 		}
-		m.focusedPanel = PanelEndpoints
+		m = m.setFocus(focus.PanelJSON)
 		endpoints := m.getDeviceMethods(d)
 		var cmd tea.Cmd
 		m.jsonViewer, cmd = m.jsonViewer.Open(d.Device.Address, msg.Endpoint, endpoints)
@@ -1151,7 +1152,7 @@ func (m Model) getCurrentKeyContext() keys.Context {
 	switch m.tabBar.ActiveTabID() {
 	case tabs.TabDashboard:
 		// Dashboard uses panel-based context
-		return m.panelToContext(m.focusedPanel)
+		return m.panelToContext(m.focusManager.Current())
 	case tabs.TabAutomation:
 		return keys.ContextAutomation
 	case tabs.TabConfig:
@@ -1163,21 +1164,23 @@ func (m Model) getCurrentKeyContext() keys.Context {
 	case tabs.TabMonitor:
 		return keys.ContextMonitor
 	default:
-		return m.panelToContext(m.focusedPanel)
+		return m.panelToContext(m.focusManager.Current())
 	}
 }
 
-// panelToContext converts a PanelFocus to a keys.Context.
-func (m Model) panelToContext(panel PanelFocus) keys.Context {
+// panelToContext converts a focus.PanelID to a keys.Context.
+func (m Model) panelToContext(panel focus.PanelID) keys.Context {
 	switch panel {
-	case PanelEvents:
+	case focus.PanelEvents:
 		return keys.ContextEvents
-	case PanelDeviceList:
+	case focus.PanelDeviceList:
 		return keys.ContextDevices
-	case PanelDetail:
+	case focus.PanelDeviceInfo:
 		return keys.ContextInfo
-	case PanelEndpoints:
+	case focus.PanelJSON:
 		return keys.ContextJSON
+	case focus.PanelEnergyBars, focus.PanelEnergyHistory:
+		return keys.ContextEnergy
 	default:
 		return keys.ContextGlobal
 	}
@@ -1190,20 +1193,20 @@ func (m Model) handleDeviceListTabKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd)
 
 	// Shift+1 (!) ALWAYS returns focus to device list, regardless of current focus
 	if keyStr == keyconst.Shift1 {
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: false})
 		return m, cmd
 	}
 
 	// Escape ALWAYS returns focus to device list
 	if keyStr == "esc" {
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: false})
 		return m, cmd
 	}
 
 	// When device list is focused, try to handle navigation keys here
-	if m.focusedPanel == PanelDeviceList {
+	if m.focusManager.IsFocused(focus.PanelDeviceList) {
 		newModel, cmd, handled := m.handleDeviceListFocusedKeys(msg)
 		if handled {
 			return newModel, cmd
@@ -1226,21 +1229,21 @@ func (m Model) handleDeviceListFocusedKeys(msg tea.KeyPressMsg) (Model, tea.Cmd,
 	switch keyStr {
 	case "tab", "shift+tab":
 		// Both Tab and Shift+Tab move focus to the view
-		m.focusedPanel = PanelDetail
+		m = m.setFocus(focus.PanelDeviceInfo)
 		// Tell the view it now has focus
 		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: true})
 		return m, cmd, true
 	}
 	// Shift+1 (!) keeps focus on device list (panel 1 on all tabs with device list)
 	if keyStr == keyconst.Shift1 {
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		// Tell the view it no longer has focus
 		cmd := m.viewManager.Update(views.ViewFocusChangedMsg{Focused: false})
 		return m, cmd, true
 	}
 	// Shift+2-9 (@, #, $, %, ^, &, *, () switch focus to view and forward the key for panel selection
 	if isShiftNumberKey(keyStr) && keyStr != keyconst.Shift1 {
-		m.focusedPanel = PanelDetail
+		m = m.setFocus(focus.PanelDeviceInfo)
 		cmd := m.viewManager.Update(msg)
 		return m, cmd, true
 	}
@@ -1256,70 +1259,67 @@ func (m Model) handleDeviceListFocusedKeys(msg tea.KeyPressMsg) (Model, tea.Cmd,
 func (m Model) handlePanelSwitch(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "tab":
-		m = m.setFocusedPanel(m.nextPanel())
+		m.focusManager.Next()
+		m = m.syncComponentFocus()
 		return m, nil, true
 	case "shift+tab":
-		m = m.setFocusedPanel(m.prevPanel())
+		m.focusManager.Prev()
+		m = m.syncComponentFocus()
 		return m, nil, true
 	case keyconst.Shift1:
-		m = m.setFocusedPanel(PanelDeviceList)
+		m = m.setFocus(focus.PanelDeviceList)
 		return m, nil, true
 	case keyconst.Shift2:
-		m = m.setFocusedPanel(PanelDetail)
+		m = m.setFocus(focus.PanelDeviceInfo)
 		return m, nil, true
 	case keyconst.Shift3:
-		m = m.setFocusedPanel(PanelEvents)
+		m = m.setFocus(focus.PanelEvents)
+		return m, nil, true
+	case keyconst.Shift4:
+		m = m.setFocus(focus.PanelEnergyBars)
+		return m, nil, true
+	case keyconst.Shift5:
+		m = m.setFocus(focus.PanelEnergyHistory)
 		return m, nil, true
 	case "enter":
 		return m.openJSONViewer()
 	case "esc":
 		if m.jsonViewer.Visible() {
 			m.jsonViewer = m.jsonViewer.Close()
-			m = m.setFocusedPanel(PanelDetail)
+			m = m.setFocus(focus.PanelDeviceInfo)
 			return m, nil, true
 		}
 	}
 	return m, nil, false
 }
 
-// nextPanel returns the next panel in the cycle: DeviceList -> Detail -> Events -> DeviceList.
-func (m Model) nextPanel() PanelFocus {
-	switch m.focusedPanel {
-	case PanelDeviceList:
-		return PanelDetail
-	case PanelDetail:
-		return PanelEvents
-	default:
-		return PanelDeviceList
-	}
+// syncComponentFocus updates all component focus states to match the current focusManager state.
+func (m Model) syncComponentFocus() Model {
+	current := m.focusManager.Current()
+	m.deviceInfo = m.deviceInfo.SetFocused(current == focus.PanelDeviceInfo)
+	m.deviceList = m.deviceList.SetFocused(current == focus.PanelDeviceList)
+	m.events = m.events.SetFocused(current == focus.PanelEvents)
+	m.energyBars = m.energyBars.SetFocused(current == focus.PanelEnergyBars)
+	*m.energyHistory = m.energyHistory.SetFocused(current == focus.PanelEnergyHistory)
+	return m
 }
 
-// prevPanel returns the previous panel in the cycle: Events -> Detail -> DeviceList -> Events.
-func (m Model) prevPanel() PanelFocus {
-	switch m.focusedPanel {
-	case PanelEvents:
-		return PanelDetail
-	case PanelDetail:
-		return PanelDeviceList
-	default:
-		return PanelEvents
-	}
-}
-
-// setFocusedPanel sets the focused panel and updates component focus states.
-// This ensures components like deviceInfo have correct focus state before handling keys.
-func (m Model) setFocusedPanel(panel PanelFocus) Model {
-	m.focusedPanel = panel
-	// Update component focus states immediately so they can handle keys correctly
-	m.deviceInfo = m.deviceInfo.SetFocused(panel == PanelDetail)
-	m.deviceList = m.deviceList.SetFocused(panel == PanelDeviceList)
-	m.events = m.events.SetFocused(panel == PanelEvents)
+// setFocus sets focus to the specified panel using focusManager as the single source of truth.
+// Updates all component focus states to match.
+func (m Model) setFocus(panel focus.PanelID) Model {
+	m.focusManager.SetFocus(panel)
+	// Update component focus states to match focusManager
+	m.deviceInfo = m.deviceInfo.SetFocused(panel == focus.PanelDeviceInfo)
+	m.deviceList = m.deviceList.SetFocused(panel == focus.PanelDeviceList)
+	m.events = m.events.SetFocused(panel == focus.PanelEvents)
+	m.energyBars = m.energyBars.SetFocused(panel == focus.PanelEnergyBars)
+	*m.energyHistory = m.energyHistory.SetFocused(panel == focus.PanelEnergyHistory)
 	return m
 }
 
 // openJSONViewer opens the JSON viewer for the selected device if on Detail panel.
 func (m Model) openJSONViewer() (Model, tea.Cmd, bool) {
-	if m.focusedPanel != PanelDetail {
+	if !m.focusManager.IsFocused(focus.PanelDeviceInfo) {
 		return m, nil, false
 	}
 
@@ -1333,7 +1333,7 @@ func (m Model) openJSONViewer() (Model, tea.Cmd, bool) {
 		return m, nil, false
 	}
 
-	m.focusedPanel = PanelEndpoints
+	m = m.setFocus(focus.PanelJSON)
 	methods := m.getDeviceMethods(d)
 	endpoint := m.selectEndpoint(methods)
 
@@ -1427,7 +1427,7 @@ func (m Model) handleViewSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, boo
 		if key.Matches(msg, *binding) {
 			m.tabBar, _ = m.tabBar.SetActive(cfg.tab)
 			if cfg.focus {
-				m.focusedPanel = PanelDeviceList
+				m = m.setFocus(focus.PanelDeviceList)
 			}
 			return m, m.viewManager.SetActive(cfg.view), true
 		}
@@ -1494,7 +1494,8 @@ func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
 	case keys.ActionNextPanel:
 		// Only handle panel cycling for Dashboard - other tabs handle it in their views
 		if m.isDashboardActive() {
-			m = m.setFocusedPanel(m.nextPanel())
+			m.focusManager.Next()
+			m = m.syncComponentFocus()
 			return m, nil, true
 		}
 		return m, nil, false // Let views handle Tab for their internal panels
@@ -1502,7 +1503,8 @@ func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
 	case keys.ActionPrevPanel:
 		// Only handle panel cycling for Dashboard - other tabs handle it in their views
 		if m.isDashboardActive() {
-			m = m.setFocusedPanel(m.prevPanel())
+			m.focusManager.Prev()
+			m = m.syncComponentFocus()
 			return m, nil, true
 		}
 		return m, nil, false // Let views handle Shift+Tab for their internal panels
@@ -1560,7 +1562,7 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 	switch action {
 	case keys.ActionTab1:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabDashboard)
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		// Fetch extended status for current device and sync device info
 		var extCmd tea.Cmd
 		if dev := m.deviceList.SelectedDevice(); dev != nil && dev.Online {
@@ -1574,7 +1576,7 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 
 	case keys.ActionTab2:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabAutomation)
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		// View starts unfocused (device list has focus)
 		// Propagate current device if one is selected
 		var deviceName string
@@ -1589,7 +1591,7 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 
 	case keys.ActionTab3:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabConfig)
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		// View starts unfocused (device list has focus)
 		// Propagate current device if one is selected
 		var deviceName string
@@ -1604,17 +1606,17 @@ func (m Model) dispatchTabAction(action keys.Action) (Model, tea.Cmd, bool) {
 
 	case keys.ActionTab4:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabManage)
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		return m, m.viewManager.SetActive(views.ViewManage), true
 
 	case keys.ActionTab5:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabMonitor)
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		return m, m.viewManager.SetActive(views.ViewMonitor), true
 
 	case keys.ActionTab6:
 		m.tabBar, _ = m.tabBar.SetActive(tabs.TabFleet)
-		m.focusedPanel = PanelDeviceList
+		m = m.setFocus(focus.PanelDeviceList)
 		return m, m.viewManager.SetActive(views.ViewFleet), true
 
 	default:
@@ -1634,17 +1636,22 @@ func (m Model) dispatchPanelAction(action keys.Action) (Model, tea.Cmd, bool) {
 
 	switch action {
 	case keys.ActionPanel1:
-		m = m.setFocusedPanel(PanelDeviceList)
+		m = m.setFocus(focus.PanelDeviceList)
 		return m, nil, true
 	case keys.ActionPanel2:
-		m = m.setFocusedPanel(PanelDetail)
+		m = m.setFocus(focus.PanelDeviceInfo)
 		return m, nil, true
 	case keys.ActionPanel3:
-		m = m.setFocusedPanel(PanelEvents)
+		m = m.setFocus(focus.PanelEvents)
 		return m, nil, true
-	case keys.ActionPanel4, keys.ActionPanel5, keys.ActionPanel6,
-		keys.ActionPanel7, keys.ActionPanel8, keys.ActionPanel9:
-		// Panel 4-9 not mapped in Dashboard layout
+	case keys.ActionPanel4:
+		m = m.setFocus(focus.PanelEnergyBars)
+		return m, nil, true
+	case keys.ActionPanel5:
+		m = m.setFocus(focus.PanelEnergyHistory)
+		return m, nil, true
+	case keys.ActionPanel6, keys.ActionPanel7, keys.ActionPanel8, keys.ActionPanel9:
+		// Panel 6-9 not mapped in Dashboard layout
 		return m, nil, false
 	default:
 		return m, nil, false
@@ -1656,7 +1663,7 @@ func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool
 	switch action {
 	case keys.ActionToggle:
 		// When focused on deviceInfo panel, let it handle toggle for individual component control
-		if m.focusedPanel == PanelDetail {
+		if m.focusManager.IsFocused(focus.PanelDeviceInfo) {
 			return m, nil, false // Fall through to handleNavigation -> deviceInfo.Update
 		}
 		return m.dispatchDeviceAction(actionToggle)
@@ -1703,7 +1710,7 @@ func (m Model) dispatchEnterAction() (Model, tea.Cmd, bool) {
 	if !m.isDashboardActive() {
 		return m, nil, false
 	}
-	if m.focusedPanel == PanelDetail {
+	if m.focusManager.IsFocused(focus.PanelDeviceInfo) {
 		return m.openJSONViewer()
 	}
 	// Default: forward to view
@@ -1762,7 +1769,7 @@ func isShiftNumberKey(keyStr string) bool {
 // handleNavigation handles j/k/g/G/h/l navigation keys based on focused panel.
 func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	// When PanelDeviceList is focused, only forward NAVIGATION keys to deviceList
-	if m.focusedPanel == PanelDeviceList {
+	if m.focusManager.IsFocused(focus.PanelDeviceList) {
 		// Only handle actual navigation keys - other keys should fall through
 		if !isNavigationKey(msg.String()) {
 			return m, nil, false
@@ -1775,14 +1782,14 @@ func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	}
 
 	// When PanelDetail is focused, forward navigation to deviceInfo component
-	if m.focusedPanel == PanelDetail {
+	if m.focusManager.IsFocused(focus.PanelDeviceInfo) {
 		var cmd tea.Cmd
 		m.deviceInfo, cmd = m.deviceInfo.Update(msg)
 		return m, cmd, true
 	}
 
 	// When PanelEvents is focused, forward navigation to events component
-	if m.focusedPanel == PanelEvents {
+	if m.focusManager.IsFocused(focus.PanelEvents) {
 		var cmd tea.Cmd
 		m.events, cmd = m.events.Update(msg)
 		return m, cmd, true
@@ -1792,7 +1799,7 @@ func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	devices := m.getFilteredDevices()
 	keyStr := msg.String()
 
-	if m.focusedPanel == PanelEndpoints {
+	if m.focusManager.IsFocused(focus.PanelJSON) {
 		if dir, ok := parseNavDirection(keyStr); ok {
 			m = m.navEndpoints(dir, devices)
 			return m, nil, true
@@ -1850,7 +1857,7 @@ func (m Model) syncDeviceInfo() Model {
 	}
 
 	// Update focus state and panel index
-	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail).SetPanelIndex(2)
+	m.deviceInfo = m.deviceInfo.SetFocused(m.focusManager.IsFocused(focus.PanelDeviceInfo)).SetPanelIndex(2)
 
 	return m
 }
@@ -1872,7 +1879,7 @@ func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 	case key.Matches(msg, m.keys.Toggle):
 		// When focused on deviceInfo panel, let it handle toggle for individual component control
 		// This allows space/t to toggle the selected component instead of all components
-		if m.focusedPanel == PanelDetail {
+		if m.focusManager.IsFocused(focus.PanelDeviceInfo) {
 			return m, nil, false // Fall through to handleNavigation -> deviceInfo.Update
 		}
 		action = actionToggle
@@ -2214,15 +2221,19 @@ func (m Model) centerOverlay(overlay string) string {
 
 // focusedPanelName returns a human-readable name for the currently focused panel.
 func (m Model) focusedPanelName() string {
-	switch m.focusedPanel {
-	case PanelDeviceList:
+	switch m.focusManager.Current() {
+	case focus.PanelDeviceList:
 		return "DeviceList"
-	case PanelDetail:
+	case focus.PanelDeviceInfo:
 		return "Detail"
-	case PanelEvents:
+	case focus.PanelEvents:
 		return "Events"
-	case PanelEndpoints:
-		return "Endpoints"
+	case focus.PanelJSON:
+		return "JSON"
+	case focus.PanelEnergyBars:
+		return "EnergyBars"
+	case focus.PanelEnergyHistory:
+		return "EnergyHistory"
 	default:
 		return "Unknown"
 	}
@@ -2302,7 +2313,7 @@ func (m Model) renderMultiPanelLayout(height int) string {
 
 	// Render device info component (top-right)
 	m.deviceInfo = m.deviceInfo.SetSize(rightColWidth, infoHeight)
-	m.deviceInfo = m.deviceInfo.SetFocused(m.focusedPanel == PanelDetail).SetPanelIndex(2)
+	m.deviceInfo = m.deviceInfo.SetFocused(m.focusManager.IsFocused(focus.PanelDeviceInfo)).SetPanelIndex(2)
 	deviceInfoPanel := m.deviceInfo.View()
 
 	// Render events (bottom-right) - now gets much more horizontal space
@@ -2480,7 +2491,7 @@ func (m Model) renderNarrowLayout(height int) string {
 	// Row 2: Device List (list only) + Device Info stacked in narrow mode
 	// In narrow mode, we keep devicelist's internal split pane for compactness
 	m.deviceList = m.deviceList.SetSize(panelWidth, deviceListHeight)
-	m.deviceList = m.deviceList.SetFocused(m.focusedPanel == PanelDeviceList).SetPanelIndex(1)
+	m.deviceList = m.deviceList.SetFocused(m.focusManager.IsFocused(focus.PanelDeviceList)).SetPanelIndex(1)
 	m.deviceList = m.deviceList.SetListOnly(false) // Use split pane in narrow mode
 	deviceListRow := m.deviceList.View()
 
@@ -2505,7 +2516,7 @@ func (m Model) renderNarrowLayout(height int) string {
 
 // renderDeviceListColumn renders the device list with consistent border styling.
 func (m Model) renderDeviceListColumn(width, height int) string {
-	focused := m.focusedPanel == PanelDeviceList
+	focused := m.focusManager.IsFocused(focus.PanelDeviceList)
 
 	// Account for border when setting component size
 	innerWidth := width - 2   // left + right border
@@ -2576,7 +2587,7 @@ func (m Model) buildDeviceListFooter() string {
 // renderEventsColumn renders the events column with embedded title.
 func (m Model) renderEventsColumn(width, height int) string {
 	orangeBorder := theme.Orange()
-	focused := m.focusedPanel == PanelEvents
+	focused := m.focusManager.IsFocused(focus.PanelEvents)
 
 	// Build badge with status info (count, paused, filtered)
 	badge := m.events.StatusBadge()
@@ -2594,7 +2605,6 @@ func (m Model) renderEventsColumn(width, height int) string {
 		SetFooterBadge(scrollInfo).
 		SetFocused(focused).
 		SetPanelIndex(3).
-		SetFocusColor(orangeBorder).
 		SetBlurColor(orangeBorder)
 
 	// Resize events model to fit inside the border box

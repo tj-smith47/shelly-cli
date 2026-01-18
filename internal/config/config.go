@@ -87,6 +87,41 @@ type TUIConfig struct {
 	Refresh     TUIRefreshConfig  `mapstructure:"refresh" yaml:"refresh,omitempty"`
 	Keybindings KeybindingsConfig `mapstructure:"keybindings" yaml:"keybindings,omitempty"`
 	Theme       *ThemeConfig      `mapstructure:"theme" yaml:"theme,omitempty"`
+	Events      TUIEventsConfig   `mapstructure:"events" yaml:"events,omitempty"`
+}
+
+// TUIEventsConfig holds event filtering settings for the TUI events panel.
+type TUIEventsConfig struct {
+	// FilteredEvents is a list of event names to filter out from the events panel.
+	// Common noisy events: "ble.scan_result", "sys" status changes, "wifi" updates.
+	// Use glob patterns like "ble.*" to filter all BLE events.
+	FilteredEvents []string `mapstructure:"filtered_events" yaml:"filtered_events,omitempty"`
+
+	// FilteredComponents is a list of component types to filter out.
+	// Examples: "sys", "wifi", "cloud", "ts" (timestamp-only changes).
+	FilteredComponents []string `mapstructure:"filtered_components" yaml:"filtered_components,omitempty"`
+
+	// MaxItems is the maximum number of events to keep in each list (user/system).
+	// Defaults to 100.
+	MaxItems int `mapstructure:"max_items" yaml:"max_items,omitempty"`
+}
+
+// DefaultTUIEventsConfig returns sensible defaults for TUI event filtering.
+func DefaultTUIEventsConfig() TUIEventsConfig {
+	return TUIEventsConfig{
+		// Default filtered events - high-frequency noise that clutters the UI
+		FilteredEvents: []string{
+			"ble.scan_result", // BLE scanning produces many events
+		},
+		// Default filtered components - status changes that aren't user-actionable
+		FilteredComponents: []string{
+			"sys",   // System heartbeats
+			"wifi",  // WiFi signal fluctuations
+			"cloud", // Cloud connection status
+			"ts",    // Timestamp-only updates
+		},
+		MaxItems: 100,
+	}
 }
 
 // EnergyConfig holds energy monitoring and cost calculation settings.
@@ -386,6 +421,30 @@ func (c *Config) GetTUIRefreshConfig() TUIRefreshConfig {
 	}
 	if cfg.FocusedBoost == 0 {
 		cfg.FocusedBoost = defaults.FocusedBoost
+	}
+
+	return cfg
+}
+
+// GetTUIEventsConfig returns the TUI events config with defaults applied.
+// Empty lists use defaults; user-provided lists replace defaults entirely.
+func (c *Config) GetTUIEventsConfig() TUIEventsConfig {
+	defaults := DefaultTUIEventsConfig()
+	cfg := c.TUI.Events
+
+	// If no filtered events specified, use defaults
+	if len(cfg.FilteredEvents) == 0 {
+		cfg.FilteredEvents = defaults.FilteredEvents
+	}
+
+	// If no filtered components specified, use defaults
+	if len(cfg.FilteredComponents) == 0 {
+		cfg.FilteredComponents = defaults.FilteredComponents
+	}
+
+	// Use default max items if not specified
+	if cfg.MaxItems == 0 {
+		cfg.MaxItems = defaults.MaxItems
 	}
 
 	return cfg

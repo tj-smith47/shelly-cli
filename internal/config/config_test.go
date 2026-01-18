@@ -1864,3 +1864,116 @@ func TestPackageLevel_Get_NilConfig(t *testing.T) {
 		t.Errorf("Get().Theme = %v, want dracula", cfg.Theme)
 	}
 }
+
+func TestDefaultTUIEventsConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultTUIEventsConfig()
+
+	// Check default filtered events
+	if len(cfg.FilteredEvents) != 1 || cfg.FilteredEvents[0] != "ble.scan_result" {
+		t.Errorf("FilteredEvents = %v, want [ble.scan_result]", cfg.FilteredEvents)
+	}
+
+	// Check default filtered components
+	expectedComponents := []string{"sys", "wifi", "cloud", "ts"}
+	if len(cfg.FilteredComponents) != len(expectedComponents) {
+		t.Errorf("FilteredComponents length = %d, want %d", len(cfg.FilteredComponents), len(expectedComponents))
+	}
+
+	// Check max items
+	if cfg.MaxItems != 100 {
+		t.Errorf("MaxItems = %d, want 100", cfg.MaxItems)
+	}
+}
+
+func TestConfig_GetTUIEventsConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		cfg            Config
+		wantMaxItems   int
+		wantEventCount int
+		wantCompCount  int
+		wantFirstEvent string
+		wantFirstComp  string
+	}{
+		{
+			name:           "empty config uses defaults",
+			cfg:            Config{},
+			wantMaxItems:   100,
+			wantEventCount: 1, // ble.scan_result
+			wantCompCount:  4, // sys, wifi, cloud, ts
+			wantFirstEvent: "ble.scan_result",
+			wantFirstComp:  "sys",
+		},
+		{
+			name: "custom filtered events replaces defaults",
+			cfg: Config{
+				TUI: TUIConfig{
+					Events: TUIEventsConfig{
+						FilteredEvents: []string{"custom.event", "another.event"},
+					},
+				},
+			},
+			wantMaxItems:   100, // Uses default
+			wantEventCount: 2,
+			wantCompCount:  4, // Uses default
+			wantFirstEvent: "custom.event",
+			wantFirstComp:  "sys", // Default
+		},
+		{
+			name: "custom filtered components replaces defaults",
+			cfg: Config{
+				TUI: TUIConfig{
+					Events: TUIEventsConfig{
+						FilteredComponents: []string{"input"},
+					},
+				},
+			},
+			wantMaxItems:   100, // Uses default
+			wantEventCount: 1,   // Uses default
+			wantCompCount:  1,
+			wantFirstEvent: "ble.scan_result", // Default
+			wantFirstComp:  "input",
+		},
+		{
+			name: "custom max items",
+			cfg: Config{
+				TUI: TUIConfig{
+					Events: TUIEventsConfig{
+						MaxItems: 50,
+					},
+				},
+			},
+			wantMaxItems:   50,
+			wantEventCount: 1, // Uses default
+			wantCompCount:  4, // Uses default
+			wantFirstEvent: "ble.scan_result",
+			wantFirstComp:  "sys",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.cfg.GetTUIEventsConfig()
+			if result.MaxItems != tt.wantMaxItems {
+				t.Errorf("MaxItems = %d, want %d", result.MaxItems, tt.wantMaxItems)
+			}
+			if len(result.FilteredEvents) != tt.wantEventCount {
+				t.Errorf("FilteredEvents count = %d, want %d", len(result.FilteredEvents), tt.wantEventCount)
+			}
+			if len(result.FilteredComponents) != tt.wantCompCount {
+				t.Errorf("FilteredComponents count = %d, want %d", len(result.FilteredComponents), tt.wantCompCount)
+			}
+			if len(result.FilteredEvents) > 0 && result.FilteredEvents[0] != tt.wantFirstEvent {
+				t.Errorf("FilteredEvents[0] = %s, want %s", result.FilteredEvents[0], tt.wantFirstEvent)
+			}
+			if len(result.FilteredComponents) > 0 && result.FilteredComponents[0] != tt.wantFirstComp {
+				t.Errorf("FilteredComponents[0] = %s, want %s", result.FilteredComponents[0], tt.wantFirstComp)
+			}
+		})
+	}
+}

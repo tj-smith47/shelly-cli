@@ -216,13 +216,20 @@ func parseSwitchComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 }
 
 // accumulateSwitchMetrics adds switch power metrics to the result.
+// Always records an entry in SwitchPowers for consistent per-switch tracking,
+// even if the switch reports 0 power (e.g., when OFF).
 func accumulateSwitchMetrics(result *ParsedStatus, sw *switchStatusData) {
+	// Always record the switch in SwitchPowers for consistent per-switch tracking
+	// Switches that are OFF report 0 power, not missing apower
+	power := 0.0
 	if sw.APower != nil {
-		result.Power += *sw.APower
-		if result.SwitchPowers != nil {
-			result.SwitchPowers[sw.ID] = *sw.APower
-		}
+		power = *sw.APower
 	}
+	result.Power += power
+	if result.SwitchPowers != nil {
+		result.SwitchPowers[sw.ID] = power
+	}
+
 	if sw.Voltage != nil && result.Voltage == 0 {
 		result.Voltage = *sw.Voltage
 	}
@@ -260,13 +267,18 @@ func parseLightComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 }
 
 // accumulateLightMetrics adds light power metrics to the result.
+// Always records an entry in LightPowers for consistent per-component tracking.
 func accumulateLightMetrics(result *ParsedStatus, lt *lightStatusData) {
+	// Always record the light in LightPowers for consistent per-component tracking
+	power := 0.0
 	if lt.APower != nil {
-		if result.LightPowers != nil {
-			result.LightPowers[lt.ID] = *lt.APower
-		}
-		result.Power += *lt.APower
+		power = *lt.APower
 	}
+	result.Power += power
+	if result.LightPowers != nil {
+		result.LightPowers[lt.ID] = power
+	}
+
 	if lt.Voltage != nil && *lt.Voltage > 0 {
 		result.Voltage = *lt.Voltage
 	}
@@ -299,12 +311,12 @@ func parseCoverComponent(result *ParsedStatus, rawStatus json.RawMessage) {
 }
 
 // accumulateCoverMetrics adds cover power metrics to the result.
+// Always records an entry in CoverPowers for consistent per-component tracking.
 func accumulateCoverMetrics(result *ParsedStatus, cv *coverStatusData) {
-	if cv.APower > 0 {
-		result.Power += cv.APower
-		if result.CoverPowers != nil {
-			result.CoverPowers[cv.ID] = cv.APower
-		}
+	// Always record the cover in CoverPowers for consistent per-component tracking
+	result.Power += cv.APower
+	if result.CoverPowers != nil {
+		result.CoverPowers[cv.ID] = cv.APower
 	}
 	if cv.Voltage > 0 && result.Voltage == 0 {
 		result.Voltage = cv.Voltage

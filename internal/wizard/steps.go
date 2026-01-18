@@ -444,6 +444,95 @@ func stepCloud(ctx context.Context, ios *iostreams.IOStreams) error {
 
 	ios.Println("")
 
+	// Ask which auth method they prefer
+	const (
+		optOAuth         = "Browser OAuth (recommended, most secure)"
+		optAuthKey       = "Auth Key (from Shelly mobile app)"
+		optEmailPassword = "Email/Password"
+	)
+	authMethods := []string{optOAuth, optAuthKey, optEmailPassword}
+
+	selection, err := ios.Select("Choose authentication method:", authMethods, 0)
+	if err != nil {
+		return fmt.Errorf("failed to select auth method: %w", err)
+	}
+
+	ios.Println("")
+
+	switch selection {
+	case optOAuth:
+		ios.Info("Browser OAuth requires opening your web browser.")
+		ios.Info("Please run: shelly cloud login")
+		ios.Info("This will open Shelly Cloud in your browser for secure authentication.")
+		ios.Println("")
+		return nil
+
+	case optAuthKey:
+		return stepCloudAuthKey(ctx, ios)
+
+	case optEmailPassword:
+		return stepCloudEmailPassword(ctx, ios)
+	}
+
+	return nil
+}
+
+func stepCloudAuthKey(ctx context.Context, ios *iostreams.IOStreams) error {
+	ios.Info("Find your auth key in the Shelly mobile app:")
+	ios.Info("  User Settings → Authorization cloud key")
+	ios.Println("")
+
+	authKey, err := iostreams.Password("Authorization Key:")
+	if err != nil {
+		return fmt.Errorf("failed to read auth key: %w", err)
+	}
+	if authKey == "" {
+		ios.Warning("Auth key is required")
+		ios.Info("You can set up cloud access later with: shelly cloud login --key")
+		ios.Println("")
+		return nil
+	}
+
+	serverURL, err := ios.Input("Server URL (e.g., shelly-59-eu.shelly.cloud):", "")
+	if err != nil {
+		return fmt.Errorf("failed to read server URL: %w", err)
+	}
+	if serverURL == "" {
+		ios.Warning("Server URL is required")
+		ios.Info("You can set up cloud access later with: shelly cloud login --key")
+		ios.Println("")
+		return nil
+	}
+
+	// Validate credentials
+	ios.StartProgress("Validating credentials...")
+	client := network.NewCloudClientWithAuthKey(authKey, serverURL)
+	_, err = client.GetAllDevices(ctx)
+	ios.StopProgress()
+
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Save credentials to config
+	cfg := config.Get()
+	cfg.Cloud.Enabled = true
+	cfg.Cloud.AuthKey = authKey
+	cfg.Cloud.ServerURL = serverURL
+	cfg.Cloud.AccessToken = ""
+	cfg.Cloud.Email = ""
+
+	if err := config.Save(); err != nil {
+		return fmt.Errorf("failed to save credentials: %w", err)
+	}
+
+	ios.Success("Authenticated with auth key")
+	ios.Info("Server: %s", serverURL)
+	ios.Println("")
+	return nil
+}
+
+func stepCloudEmailPassword(ctx context.Context, ios *iostreams.IOStreams) error {
 	// Prompt for email
 	email, err := ios.Input("Shelly Cloud email:", "")
 	if err != nil {
@@ -483,6 +572,7 @@ func stepCloud(ctx context.Context, ios *iostreams.IOStreams) error {
 	cfg.Cloud.Email = email
 	cfg.Cloud.AccessToken = result.Token
 	cfg.Cloud.ServerURL = result.UserAPIURL
+	cfg.Cloud.AuthKey = ""
 
 	if err := config.Save(); err != nil {
 		return fmt.Errorf("failed to save credentials: %w", err)

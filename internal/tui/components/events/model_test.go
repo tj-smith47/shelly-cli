@@ -378,3 +378,148 @@ func TestScrollInfo(t *testing.T) {
 		}
 	})
 }
+
+func TestMatchEventPattern(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		pattern   string
+		eventName string
+		want      bool
+	}{
+		// Exact match
+		{"exact match", "ble.scan_result", "ble.scan_result", true},
+		{"exact no match", "ble.scan_result", "ble.connect", false},
+
+		// Glob patterns with trailing *
+		{"glob matches prefix", "ble.*", "ble.scan_result", true},
+		{"glob matches another prefix", "ble.*", "ble.connect", true},
+		{"glob no match different prefix", "ble.*", "wifi.scan", false},
+		{"glob matches exact prefix", "button_*", "button_push", true},
+		{"glob no match wrong prefix", "button_*", "ble.scan_result", false},
+
+		// Edge cases
+		{"empty pattern no match", "", "ble.scan_result", false},
+		{"empty event no match", "ble.*", "", false},
+		{"star alone matches everything", "*", "ble.scan_result", true},
+		{"star alone matches empty", "*", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := matchEventPattern(tt.pattern, tt.eventName)
+			if got != tt.want {
+				t.Errorf("matchEventPattern(%q, %q) = %v, want %v",
+					tt.pattern, tt.eventName, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestModel_IsFilteredEvent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		filteredEvents []string
+		eventName      string
+		want           bool
+	}{
+		{
+			name:           "exact match filters",
+			filteredEvents: []string{"ble.scan_result"},
+			eventName:      "ble.scan_result",
+			want:           true,
+		},
+		{
+			name:           "glob pattern filters",
+			filteredEvents: []string{"ble.*"},
+			eventName:      "ble.connect",
+			want:           true,
+		},
+		{
+			name:           "no match passes through",
+			filteredEvents: []string{"ble.scan_result"},
+			eventName:      "button_push",
+			want:           false,
+		},
+		{
+			name:           "multiple patterns first match",
+			filteredEvents: []string{"ble.*", "wifi.*"},
+			eventName:      "ble.scan",
+			want:           true,
+		},
+		{
+			name:           "multiple patterns second match",
+			filteredEvents: []string{"ble.*", "wifi.*"},
+			eventName:      "wifi.disconnect",
+			want:           true,
+		},
+		{
+			name:           "empty filter list passes all",
+			filteredEvents: []string{},
+			eventName:      "ble.scan_result",
+			want:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := Model{filteredEvents: tt.filteredEvents}
+			got := m.isFilteredEvent(tt.eventName)
+			if got != tt.want {
+				t.Errorf("isFilteredEvent(%q) = %v, want %v", tt.eventName, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestModel_IsFilteredComponent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		filteredComponents []string
+		compPrefix         string
+		want               bool
+	}{
+		{
+			name:               "exact match filters",
+			filteredComponents: []string{"sys", "wifi"},
+			compPrefix:         "sys",
+			want:               true,
+		},
+		{
+			name:               "second item match filters",
+			filteredComponents: []string{"sys", "wifi"},
+			compPrefix:         "wifi",
+			want:               true,
+		},
+		{
+			name:               "no match passes through",
+			filteredComponents: []string{"sys", "wifi"},
+			compPrefix:         "switch",
+			want:               false,
+		},
+		{
+			name:               "empty filter list passes all",
+			filteredComponents: []string{},
+			compPrefix:         "sys",
+			want:               false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := Model{filteredComponents: tt.filteredComponents}
+			got := m.isFilteredComponent(tt.compPrefix)
+			if got != tt.want {
+				t.Errorf("isFilteredComponent(%q) = %v, want %v", tt.compPrefix, got, tt.want)
+			}
+		})
+	}
+}

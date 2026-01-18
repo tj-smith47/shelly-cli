@@ -342,17 +342,31 @@ func (c *Cache) handleDeviceEvent(evt events.Event) {
 		return
 	}
 
+	// Only increment version when the event type actually modifies cache data.
+	// Unhandled event types (like NotifyEvent) should NOT increment version,
+	// otherwise high-frequency events (e.g., ble.scan_result) cause unnecessary re-renders.
+	var handled bool
+
 	switch e := evt.(type) {
 	case *events.StatusChangeEvent:
 		c.handleStatusChange(data, e)
+		handled = true
 	case *events.FullStatusEvent:
 		c.handleFullStatus(data, e)
+		handled = true
 	case *events.DeviceOnlineEvent:
 		data.Online = true
 		data.UpdatedAt = evt.Timestamp()
+		handled = true
 	case *events.DeviceOfflineEvent:
 		data.Online = false
 		data.UpdatedAt = evt.Timestamp()
+		handled = true
+	}
+
+	// Only process refresh and increment version if event was actually handled
+	if !handled {
+		return
 	}
 
 	// Check if WebSocket update needs HTTP refresh (BUG-009/014)

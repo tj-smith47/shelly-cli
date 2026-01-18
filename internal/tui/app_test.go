@@ -12,6 +12,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/config"
 	"github.com/tj-smith47/shelly-cli/internal/iostreams"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
+	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/views"
 )
@@ -215,8 +216,8 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 	m = applyWindowSize(m, 100, 40)
 
 	// Initial focus should be DeviceList
-	if m.focusedPanel != PanelDeviceList {
-		t.Errorf("initial focus = %v, want %v", m.focusedPanel, PanelDeviceList)
+	if m.focusManager.Current() != focus.PanelDeviceList {
+		t.Errorf("initial focus = %v, want %v", m.focusManager.Current(), focus.PanelDeviceList)
 	}
 
 	// Tab to next panel (DeviceList -> Detail)
@@ -224,8 +225,8 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 	if !handled {
 		t.Error("tab should be handled")
 	}
-	if newM.focusedPanel != PanelDetail {
-		t.Errorf("after tab = %v, want %v", newM.focusedPanel, PanelDetail)
+	if newM.focusManager.Current() != focus.PanelDeviceInfo {
+		t.Errorf("after tab = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceInfo)
 	}
 
 	// Tab to Events (3-panel cycle: Detail -> Events)
@@ -233,17 +234,35 @@ func TestModel_PanelFocusCycling(t *testing.T) {
 	if !handled {
 		t.Error("tab should be handled")
 	}
-	if newM.focusedPanel != PanelEvents {
-		t.Errorf("after second tab = %v, want %v", newM.focusedPanel, PanelEvents)
+	if newM.focusManager.Current() != focus.PanelEvents {
+		t.Errorf("after second tab = %v, want %v", newM.focusManager.Current(), focus.PanelEvents)
 	}
 
-	// Tab should wrap back to DeviceList (Events -> DeviceList)
+	// Tab to EnergyBars (5-panel cycle: Events -> EnergyBars)
 	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
 	if !handled {
 		t.Error("tab should be handled")
 	}
-	if newM.focusedPanel != PanelDeviceList {
-		t.Errorf("after wrap = %v, want %v", newM.focusedPanel, PanelDeviceList)
+	if newM.focusManager.Current() != focus.PanelEnergyBars {
+		t.Errorf("after third tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyBars)
+	}
+
+	// Tab to EnergyHistory (5-panel cycle: EnergyBars -> EnergyHistory)
+	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
+	if !handled {
+		t.Error("tab should be handled")
+	}
+	if newM.focusManager.Current() != focus.PanelEnergyHistory {
+		t.Errorf("after fourth tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyHistory)
+	}
+
+	// Tab should wrap back to DeviceList (EnergyHistory -> DeviceList)
+	newM, _, handled = newM.handlePanelSwitch(tea.KeyPressMsg{Code: tea.KeyTab})
+	if !handled {
+		t.Error("tab should be handled")
+	}
+	if newM.focusManager.Current() != focus.PanelDeviceList {
+		t.Errorf("after wrap = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceList)
 	}
 }
 
@@ -252,32 +271,50 @@ func TestModel_ShiftTabReversesFocus(t *testing.T) {
 	m := newTestModel(t)
 	m = applyWindowSize(m, 100, 40)
 
-	// Shift+Tab from DeviceList should go to Events (reverse cycle in 3-panel mode)
+	// Shift+Tab from DeviceList should go to EnergyHistory (reverse cycle in 5-panel mode)
 	msg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	newM, _, handled := m.handlePanelSwitch(msg)
 	if !handled {
 		t.Error("shift+tab should be handled")
 	}
-	if newM.focusedPanel != PanelEvents {
-		t.Errorf("after shift+tab = %v, want %v", newM.focusedPanel, PanelEvents)
+	if newM.focusManager.Current() != focus.PanelEnergyHistory {
+		t.Errorf("after shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyHistory)
 	}
 
-	// Shift+Tab from Events should go to Detail
+	// Shift+Tab from EnergyHistory should go to EnergyBars
 	newM, _, handled = newM.handlePanelSwitch(msg)
 	if !handled {
 		t.Error("shift+tab should be handled")
 	}
-	if newM.focusedPanel != PanelDetail {
-		t.Errorf("after second shift+tab = %v, want %v", newM.focusedPanel, PanelDetail)
+	if newM.focusManager.Current() != focus.PanelEnergyBars {
+		t.Errorf("after second shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelEnergyBars)
 	}
 
-	// Shift+Tab from Detail should go to DeviceList
+	// Shift+Tab from EnergyBars should go to Events
 	newM, _, handled = newM.handlePanelSwitch(msg)
 	if !handled {
 		t.Error("shift+tab should be handled")
 	}
-	if newM.focusedPanel != PanelDeviceList {
-		t.Errorf("after third shift+tab = %v, want %v", newM.focusedPanel, PanelDeviceList)
+	if newM.focusManager.Current() != focus.PanelEvents {
+		t.Errorf("after third shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelEvents)
+	}
+
+	// Shift+Tab from Events should go to DeviceInfo
+	newM, _, handled = newM.handlePanelSwitch(msg)
+	if !handled {
+		t.Error("shift+tab should be handled")
+	}
+	if newM.focusManager.Current() != focus.PanelDeviceInfo {
+		t.Errorf("after fourth shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceInfo)
+	}
+
+	// Shift+Tab from DeviceInfo should go to DeviceList
+	newM, _, handled = newM.handlePanelSwitch(msg)
+	if !handled {
+		t.Error("shift+tab should be handled")
+	}
+	if newM.focusManager.Current() != focus.PanelDeviceList {
+		t.Errorf("after fifth shift+tab = %v, want %v", newM.focusManager.Current(), focus.PanelDeviceList)
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	shellyevents "github.com/tj-smith47/shelly-go/events"
+
 	"github.com/tj-smith47/shelly-cli/internal/model"
 	"github.com/tj-smith47/shelly-cli/internal/shelly"
 )
@@ -1065,5 +1067,70 @@ func TestCache_IsEventStreamManaged_ThreadSafe(t *testing.T) {
 		if c.IsEventStreamManaged(device) {
 			t.Errorf("expected %s to be disconnected", device)
 		}
+	}
+}
+
+func TestHandleDeviceEvent_NotifyEventDoesNotIncrementVersion(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+
+	// Add a device to the cache
+	c.SetDeviceForTesting(model.Device{Name: "test-device"}, true)
+
+	// Get initial version
+	initialVersion := c.Version()
+
+	// Send a NotifyEvent (e.g., ble.scan_result)
+	// NotifyEvent is not handled by the cache, so version should NOT increment
+	notifyEvt := shellyevents.NewNotifyEvent("test-device", "ble:0", "ble.scan_result")
+	c.handleDeviceEvent(notifyEvt)
+
+	// Version should NOT have changed
+	if c.Version() != initialVersion {
+		t.Errorf("NotifyEvent incremented version from %d to %d (should stay the same)",
+			initialVersion, c.Version())
+	}
+}
+
+func TestHandleDeviceEvent_StatusChangeEventIncrementsVersion(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+
+	// Add a device to the cache
+	c.SetDeviceForTesting(model.Device{Name: "test-device"}, true)
+
+	// Get initial version
+	initialVersion := c.Version()
+
+	// Send a StatusChangeEvent (which IS handled)
+	statusEvt := shellyevents.NewStatusChangeEvent("test-device", "switch:0", nil)
+	c.handleDeviceEvent(statusEvt)
+
+	// Version SHOULD have changed
+	if c.Version() == initialVersion {
+		t.Errorf("StatusChangeEvent did not increment version (stayed at %d)", initialVersion)
+	}
+}
+
+func TestHandleDeviceEvent_DeviceOnlineEventIncrementsVersion(t *testing.T) {
+	t.Parallel()
+
+	c := NewForTesting()
+
+	// Add a device to the cache (initially offline)
+	c.SetDeviceForTesting(model.Device{Name: "test-device"}, false)
+
+	// Get initial version
+	initialVersion := c.Version()
+
+	// Send a DeviceOnlineEvent
+	onlineEvt := shellyevents.NewDeviceOnlineEvent("test-device")
+	c.handleDeviceEvent(onlineEvt)
+
+	// Version SHOULD have changed
+	if c.Version() == initialVersion {
+		t.Errorf("DeviceOnlineEvent did not increment version (stayed at %d)", initialVersion)
 	}
 }

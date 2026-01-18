@@ -279,6 +279,10 @@
               "$ref": "#/$defs/themeConfig"
             }
           ]
+        },
+        "events": {
+          "$ref": "#/$defs/tuiEventsConfig",
+          "description": "Event filtering settings for the TUI events panel"
         }
       },
       "additionalProperties": false
@@ -986,6 +990,38 @@
           "description": "Faster refresh interval for the currently focused device (e.g., '3s')",
           "pattern": "^[0-9]+(ms|s|m)$",
           "default": "3s"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tuiEventsConfig": {
+      "type": "object",
+      "description": "Event filtering settings for the TUI events panel",
+      "properties": {
+        "filtered_events": {
+          "type": "array",
+          "description": "List of event names to filter out from the events panel. Supports glob patterns (e.g., 'ble.*' filters all BLE events).",
+          "items": {
+            "type": "string"
+          },
+          "default": ["ble.scan_result"],
+          "examples": [["ble.scan_result", "ble.*"], ["button_push"]]
+        },
+        "filtered_components": {
+          "type": "array",
+          "description": "List of component types to filter out (e.g., 'sys', 'wifi', 'cloud'). These high-frequency status changes are filtered by default.",
+          "items": {
+            "type": "string"
+          },
+          "default": ["sys", "wifi", "cloud", "ts"],
+          "examples": [["sys", "wifi"], ["cloud"]]
+        },
+        "max_items": {
+          "type": "integer",
+          "description": "Maximum number of events to keep in each list (user/system events)",
+          "minimum": 10,
+          "maximum": 1000,
+          "default": 100
         }
       },
       "additionalProperties": false

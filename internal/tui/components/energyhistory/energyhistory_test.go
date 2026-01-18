@@ -33,9 +33,11 @@ func TestModel_SetSize(t *testing.T) {
 func TestModel_addDataPoint(t *testing.T) {
 	t.Parallel()
 	m := New(nil)
-	m.addDataPoint("device1", 100.5)
-	m.addDataPoint("device1", 150.0)
-	m.addDataPoint("device2", 75.0)
+	key1 := SwitchKey{DeviceName: "device1", SwitchID: 0, SwitchName: "", SwitchCount: 1}
+	key2 := SwitchKey{DeviceName: "device2", SwitchID: 0, SwitchName: "", SwitchCount: 1}
+	m.addDataPoint(key1, 100.5)
+	m.addDataPoint(key1, 150.0)
+	m.addDataPoint(key2, 75.0)
 
 	if m.DeviceCount() != 2 {
 		t.Errorf("DeviceCount() = %d, want 2", m.DeviceCount())
@@ -50,24 +52,26 @@ func TestModel_addDataPoint_MaxItems(t *testing.T) {
 	m := New(nil)
 	m.maxItems = 5 // Set small limit for testing
 
+	key := SwitchKey{DeviceName: "device1", SwitchID: 0, SwitchName: "", SwitchCount: 1}
+
 	// Add more than max items
 	for i := range 10 {
-		m.addDataPoint("device1", float64(i*10))
+		m.addDataPoint(key, float64(i*10))
 	}
 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if len(m.history["device1"]) != 5 {
-		t.Errorf("history length = %d, want 5", len(m.history["device1"]))
+	if len(m.history[key]) != 5 {
+		t.Errorf("history length = %d, want 5", len(m.history[key]))
 	}
 
 	// Should keep the last 5 values (50, 60, 70, 80, 90)
-	if m.history["device1"][0].Value != 50 {
-		t.Errorf("first value = %f, want 50", m.history["device1"][0].Value)
+	if m.history[key][0].Value != 50 {
+		t.Errorf("first value = %f, want 50", m.history[key][0].Value)
 	}
-	if m.history["device1"][4].Value != 90 {
-		t.Errorf("last value = %f, want 90", m.history["device1"][4].Value)
+	if m.history[key][4].Value != 90 {
+		t.Errorf("last value = %f, want 90", m.history[key][4].Value)
 	}
 }
 
@@ -84,8 +88,10 @@ func TestModel_View_Empty(t *testing.T) {
 func TestModel_Clear(t *testing.T) {
 	t.Parallel()
 	m := New(nil)
-	m.addDataPoint("device1", 100.0)
-	m.addDataPoint("device2", 200.0)
+	key1 := SwitchKey{DeviceName: "device1", SwitchID: 0, SwitchName: "", SwitchCount: 1}
+	key2 := SwitchKey{DeviceName: "device2", SwitchID: 0, SwitchName: "", SwitchCount: 1}
+	m.addDataPoint(key1, 100.0)
+	m.addDataPoint(key2, 200.0)
 
 	if m.DeviceCount() != 2 {
 		t.Errorf("DeviceCount() before clear = %d, want 2", m.DeviceCount())
