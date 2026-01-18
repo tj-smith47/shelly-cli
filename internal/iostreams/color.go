@@ -17,23 +17,30 @@ func isQuietMode() bool {
 	return viper.GetBool("quiet")
 }
 
+// quietOut returns the output writer, or io.Discard if in quiet mode.
+// Use this for non-essential output that should be suppressed with --quiet.
+func (s *IOStreams) quietOut() io.Writer {
+	if s.quiet {
+		return io.Discard
+	}
+	return s.Out
+}
+
 // Message output functions that integrate with IOStreams.
 // These functions output styled messages to the appropriate streams.
 
 // Info prints an informational message with theme styling.
 // Messages are suppressed in quiet mode.
 func (s *IOStreams) Info(format string, args ...any) {
-	if s.quiet {
-		return
-	}
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.Out, theme.StatusInfo().Render("→")+" "+msg)
+	writelnQuietly(s.quietOut(), theme.StatusInfo().Render("→")+" "+msg)
 }
 
 // Success prints a success message with theme styling.
+// Messages are suppressed in quiet mode.
 func (s *IOStreams) Success(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.Out, theme.StatusOK().Render("✓")+" "+msg)
+	writelnQuietly(s.quietOut(), theme.StatusOK().Render("✓")+" "+msg)
 }
 
 // Warning prints a warning message with theme styling.
@@ -54,46 +61,48 @@ func (s *IOStreams) Error(format string, args ...any) {
 }
 
 // Plain prints a message without any styling.
+// Messages are suppressed in quiet mode.
 func (s *IOStreams) Plain(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.Out, msg)
+	writelnQuietly(s.quietOut(), msg)
 }
 
 // Hint prints a helpful tip or suggestion with dim styling.
 // Hints are suppressed in quiet mode.
 func (s *IOStreams) Hint(format string, args ...any) {
-	if s.quiet {
-		return
-	}
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.Out, theme.Dim().Render("  "+msg))
+	writelnQuietly(s.quietOut(), theme.Dim().Render("  "+msg))
 }
 
 // Title prints a section title with bold styling.
+// Messages are suppressed in quiet mode.
 func (s *IOStreams) Title(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.Out, theme.Title().Render(msg))
+	writelnQuietly(s.quietOut(), theme.Title().Render(msg))
 }
 
 // Subtitle prints a subtitle with subdued styling.
+// Messages are suppressed in quiet mode.
 func (s *IOStreams) Subtitle(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	writelnQuietly(s.Out, theme.Subtitle().Render(msg))
+	writelnQuietly(s.quietOut(), theme.Subtitle().Render(msg))
 }
 
 // Count prints a count summary (e.g., "Found 5 device(s)").
 // Callers should add ios.Println() before Count() if vertical separation is desired.
+// Messages are suppressed in quiet mode.
 func (s *IOStreams) Count(noun string, count int) {
 	suffix := "s"
 	if count == 1 {
 		suffix = ""
 	}
-	writeQuietly(s.Out, "Found %d %s%s\n", count, noun, suffix)
+	writeQuietly(s.quietOut(), "Found %d %s%s\n", count, noun, suffix)
 }
 
 // NoResults prints a "no results" message with optional hints.
+// Messages are suppressed in quiet mode.
 func (s *IOStreams) NoResults(itemType string, hints ...string) {
-	writeQuietly(s.Out, "No %s found\n", itemType)
+	writeQuietly(s.quietOut(), "No %s found\n", itemType)
 	for _, hint := range hints {
 		s.Hint("%s", hint)
 	}
@@ -200,18 +209,25 @@ func UpdateNotification(currentVersion, latestVersion string) {
 // Package-level convenience functions that write to stdout/stderr.
 // Use these when an IOStreams instance is not available (e.g., startup notifications).
 
+// quietStdout returns os.Stdout, or io.Discard if in quiet mode.
+// Use this for non-essential output that should be suppressed with --quiet.
+func quietStdout() io.Writer {
+	if isQuietMode() {
+		return io.Discard
+	}
+	return os.Stdout
+}
+
 // Info prints an informational message to stdout.
 // Messages are suppressed in quiet mode.
 func Info(format string, args ...any) {
-	if isQuietMode() {
-		return
-	}
-	InfoTo(os.Stdout, format, args...)
+	InfoTo(quietStdout(), format, args...)
 }
 
 // Success prints a success message to stdout.
+// Messages are suppressed in quiet mode.
 func Success(format string, args ...any) {
-	SuccessTo(os.Stdout, format, args...)
+	SuccessTo(quietStdout(), format, args...)
 }
 
 // Warning prints a warning message to stderr.
@@ -226,37 +242,39 @@ func Error(format string, args ...any) {
 }
 
 // Plain prints a message without any styling to stdout.
+// Messages are suppressed in quiet mode.
 func Plain(format string, args ...any) {
-	PlainTo(os.Stdout, format, args...)
+	PlainTo(quietStdout(), format, args...)
 }
 
 // Hint prints a helpful tip or suggestion to stdout.
 // Hints are suppressed in quiet mode.
 func Hint(format string, args ...any) {
-	if isQuietMode() {
-		return
-	}
-	HintTo(os.Stdout, format, args...)
+	HintTo(quietStdout(), format, args...)
 }
 
 // Title prints a section title to stdout.
+// Messages are suppressed in quiet mode.
 func Title(format string, args ...any) {
-	TitleTo(os.Stdout, format, args...)
+	TitleTo(quietStdout(), format, args...)
 }
 
 // Subtitle prints a subtitle to stdout.
+// Messages are suppressed in quiet mode.
 func Subtitle(format string, args ...any) {
-	SubtitleTo(os.Stdout, format, args...)
+	SubtitleTo(quietStdout(), format, args...)
 }
 
 // Count prints a count summary to stdout.
+// Messages are suppressed in quiet mode.
 func Count(noun string, count int) {
-	CountTo(os.Stdout, noun, count)
+	CountTo(quietStdout(), noun, count)
 }
 
 // NoResults prints a "no results" message to stdout with optional hints.
+// Messages are suppressed in quiet mode.
 func NoResults(itemType string, hints ...string) {
-	writeQuietly(os.Stdout, "No %s found\n", itemType)
+	writeQuietly(quietStdout(), "No %s found\n", itemType)
 	for _, hint := range hints {
 		Hint("%s", hint)
 	}

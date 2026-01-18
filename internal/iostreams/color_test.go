@@ -140,6 +140,90 @@ func TestIOStreams_Hint_Quiet(t *testing.T) {
 	}
 }
 
+func TestIOStreams_Success_Quiet(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, nil)
+	ios.SetQuiet(true)
+
+	ios.Success("Operation completed")
+
+	if out.Len() != 0 {
+		t.Errorf("Success() in quiet mode should not output, got %q", out.String())
+	}
+}
+
+func TestIOStreams_Plain_Quiet(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, nil)
+	ios.SetQuiet(true)
+
+	ios.Plain("Plain text")
+
+	if out.Len() != 0 {
+		t.Errorf("Plain() in quiet mode should not output, got %q", out.String())
+	}
+}
+
+func TestIOStreams_Title_Quiet(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, nil)
+	ios.SetQuiet(true)
+
+	ios.Title("Section Title")
+
+	if out.Len() != 0 {
+		t.Errorf("Title() in quiet mode should not output, got %q", out.String())
+	}
+}
+
+func TestIOStreams_Subtitle_Quiet(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, nil)
+	ios.SetQuiet(true)
+
+	ios.Subtitle("Subsection")
+
+	if out.Len() != 0 {
+		t.Errorf("Subtitle() in quiet mode should not output, got %q", out.String())
+	}
+}
+
+func TestIOStreams_Count_Quiet(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, nil)
+	ios.SetQuiet(true)
+
+	ios.Count("device", 5)
+
+	if out.Len() != 0 {
+		t.Errorf("Count() in quiet mode should not output, got %q", out.String())
+	}
+}
+
+func TestIOStreams_NoResults_Quiet(t *testing.T) {
+	t.Parallel()
+
+	out := &bytes.Buffer{}
+	ios := iostreams.Test(nil, out, nil)
+	ios.SetQuiet(true)
+
+	ios.NoResults("devices", "Use discover command")
+
+	if out.Len() != 0 {
+		t.Errorf("NoResults() in quiet mode should not output, got %q", out.String())
+	}
+}
+
 func TestIOStreams_Title(t *testing.T) {
 	t.Parallel()
 
@@ -412,6 +496,54 @@ func TestPackageLevel_Hint_Quiet(t *testing.T) {
 	viper.Set("quiet", true)
 	// Should not panic in quiet mode
 	iostreams.Hint("Hint %s", "text")
+}
+
+//nolint:paralleltest // Tests modify global state (viper)
+func TestPackageLevel_Success_Quiet(t *testing.T) {
+	setupViper(t)
+	viper.Set("quiet", true)
+	// Should not panic in quiet mode
+	iostreams.Success("Success %s", "text")
+}
+
+//nolint:paralleltest // Tests modify global state (viper)
+func TestPackageLevel_Plain_Quiet(t *testing.T) {
+	setupViper(t)
+	viper.Set("quiet", true)
+	// Should not panic in quiet mode
+	iostreams.Plain("Plain %s", "text")
+}
+
+//nolint:paralleltest // Tests modify global state (viper)
+func TestPackageLevel_Title_Quiet(t *testing.T) {
+	setupViper(t)
+	viper.Set("quiet", true)
+	// Should not panic in quiet mode
+	iostreams.Title("Title %s", "text")
+}
+
+//nolint:paralleltest // Tests modify global state (viper)
+func TestPackageLevel_Subtitle_Quiet(t *testing.T) {
+	setupViper(t)
+	viper.Set("quiet", true)
+	// Should not panic in quiet mode
+	iostreams.Subtitle("Subtitle %s", "text")
+}
+
+//nolint:paralleltest // Tests modify global state (viper)
+func TestPackageLevel_Count_Quiet(t *testing.T) {
+	setupViper(t)
+	viper.Set("quiet", true)
+	// Should not panic in quiet mode
+	iostreams.Count("item", 5)
+}
+
+//nolint:paralleltest // Tests modify global state (viper)
+func TestPackageLevel_NoResults_Quiet(t *testing.T) {
+	setupViper(t)
+	viper.Set("quiet", true)
+	// Should not panic in quiet mode
+	iostreams.NoResults("devices", "hint")
 }
 
 //nolint:paralleltest // Tests modify global state (viper)
