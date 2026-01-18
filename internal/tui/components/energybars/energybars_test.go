@@ -107,3 +107,75 @@ func TestModel_renderBar(t *testing.T) {
 		t.Error("renderBar() returned empty string")
 	}
 }
+
+func TestFormatSwitchLabel(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		deviceName  string
+		switchName  string
+		switchID    int
+		switchCount int
+		want        string
+	}{
+		{
+			name:        "single switch returns device name only",
+			deviceName:  "Office",
+			switchName:  "Light",
+			switchID:    0,
+			switchCount: 1,
+			want:        "Office",
+		},
+		{
+			name:        "multiple switches with empty name shows Sw format",
+			deviceName:  "Office",
+			switchName:  "",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office (Sw0)",
+		},
+		{
+			name:        "multiple switches combines names",
+			deviceName:  "Office",
+			switchName:  "Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office Light",
+		},
+		{
+			name:        "dedupes when switch name starts with device name",
+			deviceName:  "Office",
+			switchName:  "Office Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office Light",
+		},
+		{
+			name:        "dedupes case insensitive",
+			deviceName:  "Office",
+			switchName:  "office Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "office Light",
+		},
+		{
+			name:        "no dedupe when device name is partial match",
+			deviceName:  "Off",
+			switchName:  "Office Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office Light",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := formatSwitchLabel(tt.deviceName, tt.switchName, tt.switchID, tt.switchCount)
+			if got != tt.want {
+				t.Errorf("formatSwitchLabel(%q, %q, %d, %d) = %q, want %q",
+					tt.deviceName, tt.switchName, tt.switchID, tt.switchCount, got, tt.want)
+			}
+		})
+	}
+}

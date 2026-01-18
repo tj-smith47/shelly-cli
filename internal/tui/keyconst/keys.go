@@ -31,4 +31,6 @@ const (
 	KeyUp     = "up"
 	KeyPgDown = "pgdown"
 	KeyPgUp   = "pgup"
+	KeyCtrlD  = "ctrl+d"
+	KeyCtrlU  = "ctrl+u"
 )

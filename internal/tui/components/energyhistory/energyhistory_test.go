@@ -205,3 +205,80 @@ func TestDataPoint(t *testing.T) {
 		t.Errorf("Timestamp mismatch")
 	}
 }
+
+func TestSwitchKey_String(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		deviceName  string
+		switchName  string
+		switchID    int
+		switchCount int
+		want        string
+	}{
+		{
+			name:        "single switch returns device name only",
+			deviceName:  "Office",
+			switchName:  "Light",
+			switchID:    0,
+			switchCount: 1,
+			want:        "Office",
+		},
+		{
+			name:        "multiple switches with empty name shows Sw format",
+			deviceName:  "Office",
+			switchName:  "",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office (Sw0)",
+		},
+		{
+			name:        "multiple switches combines names",
+			deviceName:  "Office",
+			switchName:  "Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office Light",
+		},
+		{
+			name:        "dedupes when switch name starts with device name",
+			deviceName:  "Office",
+			switchName:  "Office Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office Light",
+		},
+		{
+			name:        "dedupes case insensitive",
+			deviceName:  "Office",
+			switchName:  "office Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "office Light",
+		},
+		{
+			name:        "no dedupe when device name is partial match",
+			deviceName:  "Off",
+			switchName:  "Office Light",
+			switchID:    0,
+			switchCount: 2,
+			want:        "Office Light",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			k := SwitchKey{
+				DeviceName:  tt.deviceName,
+				SwitchName:  tt.switchName,
+				SwitchID:    tt.switchID,
+				SwitchCount: tt.switchCount,
+			}
+			got := k.String()
+			if got != tt.want {
+				t.Errorf("SwitchKey.String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

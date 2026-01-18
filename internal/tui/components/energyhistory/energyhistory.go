@@ -41,12 +41,17 @@ type SwitchKey struct {
 
 // String returns the display label for this switch.
 // Shows "(Sw0)" format when switch name is empty but device has multiple switches.
+// If switch name already starts with device name, uses switch name only to avoid duplication.
 func (k SwitchKey) String() string {
 	if k.SwitchCount <= 1 {
 		return k.DeviceName
 	}
 	if k.SwitchName == "" {
 		return fmt.Sprintf("%s (Sw%d)", k.DeviceName, k.SwitchID)
+	}
+	// Avoid duplicating device name if switch name already includes it
+	if strings.HasPrefix(strings.ToLower(k.SwitchName), strings.ToLower(k.DeviceName)) {
+		return k.SwitchName
 	}
 	return k.DeviceName + " " + k.SwitchName
 }

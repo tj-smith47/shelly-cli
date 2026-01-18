@@ -368,12 +368,17 @@ func collectEMBars(deviceName string, emPowers, em1Powers map[int]float64) []Bar
 // Format: "[Device Name] [Switch Name]" when there are multiple switches.
 // If switch name is empty, shows "(Sw0)" format to identify the switch.
 // If only one switch, just show device name.
+// If switch name already starts with device name, uses switch name only to avoid duplication.
 func formatSwitchLabel(deviceName, switchName string, switchID, switchCount int) string {
 	if switchCount <= 1 {
 		return deviceName
 	}
 	if switchName == "" {
 		return fmt.Sprintf("%s (Sw%d)", deviceName, switchID)
+	}
+	// Avoid duplicating device name if switch name already includes it
+	if strings.HasPrefix(strings.ToLower(switchName), strings.ToLower(deviceName)) {
+		return switchName
 	}
 	return deviceName + " " + switchName
 }

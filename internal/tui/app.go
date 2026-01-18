@@ -1730,9 +1730,9 @@ const (
 // parseNavDirection converts a key string to a navigation direction.
 func parseNavDirection(keyStr string) (navDirection, bool) {
 	switch keyStr {
-	case "j", "down":
+	case "j", keyconst.KeyDown:
 		return navDown, true
-	case "k", "up":
+	case "k", keyconst.KeyUp:
 		return navUp, true
 	case "g":
 		return navFirst, true
@@ -1747,7 +1747,8 @@ func parseNavDirection(keyStr string) (navDirection, bool) {
 // handled by list components (device list, scripts list, etc.).
 func isNavigationKey(keyStr string) bool {
 	switch keyStr {
-	case "j", "k", "up", "down", "g", "G", "pgdown", "pgup", "ctrl+d", "ctrl+u":
+	case "j", "k", keyconst.KeyUp, keyconst.KeyDown, "g", "G",
+		keyconst.KeyPgDown, keyconst.KeyPgUp, keyconst.KeyCtrlD, keyconst.KeyCtrlU:
 		return true
 	default:
 		return false
@@ -1795,6 +1796,12 @@ func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return m, cmd, true
 	}
 
+	// When PanelEnergyBars or PanelEnergyHistory is focused, handle scrolling
+	if m.focusManager.IsFocused(focus.PanelEnergyBars) ||
+		m.focusManager.IsFocused(focus.PanelEnergyHistory) {
+		return m.handleEnergyPanelNavigation(msg)
+	}
+
 	// Handle endpoints panel navigation
 	devices := m.getFilteredDevices()
 	keyStr := msg.String()
@@ -1806,6 +1813,44 @@ func (m Model) handleNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		}
 	}
 
+	return m, nil, false
+}
+
+// handleEnergyPanelNavigation handles scroll navigation for energy panels.
+func (m Model) handleEnergyPanelNavigation(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	keyStr := msg.String()
+	isBars := m.focusManager.IsFocused(focus.PanelEnergyBars)
+
+	switch keyStr {
+	case "j", keyconst.KeyDown:
+		if isBars {
+			m.energyBars = m.energyBars.ScrollDown()
+		} else {
+			*m.energyHistory = m.energyHistory.ScrollDown()
+		}
+		return m, nil, true
+	case "k", keyconst.KeyUp:
+		if isBars {
+			m.energyBars = m.energyBars.ScrollUp()
+		} else {
+			*m.energyHistory = m.energyHistory.ScrollUp()
+		}
+		return m, nil, true
+	case keyconst.KeyCtrlD, keyconst.KeyPgDown:
+		if isBars {
+			m.energyBars = m.energyBars.PageDown()
+		} else {
+			*m.energyHistory = m.energyHistory.PageDown()
+		}
+		return m, nil, true
+	case keyconst.KeyCtrlU, keyconst.KeyPgUp:
+		if isBars {
+			m.energyBars = m.energyBars.PageUp()
+		} else {
+			*m.energyHistory = m.energyHistory.PageUp()
+		}
+		return m, nil, true
+	}
 	return m, nil, false
 }
 
