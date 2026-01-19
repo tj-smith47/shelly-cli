@@ -355,8 +355,9 @@ func (f *Fleet) updateComponents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
-	// Only update the focused component for key messages
-	if _, ok := msg.(tea.KeyPressMsg); ok {
+	// Only update the focused component for key messages and action requests
+	_, isKeyPress := msg.(tea.KeyPressMsg)
+	if isKeyPress || messages.IsActionRequest(msg) {
 		switch f.focusedPanel {
 		case FleetPanelDevices:
 			f.devices, cmd = f.devices.Update(msg)

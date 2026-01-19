@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -294,6 +295,24 @@ func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 		}
 		return m, nil
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.loading = true
+		return m, tea.Batch(m.Loader.Tick(), m.fetchCode(), m.fetchStatus())
+	case messages.DownloadRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.Download()
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -304,30 +323,31 @@ func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m EditorModel) handleKey(msg tea.KeyPressMsg) (EditorModel, tea.Cmd) {
-	switch msg.String() {
-	case "j", "down":
-		m = m.scrollDown()
-	case "k", "up":
+func (m EditorModel) handleNavigation(msg messages.NavigationMsg) (EditorModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
 		m = m.scrollUp()
-	case "g":
-		m.scroll = 0
-	case "G":
-		m = m.scrollToEnd()
-	case "pgdown":
-		m = m.pageDown()
-	case "pgup":
+	case messages.NavDown:
+		m = m.scrollDown()
+	case messages.NavPageUp:
 		m = m.pageUp()
-	case "n":
-		m.showNumbers = !m.showNumbers
-	case "r":
-		m.loading = true
-		return m, tea.Batch(m.Loader.Tick(), m.fetchCode(), m.fetchStatus())
-	case "d":
-		// Download script to file
-		return m, m.Download()
+	case messages.NavPageDown:
+		m = m.pageDown()
+	case messages.NavHome:
+		m.scroll = 0
+	case messages.NavEnd:
+		m = m.scrollToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for script editor
 	}
+	return m, nil
+}
 
+func (m EditorModel) handleKey(msg tea.KeyPressMsg) (EditorModel, tea.Cmd) {
+	// Handle component-specific keys not covered by action messages
+	if msg.String() == "n" {
+		m.showNumbers = !m.showNumbers
+	}
 	return m, nil
 }
 

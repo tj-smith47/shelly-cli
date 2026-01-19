@@ -24,6 +24,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/templates"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/layout"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 )
@@ -416,8 +417,9 @@ func (m *Manage) updateComponents(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
-	// Only update the focused component for key messages
-	if _, ok := msg.(tea.KeyPressMsg); ok {
+	// Only update the focused component for key messages and action requests
+	_, isKeyPress := msg.(tea.KeyPressMsg)
+	if isKeyPress || messages.IsActionRequest(msg) {
 		// If an overlay wizard is open, it gets all key events
 		if m.showProvisioning {
 			m.provisioning, cmd = m.provisioning.Update(msg)

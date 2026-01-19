@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -282,6 +283,32 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleStatusLoaded(msg)
 	case EditClosedMsg:
 		return m.handleEditClosed(msg)
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefreshKey()
+	case messages.ToggleEnableRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.toggleCurrentField()
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleEditKey()
+	case messages.TimezoneRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleTimezoneKey()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -400,22 +427,22 @@ func (m Model) handleEditClosed(msg EditClosedMsg) (Model, tea.Cmd) {
 	)
 }
 
-func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "j", "down":
-		m = m.cursorDown()
-	case "k", "up":
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
 		m = m.cursorUp()
-	case "r":
-		return m.handleRefreshKey()
-	case "t":
-		return m.toggleCurrentField()
-	case "e":
-		return m.handleEditKey()
-	case "z":
-		return m.handleTimezoneKey()
+	case messages.NavDown:
+		m = m.cursorDown()
+	case messages.NavPageUp, messages.NavPageDown, messages.NavHome, messages.NavEnd, messages.NavLeft, messages.NavRight:
+		// Not applicable for system settings
 	}
+	return m, nil
+}
 
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

@@ -353,6 +353,10 @@ func (c *Config) Update(msg tea.Msg) (View, tea.Cmd) {
 		}
 		cmd := c.updateFocusedComponent(msg)
 		cmds = append(cmds, cmd)
+	} else if messages.IsActionRequest(msg) {
+		// Action request messages go only to the focused component
+		cmd := c.updateFocusedComponent(msg)
+		cmds = append(cmds, cmd)
 	} else {
 		// For non-key messages (async results), update ALL components
 		cmd := c.updateAllComponents(msg)

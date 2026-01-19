@@ -19,7 +19,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -235,6 +235,53 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleExport(msg)
 	case ImportTemplateMsg:
 		return m.handleImport(msg)
+
+	// Action messages from context-based keybindings
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.NewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		return m, func() tea.Msg { return CreateTemplateMsg{} }
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		return m.editTemplate()
+	case messages.DeleteRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleDeleteKey()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		m.loading = true
+		return m, tea.Batch(m.Loader.Tick(), m.loadTemplates())
+	case messages.ExportRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.exportTemplate()
+	case messages.ImportRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.importTemplate()
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -285,60 +332,16 @@ func (m ListModel) handleImport(msg ImportTemplateMsg) (ListModel, tea.Cmd) {
 }
 
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		m.pendingDelete = "" // Clear pending delete on navigation
-		return m, nil
-	}
-
-	// Handle action keys
+	// Component-specific keys not in context system
 	switch msg.String() {
-	case "c":
-		// Create template (signals to parent to show device selector)
-		m.pendingDelete = ""
-		return m, func() tea.Msg { return CreateTemplateMsg{} }
 	case "enter", "a":
 		// Apply template to device
 		m.pendingDelete = ""
 		return m.applyTemplate()
-	case "e":
-		// Edit template
-		m.pendingDelete = ""
-		return m.editTemplate()
 	case "d":
 		// Diff template vs device
 		m.pendingDelete = ""
 		return m.diffTemplate()
-	case "D":
-		// Delete template - requires double press for confirmation
-		tpl := m.selectedTemplate()
-		if tpl == nil {
-			return m, nil
-		}
-		if m.pendingDelete == tpl.Name {
-			// Second press - confirm delete
-			m.pendingDelete = ""
-			return m.deleteTemplate()
-		}
-		// First press - mark pending
-		m.pendingDelete = tpl.Name
-		return m, nil
-	case "x":
-		// Export template
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.exportTemplate()
-	case "i":
-		// Import template
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.importTemplate()
-	case "r", "R":
-		// Refresh list
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		m.loading = true
-		return m, tea.Batch(m.Loader.Tick(), m.loadTemplates())
 	case "esc":
 		// Cancel pending delete
 		if m.pendingDelete != "" {
@@ -347,6 +350,42 @@ func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
 		}
 	}
 
+	return m, nil
+}
+
+func (m ListModel) handleNavigation(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	m.pendingDelete = "" // Clear pending delete on navigation
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
+func (m ListModel) handleDeleteKey() (ListModel, tea.Cmd) {
+	tpl := m.selectedTemplate()
+	if tpl == nil {
+		return m, nil
+	}
+	if m.pendingDelete == tpl.Name {
+		// Second press - confirm delete
+		m.pendingDelete = ""
+		return m.deleteTemplate()
+	}
+	// First press - mark pending
+	m.pendingDelete = tpl.Name
 	return m, nil
 }
 

@@ -18,7 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -363,6 +363,44 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
+
+	// Action messages from context-based keybindings
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.toggleOrTrigger()
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleEditKey()
+	case messages.NewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNewKey()
+	case messages.DeleteRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleDeleteKey()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.loading = true
+		return m, tea.Batch(
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
+			m.fetchAndCacheVirtuals(),
+		)
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -501,36 +539,31 @@ func (m Model) handleDeleteConfirmation(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		return m, nil
-	}
+func (m Model) handleKey(_ tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Component-specific keys not in context system
+	// (none currently - h/l/left/right for value adjustment handled via NavigationMsg)
+	return m, nil
+}
 
-	// Handle action keys
-	switch msg.String() {
-	case "t", "enter":
-		return m, m.toggleOrTrigger()
-	case "e":
-		return m.handleEditKey()
-	case "n":
-		return m.handleNewKey()
-	case "h", "left":
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft:
 		return m, m.adjustValue(-1)
-	case "l", "right":
+	case messages.NavRight:
 		return m, m.adjustValue(1)
-	case "d":
-		return m.handleDeleteKey()
-	case "R":
-		// Refresh list - invalidate cache and fetch fresh data
-		m.loading = true
-		return m, tea.Batch(
-			m.Loader.Tick(),
-			panelcache.Invalidate(m.fileCache, m.device, cache.TypeVirtuals),
-			m.fetchAndCacheVirtuals(),
-		)
 	}
-
 	return m, nil
 }
 

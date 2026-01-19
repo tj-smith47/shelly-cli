@@ -17,6 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -339,6 +340,24 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleStatusLoaded(msg)
 	case ToggleResultMsg:
 		return m.handleToggleResult(msg)
+
+	// Action messages from context-based keybindings
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
+	case messages.ToggleEnableRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleToggle()
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleEditConfig()
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -463,32 +482,43 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "c":
-		// Open cloud configuration modal
-		if m.device != "" && !m.loading && !m.toggling {
-			m.editModel = m.editModel.Show(m.device, m.connected, m.enabled, m.server)
-			return m, func() tea.Msg { return EditOpenedMsg{} }
-		}
-	case "t", "enter":
-		if !m.toggling && !m.loading && m.device != "" {
-			m.toggling = true
-			m.err = nil
-			return m, m.toggleCloud()
-		}
-	case "r":
-		if !m.loading && m.device != "" {
-			m.loading = true
-			// Invalidate cache and fetch fresh data
-			return m, tea.Batch(
-				m.Loader.Tick(),
-				panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
-				m.fetchAndCacheStatus(),
-			)
-		}
+	// Component-specific keys not in context system
+	if msg.String() == "c" {
+		// "c" for cloud config is component-specific
+		return m.handleEditConfig()
 	}
 
 	return m, nil
+}
+
+func (m Model) handleRefresh() (Model, tea.Cmd) {
+	if m.loading || m.device == "" {
+		return m, nil
+	}
+	m.loading = true
+	// Invalidate cache and fetch fresh data
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeCloud),
+		m.fetchAndCacheStatus(),
+	)
+}
+
+func (m Model) handleToggle() (Model, tea.Cmd) {
+	if m.toggling || m.loading || m.device == "" {
+		return m, nil
+	}
+	m.toggling = true
+	m.err = nil
+	return m, m.toggleCloud()
+}
+
+func (m Model) handleEditConfig() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.toggling {
+		return m, nil
+	}
+	m.editModel = m.editModel.Show(m.device, m.connected, m.enabled, m.server)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
 }
 
 func (m Model) toggleCloud() tea.Cmd {

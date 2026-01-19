@@ -58,6 +58,7 @@ const (
 	ActionSort
 	ActionExpand
 	ActionRefresh
+	ActionRefreshAll
 	ActionFilterToggle
 	ActionEdit
 	ActionNew
@@ -80,6 +81,7 @@ const (
 	ActionPanel8
 	ActionPanel9
 	ActionControl
+	ActionDetail
 )
 
 // KeyBinding represents a key and its description.
@@ -171,10 +173,10 @@ func (m *ContextMap) initDefaults() {
 		"O":      ActionOff,
 		"R":      ActionReboot,
 		"c":      ActionControl, // Open control panel
-		"d":      ActionEnter,   // Device detail (same as enter)
+		"d":      ActionDetail,  // Device detail overlay
 		"enter":  ActionEnter,
 		"r":      ActionRefresh,
-		"ctrl+r": ActionRefresh,
+		"ctrl+r": ActionRefreshAll,
 		"b":      ActionBrowser, // Open in browser
 		"pgdown": ActionPageDown,
 		"pgup":   ActionPageUp,
@@ -214,6 +216,10 @@ func (m *ContextMap) initDefaults() {
 		"k":      ActionUp,
 		"down":   ActionDown,
 		"up":     ActionUp,
+		"h":      ActionLeft,
+		"l":      ActionRight,
+		"left":   ActionLeft,
+		"right":  ActionRight,
 		"s":      ActionSort,
 		"e":      ActionExpand,
 		"pgdown": ActionPageDown,
@@ -253,6 +259,10 @@ func (m *ContextMap) initDefaults() {
 		"k":      ActionUp,
 		"down":   ActionDown,
 		"up":     ActionUp,
+		"h":      ActionLeft,
+		"l":      ActionRight,
+		"left":   ActionLeft,
+		"right":  ActionRight,
 		"enter":  ActionEnter,
 		"e":      ActionEdit,   // Edit script/schedule/webhook
 		"n":      ActionNew,    // Create new
@@ -272,6 +282,10 @@ func (m *ContextMap) initDefaults() {
 		"k":      ActionUp,
 		"down":   ActionDown,
 		"up":     ActionUp,
+		"h":      ActionLeft,
+		"l":      ActionRight,
+		"left":   ActionLeft,
+		"right":  ActionRight,
 		"enter":  ActionEnter,
 		"e":      ActionEdit, // Edit configuration
 		"r":      ActionRefresh,
@@ -289,6 +303,10 @@ func (m *ContextMap) initDefaults() {
 		"k":      ActionUp,
 		"down":   ActionDown,
 		"up":     ActionUp,
+		"h":      ActionLeft,
+		"l":      ActionRight,
+		"left":   ActionLeft,
+		"right":  ActionRight,
 		"enter":  ActionEnter,
 		"r":      ActionRefresh, // Refresh device list
 		"space":  ActionToggle,  // Select device
@@ -316,10 +334,10 @@ func (m *ContextMap) initDefaults() {
 		"O":      ActionOff,
 		"R":      ActionReboot,
 		"c":      ActionControl, // Open control panel
-		"d":      ActionEnter,   // Device detail
+		"d":      ActionDetail,  // Device detail overlay
 		"enter":  ActionEnter,
 		"r":      ActionRefresh,
-		"ctrl+r": ActionRefresh,
+		"ctrl+r": ActionRefreshAll,
 		"b":      ActionBrowser, // Open in browser
 		"space":  ActionPause,   // Pause/resume monitoring
 		"pgdown": ActionPageDown,
@@ -466,6 +484,7 @@ var actionDescriptions = map[Action]string{
 	ActionSort:         "Sort",
 	ActionExpand:       "Expand/Toggle all",
 	ActionRefresh:      "Refresh",
+	ActionRefreshAll:   "Refresh all",
 	ActionFilterToggle: "Toggle filter",
 	ActionEdit:         "Edit",
 	ActionNew:          "Create new",
@@ -488,6 +507,7 @@ var actionDescriptions = map[Action]string{
 	ActionPanel8:       "Jump to panel 8",
 	ActionPanel9:       "Jump to panel 9",
 	ActionControl:      "Control panel",
+	ActionDetail:       "Device detail",
 }
 
 // contextActionDescriptions overrides action descriptions for specific contexts.
@@ -504,7 +524,8 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionFilterToggle: "Filter by device",
 	},
 	ContextDevices: {
-		ActionEnter:   "View details",
+		ActionEnter:   "Select/Enter",
+		ActionDetail:  "Device detail overlay",
 		ActionRefresh: "Refresh device",
 		ActionBrowser: "Open web UI",
 		ActionControl: "Open control panel",
@@ -527,7 +548,8 @@ var contextActionDescriptions = map[Context]map[Action]string{
 		ActionRefresh: "Refresh list",
 	},
 	ContextMonitor: {
-		ActionEnter:   "View device details",
+		ActionEnter:   "Select/Enter",
+		ActionDetail:  "Device detail overlay",
 		ActionPause:   "Pause monitoring",
 		ActionRefresh: "Refresh data",
 		ActionBrowser: "Open web UI",

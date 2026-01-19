@@ -20,7 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -324,6 +324,27 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleStatusLoaded(msg)
 	case ScanResultMsg:
 		return m.handleScanResult(msg)
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ScanRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleScanKey()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefreshKey()
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleEditKey()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -468,22 +489,30 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		return m, nil
-	}
-
-	// Handle action keys
-	switch msg.String() {
-	case "s":
-		return m.handleScanKey()
-	case "r":
-		return m.handleRefreshKey()
-	case "e":
-		return m.handleEditKey()
-	}
-
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

@@ -17,7 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -342,6 +342,32 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 	case TriggerResultMsg:
 		// Re-emit so parent view can show toast
 		return m, func() tea.Msg { return msg }
+
+	// Action messages from context-based keybindings
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleEditOpenKey()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		if !m.loading && m.device != "" {
+			m.loading = true
+			return m, tea.Batch(
+				m.Loader.Tick(),
+				panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
+				m.fetchAndCacheInputs(),
+			)
+		}
+		return m, nil
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -483,35 +509,8 @@ func (m Model) handleActionModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		return m, nil
-	}
-
-	// Handle action keys
+	// Component-specific keys not in context system
 	switch msg.String() {
-	case "r", "R":
-		// Refresh list - invalidate cache and fetch fresh data
-		if !m.loading && m.device != "" {
-			m.loading = true
-			return m, tea.Batch(
-				m.Loader.Tick(),
-				panelcache.Invalidate(m.fileCache, m.device, cache.TypeInputs),
-				m.fetchAndCacheInputs(),
-			)
-		}
-	case "e", "enter":
-		// Open edit modal for selected input
-		if len(m.inputs) > 0 && !m.loading {
-			input := m.inputs[m.Scroller.Cursor()]
-			m.editing = true
-			m.editModal = m.editModal.SetSize(m.Width, m.Height)
-			var cmd tea.Cmd
-			m.editModal, cmd = m.editModal.Show(m.device, input.ID)
-			return m, tea.Batch(cmd, func() tea.Msg {
-				return EditOpenedMsg{}
-			})
-		}
 	case "a":
 		// Open action configuration modal for selected input
 		return m.openActionModal()
@@ -520,6 +519,41 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, m.triggerInput()
 	}
 
+	return m, nil
+}
+
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
+func (m Model) handleEditOpenKey() (Model, tea.Cmd) {
+	// Open edit modal for selected input
+	if len(m.inputs) > 0 && !m.loading {
+		input := m.inputs[m.Scroller.Cursor()]
+		m.editing = true
+		m.editModal = m.editModal.SetSize(m.Width, m.Height)
+		var cmd tea.Cmd
+		m.editModal, cmd = m.editModal.Show(m.device, input.ID)
+		return m, tea.Batch(cmd, func() tea.Msg {
+			return EditOpenedMsg{}
+		})
+	}
 	return m, nil
 }
 

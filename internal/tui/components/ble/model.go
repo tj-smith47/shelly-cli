@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -316,6 +317,22 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleStatusLoaded(msg)
 	case DiscoveryStartedMsg:
 		return m.handleDiscoveryStarted(msg)
+	// Action messages from context system
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
+	case messages.ScanRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleScanDiscovery()
+	case messages.EditRequestMsg, messages.ViewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleEditKey()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -450,35 +467,43 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "r":
-		if !m.loading && m.device != "" {
-			m.loading = true
-			// Invalidate cache and fetch fresh data
-			return m, tea.Batch(
-				m.Loader.Tick(),
-				panelcache.Invalidate(m.fileCache, m.device, cache.TypeBLE),
-				m.fetchAndCacheStatus(),
-			)
-		}
-	case "d":
-		if !m.starting && !m.loading && m.device != "" && m.ble != nil && m.ble.Enable {
-			m.starting = true
-			m.err = nil
-			return m, m.startDiscovery()
-		}
-	case "e", "enter":
-		// Open edit modal
-		if m.device != "" && !m.loading && m.ble != nil {
-			m.editing = true
-			m.editModal = m.editModal.SetSize(m.Width, m.Height)
-			var cmd tea.Cmd
-			m.editModal, cmd = m.editModal.Show(m.device, m.ble)
-			return m, cmd
-		}
+func (m Model) handleRefresh() (Model, tea.Cmd) {
+	if m.loading || m.device == "" {
+		return m, nil
 	}
+	m.loading = true
+	// Invalidate cache and fetch fresh data
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeBLE),
+		m.fetchAndCacheStatus(),
+	)
+}
 
+func (m Model) handleScanDiscovery() (Model, tea.Cmd) {
+	if m.starting || m.loading || m.device == "" || m.ble == nil || !m.ble.Enable {
+		return m, nil
+	}
+	m.starting = true
+	m.err = nil
+	return m, m.startDiscovery()
+}
+
+func (m Model) handleEditKey() (Model, tea.Cmd) {
+	if m.device == "" || m.loading || m.ble == nil {
+		return m, nil
+	}
+	m.editing = true
+	m.editModal = m.editModal.SetSize(m.Width, m.Height)
+	var cmd tea.Cmd
+	m.editModal, cmd = m.editModal.Show(m.device, m.ble)
+	return m, cmd
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

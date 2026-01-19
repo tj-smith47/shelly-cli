@@ -400,6 +400,9 @@ func (a *Automation) Update(msg tea.Msg) (View, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 		cmds = append(cmds, a.updateFocusedComponent(msg))
+	} else if messages.IsActionRequest(msg) {
+		// Action request messages go only to the focused component
+		cmds = append(cmds, a.updateFocusedComponent(msg))
 	} else {
 		// For non-key messages (async results), update ALL components
 		cmds = append(cmds, a.updateAllComponents(msg))

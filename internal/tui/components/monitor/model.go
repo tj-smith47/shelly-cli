@@ -25,7 +25,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -581,6 +581,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.scheduleRefresh(),
 		)
 
+	// Action messages from context-based keybindings
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg)
+	case messages.RefreshRequestMsg:
+		if m.refreshing {
+			return m, nil
+		}
+		m.refreshing = true
+		return m, m.fetchStatuses()
+	case messages.ExportRequestMsg:
+		return m, m.exportData(ExportCSV)
+
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	}
@@ -683,17 +695,32 @@ func (m Model) parseFullStatus(status *DeviceStatus, data json.RawMessage) {
 }
 
 func (m Model) handleKeyPress(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	keys.HandleScrollNavigation(msg.String(), m.Scroller)
-
-	switch msg.String() {
-	case "x":
-		// Export to CSV
-		return m, m.exportData(ExportCSV)
-	case "X":
-		// Export to JSON
+	// Component-specific keys not in context system
+	if msg.String() == "X" {
+		// Export to JSON (uppercase X is component-specific)
 		return m, m.exportData(ExportJSON)
 	}
 
+	return m, nil
+}
+
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
 	return m, nil
 }
 

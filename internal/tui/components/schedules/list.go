@@ -17,7 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -299,6 +299,46 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ViewRequestMsg, messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = 0
+		return m, m.selectSchedule()
+	case messages.ToggleEnableRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = 0
+		return m, m.toggleSchedule()
+	case messages.DeleteRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleDelete()
+	case messages.NewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = 0
+		return m, m.createSchedule()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = 0
+		m.loading = true
+		return m, tea.Batch(
+			m.Loader.Tick(),
+			panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
+			m.fetchAndCacheSchedules(),
+		)
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -398,58 +438,49 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 	)
 }
 
+func (m ListModel) handleNavigation(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	m.pendingDelete = 0 // Clear pending delete on navigation
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
+func (m ListModel) handleDelete() (ListModel, tea.Cmd) {
+	schedule := m.selectedSchedule()
+	if schedule == nil {
+		return m, nil
+	}
+	if m.pendingDelete == schedule.ID {
+		// Second press - confirm delete
+		m.pendingDelete = 0
+		return m, m.deleteSchedule()
+	}
+	// First press - mark pending
+	m.pendingDelete = schedule.ID
+	return m, nil
+}
+
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		m.pendingDelete = 0 // Clear pending delete on navigation
-		return m, nil
-	}
-
-	// Handle action keys
-	switch msg.String() {
-	case "enter", "e":
-		// Edit schedule (open in editor)
-		m.pendingDelete = 0
-		return m, m.selectSchedule()
-	case "t":
-		// Toggle enable/disable
-		m.pendingDelete = 0
-		return m, m.toggleSchedule()
-	case "d":
-		// Delete schedule - requires double press for confirmation
-		schedule := m.selectedSchedule()
-		if schedule == nil {
-			return m, nil
-		}
-		if m.pendingDelete == schedule.ID {
-			// Second press - confirm delete
-			m.pendingDelete = 0
-			return m, m.deleteSchedule()
-		}
-		// First press - mark pending
-		m.pendingDelete = schedule.ID
-		return m, nil
-	case "n":
-		// New schedule - will be handled by parent
-		m.pendingDelete = 0
-		return m, m.createSchedule()
-	case "R":
-		// Refresh list - invalidate cache and fetch fresh data
-		m.pendingDelete = 0
-		m.loading = true
-		return m, tea.Batch(
-			m.Loader.Tick(),
-			panelcache.Invalidate(m.fileCache, m.device, cache.TypeSchedules),
-			m.fetchAndCacheSchedules(),
-		)
-	case "esc":
+	// Handle component-specific keys not covered by action messages
+	if msg.String() == "esc" && m.pendingDelete != 0 {
 		// Cancel pending delete
-		if m.pendingDelete != 0 {
-			m.pendingDelete = 0
-			return m, nil
-		}
+		m.pendingDelete = 0
+		return m, nil
 	}
-
 	return m, nil
 }
 

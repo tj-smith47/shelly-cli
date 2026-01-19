@@ -642,12 +642,12 @@ func TestModel_EscapeClearsFilter(t *testing.T) {
 	m = applyWindowSize(m, 100, 40)
 	m.filter = "test-filter"
 
-	// Press Escape when filter is set
+	// Press Escape when filter is set - goes through context system
 	msg := tea.KeyPressMsg{Code: tea.KeyEscape}
-	updated, _, _ := m.handleGlobalKeys(msg)
+	updated, _, _ := m.handleKeyPressMsg(msg)
 	model, ok := updated.(Model)
 	if !ok {
-		t.Fatal("handleGlobalKeys should return Model")
+		t.Fatal("handleKeyPressMsg should return Model")
 	}
 
 	if model.filter != "" {

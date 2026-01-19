@@ -21,7 +21,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/loading"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -481,6 +481,30 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleBatchComplete(msg), nil
 	case StagedUpdateCompleteMsg:
 		return m.handleStagedUpdateComplete(msg)
+
+	// Action messages from context-based keybindings
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m = m.toggleSelection()
+		return m, nil
+	case messages.ScanRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.CheckAll()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.CheckAll()
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -694,23 +718,12 @@ func (m Model) findDeviceIndex(name string) int {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		return m, nil
-	}
-
-	// Handle action keys
+	// Component-specific keys not in context system
 	switch msg.String() {
-	case "space":
-		m = m.toggleSelection()
 	case "a":
 		m = m.selectAllWithUpdates()
 	case "n":
 		m = m.selectNone()
-	case "c":
-		return m.CheckAll()
-	case "r":
-		return m.CheckAll()
 	case "R":
 		return m.RollbackCurrent()
 	case "u", "enter":
@@ -728,6 +741,26 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.UpdateSelectedStaged(25)
 	}
 
+	return m, nil
+}
+
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
 	return m, nil
 }
 

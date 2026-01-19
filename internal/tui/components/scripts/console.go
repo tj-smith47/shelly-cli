@@ -13,7 +13,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
 
@@ -187,6 +187,25 @@ func (m ConsoleModel) Update(msg tea.Msg) (ConsoleModel, tea.Cmd) {
 		m = m.addLine(msg)
 		return m, m.pollMessages()
 
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg), nil
+	case messages.ClearRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m = m.Clear()
+		return m, nil
+	case messages.PauseRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m = m.TogglePause()
+		return m, nil
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -198,35 +217,40 @@ func (m ConsoleModel) Update(msg tea.Msg) (ConsoleModel, tea.Cmd) {
 	return m, m.pollMessages()
 }
 
-func (m ConsoleModel) handleKey(msg tea.KeyPressMsg) (ConsoleModel, tea.Cmd) {
+func (m ConsoleModel) handleNavigation(msg messages.NavigationMsg) ConsoleModel {
 	m.state.mu.Lock()
 	lineCount := len(m.state.lines)
 	m.state.mu.Unlock()
 
-	switch msg.String() {
-	case keyconst.KeyUp, "k":
+	switch msg.Direction {
+	case messages.NavUp:
 		if m.scrollPos > 0 {
 			m.scrollPos--
 		}
-	case keyconst.KeyDown, "j":
+	case messages.NavDown:
 		maxScroll := max(0, lineCount-m.visibleLines())
 		if m.scrollPos < maxScroll {
 			m.scrollPos++
 		}
-	case keyconst.KeyPgUp:
+	case messages.NavPageUp:
 		m.scrollPos = max(0, m.scrollPos-m.visibleLines())
-	case keyconst.KeyPgDown:
+	case messages.NavPageDown:
 		maxScroll := max(0, lineCount-m.visibleLines())
 		m.scrollPos = min(maxScroll, m.scrollPos+m.visibleLines())
-	case "home", "g":
+	case messages.NavHome:
 		m.scrollPos = 0
-	case "end", "G":
+	case messages.NavEnd:
 		m.scrollPos = max(0, lineCount-m.visibleLines())
-	case "c":
-		m = m.Clear()
-	case "p", " ":
-		m = m.TogglePause()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for console output
 	}
+	return m
+}
+
+func (m ConsoleModel) handleKey(msg tea.KeyPressMsg) (ConsoleModel, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

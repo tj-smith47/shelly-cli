@@ -10,6 +10,7 @@ import (
 
 	"github.com/tj-smith47/shelly-cli/internal/shelly/automation"
 	"github.com/tj-smith47/shelly-cli/internal/theme"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
 )
@@ -113,28 +114,34 @@ func (m EditorModel) SetPanelIndex(index int) EditorModel {
 
 // Update handles messages.
 func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
-	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
-		if !m.focused {
-			return m, nil
-		}
-		return m.handleKey(keyMsg)
+	if !m.focused {
+		return m, nil
+	}
+
+	switch msg := msg.(type) {
+	case messages.NavigationMsg:
+		return m.handleNavigation(msg)
+	case tea.KeyPressMsg:
+		// No component-specific keys
+		_ = msg
 	}
 
 	return m, nil
 }
 
-func (m EditorModel) handleKey(msg tea.KeyPressMsg) (EditorModel, tea.Cmd) {
-	switch msg.String() {
-	case "j", "down":
-		m = m.scrollDown()
-	case "k", "up":
+func (m EditorModel) handleNavigation(msg messages.NavigationMsg) (EditorModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
 		m = m.scrollUp()
-	case "g":
+	case messages.NavDown:
+		m = m.scrollDown()
+	case messages.NavHome:
 		m.scroll = 0
-	case "G":
+	case messages.NavEnd:
 		m = m.scrollToEnd()
+	case messages.NavPageUp, messages.NavPageDown, messages.NavLeft, messages.NavRight:
+		// Not applicable for schedule editor scroll
 	}
-
 	return m, nil
 }
 

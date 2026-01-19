@@ -18,7 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tuierrors"
@@ -234,6 +234,31 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.results = msg.Results
 		return m, nil
 
+	// Action messages from context-based keybindings
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m = m.toggleSelection()
+		return m, nil
+	case messages.RunRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.execute()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.results = nil
+		m.err = nil
+		return m, nil
+
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -254,21 +279,12 @@ func (m Model) updateLoading(msg tea.Msg) (Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	// Handle navigation keys
-	if m.handleNavKey(msg.String()) {
-		return m, nil
-	}
-
-	// Handle action keys
+	// Component-specific keys not in context system
 	switch msg.String() {
-	case "space":
-		m = m.toggleSelection()
 	case "a":
 		m = m.selectAll()
 	case "n":
 		m = m.selectNone()
-	case "enter", "x":
-		return m.execute()
 	case "1":
 		m.operation = OpToggle
 	case "2":
@@ -279,17 +295,29 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.operation = OpReboot
 	case "5":
 		m.operation = OpCheckFirmware
-	case "r":
-		m.results = nil
-		m.err = nil
 	}
 
 	return m, nil
 }
 
-// handleNavKey handles navigation keys, returns true if handled.
-func (m Model) handleNavKey(key string) bool {
-	return keys.HandleScrollNavigation(key, m.Scroller)
+func (m Model) handleNavigation(msg messages.NavigationMsg) (Model, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
+	return m, nil
 }
 
 func (m Model) toggleSelection() Model {

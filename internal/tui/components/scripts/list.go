@@ -17,7 +17,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
@@ -316,6 +316,52 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleLoaded(msg)
 	case ActionMsg:
 		return m.handleAction(msg)
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ViewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.selectScript()
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.editScript()
+	case messages.NewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.createScript()
+	case messages.DeleteRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleDelete()
+	case messages.RunRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.startScript()
+	case messages.StopRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.stopScript()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
+	case messages.EvalRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m, m.openEval()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -415,38 +461,33 @@ func (m ListModel) handleAction(msg ActionMsg) (ListModel, tea.Cmd) {
 	)
 }
 
-func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		return m, nil
+func (m ListModel) handleNavigation(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
 	}
-
-	// Handle action keys
-	return m.handleActionKey(msg.String())
+	return m, nil
 }
 
-func (m ListModel) handleActionKey(key string) (ListModel, tea.Cmd) {
-	switch key {
-	case "enter":
-		return m, m.selectScript()
-	case "e":
-		return m, m.editScript()
-	case "r":
-		return m, m.startScript()
-	case "s":
-		return m, m.stopScript()
-	case "d":
-		return m.handleDelete()
+func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
+	// Handle component-specific keys not covered by action messages
+	switch msg.String() {
 	case keyconst.KeyEsc:
 		return m.handleEscape()
-	case "n":
-		return m, m.createScript()
 	case "t":
 		return m, m.insertTemplate()
-	case "x":
-		return m, m.openEval()
-	case "R":
-		return m.handleRefresh()
 	}
 	return m, nil
 }

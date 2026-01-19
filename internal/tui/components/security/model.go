@@ -18,6 +18,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/components/cachestatus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panelcache"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -255,6 +256,17 @@ func (m Model) handleMessage(msg tea.Msg) (Model, tea.Cmd) {
 		return m.handleRefreshComplete(msg)
 	case StatusLoadedMsg:
 		return m.handleStatusLoaded(msg)
+	// Action messages from context system
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleRefresh()
+	case messages.AuthRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleAuthConfig()
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -353,26 +365,31 @@ func (m Model) handleEditModalUpdate(msg tea.Msg) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "r":
-		if !m.loading && m.device != "" {
-			m.loading = true
-			// Invalidate cache and fetch fresh data
-			return m, tea.Batch(
-				m.Loader.Tick(),
-				panelcache.Invalidate(m.fileCache, m.device, cache.TypeSecurity),
-				m.fetchAndCacheStatus(),
-			)
-		}
-	case "a":
-		// Open auth configuration modal
-		if m.device != "" && m.status != nil && !m.loading {
-			m.editModel = m.editModel.Show(m.device, m.status.AuthEnabled)
-			return m, func() tea.Msg { return EditOpenedMsg{} }
-		}
+func (m Model) handleRefresh() (Model, tea.Cmd) {
+	if m.loading || m.device == "" {
+		return m, nil
 	}
+	m.loading = true
+	// Invalidate cache and fetch fresh data
+	return m, tea.Batch(
+		m.Loader.Tick(),
+		panelcache.Invalidate(m.fileCache, m.device, cache.TypeSecurity),
+		m.fetchAndCacheStatus(),
+	)
+}
 
+func (m Model) handleAuthConfig() (Model, tea.Cmd) {
+	if m.device == "" || m.status == nil || m.loading {
+		return m, nil
+	}
+	m.editModel = m.editModel.Show(m.device, m.status.AuthEnabled)
+	return m, func() tea.Msg { return EditOpenedMsg{} }
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	// Component-specific keys not covered by action messages
+	// (none currently - all keys migrated to action messages)
+	_ = msg
 	return m, nil
 }
 

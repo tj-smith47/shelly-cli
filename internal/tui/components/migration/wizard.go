@@ -16,7 +16,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 )
@@ -257,6 +257,30 @@ func (w Wizard) handleMessage(msg tea.Msg) (Wizard, tea.Cmd) {
 		return w.handleCompareComplete(msg)
 	case ApplyCompleteMsg:
 		return w.handleApplyComplete(msg)
+
+	// Action messages from context-based keybindings
+	case messages.NavigationMsg:
+		if !w.focused {
+			return w, nil
+		}
+		return w.handleNavigation(msg)
+	case messages.ToggleEnableRequestMsg:
+		if !w.focused {
+			return w, nil
+		}
+		if w.step == StepPreview {
+			w = w.withDiffToggled()
+		}
+		return w, nil
+	case messages.RefreshRequestMsg:
+		if !w.focused {
+			return w, nil
+		}
+		if w.step == StepComplete {
+			return w.reset()
+		}
+		return w, nil
+
 	case tea.KeyPressMsg:
 		if !w.focused {
 			return w, nil
@@ -319,24 +343,40 @@ func (w Wizard) handleApplyComplete(msg ApplyCompleteMsg) (Wizard, tea.Cmd) {
 }
 
 func (w Wizard) handleKey(msg tea.KeyPressMsg) (Wizard, tea.Cmd) {
-	key := msg.String()
+	// Handle action keys
+	return w.handleActionKey(msg.String())
+}
 
+func (w Wizard) handleNavigation(msg messages.NavigationMsg) (Wizard, tea.Cmd) {
 	// Handle step-specific navigation
 	switch w.step {
 	case StepSourceSelect, StepTargetSelect:
-		if keys.HandleScrollNavigation(key, w.Scroller) {
-			return w, nil
-		}
+		w.applyNavToScroller(msg, w.Scroller)
 	case StepPreview:
-		if keys.HandleScrollNavigation(key, w.diffScroller) {
-			return w, nil
-		}
+		w.applyNavToScroller(msg, w.diffScroller)
 	case StepApply, StepComplete:
 		// No navigation in these steps
 	}
+	return w, nil
+}
 
-	// Handle action keys
-	return w.handleActionKey(key)
+func (w Wizard) applyNavToScroller(msg messages.NavigationMsg, scroller *panel.Scroller) {
+	switch msg.Direction {
+	case messages.NavUp:
+		scroller.CursorUp()
+	case messages.NavDown:
+		scroller.CursorDown()
+	case messages.NavPageUp:
+		scroller.PageUp()
+	case messages.NavPageDown:
+		scroller.PageDown()
+	case messages.NavHome:
+		scroller.CursorToStart()
+	case messages.NavEnd:
+		scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for migration wizard
+	}
 }
 
 func (w Wizard) handleActionKey(key string) (Wizard, tea.Cmd) {

@@ -20,7 +20,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/theme"
 	"github.com/tj-smith47/shelly-cli/internal/tui/generics"
 	"github.com/tj-smith47/shelly-cli/internal/tui/helpers"
-	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/panel"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/styles"
@@ -233,6 +233,69 @@ func (m ListModel) handleMessage(msg tea.Msg) (ListModel, tea.Cmd) {
 		return m.handleExport(msg)
 	case ImportSceneMsg:
 		return m.handleImport(msg)
+	// Action messages from context system
+	case messages.NavigationMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleNavigation(msg)
+	case messages.ActivateRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		return m.activateScene()
+	case messages.ViewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		return m.viewScene()
+	case messages.EditRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		return m.editScene()
+	case messages.DeleteRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		return m.handleDelete()
+	case messages.NewRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		return m, func() tea.Msg { return CreateSceneMsg{} }
+	case messages.CaptureRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		return m, func() tea.Msg { return CaptureSceneMsg{} }
+	case messages.ExportRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.exportScene()
+	case messages.ImportRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		return m.importScene()
+	case messages.RefreshRequestMsg:
+		if !m.focused {
+			return m, nil
+		}
+		m.pendingDelete = ""
+		m.statusMsg = ""
+		m.loading = true
+		return m, tea.Batch(m.Loader.Tick(), m.loadScenes())
 	case tea.KeyPressMsg:
 		if !m.focused {
 			return m, nil
@@ -282,73 +345,49 @@ func (m ListModel) handleImport(msg ImportSceneMsg) (ListModel, tea.Cmd) {
 	return m, m.loadScenes()
 }
 
+func (m ListModel) handleNavigation(msg messages.NavigationMsg) (ListModel, tea.Cmd) {
+	m.pendingDelete = "" // Clear pending delete on navigation
+	switch msg.Direction {
+	case messages.NavUp:
+		m.Scroller.CursorUp()
+	case messages.NavDown:
+		m.Scroller.CursorDown()
+	case messages.NavPageUp:
+		m.Scroller.PageUp()
+	case messages.NavPageDown:
+		m.Scroller.PageDown()
+	case messages.NavHome:
+		m.Scroller.CursorToStart()
+	case messages.NavEnd:
+		m.Scroller.CursorToEnd()
+	case messages.NavLeft, messages.NavRight:
+		// Not applicable for this component
+	}
+	return m, nil
+}
+
+func (m ListModel) handleDelete() (ListModel, tea.Cmd) {
+	scene := m.selectedScene()
+	if scene == nil {
+		return m, nil
+	}
+	if m.pendingDelete == scene.Name {
+		// Second press - confirm delete
+		m.pendingDelete = ""
+		return m.deleteScene()
+	}
+	// First press - mark pending
+	m.pendingDelete = scene.Name
+	return m, nil
+}
+
 func (m ListModel) handleKey(msg tea.KeyPressMsg) (ListModel, tea.Cmd) {
-	// Handle navigation keys first
-	if keys.HandleScrollNavigation(msg.String(), m.Scroller) {
-		m.pendingDelete = "" // Clear pending delete on navigation
-		return m, nil
-	}
-
-	// Handle action keys
-	switch msg.String() {
-	case "a":
-		// Activate scene
-		m.pendingDelete = ""
-		return m.activateScene()
-	case "v":
-		// View scene details
-		m.pendingDelete = ""
-		return m.viewScene()
-	case "enter", "e":
-		// Edit scene
-		m.pendingDelete = ""
-		return m.editScene()
-	case "d":
-		// Delete scene - requires double press for confirmation
-		scene := m.selectedScene()
-		if scene == nil {
-			return m, nil
-		}
-		if m.pendingDelete == scene.Name {
-			// Second press - confirm delete
-			m.pendingDelete = ""
-			return m.deleteScene()
-		}
-		// First press - mark pending
-		m.pendingDelete = scene.Name
-		return m, nil
-	case "n":
-		// New scene
-		m.pendingDelete = ""
-		return m, func() tea.Msg { return CreateSceneMsg{} }
-	case "C":
-		// Capture scene from device states
-		m.pendingDelete = ""
-		return m, func() tea.Msg { return CaptureSceneMsg{} }
-	case "x":
-		// Export scene
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.exportScene()
-	case "i":
-		// Import scene
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		return m.importScene()
-	case "r", "R":
-		// Refresh list
-		m.pendingDelete = ""
-		m.statusMsg = ""
-		m.loading = true
-		return m, tea.Batch(m.Loader.Tick(), m.loadScenes())
-	case "esc":
+	// Handle component-specific keys not covered by action messages
+	if msg.String() == "esc" && m.pendingDelete != "" {
 		// Cancel pending delete
-		if m.pendingDelete != "" {
-			m.pendingDelete = ""
-			return m, nil
-		}
+		m.pendingDelete = ""
+		return m, nil
 	}
-
 	return m, nil
 }
 

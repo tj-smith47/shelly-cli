@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -39,6 +38,7 @@ import (
 	"github.com/tj-smith47/shelly-cli/internal/tui/focus"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keyconst"
 	"github.com/tj-smith47/shelly-cli/internal/tui/keys"
+	"github.com/tj-smith47/shelly-cli/internal/tui/messages"
 	"github.com/tj-smith47/shelly-cli/internal/tui/rendering"
 	"github.com/tj-smith47/shelly-cli/internal/tui/tabs"
 	"github.com/tj-smith47/shelly-cli/internal/tui/views"
@@ -95,7 +95,6 @@ type Model struct {
 	ctx     context.Context
 	factory *cmdutil.Factory
 	cfg     *config.Config
-	keys    KeyMap
 	styles  Styles
 
 	// View management (5-tab system)
@@ -316,14 +315,10 @@ func New(ctx context.Context, f *cmdutil.Factory, opts Options) Model {
 	// Create tab bar
 	tabBar := tabs.New()
 
-	// Load keybindings from config or use defaults
-	keymap := KeyMapFromConfig(cfg)
-
 	m := Model{
 		ctx:             ctx,
 		factory:         f,
 		cfg:             cfg,
-		keys:            keymap,
 		styles:          DefaultStyles(),
 		viewManager:     vm,
 		tabBar:          tabBar,
@@ -770,9 +765,10 @@ func (m Model) updateComponents(msg tea.Msg) (Model, []tea.Cmd) {
 
 // handleKeyPressMsg handles keyboard input.
 func (m Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	// If help is visible, close on dismiss keys
+	// If help is visible, use ContextHelp for keybindings
 	if m.help.Visible() {
-		if key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Escape) || key.Matches(msg, m.keys.Quit) {
+		action := m.contextMap.Match(keys.ContextHelp, msg)
+		if action == keys.ActionEscape {
 			m.help = m.help.Hide()
 			return m, nil, true
 		}
@@ -1106,19 +1102,6 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 		}
 	}
 
-	// Handle global actions not in dispatchAction (view switching, quit, help, etc.)
-	if newModel, cmd, handled := m.handleGlobalKeys(msg); handled {
-		return newModel, cmd, true
-	}
-
-	// Device actions work on any tab with a device list (Dashboard, Monitor, Automation, Config)
-	// Try device actions BEFORE forwarding to views so t/o/f/r keys work everywhere
-	if m.hasDeviceList() {
-		if newModel, cmd, handled := m.handleDeviceActionKey(msg); handled {
-			return newModel, cmd, true
-		}
-	}
-
 	// For tabs with device list (Automation, Config, Monitor), handle focus management
 	if m.hasDeviceList() && !m.isDashboardActive() {
 		newModel, cmd := m.handleDeviceListTabKeyPress(msg)
@@ -1147,8 +1130,15 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 }
 
 // getCurrentKeyContext returns the appropriate keybinding context based on current state.
+// When device list is focused, always returns ContextDevices so device actions (d, c, t, etc.) work.
 func (m Model) getCurrentKeyContext() keys.Context {
-	// Check view-specific context first
+	// When device list is focused on any tab with device list, use Devices context
+	// This ensures device actions (detail, control, toggle, etc.) work regardless of tab
+	if m.hasDeviceList() && m.focusManager.IsFocused(focus.PanelDeviceList) {
+		return keys.ContextDevices
+	}
+
+	// Otherwise use tab/panel-specific context
 	switch m.tabBar.ActiveTabID() {
 	case tabs.TabDashboard:
 		// Dashboard uses panel-based context
@@ -1353,88 +1343,6 @@ func (m Model) selectEndpoint(methods []string) string {
 	return ""
 }
 
-// handleGlobalKeys handles quit, help, filter, command, tab switching, and escape keys.
-func (m Model) handleGlobalKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	switch {
-	case key.Matches(msg, m.keys.ForceQuit), key.Matches(msg, m.keys.Quit):
-		m.quitting = true
-		return m, tea.Quit, true
-	case key.Matches(msg, m.keys.Help):
-		m.help = m.help.SetSize(m.width, m.height)
-		m.help = m.help.SetContext(m.getHelpContext())
-		m.help = m.help.Toggle()
-		return m, nil, true
-	case key.Matches(msg, m.keys.Filter):
-		var cmd tea.Cmd
-		m.search, cmd = m.search.Activate()
-		m = m.updateViewManagerSize()
-		return m, cmd, true
-	case key.Matches(msg, m.keys.Command):
-		var cmd tea.Cmd
-		m.cmdMode, cmd = m.cmdMode.Activate()
-		m = m.updateViewManagerSize()
-		return m, cmd, true
-	case key.Matches(msg, m.keys.Refresh):
-		// Refresh selected device only
-		device := m.deviceList.SelectedDevice()
-		if device == nil {
-			return m, toast.Show("No device selected", toast.LevelWarning), true
-		}
-		return m, tea.Batch(
-			func() tea.Msg { return cache.DeviceRefreshMsg{Name: device.Device.Name} },
-			toast.Show(fmt.Sprintf("Refreshing %s", device.Device.Name), toast.LevelInfo),
-		), true
-	case key.Matches(msg, m.keys.RefreshAll):
-		// Refresh all devices
-		return m, tea.Batch(
-			func() tea.Msg { return cache.RefreshTickMsg{} },
-			toast.Show("Refreshing all devices", toast.LevelInfo),
-		), true
-	case key.Matches(msg, m.keys.Escape):
-		if m.filter != "" {
-			m.filter = ""
-			m.cursor = 0
-			m.deviceList = m.deviceList.SetFilter("")
-			m.deviceList = m.deviceList.SetCursor(0)
-			return m, nil, true
-		}
-	}
-
-	// Handle view switching keys
-	if newM, cmd, handled := m.handleViewSwitchKey(msg); handled {
-		return newM, cmd, true
-	}
-
-	return m, nil, false
-}
-
-// handleViewSwitchKey handles number keys for view switching.
-func (m Model) handleViewSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	type viewConfig struct {
-		tab   tabs.TabID
-		view  views.ViewID
-		focus bool
-	}
-	viewMap := map[*key.Binding]viewConfig{
-		&m.keys.View1: {tabs.TabDashboard, views.ViewDashboard, true},
-		&m.keys.View2: {tabs.TabAutomation, views.ViewAutomation, true},
-		&m.keys.View3: {tabs.TabConfig, views.ViewConfig, true},
-		&m.keys.View4: {tabs.TabManage, views.ViewManage, false},
-		&m.keys.View5: {tabs.TabMonitor, views.ViewMonitor, true},
-		&m.keys.View6: {tabs.TabFleet, views.ViewFleet, false},
-	}
-	for binding, cfg := range viewMap {
-		if key.Matches(msg, *binding) {
-			m.tabBar, _ = m.tabBar.SetActive(cfg.tab)
-			if cfg.focus {
-				m = m.setFocus(focus.PanelDeviceList)
-			}
-			return m, m.viewManager.SetActive(cfg.view), true
-		}
-	}
-	return m, nil, false
-}
-
 // dispatchAction handles an action from the context-sensitive keybinding system.
 // Returns the updated model, command, and whether the action was handled.
 func (m Model) dispatchAction(action keys.Action) (Model, tea.Cmd, bool) {
@@ -1458,8 +1366,18 @@ func (m Model) dispatchAction(action keys.Action) (Model, tea.Cmd, bool) {
 		return newModel, cmd, true
 	}
 
+	// Handle component-level actions (edit, new, delete, etc.)
+	// These are forwarded to views as action messages
+	if newModel, cmd, handled := m.dispatchComponentAction(action); handled {
+		return newModel, cmd, true
+	}
+
+	// Handle navigation actions - convert to NavigationMsg
+	if newModel, cmd, handled := m.dispatchNavigationAction(action); handled {
+		return newModel, cmd, true
+	}
+
 	// Actions not directly handled - let existing handlers deal with them
-	// This includes: ActionNone, navigation, events panel actions, etc.
 	return m, nil, false
 }
 
@@ -1489,7 +1407,22 @@ func (m Model) dispatchGlobalAction(action keys.Action) (Model, tea.Cmd, bool) {
 		return m, cmd, true
 
 	case keys.ActionRefresh:
-		return m, func() tea.Msg { return cache.RefreshTickMsg{} }, true
+		// Refresh selected device only
+		device := m.deviceList.SelectedDevice()
+		if device == nil {
+			return m, toast.Show("No device selected", toast.LevelWarning), true
+		}
+		return m, tea.Batch(
+			func() tea.Msg { return cache.DeviceRefreshMsg{Name: device.Device.Name} },
+			toast.Show(fmt.Sprintf("Refreshing %s", device.Device.Name), toast.LevelInfo),
+		), true
+
+	case keys.ActionRefreshAll:
+		// Refresh all devices
+		return m, tea.Batch(
+			func() tea.Msg { return cache.RefreshTickMsg{} },
+			toast.Show("Refreshing all devices", toast.LevelInfo),
+		), true
 
 	case keys.ActionNextPanel:
 		// Only handle panel cycling for Dashboard - other tabs handle it in their views
@@ -1658,7 +1591,7 @@ func (m Model) dispatchPanelAction(action keys.Action) (Model, tea.Cmd, bool) {
 	}
 }
 
-// dispatchDeviceKeyAction handles device control actions (toggle, on, off, reboot, enter, browser).
+// dispatchDeviceKeyAction handles device control actions (toggle, on, off, reboot, enter, browser, control, detail).
 func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool) {
 	switch action {
 	case keys.ActionToggle:
@@ -1677,6 +1610,10 @@ func (m Model) dispatchDeviceKeyAction(action keys.Action) (Model, tea.Cmd, bool
 		return m.dispatchEnterAction()
 	case keys.ActionBrowser:
 		return m.dispatchBrowserAction()
+	case keys.ActionControl:
+		return m.dispatchControlAction()
+	case keys.ActionDetail:
+		return m.dispatchDetailAction()
 	default:
 		return m, nil, false
 	}
@@ -1715,6 +1652,87 @@ func (m Model) dispatchEnterAction() (Model, tea.Cmd, bool) {
 	}
 	// Default: forward to view
 	return m, nil, false
+}
+
+// dispatchControlAction opens the control panel for the selected device.
+func (m Model) dispatchControlAction() (Model, tea.Cmd, bool) {
+	if !m.hasDeviceList() {
+		return m, nil, false
+	}
+	return m.showControlPanel()
+}
+
+// dispatchDetailAction opens the device detail overlay for the selected device.
+func (m Model) dispatchDetailAction() (Model, tea.Cmd, bool) {
+	if !m.hasDeviceList() {
+		return m, nil, false
+	}
+	return m.showDeviceDetail()
+}
+
+// dispatchComponentAction handles component-level actions by converting them to
+// action messages and forwarding them to the view manager.
+// This allows components to handle semantic actions instead of raw key strings.
+func (m Model) dispatchComponentAction(action keys.Action) (Model, tea.Cmd, bool) {
+	var msg tea.Msg
+
+	switch action {
+	case keys.ActionEdit:
+		msg = messages.EditRequestMsg{}
+	case keys.ActionNew:
+		msg = messages.NewRequestMsg{}
+	case keys.ActionDelete:
+		msg = messages.DeleteRequestMsg{}
+	case keys.ActionCopy:
+		msg = messages.CopyRequestMsg{}
+	case keys.ActionPause:
+		msg = messages.PauseRequestMsg{}
+	case keys.ActionClear:
+		msg = messages.ClearRequestMsg{}
+	case keys.ActionExpand:
+		msg = messages.ExpandRequestMsg{}
+	case keys.ActionFilterToggle:
+		msg = messages.FilterToggleRequestMsg{}
+	case keys.ActionSort:
+		msg = messages.SortRequestMsg{}
+	default:
+		return m, nil, false
+	}
+
+	// Forward the action message to the view manager
+	cmd := m.viewManager.Update(msg)
+	return m, cmd, true
+}
+
+// dispatchNavigationAction converts navigation actions to NavigationMsg and forwards to views.
+// This provides a unified navigation interface for components.
+func (m Model) dispatchNavigationAction(action keys.Action) (Model, tea.Cmd, bool) {
+	var dir messages.NavDirection
+
+	switch action {
+	case keys.ActionUp:
+		dir = messages.NavUp
+	case keys.ActionDown:
+		dir = messages.NavDown
+	case keys.ActionLeft:
+		dir = messages.NavLeft
+	case keys.ActionRight:
+		dir = messages.NavRight
+	case keys.ActionPageUp:
+		dir = messages.NavPageUp
+	case keys.ActionPageDown:
+		dir = messages.NavPageDown
+	case keys.ActionHome:
+		dir = messages.NavHome
+	case keys.ActionEnd:
+		dir = messages.NavEnd
+	default:
+		return m, nil, false
+	}
+
+	// Forward navigation to the view manager
+	cmd := m.viewManager.Update(messages.NavigationMsg{Direction: dir})
+	return m, cmd, true
 }
 
 // navDirection represents a navigation direction for cursor movement.
@@ -1907,45 +1925,8 @@ func (m Model) syncDeviceInfo() Model {
 	return m
 }
 
-// handleDeviceActionKey handles device action key presses.
-func (m Model) handleDeviceActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	// Handle 'd' to show device detail overlay
-	if msg.String() == "d" || msg.String() == "D" {
-		return m.showDeviceDetail()
-	}
-
-	// Handle 'c' to show control panel overlay
-	if msg.String() == "c" {
-		return m.showControlPanel()
-	}
-
-	var action string
-	switch {
-	case key.Matches(msg, m.keys.Toggle):
-		// When focused on deviceInfo panel, let it handle toggle for individual component control
-		// This allows space/t to toggle the selected component instead of all components
-		if m.focusManager.IsFocused(focus.PanelDeviceInfo) {
-			return m, nil, false // Fall through to handleNavigation -> deviceInfo.Update
-		}
-		action = actionToggle
-	case key.Matches(msg, m.keys.TurnOn):
-		action = actionOn
-	case key.Matches(msg, m.keys.TurnOff):
-		action = actionOff
-	case key.Matches(msg, m.keys.Reboot):
-		action = actionReboot
-	default:
-		return m, nil, false
-	}
-
-	if cmd := m.executeDeviceAction(action); cmd != nil {
-		return m, cmd, true
-	}
-	return m, nil, false
-}
-
 // showDeviceDetail shows the device detail overlay for the selected device.
-func (m Model) showDeviceDetail() (tea.Model, tea.Cmd, bool) {
+func (m Model) showDeviceDetail() (Model, tea.Cmd, bool) {
 	devices := m.getFilteredDevices()
 	if m.cursor >= len(devices) || m.cursor < 0 {
 		return m, nil, false
@@ -1966,7 +1947,7 @@ func (m Model) showDeviceDetail() (tea.Model, tea.Cmd, bool) {
 }
 
 // showControlPanel shows the control panel overlay for the selected device's component.
-func (m Model) showControlPanel() (tea.Model, tea.Cmd, bool) {
+func (m Model) showControlPanel() (Model, tea.Cmd, bool) {
 	devices := m.getFilteredDevices()
 	if m.cursor >= len(devices) || m.cursor < 0 {
 		return m, nil, false
