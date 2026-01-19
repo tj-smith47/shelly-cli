@@ -555,19 +555,12 @@ func (es *EventStream) handleCoIoTStatus(deviceID string, status *gen1.CoIoTStat
 	es.coiotMACToNameMu.RUnlock()
 
 	if !found {
-		// Try to match by iterating connections (first time we see this device)
-		es.mu.RLock()
-		for connName, conn := range es.connections {
-			if conn.generation == 1 {
-				// For now, we can't easily match MAC to name without additional info
-				// The deviceID format is like "shelly1-AABBCC" where AABBCC is part of MAC
-				// We'll need to resolve this via device info
-				_ = connName
-			}
-		}
-		es.mu.RUnlock()
+		// CoIoT messages may use shortened MAC (last 6 chars) while we registered with full MAC.
+		// Example: incoming "shbduo-1-d12965" should match registered "shbduo-1-98f4abd12965"
+		name, found = es.matchShortMAC(deviceID)
+	}
 
-		// If we still can't find it, skip (device not in our config)
+	if !found {
 		debug.TraceEvent("coiot: unknown device %s, skipping", deviceID)
 		return
 	}
@@ -583,6 +576,38 @@ func (es *EventStream) handleCoIoTStatus(deviceID string, status *gen1.CoIoTStat
 	debug.TraceEvent("coiot: publishing status for %s", name)
 	es.bus.Publish(events.NewFullStatusEvent(name, statusJSON).
 		WithSource(events.EventSourceLocal))
+}
+
+// matchShortMAC attempts to match an incoming deviceID with shortened MAC to a registered device.
+// CoIoT messages may use 6-char MAC suffix instead of full 12-char MAC.
+// Example: incoming "shbduo-1-d12965" matches registered "shbduo-1-98f4abd12965".
+func (es *EventStream) matchShortMAC(deviceID string) (name string, found bool) {
+	parts := strings.SplitN(deviceID, "-", 3)
+	if len(parts) < 3 {
+		return "", false
+	}
+
+	incomingType := parts[0] + "-" + parts[1] // e.g., "shbduo-1"
+	incomingSuffix := parts[2]                // e.g., "d12965"
+
+	es.coiotMACToNameMu.RLock()
+	for registeredID, registeredName := range es.coiotMACToName {
+		if !strings.HasPrefix(registeredID, incomingType+"-") {
+			continue
+		}
+		if !strings.HasSuffix(registeredID, incomingSuffix) {
+			continue
+		}
+		// Found a match - cache the short form so subsequent lookups are instant
+		es.coiotMACToNameMu.RUnlock()
+		es.coiotMACToNameMu.Lock()
+		es.coiotMACToName[deviceID] = registeredName
+		es.coiotMACToNameMu.Unlock()
+		debug.TraceEvent("coiot: matched short MAC %s to %s (%s)", deviceID, registeredID, registeredName)
+		return registeredName, true
+	}
+	es.coiotMACToNameMu.RUnlock()
+	return "", false
 }
 
 // RegisterCoIoTDevice registers a device MAC for CoIoT status matching.

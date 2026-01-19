@@ -412,3 +412,107 @@ func TestEventStream_RemoveDevice_NotExists(t *testing.T) {
 	// Should not panic when removing non-existent device
 	es.RemoveDevice("non-existent")
 }
+
+func TestEventStream_matchShortMAC(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		registered   map[string]string // map[mac]name
+		incoming     string
+		wantName     string
+		wantFound    bool
+		wantCacheKey string // key that should be added to cache
+	}{
+		{
+			name: "exact match not needed - short to full MAC",
+			registered: map[string]string{
+				"shbduo-1-98f4abd12965": "GB",
+			},
+			incoming:     "shbduo-1-d12965",
+			wantName:     "GB",
+			wantFound:    true,
+			wantCacheKey: "shbduo-1-d12965",
+		},
+		{
+			name: "shsw-pm short MAC match",
+			registered: map[string]string{
+				"shsw-pm-c45bbe6c293c": "Lydia's Office",
+			},
+			incoming:     "shsw-pm-6c293c",
+			wantName:     "Lydia's Office",
+			wantFound:    true,
+			wantCacheKey: "shsw-pm-6c293c",
+		},
+		{
+			name: "no match - different type prefix",
+			registered: map[string]string{
+				"shbduo-1-98f4abd12965": "GB",
+			},
+			incoming:  "shsw-1-d12965",
+			wantName:  "",
+			wantFound: false,
+		},
+		{
+			name: "no match - different MAC suffix",
+			registered: map[string]string{
+				"shbduo-1-98f4abd12965": "GB",
+			},
+			incoming:  "shbduo-1-ffffff",
+			wantName:  "",
+			wantFound: false,
+		},
+		{
+			name: "invalid format - too few parts",
+			registered: map[string]string{
+				"shbduo-1-98f4abd12965": "GB",
+			},
+			incoming:  "shbduo-d12965",
+			wantName:  "",
+			wantFound: false,
+		},
+		{
+			name:       "no registered devices",
+			registered: map[string]string{},
+			incoming:   "shbduo-1-d12965",
+			wantName:   "",
+			wantFound:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider := &mockConnectionProvider{}
+			es := NewEventStream(provider)
+
+			// Pre-populate the MAC-to-name map
+			for mac, name := range tt.registered {
+				es.coiotMACToName[mac] = name
+			}
+
+			gotName, gotFound := es.matchShortMAC(tt.incoming)
+
+			if gotFound != tt.wantFound {
+				t.Errorf("matchShortMAC() found = %v, want %v", gotFound, tt.wantFound)
+			}
+			if gotName != tt.wantName {
+				t.Errorf("matchShortMAC() name = %q, want %q", gotName, tt.wantName)
+			}
+
+			// Verify cache was updated for successful matches
+			if tt.wantFound && tt.wantCacheKey != "" {
+				es.coiotMACToNameMu.RLock()
+				cachedName, cached := es.coiotMACToName[tt.wantCacheKey]
+				es.coiotMACToNameMu.RUnlock()
+				if !cached {
+					t.Errorf("expected %q to be cached", tt.wantCacheKey)
+				}
+				if cachedName != tt.wantName {
+					t.Errorf("cached name = %q, want %q", cachedName, tt.wantName)
+				}
+			}
+		})
+	}
+}
