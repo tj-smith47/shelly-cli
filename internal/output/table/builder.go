@@ -15,12 +15,13 @@ package table
 
 // Builder provides a fluent API for constructing tables.
 type Builder struct {
-	headers     []string
-	rows        [][]string
-	separators  map[int]int // row index -> starting column for separator
-	style       *Style
-	hideHeaders bool
-	rowLines    bool
+	headers      []string
+	rows         [][]string
+	separators   map[int]int // row index -> starting column for separator
+	style        *Style
+	hideHeaders  bool
+	rowLines     bool
+	mergeHeaders bool
 }
 
 // NewBuilder creates a new table builder with the specified headers.
@@ -115,6 +116,14 @@ func (b *Builder) WithRowLines() *Builder {
 	return b
 }
 
+// MergeEmptyHeaders merges empty header cells with the previous non-empty header.
+// This creates a visual spanning effect in the header row.
+// Returns the builder for method chaining.
+func (b *Builder) MergeEmptyHeaders() *Builder {
+	b.mergeHeaders = true
+	return b
+}
+
 // Build constructs and returns the final Table.
 func (b *Builder) Build() *Table {
 	t := New(b.headers...)
@@ -137,6 +146,11 @@ func (b *Builder) Build() *Table {
 	// Apply row lines
 	if b.rowLines {
 		t.WithRowLines()
+	}
+
+	// Apply header merging
+	if b.mergeHeaders {
+		t.MergeEmptyHeaders()
 	}
 
 	// Apply separators

@@ -65,7 +65,7 @@ func DisplayConfigTable(ios *iostreams.IOStreams, configData any) error {
 		builder.AddRow(cells...)
 	}
 
-	tbl := builder.WithModeStyle(ios).Build()
+	tbl := builder.WithModeStyle(ios).MergeEmptyHeaders().Build()
 	if err := tbl.PrintTo(ios.Out); err != nil {
 		ios.DebugErr("print config table", err)
 	}

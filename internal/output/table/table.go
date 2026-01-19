@@ -22,12 +22,13 @@ const (
 
 // Table represents a formatted table.
 type Table struct {
-	headers     []string
-	rows        [][]string
-	style       Style
-	hideHeaders bool        // Hide header row entirely (for --no-headers)
-	rowLines    bool        // Show lines between rows
-	separators  map[int]int // Row index -> starting column for separator
+	headers      []string
+	rows         [][]string
+	style        Style
+	hideHeaders  bool        // Hide header row entirely (for --no-headers)
+	rowLines     bool        // Show lines between rows
+	separators   map[int]int // Row index -> starting column for separator
+	mergeHeaders bool        // Merge empty header cells with previous (span effect)
 }
 
 // New creates a new table with the given headers.
@@ -81,6 +82,13 @@ func (t *Table) WithRowLines() *Table {
 	return t
 }
 
+// MergeEmptyHeaders merges empty header cells with the previous non-empty header.
+// This creates a visual spanning effect in the header row.
+func (t *Table) MergeEmptyHeaders() *Table {
+	t.mergeHeaders = true
+	return t
+}
+
 // AddRow adds a row to the table.
 func (t *Table) AddRow(cells ...string) *Table {
 	// Ensure row has same number of columns as headers
@@ -114,50 +122,14 @@ func (t *Table) Render() string {
 	}
 
 	headers := t.prepareHeaders()
-
-	border := borderStyles[t.style.BorderStyle]
-	if !t.style.ShowBorder {
-		border = lipgloss.HiddenBorder()
-	}
-
-	// Pre-calculate which rows need a bottom border and at which starting column.
-	// Key = row index, value = starting column for the border.
-	bottomBorderStartCol := make(map[int]int)
-	for sepIdx, startCol := range t.separators {
-		if sepIdx > 0 {
-			bottomBorderStartCol[sepIdx-1] = startCol
-		}
-	}
+	border := t.getBorder()
+	bottomBorderStartCol := t.calcBottomBorders()
 
 	tbl := lgtable.New().
 		Border(border).
 		BorderStyle(t.style.Border).
 		BorderRow(t.rowLines).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			if row == lgtable.HeaderRow {
-				return t.style.Header.Padding(0, t.style.Padding)
-			}
-
-			var style lipgloss.Style
-			switch {
-			case col == 0:
-				style = t.style.PrimaryCell
-			case row%2 == 0:
-				style = t.style.Cell
-			default:
-				style = t.style.AltCell
-			}
-
-			style = style.Padding(0, t.style.Padding)
-
-			// Add bottom border for cells at or after the separator start column
-			if startCol, hasBorder := bottomBorderStartCol[row]; hasBorder && col >= startCol {
-				style = style.Border(lipgloss.NormalBorder(), false, false, true, false).
-					BorderForeground(t.style.Border.GetForeground())
-			}
-
-			return style
-		})
+		StyleFunc(t.cellStyleFunc(bottomBorderStartCol))
 
 	if !t.hideHeaders {
 		tbl = tbl.Headers(headers...)
@@ -169,7 +141,64 @@ func (t *Table) Render() string {
 	if rendered != "" && rendered[len(rendered)-1] != '\n' {
 		rendered += "\n"
 	}
+
+	// Post-process to merge empty header cells
+	if t.mergeHeaders && !t.hideHeaders {
+		rendered = t.mergeHeaderCells(rendered, headers)
+	}
+
 	return rendered
+}
+
+// getBorder returns the border style for the table.
+func (t *Table) getBorder() lipgloss.Border {
+	if !t.style.ShowBorder {
+		return lipgloss.HiddenBorder()
+	}
+	return borderStyles[t.style.BorderStyle]
+}
+
+// calcBottomBorders calculates which rows need bottom borders and at which column.
+func (t *Table) calcBottomBorders() map[int]int {
+	result := make(map[int]int)
+	for sepIdx, startCol := range t.separators {
+		if sepIdx > 0 {
+			result[sepIdx-1] = startCol
+		}
+	}
+	return result
+}
+
+// cellStyleFunc returns a StyleFunc for cell styling with separator support.
+func (t *Table) cellStyleFunc(bottomBorderStartCol map[int]int) func(row, col int) lipgloss.Style {
+	return func(row, col int) lipgloss.Style {
+		if row == lgtable.HeaderRow {
+			return t.style.Header.Padding(0, t.style.Padding)
+		}
+
+		style := t.selectCellStyle(row, col)
+		style = style.Padding(0, t.style.Padding)
+
+		// Add bottom border for cells at or after the separator start column
+		if startCol, hasBorder := bottomBorderStartCol[row]; hasBorder && col >= startCol {
+			style = style.Border(lipgloss.NormalBorder(), false, false, true, false).
+				BorderForeground(t.style.Border.GetForeground())
+		}
+
+		return style
+	}
+}
+
+// selectCellStyle returns the appropriate style for a cell based on position.
+func (t *Table) selectCellStyle(row, col int) lipgloss.Style {
+	switch {
+	case col == 0:
+		return t.style.PrimaryCell
+	case row%2 == 0:
+		return t.style.Cell
+	default:
+		return t.style.AltCell
+	}
 }
 
 // prepareHeaders returns headers, uppercased if configured.
@@ -182,6 +211,89 @@ func (t *Table) prepareHeaders() []string {
 		headers[i] = strings.ToUpper(h)
 	}
 	return headers
+}
+
+// mergeHeaderCells post-processes the rendered table to merge empty header cells.
+// It replaces column separators before empty headers with spaces.
+func (t *Table) mergeHeaderCells(rendered string, headers []string) string {
+	lines := strings.Split(rendered, "\n")
+	if len(lines) < 3 {
+		return rendered
+	}
+
+	// Find which columns have empty headers (these should merge with previous)
+	emptyHeaderCols := make(map[int]bool)
+	for i, h := range headers {
+		if h == "" {
+			emptyHeaderCols[i] = true
+		}
+	}
+
+	if len(emptyHeaderCols) == 0 {
+		return rendered
+	}
+
+	// Process top border (line 0), header row (line 1), and header separator (line 2)
+	// Line 0 is top border, line 1 is header, line 2 is header separator
+	topHorzChar := detectHorizontalChar(lines[0])
+	lines[0] = t.mergeLineColumns(lines[0], emptyHeaderCols, topHorzChar)
+	lines[1] = t.mergeLineColumns(lines[1], emptyHeaderCols, ' ')
+	sepHorzChar := detectHorizontalChar(lines[2])
+	lines[2] = t.mergeLineColumns(lines[2], emptyHeaderCols, sepHorzChar)
+
+	return strings.Join(lines, "\n")
+}
+
+// detectHorizontalChar finds the horizontal border character used in a line.
+func detectHorizontalChar(line string) rune {
+	for _, r := range line {
+		if r == '─' || r == '-' || r == '━' || r == '═' {
+			return r
+		}
+	}
+	return '-' // default
+}
+
+// mergeLineColumns replaces column separators with the given character for empty header columns.
+func (t *Table) mergeLineColumns(line string, emptyCols map[int]bool, replacement rune) string {
+	runes := []rune(line)
+	col := 0
+	inCell := false
+
+	for i, r := range runes {
+		if isColumnBoundary(r) {
+			if inCell {
+				// This is a separator after a cell, moving to next column
+				col++
+				if emptyCols[col] {
+					runes[i] = replacement
+				}
+			}
+			inCell = true
+		}
+	}
+
+	return string(runes)
+}
+
+// isColumnBoundary returns true if the rune is a column separator or junction character.
+func isColumnBoundary(r rune) bool {
+	return isCellSeparator(r) || isJunctionChar(r)
+}
+
+// isCellSeparator returns true if the rune is a vertical cell separator.
+func isCellSeparator(r rune) bool {
+	return r == '│' || r == '|'
+}
+
+// isJunctionChar returns true if the rune is a border junction character.
+func isJunctionChar(r rune) bool {
+	switch r {
+	case '+', '┼', '├', '┬', '┴', '┤', '┐', '┘', '└', '┌', '╮', '╯', '╰', '╭':
+		return true
+	default:
+		return false
+	}
 }
 
 // renderPlain renders the table with aligned columns but no borders for --plain mode.
