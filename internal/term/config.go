@@ -190,10 +190,13 @@ func sortConfigRows(rows []configRow) {
 }
 
 // configTableHeaders builds header names for the config table.
+// Uses "Setting" for all key columns (first only displays text) and "Value" for the last.
 func configTableHeaders(maxDepth int) []string {
 	headers := make([]string, maxDepth+1)
-	for i := range maxDepth {
-		headers[i] = fmt.Sprintf("Key%d", i+1)
+	headers[0] = "Setting"
+	// Leave remaining key columns empty (visual spanning effect)
+	for i := 1; i < maxDepth; i++ {
+		headers[i] = ""
 	}
 	headers[maxDepth] = "Value"
 	return headers

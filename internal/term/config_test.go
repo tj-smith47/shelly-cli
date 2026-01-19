@@ -28,7 +28,10 @@ func TestDisplayConfigTable(t *testing.T) {
 		}
 
 		result := out.String()
-		// Check for key columns and value
+		// Check for headers
+		if !strings.Contains(result, "SETTING") {
+			t.Errorf("output should contain 'SETTING' header, got: %s", result)
+		}
 		if !strings.Contains(result, "VALUE") {
 			t.Errorf("output should contain 'VALUE' header, got: %s", result)
 		}
