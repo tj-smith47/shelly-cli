@@ -135,6 +135,10 @@ and controlling Shelly devices on your local network.`,
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
+		// Silence Cobra's automatic usage/error printing - we handle it ourselves
+		// This prevents printing help text on runtime errors (network failures, etc.)
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 )
 
@@ -188,6 +192,9 @@ func execute() int {
 			// Exit quietly for signal-based cancellation
 			return 130 // 128 + SIGINT (2)
 		}
+		// Print error with themed coloring: [ERROR]: message
+		errorLabel := theme.StatusError().Render("[ERROR]")
+		fmt.Fprintf(os.Stderr, "%s: %s\n", errorLabel, err.Error())
 		return 1
 	}
 

@@ -96,9 +96,14 @@ func run(ctx context.Context, opts *Options) error {
 		}
 		ios.Debug("calling HTTP path %s on %s", opts.Method, opts.Device)
 
-		httpResult, err := svc.RawHTTPCall(ctx, opts.Device, opts.Method)
+		var httpResult []byte
+		err := cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Calling %s...", opts.Method), func(ctx context.Context) error {
+			var callErr error
+			httpResult, callErr = svc.RawHTTPCall(ctx, opts.Device, opts.Method)
+			return callErr
+		})
 		if err != nil {
-			return fmt.Errorf("HTTP call failed: %w", err)
+			return cmdutil.EnhanceDeviceError(err, opts.Device)
 		}
 
 		// Try to parse as JSON for pretty printing
@@ -112,9 +117,14 @@ func run(ctx context.Context, opts *Options) error {
 	}
 
 	// RPC method call (containing .) - must be Gen2+ device
-	isGen1, _, err := svc.IsGen1Device(ctx, opts.Device)
+	var isGen1 bool
+	err := cmdutil.RunWithSpinner(ctx, ios, "Detecting device generation...", func(ctx context.Context) error {
+		var detectErr error
+		isGen1, _, detectErr = svc.IsGen1Device(ctx, opts.Device)
+		return detectErr
+	})
 	if err != nil {
-		return fmt.Errorf("failed to detect device generation: %w", err)
+		return cmdutil.EnhanceDeviceError(err, opts.Device)
 	}
 	if isGen1 {
 		return fmt.Errorf("RPC methods are for Gen2+ devices only\n"+
@@ -132,9 +142,14 @@ func run(ctx context.Context, opts *Options) error {
 
 	ios.Debug("calling RPC method %s on %s with params: %v", opts.Method, opts.Device, params)
 
-	result, err := svc.RawRPC(ctx, opts.Device, opts.Method, params)
+	var result any
+	err = cmdutil.RunWithSpinner(ctx, ios, fmt.Sprintf("Calling %s...", opts.Method), func(ctx context.Context) error {
+		var rpcErr error
+		result, rpcErr = svc.RawRPC(ctx, opts.Device, opts.Method, params)
+		return rpcErr
+	})
 	if err != nil {
-		return fmt.Errorf("RPC call failed: %w", err)
+		return cmdutil.EnhanceDeviceError(err, opts.Device)
 	}
 
 	return term.PrintAPIResult(ios, result, opts.Raw)
