@@ -169,14 +169,17 @@ func TestNewCommand_FlagParsing(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Cannot run in parallel - modifies global GitHubAPIBaseURL
 func TestRun_DevelopmentVersion_Check(t *testing.T) {
-	t.Parallel()
-
 	// In test environment, version.Version is "dev" by default
 	// which makes IsDevelopment() return true
 	if !version.IsDevelopment() {
 		t.Skip("Test requires development version")
 	}
+
+	// Use mock server to avoid GitHub API rate limiting
+	release := mockRelease("v1.0.0", false)
+	setupMockGitHubServer(t, &release, []github.Release{release})
 
 	tf := factory.NewTestFactory(t)
 	cmd := NewCommand(tf.Factory)
@@ -189,9 +192,9 @@ func TestRun_DevelopmentVersion_Check(t *testing.T) {
 	}
 
 	// Should show update available (dev is older than any release)
-	errOutput := tf.ErrString()
-	if !strings.Contains(errOutput, "Update available") {
-		t.Errorf("ErrOutput = %q, want to contain 'Update available'", errOutput)
+	output := tf.OutString()
+	if !strings.Contains(output, "v1.0.0") {
+		t.Errorf("Output = %q, want to contain 'v1.0.0'", output)
 	}
 }
 
