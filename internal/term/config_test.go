@@ -15,9 +15,11 @@ func TestDisplayConfigTable(t *testing.T) {
 		t.Parallel()
 		ios, out, _ := testIOStreams()
 		configData := map[string]any{
-			"switch:0": map[string]any{
-				"name": "Living Room Switch",
+			"defaults": map[string]any{
+				"timeout": 30,
+				"output":  "table",
 			},
+			"editor": "vim",
 		}
 
 		err := DisplayConfigTable(ios, configData)
@@ -25,9 +27,30 @@ func TestDisplayConfigTable(t *testing.T) {
 			t.Errorf("DisplayConfigTable returned error: %v", err)
 		}
 
-		output := out.String()
-		if !strings.Contains(output, "switch:0") {
-			t.Error("output should contain 'switch:0'")
+		result := out.String()
+		// Check for key columns and value
+		if !strings.Contains(result, "VALUE") {
+			t.Errorf("output should contain 'VALUE' header, got: %s", result)
+		}
+		// Check for keys and values
+		if !strings.Contains(result, "defaults") {
+			t.Errorf("output should contain 'defaults', got: %s", result)
+		}
+		if !strings.Contains(result, "timeout") {
+			t.Errorf("output should contain 'timeout', got: %s", result)
+		}
+		if !strings.Contains(result, "30") {
+			t.Errorf("output should contain value '30', got: %s", result)
+		}
+		if !strings.Contains(result, "editor") {
+			t.Errorf("output should contain 'editor', got: %s", result)
+		}
+		if !strings.Contains(result, "vim") {
+			t.Errorf("output should contain value 'vim', got: %s", result)
+		}
+		// Verify "defaults" only appears once (row-spanning effect)
+		if strings.Count(result, "defaults") != 1 {
+			t.Errorf("'defaults' should appear only once for row-spanning, got: %s", result)
 		}
 	})
 

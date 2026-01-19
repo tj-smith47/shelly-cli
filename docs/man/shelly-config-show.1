@@ -6,11 +6,15 @@ shelly-config-show - Display current CLI configuration
 
 
 .SH SYNOPSIS
-\fBshelly config show [flags]\fP
+\fBshelly config show [key] [flags]\fP
 
 
 .SH DESCRIPTION
-Display the complete Shelly CLI configuration file contents.
+Display CLI configuration settings.
+
+.PP
+Without arguments, shows all configuration.
+With a key argument, shows only that specific setting (supports dot notation).
 
 
 .SH OPTIONS
@@ -71,6 +75,12 @@ Display the complete Shelly CLI configuration file contents.
 .EX
   # Show all configuration
   shelly config show
+
+  # Show specific setting
+  shelly config show defaults.timeout
+
+  # Show a section
+  shelly config show defaults
 
   # Output as JSON
   shelly config show -o json

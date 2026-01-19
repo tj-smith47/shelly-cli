@@ -12,18 +12,23 @@ package table
 //	    WithStyle(table.PlainStyle()).
 //	    Build()
 //	t.PrintTo(w)
+
+// Builder provides a fluent API for constructing tables.
 type Builder struct {
 	headers     []string
 	rows        [][]string
+	separators  map[int]int // row index -> starting column for separator
 	style       *Style
 	hideHeaders bool
+	rowLines    bool
 }
 
 // NewBuilder creates a new table builder with the specified headers.
 func NewBuilder(headers ...string) *Builder {
 	return &Builder{
-		headers: headers,
-		rows:    [][]string{},
+		headers:    headers,
+		rows:       [][]string{},
+		separators: make(map[int]int),
 	}
 }
 
@@ -47,6 +52,20 @@ func (b *Builder) AddRows(rows [][]string) *Builder {
 	for _, row := range rows {
 		b.AddRow(row...)
 	}
+	return b
+}
+
+// AddSeparator adds a full-width separator line between sections.
+// Returns the builder for method chaining.
+func (b *Builder) AddSeparator() *Builder {
+	return b.AddSeparatorAt(0)
+}
+
+// AddSeparatorAt adds a separator line starting at the given column.
+// Columns before startCol will not have the separator.
+// Returns the builder for method chaining.
+func (b *Builder) AddSeparatorAt(startCol int) *Builder {
+	b.separators[len(b.rows)] = startCol
 	return b
 }
 
@@ -89,6 +108,13 @@ func (b *Builder) HideHeaders() *Builder {
 	return b
 }
 
+// WithRowLines enables lines between rows for better visual separation.
+// Returns the builder for method chaining.
+func (b *Builder) WithRowLines() *Builder {
+	b.rowLines = true
+	return b
+}
+
 // Build constructs and returns the final Table.
 func (b *Builder) Build() *Table {
 	t := New(b.headers...)
@@ -107,6 +133,14 @@ func (b *Builder) Build() *Table {
 	if b.hideHeaders {
 		t.HideHeaders()
 	}
+
+	// Apply row lines
+	if b.rowLines {
+		t.WithRowLines()
+	}
+
+	// Apply separators
+	t.separators = b.separators
 
 	return t
 }

@@ -25,7 +25,9 @@ type Table struct {
 	headers     []string
 	rows        [][]string
 	style       Style
-	hideHeaders bool // Hide header row entirely (for --no-headers)
+	hideHeaders bool        // Hide header row entirely (for --no-headers)
+	rowLines    bool        // Show lines between rows
+	separators  map[int]int // Row index -> starting column for separator
 }
 
 // New creates a new table with the given headers.
@@ -73,6 +75,12 @@ func (t *Table) HideHeaders() *Table {
 	return t
 }
 
+// WithRowLines enables lines between rows for better visual separation.
+func (t *Table) WithRowLines() *Table {
+	t.rowLines = true
+	return t
+}
+
 // AddRow adds a row to the table.
 func (t *Table) AddRow(cells ...string) *Table {
 	// Ensure row has same number of columns as headers
@@ -105,41 +113,58 @@ func (t *Table) Render() string {
 		return t.renderPlain()
 	}
 
-	// Prepare headers (uppercase if configured)
 	headers := t.prepareHeaders()
 
-	// Get the appropriate border style
 	border := borderStyles[t.style.BorderStyle]
 	if !t.style.ShowBorder {
 		border = lipgloss.HiddenBorder()
 	}
 
-	// Build lipgloss table with styling
+	// Pre-calculate which rows need a bottom border and at which starting column.
+	// Key = row index, value = starting column for the border.
+	bottomBorderStartCol := make(map[int]int)
+	for sepIdx, startCol := range t.separators {
+		if sepIdx > 0 {
+			bottomBorderStartCol[sepIdx-1] = startCol
+		}
+	}
+
 	tbl := lgtable.New().
 		Border(border).
 		BorderStyle(t.style.Border).
+		BorderRow(t.rowLines).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == lgtable.HeaderRow {
 				return t.style.Header.Padding(0, t.style.Padding)
 			}
-			// First column (Name) gets primary styling
-			if col == 0 {
-				return t.style.PrimaryCell.Padding(0, t.style.Padding)
+
+			var style lipgloss.Style
+			switch {
+			case col == 0:
+				style = t.style.PrimaryCell
+			case row%2 == 0:
+				style = t.style.Cell
+			default:
+				style = t.style.AltCell
 			}
-			if row%2 == 0 {
-				return t.style.Cell.Padding(0, t.style.Padding)
+
+			style = style.Padding(0, t.style.Padding)
+
+			// Add bottom border for cells at or after the separator start column
+			if startCol, hasBorder := bottomBorderStartCol[row]; hasBorder && col >= startCol {
+				style = style.Border(lipgloss.NormalBorder(), false, false, true, false).
+					BorderForeground(t.style.Border.GetForeground())
 			}
-			return t.style.AltCell.Padding(0, t.style.Padding)
+
+			return style
 		})
 
-	// Add headers unless hidden
 	if !t.hideHeaders {
 		tbl = tbl.Headers(headers...)
 	}
 
 	tbl = tbl.Rows(t.rows...)
 
-	// Ensure output ends with newline (lipgloss doesn't add one)
 	rendered := tbl.Render()
 	if rendered != "" && rendered[len(rendered)-1] != '\n' {
 		rendered += "\n"

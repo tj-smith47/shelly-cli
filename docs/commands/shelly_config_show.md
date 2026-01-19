@@ -4,10 +4,13 @@ Display current CLI configuration
 
 ### Synopsis
 
-Display the complete Shelly CLI configuration file contents.
+Display CLI configuration settings.
+
+Without arguments, shows all configuration.
+With a key argument, shows only that specific setting (supports dot notation).
 
 ```
-shelly config show [flags]
+shelly config show [key] [flags]
 ```
 
 ### Examples
@@ -15,6 +18,12 @@ shelly config show [flags]
 ```
   # Show all configuration
   shelly config show
+
+  # Show specific setting
+  shelly config show defaults.timeout
+
+  # Show a section
+  shelly config show defaults
 
   # Output as JSON
   shelly config show -o json

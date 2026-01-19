@@ -32,8 +32,8 @@ func TestNewCommand_Structure(t *testing.T) {
 	cmd := NewCommand(cmdutil.NewFactory())
 
 	// Test Use
-	if cmd.Use != "show" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "show")
+	if cmd.Use != "show [key]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "show [key]")
 	}
 
 	// Test Aliases
@@ -58,12 +58,15 @@ func TestNewCommand_Structure(t *testing.T) {
 		t.Error("Example is empty")
 	}
 
-	// Test Args - should accept no args
+	// Test Args - should accept 0 or 1 args
 	if err := cmd.Args(cmd, []string{}); err != nil {
 		t.Errorf("Args should accept no arguments: %v", err)
 	}
-	if err := cmd.Args(cmd, []string{"extra"}); err == nil {
-		t.Error("Args should reject extra arguments")
+	if err := cmd.Args(cmd, []string{"defaults.timeout"}); err != nil {
+		t.Errorf("Args should accept one argument: %v", err)
+	}
+	if err := cmd.Args(cmd, []string{"arg1", "arg2"}); err == nil {
+		t.Error("Args should reject more than one argument")
 	}
 }
 
